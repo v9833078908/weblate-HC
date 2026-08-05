@@ -132,11 +132,18 @@ A fork of upstream Weblate (`origin` = WeblateOrg/weblate, `fork` =
 v9833078908/weblate-HC) used to localize Hero Craft games. Three
 things exist here that are not upstream:
 
-- `weblate_customization/` (untracked) - a custom-check package following
-  `docs/admin/customize.rst`. Currently ships `GameMarkupCheck` (`check_id:
-  game-markup`), which asserts that Unity rich-text tags (`<color=#RRGGBB>`,
-  `<link>`, `<size=N>`, `<b>`) and engine placeholders (`{0}`, `%KEY%`) in the
-  target match the source multiset.
+- `weblate_customization/` (untracked) - a custom-check and custom-machinery
+  package following `docs/admin/customize.rst`. Ships `GameMarkupCheck`
+  (`check_id: game-markup`) in `checks.py`, which asserts that Unity rich-text
+  tags (`<color=#RRGGBB>`, `<link>`, `<size=N>`, `<b>`) and engine placeholders
+  (`{0}`, `%KEY%`) in the target match the source multiset, and
+  `RoutedLLMTranslation` in `machinery.py`, an OpenRouter-backed automatic
+  suggestion service that resolves the model ID per target language from a
+  `routing` JSON map. Routed LLM uses one OpenRouter key and a routing JSON
+  mapping target language codes to model IDs; project-level settings replace
+  the complete global service configuration, they do not merge only the
+  `routing` field. See "Deploying custom checks and machinery" below for how
+  both modules reach the dev container.
 - `weblate-mcp/` (untracked, its own git repo) - vendored `@mmntm/weblate-mcp`,
   a NestJS MCP server that talks to the local Weblate REST API. Its `.env` points
   at `http://localhost:3001/api/`.
@@ -201,23 +208,28 @@ pnpm dev                                       # nest start --watch
 pnpm test
 ```
 
-## Deploying the custom check
+## Deploying custom checks and machinery
 
 `weblate_customization/` is a `uv_build` package, but the dev container does not
 install it - the module is **copied** into `dev-docker/data/python/`, which is on
 the container's `sys.path` via `/app/data/python`. After editing
-`weblate_customization/src/weblate_customization/checks.py`:
+`weblate_customization/src/weblate_customization/checks.py` or
+`weblate_customization/src/weblate_customization/machinery.py`:
 
 ```sh
 cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
 ```
 
-The check is currently importable but **not registered**. To activate it, add
-`WEBLATE_ADD_CHECK: weblate_customization.checks.GameMarkupCheck` to the `weblate`
-service environment in `dev-docker/docker-compose.yml` and restart;
-`settings_docker.py` folds `WEBLATE_ADD_CHECK` / `WEBLATE_REMOVE_CHECK` into
-`CHECK_LIST` through `modify_env_list` (`weblate/utils/environment.py:182`). The
-same mechanism exists for `WEBLATE_ADD_ADDONS`, `WEBLATE_ADD_APPS`, etc.
+`GameMarkupCheck` is currently importable but **not registered**. To activate
+it, add `WEBLATE_ADD_CHECK: weblate_customization.checks.GameMarkupCheck` to
+the `weblate` service environment in `dev-docker/docker-compose.yml` and
+restart; `settings_docker.py` folds `WEBLATE_ADD_CHECK` / `WEBLATE_REMOVE_CHECK`
+into `CHECK_LIST` through `modify_env_list`
+(`weblate/utils/environment.py:182`). `RoutedLLMTranslation` is registered the
+same way through `WEBLATE_ADD_MACHINERY:
+weblate_customization.machinery.RoutedLLMTranslation`, already present in
+`dev-docker/docker-compose.yml`. The same mechanism exists for
+`WEBLATE_ADD_ADDONS`, `WEBLATE_ADD_APPS`, etc.
 
 `dev-docker/data/python/customize/` is a separate, older customization module -
 unrelated to `weblate_customization/`.

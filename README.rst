@@ -22,7 +22,10 @@ v9833078908 (``origin`` = `v9833078908/weblate-HC
     ``GameMarkupCheck`` (id проверки ``game-markup``), который убеждается, что
     Unity-теги форматирования (``<color=#RRGGBB>``, ``<link>``, ``<size=N>``,
     ``<b>``) и движковые плейсхолдеры (``{0}``, ``%KEY%``) в переводе совпадают
-    с исходником.
+    с исходником. Пакет также содержит ``RoutedLLMTranslation`` — OpenRouter-совместимый
+    движок автоматических предложений, который выбирает model ID по целевому
+    языку из JSON-карты ``routing``. Движок подключается через
+    ``WEBLATE_ADD_MACHINERY``.
 
 ``weblate-mcp/``
     Вендоренный MCP-сервер `@mmntm/weblate-mcp
@@ -190,6 +193,31 @@ Dev-инстанс целиком работает в Docker (``dev-docker/``) �
 ``settings_docker.py`` вкладывает ``WEBLATE_ADD_CHECK`` / ``WEBLATE_REMOVE_CHECK``
 в ``CHECK_LIST`` через ``modify_env_list`` (``weblate/utils/environment.py``).
 Тот же механизм есть для ``WEBLATE_ADD_ADDONS``, ``WEBLATE_ADD_APPS`` и т. д.
+
+Routed LLM
+----------
+
+``RoutedLLMTranslation`` находится в
+``weblate_customization/src/weblate_customization/machinery.py``. После каждой
+правки скопируйте пакет в каталог Python-модулей dev-контейнера:
+
+.. code-block:: sh
+
+   cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
+
+Для регистрации движка сервису ``weblate`` нужна переменная:
+
+.. code-block:: yaml
+
+   WEBLATE_ADD_MACHINERY: weblate_customization.machinery.RoutedLLMTranslation
+
+Настройки задаются глобально в ``/manage/machinery/``. Поле ``routing`` — это
+JSON-объект, где ключом служит код целевого языка или ``"*"`` для fallback, а
+значением — OpenRouter model ID. Точное совпадение проверяется до базового кода
+языка и fallback. Карта без ``"*"`` допустима.
+
+Project-level настройка заменяет весь глобальный конфиг сервиса, поэтому для
+неё нужно повторно задать API key, ``base_url`` и остальные нужные поля.
 
 MCP-сервер
 ----------
