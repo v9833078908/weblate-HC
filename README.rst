@@ -1,7 +1,7 @@
 HCGameLoc
 =========
 
-Внутренний сервис непрерывной локализации игры **Hero Craft Space Arena**,
+Внутренний сервис непрерывной локализации проектов **Hero Craft Space**,
 построенный на форке `Weblate <https://weblate.org/>`_. Поддерживается
 v9833078908 (``origin`` = `v9833078908/weblate-HC
 <https://github.com/v9833078908/weblate-HC>`_).
