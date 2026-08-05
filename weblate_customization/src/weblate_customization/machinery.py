@@ -7,7 +7,8 @@
 from __future__ import annotations
 
 import re
-from typing import ClassVar, cast
+from contextvars import ContextVar
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -15,8 +16,17 @@ from django.utils.translation import gettext, gettext_lazy, pgettext_lazy
 
 from weblate.lang.forms import validate_language_code
 from weblate.lang.models import Language
+from weblate.machinery.base import (
+    MACHINERY_DEFAULT_THRESHOLD,
+    MachineTranslationError,
+)
 from weblate.machinery.forms import BaseOpenAIMachineryForm, EmptyMappingJSONField
 from weblate.machinery.openai import OpenAITranslation
+
+if TYPE_CHECKING:
+    from weblate.auth.models import User
+    from weblate.machinery.types import DownloadMultipleTranslations, SettingsDict
+    from weblate.trans.models import Unit
 
 LANGUAGE_CODE_PART_RE = re.compile(r"[-_@]")
 FALLBACK_KEY = "*"
@@ -99,6 +109,12 @@ class RoutedLLMTranslation(OpenAITranslation):
     settings_form = RoutedLLMMachineryForm
     trusted_error_hosts: ClassVar[set[str]] = {"openrouter.ai"}
 
+    def __init__(self, configuration: SettingsDict) -> None:
+        super().__init__(configuration)
+        self._route_target: ContextVar[str | None] = ContextVar(
+            "routed_llm_target", default=None
+        )
+
     def get_runtime_base_url(self) -> str:
         return self.settings.get("base_url") or DEFAULT_BASE_URL
 
@@ -132,3 +148,64 @@ class RoutedLLMTranslation(OpenAITranslation):
 
     def is_supported(self, _source_language, target_language) -> bool:
         return self.resolve_model(target_language) is not None
+
+    def get_model(self) -> str:
+        target_language = self._route_target.get()
+        model = self.resolve_model(target_language)
+        if model is None:
+            msg = f"No routed model for target language: {target_language or '<unset>'}"
+            raise MachineTranslationError(msg)
+        return model
+
+    async def aget_model(self) -> str:
+        return self.get_model()
+
+    def get_validation_target(self) -> str:
+        for language in self.get_routing():
+            if language != FALLBACK_KEY:
+                return language
+        return self.validate_target_language
+
+    def validate_settings(self) -> None:
+        try:
+            self.download_languages()
+        except Exception as error:
+            raise ValidationError(
+                gettext("Could not fetch supported languages: %s") % error
+            ) from error
+
+        try:
+            self.download_multiple_translations(
+                self.validate_source_language,
+                self.get_validation_target(),
+                [("test", None)],
+                None,
+                MACHINERY_DEFAULT_THRESHOLD,
+            )
+        except Exception as error:
+            raise ValidationError(
+                gettext("Could not fetch translation: %s") % error
+            ) from error
+
+    def _download_multiple_translations(
+        self,
+        source_language,
+        target_language,
+        sources: list[tuple[str, Unit | None]],
+        user: User | None = None,
+        threshold: int = MACHINERY_DEFAULT_THRESHOLD,
+        *,
+        source_occurrences: list[int] | None = None,
+    ) -> DownloadMultipleTranslations:
+        token = self._route_target.set(target_language)
+        try:
+            return super()._download_multiple_translations(
+                source_language,
+                target_language,
+                sources,
+                user,
+                threshold,
+                source_occurrences=source_occurrences,
+            )
+        finally:
+            self._route_target.reset(token)

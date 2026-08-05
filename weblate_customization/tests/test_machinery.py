@@ -6,11 +6,14 @@
 
 from __future__ import annotations
 
+import json
+
 from typing import cast
 
 from django.test import SimpleTestCase, TestCase
 
 from weblate.machinery.types import SettingsDict
+from weblate.utils.tests import http_mock
 from weblate_customization.machinery import (
     RoutedLLMMachineryForm,
     RoutedLLMTranslation,
@@ -27,6 +30,53 @@ CONFIGURATION: dict[str, object] = {
     "style": "",
     "language_instructions": {},
 }
+
+
+CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+def mock_chat(content: str = '["テスト"]') -> None:
+    http_mock.register(
+        "POST",
+        CHAT_URL,
+        json={
+            "id": "chatcmpl-1",
+            "object": "chat.completion",
+            "created": 1677652288,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 9,
+                "completion_tokens": 2,
+                "total_tokens": 11,
+            },
+        },
+    )
+
+
+def sent_payloads() -> list[dict[str, object]]:
+    payloads: list[dict[str, object]] = []
+    for call in http_mock.calls:
+        if str(call.request.url) != CHAT_URL:
+            continue
+        payload = json.loads(call.request.content)
+        if isinstance(payload, dict):
+            payloads.append(payload)
+    return payloads
+
+
+def sent_models() -> list[str]:
+    return [
+        model
+        for payload in sent_payloads()
+        if isinstance(model := payload.get("model"), str)
+    ]
 
 
 def as_settings(value: dict[str, object]) -> SettingsDict:
@@ -120,3 +170,27 @@ class RoutedResolveTest(SimpleTestCase):
         machine = self.machine({"ja": DEEPSEEK})
         self.assertTrue(machine.is_supported("en", "ja"))
         self.assertFalse(machine.is_supported("en", "fr"))
+
+
+class RoutedSettingsValidationTest(TestCase):
+    @http_mock.activate
+    def test_actual_form_validates_route_without_fallback(self) -> None:
+        mock_chat()
+        form = RoutedLLMMachineryForm(
+            RoutedLLMTranslation,
+            data={**CONFIGURATION, "routing": {"ja": DEEPSEEK}},
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(sent_models(), [DEEPSEEK])
+
+    @http_mock.activate
+    def test_actual_form_validates_star_only_route(self) -> None:
+        mock_chat()
+        form = RoutedLLMMachineryForm(
+            RoutedLLMTranslation,
+            data={**CONFIGURATION, "routing": {"*": GEMINI}},
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(sent_models(), [GEMINI])
