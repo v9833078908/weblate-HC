@@ -57,6 +57,7 @@ services:
       WEB_WORKERS: 1
       WEBLATE_VCS_ALLOW_SCHEMES: "https,ssh,git,file"
       GRANIAN_ARGS: --reload --reload-paths /app/src/weblate
+      WEBLATE_ADD_MACHINERY: weblate_customization.machinery.RoutedLLMTranslation
     env_file:
     - ./environment
     ports:
