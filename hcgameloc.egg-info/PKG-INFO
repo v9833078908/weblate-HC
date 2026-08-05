@@ -1,0 +1,188 @@
+Metadata-Version: 2.4
+Name: hcgameloc
+Version: 2026.8.1.dev0
+Summary: A web-based continuous localization system with tight version control integration
+Author-email: v9833078908 <v9833078908@gmail.com>
+License-Expression: GPL-3.0-or-later
+Project-URL: Homepage, https://github.com/v9833078908/weblate-HC
+Project-URL: Issue Tracker, https://github.com/v9833078908/weblate-HC/issues
+Project-URL: Source Code, https://github.com/v9833078908/weblate-HC
+Keywords: gettext,git,i18n,l10n,mercurial,translate
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Web Environment
+Classifier: Framework :: Django
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: System Administrators
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Programming Language :: Python
+Classifier: Topic :: Internet :: WWW/HTTP :: Dynamic Content
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Topic :: Software Development :: Internationalization
+Classifier: Topic :: Software Development :: Localization
+Requires-Python: >=3.12
+Description-Content-Type: text/x-rst
+License-File: LICENSE
+Requires-Dist: aeidon==1.16
+Requires-Dist: ahocorasick-rs==1.0.3
+Requires-Dist: altcha==2.1.0
+Requires-Dist: argon2-cffi-bindings==25.1.0
+Requires-Dist: argon2-cffi==25.1.0
+Requires-Dist: borgbackup==1.4.5
+Requires-Dist: celery[redis]==5.6.3
+Requires-Dist: certifi>=2026.7.22
+Requires-Dist: cffi==2.1.1
+Requires-Dist: charset-normalizer==3.4.9
+Requires-Dist: confusable-homoglyphs==3.3.1
+Requires-Dist: crispy-bootstrap5==2026.3
+Requires-Dist: cryptography==50.0.0
+Requires-Dist: cssselect==1.5.0
+Requires-Dist: cyrtranslit==1.2.0
+Requires-Dist: dateparser==1.4.1
+Requires-Dist: diff-match-patch==20241021
+Requires-Dist: disposable-email-domains==0.0.235
+Requires-Dist: django-appconf==1.2.0
+Requires-Dist: django-celery-beat==2.9.0
+Requires-Dist: django-cors-headers==4.9.0
+Requires-Dist: django-crispy-forms==2.7
+Requires-Dist: django-filter[drf]==26.1
+Requires-Dist: django-otp-webauthn==0.10.0
+Requires-Dist: django-otp==1.7.0
+Requires-Dist: django-redis==7.0.0
+Requires-Dist: Django[argon2]==6.0.7
+Requires-Dist: djangorestframework-csv==3.0.2
+Requires-Dist: djangorestframework==3.17.1
+Requires-Dist: docutils==0.21.2
+Requires-Dist: drf-spectacular[sidecar]==0.30.0
+Requires-Dist: drf-standardized-errors[openapi]==0.16.0
+Requires-Dist: fedora-messaging==3.9.1
+Requires-Dist: filelock==3.32.2
+Requires-Dist: fluent.syntax==0.19.0
+Requires-Dist: GitPython==3.1.57
+Requires-Dist: hiredis==3.4.0
+Requires-Dist: html2text==2025.4.15
+Requires-Dist: httpx2[brotli,socks,zstd]==2.9.1
+Requires-Dist: idna==3.18
+Requires-Dist: iniparse==0.5
+Requires-Dist: jsonschema==4.26.0
+Requires-Dist: lxml==6.1.1
+Requires-Dist: matplotlib==3.11.1
+Requires-Dist: mistletoe==1.6.0
+Requires-Dist: nh3==0.3.6
+Requires-Dist: openpyxl==3.1.5
+Requires-Dist: opentelemetry-exporter-otlp-proto-http==1.44.0
+Requires-Dist: opentelemetry-instrumentation-celery==0.65b0
+Requires-Dist: opentelemetry-instrumentation-django==0.65b0
+Requires-Dist: opentelemetry-instrumentation-psycopg==0.65b0
+Requires-Dist: opentelemetry-instrumentation-redis==0.65b0
+Requires-Dist: opentelemetry-instrumentation-requests==0.65b0
+Requires-Dist: opentelemetry-sdk==1.44.0
+Requires-Dist: packaging==26.2
+Requires-Dist: phply==1.2.6
+Requires-Dist: Pillow==12.3.0
+Requires-Dist: pyaskalono==0.2.0
+Requires-Dist: pyasn1==0.6.4
+Requires-Dist: Pygments==2.20.0
+Requires-Dist: pyicumessageformat==1.0.0
+Requires-Dist: PyJWT==2.13.0
+Requires-Dist: pyOpenSSL==26.4.0
+Requires-Dist: pyparsing==3.3.2
+Requires-Dist: python-dateutil==2.9.0.post0
+Requires-Dist: qrcode==8.2
+Requires-Dist: rapidfuzz==3.14.5
+Requires-Dist: redis==6.4.0
+Requires-Dist: regex==2026.7.19
+Requires-Dist: requests==2.34.2
+Requires-Dist: ruamel.yaml==0.19.1
+Requires-Dist: sentry-sdk==2.66.1
+Requires-Dist: siphashc==2.7
+Requires-Dist: social-auth-app-django==6.0.1
+Requires-Dist: social-auth-core==5.0.2
+Requires-Dist: tesserocr==2.10.0
+Requires-Dist: tomlkit==0.15.1
+Requires-Dist: translate-toolkit[chardet,fluent,ini,markdown,php,rc,subtitles,toml,yaml]==3.19.17
+Requires-Dist: translation-finder==3.4.0
+Requires-Dist: twisted==26.4.0
+Requires-Dist: unicode-segmentation-rs==0.3.1
+Requires-Dist: unidecode==1.4.0
+Requires-Dist: urllib3[brotli,zstd]==2.7.0
+Requires-Dist: user-agents==2.2.0
+Requires-Dist: webauthn==3.0.0
+Requires-Dist: weblate-fonts==2026.1
+Requires-Dist: weblate-language-data==2026.10
+Requires-Dist: weblate-schemas==2026.6
+Provides-Extra: all
+Requires-Dist: hcgameloc[amazon,gelf,gerrit,google,google-errors,ldap,mercurial,postgres,rollbar,sphinx,zxcvbn]; extra == "all"
+Provides-Extra: amazon
+Requires-Dist: boto3==1.43.62; extra == "amazon"
+Provides-Extra: asgi
+Requires-Dist: granian==2.8.0; extra == "asgi"
+Provides-Extra: gelf
+Requires-Dist: logging-gelf==0.0.32; extra == "gelf"
+Provides-Extra: gerrit
+Requires-Dist: git-review==2.5.0; extra == "gerrit"
+Provides-Extra: google
+Requires-Dist: google-cloud-storage==3.13.0; extra == "google"
+Requires-Dist: google-cloud-translate==3.27.0; extra == "google"
+Provides-Extra: google-errors
+Requires-Dist: google-cloud-error-reporting==1.16.0; extra == "google-errors"
+Provides-Extra: ldap
+Requires-Dist: django-auth-ldap==5.3.0; extra == "ldap"
+Provides-Extra: mercurial
+Requires-Dist: mercurial==7.2.3; extra == "mercurial"
+Provides-Extra: postgres
+Requires-Dist: psycopg[binary]==3.3.4; extra == "postgres"
+Provides-Extra: rollbar
+Requires-Dist: rollbar==1.4.0; extra == "rollbar"
+Provides-Extra: saml
+Requires-Dist: python3-saml==1.16.0; extra == "saml"
+Requires-Dist: xmlsec==1.3.17; extra == "saml"
+Provides-Extra: saml2idp
+Requires-Dist: djangosaml2idp2==0.9.1; extra == "saml2idp"
+Provides-Extra: sphinx
+Requires-Dist: Sphinx==8.2.3; extra == "sphinx"
+Provides-Extra: wllegal
+Requires-Dist: wllegal==2026.5; extra == "wllegal"
+Provides-Extra: wsgi
+Requires-Dist: granian==2.8.0; extra == "wsgi"
+Provides-Extra: zxcvbn
+Requires-Dist: django-zxcvbn-password-validator==1.7.0; extra == "zxcvbn"
+Dynamic: license-file
+
+HCGameLoc
+=========
+
+Fork of `Weblate <https://weblate.org/>`_, a web-based continuous
+localization system, adapted for localizing the game
+"Hero Craft Space Arena". Maintained by v9833078908.
+
+Documentation
+-------------
+
+See the ``docs`` directory of the source code.
+Upstream documentation is available at https://docs.weblate.org/.
+
+Development
+-----------
+
+The development instance runs in Docker, see ``dev-docker/README.rst``
+and ``./rundev.sh`` in the repository root.
+
+License
+-------
+
+Copyright © Michal Čihař michal@weblate.org (upstream)
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the `GNU General Public License
+<https://www.gnu.org/licenses/gpl-3.0.html>`_ for more details.

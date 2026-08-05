@@ -124,6 +124,6 @@ def format_site_title(context) -> str:
     site_title = context["site_title"]
     if context["support_status"]["is_hosted_weblate"]:
         style = "text-info"
-        site_title = "Weblate cloud"
+        site_title = "HCGameLoc cloud"
 
     return format_html('<span class="{}">{}</span>', style, site_title)

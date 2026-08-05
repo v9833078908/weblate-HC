@@ -21,7 +21,7 @@
           <div class="box">
             {% if change %}
               <h1>
-                <img src="{% if request %}{% static "email-logo.png" %}{% else %}cid:email-logo.png@cid.weblate.org{% endif %}" />
+                <img src="{% if request %}{% static "email-logo.png" %}{% else %}cid:email-logo.png@cid.hcgameloc{% endif %}" />
                 {{ change.get_action_display }}
               </h1>
               <div class="nav">
@@ -97,9 +97,9 @@
         </div>
         <footer class="footer">
           <p>
-            <img src="{% if request %}{% static "email-logo-footer.png" %}{% else %}cid:email-logo-footer.png@cid.weblate.org{% endif %}" />
+            <img src="{% if request %}{% static "email-logo-footer.png" %}{% else %}cid:email-logo-footer.png@cid.hcgameloc{% endif %}" />
             <br />
-            <a href="https://weblate.org/">{% translate "Weblate, the libre continuous localization system." %}</a>
+            <a href="https://github.com/v9833078908/weblate-HC">{% translate "HCGameLoc, based on Weblate." %}</a>
           </p>
           {% if unsubscribe_url %}
             <p>

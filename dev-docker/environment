@@ -1,5 +1,5 @@
-# See Weblate documentation for detailed description:
-# https://docs.weblate.org/en/latest/admin/deployments.html#docker
+# See HCGameLoc documentation for detailed description:
+# docs/admin/deployments.rst in this repository
 
 # Weblate setup
 WEBLATE_DEBUG=1
@@ -49,7 +49,6 @@ POSTGRES_HOST=database
 POSTGRES_PORT=
 
 # Cache setup
-# https://docs.weblate.org/en/latest/admin/install.html#production-cache
 REDIS_HOST=cache
 REDIS_PORT=6379
 
