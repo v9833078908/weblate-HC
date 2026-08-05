@@ -1,4 +1,4 @@
-"""Space Arena game markup checks.
+"""Hero Craft game markup checks.
 
 Validates Unity rich-text tags and engine placeholders that stock Weblate
 checks miss: <color=#RRGGBB>, <link>, <size=N>, <b>, {0}/{c}, %KEY%.

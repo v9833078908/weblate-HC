@@ -6,6 +6,7 @@ HCGameLoc
 v9833078908 (``origin`` = `v9833078908/weblate-HC
 <https://github.com/v9833078908/weblate-HC>`_).
 
+
 .. contents:: Содержание
    :local:
    :depth: 1

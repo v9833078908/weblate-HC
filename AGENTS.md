@@ -129,7 +129,7 @@ for game localization); the sections before it are upstream Weblate conventions.
 ## Project-specific setup
 
 A fork of upstream Weblate (`origin` = WeblateOrg/weblate, `fork` =
-v9833078908/weblate-HC) used to localize the game "Hero Craft Space Arena". Three
+v9833078908/weblate-HC) used to localize Hero Craft games. Three
 things exist here that are not upstream:
 
 - `weblate_customization/` (untracked) - a custom-check package following

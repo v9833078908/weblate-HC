@@ -5,6 +5,6 @@ build-backend = "uv_build"
 [project]
 name = "weblate-customization"
 version = "0.1.0"
-description = "Hero Craft Space Arena Weblate customizations"
+description = "Hero Craft Weblate customizations"
 requires-python = ">=3.12"
 dependencies = []
