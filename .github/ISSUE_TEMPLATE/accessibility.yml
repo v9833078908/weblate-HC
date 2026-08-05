@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: CC0-1.0
 
 name: Accessibility issue
-description: Report a barrier when using Weblate
+description: Report a barrier when using HCGameLoc
 title: 'Accessibility: '
 labels:
 - accessibility
@@ -17,7 +17,7 @@ body:
   id: affected-area
   attributes:
     label: Affected page or workflow
-    description: Which Weblate page, feature, or task is affected?
+    description: Which HCGameLoc page, feature, or task is affected?
     placeholder: 'Example: Translation editor, project settings, sign-in form'
   validations:
     required: true

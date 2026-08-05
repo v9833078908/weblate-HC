@@ -2,34 +2,23 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import httpx2
-from django.core.cache import cache
 from django.db.models import Sum
 from django.utils.translation import gettext, gettext_lazy
 from django.views.generic import TemplateView
 
 from weblate.accounts.models import Profile
 from weblate.metrics.models import Metric
-from weblate.utils.requests import JSON_RESPONSE_ERRORS, fetch_url
 from weblate.utils.requirements import get_versions_list
 from weblate.utils.stats import GlobalStats
 from weblate.vcs.gpg import get_gpg_public_key, get_gpg_sign_key
 from weblate.vcs.ssh import get_all_key_data
 
 MENU = (
-    ("index", "about", gettext_lazy("About Weblate")),
+    ("index", "about", gettext_lazy("About HCGameLoc")),
     ("stats", "stats", gettext_lazy("Statistics")),
     ("keys", "keys", gettext_lazy("Keys")),
-    ("donate", "donate", gettext_lazy("Support Weblate")),
+    ("donate", "donate", gettext_lazy("Support")),
 )
-
-REPO_URL = "https://api.github.com/repos/WeblateOrg/weblate"
-ACTIVITY_URL = "https://api.github.com/repos/WeblateOrg/weblate/stats/commit_activity"
-FALLBACK_STATS = {
-    "stars": 6009,
-    "issues": 501,
-    "commits": 1546,
-}
 
 
 class AboutView(TemplateView):
@@ -38,7 +27,7 @@ class AboutView(TemplateView):
     def page_context(self, context) -> None:
         context.update(
             {
-                "title": gettext("About Weblate"),
+                "title": gettext("About HCGameLoc"),
                 "versions": get_versions_list(),
                 "allow_index": True,
             }
@@ -62,7 +51,7 @@ class StatsView(AboutView):
     page = "stats"
 
     def page_context(self, context) -> None:
-        context["title"] = gettext("Weblate statistics")
+        context["title"] = gettext("HCGameLoc statistics")
 
         stats = GlobalStats()
 
@@ -92,7 +81,7 @@ class KeysView(AboutView):
     def page_context(self, context) -> None:
         context.update(
             {
-                "title": gettext("Weblate keys"),
+                "title": gettext("HCGameLoc keys"),
                 "gpg_key_id": get_gpg_sign_key(),
                 "gpg_key": get_gpg_public_key(),
                 "public_ssh_keys": get_all_key_data(),
@@ -103,29 +92,6 @@ class KeysView(AboutView):
 
 class DonateView(AboutView):
     page = "donate"
-    cache_key = "weblate-repo-stats"
-
-    def fetch_url(self, url: str):
-        response = fetch_url("get", url)
-        return response.json()
-
-    def get_stats(self) -> dict[str, int]:
-        result = cache.get(self.cache_key)
-        if result is None:
-            try:
-                repo = self.fetch_url(REPO_URL)
-                activity = self.fetch_url(ACTIVITY_URL)
-            except (httpx2.HTTPError, *JSON_RESPONSE_ERRORS):
-                return FALLBACK_STATS
-            activity = sorted(activity, key=lambda item: -item["week"])
-            result = {
-                "stars": repo["stargazers_count"],
-                "issues": repo["open_issues_count"],
-                "commits": sum(item["total"] for item in activity[:8]),
-            }
-            cache.set(self.cache_key, result, 24 * 3600)
-        return result
 
     def page_context(self, context) -> None:
-        context["title"] = gettext("Support Weblate")
-        context.update(self.get_stats())
+        context["title"] = gettext("Support")

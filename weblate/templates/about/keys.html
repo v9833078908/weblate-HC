@@ -4,10 +4,10 @@
 
 {% block breadcrumbs %}
   <li class="breadcrumb-item">
-    <a href="{% url 'about' %}">{% translate "About Weblate" %}</a>
+    <a href="{% url 'about' %}">{% translate "About HCGameLoc" %}</a>
   </li>
   <li class="breadcrumb-item">
-    <a href="{% url 'about' %}">{% translate "Weblate keys" %}</a>
+    <a href="{% url 'about' %}">{% translate "HCGameLoc keys" %}</a>
   </li>
 {% endblock breadcrumbs %}
 
@@ -31,7 +31,7 @@
                 data-clipboard-message="{% translate "Public key copied to clipboard." %}"
                 title="{% translate "Copy to clipboard" %}">{% icon "copy.svg" %}</button>
         <p>
-          {% blocktranslate %}All commits made with Weblate are signed with the GPG key {{ gpg_key_id }}, for which the corresponding public key is found below.{% endblocktranslate %}
+          {% blocktranslate %}All commits made with HCGameLoc are signed with the GPG key {{ gpg_key_id }}, for which the corresponding public key is found below.{% endblocktranslate %}
         </p>
         <div class="list-group-item pre-scrollable">{{ gpg_key|linebreaks }}</div>
       {% else %}

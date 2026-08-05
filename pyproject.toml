@@ -97,7 +97,7 @@ types = [
 
 [project]
 authors = [
-  {email = "michal@weblate.org", name = "Michal Čihař"}
+  {email = "v9833078908@gmail.com", name = "v9833078908"}
 ]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
@@ -225,13 +225,13 @@ keywords = [
 ]
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
-name = "weblate"
+name = "hcgameloc"
 requires-python = ">=3.12"
 version = "2026.8.1.dev0"
 
 [project.optional-dependencies]
 all = [
-  "weblate[amazon,gelf,gerrit,google,google-errors,ldap,mercurial,postgres,rollbar,sphinx,zxcvbn]"
+  "hcgameloc[amazon,gelf,gerrit,google,google-errors,ldap,mercurial,postgres,rollbar,sphinx,zxcvbn]"
 ]
 amazon = [
   "boto3==1.43.62"
@@ -293,14 +293,9 @@ weblate = "weblate.runner:main"
 weblate-generate-secret-key = "weblate.utils.generate_secret_key:main"
 
 [project.urls]
-Documentation = "https://docs.weblate.org/"
-Download = "https://weblate.org/download/"
-Funding = "https://weblate.org/donate/"
-Homepage = "https://weblate.org/"
-"Issue Tracker" = "https://github.com/WeblateOrg/weblate/issues"
-"Release Notes" = "https://docs.weblate.org/en/latest/changes.html"
-"Source Code" = "https://github.com/WeblateOrg/weblate"
-X = "https://x.com/WeblateOrg"
+Homepage = "https://github.com/v9833078908/weblate-HC"
+"Issue Tracker" = "https://github.com/v9833078908/weblate-HC/issues"
+"Source Code" = "https://github.com/v9833078908/weblate-HC"
 
 [tool.check-manifest]
 ignore = [

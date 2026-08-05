@@ -186,6 +186,15 @@ Running tests through `./rundev.sh test` avoids all of that setup.
 
 ### weblate-mcp
 
+For any operation against the running Weblate instance (projects, components,
+languages, units, statistics), prefer the vendored MCP server
+<https://github.com/mmntm/weblate-mcp> when it is connected to the agent
+session, instead of hand-rolled REST calls or Django shell one-liners.
+
+If the MCP server is not connected in the current session, fall back to direct
+REST calls against `http://localhost:3001/api/` using the token already stored
+in `weblate-mcp/.env` (`WEBLATE_API_TOKEN`) - do not mint a second token.
+
 ```sh
 cd weblate-mcp && pnpm install && pnpm build   # dist/main.js is the stdio entrypoint
 pnpm dev                                       # nest start --watch

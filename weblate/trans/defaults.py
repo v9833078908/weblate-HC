@@ -6,7 +6,7 @@ from __future__ import annotations
 
 DEFAULT_DATA_DIR = None
 DEFAULT_CACHE_DIR = None
-DEFAULT_SITE_TITLE = "Weblate"
+DEFAULT_SITE_TITLE = "HCGameLoc"
 DEFAULT_SITE_DOMAIN = ""
 DEFAULT_OFFER_HOSTING = False
 DEFAULT_ENABLE_HOOKS = True

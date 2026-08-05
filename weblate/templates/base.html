@@ -60,8 +60,8 @@
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'logo-32.png' %}">
     <link rel="icon" type="image/png" sizes="16x16" href="{% static 'logo-16.png' %}">
     <link rel="apple-touch-icon" sizes="180x180" href="{% static 'weblate-180.png' %}" />
-    <link rel="mask-icon" href="{% static 'weblate-black.svg' %}" color="#144d3f">
-    <meta name="msapplication-TileColor" content="#144d3f">
+    <link rel="mask-icon" href="{% static 'weblate-black.svg' %}" color="#e5231f">
+    <meta name="msapplication-TileColor" content="#e5231f">
     <meta name="msapplication-config" content="/browserconfig.xml">
     <link rel="manifest" href="/site.webmanifest">
     {{ extra_html_head|safe }}
@@ -312,7 +312,7 @@
                         </li>
                         {% if payment_enabled %}
                           <li>
-                            <a class="dropdown-item" href="{% url 'trial' %}">{% translate "Try Weblate for free" %}</a>
+                            <a class="dropdown-item" href="{% url 'trial' %}">{% translate "Try HCGameLoc for free" %}</a>
                           </li>
                         {% endif %}
                         <li>
@@ -395,15 +395,15 @@
                     </li>
                   {% endif %}
                   <li>
-                    <a class="dropdown-item" href="https://github.com/orgs/WeblateOrg/discussions">{% translate "Community discussions" %}</a>
+                    <a class="dropdown-item" href="https://github.com/v9833078908/weblate-HC/discussions">{% translate "Community discussions" %}</a>
                   </li>
                   {% if support_status.has_support %}
                     <li>
-                      <a class="dropdown-item" href="https://care.weblate.org/">{% translate "Professional support" %}</a>
+                      <a class="dropdown-item" href="https://github.com/v9833078908/weblate-HC/issues">{% translate "Professional support" %}</a>
                     </li>
                   {% else %}
                     <li>
-                      <a class="dropdown-item" href="https://weblate.org/support/">{% translate "Get professional support" %}</a>
+                      <a class="dropdown-item" href="https://github.com/v9833078908/weblate-HC/issues">{% translate "Get professional support" %}</a>
                     </li>
                     {% if get_help_url %}
                       <li>
@@ -419,9 +419,9 @@
                   <li>
                     <a class="dropdown-item" id="shortcuts-btn" href="#">{% translate "Keyboard shortcuts" %}</a>
                   </li>
-                  <li class="dropdown-header">{% translate "Weblate project" %}</li>
+                  <li class="dropdown-header">{% translate "HCGameLoc project" %}</li>
                   <li>
-                    <a class="dropdown-item" href="https://weblate.org/contribute/">{% translate "Contribute" %}</a>
+                    <a class="dropdown-item" href="https://github.com/v9833078908/weblate-HC">{% translate "Contribute" %}</a>
                   </li>
                   {% if not support_status.has_support or support_status.is_hosted_weblate %}
                     <li>
@@ -432,7 +432,7 @@
                     <a class="dropdown-item" href="{% url 'about' %}">{% translate "About" %}</a>
                   </li>
                   <li>
-                    <a class="dropdown-item" href="https://weblate.org/">{% translate "Website" %}</a>
+                    <a class="dropdown-item" href="https://github.com/v9833078908/weblate-HC">{% translate "Website" %}</a>
                   </li>
                 </ul>
               </li>
@@ -460,7 +460,7 @@
     <div class="main-content {% block content_class %}{% endblock %} ">
 
       {% if user.is_superuser and support_status.has_support and not support_status.in_limits %}
-        {% translate 'Your Weblate is exceeding service limits. Please upgrade the subscription.' as msg %}
+        {% translate 'Your HCGameLoc is exceeding service limits. Please upgrade the subscription.' as msg %}
         {% show_message 'warning' msg %}
       {% endif %}
 

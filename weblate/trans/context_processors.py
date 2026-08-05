@@ -26,8 +26,9 @@ if TYPE_CHECKING:
     from weblate.auth.models import AuthenticatedHttpRequest
 
 WEBLATE_URL = "https://weblate.org/"
-DONATE_URL = "https://weblate.org/donate/"
-SUPPORT_URL = "https://weblate.org/support/"
+FORK_URL = "https://github.com/v9833078908/weblate-HC"
+DONATE_URL = FORK_URL
+SUPPORT_URL = f"{FORK_URL}/issues"
 
 CONTEXT_SETTINGS = [
     "SITE_TITLE",
@@ -130,15 +131,15 @@ def weblate_context(request: AuthenticatedHttpRequest):
 
     if settings.OFFER_HOSTING:
         description = gettext(
-            "Hosted Weblate, the place to localize your software project."
+            "Hosted HCGameLoc, the place to localize your software project."
         )
     elif settings.SINGLE_PROJECT:
         description = gettext(
-            "This site runs Weblate for localizing a software project."
+            "This site runs HCGameLoc for localizing a software project."
         )
     else:
         description = gettext(
-            "This site runs Weblate for localizing various software projects."
+            "This site runs HCGameLoc for localizing various software projects."
         )
 
     support_status = get_support_status(request)
@@ -147,9 +148,9 @@ def weblate_context(request: AuthenticatedHttpRequest):
         getattr(user, "is_superuser", False)
     ) or not hide_detailed_version(version_display)
     weblate_label = (
-        "Weblate"
+        "HCGameLoc (based on Weblate)"
         if hide_prominent_version(version_display)
-        else f"Weblate {weblate.utils.version.VERSION}"
+        else f"HCGameLoc {weblate.utils.version.VERSION} (based on Weblate)"
     )
 
     context = {
@@ -157,11 +158,11 @@ def weblate_context(request: AuthenticatedHttpRequest):
         "version": weblate.utils.version.VERSION,
         "bread_image": get_bread_image(request.path),
         "description": description,
-        "weblate_link": format_html('<a href="{}">weblate.org</a>', WEBLATE_URL),
-        "weblate_name_link": format_html('<a href="{}">Weblate</a>', WEBLATE_URL),
+        "weblate_link": format_html('<a href="{}">Weblate</a>', WEBLATE_URL),
+        "weblate_name_link": format_html('<a href="{}">HCGameLoc</a>', FORK_URL),
         "weblate_version_link": format_html(
             '<a href="{}">{}</a>',
-            WEBLATE_URL,
+            FORK_URL,
             weblate_label,
         ),
         "show_version_details": show_version_details,

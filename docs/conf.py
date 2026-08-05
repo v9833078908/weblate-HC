@@ -77,9 +77,9 @@ def setup(app) -> None:
 
 # -- Project information -----------------------------------------------------
 
-project = "Weblate"
+project = "HCGameLoc"
 project_copyright = "Michal Čihař"
-author = "Michal Čihař"
+author = "v9833078908 (based on Weblate by Michal Čihař)"
 
 # The full version, including alpha/beta/rc tags
 release = "2026.8.1"
@@ -124,7 +124,7 @@ exclude_patterns = [
 ogp_social_cards = {
     "image": "../weblate/static/logo-1024.png",
     "line_color": "#144d3f",
-    "site_url": "docs.weblate.org",
+    "site_url": "https://github.com/v9833078908/weblate-HC",
     "font": [
         "Source Sans 3",
         "Kurinto Sans JP",
@@ -134,11 +134,7 @@ ogp_social_cards = {
         "Kurinto Sans",
     ],
 }
-ogp_custom_meta_tags = (
-    '<meta property="fb:app_id" content="741121112629028" />',
-    '<meta property="fb:page_id" content="371217713079025" />',
-    '<meta name="twitter:site" content="@WeblateOrg" />',
-)
+ogp_custom_meta_tags = ()
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -168,7 +164,7 @@ html_logo = "images/logo-text.svg"
 
 
 html_theme_options = {
-    "source_repository": "https://github.com/WeblateOrg/weblate/",
+    "source_repository": "https://github.com/v9833078908/weblate-HC/",
     "source_branch": "main",
     "source_directory": "docs/",
     "sidebar_hide_name": True,
@@ -186,15 +182,12 @@ html_theme_options = {
     },
 }
 
-html_css_files = [
-    "https://weblate.org/static/weblate_fonts/source-sans-3.css",
-    "https://weblate.org/static/weblate_fonts/source-code-pro.css",
-]
+html_css_files = []
 
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "Weblatedoc"
+htmlhelp_basename = "HCGameLocdoc"
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -221,7 +214,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
-latex_documents = [("index", "Weblate.tex", "The Weblate Manual", author, "manual")]
+latex_documents = [("index", "HCGameLoc.tex", "The HCGameLoc Manual", author, "manual")]
 
 # Include logo on title page
 latex_logo = "../weblate/static/logo-1024.png"
@@ -234,7 +227,7 @@ latex_use_xindy = False
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [("wlc", "wlc", "Weblate Client Documentation", [author], 1)]
+man_pages = [("wlc", "wlc", "HCGameLoc Client Documentation", [author], 1)]
 
 
 # -- Options for Texinfo output ----------------------------------------------
@@ -245,10 +238,10 @@ man_pages = [("wlc", "wlc", "Weblate Client Documentation", [author], 1)]
 texinfo_documents = [
     (
         "index",
-        "Weblate",
+        "HCGameLoc",
         project,
         author,
-        "Weblate",
+        "HCGameLoc",
         "One line description of project.",
         "Miscellaneous",
     )

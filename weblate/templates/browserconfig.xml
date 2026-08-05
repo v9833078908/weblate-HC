@@ -3,7 +3,7 @@
     <msapplication>
         <tile>
             <square150x150logo src="{% static 'weblate-150.png' %}"/>
-            <TileColor>#114444</TileColor>
+            <TileColor>#e5231f</TileColor>
         </tile>
     </msapplication>
 </browserconfig>

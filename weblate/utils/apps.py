@@ -600,13 +600,13 @@ def check_version(
             return [
                 weblate_check(
                     "weblate.C031",
-                    f"Your Weblate version is outdated, please upgrade to {latest.version}.",
+                    f"Your HCGameLoc version is outdated, please upgrade to {latest.version}.",
                 )
             ]
         return [
             weblate_check(
                 "weblate.I031",
-                f"New Weblate version is available, please upgrade to {latest.version}.",
+                f"New HCGameLoc version is available, please upgrade to {latest.version}.",
                 Info,
             )
         ]

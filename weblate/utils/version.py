@@ -32,7 +32,7 @@ VERSION = "2026.8.1.dev0"
 VERSION_BASE = Version(VERSION).base_version
 
 # User-Agent string to use
-USER_AGENT = f"Weblate/{VERSION}"
+USER_AGENT = f"HCGameLoc/{VERSION}"
 
 # Git tag name for this release
 TAG_NAME = f"weblate-{VERSION_BASE}"
@@ -61,9 +61,9 @@ except (RepositoryError, OSError):
         GIT_REVISION = None
 
 if GIT_REVISION:
-    GIT_LINK = f"https://github.com/WeblateOrg/weblate/commits/{GIT_REVISION}"
+    GIT_LINK = f"https://github.com/v9833078908/weblate-HC/commits/{GIT_REVISION}"
 elif VERSION == VERSION_BASE:
-    GIT_LINK = f"https://github.com/WeblateOrg/weblate/releases/tag/weblate-{VERSION}"
+    GIT_LINK = f"https://github.com/v9833078908/weblate-HC/releases/tag/weblate-{VERSION}"
 else:
     GIT_LINK = None
 

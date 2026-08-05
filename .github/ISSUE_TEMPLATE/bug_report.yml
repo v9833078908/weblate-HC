@@ -2,8 +2,6 @@
 #
 # SPDX-License-Identifier: CC0-1.0
 
-# This file is maintained in https://github.com/WeblateOrg/meta/
-# and generated from .github/ISSUE_TEMPLATE/snippets there.
 name: Reproducible bug report
 description: Create a report to help us improve
 body:
@@ -12,8 +10,6 @@ body:
     value: |
       Thank you for reporting an issue.
       This form guides you in creating a useful issue report.
-
-      Want your answer quickly and guaranteed? Visit https://weblate.org/support/ to reach our dedicated support team. As a subscriber, you will always have priority and help Weblate growing.
 - type: textarea
   id: what-happened
   attributes:
@@ -31,7 +27,7 @@ body:
     label: I already tried
     description: If you didn’t try already, try searching the documentation and existing issues.
     options:
-    - label: I've read and searched [the documentation](https://docs.weblate.org/).
+    - label: I've read and searched the documentation in the docs/ directory of this repository.
       required: true
     - label: I've searched for similar filed issues in this repository.
       required: true
@@ -64,7 +60,7 @@ body:
     label: Exception traceback
     description: >
       In case you observed a server error or crash, please read
-      [the debugging documentation](https://docs.weblate.org/en/latest/contributing/debugging.html)
+      the debugging documentation in docs/contributing/debugging.rst
       for information on obtaining the relevant logs.
 
       This field will be rendered as a Python traceback automatically.
@@ -72,11 +68,11 @@ body:
 - type: dropdown
   id: installation
   attributes:
-    label: How do you run Weblate?
+    label: How do you run HCGameLoc?
     options:
     - ''
     - Docker container
-    - weblate.org service
+    - Self-hosted service
     - PyPI module
     - Git checkout
     - Other
@@ -87,19 +83,19 @@ body:
   validations:
     required: true
   attributes:
-    label: Weblate version
-    description: What Weblate version do you use? You can usually figure this out at /about/ URL.
+    label: HCGameLoc version
+    description: What version do you use? You can usually figure this out at /about/ URL.
 - type: textarea
   id: checks
   attributes:
-    label: Weblate deploy checks
+    label: HCGameLoc deploy checks
     description: >
       Please paste here list of [the deploy
-      checks](https://docs.weblate.org/en/latest/admin/install.html#production).
+      checks](https://github.com/v9833078908/weblate-HC/blob/main/docs/admin/install.rst).
 
       Depending on the installation, these can be executed in a different
       way. Please consult [the management commands
-      documentation](https://docs.weblate.org/en/latest/admin/management.html)
+      documentation](https://github.com/v9833078908/weblate-HC/blob/main/docs/admin/management.rst)
       for more details.
 
       On pip installed Weblate:
