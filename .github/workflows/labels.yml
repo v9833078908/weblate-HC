@@ -1,0 +1,29 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+# This file is maintained in https://github.com/WeblateOrg/meta/
+name: Issue labeled
+
+on:
+  issues:
+    types: [labeled]
+
+permissions: {}
+
+jobs:
+  issue-labeled:
+    if: ${{ ! github.event.issue.pull_request && github.event.label.name == 'good first issue' }}
+    permissions:
+      contents: read  # for actions/checkout
+      issues: write  # for gh issue comment
+    runs-on: ubuntu-slim
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Add good first issue comment
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ISSUE_NUMBER: ${{ github.event.issue.number }}
+      run: gh issue comment "$ISSUE_NUMBER" --body-file .github/comments/issue-newbie.md

@@ -1,0 +1,1023 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Translate Toolkit converter based file format wrappers."""
+
+from __future__ import annotations
+
+import codecs
+import os
+import shutil
+from collections import defaultdict, deque
+from io import BytesIO
+from operator import attrgetter
+from typing import IO, TYPE_CHECKING, Any, ClassVar, NoReturn, Protocol, cast
+from zipfile import ZipFile
+
+from django.utils.functional import cached_property
+from django.utils.translation import gettext_lazy
+from translate.convert import convert as tt_convert
+from translate.convert.po2asciidoc import AsciiDocTranslator
+from translate.convert.po2html import po2html
+from translate.convert.po2idml import translate_idml, write_idml
+from translate.convert.po2rc import rerc
+from translate.convert.po2txt import po2txt
+from translate.convert.rc2po import rc2po
+from translate.convert.xliff2odf import translate_odf, write_odf
+from translate.storage.asciidoc import AsciiDocFile
+from translate.storage.html import htmlfile
+from translate.storage.idml import INLINE_ELEMENTS, NO_TRANSLATE_ELEMENTS, open_idml
+from translate.storage.odf_io import open_odf
+from translate.storage.odf_shared import inline_elements, no_translate_content_elements
+from translate.storage.pypo import pofile, pounit
+from translate.storage.rc import rcfile
+from translate.storage.txt import TxtFile
+from translate.storage.wxl import WxlFile
+from translate.storage.xliff import Xliff1File, Xliff1Unit
+from translate.storage.xml_extract.extract import (
+    IdMaker,
+    ParseState,
+    build_idml_store,
+    build_store,
+    make_postore_adder,
+)
+
+from weblate.formats.base import TranslationFormat
+from weblate.formats.helpers import NamedBytesIO
+from weblate.formats.ttkit import BasePoUnit, TTKitUnit, XliffUnit
+from weblate.trans.exceptions import is_expected_parse_error
+from weblate.trans.file_format_params import (
+    LineMaxLength,
+    MdExtractCodeBlocks,
+    MdExtractFrontmatter,
+    MdFrontmatterTranslateValues,
+    MdNoPlaceholders,
+    MergeDuplicates,
+)
+from weblate.trans.util import get_string
+from weblate.utils.concurrency import MARKDOWN_LOCK
+from weblate.utils.errors import report_error
+from weblate.utils.state import STATE_APPROVED
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from translate.storage.base import TranslationStore
+    from translate.storage.base import TranslationUnit as TranslateToolkitUnit
+
+    from weblate.formats.base import TranslationUnit
+    from weblate.lang.models import Language
+    from weblate.trans.file_format_params import FileFormatParams
+    from weblate.trans.models import Unit
+
+
+class MarkdownTranslatorLike(Protocol):
+    inputstore: TranslationStore
+    outputthreshold: int | None
+    maxlength: int
+    extract_code_blocks: bool
+    extract_frontmatter: bool
+    no_placeholders: bool
+
+    def lookup(self, string: str) -> str: ...
+
+
+# TODO: the type ignore is wrong, we probably need some shared base class
+class ConvertPoUnit[U: pounit, F: "ConvertFormat"](BasePoUnit[U, F]):  # type: ignore[type-var]
+    id_hash_with_source: bool = True
+
+    def is_translated(self) -> bool:
+        """Check whether unit is translated."""
+        if self.parent.is_template:
+            return self.has_translation()
+        return self.has_unit() and self.has_translation()
+
+    def is_fuzzy(self, fallback: bool = False) -> bool:
+        """Check whether unit needs editing."""
+        return fallback
+
+    def is_approved(self, fallback: bool = False) -> bool:
+        """Check whether unit is approved."""
+        return fallback
+
+    @cached_property
+    def source(self) -> str:
+        """Return source string from a Translate Toolkit unit."""
+        if self.template:
+            return get_string(self.template.source)
+        return get_string(self.unit.source)
+
+    def is_code_block(self) -> bool:
+        """
+        Check whether unit is a code block.
+
+        Code blocks are identified by the presence of a docpath ending with code[N]".
+        This would be true for both fenced and indented code blocks.
+        """
+        if docpath := self.mainunit.getdocpath():
+            return docpath.rsplit("/", 1)[-1].startswith("code[")
+        return False
+
+
+class ConvertXliffUnit(XliffUnit):
+    remove_flags: ClassVar[list[str]] = ["xml-text"]
+
+    def is_fuzzy(self, fallback: bool = False) -> bool:
+        """Check whether unit needs editing."""
+        return fallback
+
+    def is_approved(self, fallback: bool = False) -> bool:
+        """Check whether unit is approved."""
+        return fallback
+
+    def is_translated(self) -> bool:
+        """Check whether unit is translated."""
+        if self.parent.is_template:
+            return self.has_translation()
+        return self.has_unit()
+
+
+class ConvertFormat[S: TranslationStore, U: TranslateToolkitUnit, T: TTKitUnit](
+    TranslationFormat[S, U, T]
+):
+    """
+    Base class for convert based formats.
+
+    This always uses intermediate representation.
+    """
+
+    monolingual = True
+    can_add_unit = False
+    can_delete_unit = False
+    can_edit_base: bool = False
+    unit_class: type[TranslationUnit] = ConvertPoUnit  # type: ignore[assignment]
+    needs_existing_units = True
+    autoaddon: ClassVar[dict[str, dict[str, Any]]] = {
+        "weblate.flags.same_edit": {},
+        "weblate.cleanup.generic": {},
+    }
+    create_style = "copy"
+
+    def save_content(self, handle: IO[bytes]) -> None:
+        """Store content to file."""
+        raise NotImplementedError
+
+    def save(self) -> None:
+        """Save underlying store to disk."""
+        if not isinstance(self.storefile, str):
+            msg = "Can save only to a file."
+            raise TypeError(msg)
+        self.save_atomic(
+            self.storefile, self.save_content, repo_temp_dir=self.repo_temp_dir
+        )
+
+    def convertfile(
+        self, storefile: IO[bytes], template_store: TranslationFormat | None
+    ) -> S:
+        raise NotImplementedError
+
+    @staticmethod
+    # ruff: ignore[unused-static-method-argument]
+    def needs_target_sync(template_store: TranslationFormat | None) -> bool:
+        return False
+
+    def load(
+        self,
+        storefile: str | IO[bytes],
+        template_store: TranslationFormat | None,
+    ) -> S:
+        # Did we get file or filename?
+        if not hasattr(storefile, "read"):
+            with open(storefile, "rb") as handle:
+                store = self.convertfile(handle, template_store)
+        else:
+            store = self.convertfile(cast("IO[bytes]", storefile), template_store)
+        # Adjust store to have translations
+        if self.needs_target_sync(template_store):
+            for unit in store.units:
+                if unit.isheader():
+                    continue
+                # HTML does this properly on loading, others need it
+                unit.target = unit.source
+                unit.rich_target = unit.rich_source
+        return store
+
+    @classmethod
+    def create_new_file(
+        cls,
+        filename: str,
+        # ruff: ignore[unused-class-method-argument]
+        language: Language,
+        base: str,
+        # ruff: ignore[unused-class-method-argument]
+        callback: Callable | None = None,
+        # ruff: ignore[unused-class-method-argument]
+        file_format_params: FileFormatParams | None = None,
+    ) -> None:
+        """Handle creation of new translation file."""
+        if not base:
+            msg = "Not supported"
+            raise ValueError(msg)
+        # Copy file
+        shutil.copy(base, filename)
+
+    @classmethod
+    def is_valid_base_for_new(
+        cls,
+        base: str,
+        # ruff: ignore[unused-class-method-argument]
+        monolingual: bool,
+        errors: list[Exception] | None = None,
+        fast: bool = False,
+        # ruff: ignore[unused-class-method-argument]
+        file_format_params: FileFormatParams | None = None,
+    ) -> bool:
+        """Check whether base is valid."""
+        if not base:
+            return False
+        try:
+            if not fast:
+                cls(base, None)
+        except Exception as exception:
+            if errors is not None:
+                errors.append(exception)
+            if not is_expected_parse_error(exception):
+                report_error("File-parsing error")
+            return False
+        return True
+
+    def add_unit(self, unit: TranslationUnit) -> None:
+        self.store.addunit(unit.unit)
+
+    def create_unit(
+        self,
+        key: str,
+        source: str | list[str],
+        target: str | list[str] | None = None,
+    ) -> NoReturn:
+        msg = "Not supported"
+        raise ValueError(msg)
+
+    def cleanup_unused(self) -> list[str]:
+        """
+        Bring target in sync with the source.
+
+        This is done automatically on save as it reshapes translations
+        based on the template.
+        """
+        self.save()
+        return []
+
+    def get_unit_index(
+        self, store: TranslationStore
+    ) -> tuple[dict[str, TranslateToolkitUnit], dict[str, TranslateToolkitUnit]]:
+        locationindex: dict[str, TranslateToolkitUnit] = {}
+        docpathindex: dict[str, TranslateToolkitUnit] = {}
+
+        # We override the previous entries with more recent ones,
+        # in most cases this should not happen and we have no way
+        # to figure out which unit is "better" while merging the
+        # translations.
+        for unit in store.units:
+            if docpath := unit.getdocpath():
+                docpathindex[docpath] = unit
+            for location in unit.getlocations():
+                locationindex[location] = unit
+
+        return locationindex, docpathindex
+
+    # ruff: ignore[complex-structure]
+    def convert_to_po(
+        self,
+        parser: TranslationStore,
+        template_store: TranslationFormat | None,
+        *,
+        duplicate_style: str = "msgctxt",
+        source_attribute: str = "source",
+    ) -> S:
+        store = pofile()
+        get_text = attrgetter(source_attribute)
+        # Prepare index of existing translations
+        unitindex: dict[str, list[Unit]] = defaultdict(list)
+        for existing_unit in self.existing_units:
+            for source in existing_unit.get_source_plurals():
+                unitindex[source].append(existing_unit)
+
+        # Convert store
+        if template_store:
+            locationindex, docpathindex = self.get_unit_index(parser)
+            for unit in template_store.content_units:
+                thepo = store.addsourceunit(unit.source)
+                ttkit_unit = cast("TranslateToolkitUnit", unit.unit)
+                thepo.setdocpath(ttkit_unit.getdocpath())
+                locations = ttkit_unit.getlocations()
+                thepo.addlocations(locations)
+                thepo.addnote(ttkit_unit.getnotes(), "developer")
+                if self.is_template:
+                    thepo.target = unit.source
+                elif not unitindex:
+                    # Try to import initial translation from the file
+                    if docpath := ttkit_unit.getdocpath():
+                        # Use docpath if available as it provides logical location
+                        if docpath in docpathindex:
+                            thepo.target = get_text(docpathindex[docpath])
+                    else:
+                        # Rely on physical location as fallback
+                        for location in locations:
+                            if location in locationindex:
+                                thepo.target = get_text(locationindex[location])
+                                break
+        else:
+            for htmlunit in parser.units:
+                # Source file
+                thepo = store.addsourceunit(get_text(htmlunit))
+                thepo.target = get_text(htmlunit)
+                thepo.setdocpath(htmlunit.getdocpath())
+                thepo.addlocations(htmlunit.getlocations())
+                thepo.addnote(htmlunit.getnotes(), "developer")
+
+        # Handle duplicate strings (use context to differentiate them)
+        store.removeduplicates(duplicate_style)
+
+        # Merge existing translations
+        if unitindex and not self.is_template:
+            for unit in store.units:
+                possible_translations = unitindex[unit.source]
+                # Single match
+                if len(possible_translations) == 1:
+                    unit.target = possible_translations[0].target
+                    continue
+                # None match
+                if not possible_translations:
+                    continue
+                # Multiple matches
+                for translation in possible_translations:
+                    if translation.context == unit.getcontext():
+                        unit.target = translation.target
+                        break
+
+        return store  # type: ignore[return-value]
+
+
+class HTMLFormat[S: pofile, U: pounit, T: ConvertPoUnit](ConvertFormat[S, U, T]):
+    # Translators: File format name
+    name = gettext_lazy("HTML file")
+    autoload = ("*.htm", "*.html")
+    format_id = "html"
+    check_flags = ("safe-html", "strict-same")
+
+    def convertfile(
+        self, storefile: IO[bytes], template_store: TranslationFormat | None
+    ) -> S:
+        # Fake input file with a blank filename
+        htmlparser = htmlfile(inputfile=NamedBytesIO("", storefile.read()))
+        duplicate_style = "msgctxt"
+        if MergeDuplicates.get_value(self.file_format_params):
+            duplicate_style = "merge"
+
+        return self.convert_to_po(
+            htmlparser, template_store, duplicate_style=duplicate_style
+        )
+
+    def save_content(self, handle: IO[bytes]) -> None:
+        """Store content to file."""
+        converter = po2html()
+        if self.template_store is None:
+            msg = "Template store is required."
+            raise TypeError(msg)
+        templatename = self.template_store.storefile
+        if hasattr(templatename, "name"):
+            templatename = templatename.name
+        with open(templatename, "rb") as templatefile:
+            outputstring = converter.mergestore(
+                self.store, templatefile, includefuzzy=True
+            )
+        handle.write(outputstring.encode("utf-8"))
+
+    @staticmethod
+    def mimetype() -> str:
+        """Return most common mime type for format."""
+        return "text/html"
+
+    @staticmethod
+    def extension() -> str:
+        """Return most common file extension for format."""
+        return "html"
+
+
+class MarkdownFormat[S: pofile, U: pounit, T: ConvertPoUnit](ConvertFormat[S, U, T]):
+    # Translators: File format name
+    name = gettext_lazy("Markdown file")
+    autoload: tuple[str, ...] = ("*.md", "*.markdown")
+    format_id = "markdown"
+    check_flags: tuple[str, ...] = ("auto-safe-html", "strict-same", "md-text")
+
+    @staticmethod
+    def get_parser_class() -> type[Any]:
+        """Return parser class."""
+        # Lazy import as mistletoe is expensive
+        # ruff: ignore[import-outside-top-level]
+        from translate.storage.markdown import MarkdownFile
+
+        return MarkdownFile
+
+    @staticmethod
+    def get_translator_class() -> type[Any]:
+        """Return translator class."""
+        # Lazy import as mistletoe is expensive
+        # ruff: ignore[import-outside-top-level]
+        from translate.convert.po2md import MarkdownTranslator
+
+        return MarkdownTranslator
+
+    def get_save_translator_class(self) -> type[Any]:
+        """Return translator class for saving."""
+        translator_class = self.get_translator_class()
+
+        class WeblateMarkdownTranslator(translator_class):  # type: ignore[valid-type, misc]
+            def lookup(self, string: str) -> str:
+                unit = self.inputstore.sourceindex.get(string, None)
+                if unit is None:
+                    return string
+                unit = unit[0]
+                if unit.istranslated():
+                    return unit.target
+                if self.includefuzzy and unit.isfuzzy():
+                    return unit.target
+                return unit.source
+
+        return WeblateMarkdownTranslator
+
+    def translate_markdown(
+        self,
+        converter: MarkdownTranslatorLike,
+        templatefile: IO[bytes],
+        outputfile: IO[bytes],
+    ) -> int:
+        """Translate Markdown using the parser class directly."""
+        if not tt_convert.should_output_store(
+            converter.inputstore, converter.outputthreshold
+        ):
+            return False
+
+        outputstore = self.get_parser_class()(
+            inputfile=templatefile,
+            callback=converter.lookup,
+            max_line_length=converter.maxlength if converter.maxlength > 0 else None,
+            extract_code_blocks=converter.extract_code_blocks,
+            extract_frontmatter=converter.extract_frontmatter,
+            frontmatter_translate_values=MdFrontmatterTranslateValues.get_value(
+                self.file_format_params
+            ),
+            no_placeholders=converter.no_placeholders,
+        )
+        outputfile.write(outputstore.filesrc.encode("utf-8"))
+        return 1
+
+    def convertfile(
+        self, storefile: IO[bytes], template_store: TranslationFormat | None
+    ) -> S:
+        # Hold Markdown lock because this is not thread-safe, see
+        # https://github.com/miyuchina/mistletoe/issues/210
+        with MARKDOWN_LOCK:
+            # Fake input file with a blank filename
+            mdparser = self.get_parser_class()(
+                inputfile=NamedBytesIO("", storefile.read()),
+                max_line_length=LineMaxLength.get_value(self.file_format_params),
+                extract_code_blocks=MdExtractCodeBlocks.get_value(
+                    self.file_format_params
+                ),
+                extract_frontmatter=MdExtractFrontmatter.get_value(
+                    self.file_format_params
+                ),
+                frontmatter_translate_values=MdFrontmatterTranslateValues.get_value(
+                    self.file_format_params
+                ),
+                no_placeholders=MdNoPlaceholders.get_value(self.file_format_params),
+            )
+
+        duplicate_style = "msgctxt"
+        if MergeDuplicates.get_value(self.file_format_params):
+            duplicate_style = "merge"
+
+        return self.convert_to_po(
+            mdparser,
+            template_store,
+            duplicate_style=duplicate_style,
+        )
+
+    def save_content(self, handle: IO[bytes]) -> None:
+        """Store content to file."""
+        # Hold Markdown lock because this is not thread-safe, see
+        # https://github.com/miyuchina/mistletoe/issues/210
+        with MARKDOWN_LOCK:
+            converter = self.get_save_translator_class()(
+                inputstore=self.store,
+                includefuzzy=True,
+                outputthreshold=None,
+                maxlength=LineMaxLength.get_value(self.file_format_params),
+                extract_code_blocks=MdExtractCodeBlocks.get_value(
+                    self.file_format_params
+                ),
+                extract_frontmatter=MdExtractFrontmatter.get_value(
+                    self.file_format_params
+                ),
+                no_placeholders=MdNoPlaceholders.get_value(self.file_format_params),
+            )
+            if self.template_store is None:
+                msg = "Template store is required."
+                raise TypeError(msg)
+            templatename = self.template_store.storefile
+            if hasattr(templatename, "name"):
+                templatename = templatename.name
+            with open(templatename, "rb") as templatefile:
+                if MdFrontmatterTranslateValues.get_value(self.file_format_params):
+                    self.translate_markdown(converter, templatefile, handle)
+                else:
+                    converter.translate(templatefile, handle)
+
+    @staticmethod
+    def mimetype() -> str:
+        """Return most common mime type for format."""
+        return "text/markdown"
+
+    @staticmethod
+    def extension() -> str:
+        """Return most common file extension for format."""
+        return "md"
+
+
+class MDXPoUnit(ConvertPoUnit):
+    def get_extra_flags(self):
+        yield from super().get_extra_flags()
+        if self.is_code_block():
+            # fenced/indented code-block contents are considered as literal text, not JSX
+            yield "ignore-safe-mdx"
+
+
+class MDXFormat(MarkdownFormat):
+    # Translators: File format name
+    name = gettext_lazy("MDX file")
+    autoload: tuple[str, ...] = ("*.mdx",)
+    format_id = "mdx"
+    check_flags = ("auto-safe-html", "strict-same", "md-text", "safe-mdx")
+    unit_class = MDXPoUnit
+
+    @staticmethod
+    def get_parser_class() -> type[Any]:
+        """Return parser class."""
+        # Lazy import as mistletoe is expensive
+        # ruff: ignore[import-outside-top-level]
+        from translate.storage.mdxfile import MDXFile
+
+        return MDXFile
+
+    @staticmethod
+    def get_translator_class() -> type[Any]:
+        """Return translator class."""
+        # Lazy import as mistletoe is expensive
+        # ruff: ignore[import-outside-top-level]
+        from translate.convert.po2mdx import MDXTranslator
+
+        return MDXTranslator
+
+    def get_save_translator_class(self) -> type[Any]:
+        """Return translator class for saving."""
+        if MergeDuplicates.get_value(self.file_format_params):
+            return super().get_save_translator_class()
+
+        # Lazy import as mistletoe is expensive
+        # ruff: ignore[import-outside-top-level]
+        from translate.convert.po2mdx import MDXTranslator
+
+        class ContextMDXTranslator(MDXTranslator):
+            def __init__(
+                self,
+                inputstore: TranslationStore,
+                includefuzzy: bool,
+                outputthreshold: int | None,
+                maxlength: int,
+                extract_code_blocks: bool = True,
+                extract_frontmatter: bool = True,
+                no_placeholders: bool = False,
+            ) -> None:
+                super().__init__(
+                    inputstore,
+                    includefuzzy,
+                    outputthreshold,
+                    maxlength,
+                    extract_code_blocks,
+                    extract_frontmatter,
+                    no_placeholders,
+                )
+                self._source_units: dict[str, deque[pounit]] = defaultdict(deque)
+                for unit in self.inputstore.units:
+                    if not unit.isheader():
+                        self._source_units[get_string(unit.source)].append(unit)
+
+            def lookup(self, string: str) -> str:
+                units = self._source_units.get(string)
+                if not units:
+                    return string
+                unit = units.popleft()
+                if unit.istranslated():
+                    return get_string(unit.target)
+                if self.includefuzzy and unit.isfuzzy():
+                    return get_string(unit.target)
+                return get_string(unit.source)
+
+            def _lookup(self, string: str) -> str:
+                return self.lookup(string)
+
+        return ContextMDXTranslator
+
+    @staticmethod
+    def mimetype() -> str:
+        """Return most common mime type for format."""
+        return "text/mdx"
+
+    @staticmethod
+    def extension() -> str:
+        """Return most common file extension for format."""
+        return "mdx"
+
+
+class OpenDocumentFormat[S: Xliff1File, U: Xliff1Unit, T: ConvertXliffUnit](
+    ConvertFormat[S, U, T]
+):
+    # Translators: File format name
+    name = gettext_lazy("OpenDocument file")
+    autoload = (
+        "*.sxw",
+        "*.odt",
+        "*.ods",
+        "*.odp",
+        "*.odg",
+        "*.odc",
+        "*.odf",
+        "*.odi",
+        "*.odm",
+        "*.ott",
+        "*.ots",
+        "*.otp",
+        "*.otg",
+        "*.otc",
+        "*.otf",
+        "*.oti",
+        "*.oth",
+    )
+    format_id = "odf"
+    check_flags = ("strict-same",)
+    unit_class = ConvertXliffUnit
+
+    def convertfile(
+        self, storefile: IO[bytes], template_store: TranslationFormat | None
+    ) -> S:
+        store: Xliff1File = Xliff1File()
+        store.setfilename(store.getfilenode("NoName"), "odf")
+        contents = open_odf(storefile)
+        for data in contents.values():
+            parse_state = ParseState(no_translate_content_elements, inline_elements)
+            build_store(BytesIO(data), store, parse_state)
+        return store  # type: ignore[return-value]
+
+    def save_content(self, handle: IO[bytes]) -> None:
+        """Store content to file."""
+        if self.template_store is None:
+            msg = "Template store is required."
+            raise TypeError(msg)
+        templatename = self.template_store.storefile
+        if hasattr(templatename, "name"):
+            templatename = templatename.name
+        # This is workaround for weird fuzzy handling in translate-toolkit
+        for unit in self.all_units:
+            if any(state == "translated" for state in unit.get_xliff_states()):  # type: ignore[attr-defined]
+                unit.set_state(STATE_APPROVED)
+
+        with open(templatename, "rb") as templatefile:
+            dom_trees = translate_odf(templatefile, self.store)
+            write_odf(templatefile, handle, dom_trees)
+
+    @staticmethod
+    def mimetype() -> str:
+        """Return most common mime type for format."""
+        return "application/vnd.oasis.opendocument.text"
+
+    @staticmethod
+    def extension() -> str:
+        """Return most common file extension for format."""
+        return "odt"
+
+    @staticmethod
+    # ruff: ignore[unused-static-method-argument]
+    def needs_target_sync(template_store: TranslationFormat | None) -> bool:
+        return True
+
+
+class IDMLFormat[S: pofile, U: pounit, T: ConvertPoUnit](ConvertFormat[S, U, T]):
+    # Translators: File format name
+    name = gettext_lazy("IDML file")
+    autoload = ("*.idml", "*.idms")
+    format_id = "idml"
+    check_flags = ("strict-same",)
+
+    def convertfile(
+        self, storefile: IO[bytes], template_store: TranslationFormat | None
+    ) -> S:
+        store = pofile()
+
+        contents = open_idml(storefile)
+
+        # Create it here to avoid having repeated ids.
+        id_maker = IdMaker()
+
+        for filename, translatable_file in contents.items():
+            parse_state = ParseState(NO_TRANSLATE_ELEMENTS, INLINE_ELEMENTS)
+            po_store_adder = make_postore_adder(store, id_maker, filename)
+            build_idml_store(
+                BytesIO(translatable_file),
+                store,
+                parse_state,
+                store_adder=po_store_adder,
+            )
+
+        return store  # type: ignore[return-value]
+
+    def save_content(self, handle: IO[bytes]) -> None:
+        """Store content to file."""
+        if self.template_store is None:
+            msg = "Template store is required."
+            raise TypeError(msg)
+        templatename = self.template_store.storefile
+        if hasattr(templatename, "name"):
+            templatename = templatename.name
+        with ZipFile(templatename, "r") as template_zip:
+            translatable_files = [
+                filename
+                for filename in template_zip.namelist()
+                if filename.startswith("Stories/")
+            ]
+
+            dom_trees = translate_idml(templatename, self.store, translatable_files)
+
+            write_idml(template_zip, handle, dom_trees)
+
+    @staticmethod
+    def mimetype() -> str:
+        """Return most common mime type for format."""
+        return "application/octet-stream"
+
+    @staticmethod
+    def extension() -> str:
+        """Return most common file extension for format."""
+        return "idml"
+
+    @staticmethod
+    # ruff: ignore[unused-static-method-argument]
+    def needs_target_sync(template_store: TranslationFormat | None) -> bool:
+        return True
+
+
+class WindowsRCFormat[S: pofile, U: pounit, T: ConvertPoUnit](ConvertFormat[S, U, T]):
+    # Translators: File format name
+    name = gettext_lazy("RC file")
+    format_id = "rc"
+    autoload = ("*.rc",)
+    language_format = "bcp"
+    supports_descriptions: bool = True
+
+    @staticmethod
+    def needs_target_sync(template_store: TranslationFormat | None) -> bool:
+        return template_store is None
+
+    @staticmethod
+    def mimetype() -> str:
+        """Return most common media type for format."""
+        return "text/plain"
+
+    @staticmethod
+    def extension() -> str:
+        """Return most common file extension for format."""
+        return "rc"
+
+    def convertfile(
+        self, storefile: IO[bytes], template_store: TranslationFormat | None
+    ) -> S:
+        input_store = rcfile()
+        input_store.parse(storefile.read())
+        converter = rc2po()
+        if template_store:
+            store = converter.merge_store(
+                template_store.store.rcfile,  # type: ignore[union-attr]
+                input_store,
+            )
+        else:
+            store = converter.convert_store(input_store)
+        store.rcfile = input_store
+        return store
+
+    def save_content(self, handle: IO[bytes]) -> None:
+        """Store content to file."""
+        # Fallback language
+        lang = "LANG_ENGLISH"
+        sublang = "SUBLANG_DEFAULT"
+
+        # Keep existing language tags
+        storage = self.store.rcfile  # type: ignore[attr-defined]
+        if storage.lang:
+            lang = storage.lang
+            if storage.sublang:
+                sublang = storage.sublang
+        if self.template_store is None:
+            msg = "Template store is required."
+            raise TypeError(msg)
+        templatename = self.template_store.storefile
+        if hasattr(templatename, "name"):
+            templatename = templatename.name
+        encoding = "utf-8"
+        with open(templatename, "rb") as templatefile:
+            bom = templatefile.read(2)
+            if bom == codecs.BOM_UTF16_LE or b"\000" in bom:
+                encoding = "utf-16-le"
+            templatefile.seek(0)
+            converter = rerc(
+                templatefile,
+                lang=lang,
+                sublang=sublang,
+                charset=encoding,
+            )
+            outputrclines = converter.convertstore(self.store, includefuzzy=True)
+            try:
+                handle.write(outputrclines.encode(encoding))
+            except UnicodeEncodeError:
+                handle.write(codecs.BOM_UTF16_LE)
+                handle.write(outputrclines.encode("utf-16-le"))
+
+
+class PlainTextFormat[S: pofile, U: pounit, T: ConvertPoUnit](ConvertFormat[S, U, T]):
+    # Translators: File format name
+    name = gettext_lazy("Plain text file")
+    format_id = "txt"
+    autoload = ("*.txt",)
+    flavour = "plain"
+
+    @staticmethod
+    def mimetype() -> str:
+        """Return most common media type for format."""
+        return "text/plain"
+
+    @staticmethod
+    def extension() -> str:
+        """Return most common file extension for format."""
+        return "txt"
+
+    def convertfile(
+        self, storefile: IO[bytes], template_store: TranslationFormat | None
+    ) -> S:
+        input_store = TxtFile(encoding="utf-8", flavour=self.flavour)
+        input_store.parse(storefile.readlines())
+        input_store.filename = os.path.basename(storefile.name)
+        duplicate_style = "msgctxt"
+        if MergeDuplicates.get_value(self.file_format_params):
+            duplicate_style = "merge"
+
+        return self.convert_to_po(
+            input_store, template_store, duplicate_style=duplicate_style
+        )
+
+    def save_content(self, handle: IO[bytes]) -> None:
+        """Store content to file."""
+        if self.template_store is None:
+            msg = "Template store is required."
+            raise TypeError(msg)
+        templatename = self.template_store.storefile
+        if hasattr(templatename, "name"):
+            templatename = templatename.name
+        with open(cast("str", templatename), "rb") as templatefile:
+            converter = po2txt(
+                input_file=self.store,
+                output_file=None,
+                template_file=templatefile,
+                flavour=self.flavour,
+            )
+            outputstring = converter.merge_stores()
+        handle.write(outputstring.encode("utf-8"))
+
+
+class DokuWikiFormat(PlainTextFormat):
+    # Translators: File format name
+    name = gettext_lazy("DokuWiki text file")
+    format_id = "dokuwiki"
+    autoload = ("*.dw",)
+    flavour = "dokuwiki"
+
+
+class MediaWikiFormat(PlainTextFormat):
+    # Translators: File format name
+    name = gettext_lazy("MediaWiki text file")
+    format_id = "mediawiki"
+    autoload = ("*.mw",)
+    flavour = "mediawiki"
+
+
+class AsciiDocFormat[S: pofile, U: pounit, T: ConvertPoUnit](ConvertFormat[S, U, T]):
+    # Translators: File format name
+    name = gettext_lazy("AsciiDoc file")
+    autoload = ("*.ad", "*.adoc", "*.asciidoc")
+    format_id = "asciidoc"
+    check_flags = ("safe-html", "strict-same", "asciidoc-text")
+
+    def convertfile(
+        self, storefile: IO[bytes], template_store: TranslationFormat | None
+    ) -> S:
+        # Fake input file with a blank filename
+        adocparser = AsciiDocFile(inputfile=NamedBytesIO("", storefile.read()))
+
+        duplicate_style = "msgctxt"
+        if MergeDuplicates.get_value(self.file_format_params):
+            duplicate_style = "merge"
+
+        return self.convert_to_po(
+            adocparser,
+            template_store,
+            duplicate_style=duplicate_style,
+        )
+
+    def save_content(self, handle: IO[bytes]) -> None:
+        """Store content to file."""
+        converter = AsciiDocTranslator(
+            inputstore=self.store, includefuzzy=True, outputthreshold=None
+        )
+        if self.template_store is None:
+            msg = "Template store is required."
+            raise TypeError(msg)
+        templatename = self.template_store.storefile
+        if hasattr(templatename, "name"):
+            templatename = templatename.name
+        with open(templatename, "rb") as templatefile:
+            converter.translate(templatefile, handle)
+
+    @staticmethod
+    def mimetype() -> str:
+        """Return most common mime type for format."""
+        return "text/x-asciidoc"
+
+    @staticmethod
+    def extension() -> str:
+        """Return most common file extension for format."""
+        return "adoc"
+
+
+class WXLFormat[S: pofile, U: pounit, T: ConvertPoUnit](ConvertFormat[S, U, T]):
+    # Translators: File format name
+    name = gettext_lazy("WixLocalization file")
+    format_id = "wxl"
+    autoload: tuple[str, ...] = ("*.wxl",)
+    language_format: str = "bcp_long_lower"
+
+    def convertfile(
+        self, storefile: IO[bytes], template_store: TranslationFormat | None
+    ) -> S:
+        # Fake input file with a blank filename
+        wxlparser = WxlFile(inputfile=NamedBytesIO("", storefile.read()))
+
+        return self.convert_to_po(
+            wxlparser,
+            template_store,
+            source_attribute="target",
+        )
+
+    def save_content(self, handle: IO[bytes]) -> None:
+        """Store content to file."""
+        if self.template_store is None:
+            msg = "Template store is required."
+            raise TypeError(msg)
+        templatename = self.template_store.storefile
+        if hasattr(templatename, "name"):
+            templatename = templatename.name
+        with open(cast("str", templatename), "rb") as templatefile:
+            wxlparser = WxlFile(inputfile=templatefile)
+
+        wxlparser.makeindex()
+
+        for unit in self.store.units:
+            if unit.isheader() or not unit.istranslated():
+                continue
+            key = unit.getlocations()[0]
+            if not key or key not in wxlparser.locationindex:
+                continue
+
+            wxlparser.locationindex[key].target = unit.target
+
+        wxlparser.serialize(handle)
+
+    @staticmethod
+    def mimetype() -> str:
+        """Return most common mime type for format."""
+        return "application/xml"
+
+    @staticmethod
+    def extension() -> str:
+        """Return most common file extension for format."""
+        return "wxl"

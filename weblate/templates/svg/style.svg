@@ -1,0 +1,2 @@
+{% load static %}
+<style type="text/css">@import url({{ site_url }}{% static 'weblate_fonts/source-sans-3.css' %});</style>

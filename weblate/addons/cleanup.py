@@ -1,0 +1,169 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
+
+from django.utils.translation import gettext_lazy
+
+from weblate.addons.base import BaseAddon, UpdateBaseAddon
+from weblate.addons.events import (
+    AddonActivityLogReason,
+    AddonEvent,
+    AddonEventOutcome,
+)
+from weblate.formats.base import TranslationFormat
+from weblate.trans.exceptions import FileParseError
+
+if TYPE_CHECKING:
+    from weblate.trans.models import Category, Component, Project
+
+
+class BaseCleanupAddon(UpdateBaseAddon):
+    @staticmethod
+    def can_install_format(component: Component) -> bool:
+        return component.file_format_cls.can_delete_unit
+
+    @classmethod
+    def can_install(
+        cls,
+        *,
+        component: Component | None = None,
+        category: Category | None = None,
+        project: Project | None = None,
+    ) -> bool:
+        if component is not None and (
+            not component.has_template() or not cls.can_install_format(component)
+        ):
+            return False
+        return super().can_install(
+            component=component, category=category, project=project
+        )
+
+
+class CleanupAddon(BaseCleanupAddon):
+    name = "weblate.cleanup.generic"
+    verbose = gettext_lazy("Cleanup translation files")
+    description = gettext_lazy(
+        "Update all translation files to match the monolingual base file. "
+        "For most file formats, this means removing stale translation keys "
+        "no longer present in the base file."
+    )
+    icon = "eraser.svg"
+    events: ClassVar[set[AddonEvent]] = {
+        AddonEvent.EVENT_PRE_COMMIT,
+        AddonEvent.EVENT_POST_UPDATE,
+    }
+
+    @classmethod
+    def can_install_format(cls, component: Component) -> bool:
+        return (
+            super().can_install_format(component)
+            or component.file_format_cls.cleanup_unused
+            != TranslationFormat.cleanup_unused
+        )
+
+    def update_translations(
+        self, component: Component, previous_head: str, changed_files: list[str]
+    ) -> None:
+        for translation in self.iterate_translations(component):
+            filenames = translation.store.cleanup_unused()
+            if filenames is None:
+                continue
+            self.extra_files.extend(filenames)
+            # Do not update hash here as this is just before parsing updated files
+
+    def pre_commit(
+        self,
+        translation,
+        author: str,
+        store_hash: bool,
+        activity_log_id: int | None = None,
+    ) -> AddonEventOutcome | None:
+        if translation.is_source and not translation.component.intermediate:
+            return AddonEventOutcome.skipped(AddonActivityLogReason.NOT_APPLICABLE)
+        try:
+            filenames = translation.store.cleanup_unused()
+        except FileParseError:
+            return AddonEventOutcome.error()
+        if filenames is not None:
+            self.extra_files.extend(filenames)
+            if store_hash:
+                translation.store_hash()
+        return None
+
+
+class RemoveBlankAddon(BaseCleanupAddon):
+    name = "weblate.cleanup.blank"
+    verbose = gettext_lazy("Remove blank strings")
+    description = gettext_lazy(
+        "Removes strings without a translation from translation files."
+    )
+    events: ClassVar[set[AddonEvent]] = {
+        AddonEvent.EVENT_POST_COMMIT,
+        AddonEvent.EVENT_POST_UPDATE,
+    }
+    icon = "eraser.svg"
+    version_added = "4.4"
+
+    def update_translations(
+        self, component: Component, previous_head: str, changed_files: list[str]
+    ) -> None:
+        for translation in self.iterate_translations(component):
+            filenames = translation.store.cleanup_blank()
+            if filenames is None:
+                continue
+            self.extra_files.extend(filenames)
+            # Do not update hash in post_update, only in post_commit
+            if previous_head == "weblate:post-commit":
+                translation.store_hash()
+
+    def post_commit(
+        self, component: Component, store_hash: bool, activity_log_id: int | None = None
+    ) -> AddonEventOutcome | None:
+        return self.post_update(
+            component,
+            "weblate:post-commit" if store_hash else "weblate:post-commit-no-store",
+            skip_push=True,
+            changed_files=[],
+            activity_log_id=activity_log_id,
+        )
+
+
+class ResetAddon(BaseAddon):
+    # Event used to trigger the script
+    events: ClassVar[set[AddonEvent]] = {AddonEvent.EVENT_DAILY}
+    # Name of the addon, has to be unique
+    name = "weblate.hosted.reset"
+    # Verbose name and long description
+    verbose = gettext_lazy("Reset repository to upstream")
+    description = gettext_lazy(
+        "Discards all changes in the Weblate repository each night."
+    )
+    repo_scope = True
+    icon = "eraser.svg"
+    version_added = "5.17"
+
+    @classmethod
+    def can_install(
+        cls,
+        *,
+        component: Component | None = None,
+        category: Category | None = None,
+        project: Project | None = None,
+    ) -> bool:
+        # Only installable on the sandbox project
+        return (
+            component is not None
+            and component.project.slug == "sandbox"
+            and super().can_install(
+                component=component, category=category, project=project
+            )
+        )
+
+    def daily_component(
+        self, component: Component, activity_log_id: int | None = None
+    ) -> None:
+        component.do_reset()

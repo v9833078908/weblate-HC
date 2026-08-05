@@ -1,0 +1,79 @@
+{% load i18n static translations %}
+
+<footer>
+  <ul>
+    <li>
+      {% blocktranslate %}Powered by {{ weblate_version_link }}{% endblocktranslate %}
+    </li>
+    <li>
+      <a href="{% url 'about' %}" id="footer-about-link">{% translate "About" context "About this server" %}</a>
+    </li>
+    {% if has_legal %}
+      {% if terms_url %}
+        <li>
+          <a href="{{ terms_url }}">{% translate "Terms" context "General terms and conditions" %}</a>
+        </li>
+      {% endif %}
+      {% if privacy_url %}
+        <li>
+          <a href="{{ privacy_url }}">{% translate "Privacy" context "Privacy policy" %}</a>
+        </li>
+      {% endif %}
+    {% else %}
+      {% if legal_url %}
+        <li>
+          <a href="{{ legal_url }}">{% translate "Legal" context "Link to legal documents" %}</a>
+        </li>
+      {% endif %}
+      {% if privacy_url %}
+        <li>
+          <a href="{{ privacy_url }}">{% translate "Privacy" context "Privacy policy" %}</a>
+        </li>
+      {% endif %}
+    {% endif %}
+    {% if status_url %}
+      <li>
+        <a href="{{ status_url }}">{% translate "Status" context "Service status" %}</a>
+      </li>
+    {% endif %}
+    {% if contact_form != "disabled" %}
+      <li>
+        <a href="{% url 'contact' %}">{% translate "Contact" %}</a>
+      </li>
+    {% endif %}
+    <li>
+      <a href="{% documentation 'index' %}">{% translate "Documentation" %}</a>
+    </li>
+    {% if not support_status.has_support %}
+      <li>
+        <a href="{% url 'donate' %}">{% translate "Become a Weblate supporter" context "Support Weblate financially" %}</a>
+      </li>
+    {% endif %}
+  </ul>
+</footer>
+
+{% if matomo_site_id and matomo_url %}
+  <!-- Matomo -->
+  <script src="{% static 'js/matomo.js' %}"
+          async
+          defer
+          id="matomo-tracker"
+          data-url="{{ matomo_url }}"
+          data-site-id="{{ matomo_site_id }}"
+          data-language="{{ LANGUAGE_CODE }}"
+          {% if project %}data-project="{{ project.name }}"{% endif %}></script>
+  <noscript>
+    <img src="{{ matomo_url }}matomo.php?idsite={{ matomo_site_id }}&amp;rec=1"
+         style="border:0"
+         alt="" />
+  </noscript>
+  <!-- End Matomo Code -->
+{% endif %}
+
+{% if google_analytics_id %}
+  <script src="{% static 'js/google-analytics.js' %}"
+          id="google-analytics-tracker"
+          data-tracking-id="{{ google_analytics_id }}"
+          data-language="{{ LANGUAGE_CODE }}"
+          {% if project %}data-project="{{ project.name }}"{% endif %}></script>
+{% endif %}

@@ -1,0 +1,69 @@
+{% load i18n %}
+
+{% if analysis.redirect %}
+  <p>
+    {% translate "The repository URL returned a permanent HTTP redirect. Weblate automatically accepts only verified redirects on the same host. Update the component to use the canonical repository URL if the redirect points elsewhere." %}
+  </p>
+{% endif %}
+
+{% if analysis.not_found %}
+  <p>
+    {% translate "The upstream repository was not found. Please check whether it exists and is accessible to Weblate." %}
+  </p>
+{% endif %}
+
+{% if analysis.permission %}
+  <p>
+    {% translate "The upstream repository could not be accessed. Please check whether it is accessible to Weblate." %}
+  </p>
+{% endif %}
+
+{% if analysis.gerrit %}
+  <p>
+    {% translate "Gerrit prohibited this push. You might need a gerrit-account that has the forge author permissions for the repository/branch or have to use the squash add-on on this component in Weblate." %}
+  </p>
+{% endif %}
+
+{% if analysis.github_pull_request_creation_restricted %}
+  <p>
+    {% if analysis.github_pull_request_creation_restricted_username %}
+      {% blocktranslate with username=analysis.github_pull_request_creation_restricted_username %}The GitHub repository allows only collaborators to create pull requests. Ask a repository maintainer to allow pull requests from all users or add <code>{{ username }}</code> as a collaborator.{% endblocktranslate %}
+    {% else %}
+      {% translate "The GitHub repository allows only collaborators to create pull requests. Ask a repository maintainer to allow pull requests from all users." %}
+    {% endif %}
+  </p>
+{% endif %}
+
+{% if analysis.temporary %}
+  <p>{% translate "The upstream repository could not be temporarily accessed. Please try it again later." %}</p>
+{% endif %}
+
+{% if analysis.host_key_message %}<p>{{ analysis.host_key_message }}</p>{% endif %}
+
+{% if analysis.terminal %}
+  <p>
+    {% translate "Your repository URL seems to miss credentials. Either provide them in the URL or use SSH with key based authentication." %}
+  </p>
+{% endif %}
+
+{% if analysis.repo_suggestion %}
+  <p>
+    {% translate "You might want to use following URL instead:" %} <code>{{ analysis.repo_suggestion }}</code>
+  </p>
+{% endif %}
+
+{% if analysis.force_push_suggestion %}
+  <p>
+    {% translate "You might want to choose Git with force push as version control system in the component configuration to overwrite the remote repository after rebasing commits in Weblate." %}
+  </p>
+{% elif analysis.behind %}
+  <p>
+    {% translate "The Weblate repository is missing some commits from upstream. Perhaps it is not receiving notifications upon updates of the remote repository." %}
+  </p>
+{% endif %}
+
+{% if not analysis.redirect %}
+  <p>
+    {% translate "Weblate will retry the operation once it is needed again, so the alert might disappear for the temporary issues." %}
+  </p>
+{% endif %}

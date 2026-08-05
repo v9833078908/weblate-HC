@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% load crispy_forms_tags i18n translations %}
+
+{% block nav_pills %}
+  <ul class="nav nav-pills">
+    {% if projects %}
+      <li class="nav-item" role="presentation">
+        {# Translators: Create a component from version control #}
+        <a class="nav-link active" data-bs-target="#vcs" data-bs-toggle="tab" href="#">{% translate "From version control" %}</a>
+      </li>
+    {% endif %}
+    {% if form.fields.component.queryset %}
+      <li class="nav-item" role="presentation">
+        {# Translators: Create a component from existing component #}
+        <a class="nav-link" data-bs-target="#existing" data-bs-toggle="tab" href="#">{% translate "From an existing component" %}</a>
+      </li>
+    {% endif %}
+    {% if branch_form.fields.component.queryset %}
+      <li class="nav-item" role="presentation">
+        {# Translators: Create a component as additional branch #}
+        <a class="nav-link" data-bs-target="#branch" data-bs-toggle="tab" href="#">{% translate "Additional branch" %}</a>
+      </li>
+    {% endif %}
+    {% if zip_form %}
+      <li class="nav-item" role="presentation">
+        {# Translators: Create a component using ZIP upload #}
+        <a class="nav-link" data-bs-target="#zip" data-bs-toggle="tab" href="#">{% translate "Upload translations files" %}</a>
+      </li>
+    {% endif %}
+    {% if doc_form %}
+      <li class="nav-item" role="presentation">
+        {# Translators: Create a component using document upload #}
+        <a class="nav-link" data-bs-target="#doc" data-bs-toggle="tab" href="#">{% translate "Translate document" %}</a>
+      </li>
+    {% endif %}
+    {% if scratch_form %}
+      <li class="nav-item" role="presentation">
+        {# Translators: Create a component from scratch #}
+        <a class="nav-link" data-bs-target="#scratch" data-bs-toggle="tab" href="#">{% translate "Start from scratch" %}</a>
+      </li>
+    {% endif %}
+    {% if github_app_available %}
+      <li class="nav-item" role="presentation">
+        <a class="nav-link" data-bs-target="#github" data-bs-toggle="tab" href="#">{% translate "From GitHub" %}</a>
+      </li>
+    {% endif %}
+  </ul>
+{% endblock nav_pills %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'create-component' %}">{% translate "Create component" %}</a>
+  </li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+
+  {% if not projects and not form.fields.component.queryset and not branch_form.fields.component.queryset %}
+
+    {% translate "You do not have permission to create components in any projects." as msg %}
+    {% show_message "warning" msg %}
+
+    {% if has_billing %}
+      {% include "snippets/billing-failure.html" %}
+    {% endif %}
+
+  {% else %}
+
+    <div class="tab-content">
+
+      {% if projects %}
+        <div class="tab-pane active" id="vcs">
+          <form action="{% url 'create-component-vcs' %}"
+                method="post"
+                enctype="multipart/form-data"
+                id="form-create-component-vcs">
+            {% csrf_token %}
+            <input type="hidden" name="project" value="{{ selected_project }}" />
+            <p>{% translate "Create a new translation component from remote version control system repository." %}</p>
+            {% crispy full_form %}
+            <input type="submit"
+                   value="{% translate "Continue" %}"
+                   class="btn btn-primary"
+                   id="create-vcs">
+          </form>
+        </div>
+      {% endif %}
+
+      {% if form.fields.component.queryset %}
+        <div class="tab-pane" id="existing">
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="origin" value="existing" />
+            <input type="hidden" name="project" value="{{ selected_project }}" />
+            <p>{% translate "Create a new translation component from a repository already cloned in Weblate." %}</p>
+            {% crispy existing_form %}
+            <input type="submit"
+                   value="{% translate "Continue" %}"
+                   class="btn btn-primary"
+                   id="create-existing">
+          </form>
+        </div>
+      {% endif %}
+
+      {% if branch_form.fields.component.queryset %}
+        <div class="tab-pane" id="branch">
+          <form method="post"
+                class="branch-loader"
+                data-branches="{{ branch_data }}"
+                id="form-create-component-branch">
+            {% csrf_token %}
+            <input type="hidden" name="origin" value="branch" />
+            <input type="hidden" name="project" value="{{ selected_project }}" />
+            <p>
+              {% translate "Create a new translation component for an additional branch of the existing translation component." %}
+            </p>
+            {% crispy branch_form %}
+            <p class="help-block">
+              {% translate "The new component will be created for the selected branch with the exact same configuration as the existing one." %}
+            </p>
+            <input type="submit"
+                   value="{% translate "Continue" %}"
+                   class="btn btn-primary"
+                   id="create-branch">
+          </form>
+        </div>
+      {% endif %}
+
+      {% if zip_form %}
+        <div class="tab-pane" id="zip">
+          <form action="{% url 'create-component-zip' %}"
+                method="post"
+                enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="project" value="{{ selected_project }}" />
+            <p>
+              {% translate "Create a new translation component from an uploaded ZIP file containing strings for translation." %}
+              {% translate "The filenames within the archive need to have locale codes in them." %}
+            </p>
+            {% crispy zip_form %}
+            <input type="submit"
+                   value="{% translate "Continue" %}"
+                   class="btn btn-primary"
+                   id="create-vcs">
+          </form>
+        </div>
+      {% endif %}
+
+      {% if doc_form %}
+        <div class="tab-pane" id="doc">
+          <form action="{% url 'create-component-doc' %}"
+                method="post"
+                enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="project" value="{{ selected_project }}" />
+            <p>{% translate "Create a new translation component from an uploaded document for translation." %}</p>
+            {% crispy doc_form %}
+            <input type="submit"
+                   value="{% translate "Continue" %}"
+                   class="btn btn-primary"
+                   id="create-vcs">
+          </form>
+        </div>
+      {% endif %}
+
+      {% if scratch_form %}
+        <div class="tab-pane" id="scratch">
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="origin" value="scratch" />
+            <input type="hidden" name="project" value="{{ selected_project }}" />
+            <p class="check">
+              {% translate "Create a new empty translation component to start from scratch." %}
+              {% blocktranslate with link_start='<a data-bs-target="#zip" data-bs-toggle="tab" href="#">' link_end='</a>' %}Create a ZIP file containing any existing translation files you have, and {{ link_start }}upload it{{ link_end }}.{% endblocktranslate %}
+            </p>
+            {% crispy scratch_form %}
+            <input type="submit"
+                   value="{% translate "Continue" %}"
+                   class="btn btn-primary"
+                   id="create-vcs">
+          </form>
+        </div>
+      {% endif %}
+
+      {% if github_app_available %}
+        <div class="tab-pane" id="github">
+          <p>
+            {% translate "Pick a repository from a connected account. The component creation form will be pre-filled with the clone URL, default branch, and matching VCS driver." %}
+            {% if github_app_install_url %}
+              <a href="{{ github_app_install_url }}"
+                 class="btn btn-outline-primary btn-sm float-end">{% translate "Add or configure account" %}</a>
+            {% endif %}
+          </p>
+          {% if github_app_install_url %}
+            {% include "vcs/github_install_help.html" %}
+          {% endif %}
+          {% if github_app_repositories %}
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>{% translate "Repository" %}</th>
+                  <th>{% translate "Workspace" %}</th>
+                  <th>{% translate "Account" %}</th>
+                  <th>{% translate "Branch" %}</th>
+                  <th>{% translate "Visibility" %}</th>
+                  <th>{% translate "Actions" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for repo in github_app_repositories %}
+                  <tr>
+                    <td>
+                      <strong>{{ repo.full_name }}</strong>
+                      {% if repo.description %}
+                        <br>
+                        <small class="text-body-secondary">{{ repo.description }}</small>
+                      {% endif %}
+                    </td>
+                    <td>{{ repo.workspace_name }}</td>
+                    <td>{{ repo.account_name }}</td>
+                    <td>{{ repo.default_branch }}</td>
+                    <td>
+                      {% if repo.private %}
+                        <span class="badge text-bg-warning">{% translate "Private" %}</span>
+                      {% else %}
+                        <span class="badge text-bg-success">{% translate "Public" %}</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <a href="{{ repo.import_url }}" class="btn btn-outline-primary btn-sm">{% translate "Import" %}</a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p class="text-body-secondary">
+              {% if github_app_install_url %}
+                {% translate "No repositories available yet. Connect a code-hosting account to make repositories available here." %}
+              {% elif selected_project %}
+                {% translate "No repositories are available from connected accounts for this project workspace." %}
+              {% else %}
+                {% translate "Select a project with a workspace to connect an account or import repositories from an existing connection." %}
+              {% endif %}
+            </p>
+          {% endif %}
+        </div>
+      {% endif %}
+
+    </div>
+  {% endif %}
+
+{% endblock content %}

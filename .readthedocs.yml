@@ -1,0 +1,31 @@
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+# Required
+version: 2
+
+# Build documentation in the docs/ directory with Sphinx
+sphinx:
+  configuration: docs/conf.py
+
+# Optionally build your docs in additional formats such as PDF and ePub
+formats: []
+
+build:
+  os: ubuntu-24.04
+  tools:
+    python: '3.14'
+  apt_packages:
+    # Graphviz is needed for sphinx.ext.graphviz
+  - graphviz
+  jobs:
+    post_create_environment:
+    - asdf plugin add uv
+    - asdf install uv latest
+    - asdf global uv latest
+    install:
+    - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH uv sync --only-group docs --frozen --active --inexact
+
+# Avoid cloning submodules
+submodules:
+  exclude: all

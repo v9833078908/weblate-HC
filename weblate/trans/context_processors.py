@@ -1,0 +1,189 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+from urllib.parse import urlparse
+
+from django.conf import settings
+from django.utils.html import format_html
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.translation import gettext
+
+import weblate.utils.version
+from weblate.configuration.views import CustomCSSView
+from weblate.legal.utils import get_document_context
+from weblate.trans.validators import SUGGESTION_REJECTION_REASON_LENGTH
+from weblate.utils.site import get_site_domain, get_site_url
+from weblate.utils.version_display import (
+    hide_detailed_version,
+    hide_prominent_version,
+)
+from weblate.wladmin.models import ConfigurationError, get_support_status
+
+if TYPE_CHECKING:
+    from weblate.auth.models import AuthenticatedHttpRequest
+
+WEBLATE_URL = "https://weblate.org/"
+DONATE_URL = "https://weblate.org/donate/"
+SUPPORT_URL = "https://weblate.org/support/"
+
+CONTEXT_SETTINGS = [
+    "SITE_TITLE",
+    "SITE_DOMAIN",
+    "ENABLE_HTTPS",
+    "OFFER_HOSTING",
+    "ENABLE_AVATARS",
+    "ENABLE_SHARING",
+    "MATOMO_SITE_ID",
+    "MATOMO_URL",
+    "GOOGLE_ANALYTICS_ID",
+    "ENABLE_HOOKS",
+    "REGISTRATION_OPEN",
+    "CONTACT_FORM",
+    "GET_HELP_URL",
+    "STATUS_URL",
+    "LEGAL_URL",
+    "PRIVACY_URL",
+    "PASSWORD_RESET_URL",
+    "FONTS_CDN_URL",
+    "AVATAR_URL_PREFIX",
+    "VERSION_DISPLAY",
+    "HIDE_VERSION",
+    "EXTRA_HTML_HEAD",
+    "PRIVATE_COMMIT_EMAIL_OPT_IN",
+    "PRIVATE_COMMIT_NAME_OPT_IN",
+    # Hosted Weblate integration
+    "PAYMENT_ENABLED",
+    "IP_ADDRESSES",
+]
+
+CONTEXT_APPS = ["billing", "legal", "gitexport"]
+
+
+def add_settings_context(context) -> None:
+    for name in CONTEXT_SETTINGS:
+        context[name.lower()] = getattr(settings, name, None)
+
+
+def add_optional_context(context) -> None:
+    for name in CONTEXT_APPS:
+        appname = f"weblate.{name}"
+        context[f"has_{name}"] = appname in settings.INSTALLED_APPS
+    if context["has_legal"]:
+        context.update(get_document_context())
+
+
+def get_preconnect_list() -> list[str | None]:
+    result: list[str | None] = []
+    if settings.MATOMO_URL:
+        result.append(urlparse(settings.MATOMO_URL).hostname)
+    if settings.GOOGLE_ANALYTICS_ID:
+        result.append("www.google-analytics.com")
+    return result
+
+
+def get_bread_image(path) -> str:
+    if path == "/":
+        return "dashboard.svg"
+    first = path.split("/", 2)[1]
+    if first in {"user", "accounts"}:
+        return "account.svg"
+    if first == "checks":
+        return "alert.svg"
+    if first == "languages":
+        return "language.svg"
+    if first == "manage":
+        return "wrench.svg"
+    if first in {"about", "stats", "keys", "legal", "donate"}:
+        return "weblate.svg"
+    if first in {
+        "glossaries",
+        "upload-glossaries",
+        "delete-glossaries",
+        "edit-glossaries",
+    }:
+        return "glossary.svg"
+    return "project.svg"
+
+
+def weblate_context(request: AuthenticatedHttpRequest):
+    """Context processor to inject various useful variables into context."""
+    if url_has_allowed_host_and_scheme(request.GET.get("next", ""), allowed_hosts=None):
+        login_redirect_url = request.GET["next"]
+    elif request.resolver_match is None or (
+        not request.resolver_match.view_name.startswith("social:")
+        and request.resolver_match.view_name != "logout"
+    ):
+        login_redirect_url = request.get_full_path()
+    else:
+        login_redirect_url = ""
+
+    # Load user translations if user is authenticated
+    watched_projects = None
+    theme = "auto"
+    user = getattr(request, "user", None)
+    if user is not None and user.is_authenticated:
+        watched_projects = user.watched_projects
+        theme = user.profile.theme
+
+    if settings.OFFER_HOSTING:
+        description = gettext(
+            "Hosted Weblate, the place to localize your software project."
+        )
+    elif settings.SINGLE_PROJECT:
+        description = gettext(
+            "This site runs Weblate for localizing a software project."
+        )
+    else:
+        description = gettext(
+            "This site runs Weblate for localizing various software projects."
+        )
+
+    support_status = get_support_status(request)
+    version_display = settings.VERSION_DISPLAY
+    show_version_details = bool(
+        getattr(user, "is_superuser", False)
+    ) or not hide_detailed_version(version_display)
+    weblate_label = (
+        "Weblate"
+        if hide_prominent_version(version_display)
+        else f"Weblate {weblate.utils.version.VERSION}"
+    )
+
+    context = {
+        "support_status": support_status,
+        "version": weblate.utils.version.VERSION,
+        "bread_image": get_bread_image(request.path),
+        "description": description,
+        "weblate_link": format_html('<a href="{}">weblate.org</a>', WEBLATE_URL),
+        "weblate_name_link": format_html('<a href="{}">Weblate</a>', WEBLATE_URL),
+        "weblate_version_link": format_html(
+            '<a href="{}">{}</a>',
+            WEBLATE_URL,
+            weblate_label,
+        ),
+        "show_version_details": show_version_details,
+        "donate_url": DONATE_URL,
+        "support_url": SUPPORT_URL,
+        "site_url": get_site_url(),
+        "site_domain": get_site_domain(),
+        "login_redirect_url": login_redirect_url,
+        "has_antispam": False,  # Akismet integration removed
+        "has_sentry": bool(settings.SENTRY_DSN),
+        "suggestion_rejection_reason_length": SUGGESTION_REJECTION_REASON_LENGTH,
+        "watched_projects": watched_projects,
+        "allow_index": False,
+        "configuration_errors": ConfigurationError.objects.filter(
+            ignored=False
+        ).order_by("-timestamp"),
+        "preconnect_list": get_preconnect_list(),
+        "custom_css_hash": CustomCSSView.get_hash(request),
+        "theme": theme,
+    }
+
+    add_settings_context(context)
+    add_optional_context(context)
+
+    return context

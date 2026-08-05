@@ -1,0 +1,1189 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+import re
+import threading
+from collections import Counter
+from functools import cache, lru_cache
+from itertools import chain
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, NamedTuple, cast
+
+import regex
+from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
+from django.utils.functional import cached_property
+from django.utils.translation import gettext, gettext_lazy
+from docutils import utils
+from docutils.core import Publisher
+from docutils.nodes import (
+    Element,
+    Text,
+    emphasis,
+    footnote_reference,
+    literal,
+    reference,
+    strong,
+    substitution_reference,
+)
+from docutils.nodes import (
+    target as docutils_target,
+)
+from docutils.parsers.rst import Parser, languages
+from docutils.parsers.rst.states import Inliner
+from docutils.readers.standalone import Reader
+from docutils.writers.null import Writer
+
+from weblate.checks.base import Highlight, PluralResultDescriptionMixin, TargetCheck
+from weblate.checks.format import (
+    ES_TEMPLATE_MATCH,
+    FLAG_RULES,
+    I18NEXT_MATCH,
+    JAVA_MESSAGE_MATCH,
+    PERCENT_MATCH,
+    VUE_MATCH,
+)
+from weblate.checks.utils import pair_markup_highlights
+from weblate.utils.html import (
+    MD_BROKEN_LINK,
+    MD_LINK,
+    MD_REFLINK,
+    MD_SYNTAX,
+    MD_SYNTAX_GROUPS,
+    HTMLSanitizer,
+    extract_html_attributes,
+)
+from weblate.utils.xml import parse_xml
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from django_stubs_ext import StrOrPromise
+    from docutils.nodes import (
+        system_message,
+    )
+    from lxml.etree import _Element
+
+    from weblate.checks.base import MissingExtraDict
+    from weblate.trans.models import Unit
+
+    from .base import FixupType
+
+DOCUTILS_PARSER_LOCK = threading.Lock()
+BBCODE_MATCH = re.compile(
+    r"(?P<start>\[(?P<tag>[^]]+)(@[^]]*)?\])(.*?)(?P<end>\[\/(?P=tag)\])", re.MULTILINE
+)
+HTML_ATTRIBUTE_PLACEHOLDER_MATCHES = (
+    *(rule[0] for rule in FLAG_RULES.values()),
+    I18NEXT_MATCH,
+    ES_TEMPLATE_MATCH,
+    JAVA_MESSAGE_MATCH,
+    PERCENT_MATCH,
+    VUE_MATCH,
+)
+HTML_ATTRIBUTE_WRAPPER_CHARS = frozenset("\"'`“”„‟‘’‚‛«»‹›")
+
+
+XML_MATCH = re.compile(r"<[^>]+>")
+XML_ENTITY_MATCH = re.compile(
+    r"""
+    # Initial &
+    \&
+        (
+            # CharRef
+            \x23[0-9]+
+        |
+            # CharRef
+			\x23x[0-9a-fA-F]+
+        |
+            # EntityRef
+            # NameStartChar
+            [:A-Z_a-z\xC0-\xD6\xD8-\xF6\xF8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\u10000-\uEFFFF]
+            # NameChar
+            [0-9\xB7.:A-Z_a-z\xC0-\xD6\xD8-\xF6\xF8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\u10000-\uEFFFF\u0300-\u036F\u203F-\u2040-]*
+        )
+    # Closing ;
+    ;
+    """,
+    re.VERBOSE,
+)
+XML_CDATA_MATCH = re.compile(r"<!\[CDATA\[(.*?)]]>")
+
+SINGLE_LETTER_MATCH = regex.compile(r"\p{L}")
+
+# Arabic letter Waw ("و", meaning "and") is a conjunction that commonly attaches
+# directly to the adjacent word without a space
+ARABIC_WAW = "\u0648"
+
+# Extracted from Sphinx sphinx/util/docutils.py
+RST_EXPLICIT_TITLE_RE = re.compile(r"^(.+?)\s*(?<!\x00)<(.*?)>$", re.DOTALL)
+
+# These should be present in translation if present in source, but might be translated
+RST_TRANSLATABLE = {
+    "guilabel",
+    "file",
+    "code",
+    "math",
+    "eq",
+    "abbr",
+    "dfn",
+    "menuselection",
+    "sub",
+    "sup",
+    "kbd",
+    "index",
+    "samp",
+}
+RST_LLM_TRANSLATABLE = {
+    "abbr",
+    "code",
+    "dfn",
+    "guilabel",
+    "index",
+    "kbd",
+    "menuselection",
+    "samp",
+    "sub",
+    "sup",
+}
+
+RST_ROLE_RE = [
+    re.compile(r"""Unknown interpreted text role "([^"]*)"\."""),
+    re.compile(r"""Interpreted text role "([^"]*)" not implemented\."""),
+]
+
+RST_LIST_START = ("- ", "* ", "+ ")
+RST_WRAPPED_ROLE_RE = re.compile(
+    r"(?<!\S)`\s+"
+    r"(?P<role>(?::[^`\s]+:`[^`]+`|`[^`]+`:[^`\s]+:))"
+    r"\s+`(?!`)"
+)
+RST_HIGHLIGHT_WHOLE = "whole"
+RST_HIGHLIGHT_ROLE_SYNTAX = "role-syntax"
+RST_HIGHLIGHT_ROLE_TARGET = "role-target"
+
+
+type RSTHighlightKind = str
+type RSTHighlight = Highlight
+
+
+class RSTRoleMatch(NamedTuple):
+    role: str
+    inner: str
+    syntax_prefix: str
+    syntax_suffix: str
+
+
+def strip_entities(text):
+    """Strip all HTML entities (we don't care about them)."""
+    return XML_CDATA_MATCH.sub(r"\1", XML_ENTITY_MATCH.sub(" ", text))
+
+
+def is_html_attribute_placeholder(value: str | None) -> bool:
+    """Check whether an HTML attribute value is exactly one placeholder."""
+    if value is None or value in {"%", "%%", "{{", "}}"}:
+        return False
+    return any(regexp.fullmatch(value) for regexp in HTML_ATTRIBUTE_PLACEHOLDER_MATCHES)
+
+
+def strip_html_attribute_wrappers(value: str) -> str:
+    """Remove quote-like wrappers around a placeholder attribute."""
+    start = 0
+    end = len(value)
+
+    while True:
+        original = (start, end)
+
+        while start < end and value[start].isspace():
+            start += 1
+
+        if start < end and value[start] in HTML_ATTRIBUTE_WRAPPER_CHARS:
+            start += 1
+            while start < end and value[start].isspace():
+                start += 1
+        elif (
+            start + 1 < end
+            and value[start] == "\\"
+            and value[start + 1] in HTML_ATTRIBUTE_WRAPPER_CHARS
+        ):
+            start += 2
+            while start < end and value[start].isspace():
+                start += 1
+
+        while start < end and value[end - 1].isspace():
+            end -= 1
+
+        if (
+            start + 1 < end
+            and value[end - 2] == "\\"
+            and value[end - 1] in HTML_ATTRIBUTE_WRAPPER_CHARS
+        ):
+            end -= 2
+            while start < end and value[end - 1].isspace():
+                end -= 1
+        elif start < end and value[end - 1] in HTML_ATTRIBUTE_WRAPPER_CHARS:
+            end -= 1
+            while start < end and value[end - 1].isspace():
+                end -= 1
+
+        if (start, end) == original:
+            return value[start:end]
+
+
+def get_wrapped_placeholder_attribute(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    placeholder = strip_html_attribute_wrappers(value)
+    if (
+        value != placeholder
+        and placeholder in value
+        and is_html_attribute_placeholder(placeholder)
+    ):
+        return placeholder
+    return None
+
+
+def has_changed_placeholder_attributes(source: str, target: str) -> bool:
+    source_values: set[tuple[str, str, str]] = {
+        (attribute.tag, attribute.name, attribute.value)
+        for attribute in extract_html_attributes(source)
+        if is_html_attribute_placeholder(attribute.value)
+    }
+    source_attribute_names = {(tag, name) for tag, name, _placeholder in source_values}
+    if not source_attribute_names:
+        return False
+
+    for attribute in extract_html_attributes(target):
+        if (attribute.tag, attribute.name) not in source_attribute_names:
+            continue
+        if (placeholder := get_wrapped_placeholder_attribute(attribute.value)) and (
+            attribute.tag,
+            attribute.name,
+            placeholder,
+        ) in source_values:
+            return True
+    return False
+
+
+class BBCodeCheck(TargetCheck):
+    """Check for matching bbcode tags."""
+
+    check_id = "bbcode"
+    name = gettext_lazy("BBCode markup")
+    description = gettext_lazy("BBCode in translation does not match source.")
+    default_disabled = True
+    versions_changed = (
+        (
+            "5.10",
+            "This checks no longer relies on unreliable automatic detection, it now needs to be turned on using the ``bbcode-text`` flag.",
+        ),
+    )
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.enable_string = "bbcode-text"
+
+    def check_single(self, source: str, target: str, unit: Unit):
+        # Parse source
+        src_match = BBCODE_MATCH.findall(source)
+
+        # Parse target
+        tgt_match = BBCODE_MATCH.findall(target)
+        if len(src_match) != len(tgt_match):
+            return True
+
+        src_tags = {x[1] for x in src_match}
+        tgt_tags = {x[1] for x in tgt_match}
+
+        return src_tags != tgt_tags
+
+    def check_highlight(self, source: str, unit: Unit):
+        if self.should_skip(unit):
+            return
+        for match in BBCODE_MATCH.finditer(source):
+            group = f"bbcode:{match.start()}:{match.end()}"
+            for tag in ("start", "end"):
+                yield Highlight(
+                    match.start(tag),
+                    match.end(tag),
+                    match.group(tag),
+                    kind="markup",
+                    group=group,
+                    translatable=True,
+                    forbidden_text=("[", "]"),
+                )
+
+
+class BaseXMLCheck(TargetCheck):
+    def detect_xml_wrapping(self, text: str) -> tuple[_Element, bool]:
+        """Detect whether wrapping is desired."""
+        try:
+            return self.parse_xml(text, True), True
+        except SyntaxError:
+            return self.parse_xml(text, False), False
+
+    def can_parse_xml(self, text: str) -> bool:
+        try:
+            self.detect_xml_wrapping(text)
+        except SyntaxError:
+            return False
+        return True
+
+    def parse_xml(self, text: str, wrap: bool) -> _Element:
+        """Parse XML."""
+        text = strip_entities(text)
+        if wrap:
+            text = f"<weblate>{text}</weblate>"
+        return parse_xml(text.encode() if "encoding" in text else text)
+
+    def should_skip(self, unit: Unit) -> bool:
+        if super().should_skip(unit):
+            return True
+
+        flags = unit.all_flags
+
+        if flags.has_any({"safe-html", "auto-safe-html"}):
+            return True
+
+        if "xml-text" in flags:
+            return False
+
+        sources = unit.get_source_plurals()
+
+        # Quick check if source looks like XML.
+        if all(
+            "<" not in source or not XML_MATCH.findall(source) for source in sources
+        ):
+            return True
+
+        # Actually verify XML parsing
+        return not all(self.can_parse_xml(source) for source in sources)
+
+    def check_single(self, source: str, target: str, unit: Unit) -> bool:
+        """Check for single phrase, not dealing with plurals."""
+        raise NotImplementedError
+
+
+class XMLValidityCheck(BaseXMLCheck):
+    """Check whether XML in target is valid."""
+
+    check_id = "xml-invalid"
+    name = gettext_lazy("XML syntax")
+    description = gettext_lazy("The translation is not valid XML.")
+
+    def check_single(self, source: str, target: str, unit: Unit) -> bool:
+        # Check if source is XML
+        try:
+            wrap = self.detect_xml_wrapping(source)[1]
+        except SyntaxError:
+            # Source is not valid XML, we give up
+            return False
+
+        # Check target
+        try:
+            self.parse_xml(target, wrap)
+        except SyntaxError:
+            # Target is not valid XML
+            return True
+
+        return False
+
+
+class XMLTagsCheck(BaseXMLCheck):
+    """Check whether XML in target matches source."""
+
+    check_id = "xml-tags"
+    name = gettext_lazy("XML markup")
+    description = gettext_lazy("XML tags in translation do not match source.")
+
+    def check_single(self, source: str, target: str, unit: Unit):
+        # Check if source is XML
+        try:
+            source_tree, wrap = self.detect_xml_wrapping(source)
+            source_tags = [(x.tag, x.keys()) for x in source_tree.iter()]
+        except SyntaxError:
+            # Source is not valid XML, we give up
+            return False
+
+        # Check target
+        try:
+            target_tree = self.parse_xml(target, wrap)
+            target_tags = [(x.tag, x.keys()) for x in target_tree.iter()]
+        except SyntaxError:
+            # Target is not valid XML
+            return False
+
+        # Compare tags
+        return source_tags != target_tags
+
+    def check_highlight(self, source: str, unit: Unit):
+        if self.should_skip(unit):
+            return []
+        if not self.can_parse_xml(source):
+            return []
+        # Include XML markup
+        ret = [
+            Highlight(match.start(), match.end(), match.group(), kind="markup")
+            for match in XML_MATCH.finditer(source)
+        ]
+        ret = pair_markup_highlights(ret, group_prefix="xml")
+        # Add XML entities
+        skipranges = [(highlight.start, highlight.end) for highlight in ret]
+        skipranges.append((len(source), len(source)))
+        offset = 0
+        for match in XML_ENTITY_MATCH.finditer(source):
+            start = match.start()
+            end = match.end()
+            while skipranges[offset][1] < end:
+                offset += 1
+            # Avoid including entities inside markup
+            if start > skipranges[offset][0] and end < skipranges[offset][1]:
+                continue
+            ret.append(Highlight(start, end, match.group(), kind="syntax"))
+        return ret
+
+
+class XMLCharsAroundTagsCheck(BaseXMLCheck):
+    """Check that characters adjacent to target's XML tags are letters or non-letters according to the source."""
+
+    check_id = "xml-chars-around-tags"
+    name = gettext_lazy("Chars around XML tags")
+    description = gettext_lazy(
+        "Characters surrounding XML tags in translation do not align with source."
+    )
+
+    def check_single(self, source: str, target: str, unit: Unit) -> bool:
+        src_tags = list(XML_MATCH.finditer(source))
+        tgt_tags = list(XML_MATCH.finditer(target))
+
+        if len(src_tags) != len(tgt_tags):
+            return False
+
+        for i, tag in enumerate(src_tags):
+            src_start_idx = tag.start()
+            tgt_start_idx = tgt_tags[i].start()
+            src_end_idx = tag.end()
+            tgt_end_idx = tgt_tags[i].end()
+
+            # if string starts with tag, only check char following this tag
+            if src_start_idx == 0 or tgt_start_idx == 0:
+                if src_end_idx < len(source) and tgt_end_idx < len(target):
+                    src_next_char = source[src_end_idx]
+                    tgt_next_char = target[tgt_end_idx]
+                    if self.char_check(src_next_char, tgt_next_char):
+                        return True
+            # if string ends with tag, only check char preceding this tag
+            elif src_end_idx == len(source) or tgt_end_idx == len(target):
+                if src_start_idx > 0 and tgt_start_idx > 0:
+                    src_prev_char = source[src_start_idx - 1]
+                    tgt_prev_char = target[tgt_start_idx - 1]
+                    if self.char_check(src_prev_char, tgt_prev_char):
+                        return True
+            # if inline tag, check char preceding and following this tag
+            else:
+                src_prev_char = source[src_start_idx - 1]
+                tgt_prev_char = target[tgt_start_idx - 1]
+                src_next_char = source[src_end_idx]
+                tgt_next_char = target[tgt_end_idx]
+
+                if self.char_check(src_prev_char, tgt_prev_char):
+                    return True
+                if self.char_check(src_next_char, tgt_next_char):
+                    return True
+        return False
+
+    def char_check(self, src_char: str, tgt_char: str) -> bool:
+        src_letter = bool(SINGLE_LETTER_MATCH.search(src_char))
+        tgt_letter = bool(SINGLE_LETTER_MATCH.search(tgt_char))
+        if not src_letter ^ tgt_letter:
+            return False
+        # Arabic letter Waw ("و") is a conjunction that commonly attaches directly
+        # to the adjacent word without a space, so don't flag *whitespace* vs Waw.
+        if ARABIC_WAW in {src_char, tgt_char}:
+            other_char = tgt_char if src_char == ARABIC_WAW else src_char
+            if other_char.isspace():
+                return False
+        return True
+
+
+class MarkdownBaseCheck(TargetCheck):
+    default_disabled = True
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.enable_string = "md-text"
+
+
+class MarkdownRefLinkCheck(MarkdownBaseCheck):
+    check_id = "md-reflink"
+    name = gettext_lazy("Markdown references")
+    description = gettext_lazy("Markdown link references do not match source.")
+
+    def check_single(self, source: str, target: str, unit: Unit):
+        src_match = MD_REFLINK.findall(source)
+        if not src_match:
+            return False
+        tgt_match = MD_REFLINK.findall(target)
+
+        src_tags = {x[1] for x in src_match}
+        tgt_tags = {x[1] for x in tgt_match}
+
+        return src_tags != tgt_tags
+
+
+class MarkdownLinkCheck(MarkdownBaseCheck):
+    check_id = "md-link"
+    name = gettext_lazy("Markdown links")
+    description = gettext_lazy("Markdown links do not match source.")
+
+    def check_single(self, source: str, target: str, unit: Unit):
+        src_match = MD_LINK.findall(source)
+        if not src_match:
+            return False
+        tgt_match = MD_LINK.findall(target)
+
+        # Check number of links
+        if len(src_match) != len(tgt_match):
+            return True
+
+        # We don't check actual remote link targets as those might
+        # be localized as well (consider links to Wikipedia).
+        # Instead we check only relative links and templated ones.
+        link_start = (".", "#", "{")
+        tgt_anchors = {x[2] for x in tgt_match if x[2] and x[2][0] in link_start}
+        src_anchors = {x[2] for x in src_match if x[2] and x[2][0] in link_start}
+        return tgt_anchors != src_anchors
+
+    def get_fixup(self, unit: Unit) -> Iterable[FixupType] | None:
+        if MD_BROKEN_LINK.findall(unit.target):
+            return [("regex", MD_BROKEN_LINK.pattern, "](", "u")]
+        return None
+
+
+class MarkdownSyntaxCheck(MarkdownBaseCheck):
+    check_id = "md-syntax"
+    name = gettext_lazy("Markdown syntax")
+    description = gettext_lazy("Markdown syntax does not match source.")
+
+    @staticmethod
+    def extract_match(match):
+        for i in range(6):
+            if match[i]:
+                return match[i]
+        return None
+
+    def check_single(self, source: str, target: str, unit: Unit):
+        src_tags = {self.extract_match(x) for x in MD_SYNTAX.findall(source)}
+        tgt_tags = {self.extract_match(x) for x in MD_SYNTAX.findall(target)}
+
+        return src_tags != tgt_tags
+
+    def check_highlight(self, source: str, unit: Unit):
+        if self.should_skip(unit):
+            return
+        for match in MD_SYNTAX.finditer(source):
+            value = ""
+            for i in range(MD_SYNTAX_GROUPS):
+                value = match.group(i + 1)
+                if value:
+                    break
+            start = match.start()
+            end = match.end()
+            group = f"markdown:{start}:{end}"
+            translatable = value != "<"
+            forbidden_text = (value[0],) if translatable and len(value) > 1 else ()
+            yield Highlight(
+                start,
+                start + len(value),
+                value,
+                kind="markup",
+                group=group,
+                translatable=translatable,
+                forbidden_text=forbidden_text,
+            )
+            yield Highlight(
+                end - len(value),
+                end,
+                value if value != "<" else ">",
+                kind="markup",
+                group=group,
+                translatable=translatable,
+                forbidden_text=forbidden_text,
+            )
+
+
+class URLCheck(TargetCheck):
+    check_id = "url"
+    name = gettext_lazy("URL")
+    description = gettext_lazy("The translation does not contain a URL.")
+    default_disabled = True
+
+    @cached_property
+    def validator(self):
+        return URLValidator()
+
+    def check_single(self, source: str, target: str, unit: Unit) -> bool:
+        if not source:
+            return False
+        try:
+            self.validator(target)  # pylint: disable=too-many-function-args
+        except ValidationError:
+            return True
+        return False
+
+
+class SafeHTMLCheck(TargetCheck):
+    check_id = "safe-html"
+    name = gettext_lazy("Unsafe HTML")
+    description = gettext_lazy("The translation uses unsafe HTML markup.")
+    default_disabled = True
+    extra_enable_strings = ("auto-safe-html",)
+
+    def check_single(self, source: str, target: str, unit: Unit):
+        flags = unit.all_flags
+        if not flags.is_active("safe-html", source):
+            return False
+
+        # Strip MarkDown links
+        if "md-text" in flags:
+            target = MD_LINK.sub("", target)
+
+        sanitizer = HTMLSanitizer()
+        cleaned_target = sanitizer.clean(target, source, flags)
+
+        if cleaned_target != target:
+            return True
+
+        return has_changed_placeholder_attributes(source, target)
+
+
+class RSTBaseCheck(TargetCheck):
+    default_disabled = True
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.enable_string = "rst-text"
+
+
+def get_rst_role_name(text: str) -> str | None:
+    if matched := get_rst_role_match(text):
+        return matched.role
+    return None
+
+
+def get_rst_role_match(text: str) -> RSTRoleMatch | None:
+    if text.startswith(":"):
+        separator = text.find(":`", 1)
+        if separator == -1 or not text.endswith("`"):
+            return None
+        role = text[1:separator]
+        if not role:
+            return None
+        return RSTRoleMatch(
+            role.lower(), text[separator + 2 : -1], text[: separator + 2], text[-1:]
+        )
+
+    if text.startswith("`") and text.endswith(":"):
+        separator = text.rfind("`:")
+        if separator <= 0:
+            return None
+        role = text[separator + 2 : -1]
+        if not role:
+            return None
+        return RSTRoleMatch(role.lower(), text[1:separator], text[:1], text[separator:])
+
+    return None
+
+
+def get_rst_role_reference(rawsource: str) -> tuple[str, RSTHighlightKind] | None:
+    if (matched_role := get_rst_role_match(rawsource)) is None:
+        return None
+
+    role = matched_role.role
+    if role in RST_TRANSLATABLE:
+        return f":{role}:", RST_HIGHLIGHT_ROLE_SYNTAX
+
+    if matched := RST_EXPLICIT_TITLE_RE.match(matched_role.inner):
+        return f":{role}:`{matched.group(2)}`", RST_HIGHLIGHT_ROLE_TARGET
+
+    return f":{role}:`{matched_role.inner}`", RST_HIGHLIGHT_WHOLE
+
+
+def get_rst_role_highlight(
+    rawsource: str,
+    start: int,
+    end: int,
+) -> list[RSTHighlight]:
+    if (matched_role := get_rst_role_match(rawsource)) is None:
+        return [Highlight(start, end, rawsource, kind="syntax")]
+
+    prefix_end = start + len(matched_role.syntax_prefix)
+    group = f"rst-role:{start}:{end}"
+    if matched_role.role in RST_TRANSLATABLE:
+        translatable = matched_role.role in RST_LLM_TRANSLATABLE
+        return [
+            Highlight(
+                start,
+                prefix_end,
+                matched_role.syntax_prefix,
+                kind="markup",
+                group=group,
+                role=matched_role.role,
+                translatable=translatable,
+            ),
+            Highlight(
+                end - len(matched_role.syntax_suffix),
+                end,
+                matched_role.syntax_suffix,
+                kind="markup",
+                group=group,
+                role=matched_role.role,
+                translatable=translatable,
+            ),
+        ]
+
+    if matched := RST_EXPLICIT_TITLE_RE.match(matched_role.inner):
+        suffix_start = prefix_end + len(matched.group(1))
+        forbidden_text = ("`", "<", ">")
+        return [
+            Highlight(
+                start,
+                prefix_end,
+                matched_role.syntax_prefix,
+                kind="markup",
+                group=group,
+                role=matched_role.role,
+                translatable=True,
+                forbidden_text=forbidden_text,
+            ),
+            Highlight(
+                suffix_start,
+                end,
+                rawsource[len(matched_role.syntax_prefix) + len(matched.group(1)) :],
+                kind="markup",
+                group=group,
+                role=matched_role.role,
+                translatable=True,
+                forbidden_text=forbidden_text,
+            ),
+        ]
+
+    return [Highlight(start, end, rawsource, kind="syntax", role=matched_role.role)]
+
+
+def normalize_rst_node_token(token: str) -> str:
+    # Docutils uses a NUL placeholder for escaped markup in text nodes.
+    return token.replace("\x00", "\\")
+
+
+def get_rst_node_position(text: str, token: str, offset: int) -> tuple[int, int]:
+    normalized_token = normalize_rst_node_token(token)
+    start = text.find(normalized_token, offset)
+    if start == -1:
+        msg = (
+            "Could not locate parsed reStructuredText token "
+            f"{normalized_token!r} at offset {offset}"
+        )
+        raise ValueError(msg)
+    return start, start + len(normalized_token)
+
+
+def update_rst_target_offset(
+    text: str,
+    token: str,
+    offset: int,
+    previous_start: int,
+    previous_end: int,
+    *,
+    previous_is_text: bool,
+) -> int:
+    normalized_token = normalize_rst_node_token(token)
+
+    if not previous_is_text and previous_start < previous_end:
+        nested_start = text.rfind(normalized_token, previous_start, previous_end)
+        if nested_start != -1 and nested_start + len(normalized_token) <= previous_end:
+            return offset
+
+    if (start := text.find(normalized_token, offset)) != -1:
+        return start + len(normalized_token)
+
+    return offset
+
+
+@lru_cache(maxsize=512)
+def extract_rst_references(
+    text: str,
+) -> tuple[dict[str, str], Counter, tuple[RSTHighlight, ...]]:
+    memo = SimpleNamespace()
+    publisher = get_rst_publisher()
+    document = utils.new_document("", publisher.settings)
+    memo.reporter = document.reporter
+    memo.document = document
+    memo.language = languages.get_language(
+        document.settings.language_code, document.reporter
+    )
+    inliner = Inliner()
+    inliner.init_customizations(document.settings)
+    with DOCUTILS_PARSER_LOCK:
+        nodes, system_messages = inliner.parse(text, 0, memo, document)
+
+    del system_messages
+    result: list[tuple[str, str]] = []
+    highlights: list[RSTHighlight] = []
+    offset = 0
+    previous_start = 0
+    previous_end = 0
+    previous_is_text = True
+
+    for node in nodes:
+        token = str(node) if isinstance(node, Text) else getattr(node, "rawsource", "")
+
+        if not token:
+            continue
+
+        if isinstance(node, docutils_target):
+            offset = update_rst_target_offset(
+                text,
+                token,
+                offset,
+                previous_start,
+                previous_end,
+                previous_is_text=previous_is_text,
+            )
+            continue
+
+        start, end = get_rst_node_position(text, token, offset)
+        offset = end
+        previous_start = start
+        previous_end = end
+        previous_is_text = isinstance(node, Text)
+
+        if not isinstance(node, Text) and (
+            role_reference := get_rst_role_reference(token)
+        ):
+            name, highlight_type = role_reference
+            result.append((name, token))
+            if highlight_type == RST_HIGHLIGHT_WHOLE:
+                highlights.append(Highlight(start, end, token, kind="syntax"))
+            else:
+                highlights.extend(get_rst_role_highlight(token, start, end))
+        elif isinstance(node, (footnote_reference, substitution_reference)):
+            result.append((token, token))
+            highlights.append(Highlight(start, end, token, kind="syntax"))
+        elif isinstance(node, reference):
+            # Ignore the content as it might be localized, just differentiate
+            # references with a link and without
+            refuri = node.get("refuri")
+            result.append(("`... <...>`_" if refuri else "`...`_", token))
+            if refuri and (target_start := token.find(f"<{refuri}>")) != -1:
+                target_end = target_start + len(refuri) + 2
+                highlights.append(
+                    Highlight(
+                        start + target_start,
+                        start + target_end,
+                        token[target_start:target_end],
+                        kind="syntax",
+                    )
+                )
+        elif isinstance(node, literal):
+            result.append(("``...``", token))
+        elif isinstance(node, emphasis):
+            result.append(("*...*", token))
+        elif isinstance(node, strong):
+            result.append(("**...**", token))
+
+    return dict(result), Counter(item[0] for item in result), tuple(highlights)
+
+
+class RSTReferencesCheck(PluralResultDescriptionMixin, RSTBaseCheck):
+    check_id = "rst-references"
+    name = gettext_lazy("Inconsistent reStructuredText")
+    description = gettext_lazy(
+        "Inconsistent reStructuredText markup in the translated message."
+    )
+    version_added = "5.10"
+
+    def get_missing_text(self, values: Iterable[str]) -> StrOrPromise:
+        return self.get_values_text(
+            gettext("The following reStructuredText markup is missing: {}"), values
+        )
+
+    def get_extra_text(self, values: Iterable[str]) -> StrOrPromise:
+        return self.get_values_text(
+            gettext("The following reStructuredText markup is extra: {}"), values
+        )
+
+    def check_single(
+        self, source: str, target: str, unit: Unit
+    ) -> bool | MissingExtraDict:
+        src_references, src_set, _alltags = extract_rst_references(source)
+        tgt_references, tgt_set, _alltags = extract_rst_references(target)
+
+        missing = src_set - tgt_set
+        extra = tgt_set - src_set
+
+        if missing or extra:
+            return {
+                "missing": list(
+                    chain.from_iterable(
+                        [src_references[item]] if src_set[item] == 1 else [item] * count
+                        for item, count in missing.items()
+                    )
+                ),
+                "extra": list(
+                    chain.from_iterable(
+                        [tgt_references[item]] if tgt_set[item] == 1 else [item] * count
+                        for item, count in extra.items()
+                    )
+                ),
+                "errors": [],
+            }
+        return False
+
+    def check_highlight(self, source: str, unit: Unit):
+        if self.should_skip(unit):
+            return
+        _references, _counter, highlights = extract_rst_references(source)
+        yield from highlights
+
+
+@cache
+def get_rst_publisher() -> Publisher:
+    parser = Parser()
+    reader: Reader = Reader(parser)
+    writer = Writer()
+    publisher = Publisher(settings=None, reader=reader, parser=parser, writer=writer)
+    publisher.get_settings(
+        # Never halt parsing with an exception
+        halt_level=5,
+        # Disable warnings
+        warning_stream=False,
+        # Do not allow file insertion
+        file_insertion_enabled=False,
+        # Following are needed in case django.contrib.admindocs is imported
+        # and registers own rst tags
+        default_reference_context="",
+        link_base="",
+    )
+    return publisher
+
+
+@lru_cache(maxsize=512)
+def validate_rst_snippet(
+    snippet: str, source_tags: tuple[str] | None = None
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    publisher = get_rst_publisher()
+    document = utils.new_document("", publisher.settings)
+
+    errors: list[str] = []
+    roles: list[str] = []
+
+    def error_collector(data: system_message) -> None:
+        """Save the error."""
+        message = Element.astext(data)
+        if message.startswith("Unknown target name:") and "`" not in message:
+            # Translating targets is okay, just catch obvious errors
+            return
+        if message.startswith(
+            (
+                # Duplicates Unknown interpreted in our case
+                "No role entry",
+                # Can not work on snippets
+                "Too many autonumbered footnote",
+                # Can not work on snippets
+                "Enumerated list start value not ordinal",
+                # Substitutions are typically defined at the document level
+                "Undefined substitution referenced",
+            )
+        ):
+            return
+        for rst_role_re in RST_ROLE_RE:
+            if match := rst_role_re.match(message):
+                role = match.group(1)
+                roles.append(role)
+                if source_tags is not None and role in source_tags:
+                    # Skip if the role was found in the source
+                    return
+        errors.append(message)
+
+    document.reporter.attach_observer(error_collector)
+    with DOCUTILS_PARSER_LOCK:
+        cast("Parser", publisher.reader.parser).parse(snippet, document)
+    transformer = document.transformer
+    transformer.populate_from_components(
+        (
+            publisher.reader,
+            cast("Parser", publisher.reader.parser),
+            publisher.writer,
+        )
+    )
+    while transformer.transforms:
+        if not transformer.sorted:
+            # Unsorted initially, and whenever a transform is added.
+            transformer.transforms.sort()
+            transformer.transforms.reverse()
+            transformer.sorted = True
+        priority, transform_class, pending, kwargs = transformer.transforms.pop()
+        transform = transform_class(transformer.document, startnode=pending)
+        transform.apply(**kwargs)
+        transformer.applied.append((priority, transform_class, pending, kwargs))
+    return tuple(errors), tuple(roles)
+
+
+class RSTSyntaxCheck(PluralResultDescriptionMixin, RSTBaseCheck):
+    check_id = "rst-syntax"
+    name = gettext_lazy("reStructuredText syntax error")
+    description = gettext_lazy("reStructuredText syntax error in the translation.")
+    version_added = "5.10"
+
+    def check_single(
+        self, source: str, target: str, unit: Unit
+    ) -> bool | MissingExtraDict:
+        _errors, source_roles = validate_rst_snippet(source)
+        rst_errors, _target_roles = validate_rst_snippet(target, source_roles)
+        errors = list(rst_errors)
+
+        errors.extend(
+            (
+                gettext(
+                    "The reStructuredText role should not be wrapped in backticks: {role}"
+                ).format(role=match.group("role"))
+            )
+            for match in RST_WRAPPED_ROLE_RE.finditer(target)
+        )
+
+        # This is valid RST, but might mess up the document
+        if not source.startswith(RST_LIST_START) and target.startswith(RST_LIST_START):
+            errors.append(
+                gettext("The translation should not start with a list marker.")
+            )
+
+        if errors:
+            return {"errors": errors}
+        return False
+
+
+# inline (`name:target[attrs]`) and block (`name::target[attrs]`) macros.
+ASCIIDOC_MACRO = re.compile(
+    r"(?<![a-z0-9])(?P<name>[a-z][a-z0-9]*?)(?P<sep>::?)(?P<target>[^\s\[]*+)\[(?P<attrs>(?:\\.|[^\]])*+)\]"
+)
+# cross references: <<id>> or <<id,text>>.
+ASCIIDOC_XREF = re.compile(r"(?<!<)<<(?P<id>[^,>]++)(?:,(?P<text>[^>]*+))?>>")
+# inline anchors: [[id]] or [[id,label]].
+ASCIIDOC_INLINE_ANCHOR = re.compile(
+    r"(?<!\[)\[\[(?P<id>[^,\]]++)(?:,(?P<label>[^\]]*+))?\]\]"
+)
+# passthroughs. Bare single-plus `+...+` is excluded to avoid false positives.
+ASCIIDOC_PASSTHROUGH = re.compile(
+    r"\+\+\+.+?\+\+\+|\+\+.+?\+\+|`\+.+?\+`|\$\$.+?\$\$",
+    re.DOTALL,
+)
+
+
+def is_preceded_by_asciidoc_escape(text: str, start: int) -> bool:
+    """Return whether markup at ``start`` is escaped and renders as literal text."""
+    backslashes = 0
+    pos = start - 1
+    while pos >= 0 and text[pos] == "\\":
+        backslashes += 1
+        pos -= 1
+    return backslashes % 2 == 1
+
+
+class AsciiDocMarkupCheck(PluralResultDescriptionMixin, TargetCheck):
+    """Check that AsciiDoc macros, xrefs, and passthroughs match the source."""
+
+    check_id = "asciidoc-markup"
+    name = gettext_lazy("AsciiDoc markup")
+    description = gettext_lazy("AsciiDoc markup does not match source.")
+    version_added = "2026.8"
+    default_disabled = True
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.enable_string = "asciidoc-text"
+
+    def get_missing_text(self, values: Iterable[str]) -> StrOrPromise:
+        return self.get_values_text(
+            gettext("The following AsciiDoc markup is missing: {}"), values
+        )
+
+    def get_extra_text(self, values: Iterable[str]) -> StrOrPromise:
+        return self.get_values_text(
+            gettext("The following AsciiDoc markup is extra: {}"), values
+        )
+
+    def check_single(
+        self, source: str, target: str, unit: Unit
+    ) -> bool | MissingExtraDict:
+        src_set = extract_asciidoc_markup(source)
+        tgt_set = extract_asciidoc_markup(target)
+
+        missing = src_set - tgt_set
+        extra = tgt_set - src_set
+
+        if missing or extra:
+            return {
+                "missing": list(missing.elements()),
+                "extra": list(extra.elements()),
+                "errors": [],
+            }
+        return False
+
+    def check_highlight(self, source: str, unit: Unit):
+        if self.should_skip(unit):
+            return
+        yield from iter_asciidoc_highlights(source)
+
+
+def extract_asciidoc_markup(text: str) -> Counter[str]:
+    tokens: list[str] = []
+    for match in ASCIIDOC_MACRO.finditer(text):
+        if is_preceded_by_asciidoc_escape(text, match.start()):
+            continue
+        if match.group("name") == "pass":
+            # special case for passthrough macros, the content is not translatable and must be preserved
+            tokens.append(match.group())
+        else:
+            tokens.append(
+                f"{match.group('name')}{match.group('sep')}{match.group('target')}[]"
+            )
+    tokens.extend(
+        f"<<{match.group('id')}>>"
+        for match in ASCIIDOC_XREF.finditer(text)
+        if not is_preceded_by_asciidoc_escape(text, match.start())
+    )
+    tokens.extend(
+        f"[[{match.group('id')}]]"
+        for match in ASCIIDOC_INLINE_ANCHOR.finditer(text)
+        if not is_preceded_by_asciidoc_escape(text, match.start())
+    )
+    tokens.extend(
+        match.group()
+        for match in ASCIIDOC_PASSTHROUGH.finditer(text)
+        if not is_preceded_by_asciidoc_escape(text, match.start())
+    )
+    return Counter(tokens)
+
+
+def iter_asciidoc_highlights(text: str) -> Iterable[Highlight]:
+    for match in ASCIIDOC_MACRO.finditer(text):
+        if is_preceded_by_asciidoc_escape(text, match.start()):
+            continue
+        yield Highlight(match.start(), match.end(), match.group(), kind="syntax")
+    for match in ASCIIDOC_XREF.finditer(text):
+        if is_preceded_by_asciidoc_escape(text, match.start()):
+            continue
+        yield Highlight(match.start(), match.end(), match.group(), kind="syntax")
+    for match in ASCIIDOC_INLINE_ANCHOR.finditer(text):
+        if is_preceded_by_asciidoc_escape(text, match.start()):
+            continue
+        yield Highlight(match.start(), match.end(), match.group(), kind="syntax")
+    for match in ASCIIDOC_PASSTHROUGH.finditer(text):
+        if is_preceded_by_asciidoc_escape(text, match.start()):
+            continue
+        yield Highlight(match.start(), match.end(), match.group(), kind="syntax")

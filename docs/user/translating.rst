@@ -1,0 +1,570 @@
+Translating using Weblate
+=========================
+
+Thank you for your interest in translating with Weblate!
+
+Generally, there are two most used modes of translation:
+
+* Project accepts direct translations
+* Project accepts the suggestions made by users.
+
+Sometimes, anonymous suggestions are accepted as well.
+
+There are more translation workflows detailed in :ref:`workflows`.
+
+Projects, or the components in them are either visible to everyone,
+or only to a certain group of translators.
+
+.. seealso::
+
+   * :ref:`access-control`
+   * :ref:`workflows`
+
+Translation projects
+--------------------
+
+Translation projects hold related components; resources for the same software, book, or project.
+
+.. image:: /screenshots/project-overview.webp
+
+.. _strings-to-check:
+
+Translation links
+-----------------
+
+Having navigated to a component, a set of links lead to its actual translation.
+The translation is further divided into individual checks, like
+:guilabel:`Untranslated strings` or :guilabel:`Unfinished strings`.
+If the whole project is already translated without any errors, :guilabel:`All strings`
+is still available. Alternatively you can use the :doc:`Search </user/search>` feature
+to find a specific string or term.
+
+
+.. image:: /screenshots/strings-to-check.webp
+
+.. _suggestions:
+
+Suggestions
+-----------
+
+.. note::
+
+    Actual permissions might vary depending on your Weblate configuration.
+
+Anonymous users (by default) can only forward suggestions. Doing so is still
+available to signed-in users, in cases where uncertainty about a translation
+arises, prompting other translators to review it. Any user can clone an existing
+suggestion into the translation fields, including plural forms, and use it
+as the basis for a new suggestion or translation.
+
+All suggestions are scanned on a daily basis to remove duplicates and
+those matching current translations.
+
+If you have the :guilabel:`Accept suggestions` permission, you can bulk accept
+all suggestions from a specific user by clicking the account check icon next
+to their suggestion. This is useful for quickly processing suggestions from
+trusted contributors. Suggestions failing quality checks are skipped and
+remain for manual review. Weblate shows the number of matching suggestions for
+confirmation and processes the acceptance in the background. If you can review
+the translation, you can accept and approve the suggestions in the same step.
+
+.. _user-comments:
+
+Comments
+--------
+
+Three types of comments can be posted:
+
+* for translations
+* for source strings
+* for reporting source string bugs when this functionality is turned on using :ref:`project-source_review`.
+
+Choose the suitable type for the topic you want to discuss.
+Source string comments are in any event good for providing feedback on
+the original string, for example that it should be rephrased, or to ask
+questions about it.
+
+Markdown syntax can be used in all comments, as well as mentioning other
+users by using ``@username``. Mention a maintainer or another translator when
+you need them to see a follow-up question; they can reply in the same
+:guilabel:`Comments` tab.
+
+To find comments again, open your :ref:`user-profile`; the comment count links
+to your comment activity. To find strings with comments by a specific user, use
+:doc:`/user/search`. For example, ``comment_author:USERNAME`` finds strings
+with comments by that user, and ``source_comment_author:USERNAME`` finds
+strings with source string comments by that user. When you are signed in, the
+search filter menu also includes shortcuts for comments by you and source
+comments by you.
+
+.. seealso::
+
+   * :ref:`report-source`
+   * :ref:`source-reviews`
+   * :ref:`project-source_review`
+
+Variants
+--------
+
+Variants are used to group different-length variants of a string.
+The frontend of your project can then utilize different strings
+depending on the size of a screen or window.
+
+.. seealso::
+
+   * :ref:`variants`
+   * :ref:`glossary-variants`
+
+Labels
+------
+
+Labels are used to categorize strings within a project to further customize the
+localization workflow (for example to define categories of strings).
+
+Following labels are used by Weblate:
+
+Automatically translated
+   String translated using :ref:`auto-translation`.
+Source needs review
+   String marked for review using :ref:`source-reviews`.
+
+.. seealso::
+
+    :ref:`labels`
+
+.. _translating:
+
+Translating
+-----------
+
+On the translation page, the source string and an editing area for its translation are shown.
+Should the translation be plural, multiple source strings and editing areas are
+shown, each described and labeled in the amount of plural forms the translated language has.
+
+All special whitespace characters are underlined in red and indicated with grey
+symbols. More than one subsequent space is also underlined in red to alert the translator to
+a potential formatting issue.
+
+Various bits of extra info can be shown on this page, most of which coming from the project source code
+(like context, comments or where the message is being used).
+Translation fields for any secondary languages translators select in the preferences will be shown
+(see :ref:`secondary-languages`) above the source string.
+
+Below the translation, translators will find suggestions made by others, to be accepted (✓),
+accepted with changes (✏️), bulk accepted for a specific user (👤✓),
+cloned into the translation fields (📑) or deleted (🗑).
+
+.. _translating-special-text:
+
+Translating special text safely
++++++++++++++++++++++++++++++++
+
+Some source strings contain text that the application interprets at runtime.
+Translate the human-readable parts, but keep technical markers intact unless
+the project instructions say otherwise.
+
+Placeholders and format strings
+    Keep variables such as ``%s``, ``%1$d``, ``%(name)s``, ``{count}``,
+    ``{{ value }}``, or similar markers in the translation. Named placeholders
+    describe the inserted value, but the names themselves are not translated.
+    You can usually reorder numbered or named placeholders to fit the target
+    language. Use the placeable copy shortcuts to insert them without typing
+    mistakes.
+Markup
+    Keep HTML and XML tags, tag names, and attribute names unchanged. Translate
+    the visible text between tags and any attribute value that is meant for
+    users, for example alternative text or a tooltip, when it appears as part
+    of the translatable string. Make sure opening and closing tags still match
+    after reordering the sentence.
+Program syntax
+    Leave function names, commands, environment variables, spreadsheet
+    functions, SQL keywords, and similar program syntax untranslated unless the
+    project explicitly documents a localized form.
+Punctuation and whitespace
+    Preserve punctuation and spaces that affect the interface, such as
+    trailing colons, ellipses, leading or trailing spaces, and punctuation next
+    to placeholders. Follow the target language's typography when it differs
+    from the source, and use comments when a source punctuation choice looks
+    wrong.
+Accelerators
+    Menu labels can mark keyboard accelerators with characters such as ``&``,
+    ``_``, or ``~``. When the source has an accelerator, keep one in the
+    translation. Choose a readable key in the translated label and avoid
+    obvious conflicts with nearby menu items or buttons.
+Plural forms
+    Translate each plural field Weblate shows. Do not combine forms into a
+    single construction such as ``file(s)`` unless that is correct for the
+    target language and project. If the source string uses an ambiguous plural,
+    report it with a source string comment or review.
+
+Weblate quality checks catch many technical mistakes in placeholders, markup,
+punctuation, whitespace, and plural forms. They do not replace translator
+judgment, so use :ref:`source-context`, :doc:`/user/glossary`, and
+:ref:`user-comments` when the source text needs clarification.
+
+.. seealso::
+
+   * :doc:`/user/checks`
+   * :ref:`plurals`
+   * :ref:`source-context`
+   * :ref:`user-comments`
+
+.. _plurals:
+
+Plurals
++++++++
+
+Words changing form to account for their numeric designation are called plurals.
+Each language has its own definition of them. English, for example, supports one.
+In the singular definition of an example "car", implicitly one car is referenced,
+in the plural definition of "cars", two or more cars are referenced (or the concept
+of cars as a noun). Languages like, for example, Czech or Arabic have more forms
+of plurals, and their rules for plurals are different as well.
+
+Weblate has full support for each of these forms, in each respective language.
+Each grammatical number is translated in a separate field for a pre-defined set of
+cardinal numbers specific to the translation language.
+The number of fields and how they are in turn used in the translated application or
+project, depends on the configured plural formula.
+Weblate shows the basic information and the `Language Plural Rules`_
+by the Unicode Consortium is a more detailed description.
+
+.. _Language Plural Rules: https://unicode-org.github.io/cldr-staging/charts/37/supplemental/language_plural_rules.html
+
+.. seealso::
+
+   :ref:`plural-definitions`
+
+.. image:: /screenshots/plurals.webp
+
+.. _alternative-translations:
+
+Alternative translations
+++++++++++++++++++++++++
+
+.. versionadded:: 4.13
+
+.. note::
+
+   This is currently only supported with :ref:`multivalue-csv`.
+
+With some formats, it is possible to have more translations for a single
+string. You can add more alternative translations using the :guilabel:`Tools`
+menu. Any blank alternative translations will be automatically removed upon
+saving.
+
+.. _keyboard:
+
+Keyboard shortcuts
+++++++++++++++++++
+
+The following keyboard shortcuts can be utilized during translation:
+
++-------------------------------------------+-----------------------------------------------------------------------+
+| Keyboard shortcut                         | Description                                                           |
++===========================================+=======================================================================+
+| :kbd:`?`                                  | Open available keyboard shortcuts.                                    |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Alt+Home`                           | Navigate to the first translation in the current search.              |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Alt+End`                            | Navigate to the last translation in the current search.               |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Alt+PageUp` or                      | Navigate to the previous translation in the current search.           |
+|                                           |                                                                       |
+| :kbd:`Ctrl+↑` or                          |                                                                       |
+|                                           |                                                                       |
+| :kbd:`Alt+↑` or                           |                                                                       |
+|                                           |                                                                       |
+| :kbd:`Cmd+↑`                              |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Alt+PageDown` or                    | Navigate to the next translation in the current search.               |
+|                                           |                                                                       |
+| :kbd:`Ctrl+↓` or                          |                                                                       |
+|                                           |                                                                       |
+| :kbd:`Alt+↓` or                           |                                                                       |
+|                                           |                                                                       |
+| :kbd:`Cmd+↓`                              |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Ctrl+Enter` or                      | Submit current form; this is same as                                  |
+|                                           | pressing :guilabel:`Save and continue` while editing translation.     |
+| :kbd:`Cmd+Enter`                          |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Ctrl+Shift+Enter` or                | Unmark translation as Needing edit and submit it.                     |
+|                                           |                                                                       |
+| :kbd:`Cmd+Shift+Enter`                    |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Alt+Enter` or                       | Submit the string as a suggestion; this works the same as             |
+|                                           | pressing :guilabel:`Suggest` while editing translation.               |
+| :kbd:`Option+Enter`                       |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Ctrl+E` or                          | Focus on translation editor.                                          |
+|                                           |                                                                       |
+| :kbd:`Cmd+E`                              |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Ctrl+U` or                          | Focus on comment editor.                                              |
+|                                           |                                                                       |
+| :kbd:`Cmd+U`                              |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Ctrl+M` or                          | Shows :guilabel:`Automatic suggestions` tab,                          |
+|                                           | see :ref:`machine-translation`.                                       |
+| :kbd:`Cmd+M`                              |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Ctrl+1` to :kbd:`Ctrl+9` or         | Copies placeable of a given number from source string.                |
+|                                           |                                                                       |
+| :kbd:`Cmd+1` to :kbd:`Cmd+9`              |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Ctrl+M` followed by                 | Copy the machine translation of a given number to current translation.|
+| :kbd:`1` to :kbd:`9` or                   |                                                                       |
+|                                           |                                                                       |
+| :kbd:`Cmd+M` followed by                  |                                                                       |
+| :kbd:`1` to :kbd:`9`                      |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Ctrl+I` followed by                 | Ignore one item in the list of failing checks.                        |
+| :kbd:`1` to :kbd:`9` or                   |                                                                       |
+|                                           |                                                                       |
+| :kbd:`Cmd+I` followed by                  |                                                                       |
+| :kbd:`1` to :kbd:`9`                      |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Ctrl+J` or                          | Shows the :guilabel:`Nearby strings` tab.                             |
+|                                           |                                                                       |
+| :kbd:`Cmd+J`                              |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Ctrl+S` or                          | Focus on search field.                                                |
+|                                           |                                                                       |
+| :kbd:`Cmd+S`                              |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Ctrl+O` or                          | Copy the source string.                                               |
+|                                           |                                                                       |
+| :kbd:`Cmd+O`                              |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`Ctrl+Y` or                          | Toggle the :guilabel:`Needs editing` checkbox.                        |
+|                                           |                                                                       |
+| :kbd:`Cmd+Y`                              |                                                                       |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`→`                                  | Browse the next translation string.                                   |
++-------------------------------------------+-----------------------------------------------------------------------+
+| :kbd:`←`                                  | Browse the previous translation string.                               |
++-------------------------------------------+-----------------------------------------------------------------------+
+
+.. _visual-keyboard:
+
+Visual keyboard
++++++++++++++++
+
+A small visual keyboard row is shown just above the translation field.
+Its rows are specific to each language; it can be useful for local punctuation
+or characters that are hard to type by hand.
+
+The shown symbols factor into three categories:
+
+* User configured :ref:`profile-specialchars` defined in the :ref:`user-profile`
+* Per-language characters provided by Weblate (e.g. quotes or RTL-specific characters)
+* Characters configured using :setting:`SPECIAL_CHARS`
+
+.. image:: /screenshots/visual-keyboard.webp
+
+.. _source-context:
+
+Translation context
++++++++++++++++++++
+
+This contextual description provides related info about the current string.
+
+String attributes
+    Things like message ID, context (``msgctxt``) or location in source code.
+Explanation
+    Further clarification can be provided in Weblate via :ref:`additional-explanation`.
+Screenshots
+    Screenshots can be uploaded directly from this panel using
+    :guilabel:`Add screenshot`, or managed elsewhere in Weblate to better
+    inform translators of where and how the string is used. Source-language
+    screenshots are shown for every translation of the string, while
+    translation-specific screenshots are shown only for that translation; see
+    :ref:`screenshots`.
+Nearby strings
+    Displays neighbouring strings from the translation file.
+    These are usually also used in a similar context and prove
+    useful in keeping the translation consistent.
+Other occurrences
+    In case a message appears in multiple places (e.g. multiple components),
+    this tab shows all of them if they are found to be inconsistent (see
+    :ref:`check-inconsistent`). You can choose which one to use.
+Translation memory
+    Look at similar strings translated in past, see :ref:`memory`.
+Glossary
+    Displays terms from the project glossary used in the current message.
+History
+    List of people whom have changed this message recently using Weblate.
+Project
+    Project info like instructions for translators, or a directory or link
+    to the string in the version control system repository the project uses.
+
+If you want direct links, the translation format has to support it.
+
+Translation history
++++++++++++++++++++
+
+Every change is by default (unless turned-off in component settings) saved in
+the database, and can be reverted.
+Optionally, translations can also be reverted
+in the underlying version control system.
+
+Translated string length
+++++++++++++++++++++++++
+
+Weblate can limit the length of a translation in several ways to ensure the
+translated string is not too long:
+
+* The default limitation for translation is ten times longer than the source
+  string. This can be modified with :setting:`LIMIT_TRANSLATION_LENGTH_BY_SOURCE_LENGTH`.
+  If you are hitting this, it can also be caused by a monolingual translation being
+  wrongly set up as a bilingual one, making Weblate mistaking the translation
+  key for the actual source string. See :ref:`bimono` for more info.
+* Maximum length in characters defined by the translation file or flag, as per
+  :ref:`check-max-length`.
+* Maximal rendered size in pixels as defined by flags; see :ref:`check-max-size`.
+
+.. _machine-translation:
+
+Automatic suggestions
+---------------------
+
+Based on configuration and your translated language, Weblate provides suggestions
+from several machine translation tools and :ref:`translation-memory`.
+All machine translations are available in a single tab of each translation page.
+
+You can also perform a concordance search on the :ref:`translation-memory`.
+
+.. seealso::
+
+   You can find the list of supported tools in :ref:`machine-translation-setup`.
+
+.. _auto-translation:
+
+Automatic translation
+---------------------
+
+You can use automatic translation to bootstrap translation based on external
+sources. This tool is called :guilabel:`Automatic translation` accessible in
+the :guilabel:`Operations` menu, once you have selected a component and a language:
+
+.. image:: /screenshots/automatic-translation.webp
+
+A similar operation :guilabel:`Batch automatic translation` is available if you have
+selected a project language, a component or a category.
+
+Two modes of operation are possible:
+
+- Using other Weblate components as a source for translations.
+- Using selected machine translation services with translations above a certain
+  quality threshold.
+
+When using other components as the source, Weblate applies translations only
+when plural forms are compatible. If the source component uses different plural
+rules, pluralized strings are skipped and Weblate shows a warning, while
+single-form strings are still translated.
+
+You can also choose which strings are to be auto-translated.
+
+.. warning::
+
+    Be mindful that this will overwrite existing translations if employed with
+    wide filters such as :guilabel:`All strings`.
+
+Useful in several situations like consolidating translation between different
+components (for example the application and its website) or when bootstrapping
+a translation for a new component using existing translations
+(translation memory).
+
+The automatically translated strings are labelled :guilabel:`Automatically
+translated`.
+
+.. seealso::
+
+    :ref:`translation-consistency`
+
+.. _user-rate:
+
+Rate limiting
+-------------
+
+To avoid abuse of the interface, rate limiting is applied to several
+operations like searching, sending contact forms, or translating.
+If affected by it, you are blocked for a certain period, until you can
+perform the operation again.
+
+Default limits and fine-tuning are described in the administrative manual,
+see :ref:`rate-limit`.
+
+.. _search-replace:
+
+Search and replace
+------------------
+
+Change terminology effectively or perform bulk fixing of the
+strings using :guilabel:`Search and replace` in the :guilabel:`Operations` menu.
+
+.. image:: /screenshots/search-replace.webp
+
+.. hint::
+
+    Don't worry about messing up the strings, as it is a two-step process.
+    A preview of edited strings is shown before confirming the change.
+    You can adjust the search parameters from the preview and update it before
+    applying the replacement.
+
+.. _bulk-edit:
+
+Bulk edit
+---------
+
+Bulk editing allows performing one operation for multiple strings.
+Define strings by searching for them and actions to perform on matching ones.
+Supported operations:
+
+* Change string state (for example to approve all unreviewed strings).
+* Adjust translation flags (see :ref:`custom-checks`)
+* Adjust string labels (see :ref:`labels`)
+
+.. hint::
+
+    This tool is called :guilabel:`Bulk edit`, accessible in the
+    :guilabel:`Operations` menu of each project, component or translation.
+
+.. image:: /screenshots/bulk-edit.webp
+
+
+
+.. seealso::
+
+   :ref:`Bulk edit add-on <addon-weblate.flags.bulk>`
+
+Matrix View
+-----------
+
+You can compare different languages efficiently using this view.
+It is available on every component page, from the :guilabel:`Operations` menu.
+First select all languages you want to compare, confirm your selection,
+then click on any translation to open and edit it.
+
+The matrix view is also a very good starting point to find missing
+translations in different languages, and quickly add them from one view.
+
+.. image:: /screenshots/matrix-view.webp
+
+.. _zen-mode:
+
+Zen Mode
+--------
+This mode simplifies the layout and removes additional UI elements such as
+:guilabel:`Nearby strings` or the :guilabel:`Glossary`.
+It is available by clicking the :guilabel:`Zen` button
+on the top-right of the regular editor (translation of a string).
+
+You can select the Zen editor as your default editor using the
+:ref:`profile-preferences` tab on your :ref:`user-profile`.
+You can also choose there between having translations listed
+:guilabel:`Top to bottom` or :guilabel:`Side by side`,
+depending on your personal preference.
+
+.. image:: /screenshots/zen-mode.webp

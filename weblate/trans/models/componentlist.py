@@ -1,0 +1,166 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Components list."""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING
+
+from django.db import models
+from django.urls import reverse
+from django.utils.translation import gettext_lazy
+
+from weblate.trans.fields import RegexField
+from weblate.trans.mixins import CacheKeyMixin
+from weblate.trans.models.component import Component
+from weblate.utils.errors import report_error
+from weblate.utils.regex import regex_match
+from weblate.utils.stats import ComponentListStats
+
+if TYPE_CHECKING:
+    from weblate.auth.models import User
+    from weblate.trans.models.translation import Translation
+
+
+LOGGER = logging.getLogger("weblate.trans.componentlist")
+
+
+class ComponentListQuerySet(models.QuerySet["ComponentList", "ComponentList"]):
+    def filter_access(self, user: User):
+        # componentlist.edit is site-wide and grants management of all lists,
+        # including lists assigned only to otherwise inaccessible projects.
+        if user.has_perm("componentlist.edit"):
+            return self.all()
+
+        return self.filter(
+            components__in=Component.objects.filter_access(user)
+        ).distinct()
+
+    def order(self):
+        return self.order_by("name")
+
+
+class ComponentList(models.Model, CacheKeyMixin):
+    name = models.CharField(
+        verbose_name=gettext_lazy("Component list name"),
+        max_length=100,
+        unique=True,
+        help_text=gettext_lazy("Display name"),
+    )
+
+    slug = models.SlugField(
+        verbose_name=gettext_lazy("URL slug"),
+        db_index=True,
+        unique=True,
+        max_length=100,
+        help_text=gettext_lazy("Name used in URLs and filenames."),
+    )
+    show_dashboard = models.BooleanField(
+        verbose_name=gettext_lazy("Show on dashboard"),
+        default=True,
+        db_index=True,
+        help_text=gettext_lazy(
+            "When enabled this component list will be shown as a tab on the dashboard"
+        ),
+    )
+
+    components = models.ManyToManyField("trans.Component", blank=True)
+
+    # Used on dashboard
+    translations: list[Translation]
+
+    objects = ComponentListQuerySet.as_manager()
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        verbose_name = "Component list"
+        verbose_name_plural = "Component lists"
+
+    def __str__(self) -> str:
+        return self.name
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.stats = ComponentListStats(self)
+
+    def get_absolute_url(self) -> str:
+        return reverse("component-list", kwargs={"name": self.slug})
+
+    def tab_slug(self):
+        return f"list-{self.slug}"
+
+
+class AutoComponentList(models.Model):
+    project_match = RegexField(
+        verbose_name=gettext_lazy("Project regular expression"),
+        max_length=200,
+        default="^$",
+        help_text=gettext_lazy(
+            "Regular expression which is used to match project slug."
+        ),
+    )
+    component_match = RegexField(
+        verbose_name=gettext_lazy("Component regular expression"),
+        max_length=200,
+        default="^$",
+        help_text=gettext_lazy(
+            "Regular expression which is used to match component slug."
+        ),
+    )
+    componentlist = models.ForeignKey(
+        ComponentList,
+        verbose_name=gettext_lazy("Component list to assign"),
+        on_delete=models.deletion.CASCADE,
+    )
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        verbose_name = "Automatic component list assignment"
+        verbose_name_plural = "Automatic component list assignments"
+
+    def __str__(self) -> str:
+        return self.componentlist.name
+
+    def check_match(self, component) -> None:
+        try:
+            project_match = regex_match(self.project_match, component.project.slug)
+        except TimeoutError:
+            report_error(
+                "Automatic component list project regex timed out",
+                project=component.project,
+            )
+            LOGGER.warning(
+                "Automatic component list regex timed out: list=%s project_match=%r "
+                "component_match=%r project=%s component=%s",
+                self.componentlist_id,
+                self.project_match,
+                self.component_match,
+                component.project.slug,
+                component.slug,
+            )
+            return
+        if not project_match:
+            return
+        try:
+            component_match = regex_match(self.component_match, component.slug)
+        except TimeoutError:
+            report_error(
+                "Automatic component list component regex timed out",
+                project=component.project,
+            )
+            LOGGER.warning(
+                "Automatic component list regex timed out: list=%s project_match=%r "
+                "component_match=%r project=%s component=%s",
+                self.componentlist_id,
+                self.project_match,
+                self.component_match,
+                component.project.slug,
+                component.slug,
+            )
+            return
+        if not component_match:
+            return
+        self.componentlist.components.add(component)

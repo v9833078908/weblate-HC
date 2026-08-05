@@ -1,0 +1,1268 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Test for search views."""
+
+import re
+from types import SimpleNamespace
+from unittest.mock import ANY, patch
+
+from django.http import QueryDict
+from django.test.utils import override_settings
+from django.urls import reverse
+
+from weblate.auth.data import SELECTION_ALL
+from weblate.auth.models import Group, Role, User
+from weblate.checks.models import Check
+from weblate.screenshots.models import Screenshot
+from weblate.trans.actions import ActionEvents
+from weblate.trans.bulk import bulk_perform
+from weblate.trans.models import (
+    Change,
+    Comment,
+    Component,
+    PendingUnitChange,
+    Translation,
+    Unit,
+    WorkflowSetting,
+)
+from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.ratelimit import reset_rate_limit
+from weblate.utils.state import (
+    STATE_APPROVED,
+    STATE_FUZZY,
+    STATE_NEEDS_CHECKING,
+    STATE_NEEDS_REWRITING,
+    STATE_READONLY,
+    STATE_TRANSLATED,
+)
+from weblate.utils.views import get_form_data
+from weblate.workspaces.models import Workspace
+
+
+class SearchViewTest(ViewTestCase):
+    CREATE_GLOSSARIES = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.translation = self.component.translation_set.get(language_code="cs")
+        self.translate_url = self.translation.get_translate_url()
+        self.update_fulltext_index()
+        reset_rate_limit("search", address="127.0.0.1")
+
+    def do_search(self, params, expected, url=None, *, anchor="#search"):
+        """Perform search test."""
+        if url is None:
+            url = self.translate_url
+        response = self.client.get(url, params)
+        if expected is None:
+            extra = ""
+            if "q" in params:
+                extra = f"?q={params['q']}"
+            self.assertRedirects(
+                response, f"{self.translation.get_absolute_url()}{extra}{anchor}"
+            )
+        else:
+            self.assertContains(response, expected)
+        return response
+
+    def make_fake_page(
+        self,
+        *,
+        count: int,
+        num_pages: int = 1,
+        per_page: int = 20,
+        has_previous: bool = False,
+        has_next: bool = False,
+    ):
+        class FakePage:
+            def __init__(self) -> None:
+                self.object_list = ()
+                self.number = 1
+                self.paginator = SimpleNamespace(
+                    count=count,
+                    num_pages=num_pages,
+                    per_page=per_page,
+                    sort_by=None,
+                )
+                self.has_previous = has_previous
+                self.has_next = has_next
+
+            def __iter__(self):
+                return iter(self.object_list)
+
+        return FakePage()
+
+    def do_search_url(self, url) -> None:
+        """Test search on given URL."""
+        response = self.client.get(url, {"q": "hello"})
+        self.assertContains(response, '<span class="hlmatch">Hello</span>, world')
+        response = self.client.get(url, {"q": "changed:>=2010-01-10"})
+        self.assertContains(response, "2010-01-10")
+
+    def get_search_result_count(self, query: str) -> int:
+        response = self.client.get(
+            reverse("search", kwargs={"path": self.translation.get_url_path()}),
+            {"q": query},
+        )
+        self.assertEqual(response.status_code, 200)
+        return response.context["total_strings"]
+
+    @override_settings(RATELIMIT_SEARCH_ATTEMPTS=20000)
+    def test_all_search(self) -> None:
+        """Searching in all projects."""
+        response = self.client.get(reverse("search"), {"q": "hello"})
+        self.assertContains(response, '<span class="hlmatch">Hello</span>, world')
+        response = self.client.get(reverse("search"), {"q": 'source:r"^Hello"'})
+        self.assertContains(response, "Hello, world")
+        response = self.client.get(reverse("search"), {"q": 'source:r"^(Hello"'})
+        self.assertContains(response, "Invalid regular expression")
+        response = self.client.get(
+            reverse("search"), {"q": "hello AND state:<translated"}
+        )
+        self.assertContains(response, "Hello, world")
+        response = self.client.get(reverse("search"), {"q": "hello AND state:empty"})
+        self.assertContains(response, "Hello, world")
+        response = self.client.get(reverse("search"), {"q": "check:php_format"})
+        self.assertContains(response, "No matching strings found.")
+        response = self.client.get(
+            reverse("search"), {"q": "check:php_format", "ignored": "1"}
+        )
+        self.assertContains(response, "No matching strings found.")
+        self.do_search_url(reverse("search"))
+
+    def test_pagination(self) -> None:
+        response = self.client.get(reverse("search"), {"q": "hello", "page": "1"})
+        self.assertContains(response, '<span class="hlmatch">Hello</span>, world')
+        response = self.client.get(reverse("search"), {"q": "hello", "page": "10"})
+        self.assertContains(response, '<span class="hlmatch">Hello</span>, world')
+        response = self.client.get(reverse("search"), {"q": "hello", "page": "x"})
+        self.assertContains(response, '<span class="hlmatch">Hello</span>, world')
+
+    def test_language_search(self) -> None:
+        """Searching in all projects."""
+        response = self.client.get(reverse("search"), {"q": "hello", "lang": "cs"})
+        self.assertContains(response, '<span class="hlmatch">Hello</span>, world')
+
+    def test_project_search(self) -> None:
+        """Searching within project."""
+        self.do_search_url(
+            reverse("search", kwargs={"path": self.project.get_url_path()})
+        )
+
+    def test_workspace_search(self) -> None:
+        """Searching within workspace."""
+        workspace = Workspace.objects.create(name="Search workspace")
+        self.project.workspace = workspace
+        self.project.save(update_fields=["workspace"])
+
+        self.do_search_url(reverse("search", kwargs={"path": workspace.get_url_path()}))
+
+    def test_workspace_bulk_edit(self) -> None:
+        """Bulk editing within workspace."""
+        workspace = Workspace.objects.create(name="Bulk workspace")
+        self.project.workspace = workspace
+        self.project.save(update_fields=["workspace"])
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.user.clear_permissions_cache()
+
+        response = self.client.post(
+            reverse("bulk-edit", kwargs={"path": workspace.get_url_path()}),
+            {
+                "q": "source:Hello",
+                "state": STATE_TRANSLATED,
+                "add_flags": "",
+                "remove_flags": "",
+            },
+            follow=True,
+        )
+
+        self.assertContains(response, "Bulk edit completed")
+
+    def test_workspace_bulk_edit_derives_matching_components(self) -> None:
+        """Bulk editing within workspace derives affected components from matches."""
+        workspace = Workspace.objects.create(name="Bulk workspace")
+        self.project.workspace = workspace
+        self.project.save(update_fields=["workspace"])
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.user.clear_permissions_cache()
+
+        with patch(
+            "weblate.trans.views.search.bulk_perform", return_value=0
+        ) as perform:
+            response = self.client.post(
+                reverse("bulk-edit", kwargs={"path": workspace.get_url_path()}),
+                {
+                    "q": "source:Hello",
+                    "state": STATE_TRANSLATED,
+                    "add_flags": "",
+                    "remove_flags": "",
+                },
+                follow=True,
+            )
+
+        self.assertContains(response, "Bulk edit completed")
+        self.assertIsNone(perform.call_args.kwargs["components"])
+
+    def test_component_search(self) -> None:
+        """Searching within component."""
+        self.do_search_url(reverse("search", kwargs=self.kw_component))
+
+    def test_project_language_search(self) -> None:
+        """Searching within project."""
+        self.do_search_url(
+            reverse("search", kwargs={"path": [self.project.slug, "-", "cs"]})
+        )
+
+    def test_project_search_skips_large_word_summary(self) -> None:
+        with (
+            patch(
+                "weblate.trans.views.search.get_paginator",
+                return_value=self.make_fake_page(count=1_001),
+            ),
+            patch("weblate.trans.views.search.fill_in_source_translation"),
+            patch(
+                "weblate.trans.models.unit.UnitQuerySet.aggregate",
+                side_effect=AssertionError(
+                    "large search summary should not aggregate total words"
+                ),
+            ),
+        ):
+            response = self.client.get(
+                reverse("search", kwargs={"path": self.project.get_url_path()}),
+                {"q": "hello"},
+            )
+
+        self.assertEqual(response.context["total_strings"], 1_001)
+        self.assertIsNone(response.context["total_words"])
+
+    def test_project_search_word_summary_uses_full_queryset(self) -> None:
+        with (
+            patch(
+                "weblate.trans.views.search.get_paginator",
+                return_value=self.make_fake_page(
+                    count=10, num_pages=2, per_page=5, has_next=True
+                ),
+            ),
+            patch("weblate.trans.views.search.fill_in_source_translation"),
+            patch(
+                "weblate.trans.models.unit.UnitQuerySet.aggregate",
+                return_value={"total_words": 123},
+            ) as aggregate,
+        ):
+            response = self.client.get(
+                reverse("search", kwargs={"path": self.project.get_url_path()}),
+                {"q": "hello"},
+            )
+
+        aggregate.assert_called_once_with(total_words=ANY)
+        self.assertEqual(response.context["total_strings"], 10)
+        self.assertEqual(response.context["total_words"], 123)
+
+    def test_translation_search(self) -> None:
+        """Searching within translation."""
+        # Default
+        self.do_search({"q": "source:hello"}, "source:hello")
+        # Short exact
+        self.do_search({"q": "x", "search": "exact"}, None)
+
+    def test_comment_search_keeps_source_comments_separate(self) -> None:
+        unit = self.get_unit()
+        Comment.objects.all().delete()
+
+        Comment.objects.create(
+            unit=unit.source_unit,
+            comment="Source comment by me",
+            user=self.user,
+        )
+
+        self.assertEqual(self.get_search_result_count('comment_author:="testuser"'), 0)
+        self.assertEqual(self.get_search_result_count("has:comment"), 0)
+        self.assertEqual(
+            self.get_search_result_count('source_comment_author:="testuser"'), 1
+        )
+        self.assertEqual(self.get_search_result_count("has:source-comment"), 1)
+
+        Comment.objects.create(
+            unit=unit,
+            comment="Translation comment by me",
+            user=self.user,
+        )
+
+        self.assertEqual(self.get_search_result_count('comment_author:="testuser"'), 1)
+        self.assertEqual(self.get_search_result_count("has:comment"), 1)
+
+    def test_search_filter_dropdown_includes_comments_by_me(self) -> None:
+        response = self.client.get(
+            reverse("search", kwargs={"path": self.translation.get_url_path()})
+        )
+
+        self.assertContains(response, "Strings with comments by me")
+        self.assertContains(response, "comment_author:=&quot;testuser&quot;")
+        self.assertContains(response, "Strings with source comments by me")
+        self.assertContains(response, "source_comment_author:=&quot;testuser&quot;")
+
+    def test_review(self) -> None:
+        # Review
+        self.do_search({"q": "changed:>=2010-01-10"}, None)
+        self.do_search({"q": "changed:>=2010-01-10 AND NOT changed_by:testuser"}, None)
+        self.do_search({"q": "changed:>2010-01-10 AND changed_by:testuser"}, None)
+        self.do_search({"q": "changed_by:testuser"}, None)
+        # Review, partial date
+        self.do_search({"q": "changed:>=2010-01-"}, None)
+
+    def extract_params(self, response):
+        search_url = re.findall(r'data-params="([^"]*)"', response.content.decode())[0]
+        return QueryDict(search_url, mutable=True)
+
+    def test_search_links(self) -> None:
+        response = self.do_search({"q": "source:Weblate"}, "source:Weblate")
+        # Extract search URL
+        params = self.extract_params(response)
+        # Try access to pages
+        params["offset"] = 1
+        response = self.client.get(self.translate_url, params)
+        self.assertContains(response, "https://demo.weblate.org/")
+        params["offset"] = 2
+        response = self.client.get(self.translate_url, params)
+        self.assertContains(response, "Thank you for using Weblate.")
+        # Invalid offset
+        params["offset"] = "bug"
+        response = self.client.get(self.translate_url, params)
+        self.assertContains(response, "https://demo.weblate.org/")
+        # Go to end
+        params["offset"] = 3
+        response = self.client.get(self.translate_url, params)
+        self.assertRedirects(response, self.translation.get_absolute_url())
+        # Try no longer cached query (should be deleted above)
+        params["offset"] = 2
+        response = self.client.get(self.translate_url, params)
+        self.assertContains(response, "Thank you for using Weblate.")
+
+    def test_search_checksum(self) -> None:
+        unit = self.translation.unit_set.get(
+            source="Try Weblate at <https://demo.weblate.org/>!\n"
+        )
+        self.do_search({"checksum": unit.checksum}, "3 / 4")
+
+    def test_search_offset(self) -> None:
+        """Test offset navigation."""
+        self.do_search({"offset": 1}, "1 / 4")
+        self.do_search({"offset": 4}, "4 / 4")
+        self.do_search({"offset": 5}, None, anchor="")
+
+    def test_search_type(self) -> None:
+        self.do_search({"q": "state:<translated"}, "Unfinished strings")
+        self.do_search({"q": "state:needs-editing"}, None)
+        self.do_search({"q": "has:suggestion"}, None)
+        self.do_search({"q": "has:check"}, None)
+        self.do_search({"q": "check:plurals"}, None)
+        self.do_search({"q": ""}, "1 / 4")
+
+    def test_search_automatically_translated(self) -> None:
+        self.do_search({"q": "is:automatically-translated"}, None)
+
+        unit = self.translation.unit_set.first()
+        assert unit is not None
+        unit.automatically_translated = True
+        unit.save()
+
+        response = self.do_search({"q": "is:automatically-translated"}, "1 / 1")
+        self.assertContains(response, unit.source)
+
+        self.do_search({"q": "NOT is:automatically-translated"}, "1 / 3")
+
+    def test_search_plural(self) -> None:
+        response = self.do_search({"q": "banana"}, "banana")
+        self.assertContains(response, "One")
+        self.assertContains(response, "Few")
+        self.assertContains(response, "Other")
+        self.assertNotContains(response, "Plural form ")
+
+    def assert_search_variant(
+        self,
+        expected_source: str,
+        match_components: list[Translation],
+        no_match_component: Translation,
+    ) -> None:
+        for component in match_components:
+            response = self.client.get(
+                reverse("search", kwargs={"path": component.get_url_path()}),
+                {"q": "has:variant"},
+            )
+            self.assertContains(response, expected_source)
+
+        response = self.client.get(
+            reverse("search", kwargs={"path": no_match_component.get_url_path()}),
+            {"q": "has:variant"},
+        )
+        self.assertContains(response, "No matching strings found.")
+
+    def test_search_variant_with_flag_create(self) -> None:
+        """
+        Test glossary variant search.
+
+        Specifically checks that search result of 'has:variant' only contains
+        units that have variants in the search language
+        """
+        self.glossary = self.project.glossaries[0]
+        en_glossary = self.glossary.translation_set.get(language__code="en")  # source
+        de_glossary = self.glossary.translation_set.get(language__code="de")
+        cs_glossary = self.glossary.translation_set.get(language__code="cs")
+
+        en_glossary.add_unit(None, "", source="glossary-term", author=self.user)
+
+        # create a unit with a variant for both 'en' and 'de'
+        de_glossary.add_unit(
+            None,
+            "",
+            source="variant-glossary-term",
+            extra_flags="variant:glossary-term",
+            author=self.user,
+        )
+
+        self.assert_search_variant(
+            "variant-glossary-term", [en_glossary, de_glossary], cs_glossary
+        )
+
+    def test_search_variant_with_regex_key(self) -> None:
+        mono_component = self.create_po_mono(project=self.project, name="Monolingual")
+
+        # set variant_regex match
+        url = reverse("settings", kwargs={"path": mono_component.get_url_path()})
+        self.project.add_user(self.user, "Administration")
+        response = self.client.get(url)
+        data = get_form_data(response.context["form"].initial)
+        data["variant_regex"] = r"(_variant)$"
+
+        response = self.client.post(
+            url,
+            data,
+            follow=True,
+        )
+        self.assertContains(response, "Settings saved")
+
+        mono_component.refresh_from_db()
+        self.assertNotEqual(mono_component.variant_regex, "")
+
+        en_glossary = mono_component.translation_set.get(language__code="en")  # source
+        de_glossary = mono_component.translation_set.get(language__code="de")
+        cs_glossary = mono_component.translation_set.get(language__code="cs")
+
+        en_glossary.add_unit(None, "original", "glossary-term", author=self.user)
+        de_glossary.add_unit(
+            None, "original_variant", source="variant-glossary-term", author=self.user
+        )
+
+        self.assert_search_variant(
+            "glossary-term", [en_glossary, de_glossary], cs_glossary
+        )
+
+    def test_checksum(self) -> None:
+        self.do_search({"checksum": "invalid"}, None, anchor="")
+
+    def test_search_multiple_labels(self) -> None:
+        """Test that searching with label:ABC AND label:XYZ works correctly."""
+        label1 = self.project.label_set.create(name="ABC", color="black")
+        label2 = self.project.label_set.create(name="XYZ", color="blue")
+
+        unit = self.get_unit()
+        source_unit = unit.source_unit
+        source_unit.labels.add(label1, label2)
+
+        unit.translation.stats.clear()
+
+        self.do_search({"q": "label:ABC"}, "Hello, world!")
+        self.do_search({"q": "label:XYZ"}, "Hello, world!")
+        self.do_search({"q": "label:ABC AND label:XYZ"}, "Hello, world!")
+        self.do_search({"q": "label:ABC label:XYZ"}, "Hello, world!")
+
+        source_unit.labels.remove(label2)
+        unit.translation.stats.clear()
+        self.do_search({"q": "label:ABC AND label:XYZ"}, None)
+        self.do_search({"q": "label:ABC label:XYZ"}, None)
+
+    def test_search_multiple_checks(self) -> None:
+        """Test that searching with check:A AND check:B works correctly."""
+        unit = self.get_unit()
+        Check.objects.create(unit=unit, name="ellipsis", dismissed=False)
+        Check.objects.create(unit=unit, name="same", dismissed=False)
+
+        self.do_search({"q": "check:ellipsis"}, "Hello, world!")
+        self.do_search({"q": "check:same"}, "Hello, world!")
+        self.do_search({"q": "check:ellipsis AND check:same"}, "Hello, world!")
+        self.do_search({"q": "check:ellipsis check:same"}, "Hello, world!")
+
+        Check.objects.filter(unit=unit, name="same").update(dismissed=True)
+        self.do_search(
+            {"q": "check:ellipsis AND dismissed_check:same"}, "Hello, world!"
+        )
+        self.do_search({"q": "check:ellipsis dismissed_check:same"}, "Hello, world!")
+
+        Check.objects.filter(unit=unit, name="same").delete()
+        self.do_search({"q": "check:ellipsis AND check:same"}, None)
+        self.do_search({"q": "check:ellipsis check:same"}, None)
+
+    def test_search_multiple_screenshots(self) -> None:
+        """Test that searching with screenshot:A AND screenshot:B works correctly."""
+        unit = self.get_unit()
+        source_unit = unit.source_unit
+        translation = self.component.source_translation
+
+        shot1 = Screenshot.objects.create(
+            name="ScreenshotAlpha", translation=translation
+        )
+        shot2 = Screenshot.objects.create(
+            name="ScreenshotBeta", translation=translation
+        )
+        shot1.units.add(source_unit)
+        shot2.units.add(unit)
+
+        self.do_search({"q": "screenshot:ScreenshotAlpha"}, "Hello, world!")
+        self.do_search({"q": "screenshot:ScreenshotBeta"}, "Hello, world!")
+        self.do_search(
+            {"q": "screenshot:ScreenshotAlpha AND screenshot:ScreenshotBeta"},
+            "Hello, world!",
+        )
+        self.do_search(
+            {"q": "screenshot:ScreenshotAlpha screenshot:ScreenshotBeta"},
+            "Hello, world!",
+        )
+
+        shot2.units.remove(unit)
+        self.do_search(
+            {"q": "screenshot:ScreenshotAlpha AND screenshot:ScreenshotBeta"}, None
+        )
+        self.do_search(
+            {"q": "screenshot:ScreenshotAlpha screenshot:ScreenshotBeta"}, None
+        )
+
+
+class ReplaceTest(ViewTestCase):
+    """Test for search and replace functionality."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.edit_unit("Hello, world!\n", "Nazdar svete!\n")
+        self.unit = self.get_unit()
+
+    def do_replace_test(self, url, confirm=True, query=None) -> None:
+        query = query or ""
+        response = self.client.post(
+            url, {"q": query, "search": "Nazdar", "replacement": "Ahoj"}, follow=True
+        )
+        self.assertContains(
+            response, "Please review and confirm the search and replace results."
+        )
+        payload = {
+            "q": query,
+            "search": "Nazdar",
+            "replacement": "Ahoj",
+            "confirm": "1",
+        }
+        if confirm:
+            payload["units"] = self.unit.pk
+        response = self.client.post(url, payload, follow=True)
+        unit = self.get_unit()
+        if confirm:
+            self.assertContains(
+                response, "Search and replace completed, 1 string was updated."
+            )
+            self.assertEqual(unit.target, "Ahoj svete!\n")
+        else:
+            self.assertContains(
+                response, "Search and replace completed, no strings were updated."
+            )
+            self.assertEqual(unit.target, "Nazdar svete!\n")
+
+    def test_no_match(self) -> None:
+        response = self.client.post(
+            reverse("replace", kwargs=self.kw_translation),
+            {"search": "Ahoj", "replacement": "Cau"},
+            follow=True,
+        )
+        self.assertContains(
+            response, "Search and replace completed, no strings were updated."
+        )
+        unit = self.get_unit()
+        self.assertEqual(unit.target, "Nazdar svete!\n")
+
+    def test_replace_translated(self) -> None:
+        self.do_replace_test(
+            reverse("replace", kwargs=self.kw_translation),
+            "is:translated",
+        )
+
+    def test_replace_nontranslated(self) -> None:
+        response = self.client.post(
+            reverse("replace", kwargs=self.kw_translation),
+            {"q": "NOT is:translated", "search": "Nazdar", "replacement": "Ahoj"},
+            follow=True,
+        )
+        self.assertNotContains(
+            response, "Please review and confirm the search and replace results."
+        )
+
+    def test_replace(self) -> None:
+        self.do_replace_test(reverse("replace", kwargs=self.kw_translation))
+
+    def test_replace_preview_parameters_are_editable(self) -> None:
+        url = reverse("replace", kwargs=self.kw_translation)
+
+        response = self.client.post(
+            url,
+            {"q": "", "search": "Nazdar", "replacement": "Ahoj"},
+            follow=True,
+        )
+
+        self.assertContains(
+            response, "Please review and confirm the search and replace results."
+        )
+        self.assertContains(response, "Update preview")
+        self.assertContains(response, 'id="id_replace_search"')
+        self.assertContains(response, 'id="id_replace_replacement"')
+        content = response.content.decode()
+        self.assertEqual(content.count('id="id_replace_search"'), 1)
+        self.assertEqual(content.count('id="id_replace_replacement"'), 1)
+
+        response = self.client.post(
+            url,
+            {"q": "", "search": "Nazdar", "replacement": "Cau"},
+            follow=True,
+        )
+
+        unit = self.get_unit()
+        self.assertContains(
+            response, "Please review and confirm the search and replace results."
+        )
+        self.assertContains(response, 'value="Cau"')
+        self.assertEqual(unit.target, "Nazdar svete!\n")
+
+        response = self.client.post(
+            url,
+            {
+                "q": "",
+                "search": "Nazdar",
+                "replacement": "Cau",
+                "confirm": "1",
+                "units": unit.pk,
+            },
+            follow=True,
+        )
+
+        self.assertContains(
+            response, "Search and replace completed, 1 string was updated."
+        )
+        unit = self.get_unit()
+        self.assertEqual(unit.target, "Cau svete!\n")
+
+    def test_replace_project(self) -> None:
+        self.do_replace_test(
+            reverse("replace", kwargs={"path": self.project.get_url_path()})
+        )
+
+    def test_replace_workspace(self) -> None:
+        workspace = Workspace.objects.create(name="Replace workspace")
+        self.project.workspace = workspace
+        self.project.save(update_fields=["workspace"])
+
+        response = self.client.get(workspace.get_absolute_url())
+
+        self.assertContains(response, 'data-bs-target="#replace"')
+        self.do_replace_test(
+            reverse("replace", kwargs={"path": workspace.get_url_path()})
+        )
+
+    def test_replace_workspace_excludes_other_workspaces(self) -> None:
+        workspace = Workspace.objects.create(name="Replace workspace")
+        self.project.workspace = workspace
+        self.project.save(update_fields=["workspace"])
+        outside_project = self.create_project(
+            name="Outside workspace",
+            slug="outside-workspace",
+        )
+        outside_component = self.create_po(
+            project=outside_project,
+            name="Outside component",
+        )
+        outside_unit = outside_component.translation_set.get(
+            language_code="cs"
+        ).unit_set.get(source__startswith="Hello, world!")
+        outside_unit.translate(
+            self.user,
+            "Nazdar outside!\n",
+            STATE_TRANSLATED,
+        )
+        url = reverse("replace", kwargs={"path": workspace.get_url_path()})
+
+        response = self.client.post(
+            url,
+            {"q": "", "search": "Nazdar", "replacement": "Ahoj"},
+        )
+
+        self.assertContains(
+            response, "Please review and confirm the search and replace results."
+        )
+        self.assertNotContains(response, outside_component.name)
+
+        response = self.client.post(
+            url,
+            {
+                "q": "",
+                "search": "Nazdar",
+                "replacement": "Ahoj",
+                "confirm": "1",
+                "units": self.unit.pk,
+            },
+            follow=True,
+        )
+
+        self.assertContains(
+            response, "Search and replace completed, 1 string was updated."
+        )
+        outside_unit.refresh_from_db()
+        self.assertEqual(outside_unit.target, "Nazdar outside!\n")
+
+    def test_replace_workspace_requires_edit_permission(self) -> None:
+        workspace = Workspace.objects.create(name="Read-only replace workspace")
+        self.project.workspace = workspace
+        self.project.save(update_fields=["workspace"])
+        self.user.groups.clear()
+        group = Group.objects.create(
+            name="Workspace project access",
+            language_selection=SELECTION_ALL,
+        )
+        group.projects.add(self.project)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+        url = reverse("replace", kwargs={"path": workspace.get_url_path()})
+
+        response = self.client.get(workspace.get_absolute_url())
+
+        self.assertNotContains(response, "Search and replace", status_code=200)
+
+        response = self.client.post(
+            url,
+            {"q": "", "search": "Nazdar", "replacement": "Ahoj"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_replace_workspace_caps_editable_units(self) -> None:
+        workspace = Workspace.objects.create(name="Mixed access workspace")
+        self.project.workspace = workspace
+        self.project.save(update_fields=["workspace"])
+        Unit.objects.bulk_create(
+            [
+                Unit(
+                    translation=self.translation,
+                    id_hash=-10_000_000 - index,
+                    source=f"View-only source {index}",
+                    target="Nazdar view-only",
+                    state=STATE_TRANSLATED,
+                    original_state=STATE_TRANSLATED,
+                    position=10_000 + index,
+                    source_unit=self.unit.source_unit,
+                )
+                for index in range(249)
+            ]
+        )
+        editable_project = self.create_project(
+            name="Editable workspace project",
+            slug="editable-workspace-project",
+            workspace=workspace,
+        )
+        editable_component = self.create_po(
+            project=editable_project,
+            name="editable-workspace-component",
+        )
+        editable_unit = editable_component.translation_set.get(
+            language_code="cs"
+        ).unit_set.get(source__startswith="Hello, world!")
+        editable_unit.translate(
+            self.user,
+            "Nazdar editable\n",
+            STATE_TRANSLATED,
+        )
+
+        self.user.groups.clear()
+        view_group = Group.objects.create(
+            name="View-only workspace project",
+            language_selection=SELECTION_ALL,
+        )
+        view_group.projects.add(self.project)
+        edit_group = Group.objects.create(
+            name="Editable workspace project",
+            language_selection=SELECTION_ALL,
+        )
+        edit_group.roles.add(Role.objects.get(name="Translate"))
+        edit_group.projects.add(editable_project)
+        self.user.groups.add(view_group, edit_group)
+        self.user.clear_permissions_cache()
+
+        response = self.client.post(
+            reverse("replace", kwargs={"path": workspace.get_url_path()}),
+            {"q": "", "search": "Nazdar", "replacement": "Ahoj"},
+        )
+
+        self.assertContains(
+            response, "Please review and confirm the search and replace results."
+        )
+        self.assertEqual(list(response.context["matching"]), [editable_unit])
+        self.assertFalse(response.context["limited"])
+
+    def test_replace_workspace_with_component_language_permission(self) -> None:
+        workspace = Workspace.objects.create(name="Component access workspace")
+        self.project.workspace = workspace
+        self.project.save(update_fields=["workspace"])
+        self.user.groups.clear()
+        group = Group.objects.create(name="Workspace component translator")
+        group.roles.add(Role.objects.get(name="Translate"))
+        group.components.add(self.component)
+        group.languages.add(self.translation.language)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+        self.assertFalse(self.user.has_perm("unit.edit", self.project))
+        self.assertTrue(self.user.has_perm("unit.edit", self.unit))
+        editable_scope = Unit.objects.filter_editable_scope(self.user)
+        self.assertTrue(editable_scope.filter(pk=self.unit.pk).exists())
+        self.assertFalse(
+            editable_scope.filter(translation__component=self.component)
+            .exclude(translation__language=self.translation.language)
+            .exists()
+        )
+
+        response = self.client.get(workspace.get_absolute_url())
+
+        self.assertContains(response, 'data-bs-target="#replace"')
+        self.do_replace_test(
+            reverse("replace", kwargs={"path": workspace.get_url_path()})
+        )
+
+    def test_replace_component(self) -> None:
+        self.do_replace_test(reverse("replace", kwargs=self.kw_component))
+
+    def test_replace_project_language(self) -> None:
+        self.do_replace_test(
+            reverse(
+                "replace",
+                kwargs={
+                    "path": (self.project.slug, "-", self.translation.language.code)
+                },
+            )
+        )
+
+    def test_replace_plurals(self) -> None:
+        unit = self.get_unit("Orangutan")
+        url = reverse("replace", kwargs=self.kw_translation)
+        self.edit_unit(
+            "Orangutan",
+            "Opice má %d banán.\n",
+            target_1="Opice má %d banány.\n",
+            target_2="Opice má %d banánů.\n",
+        )
+        response = self.client.post(
+            url, {"q": "", "search": "Opice", "replacement": "Orangutan"}, follow=True
+        )
+        self.assertContains(
+            response, "Please review and confirm the search and replace results."
+        )
+        payload = {
+            "q": "",
+            "search": "Opice",
+            "replacement": "Orangutan",
+            "confirm": "1",
+            "units": unit.pk,
+        }
+        response = self.client.post(url, payload, follow=True)
+        unit = self.get_unit("Orangutan")
+        self.assertContains(
+            response, "Search and replace completed, 1 string was updated."
+        )
+        self.assertEqual(
+            unit.get_target_plurals(),
+            [
+                "Orangutan má %d banán.\n",
+                "Orangutan má %d banány.\n",
+                "Orangutan má %d banánů.\n",
+            ],
+        )
+
+
+class BulkEditTest(ViewTestCase):
+    """Test for build edit functionality."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.edit_unit("Hello, world!\n", "Nazdar svete!\n", fuzzy=True)
+        self.unit = self.get_unit()
+        self.make_manager()
+
+    def do_bulk_edit_test(self, url) -> None:
+        response = self.client.post(
+            url, {"q": "state:needs-editing", "state": STATE_TRANSLATED}, follow=True
+        )
+        self.assertContains(response, "Bulk edit completed, 1 string was updated.")
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
+
+    def test_no_match(self) -> None:
+        response = self.client.post(
+            reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+            {"q": "state:approved", "state": STATE_FUZZY},
+            follow=True,
+        )
+        self.assertContains(response, "Bulk edit completed, no strings were updated.")
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_FUZZY)
+
+    def test_bulk_edit(self) -> None:
+        self.do_bulk_edit_test(reverse("bulk-edit", kwargs=self.kw_translation))
+
+    def test_bulk_edit_project(self) -> None:
+        self.do_bulk_edit_test(
+            reverse("bulk-edit", kwargs={"path": self.project.get_url_path()})
+        )
+
+    def test_bulk_edit_component(self) -> None:
+        self.do_bulk_edit_test(reverse("bulk-edit", kwargs=self.kw_component))
+
+    def test_bulk_edit_project_language(self) -> None:
+        self.do_bulk_edit_test(
+            reverse(
+                "bulk-edit",
+                kwargs={
+                    "path": (self.project.slug, "-", self.translation.language.code)
+                },
+            )
+        )
+
+    def test_bulk_edit_fuzzy_alias_includes_substates(self) -> None:
+        self.unit.state = STATE_NEEDS_REWRITING
+        self.unit.save(update_fields=["state"])
+
+        response = self.client.post(
+            reverse("bulk-edit", kwargs=self.kw_translation),
+            {"q": "is:needs-editing", "state": STATE_TRANSLATED},
+            follow=True,
+        )
+
+        self.assertContains(response, "Bulk edit completed, 1 string was updated.")
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.state, STATE_TRANSLATED)
+
+    def test_bulk_edit_or_query_includes_substates(self) -> None:
+        self.unit.state = STATE_NEEDS_CHECKING
+        self.unit.save(update_fields=["state"])
+
+        response = self.client.post(
+            reverse("bulk-edit", kwargs=self.kw_translation),
+            {
+                "q": "state:needs-checking OR state:needs-rewriting",
+                "state": STATE_TRANSLATED,
+            },
+            follow=True,
+        )
+
+        self.assertContains(response, "Bulk edit completed, 1 string was updated.")
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.state, STATE_TRANSLATED)
+
+    def test_bulk_edit_requires_bulk_permission_per_unit(self) -> None:
+        limited_user = User.objects.create_user(
+            "limited-bulk", "limited-bulk@example.com", "limited-bulk"
+        )
+        group = Group.objects.create(
+            name="Limited bulk", language_selection=SELECTION_ALL
+        )
+        group.roles.add(Role.objects.get(name="Translate"))
+        group.components.add(self.component)
+        limited_user.groups.add(group)
+        limited_user.clear_permissions_cache()
+
+        self.assertTrue(limited_user.has_perm("unit.edit", self.unit))
+        self.assertFalse(limited_user.has_perm("unit.bulk_edit", self.unit))
+
+        updated = bulk_perform(
+            limited_user,
+            Unit.objects.filter(translation__component=self.component),
+            query="state:needs-editing",
+            target_state=STATE_TRANSLATED,
+            add_flags="",
+            remove_flags="",
+            add_labels=self.project.label_set.none(),
+            remove_labels=self.project.label_set.none(),
+            project=self.project,
+            components=[self.component],
+        )
+
+        self.assertEqual(updated, 0)
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.state, STATE_FUZZY)
+
+    def test_bulk_edit_skips_restricted_language(self) -> None:
+        limited_user = User.objects.create_user(
+            "restricted-bulk", "restricted-bulk@example.com", "restricted-bulk"
+        )
+        group = Group.objects.create(
+            name="Restricted bulk", language_selection=SELECTION_ALL
+        )
+        group.roles.add(
+            Role.objects.get(name="Translate"), Role.objects.get(name="Bulk editing")
+        )
+        group.components.add(self.component)
+        limited_user.groups.add(group)
+        limited_user.clear_permissions_cache()
+        self.assertTrue(limited_user.has_perm("unit.edit", self.unit))
+        self.assertTrue(limited_user.has_perm("unit.bulk_edit", self.unit))
+
+        WorkflowSetting.objects.create(
+            project=self.project,
+            language=self.translation.language,
+            restrict_direct_editing=True,
+        )
+        unit = Unit.objects.get(pk=self.unit.pk)
+
+        updated = bulk_perform(
+            limited_user,
+            Unit.objects.filter(pk=unit.pk),
+            query="state:needs-editing",
+            target_state=STATE_TRANSLATED,
+            add_flags="",
+            remove_flags="",
+            add_labels=self.project.label_set.none(),
+            remove_labels=self.project.label_set.none(),
+            project=self.project,
+            components=[self.component],
+        )
+
+        self.assertEqual(updated, 0)
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_FUZZY)
+
+    def test_bulk_edit_requires_review_permission_to_approve(self) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        limited_user = User.objects.create_user(
+            "limited-approve", "limited-approve@example.com", "limited-approve"
+        )
+        group = Group.objects.create(
+            name="Limited approve", language_selection=SELECTION_ALL
+        )
+        group.roles.add(
+            Role.objects.get(name="Translate"), Role.objects.get(name="Bulk editing")
+        )
+        group.components.add(self.component)
+        limited_user.groups.add(group)
+        limited_user.clear_permissions_cache()
+
+        self.assertTrue(limited_user.has_perm("unit.edit", self.unit))
+        self.assertTrue(limited_user.has_perm("unit.bulk_edit", self.unit))
+        self.assertFalse(limited_user.has_perm("unit.review", self.unit))
+
+        updated = bulk_perform(
+            limited_user,
+            Unit.objects.filter(translation__component=self.component),
+            query="state:needs-editing",
+            target_state=STATE_APPROVED,
+            add_flags="",
+            remove_flags="",
+            add_labels=self.project.label_set.none(),
+            remove_labels=self.project.label_set.none(),
+            project=self.project,
+            components=[self.component],
+        )
+
+        self.assertEqual(updated, 0)
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.state, STATE_FUZZY)
+
+    def test_bulk_flags(self) -> None:
+        response = self.client.post(
+            reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+            {"q": "state:needs-editing", "state": -1, "add_flags": "python-format"},
+            follow=True,
+        )
+        self.assertContains(response, "Bulk edit completed, 1 string was updated.")
+        unit = self.get_unit()
+        self.assertIn("python-format", unit.all_flags)
+        response = self.client.post(
+            reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+            {"q": "state:needs-editing", "state": -1, "remove_flags": "python-format"},
+            follow=True,
+        )
+        self.assertContains(response, "Bulk edit completed, 1 string was updated.")
+        unit = self.get_unit()
+        self.assertNotIn("python-format", unit.all_flags)
+
+    def test_bulk_read_only(self) -> None:
+        response = self.client.post(
+            reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+            {"q": "language:en", "state": -1, "add_flags": "read-only"},
+            follow=True,
+        )
+        self.assertContains(response, "Bulk edit completed, 4 strings were updated.")
+        unit = self.get_unit()
+        self.assertIn("read-only", unit.all_flags)
+        response = self.client.post(
+            reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+            {"q": "language:en", "state": -1, "remove_flags": "read-only"},
+            follow=True,
+        )
+        self.assertContains(response, "Bulk edit completed, 4 strings were updated.")
+        unit = self.get_unit()
+        self.assertNotIn("read-only", unit.all_flags)
+
+    def test_bulk_labels(self) -> None:
+        label = self.project.label_set.create(name="Test label", color="black")
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+                {"q": "state:needs-editing", "state": -1, "add_labels": label.pk},
+                follow=True,
+            )
+        self.assertContains(response, "Bulk edit completed, 1 string was updated.")
+        response = self.client.post(
+            reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+            {"q": "state:needs-editing", "state": -1, "add_labels": label.pk},
+            follow=True,
+        )
+        self.assertContains(response, "Bulk edit completed, no strings were updated.")
+        unit = self.get_unit()
+        self.assertIn(label, unit.all_labels)
+        self.assertEqual(getattr(unit.translation.stats, f"label:{label.name}"), 1)
+        # Clear local outdated cache
+        unit.source_unit.translation.stats.clear()
+        self.assertEqual(
+            getattr(unit.source_unit.translation.stats, f"label:{label.name}"),
+            1,
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+                {"q": "state:needs-editing", "state": -1, "remove_labels": label.pk},
+                follow=True,
+            )
+        self.assertContains(response, "Bulk edit completed, 1 string was updated.")
+        response = self.client.post(
+            reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+            {"q": "state:needs-editing", "state": -1, "remove_labels": label.pk},
+            follow=True,
+        )
+        self.assertContains(response, "Bulk edit completed, no strings were updated.")
+        unit = self.get_unit()
+        self.assertNotIn(label, unit.labels.all())
+        self.assertEqual(getattr(unit.translation.stats, f"label:{label.name}"), 0)
+        # Clear local outdated cache
+        unit.source_unit.translation.stats.clear()
+        self.assertEqual(
+            getattr(unit.source_unit.translation.stats, f"label:{label.name}"),
+            0,
+        )
+
+    def test_bulk_translation_label(self) -> None:
+        label = self.project.label_set.create(name="Test label", color="black")
+        unit = self.get_unit()
+        unit.source_unit.labels.add(label)
+        # Clear local outdated cache
+        unit.translation.stats.clear()
+        self.assertEqual(
+            getattr(unit.translation.stats, f"label:{label.name}"),
+            1,
+        )
+        response = self.client.post(
+            reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+            {"q": "state:>=empty", "state": -1, "remove_labels": label.pk},
+            follow=True,
+        )
+        self.assertContains(response, "Bulk edit completed, 1 string was updated.")
+        unit = self.get_unit()
+        self.assertNotIn(label, unit.source_unit.labels.all())
+        # Clear local outdated cache
+        unit.translation.stats.clear()
+        self.assertEqual(
+            getattr(unit.translation.stats, f"label:{label.name}"),
+            0,
+        )
+
+    def test_source_state(self) -> None:
+        with override_settings(CREATE_GLOSSARIES=self.CREATE_GLOSSARIES):
+            mono = Component.objects.create(
+                name="Test2",
+                slug="test2",
+                project=self.project,
+                repo="weblate://test/test",
+                file_format="json",
+                filemask="json-mono/*.json",
+                template="json-mono/en.json",
+            )
+        # Translate single unit
+        translation = mono.translation_set.get(language_code="cs")
+        translation.unit_set.get(context="hello").translate(
+            self.user, "Ahoj světe", STATE_TRANSLATED
+        )
+        self.assertEqual(translation.unit_set.filter(state=STATE_READONLY).count(), 0)
+        self.assertEqual(translation.unit_set.filter(state=STATE_TRANSLATED).count(), 1)
+
+        url = reverse("bulk-edit", kwargs={"path": mono.get_url_path()})
+
+        # Mark all source strings as needing edit and that should turn all
+        # translated strings read-only
+        response = self.client.post(
+            url, {"q": "language:en", "state": STATE_FUZZY}, follow=True
+        )
+        self.assertContains(response, "Bulk edit completed, 4 strings were updated.")
+        self.assertEqual(translation.unit_set.filter(state=STATE_READONLY).count(), 0)
+        self.assertEqual(translation.unit_set.filter(state=STATE_TRANSLATED).count(), 1)
+
+        # Mark all source strings as needing edit and that should turn all
+        # translated strings back to translated
+        response = self.client.post(
+            url, {"q": "language:en", "state": STATE_TRANSLATED}, follow=True
+        )
+        self.assertContains(response, "Bulk edit completed, 4 strings were updated.")
+        self.assertEqual(translation.unit_set.filter(state=STATE_READONLY).count(), 0)
+        self.assertEqual(translation.unit_set.filter(state=STATE_TRANSLATED).count(), 1)
+
+    def test_bulk_approve_clears_automatically_translated(self) -> None:
+        self.project.translation_review = True
+        self.project.save()
+
+        unit = self.get_unit()
+        unit.automatically_translated = True
+        unit.save()
+        self.assertTrue(self.get_unit().automatically_translated)
+
+        response = self.client.post(
+            reverse("bulk-edit", kwargs={"path": self.project.get_url_path()}),
+            {"q": "state:<translated", "state": STATE_APPROVED},
+            follow=True,
+        )
+        self.assertContains(response, "Bulk edit completed, 1 string was updated.")
+
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_APPROVED)
+        self.assertFalse(unit.automatically_translated)
+
+    def test_bulk_edit_creates_change_and_pending_unit_change(self) -> None:
+        """Bulk edit creates Change and PendingUnitChange records via bulk insert."""
+        PendingUnitChange.objects.filter(unit=self.unit).delete()
+        initial_change_count = Change.objects.filter(
+            action=ActionEvents.BULK_EDIT
+        ).count()
+
+        response = self.client.post(
+            reverse("bulk-edit", kwargs=self.kw_translation),
+            {"q": "state:needs-editing", "state": STATE_TRANSLATED},
+            follow=True,
+        )
+        self.assertContains(response, "Bulk edit completed, 1 string was updated.")
+
+        self.assertEqual(
+            Change.objects.filter(action=ActionEvents.BULK_EDIT).count(),
+            initial_change_count + 1,
+        )
+        self.assertTrue(PendingUnitChange.objects.filter(unit=self.unit).exists())

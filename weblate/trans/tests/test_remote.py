@@ -1,0 +1,1319 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Test for changes done in remote repository."""
+
+import os
+import pathlib
+import sys
+from unittest.mock import patch
+
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.test.utils import override_settings
+from django.urls import reverse
+
+from weblate.auth.models import User
+from weblate.lang.models import Language
+from weblate.trans.actions import ActionEvents
+from weblate.trans.models import (
+    Change,
+    CommitPolicyChoices,
+    Component,
+    PendingUnitChange,
+    Unit,
+)
+from weblate.trans.tasks import component_after_save, perform_update
+from weblate.trans.tests.test_views import ViewTestCase
+from weblate.trans.tests.utils import REPOWEB_URL
+from weblate.utils.files import remove_tree
+from weblate.utils.state import (
+    STATE_APPROVED,
+    STATE_EMPTY,
+    STATE_FUZZY,
+    STATE_TRANSLATED,
+)
+from weblate.vcs.base import RepositoryError
+from weblate.vcs.models import VCS_REGISTRY
+
+EXTRA_PO = """
+#: accounts/models.py:319 trans/views/basic.py:104 weblate/html/index.html:21
+msgid "Languages"
+msgstr "Jazyky"
+"""
+
+MINIMAL_PO = r"""
+msgid ""
+msgstr ""
+"Project-Id-Version: Weblate Hello World 2012\n"
+"Report-Msgid-Bugs-To: <noreply@example.net>\n"
+"POT-Creation-Date: 2012-03-14 15:54+0100\n"
+"PO-Revision-Date: 2013-08-25 15:23+0200\n"
+"Last-Translator: testuser <>\n"
+"Language-Team: Czech <http://example.com/projects/test/test/cs/>\n"
+"Language: cs\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
+"X-Generator: Weblate 1.7-dev\n"
+
+#: main.c:11
+#, c-format
+msgid "Hello, world!\n"
+msgstr "Nazdar svete!\n"
+"""
+
+
+class MultiRepoTest(ViewTestCase):
+    """Test handling of remote changes, conflicts and so on."""
+
+    _vcs = "git"
+    _branch = "main"
+    _filemask = "po/*.po"
+
+    def setUp(self) -> None:
+        super().setUp()
+        if self._vcs not in VCS_REGISTRY:
+            self.skipTest(f"VCS {self._vcs} not available!")
+        repo = push = self.format_local_path(getattr(self, f"{self._vcs}_repo_path"))
+        with override_settings(CREATE_GLOSSARIES=self.CREATE_GLOSSARIES):
+            self.component2 = Component.objects.create(
+                name="Test 2",
+                slug="test-2",
+                project=self.project,
+                repo=repo,
+                push=push,
+                vcs=self._vcs,
+                filemask=self._filemask,
+                template="",
+                file_format="po",
+                repoweb=REPOWEB_URL,
+                new_base="",
+                branch=self._branch,
+            )
+        self.request = self.get_request()
+
+    def push_first(self, propagate=True, newtext="Nazdar svete!\n") -> None:
+        """Change and pushes first component."""
+        if not propagate:
+            # Disable changes propagating
+            self.component2.allow_translation_propagation = False
+            self.component2.save()
+
+        unit = self.get_unit()
+        unit.translate(self.user, [newtext], STATE_TRANSLATED)
+        self.assertEqual(self.get_translation().stats.translated, 1)
+        self.component.do_push(self.request)
+
+    def push_replace(self, content, mode: str) -> None:
+        """Replace content of a po file and pushes it to remote repository."""
+        # Manually edit po file, adding new unit
+        translation = self.component.translation_set.get(language_code="cs")
+        with open(translation.get_filename(), mode, encoding="utf-8") as handle:
+            handle.write(content)
+
+        # Do changes in first repo
+        with transaction.atomic():
+            translation.git_commit(self.request.user, "TEST <test@example.net>")
+        self.assertFalse(translation.needs_commit())
+        translation.component.do_push(self.request)
+
+    def test_background_push_uses_bot_user(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Background push\n"], STATE_TRANSLATED)
+
+        self.assertTrue(
+            self.component.commit_pending("test", self.user, skip_push=True)
+        )
+        self.assertTrue(self.component.repo_needs_push())
+        self.assertTrue(
+            self.component.do_push(None, force_commit=False, do_update=False)
+        )
+
+        change = self.component.change_set.filter(action=ActionEvents.PUSH).latest(
+            "timestamp"
+        )
+        self.assertIsNotNone(change.user)
+        self.assertEqual(change.user.username, "weblate:push")
+        self.assertTrue(change.user.is_bot)
+        self.assertEqual(change.user.full_name, "Background push")
+
+    def assert_background_update_user(self, change) -> None:
+        self.assertIsNotNone(change.user)
+        self.assertEqual(change.user.username, "weblate:update")
+        self.assertTrue(change.user.is_bot)
+        self.assertEqual(change.user.full_name, "Background update")
+        self.assertIsNotNone(change.author)
+        self.assertEqual(change.author.username, "weblate:update")
+
+    def do_update_with_callbacks(self, translation) -> bool:
+        translation = type(translation).objects.get(pk=translation.pk)
+        with self.captureOnCommitCallbacks(execute=True):
+            result = translation.do_update(self.request)
+        translation = type(translation).objects.get(pk=translation.pk)
+        with self.captureOnCommitCallbacks(execute=True):
+            translation.invalidate_cache()
+        return result
+
+    def test_propagate(self) -> None:
+        """Test handling of propagating."""
+        # Do changes in first repo
+        self.push_first()
+
+        # Verify changes got to the second one
+        translation = self.component2.translation_set.get(language_code="cs")
+        self.assertEqual(translation.stats.translated, 1)
+
+        # The text is intentionally duplicated to trigger check
+        new_text = "Other text text\n"
+
+        # Propagate edit
+        unit = self.get_unit()
+        self.assertEqual(len(unit.all_checks), 0)
+        self.assertEqual(len(unit.propagated_units), 1)
+        unit.translate(self.user, [new_text], STATE_TRANSLATED)
+
+        # Verify new content
+        unit = self.get_unit()
+        self.assertEqual(unit.target, new_text)
+        self.assertEqual(len(unit.propagated_units), 1)
+        other_unit = unit.propagated_units[0]
+        self.assertEqual(other_unit.target, new_text)
+
+        # There should be no checks on both
+        self.assertEqual(
+            list(unit.check_set.values_list("name", flat=True)), ["duplicate"]
+        )
+        self.assertEqual(
+            list(other_unit.check_set.values_list("name", flat=True)), ["duplicate"]
+        )
+
+    def test_failed_update(self) -> None:
+        """Test failed remote update."""
+        for repo_name in ("test-repo.git", "test-repo.hg", "test-repo.svn"):
+            repo_path = self.get_repo_path(repo_name)
+            if os.path.exists(repo_path):
+                remove_tree(repo_path)
+        translation = self.component.translation_set.get(language_code="cs")
+        self.assertFalse(translation.do_update(self.request))
+
+    def test_update(self) -> None:
+        """Test handling update in case remote has changed."""
+        # Do changes in first repo
+        self.push_first(False)
+
+        # Test pull
+        translation = self.component2.translation_set.get(language_code="cs")
+        with self.captureOnCommitCallbacks(execute=True):
+            translation.invalidate_cache()
+        self.assertEqual(translation.stats.translated, 0)
+
+        self.do_update_with_callbacks(translation)
+        translation = self.component2.translation_set.get(language_code="cs")
+        self.assertEqual(translation.stats.translated, 1)
+        change = translation.change_set.filter(action=ActionEvents.UPDATE).latest(
+            "timestamp"
+        )
+        self.assertEqual(change.user, self.user)
+        self.assertEqual(change.author, self.user)
+
+    def test_background_update_uses_bot_user(self) -> None:
+        """Test background update attribution in case remote has changed."""
+        self.push_first(False)
+
+        self.assertTrue(self.component2.do_update(None))
+
+        translation = self.component2.translation_set.get(language_code="cs")
+        self.assertEqual(translation.stats.translated, 1)
+        change = translation.change_set.filter(action=ActionEvents.UPDATE).latest(
+            "timestamp"
+        )
+        self.assert_background_update_user(change)
+
+    def test_rebase(self) -> None:
+        """Testing of rebase."""
+        self.component2.merge_style = "rebase"
+        self.component2.save()
+        self.test_update()
+        change = self.component2.change_set.filter(action=ActionEvents.REBASE).latest(
+            "timestamp"
+        )
+        self.assertEqual(change.user, self.user)
+        self.assertEqual(change.author, self.user)
+
+    def test_hook_rebase_update_uses_hook_author(self) -> None:
+        """Test hook-triggered rebase attribution."""
+        self.component2.merge_style = "rebase"
+        self.component2.save()
+        self.push_first(False)
+        hook_user = User.objects.get_or_create_bot(
+            scope="webhook", name="github", verbose="GitHub webhook"
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            perform_update("Component", self.component2.pk, user_id=hook_user.id)
+
+        change = self.component2.change_set.filter(action=ActionEvents.REBASE).latest(
+            "timestamp"
+        )
+        self.assertEqual(change.user, hook_user)
+        self.assertEqual(change.author, hook_user)
+
+    def test_remote_update_history_event(self) -> None:
+        """Test remote update history records remote revision changes."""
+        self.component2.repository.last_output = ""
+        self.component2.repository.__dict__["last_remote_revision"] = "new-remote"
+
+        with patch.object(
+            self.component2,
+            "update_remote_repository",
+            return_value=("old-remote", None),
+        ):
+            self.assertTrue(self.component2.update_remote_branch(user=self.user))
+
+        change = self.component2.change_set.get(action=ActionEvents.REMOTE_UPDATE)
+        self.assertIn(change.action, Change.ACTIONS_REPOSITORY)
+        self.assertNotIn(change.action, Change.ACTIONS_REPOSITORY_STATUS)
+        self.assertEqual(change.user, self.user)
+        self.assertEqual(change.author, self.user)
+        self.assertEqual(change.details["previous_remote_revision"], "old-remote")
+        self.assertEqual(change.details["remote_revision"], "new-remote")
+        self.assertIn("old-remote", change.get_details_display())
+        self.assertIn("new-remote", change.get_details_display())
+
+    def test_remote_update_history_skips_unchanged_revision(self) -> None:
+        """Test remote update history skips unchanged remote revisions."""
+        self.component2.repository.last_output = ""
+        self.component2.repository.__dict__["last_remote_revision"] = "same-remote"
+
+        with patch.object(
+            self.component2,
+            "update_remote_repository",
+            return_value=("same-remote", None),
+        ):
+            self.assertTrue(self.component2.update_remote_branch(user=self.user))
+
+        self.assertFalse(
+            self.component2.change_set.filter(
+                action=ActionEvents.REMOTE_UPDATE
+            ).exists()
+        )
+
+    def test_failed_remote_update_history_event(self) -> None:
+        """Test remote update failures are recorded in history."""
+        self.component2.repository.__dict__["last_remote_revision"] = "old-remote"
+
+        with patch.object(
+            self.component2,
+            "update_remote_repository",
+            return_value=("old-remote", RepositoryError(1, "fetch failed")),
+        ):
+            self.assertFalse(self.component2.update_remote_branch(user=self.user))
+
+        change = self.component2.change_set.get(
+            action=ActionEvents.FAILED_REMOTE_UPDATE
+        )
+        self.assertIn(change.action, Change.ACTIONS_REPOSITORY)
+        self.assertNotIn(change.action, Change.ACTIONS_REPOSITORY_STATUS)
+        self.assertFalse(change.is_merge_failure())
+        self.assertEqual(change.user, self.user)
+        self.assertEqual(change.author, self.user)
+        self.assertEqual(change.target, "fetch failed (1)")
+        self.assertEqual(change.details["error"], "fetch failed (1)")
+        self.assertEqual(change.details["previous_remote_revision"], "old-remote")
+        self.assertIn("fetch failed", change.get_details_display())
+        alert = self.component2.alert_set.get(name="UpdateFailure")
+        self.assertEqual(
+            alert.details,
+            {"error": "fetch failed (1)", "diagnoses": []},
+        )
+
+    def test_remote_update_history_failure_skips_validation(self) -> None:
+        """Test repository validation does not record failed update history."""
+        with (
+            patch.object(
+                self.component2,
+                "update_remote_repository",
+                return_value=("old-remote", RepositoryError(1, "fetch failed")),
+            ),
+            self.assertRaises(ValidationError),
+        ):
+            self.component2.update_remote_branch(validate=True, user=self.user)
+
+        self.assertFalse(
+            self.component2.change_set.filter(
+                action=ActionEvents.FAILED_REMOTE_UPDATE
+            ).exists()
+        )
+
+    def test_remote_update_history_success_skips_validation(self) -> None:
+        """Test repository validation does not record remote update history."""
+        self.component2.add_alert("UpdateFailure", error="previous fetch failed")
+        self.component2.repository.last_output = ""
+        self.component2.repository.__dict__["last_remote_revision"] = "new-remote"
+
+        with patch.object(
+            self.component2,
+            "update_remote_repository",
+            return_value=("old-remote", None),
+        ):
+            self.assertTrue(
+                self.component2.update_remote_branch(validate=True, user=self.user)
+            )
+
+        self.assertFalse(
+            self.component2.change_set.filter(
+                action=ActionEvents.REMOTE_UPDATE
+            ).exists()
+        )
+        self.assertTrue(self.component2.alert_set.filter(name="UpdateFailure").exists())
+
+    def test_update_remote_repository_samples_revision_under_lock(self) -> None:
+        """Test remote revision sampling uses the fetch lock."""
+        repository = self.component2.repository
+        sampled_locks = []
+
+        def get_last_remote_revision(repository):
+            sampled_locks.append(repository.lock.lock_object.is_locked)
+            return "old-remote"
+
+        with (
+            patch.object(
+                type(repository),
+                "last_remote_revision",
+                property(get_last_remote_revision),
+            ),
+            patch.object(repository, "update_remote"),
+        ):
+            previous_revision, error = self.component2.update_remote_repository()
+
+        self.assertEqual(previous_revision, "old-remote")
+        self.assertIsNone(error)
+        self.assertEqual(sampled_locks, [True])
+
+    def test_update_remote_repository_reports_fetch_error_context(self) -> None:
+        """Test fetch errors are reported with active exception context."""
+        repository = self.component2.repository
+        fetch_error = RepositoryError(1, "fetch failed")
+        reported_errors = []
+
+        def collect_reported_error(*args, **kwargs):
+            reported_errors.append(sys.exc_info()[1])
+
+        def get_last_remote_revision(repository):
+            return "old-remote"
+
+        with (
+            patch.object(
+                type(repository),
+                "last_remote_revision",
+                property(get_last_remote_revision),
+            ),
+            patch.object(repository, "update_remote", side_effect=fetch_error),
+            patch(
+                "weblate.trans.models.component.report_error",
+                side_effect=collect_reported_error,
+            ) as report_error,
+        ):
+            previous_revision, error = self.component2.update_remote_repository()
+
+        self.assertEqual(previous_revision, "old-remote")
+        self.assertIs(error, fetch_error)
+        self.assertEqual(reported_errors, [fetch_error])
+        report_error.assert_called_once()
+        self.assertEqual(
+            report_error.call_args.args, ("Could not update the repository",)
+        )
+        self.assertEqual(report_error.call_args.kwargs["project"], self.project)
+
+    @override_settings(AUTO_UPDATE="remote")
+    def test_remote_only_background_update_uses_bot_user(self) -> None:
+        """Test remote-only background updates use the update bot."""
+        with patch.object(
+            self.component2, "update_remote_branch", return_value=True
+        ) as update_remote_branch:
+            perform_update("Component", -1, auto=True, obj=self.component2)
+
+        user = update_remote_branch.call_args.kwargs["user"]
+        self.assertIsNotNone(user)
+        self.assertEqual(user.username, "weblate:update")
+        self.assertTrue(user.is_bot)
+        self.assertEqual(user.full_name, "Background update")
+
+    def test_component_after_save_preserves_acting_user(self) -> None:
+        """Test after-save repository sync keeps the acting user."""
+        with patch.object(Component, "after_save", autospec=True) as after_save:
+            component_after_save(
+                self.component2.pk,
+                changed_git=True,
+                changed_setup=False,
+                changed_template=False,
+                changed_variant=False,
+                changed_enforced_checks=False,
+                skip_push=False,
+                create=False,
+                acting_user_id=self.user.pk,
+            )
+
+        component = after_save.call_args.args[0]
+        self.assertEqual(component.acting_user, self.user)
+
+    def test_failed_rebase_history_when_status_fails(self) -> None:
+        """Test rebase failures are recorded even if status collection fails."""
+        self.component2.merge_style = "rebase"
+        self.component2.save()
+
+        with (
+            patch.object(
+                self.component2.repository,
+                "rebase",
+                side_effect=[RepositoryError(1, "rebase failed"), None],
+            ),
+            patch.object(
+                self.component2.repository,
+                "status",
+                side_effect=RepositoryError(1, "status failed"),
+            ),
+        ):
+            self.assertIsNone(
+                self.component2.update_branch(user=self.user, raise_update_errors=False)
+            )
+
+        change = self.component2.change_set.get(action=ActionEvents.FAILED_REBASE)
+        self.assertEqual(change.user, self.user)
+        self.assertEqual(change.author, self.user)
+        self.assertEqual(change.target, "rebase failed (1)")
+        self.assertEqual(change.details["error"], "rebase failed (1)")
+        self.assertEqual(change.details["status"], "")
+        self.assertEqual(change.details["status_error"], "status failed (1)")
+        self.assertIn("previous_head", change.details)
+
+    def test_conflict(self) -> None:
+        """Test conflict handling."""
+        # Do changes in first repo
+        self.push_first(False)
+
+        # Do changes in the second repo
+        translation = self.component2.translation_set.get(language_code="cs")
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        unit.translate(self.user, ["Ahoj svete!\n"], STATE_TRANSLATED)
+
+        self.assertFalse(translation.do_update(self.request))
+
+        self.assertFalse(translation.do_push(self.request))
+
+    def test_more_changes(self) -> None:
+        """Test more string changes in remote repo."""
+        translation = self.component2.translation_set.get(language_code="cs")
+
+        self.push_first(False, "Hello, world!\n")
+        self.do_update_with_callbacks(translation)
+        translation = self.component2.translation_set.get(language_code="cs")
+        self.assertEqual(translation.stats.allchecks, 1)
+
+        self.push_first(False, "Nazdar svete\n")
+        self.do_update_with_callbacks(translation)
+        translation = self.component2.translation_set.get(language_code="cs")
+        self.assertEqual(translation.stats.allchecks, 0)
+
+    def test_new_unit(self) -> None:
+        """Test adding new unit with update."""
+        self.push_replace(EXTRA_PO, "a")
+
+        self.component2.do_update(self.request)
+
+        translation = self.component2.translation_set.get(language_code="cs")
+        self.assertEqual(translation.stats.all, 5)
+        unit = translation.unit_set.get(source="Languages")
+        change = unit.source_unit.change_set.filter(
+            action=ActionEvents.NEW_SOURCE_REPO
+        ).latest("timestamp")
+        self.assertEqual(change.user, self.user)
+        self.assertEqual(change.author, self.user)
+
+    def test_background_new_unit_update_uses_bot_user(self) -> None:
+        """Test background update attribution for units added in a repository."""
+        self.push_replace(EXTRA_PO, "a")
+
+        self.assertTrue(self.component2.do_update(None))
+
+        translation = self.component2.translation_set.get(language_code="cs")
+        self.assertEqual(translation.stats.all, 5)
+        unit = translation.unit_set.get(source="Languages")
+        change = unit.change_set.filter(action=ActionEvents.NEW_UNIT_REPO).latest(
+            "timestamp"
+        )
+        self.assert_background_update_user(change)
+        change = unit.source_unit.change_set.filter(
+            action=ActionEvents.NEW_SOURCE_REPO
+        ).latest("timestamp")
+        self.assert_background_update_user(change)
+
+    def test_deleted_unit(self) -> None:
+        """Test removing several units from remote repo."""
+        self.push_replace(MINIMAL_PO, "w")
+
+        self.component2.do_update(self.request)
+
+        translation = self.component2.translation_set.get(language_code="cs")
+        self.assertEqual(translation.stats.all, 1)
+
+    def test_deleted_stale_unit(self) -> None:
+        """
+        Test removing several units from remote repo.
+
+        There is no other reference, so full cleanup has to happen.
+        """
+        self.push_replace(MINIMAL_PO, "w")
+        self.component.delete()
+
+        self.component2.do_update(self.request)
+
+        translation = self.component2.translation_set.get(language_code="cs")
+        self.assertEqual(translation.stats.all, 1)
+
+    def test_commit_policy(self) -> None:
+        component1 = self.component
+        component2 = self.component2
+        component1.merge_style = "merge"
+        component1.allow_translation_propagation = False
+        component1.save()
+        component2.merge_style = "merge"
+        component2.allow_translation_propagation = False
+        component2.save()
+        self.commit_policy_testing(component1, component2)
+
+    def test_commit_policy_mono(self) -> None:
+        with override_settings(CREATE_GLOSSARIES=self.CREATE_GLOSSARIES):
+            component1 = self.create_json_mono(
+                name="Test 3",
+                slug="test-3",
+                project=self.project,
+                merge_style="merge",
+                allow_translation_propagation=False,
+            )
+            component2 = self.create_json_mono(
+                name="Test 4",
+                slug="test-4",
+                project=self.project,
+                merge_style="merge",
+                allow_translation_propagation=False,
+            )
+        language = Language.objects.get(code="de")
+        component1.add_new_language(language, None)
+        component1.do_push(self.request)
+        component2.do_update(self.request)
+        self.commit_policy_testing(component1, component2)
+
+        # Add changes to other language as well
+        other_translation1 = component1.translation_set.get(language_code="de")
+        self.change_unit("Hallo welt!\n", translation=other_translation1)
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component1),
+            {
+                "total": 2,
+                "commit_policy_skipped": 2,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+
+        # Test editing source language does not discard changes
+        self.change_unit(
+            "Thank you very much for using Weblate.",
+            source="Thank you for using Weblate.",
+            translation=component2.source_translation,
+            state=STATE_APPROVED,
+        )
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component1),
+            {
+                "total": 2,
+                "commit_policy_skipped": 2,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component2),
+            {
+                "total": 3,
+                "commit_policy_skipped": 2,
+                "errors_skipped": 0,
+                "eligible_for_commit": 1,
+            },
+        )
+        # The unit should be pending translation units with change to fuzzy
+        component2.do_push(self.request)
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component2),
+            {
+                "total": 2,
+                "commit_policy_skipped": 2,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+
+        # The units should be still pending after update
+        component1.do_update(self.request)
+        self.assertFalse(component1.repo_needs_merge())
+        self.assertFalse(component2.repo_needs_merge())
+        # The pending unit state should be kept
+        unit = self.get_unit(
+            translation=component1.translation_set.get(language_code="cs")
+        )
+        self.assertEqual(unit.target, "Ahoj světe!\n")
+        unit = self.get_unit(
+            translation=component1.translation_set.get(language_code="de")
+        )
+        self.assertEqual(unit.target, "Hallo welt!\n")
+        # The source string change marked two additional units as pending
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component1),
+            {
+                "total": 4,
+                "commit_policy_skipped": 4,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+
+    def commit_policy_testing(
+        self, component1: Component, component2: Component
+    ) -> None:
+        self.project.commit_policy = CommitPolicyChoices.APPROVED_ONLY
+        self.project.translation_review = True
+        self.project.save()
+
+        translation1 = component1.translation_set.get(language_code="cs")
+        translation2 = component2.translation_set.get(language_code="cs")
+
+        # Test that pending units are kept
+        self.change_unit("Čau světe!\n", translation=translation1)
+        self.change_unit("Ahoj světe!\n", translation=translation2)
+        # The units should be still pending after push
+        component1.do_push(self.request)
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component1),
+            {
+                "total": 1,
+                "commit_policy_skipped": 1,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+        component2.do_push(self.request)
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component2),
+            {
+                "total": 1,
+                "commit_policy_skipped": 1,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+
+        # The units should be still pending after update
+        component1.do_update(self.request)
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component1),
+            {
+                "total": 1,
+                "commit_policy_skipped": 1,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+
+        component2.do_update(self.request)
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component2),
+            {
+                "total": 1,
+                "commit_policy_skipped": 1,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+
+        self.assertFalse(component1.repo_needs_merge())
+        self.assertFalse(component2.repo_needs_merge())
+
+        # Test that pending units are overwritten by upstream changes
+        self.change_unit(
+            "Nazdar světe!\n", translation=translation2, state=STATE_APPROVED
+        )
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component1),
+            {
+                "total": 1,
+                "commit_policy_skipped": 1,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component2),
+            {
+                "total": 1,
+                "commit_policy_skipped": 0,
+                "errors_skipped": 0,
+                "eligible_for_commit": 1,
+            },
+        )
+
+        # There should be no pending units now
+        component2.do_push(self.request)
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component2),
+            {
+                "total": 0,
+                "commit_policy_skipped": 0,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+
+        # There should be no pending change
+        component1.do_update(self.request)
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component1),
+            {
+                "total": 0,
+                "commit_policy_skipped": 0,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+
+        unit = self.get_unit(translation=translation1)
+        self.assertEqual(unit.target, "Nazdar světe!\n")
+        self.assertFalse(component1.repo_needs_merge())
+        self.assertFalse(component2.repo_needs_merge())
+
+        # Test that unrelated pending changes are kept
+        self.change_unit("Ahoj světe!\n", translation=translation1)
+        self.change_unit(
+            "Díky za používání Weblate.",
+            source="Thank you for using Weblate.",
+            translation=translation2,
+            state=STATE_APPROVED,
+        )
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component1),
+            {
+                "total": 1,
+                "commit_policy_skipped": 1,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component2),
+            {
+                "total": 1,
+                "commit_policy_skipped": 0,
+                "errors_skipped": 0,
+                "eligible_for_commit": 1,
+            },
+        )
+
+        # There should be no pending units now
+        component2.do_push(self.request)
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component2),
+            {
+                "total": 0,
+                "commit_policy_skipped": 0,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+
+        # The units should be still pending after update
+        component1.do_update(self.request)
+        self.assertFalse(component1.repo_needs_merge())
+        self.assertFalse(component2.repo_needs_merge())
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component1),
+            {
+                "total": 1,
+                "commit_policy_skipped": 1,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+
+        # The changed unit should be updated
+        unit = self.get_unit(
+            source="Thank you for using Weblate.", translation=translation1
+        )
+        self.assertEqual(unit.target, "Díky za používání Weblate.")
+        # The pending unit state should be kept
+        unit = self.get_unit(translation=translation1)
+        self.assertEqual(unit.target, "Ahoj světe!\n")
+
+        # Test editing other language does not discard changes
+        other_translation2 = component2.translation_set.get(language_code="de")
+        self.change_unit(
+            "Vielen Dank, dass Sie Weblate nutzen.",  # codespell:ignore
+            source="Thank you for using Weblate.",
+            translation=other_translation2,
+            state=STATE_APPROVED,
+        )
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component1),
+            {
+                "total": 1,
+                "commit_policy_skipped": 1,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component2),
+            {
+                "total": 1,
+                "commit_policy_skipped": 0,
+                "errors_skipped": 0,
+                "eligible_for_commit": 1,
+            },
+        )
+
+        # There should be no pending units now
+        component2.do_push(self.request)
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component2),
+            {
+                "total": 0,
+                "commit_policy_skipped": 0,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+
+        # The units should be still pending after update
+        component1.do_update(self.request)
+        self.assertFalse(component1.repo_needs_merge())
+        self.assertFalse(component2.repo_needs_merge())
+        self.assertEqual(
+            PendingUnitChange.objects.detailed_count(component1),
+            {
+                "total": 1,
+                "commit_policy_skipped": 1,
+                "errors_skipped": 0,
+                "eligible_for_commit": 0,
+            },
+        )
+
+        # The pending unit state should be kept
+        unit = self.get_unit(translation=translation1)
+        self.assertEqual(unit.target, "Ahoj světe!\n")
+
+    def test_pending_changes_preserved_on_non_translation_update(self) -> None:
+        """Test that pending database changes are not overwritten when remote commits non-translation files."""
+        self.component2.allow_translation_propagation = False
+        self.component2.save()
+
+        translation2 = self.component2.translation_set.get(language_code="cs")
+        unit = translation2.unit_set.get(source="Hello, world!\n")
+        new_target = "Ahoj světe - čeká na vyřízení!\n"
+        unit.translate(self.user, new_target, STATE_TRANSLATED)
+
+        self.assertEqual(
+            PendingUnitChange.objects.filter(
+                unit__translation__component=self.component2
+            ).count(),
+            1,
+        )
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, new_target)
+
+        # Commit and push the non-translation file change from component1
+        readme_path = os.path.join(self.component.full_path, "README.md")
+        pathlib.Path(readme_path).write_text(
+            "# Test Project\n\nThis is a test README.\n", encoding="utf-8"
+        )
+        with self.component.repository.lock:
+            self.component.repository.execute(["add", "README.md"], remote_op="none")
+            self.component.repository.execute(
+                ["commit", "-m", "Add README.md (non-translation file)"],
+                remote_op="none",
+            )
+            self.component.repository.push(self.component.push_branch)
+
+        # pull changes from component2
+        result = self.component2.do_update(self.request)
+        self.assertTrue(result)
+
+        # verify the pending change is still preserved
+        self.assertEqual(
+            PendingUnitChange.objects.filter(
+                unit__translation__component=self.component2
+            ).count(),
+            1,
+        )
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, new_target)
+
+    def test_push_branch_skips_upstream_only_commits(self) -> None:
+        """Push branch should stay untouched when only the tracked branch advanced."""
+        if self._vcs != "git":
+            self.skipTest("Push branch divergence is covered for Git only")
+
+        self.component.allow_translation_propagation = False
+        self.component.push_branch = "push-branch"
+        self.component.save(
+            update_fields=["allow_translation_propagation", "push_branch"]
+        )
+        self.component2.allow_translation_propagation = False
+        self.component2.save(update_fields=["allow_translation_propagation"])
+
+        with self.component.repository.lock:
+            self.component.repository.push(self.component.push_branch)
+
+        upstream_translation = self.component2.translation_set.get(language_code="cs")
+        upstream_unit = upstream_translation.unit_set.get(source="Hello, world!\n")
+        upstream_unit.translate(
+            self.user, "Upstream branch only change\n", STATE_TRANSLATED
+        )
+        self.assertTrue(self.component2.do_push(self.request))
+
+        self.assertTrue(self.component.do_update(self.request))
+        self.assertEqual(self.component.count_repo_outgoing, 0)
+        self.assertEqual(self.component.count_push_branch_outgoing, 0)
+        self.assertFalse(self.component.repo_needs_push())
+
+        with patch.object(self.component.repository, "push") as mock_push:
+            self.assertTrue(self.component.do_push(self.request))
+
+        mock_push.assert_not_called()
+
+    def test_api(self):
+        """Test the project repository API works for various VCS."""
+        self.push_first()
+        self.project.add_user(self.user, "Administration")
+        headers = {"Authorization": f"Token {self.user.auth_token.key}"}
+
+        response = self.client.get(
+            reverse("api:project-repository", kwargs={"slug": self.project.slug}),
+            headers=headers,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(
+            reverse(
+                "api:component-repository",
+                kwargs={
+                    "slug": self.component.slug,
+                    "project__slug": self.project.slug,
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(
+            reverse(
+                "api:translation-repository",
+                kwargs={
+                    "language__code": "cs",
+                    "component__slug": self.component.slug,
+                    "component__project__slug": self.project.slug,
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+
+
+class FileScanTest(ViewTestCase):
+    def test_file_scan_commit_policy(self) -> None:
+        """Test file scan does not discard pending changes blocked by commit policy."""
+        request = self.get_request()
+        self.project.commit_policy = CommitPolicyChoices.APPROVED_ONLY
+        self.project.translation_review = True
+        self.project.save()
+
+        # TODO: add tests for the monolingual and monolingual with intermediate.
+
+        translation = self.component.translation_set.get(language_code="cs")
+
+        unit_1 = translation.unit_set.get(source="Hello, world!\n")
+        unit_2 = translation.unit_set.get(source="Thank you for using Weblate.")
+        unit_3 = translation.unit_set.get(
+            source="Try Weblate at <https://demo.weblate.org/>!\n"
+        )
+
+        target_1 = "Ahoj svete!\n"
+        explanation_1 = unit_1.explanation
+        unit_1.translate(self.user, target_1, STATE_APPROVED)
+
+        self.component.commit_pending("test", None)
+
+        new_target_1 = "Ahoj Vesmíre!\n"
+        unit_1 = Unit.objects.get(pk=unit_1.pk)
+        unit_1.translate(self.user, new_target_1, STATE_TRANSLATED)
+
+        # check that disk state is written correctly when creating a new change
+        unit_1 = Unit.objects.get(pk=unit_1.pk)
+        self.assertEqual(unit_1.target, new_target_1)
+        self.assertEqual(unit_1.state, STATE_TRANSLATED)
+        self.assertEqual(
+            unit_1.details["disk_state"],
+            {
+                "target": target_1,
+                "state": STATE_APPROVED,
+                "explanation": explanation_1,
+                "automatically_translated": False,
+            },
+        )
+        self.assertEqual(PendingUnitChange.objects.filter(unit=unit_1).count(), 1)
+
+        target_2 = "Děkujeme, že používáte Weblate."
+        explanation_2 = unit_2.explanation
+        unit_2.translate(self.user, target_2, STATE_APPROVED)
+
+        unit_2 = Unit.objects.get(pk=unit_2.pk)
+        new_target_2 = "Děkuju"
+        unit_2.translate(self.user, new_target_2, STATE_TRANSLATED)
+
+        # check that disk state is not overwritten when updating a unit
+        # with unflushed changes
+        unit_2 = Unit.objects.get(pk=unit_2.pk)
+        self.assertEqual(unit_2.target, new_target_2)
+        self.assertEqual(unit_2.state, STATE_TRANSLATED)
+        self.assertEqual(
+            unit_2.details["disk_state"],
+            {
+                "target": "",
+                "state": STATE_EMPTY,
+                "explanation": explanation_2,
+                "automatically_translated": False,
+            },
+        )
+        self.assertEqual(PendingUnitChange.objects.filter(unit=unit_2).count(), 2)
+
+        # translate this unit but introduce a conflict by manually editing the translation file
+        # before this change is written
+        explanation_3 = unit_3.explanation
+        unit_3.translate(
+            self.user,
+            "Vyzkoušejte Weblate na <https://demo.weblate.org/>!\n",
+            STATE_TRANSLATED,
+        )
+        self.assertEqual(
+            unit_3.details["disk_state"],
+            {
+                "target": "",
+                "state": STATE_EMPTY,
+                "explanation": explanation_3,
+                "automatically_translated": False,
+            },
+        )
+        self.assertEqual(PendingUnitChange.objects.filter(unit=unit_3).count(), 1)
+
+        # update translation file directly to introduce conflict with unit in weblate
+        disk_target = "Vyzkoušejte Weblate!\n"
+        ttk_unit, _ = translation.store.find_unit(unit_3.context, unit_3.source)
+        ttk_unit.set_target(disk_target)
+        translation.store.save()
+        with transaction.atomic():
+            translation.git_commit(request.user, "TEST <test@example.net>")
+
+        self.component.do_file_scan(request)
+
+        # check that changes are not lost and disk state is retained for future
+        unit_1 = Unit.objects.get(pk=unit_1.pk)
+        self.assertEqual(unit_1.target, new_target_1)
+        self.assertEqual(unit_1.state, STATE_TRANSLATED)
+        self.assertEqual(
+            unit_1.details["disk_state"],
+            {
+                "target": target_1,
+                "state": STATE_APPROVED,
+                "explanation": explanation_1,
+                "automatically_translated": False,
+            },
+        )
+        self.assertEqual(PendingUnitChange.objects.filter(unit=unit_1).count(), 1)
+
+        # check that disk state is moved forward when a PendingUnitChange is committed
+        # there were initially two changes for this unit, the approved one got committed
+        # and the disk state was updated here as a result.
+        unit_2 = Unit.objects.get(pk=unit_2.pk)
+        self.assertEqual(unit_2.target, new_target_2)
+        self.assertEqual(unit_2.state, STATE_TRANSLATED)
+        self.assertEqual(
+            unit_2.details["disk_state"],
+            {
+                "target": target_2,
+                "state": STATE_APPROVED,
+                "explanation": explanation_2,
+                "automatically_translated": False,
+            },
+        )
+        self.assertEqual(PendingUnitChange.objects.filter(unit=unit_2).count(), 1)
+
+        unit_3 = Unit.objects.get(pk=unit_3.pk)
+        self.assertEqual(unit_3.target, disk_target)
+        self.assertNotIn("disk_state", unit_3.details)
+        self.assertEqual(PendingUnitChange.objects.filter(unit=unit_3).count(), 0)
+
+    def test_tbx_explanation_sync(self) -> None:
+        """Test that explanation changes from file are treated as data changes for TBX."""
+        request = self.get_request()
+        self.project.commit_policy = CommitPolicyChoices.APPROVED_ONLY
+        self.project.translation_review = True
+        self.project.save()
+
+        component = self.create_tbx(project=self.project, name="TBX component")
+        translation = component.translation_set.get(language_code="cs")
+        unit = translation.unit_set.get(source="address bar")
+        self.assertEqual(unit.explanation, "")
+
+        unit.update_explanation("dummy explanation", self.user)
+        self.assertEqual(PendingUnitChange.objects.filter(unit=unit).count(), 1)
+        self.assertEqual(unit.details["disk_state"]["explanation"], "")
+
+        disk_explanation = "text field in a browser"
+        ttk_unit, _ = translation.store.find_unit(unit.context, unit.source)
+        ttk_unit.set_explanation(disk_explanation)
+        translation.store.save()
+        with transaction.atomic():
+            translation.git_commit(request.user, "TEST <test@example.net>")
+
+        component.do_file_scan(request)
+
+        unit = translation.unit_set.get(source="address bar")
+        self.assertEqual(unit.explanation, disk_explanation)
+
+        self.assertEqual(PendingUnitChange.objects.filter(unit=unit).count(), 0)
+
+    def _test_fuzzy_state_commit_policy(self, component) -> None:
+        self.project.commit_policy = CommitPolicyChoices.APPROVED_ONLY
+        self.project.translation_review = True
+        self.project.save()
+
+        translation = component.translation_set.get(language_code="cs")
+        unit = translation.unit_set.get(source="Hello, world!\n")
+
+        unit.translate(self.user, "Ahoj světe!\n", STATE_FUZZY)
+        self.assertEqual(unit.state, STATE_FUZZY)
+        self.assertEqual(unit.details["disk_state"]["state"], STATE_EMPTY)
+
+        count = PendingUnitChange.objects.filter(unit=unit).count()
+        self.assertEqual(count, 1)
+
+        # trigger commit and check_sync to simulate repository rescan
+        translation.commit_pending("test", None)
+        translation.check_sync(force=True)
+
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        self.assertEqual(unit.state, STATE_FUZZY)
+
+        # pending changes for unit are not discarded
+        count = PendingUnitChange.objects.filter(unit=unit).count()
+        self.assertEqual(count, 1)
+        self.assertEqual(unit.details["disk_state"]["state"], STATE_EMPTY)
+
+    def test_fuzzy_state_commit_policy_json(self) -> None:
+        component = self.create_json(name="JSON component", project=self.project)
+        self._test_fuzzy_state_commit_policy(component)
+
+    def test_fuzzy_state_commit_policy_po(self) -> None:
+        component = self.create_po(name="Po component", project=self.project)
+        self._test_fuzzy_state_commit_policy(component)
+
+    def _test_auto_translated_cleared_on_state_change_from_repo(
+        self, component, expect_auto_translated: bool
+    ) -> None:
+        """Test that automatically_translated flag is cleared on any repo update."""
+        request = self.get_request()
+        translation = component.translation_set.get(language_code="cs")
+
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        unit.translate(
+            self.user,
+            "Nazdar svete!\n",
+            STATE_TRANSLATED,
+            change_action=ActionEvents.AUTO,
+        )
+        unit.refresh_from_db()
+        self.assertTrue(unit.automatically_translated)
+
+        component.commit_pending("test", None)
+
+        # Directly edit the file on disk to mark the string as fuzzy
+        # (state change without content change)
+        ttk_unit, _ = translation.store.find_unit(unit.context, unit.source)
+        ttk_unit.unit.markfuzzy(True)
+        translation.store.save()
+        with transaction.atomic():
+            translation.git_commit(request.user, "TEST <test@example.net>")
+
+        component.do_file_scan(request)
+
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        self.assertEqual(unit.state, STATE_FUZZY)
+        self.assertEqual(unit.automatically_translated, expect_auto_translated)
+
+    def test_auto_translated_cleared_on_state_change_from_repo_po(self) -> None:
+        component = self.create_po(name="Po component", project=self.project)
+        self._test_auto_translated_cleared_on_state_change_from_repo(component, False)
+
+    def test_auto_translated_cleared_on_state_change_from_repo_xliff(self) -> None:
+        component = self.create_xliff_mono(name="Xliff component", project=self.project)
+        # XLIFF stores auto-translated state in state-qualifier attribute,
+        # which is not cleared by markfuzzy - the file state is trusted
+        self._test_auto_translated_cleared_on_state_change_from_repo(component, True)
+
+    def test_auto_translated_ignored_on_empty_target_xliff(self) -> None:
+        """Test that state-qualifier is ignored when the unit target is empty."""
+        component = self.create_xliff_mono(name="Xliff component", project=self.project)
+        request = self.get_request()
+        translation = component.translation_set.get(language_code="cs")
+
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        # Clear the target on disk while keeping state-qualifier="leveraged-mt"
+        ttk_unit, _ = translation.store.find_unit(unit.context, unit.source)
+        ttk_unit.set_target("t")
+        ttk_unit.unit.markfuzzy(False)
+        for node in ttk_unit.get_xliff_nodes():
+            if node is not None:
+                node.set("state-qualifier", "leveraged-mt")
+        translation.store.save()
+        with transaction.atomic():
+            translation.git_commit(request.user, "TEST <test@example.net>")
+
+        component.do_file_scan(request)
+
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        self.assertEqual(unit.state, STATE_EMPTY)
+        self.assertFalse(unit.automatically_translated)
+
+
+class GitBranchMultiRepoTest(MultiRepoTest):
+    _vcs = "git"
+    _branch = "translations"
+    _filemask = "translations/*.po"
+
+    def create_component(self):
+        return self.create_po_branch()
+
+
+class MercurialMultiRepoTest(MultiRepoTest):
+    _vcs = "mercurial"
+    _branch = "default"
+
+    def create_component(self):
+        return self.create_po_mercurial()
+
+
+class SubversionMultiRepoTest(MultiRepoTest):
+    _vcs = "subversion"
+    _branch = "master"
+
+    def create_component(self):
+        return self.create_po_svn()

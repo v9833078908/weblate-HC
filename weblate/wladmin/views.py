@@ -1,0 +1,1096 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+from datetime import timedelta
+from shutil import disk_usage
+
+# pylint: disable-next=unused-import
+from typing import TYPE_CHECKING, Any, Literal, cast, get_args
+from urllib.parse import quote, urlencode
+
+import httpx2
+from django.conf import settings
+from django.core.cache import cache
+from django.core.checks import run_checks
+from django.core.exceptions import PermissionDenied
+from django.core.mail import send_mail
+from django.db import transaction
+from django.db.models import Count, Max
+from django.http import Http404, HttpResponse
+from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.utils.html import format_html
+from django.utils.translation import gettext, gettext_lazy
+from django.views.decorators.http import require_POST
+from django.views.generic import ListView
+from django.views.generic.edit import CreateView, FormMixin
+
+from weblate.accounts.forms import AdminUserSearchForm, ContactForm
+from weblate.accounts.views import UserList, get_initial_contact
+from weblate.auth.decorators import (
+    management_access,
+    management_permission_required,
+)
+from weblate.auth.forms import (
+    AdminBulkInviteForm,
+    AdminInviteUserForm,
+    SitewideTeamForm,
+)
+from weblate.auth.models import (
+    Group,
+    Invitation,
+    User,
+)
+from weblate.configuration.models import Setting, SettingCategory
+from weblate.configuration.views import CustomCSSView
+from weblate.memory.models import Memory, MemoryScopeMigrationState
+from weblate.memory.tasks import MEMORY_SCOPE_COMPACTION_STATE
+from weblate.trans.actions import ActionEvents
+from weblate.trans.alerts.base import AlertSeverity
+from weblate.trans.forms import AnnouncementForm
+from weblate.trans.models import (
+    Alert,
+    Announcement,
+    Change,
+    Component,
+    Project,
+)
+from weblate.trans.util import redirect_param
+from weblate.utils import messages
+from weblate.utils.cache import measure_cache_latency
+from weblate.utils.celery import get_queue_stats
+from weblate.utils.const import SUPPORT_STATUS_CACHE_KEY
+from weblate.utils.db import (
+    get_database_disk_usage,
+    get_database_size,
+    measure_database_latency,
+)
+from weblate.utils.encoding import get_encoding_list
+from weblate.utils.errors import report_error
+from weblate.utils.requests import fetch_url
+from weblate.utils.site import get_site_url
+from weblate.utils.stats import prefetch_stats
+from weblate.utils.tasks import database_backup, settings_backup
+from weblate.utils.token import get_token
+from weblate.utils.version import GIT_LINK, GIT_REVISION
+from weblate.utils.views import show_form_errors
+from weblate.utils.zammad import ZammadError, submit_zammad_ticket
+from weblate.vcs.ssh import (
+    KeyType,
+    add_host_key,
+    can_generate_key,
+    generate_ssh_key,
+    get_all_key_data,
+    get_host_key_entries,
+    get_key_data_raw,
+    remove_host_key,
+)
+from weblate.wladmin.forms import (
+    ActivateForm,
+    AppearanceForm,
+    BackupForm,
+    BackupSelectionForm,
+    SSHAddForm,
+    TestMailForm,
+    WorkspaceCreateForm,
+)
+from weblate.wladmin.middleware import (
+    claim_configuration_health_check,
+    perform_configuration_health_check,
+)
+from weblate.wladmin.models import (
+    BackupService,
+    ConfigurationError,
+    SupportStatus,
+    get_support_url,
+)
+from weblate.wladmin.tasks import backup_service, support_status_update
+from weblate.workspaces.models import Workspace
+from weblate.workspaces.views import WorkspaceListBase
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
+    from django.http.request import QueryDict
+    from django_stubs_ext import StrOrPromise
+
+    from weblate.auth.models import AuthenticatedHttpRequest, GroupQuerySet
+
+MENU: tuple[tuple[str, str, StrOrPromise], ...] = (
+    ("index", "manage", gettext_lazy("Weblate status")),
+    ("backups", "manage-backups", gettext_lazy("Backups")),
+    ("memory", "manage-memory", gettext_lazy("Translation memory")),
+    ("performance", "manage-performance", gettext_lazy("Performance report")),
+    ("ssh", "manage-ssh", gettext_lazy("SSH keys")),
+    ("alerts", "manage-alerts", gettext_lazy("Diagnostics")),
+    ("repos", "manage-repos", gettext_lazy("Repositories")),
+    ("workspaces", "manage-workspaces", gettext_lazy("Workspaces")),
+    ("users", "manage-users", gettext_lazy("Users")),
+    ("teams", "manage-teams", gettext_lazy("Teams")),
+    ("appearance", "manage-appearance", gettext_lazy("Appearance")),
+    ("tools", "manage-tools", gettext_lazy("Tools")),
+    ("machinery", "manage-machinery", gettext_lazy("Automatic suggestions")),
+    ("addons", "manage-addons", gettext_lazy("Add-ons")),
+    ("github", "manage-github-accounts", gettext_lazy("Code-hosting connections")),
+)
+if "weblate.billing" in settings.INSTALLED_APPS:
+    MENU += (("billing", "manage-billing", gettext_lazy("Billing")),)
+
+DISCOVERY_REGISTRATION_SESSION = "discovery_registration"
+DISCOVERY_REGISTRATION_STATE_AGE = timedelta(minutes=10)
+DISCOVERY_ACTIVATION_CODE_MAX_LENGTH = 100
+DISCOVERY_CALLBACK_PATH = "/manage/discovery/callback/"
+
+
+def get_discovery_registration_url() -> str:
+    return get_support_url("subscription/discovery/register/")
+
+
+def get_discovery_activation_url() -> str:
+    return get_support_url("api/support/activation/")
+
+
+def get_discovery_site_url(callback_path: str) -> str:
+    return get_site_url(callback_path.removesuffix(DISCOVERY_CALLBACK_PATH)).rstrip("/")
+
+
+def store_discovery_registration_state(request: AuthenticatedHttpRequest) -> str:
+    state = get_token("discovery")
+    request.session[DISCOVERY_REGISTRATION_SESSION] = {
+        "state": state,
+        "expires": (timezone.now() + DISCOVERY_REGISTRATION_STATE_AGE).timestamp(),
+    }
+    return state
+
+
+def validate_discovery_registration_state(
+    request: AuthenticatedHttpRequest, state: str
+) -> bool:
+    stored = request.session.get(DISCOVERY_REGISTRATION_SESSION)
+    if not stored:
+        return False
+    if stored.get("expires", 0) < timezone.now().timestamp():
+        request.session.pop(DISCOVERY_REGISTRATION_SESSION, None)
+        return False
+    if stored.get("state") != state:
+        return False
+    request.session.pop(DISCOVERY_REGISTRATION_SESSION, None)
+    return True
+
+
+def get_discovery_unavailable_reason() -> str:
+    if settings.SITE_TITLE == "Weblate":
+        return gettext(
+            "Please change SITE_TITLE in settings to make your Weblate easy "
+            "to recognize in Discover Weblate."
+        )
+    return ""
+
+
+def unlink_support_status() -> None:
+    SupportStatus.objects.select_for_update().filter(enabled=True).update(
+        discoverable=False, enabled=False
+    )
+    cache.delete(SUPPORT_STATUS_CACHE_KEY)
+
+
+@management_access
+def manage(request: AuthenticatedHttpRequest) -> HttpResponse:
+    support = SupportStatus.objects.get_current()
+    initial = None
+    activation_code = request.GET.get("activation")
+    if activation_code and len(activation_code) < 400:
+        initial = {"secret": activation_code}
+    form = None
+    if support.name != "community":
+        form = ContactForm(
+            request=request,
+            hide_captcha=request.user.is_authenticated,
+            initial=get_initial_contact(request),
+        )
+
+    return render(
+        request,
+        "manage/index.html",
+        {
+            "menu_items": MENU,
+            "menu_page": "index",
+            "support": support,
+            "activate_form": ActivateForm(initial=initial),
+            "support_form": form,
+            "git_revision_link": GIT_LINK,
+            "git_revision": GIT_REVISION,
+            "discovery_unavailable_reason": get_discovery_unavailable_reason(),
+        },
+    )
+
+
+@management_access
+@require_POST
+def support_form(request: AuthenticatedHttpRequest) -> HttpResponse:
+    support = SupportStatus.objects.get_current()
+    if support.name == "community":
+        raise PermissionDenied
+    form = ContactForm(
+        request=request,
+        hide_captcha=request.user.is_authenticated,
+        data=request.POST,
+    )
+    if not form.is_valid():
+        show_form_errors(request, form)
+    else:
+        try:
+            url, number = submit_zammad_ticket(
+                title=form.cleaned_data["subject"],
+                body=form.cleaned_data["message"],
+                name=form.cleaned_data["name"],
+                email=form.cleaned_data["email"],
+                zammad_url="https://care.weblate.org",
+            )
+            messages.success(
+                request,
+                format_html(
+                    """{} <a href="{}">{}</a>""",
+                    gettext("Customer care ticket created:"),
+                    url,
+                    number,
+                ),
+            )
+        except ZammadError as error:
+            messages.error(request, str(error))
+    return redirect("manage")
+
+
+def send_test_mail(email: str) -> None:
+    send_mail(
+        subject=f"Test e-mail from Weblate on {timezone.now()}",
+        message="It works.",
+        recipient_list=[email],
+        from_email=None,
+    )
+
+
+@management_access
+def tools(request: AuthenticatedHttpRequest) -> HttpResponse:
+    can_configure = request.user.has_perm("management.configure")
+    email_form = (
+        TestMailForm(initial={"email": request.user.email}) if can_configure else None
+    )
+    can_post_announcement = request.user.has_perm("announcement.edit")
+    announce_form = AnnouncementForm() if can_post_announcement else None
+
+    if request.method == "POST":
+        if "email" in request.POST:
+            if not can_configure:
+                raise PermissionDenied
+            email_form = TestMailForm(request.POST)
+            if email_form.is_valid():
+                try:
+                    send_test_mail(**email_form.cleaned_data)
+                    messages.success(request, gettext("Test e-mail sent."))
+                except Exception as error:
+                    report_error("E-mail sending failed")
+                    messages.error(
+                        request, gettext("Could not send test e-mail: %s") % error
+                    )
+                return redirect("manage-tools")
+
+        if "sentry" in request.POST:
+            if not can_configure:
+                raise PermissionDenied
+            report_error("Test message", message=True, level="info")
+            return redirect("manage-tools")
+
+        if "message" in request.POST:
+            if not can_post_announcement:
+                raise PermissionDenied
+            announce_form = AnnouncementForm(request.POST)
+            if announce_form.is_valid():
+                Announcement.objects.create(
+                    user=request.user, **announce_form.cleaned_data
+                )
+
+    return render(
+        request,
+        "manage/tools.html",
+        {
+            "menu_items": MENU,
+            "menu_page": "tools",
+            "email_form": email_form,
+            "announce_form": announce_form,
+            "can_configure": can_configure,
+            "can_post_announcement": can_post_announcement,
+        },
+    )
+
+
+@management_permission_required("management.configure")
+@require_POST
+@transaction.atomic
+def discovery(request: AuthenticatedHttpRequest) -> HttpResponse:
+    support = SupportStatus.objects.get_current(for_update=True)
+    discovery_unavailable_reason = get_discovery_unavailable_reason()
+
+    if not support.discoverable and discovery_unavailable_reason:
+        messages.error(request, discovery_unavailable_reason)
+    elif support.secret and support.enabled:
+        support.discoverable = not support.discoverable
+        support.save(update_fields=["discoverable"])
+        support_status_update.delay()
+
+    return redirect("manage")
+
+
+@management_permission_required("management.configure")
+@require_POST
+def discovery_register(request: AuthenticatedHttpRequest) -> HttpResponse:
+    support = SupportStatus.objects.get_current()
+    if support.secret:
+        messages.error(
+            request,
+            gettext(
+                "This installation is already linked to weblate.org. "
+                "Use discovery settings to manage its listing."
+            ),
+        )
+        return redirect("manage")
+
+    discovery_unavailable_reason = get_discovery_unavailable_reason()
+    if discovery_unavailable_reason:
+        messages.error(request, discovery_unavailable_reason)
+        return redirect("manage")
+
+    state = store_discovery_registration_state(request)
+    callback_path = reverse("manage-discovery-callback")
+    query = urlencode(
+        {
+            "site_url": get_discovery_site_url(callback_path),
+            "state": state,
+        }
+    )
+    return redirect(f"{get_discovery_registration_url()}?{query}")
+
+
+@management_permission_required("management.configure")
+def discovery_callback(request: AuthenticatedHttpRequest) -> HttpResponse:
+    state = request.GET.get("state", "")
+    code = request.GET.get("code", "")
+    if not validate_discovery_registration_state(request, state):
+        messages.error(
+            request,
+            gettext("Could not activate your installation. Invalid activation state."),
+        )
+        return redirect("manage")
+    if not code:
+        messages.error(
+            request,
+            gettext("Could not activate your installation. Missing activation code."),
+        )
+        return redirect("manage")
+    if len(code) > DISCOVERY_ACTIVATION_CODE_MAX_LENGTH:
+        messages.error(
+            request,
+            gettext("Could not activate your installation. Invalid activation code."),
+        )
+        return redirect("manage")
+
+    try:
+        response = fetch_url(
+            "post",
+            get_discovery_activation_url(),
+            data={"code": code},
+            timeout=60,
+        )
+        payload = response.json()
+        support = SupportStatus(secret=payload["secret"])
+        support.refresh(
+            site_url=get_discovery_site_url(reverse("manage-discovery-callback"))
+        )
+    except httpx2.TimeoutException:
+        report_error("Activation timeout")
+        messages.error(
+            request,
+            gettext("Could not activate your installation. Please try again later."),
+        )
+    except Exception:
+        report_error("Activation error")
+        messages.error(
+            request,
+            gettext("Could not activate your installation. Please try again later."),
+        )
+    else:
+        with transaction.atomic():
+            active_subscription = (
+                SupportStatus.objects.select_for_update()
+                .filter(enabled=True, has_subscription=True)
+                .exists()
+            )
+            if active_subscription and not support.has_subscription:
+                messages.error(
+                    request,
+                    gettext(
+                        "Could not activate discovery because a support package "
+                        "is already linked."
+                    ),
+                )
+            else:
+                support.discoverable = True
+                SupportStatus.objects.select_for_update().filter(enabled=True).update(
+                    enabled=False
+                )
+                support.save()
+                transaction.on_commit(support_status_update.delay)
+                messages.success(request, gettext("Activation completed."))
+    return redirect("manage")
+
+
+@management_permission_required("management.configure")
+@require_POST
+@transaction.atomic
+def activate(request: AuthenticatedHttpRequest) -> HttpResponse:
+    support: SupportStatus | None = None
+    unlink = False
+    if "refresh" in request.POST:
+        support = SupportStatus.objects.get_current(for_update=True)
+    elif "unlink" in request.POST:
+        unlink = True
+        support = SupportStatus.objects.get_current(for_update=True)
+        if support.secret and support.discoverable:
+            support.discoverable = False
+        else:
+            support = None
+            unlink_support_status()
+    else:
+        form = ActivateForm(request.POST)
+        if form.is_valid():
+            support = SupportStatus(**form.cleaned_data)
+        else:
+            show_form_errors(request, form)
+
+    if support is not None:
+        activation_error = ""
+        try:
+            support.refresh()
+        except httpx2.TimeoutException:
+            report_error("Activation timeout")
+            activation_error = gettext(
+                "Could not activate your installation. Please try again later."
+            )
+        except httpx2.HTTPStatusError as error:
+            report_error("Activation error")
+            if error.response is not None and error.response.status_code == 404:
+                activation_error = gettext(
+                    "Could not activate your installation. "
+                    "Please ensure your activation token is correct."
+                )
+            else:
+                activation_error = gettext(
+                    "Could not activate your installation. Please try again later."
+                )
+        except Exception as error:
+            report_error("Activation error")
+            activation_error = (
+                gettext("Could not activate your installation: %s") % error
+            )
+        if activation_error:
+            if unlink:
+                unlink_support_status()
+                messages.error(
+                    request,
+                    gettext(
+                        "The support package was unlinked locally, but Discover "
+                        "Weblate could not be disabled on weblate.org. The site "
+                        "may remain listed."
+                    ),
+                )
+            else:
+                messages.error(request, activation_error)
+        else:
+            if unlink:
+                support.save()
+                unlink_support_status()
+            elif not support.pk:
+                unlink_support_status()
+                support.save()
+            else:
+                support.save()
+            messages.success(request, gettext("Activation completed."))
+    return redirect("manage")
+
+
+@management_access
+def repos(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Provide report about Git status of all repos."""
+    return render(
+        request,
+        "manage/repos.html",
+        {
+            "components": Component.objects.order_project(),
+            "menu_items": MENU,
+            "menu_page": "repos",
+        },
+    )
+
+
+@management_permission_required("management.configure")
+def backups(request: AuthenticatedHttpRequest) -> HttpResponse:
+    form = BackupForm()
+    if request.method == "POST":
+        if "repository" in request.POST:
+            form = BackupForm(request.POST)
+            if form.is_valid():
+                form.save()
+                return redirect("manage-backups")
+        else:
+            modelform = BackupSelectionForm(request.POST)
+            if modelform.is_valid():
+                service = cast("BackupService", modelform.cleaned_data["service"])
+                if "remove" in request.POST:
+                    service.delete()
+                    return redirect("manage-backups")
+                if "toggle" in request.POST:
+                    service.enabled = not service.enabled
+                    service.save()
+                    return redirect("manage-backups")
+                if "trigger" in request.POST:
+                    settings_backup.delay()
+                    database_backup.delay()
+                    backup_service.delay(pk=service.pk)
+                    messages.success(request, gettext("Backup process triggered"))
+                    return redirect("manage-backups")
+            else:
+                show_form_errors(request, modelform)
+
+    context = {
+        "services": BackupService.objects.all(),
+        "menu_items": MENU,
+        "menu_page": "backups",
+        "form": form,
+        "activate_form": ActivateForm(),
+    }
+    return render(request, "manage/backups.html", context)
+
+
+def get_memory_migration_status() -> dict[str, Any]:
+    # TODO(2028.1): Remove this migration status helper once Weblate no longer
+    # supports direct upgrades from 2026 releases.
+    """Return translation memory background migration status."""
+    state = MemoryScopeMigrationState.objects.filter(
+        name="memory-scope-backfill"
+    ).first()
+    compaction_state = MemoryScopeMigrationState.objects.filter(
+        name=MEMORY_SCOPE_COMPACTION_STATE
+    ).first()
+    max_memory_id = Memory.objects.aggregate(max_id=Max("id"))["max_id"] or 0
+    last_memory_id = state.last_memory_id if state is not None else 0
+    compaction_last_memory_id = (
+        compaction_state.last_memory_id if compaction_state is not None else 0
+    )
+    needs_backfill = state is not None and not state.completed
+    if state is None and max_memory_id:
+        needs_backfill = (
+            Memory.objects.alias(memory_has_scope=Memory.objects.get_has_scope_exists())
+            .filter(memory_has_scope=False)
+            .exists()
+        )
+    backfill_completed = max_memory_id == 0 or not needs_backfill
+
+    if backfill_completed:
+        backfill_percent = 100
+        processed = max_memory_id
+    else:
+        processed = last_memory_id
+        backfill_percent = (
+            min(round(processed * 100 / max_memory_id), 100) if max_memory_id else 0
+        )
+
+    compaction_completed = (
+        backfill_completed
+        and compaction_state is not None
+        and compaction_state.completed
+    )
+    compaction_active = (
+        backfill_completed and max_memory_id > 0 and not compaction_completed
+    )
+    compaction_percent = (
+        min(round(compaction_last_memory_id * 100 / max_memory_id), 100)
+        if max_memory_id and compaction_active
+        else 100
+        if compaction_completed or not max_memory_id
+        else 0
+    )
+    return {
+        "backfill_completed": backfill_completed,
+        "backfill_percent": backfill_percent,
+        "completed": backfill_completed and not compaction_active,
+        "compaction_active": compaction_active,
+        "compaction_completed": compaction_completed,
+        "compaction_last_memory_id": compaction_last_memory_id,
+        "compaction_max_memory_id": max_memory_id,
+        "compaction_percent": compaction_percent,
+        "last_memory_id": last_memory_id,
+        "processed": processed,
+        "state": state,
+        "total": max_memory_id,
+        "updated": (
+            compaction_state.updated
+            if backfill_completed and compaction_state is not None
+            else state.updated
+            if state is not None
+            else None
+        ),
+    }
+
+
+def handle_dismiss(request: AuthenticatedHttpRequest) -> HttpResponse:
+    try:
+        error = ConfigurationError.objects.get(pk=int(request.POST["pk"]))
+    except (ValueError, KeyError, ConfigurationError.DoesNotExist):
+        messages.error(request, gettext("Could not dismiss the configuration error!"))
+    else:
+        if "ignore" in request.POST:
+            error.ignored = True
+            error.save(update_fields=["ignored"])
+        else:
+            error.delete()
+    return redirect("manage-performance")
+
+
+@management_access
+def performance(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Show performance tuning tips."""
+    if request.method == "POST":
+        if not request.user.has_perm("management.configure"):
+            raise PermissionDenied
+        return handle_dismiss(request)
+    all_checks = run_checks(include_deployment_checks=True)
+    if settings.BACKGROUND_ADMIN_CHECKS and claim_configuration_health_check():
+        perform_configuration_health_check(all_checks)
+    checks = sorted(
+        (check for check in all_checks if not check.is_silenced()),
+        key=lambda check: (check.id, check.msg),
+    )
+
+    try:
+        disk_usage_bytes = disk_usage(settings.DATA_DIR)
+    except OSError:
+        disk_usage_bytes = None
+
+    if disk_usage_bytes is None:
+        disk_usage_percent = 0
+    else:
+        disk_usage_percent = round(disk_usage_bytes.used * 100 / disk_usage_bytes.total)
+
+    database_size = get_database_size()
+    database_disk_usage = get_database_disk_usage()
+
+    context = {
+        "checks": checks,
+        "errors": ConfigurationError.objects.filter(ignored=False),
+        "queues": sorted(get_queue_stats().items()),
+        "menu_items": MENU,
+        "menu_page": "performance",
+        "web_encoding": get_encoding_list(),
+        "celery_encoding": cache.get("celery_encoding"),
+        "celery_latency": cache.get("celery_latency"),
+        "database_latency": measure_database_latency(),
+        "cache_latency": measure_cache_latency(),
+        "disk_usage": disk_usage_bytes,
+        "disk_usage_percent": disk_usage_percent,
+        "database_size": database_size,
+        "database_disk_usage": database_disk_usage,
+        "memory_migration_status": get_memory_migration_status(),
+    }
+
+    return render(request, "manage/performance.html", context)
+
+
+def get_key_type(data: QueryDict) -> KeyType:
+    value = data.get("type", "rsa")
+    if value not in get_args(KeyType):
+        raise Http404
+    return cast("KeyType", value)
+
+
+@management_permission_required("management.configure")
+def ssh_key(request: AuthenticatedHttpRequest) -> HttpResponse:
+    key_type = get_key_type(request.GET)
+    filename, data = get_key_data_raw(key_type=key_type, kind="private")
+    if data is None:
+        raise Http404
+
+    response = HttpResponse(data, content_type="text/plain")
+    response["Content-Disposition"] = f"attachment; filename={filename}"
+    response["Content-Length"] = len(data)
+    return response
+
+
+@management_permission_required("management.configure")
+def ssh(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Show information and manipulate with SSH key."""
+    # Check whether we can generate SSH key
+    can_generate = can_generate_key()
+
+    # Grab action type
+    action = request.POST.get("action")
+
+    # Generate key if it does not exist yet
+    if can_generate and action == "generate":
+        key_type = get_key_type(request.POST)
+        generate_ssh_key(request, key_type=key_type)
+        return redirect("manage-ssh")
+
+    # Read key data if it exists
+    keys = get_all_key_data()
+
+    # Add host key
+    form = SSHAddForm()
+    if action == "add-host":
+        form = SSHAddForm(request.POST)
+        if form.is_valid():
+            add_host_key(
+                request,
+                form.cleaned_data["host"],
+                form.cleaned_data["port"],
+                accept_fingerprint=form.cleaned_data["fingerprint"],
+                restrict_private=True,
+            )
+    elif action == "remove-host":
+        remove_host_key(request, request.POST.get("host_key", ""))
+
+    context = {
+        "public_ssh_keys": keys,
+        "can_generate": can_generate,
+        "missing_ssh_keys": [
+            keydata for keydata in keys.values() if keydata["key"] is None
+        ],
+        "host_keys": get_host_key_entries(),
+        "menu_items": MENU,
+        "menu_page": "ssh",
+        "add_form": form,
+    }
+
+    return render(request, "manage/ssh.html", context)
+
+
+@management_access
+def alerts(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Show component alerts."""
+    context = {
+        "alerts": Alert.objects.filter(severity__gte=AlertSeverity.ERROR)
+        .order()
+        .select_related("component", "component__project"),
+        "no_components": Project.objects.filter(component__isnull=True),
+        "menu_items": MENU,
+        "menu_page": "alerts",
+    }
+
+    return render(request, "manage/alerts.html", context)
+
+
+@method_decorator(management_access, name="dispatch")
+class AdminUserList(UserList):
+    template_name = "manage/users.html"
+    form_class = AdminUserSearchForm
+    initial_query = "is:active"
+
+    def get_base_queryset(self) -> QuerySet[User]:
+        return User.objects.all()
+
+    @staticmethod
+    def get_invite_form(data=None) -> AdminInviteUserForm:
+        return AdminInviteUserForm(data, auto_id="id_admin_invite_%s")
+
+    @staticmethod
+    def get_bulk_invite_form(data=None) -> AdminBulkInviteForm:
+        return AdminBulkInviteForm(data, auto_id="id_admin_bulk_invite_%s")
+
+    def dispatch(self, request: AuthenticatedHttpRequest, *args, **kwargs):  # type: ignore[override]
+        if request.method == "POST":
+            if not request.user.has_perm("user.edit"):
+                raise PermissionDenied
+        elif not (
+            request.user.has_perm("user.view") or request.user.has_perm("user.edit")
+        ):
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request: AuthenticatedHttpRequest, **kwargs) -> HttpResponse:
+        if "emails" in request.POST:
+            bulk_invite_form = self.get_bulk_invite_form(request.POST)
+            if bulk_invite_form.is_valid():
+                bulk_invite_form.save(request)
+                return redirect("manage-users")
+            show_form_errors(request, bulk_invite_form)
+        elif "email" in request.POST:
+            invite_form = self.get_invite_form(request.POST)
+            if invite_form.is_valid():
+                invite_form.save(request)
+                return redirect("manage-users")
+            show_form_errors(request, invite_form)
+        return super().get(request, **kwargs)
+
+    def get_context_data(self, **kwargs) -> dict[str, Any]:
+        result = super().get_context_data(**kwargs)
+        can_edit_users = self.request.user.has_perm("user.edit")
+
+        posted_invite = self.request.method == "POST" and "email" in self.request.POST
+        if can_edit_users and posted_invite:
+            invite_form = self.get_invite_form(self.request.POST)
+            invite_form.is_valid()
+        elif can_edit_users:
+            invite_form = self.get_invite_form()
+        else:
+            invite_form = None
+
+        posted_bulk_invite = (
+            self.request.method == "POST" and "emails" in self.request.POST
+        )
+        if can_edit_users and posted_bulk_invite:
+            bulk_invite_form = self.get_bulk_invite_form(self.request.POST)
+            bulk_invite_form.is_valid()
+        elif can_edit_users:
+            bulk_invite_form = self.get_bulk_invite_form()
+        else:
+            bulk_invite_form = None
+
+        result["menu_items"] = MENU
+        result["menu_page"] = "users"
+        result["can_edit_users"] = can_edit_users
+        result["invite_form"] = invite_form
+        result["bulk_invite_form"] = bulk_invite_form
+        result["search_form"] = self.form
+        result["invitations"] = Invitation.objects.select_related(
+            "user",
+            "group",
+            "group__defining_project",
+            "group__defining_workspace",
+        )
+        return result
+
+
+@management_permission_required("user.edit")
+def users_check(request: AuthenticatedHttpRequest) -> HttpResponse:
+    data: QueryDict = request.GET
+    # Legacy links for care.weblate.org integration
+    if "email" in data and "q" not in data:
+        data = data.copy()
+        data.setlist("q", data.getlist("email"))
+    form = AdminUserSearchForm(data)
+
+    user_list = None
+    if form.is_valid():
+        query = form.cleaned_data.get("q", "")
+        parser = cast(
+            "Literal['user', 'superuser']", getattr(form.fields["q"], "parser", "user")
+        )
+        user_list = User.objects.search(query, parser=parser)[:2]
+        if user_list.count() != 1:
+            return redirect_param("manage-users", f"?q={quote(form.cleaned_data['q'])}")
+        return redirect(user_list[0])
+    return redirect("manage-users")
+
+
+@management_permission_required("management.configure")
+def appearance(request: AuthenticatedHttpRequest) -> HttpResponse:
+    current = Setting.objects.get_settings_dict(SettingCategory.UI)
+    form = AppearanceForm(initial=current)
+
+    if request.method == "POST":
+        if "reset" in request.POST:
+            Setting.objects.filter(category=SettingCategory.UI).delete()
+            CustomCSSView.drop_cache()
+            return redirect("manage-appearance")
+        form = AppearanceForm(request.POST)
+        if form.is_valid():
+            for name, value in form.cleaned_data.items():
+                if name not in current:
+                    # New setting previously not set
+                    Setting.objects.create(
+                        category=SettingCategory.UI, name=name, value=value
+                    )
+                else:
+                    if value != current[name]:
+                        # Update setting
+                        Setting.objects.filter(
+                            category=SettingCategory.UI, name=name
+                        ).update(value=value)
+                    current.pop(name)
+            # Drop stale settings
+            if current:
+                Setting.objects.filter(
+                    category=SettingCategory.UI, name__in=current.keys()
+                ).delete()
+
+            # Flush cache
+            CustomCSSView.drop_cache()
+            return redirect("manage-appearance")
+
+    return render(
+        request,
+        "manage/appearance.html",
+        {
+            "menu_items": MENU,
+            "menu_page": "appearance",
+            "form": form,
+        },
+    )
+
+
+@management_permission_required("billing.manage")
+def billing(request: AuthenticatedHttpRequest) -> HttpResponse:
+    # ruff: ignore[import-outside-top-level]
+    from weblate.billing.models import Billing
+
+    trial = []
+    pending = []
+    removal = []
+    free = []
+    paid = []
+    terminated = []
+
+    # We will list all billings anyway, so fetch  them at once
+    billings = Billing.objects.prefetch().order_by("expiry", "removal", "id")
+    projects = []
+
+    for current in billings:
+        if current.removal:
+            removal.append(current)
+        if current.state == Billing.STATE_TRIAL:
+            if (
+                current.plan
+                and current.plan.price == 0
+                and current.payment.get("libre_request")
+            ):
+                pending.append(current)
+            trial.append(current)
+        elif current.state == Billing.STATE_TERMINATED:
+            terminated.append(current)
+        elif current.plan.price:
+            paid.append(current)
+        else:
+            free.append(current)
+        projects.extend(current.ordered_projects)
+    prefetch_stats(projects)
+
+    return render(
+        request,
+        "manage/billing.html",
+        {
+            "menu_items": MENU,
+            "menu_page": "billing",
+            "trial": trial,
+            "removal": removal,
+            "free": free,
+            "paid": paid,
+            "terminated": terminated,
+            "pending": pending,
+        },
+    )
+
+
+@method_decorator(management_access, name="dispatch")
+class TeamListView(FormMixin, ListView):
+    template_name = "manage/teams.html"
+    paginate_by = 50
+    model = Group
+    form_class = SitewideTeamForm
+
+    def dispatch(self, request: AuthenticatedHttpRequest, *args, **kwargs):  # type: ignore[override]
+        if request.method == "POST":
+            if not request.user.has_perm("group.edit"):
+                raise PermissionDenied
+        elif not (
+            request.user.has_perm("group.view") or request.user.has_perm("group.edit")
+        ):
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self) -> QuerySet[Group]:
+        return (
+            cast("GroupQuerySet", super().get_queryset())
+            .prefetch_related("languages", "projects", "components")
+            .filter(defining_project=None)
+            .annotate(Count("user"), Count("autogroup"))
+            .order()
+        )
+
+    def get_context_data(self, **kwargs) -> dict[str, Any]:
+        result = super().get_context_data(**kwargs)
+        result["menu_items"] = MENU
+        result["menu_page"] = "teams"
+        result["can_edit_teams"] = self.request.user.has_perm("group.edit")
+        return result
+
+    def get_success_url(self) -> str:
+        return reverse("manage-teams")
+
+    def post(self, request: AuthenticatedHttpRequest, *args, **kwargs) -> HttpResponse:
+        form = self.get_form()
+        if form.is_valid():
+            return self.form_valid(form)
+        return self.form_invalid(form)
+
+    def form_valid(self, form: SitewideTeamForm) -> HttpResponse:
+        form.save()
+        return super().form_valid(form)
+
+
+@method_decorator(management_access, name="dispatch")
+class WorkspaceListView(WorkspaceListBase):
+    template_name = "manage/workspaces.html"
+
+    def include_billing(self) -> bool:
+        return "weblate.billing" in settings.INSTALLED_APPS
+
+    def get_context_data(self, **kwargs) -> dict[str, Any]:
+        result = super().get_context_data(**kwargs)
+        result["menu_items"] = MENU
+        result["menu_page"] = "workspaces"
+        return result
+
+
+class WorkspaceCreateView(CreateView):
+    template_name = "manage/workspace_form.html"
+    model = Workspace
+    form_class = WorkspaceCreateForm
+    request: AuthenticatedHttpRequest
+    object: Workspace
+
+    def dispatch(self, request: AuthenticatedHttpRequest, *args, **kwargs):  # type: ignore[override]
+        if "weblate.billing" in settings.INSTALLED_APPS:
+            raise Http404
+        if not request.user.has_perm("workspace.add"):
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
+    @transaction.atomic
+    def form_valid(self, form: WorkspaceCreateForm) -> HttpResponse:
+        self.object = form.save(commit=False)
+        self.object.acting_user = self.request.user
+        self.object.save()
+        self.object.add_owner(self.request.user, self.request)
+        self.request.user.clear_permissions_cache()
+        Change.objects.create(
+            action=ActionEvents.CREATE_WORKSPACE,
+            workspace=self.object,
+            user=self.request.user,
+            author=self.request.user,
+        )
+        messages.success(self.request, gettext("Workspace created."))
+        return redirect(self.get_success_url())
+
+    def get_context_data(self, **kwargs) -> dict[str, Any]:
+        result = super().get_context_data(**kwargs)
+        result["user_can_manage"] = self.request.user.has_perm("management.use")
+        if result["user_can_manage"]:
+            result["menu_items"] = MENU
+            result["menu_page"] = "workspaces"
+        return result
+
+    def get_success_url(self) -> str:
+        return self.object.get_absolute_url()

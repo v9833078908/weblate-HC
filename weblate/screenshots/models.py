@@ -1,0 +1,302 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+import fnmatch
+import os
+from typing import TYPE_CHECKING, Any
+
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.files import File
+from django.core.files.storage import default_storage
+from django.db import models
+from django.db.models import Q
+from django.db.models.signals import m2m_changed, post_delete, post_save
+from django.dispatch import receiver
+from django.urls import reverse
+from django.utils.translation import gettext_lazy
+
+from weblate.auth.models import User
+from weblate.checks.flags import Flags
+from weblate.screenshots.fields import ScreenshotField
+from weblate.trans.actions import ActionEvents
+from weblate.trans.alerts.registry import update_alerts
+from weblate.trans.mixins import UserDisplayMixin
+from weblate.trans.models import Translation, Unit
+from weblate.trans.signals import component_post_update, vcs_post_update
+from weblate.utils.decorators import disable_for_loaddata
+from weblate.utils.errors import report_error
+from weblate.vcs.base import RepositorySymlinkError
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from weblate.trans.models import Component
+
+
+class ScreenshotQuerySet(models.QuerySet["Screenshot", "Screenshot"]):
+    def order(self):
+        return self.order_by("name")
+
+    def filter_access(self, user: User):
+        result = self
+        if user.needs_project_filter:
+            result = result.filter(
+                user.get_project_access_query("translation__component__project")
+            )
+        if user.needs_component_restrictions_filter:
+            result = result.filter(
+                Q(translation__component__restricted=False)
+                | Q(translation__component_id__in=user.component_permissions)
+            )
+        return result
+
+
+class Screenshot(models.Model, UserDisplayMixin):
+    name = models.CharField(
+        verbose_name=gettext_lazy("Screenshot name"), max_length=200
+    )
+    repository_filename = models.CharField(
+        verbose_name=gettext_lazy("Repository path to screenshot"),
+        help_text=gettext_lazy("Scan for screenshot file change on repository update."),
+        blank=True,
+        max_length=200,
+    )
+    image = ScreenshotField(
+        verbose_name=gettext_lazy("Image"),
+        help_text=gettext_lazy("Upload image up to 2000x2000 pixels."),
+        upload_to="screenshots/",
+    )
+    translation = models.ForeignKey(Translation, on_delete=models.deletion.CASCADE)
+    units = models.ManyToManyField(Unit, blank=True, related_name="screenshots")
+    timestamp = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.deletion.SET_NULL,
+    )
+
+    objects = ScreenshotQuerySet.as_manager()
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        verbose_name = "Screenshot"
+        verbose_name_plural = "Screenshots"
+
+    def __str__(self) -> str:
+        return self.name
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # Project backup integration
+        self.import_data: dict[str, Any] = {}
+
+    def get_absolute_url(self) -> str:
+        return reverse("screenshot", kwargs={"pk": self.pk})
+
+    def get_view_url(self) -> str:
+        return reverse("screenshot-view", kwargs={"pk": self.pk})
+
+    @classmethod
+    def validate_image_file(cls, image: File) -> None:
+        """Validate screenshot uploads using the model field policy."""
+        field = cls._meta.get_field("image")
+        if not isinstance(field, ScreenshotField):
+            msg = "Screenshot.image is not a ScreenshotField."
+            raise TypeError(msg)
+        field.run_validators(image)
+
+    @property
+    def filter_name(self) -> str:
+        return f"screenshot:{Flags.format_value(self.name)}"
+
+    def add_unit(self, unit: Unit, user: User | None = None) -> None:
+        """Add a unit to this screenshot and create a change event."""
+        self.add_units([unit], user=user)
+
+    def add_units(self, units: Sequence[Unit], user: User | None = None) -> None:
+        """Add units to this screenshot and create change events."""
+        if not units:
+            return
+        self.units.add(*units)
+        for unit in units:
+            self.change_set.create(
+                action=ActionEvents.SCREENSHOT_ADDED,
+                user=user or self.user,
+                target=self.name,
+                unit=unit,
+            )
+
+    async def add_units_async(
+        self, units: Sequence[Unit], user: User | None = None
+    ) -> None:
+        """Asynchronously add units and create change events."""
+        if not units:
+            return
+        user_id = user.pk if user is not None else self.user_id
+        await self.units.aadd(*units)  # codespell:ignore aadd
+        for unit in units:
+            await self.change_set.acreate(
+                action=ActionEvents.SCREENSHOT_ADDED,
+                user_id=user_id,
+                target=self.name,
+                unit=unit,
+            )
+
+    def remove_unit(self, unit: Unit, user: User | None = None) -> None:
+        """Remove a unit from this screenshot and create a change event."""
+        self.units.remove(unit)
+        self.change_set.create(
+            action=ActionEvents.SCREENSHOT_REMOVED,
+            user=user or self.user,
+            target=self.name,
+            unit=unit,
+        )
+
+    async def aremove_unit(self, unit: Unit, user: User | None = None) -> None:
+        """Asynchronously remove a unit and create a change event."""
+        user_id = user.pk if user is not None else self.user_id
+        await self.units.aremove(unit)
+        await self.change_set.acreate(
+            action=ActionEvents.SCREENSHOT_REMOVED,
+            user_id=user_id,
+            target=self.name,
+            unit=unit,
+        )
+
+
+@receiver(m2m_changed, sender=Screenshot.units.through)
+@disable_for_loaddata
+def change_screenshot_assignment(sender, instance, action, **kwargs) -> None:
+    # Update alerts in case there is change in string assignment
+    if action in {"post_add", "post_remove", "post_clear"}:
+        update_alerts(
+            instance.translation.component,
+            alerts={"MissingScreenshots", "UnusedScreenshot"},
+        )
+
+
+@receiver(post_save, sender=Screenshot)
+@disable_for_loaddata
+def update_alerts_on_screenshot_save(sender, instance: Screenshot, **kwargs) -> None:
+    update_alerts(
+        instance.translation.component,
+        alerts={"MissingScreenshots", "UnusedScreenshot"},
+    )
+
+
+@receiver(post_delete, sender=Screenshot)
+def update_alerts_on_screenshot_delete(sender, instance: Screenshot, **kwargs) -> None:
+    update_alerts(
+        instance.translation.component,
+        alerts={"MissingScreenshots", "UnusedScreenshot"},
+    )
+
+
+@receiver(component_post_update)
+def update_screenshot_coverage_on_component_update(
+    sender, component: Component, **kwargs
+) -> None:
+    update_alerts(component, alerts={"MissingScreenshots"})
+
+
+def validate_screenshot_image(component: Component, filename: str) -> str | None:
+    """Validate a screenshot image and return its resolved path."""
+    try:
+        resolved = component.repository.resolve_symlinks(filename)
+    except RepositorySymlinkError:
+        component.log_info("ignoring screenshot %s, invalid symlink", filename)
+        return None
+    if not resolved:
+        component.log_info("ignoring screenshot %s, invalid symlink", filename)
+        return None
+
+    full_name = os.path.join(component.repository.path, resolved)
+    if not os.path.isfile(full_name):
+        component.log_info("ignoring screenshot %s, not a file", filename)
+        return None
+
+    try:
+        with open(full_name, "rb") as f:
+            image_file = File(f, name=os.path.basename(filename))
+            Screenshot.validate_image_file(image_file)
+    except OSError as error:
+        component.log_info(
+            "ignoring screenshot %s, could not open: %s", filename, error
+        )
+        return None
+    except ValidationError as error:
+        component.log_error("failed to validate screenshot %s: %s", filename, error)
+        report_error("Could not validate image from repository")
+        return None
+    return full_name
+
+
+@receiver(vcs_post_update)
+def sync_screenshots_from_repo(
+    sender,
+    component: Component,
+    previous_head: str,
+    user: User | None,
+    changed_files: list[str],
+    **kwargs,
+) -> None:
+    if user is None:
+        user = User.objects.get_or_create_bot(
+            scope="weblate", name="screenshots", verbose="Screenshots from repository"
+        )
+    changed_files = list(changed_files)
+
+    screenshots = Screenshot.objects.filter(
+        translation__component=component, repository_filename__in=changed_files
+    )
+
+    # Update existing screenshots
+    for screenshot in screenshots:
+        filename = screenshot.repository_filename
+        component.log_debug("detected screenshot change in repository: %s", filename)
+        changed_files.remove(filename)
+
+        if full_name := validate_screenshot_image(component, filename):
+            with open(full_name, "rb") as f:
+                screenshot.image = File(
+                    f,
+                    name=default_storage.get_available_name(os.path.basename(filename)),
+                )
+                screenshot.save(update_fields=["image"])
+                component.log_info("updated screenshot from repository: %s", filename)
+                screenshot.change_set.create(
+                    action=ActionEvents.SCREENSHOT_UPLOADED,
+                    user=user,
+                    target=screenshot.name,
+                )
+
+    # Add new screenshots matching screenshot filemask
+    for filename in changed_files:
+        if fnmatch.fnmatch(filename, component.screenshot_filemask) and (
+            full_name := validate_screenshot_image(component, filename)
+        ):
+            with open(full_name, "rb") as f:
+                screenshot = Screenshot.objects.create(
+                    name=filename,
+                    repository_filename=filename,
+                    image=File(
+                        f,
+                        name=default_storage.get_available_name(
+                            os.path.basename(filename)
+                        ),
+                    ),
+                    translation=component.source_translation,
+                    user=user,
+                )
+                screenshot.save()
+                component.log_info("create screenshot from repository: %s", filename)
+                screenshot.change_set.create(
+                    action=ActionEvents.SCREENSHOT_UPLOADED,
+                    user=user,
+                    target=screenshot.name,
+                )

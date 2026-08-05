@@ -1,0 +1,235 @@
+#!/bin/sh
+
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Migrations test executor
+
+# shellcheck source=/dev/null
+. ci/lib.sh
+
+if [ -n "$1" ]; then
+    TAG="weblate-$1"
+else
+    echo "Missing version to migrate from!"
+    exit 1
+fi
+
+HEAD_COMMIT=$(git rev-parse HEAD)
+
+# Copy the current file to survive checkout
+MIGRATE_DIR=$(mktemp -d)
+cp ci/migrate-override.txt "$MIGRATE_DIR/migrate-override.txt"
+cp -r ci/migrate-scripts "$MIGRATE_DIR/"
+
+print_step "Testing migration from $TAG..."
+cleanup_database
+check
+if ! git fetch --depth 1 origin tag "$TAG"; then
+    git remote add upstream https://github.com/WeblateOrg/weblate.git
+    git fetch --depth 1 upstream tag "$TAG"
+fi
+check
+git checkout "$TAG"
+check
+# Use clean Python environment for each version, this avoids problems when trying to downgrade from current versions
+if semver_compare "$1" "<" "5.14"; then
+    uv venv --python python3.11 ".venv-$TAG"
+else
+    uv venv --python python3.13 ".venv-$TAG"
+fi
+check
+# shellcheck source=/dev/null
+. ".venv-$TAG/bin/activate"
+# Install matching Weblate package
+# - Force PyGobject 3.52 to be compatible with girepository-2.0 in old releases
+uv pip install --override "$MIGRATE_DIR/migrate-override.txt" -e ".[all]"
+check
+if [ -n "$CI_DB_HOST" ]; then
+    echo "DATABASES['default']['HOST'] = '$CI_DB_HOST'" >> weblate/settings_test.py
+    check
+fi
+if [ -n "$CI_DB_PASSWORD" ]; then
+    echo "DATABASES['default']['PASSWORD'] = '$CI_DB_PASSWORD'" >> weblate/settings_test.py
+    check
+fi
+if [ -n "$CI_DB_PORT" ]; then
+    echo "DATABASES['default']['PORT'] = '$CI_DB_PORT'" >> weblate/settings_test.py
+    check
+fi
+./manage.py migrate
+check
+
+# Delete automatically created languages to be able to load fixture
+./manage.py shell < "$MIGRATE_DIR/migrate-scripts/setup-languages.py"
+check
+
+# Load basic project fixture from the older version
+./manage.py loaddata simple-project.json
+check
+
+# Setup migration testing
+./manage.py shell < "$MIGRATE_DIR/migrate-scripts/setup-base.py"
+check
+
+# Add stale comment removal add-on for cleanup settings migration test
+# This migration is already applied when migrating from 2026.5 or newer.
+semver_compare "$1" "<" "2026.5"
+cleanup_settings_migrate=$?
+if [ "$cleanup_settings_migrate" -eq 0 ]; then
+    ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/setup-cleanup-settings.py"
+    check
+fi
+
+# Add component links for through-model migration test
+./manage.py shell < "$MIGRATE_DIR/migrate-scripts/setup-links.py"
+check
+
+# Add user team membership for through-model migration test
+semver_compare "$1" "<" "2026.6"
+team_membership_migrate=$?
+if [ "$team_membership_migrate" -eq 0 ]; then
+    ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/setup-team-membership.py"
+    check
+fi
+
+# Add a pending unit
+semver_compare "$1" "<" "5.12"
+pending_migration_test=$?
+if [ "$pending_migration_test" -eq 0 ]; then
+    ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/setup-pending.py"
+    check
+fi
+
+semver_compare "$1" ">" "5.5"
+addon_scopes=$?
+# Create addons with different scopes
+semver_compare "$1" "<" "5.12"
+file_format_params=$?
+
+if [ "$addon_scopes" -eq 0 ] && [ "$file_format_params" -eq 0 ]; then
+    ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/setup-addon-customize.py"
+    check
+fi
+
+# File format encoding migration
+semver_compare "$1" "<" "5.16"
+file_format_encoding_merge=$?
+if [ "$file_format_encoding_merge" -eq 0 ]; then
+    ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/setup-formats.py"
+    check
+fi
+
+# Add users with billing permission
+semver_compare "$1" "<" "5.16"
+billing_users_migrate=$?
+if [ "$billing_users_migrate" -eq 0 ]; then
+    ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/setup-billing.py"
+    check
+fi
+
+# Add billing projects for workspace migration test
+semver_compare "$1" "<" "2026.6"
+workspace_migrate=$?
+if [ "$workspace_migrate" -eq 0 ]; then
+    ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/setup-workspaces.py"
+    check
+fi
+
+# Add dos-eol flag to project, component, translation and unit
+semver_compare "5.11" "<=" "$1" && semver_compare "$1" "<" "5.17.1"
+dos_eol_migrate=$?
+if [ "$dos_eol_migrate" -eq 0 ]; then
+    ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/setup-dos-eol-param.py"
+    check
+fi
+
+# Migrate gettext file format header settings
+semver_compare "$1" "<" "5.17"
+gettext_header_settings_migrate=$?
+if [ "$gettext_header_settings_migrate" -eq 0 ]; then
+    ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/setup-gettext-header-settings.py"
+    check
+fi
+
+git reset --hard
+check
+git checkout "$HEAD_COMMIT"
+check
+if [ "$cleanup_settings_migrate" -eq 0 ]; then
+    cp weblate/settings_test.py "$MIGRATE_DIR/settings_test.py"
+    check
+    cat >> weblate/settings_test.py << 'EOF'
+COMMENT_CLEANUP_DAYS = 15
+SUGGESTION_CLEANUP_DAYS = 20
+EOF
+    check
+fi
+# Use CI environment
+deactivate
+check
+run_coverage ./manage.py migrate
+check
+if [ "$cleanup_settings_migrate" -eq 0 ]; then
+    cp "$MIGRATE_DIR/settings_test.py" weblate/settings_test.py
+    check
+fi
+# Check migrated vote exists
+uv run --all-extras ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/assert-vote.py"
+check
+
+# Check component links survived through-model migration
+uv run --all-extras ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/assert-links.py"
+check
+
+# Check user team memberships survived through-model migration
+if [ "$team_membership_migrate" -eq 0 ]; then
+    uv run --all-extras ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/assert-team-membership.py"
+    check
+fi
+
+# Check cleanup settings were migrated to site-wide add-ons
+if [ "$cleanup_settings_migrate" -eq 0 ]; then
+    uv run --all-extras ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/assert-cleanup-settings.py"
+    check
+fi
+
+# Check migrated pending unit
+if [ "$pending_migration_test" -eq 0 ]; then
+    uv run --all-extras ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/assert-pending.py"
+fi
+
+if [ "$addon_scopes" -eq 0 ] && [ "$file_format_params" -eq 0 ]; then
+    # check that relevant addon parameters have been migrated to file_format_params
+    uv run --all-extras ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/assert-params.py"
+    check
+fi
+
+if [ "$file_format_encoding_merge" -eq 0 ]; then
+    # check that different encoding file-formats are merged into a single one with correct file format params
+    uv run --all-extras ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/assert-encoding.py"
+fi
+
+if [ "$billing_users_migrate" -eq 0 ]; then
+    # Verify that the user has been migrated from the billing permission to the owner
+    uv run --all-extras ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/assert-billing.py"
+fi
+
+if [ "$workspace_migrate" -eq 0 ]; then
+    # Verify that billing projects have been migrated to workspaces
+    uv run --all-extras ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/assert-workspaces.py"
+    check
+fi
+
+if [ "$dos_eol_migrate" -eq 0 ]; then
+    # check that the dos-eol flag has been migrated to the file format params
+    uv run --all-extras ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/assert-dos-eol-param.py"
+    check
+fi
+
+if [ "$gettext_header_settings_migrate" -eq 0 ]; then
+    # check that the gettext file format header settings have been migrated
+    uv run --all-extras ./manage.py shell < "$MIGRATE_DIR/migrate-scripts/assert-gettext-header-settings.py"
+    check
+fi

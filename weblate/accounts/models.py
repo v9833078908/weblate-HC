@@ -1,0 +1,1518 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+import datetime
+import logging
+import re
+from datetime import timedelta
+from ipaddress import IPv6Network, ip_network
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from urllib.parse import urlparse
+
+from appconf import AppConf
+from django.conf import settings
+from django.contrib import admin
+from django.contrib.auth.signals import user_logged_in
+from django.core.exceptions import ValidationError
+from django.core.signing import TimestampSigner
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
+from django.db.models import F, Q
+from django.db.models.functions import Upper
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.utils import timezone
+from django.utils.functional import cached_property
+from django.utils.html import format_html
+from django.utils.timezone import now
+from django.utils.translation import (
+    get_language,
+    gettext,
+    gettext_lazy,
+    pgettext_lazy,
+)
+from django_otp.plugins.otp_static.models import StaticDevice
+from django_otp.plugins.otp_totp.models import TOTPDevice
+from django_otp_webauthn.models import WebAuthnCredential
+from social_django.models import UserSocialAuth
+from unidecode import unidecode
+
+from weblate.accounts.avatar import get_user_display
+from weblate.accounts.data import create_default_notifications
+from weblate.accounts.notifications import (
+    NOTIFICATIONS,
+    NotificationFrequency,
+    NotificationScope,
+)
+from weblate.accounts.tasks import notify_auditlog
+from weblate.auth.models import User
+from weblate.lang.models import Language
+from weblate.trans.defines import EMAIL_LENGTH
+from weblate.trans.models import Change, ComponentList, Translation
+from weblate.trans.models.translation import GhostTranslation
+from weblate.utils import messages
+from weblate.utils.decorators import disable_for_loaddata
+from weblate.utils.fields import EmailField
+from weblate.utils.html import mail_quote_value
+from weblate.utils.render import validate_editor
+from weblate.utils.request import get_ip_address, get_user_agent
+from weblate.utils.stats import (
+    CategoryLanguageStats,
+    GhostCategoryLanguageStats,
+    GhostProjectLanguageStats,
+    ProjectLanguageStats,
+)
+from weblate.utils.validators import (
+    EMAIL_BLACKLIST,
+    WeblateURLValidator,
+    validate_code_site_url,
+    validate_contact_url,
+    validate_fediverse_url,
+    validate_profile_url,
+)
+from weblate.wladmin.models import get_support_status
+
+from . import defaults
+from .types import ThemeChoices
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from django.http.request import HttpRequest
+    from django_otp.models import Device
+    from django_stubs_ext import StrOrPromise
+
+    from weblate.accounts.types import DeviceType
+    from weblate.auth.models import AuthenticatedHttpRequest
+    from weblate.trans.models import Project, Unit
+
+LOGGER = logging.getLogger("weblate.audit")
+
+
+class WeblateAccountsConf(AppConf):
+    """Accounts settings."""
+
+    # Disable avatars
+    ENABLE_AVATARS = defaults.DEFAULT_ENABLE_AVATARS
+
+    # Avatar URL prefix
+    AVATAR_URL_PREFIX = defaults.DEFAULT_AVATAR_URL_PREFIX
+
+    # Avatar fallback image
+    # See http://en.gravatar.com/site/implement/images/ for available choices
+    AVATAR_DEFAULT_IMAGE = defaults.DEFAULT_AVATAR_DEFAULT_IMAGE
+
+    # Enable registrations
+    REGISTRATION_OPEN = defaults.DEFAULT_REGISTRATION_OPEN
+
+    # Allow registration from certain backends
+    REGISTRATION_ALLOW_BACKENDS: ClassVar[list[str]] = list(
+        defaults.DEFAULT_REGISTRATION_ALLOW_BACKENDS
+    )
+
+    # Allow rebinding to existing accounts
+    REGISTRATION_REBIND = defaults.DEFAULT_REGISTRATION_REBIND
+
+    # Registration email filter
+    REGISTRATION_EMAIL_MATCH = defaults.DEFAULT_REGISTRATION_EMAIL_MATCH
+    REGISTRATION_ALLOW_DISPOSABLE_EMAILS = (
+        defaults.DEFAULT_REGISTRATION_ALLOW_DISPOSABLE_EMAILS
+    )
+
+    # Captcha for registrations
+    REGISTRATION_CAPTCHA = defaults.DEFAULT_REGISTRATION_CAPTCHA
+
+    ALTCHA_COST = defaults.DEFAULT_ALTCHA_COST
+    ALTCHA_MEMORY_COST = defaults.DEFAULT_ALTCHA_MEMORY_COST
+    ALTCHA_PARALLELISM = defaults.DEFAULT_ALTCHA_PARALLELISM
+
+    REGISTRATION_HINTS: ClassVar[dict[str, str]] = dict(
+        defaults.DEFAULT_REGISTRATION_HINTS
+    )
+
+    # How long to keep auditlog entries
+    AUDITLOG_EXPIRY = defaults.DEFAULT_AUDITLOG_EXPIRY
+
+    # Disable login support status check for superusers
+    SUPPORT_STATUS_CHECK = defaults.DEFAULT_SUPPORT_STATUS_CHECK
+
+    # Auto-watch setting for new users
+    DEFAULT_AUTO_WATCH = defaults.DEFAULT_AUTO_WATCH
+
+    CONTACT_FORM = defaults.DEFAULT_CONTACT_FORM
+
+    PRIVATE_COMMIT_EMAIL_TEMPLATE = defaults.DEFAULT_PRIVATE_COMMIT_EMAIL_TEMPLATE
+    PRIVATE_COMMIT_EMAIL_OPT_IN = defaults.DEFAULT_PRIVATE_COMMIT_EMAIL_OPT_IN
+    PRIVATE_COMMIT_NAME_TEMPLATE = defaults.DEFAULT_PRIVATE_COMMIT_NAME_TEMPLATE
+    PRIVATE_COMMIT_NAME_OPT_IN = defaults.DEFAULT_PRIVATE_COMMIT_NAME_OPT_IN
+
+    # Auth0 provider default image & title on login page
+    SOCIAL_AUTH_AUTH0_IMAGE = defaults.DEFAULT_SOCIAL_AUTH_AUTH0_IMAGE
+    SOCIAL_AUTH_AUTH0_TITLE = defaults.DEFAULT_SOCIAL_AUTH_AUTH0_TITLE
+    SOCIAL_AUTH_SAML_IMAGE = defaults.DEFAULT_SOCIAL_AUTH_SAML_IMAGE
+    SOCIAL_AUTH_SAML_TITLE = defaults.DEFAULT_SOCIAL_AUTH_SAML_TITLE
+
+    # URL for password reset page when using external identity provider
+    PASSWORD_RESET_URL = defaults.DEFAULT_PASSWORD_RESET_URL
+
+    MAXIMAL_PASSWORD_LENGTH = defaults.DEFAULT_MAXIMAL_PASSWORD_LENGTH
+
+    # Multi-level rate limiting for email notifications
+    # Each tuple contains (max_emails, time_window_seconds)
+    RATELIMIT_NOTIFICATION_LIMITS: ClassVar[list[tuple[int, int]]] = list(
+        defaults.DEFAULT_RATELIMIT_NOTIFICATION_LIMITS
+    )
+
+    class Meta:
+        prefix = ""
+
+
+# This is essentially a part for django.core.validators.EmailValidator
+DOT_ATOM_RE = re.compile(
+    r"^[-!#$%&'*+/=?^_`{}|~0-9A-Z]+(\.[-!#$%&'*+/=?^_`{}|~0-9A-Z]+)*\Z", re.IGNORECASE
+)
+
+
+def format_private_commit_data(template: str, username: str, user_id: int) -> str:
+    """Format private commit data (email or name) using a template."""
+    if not template:
+        return ""
+    if username:
+        if username.endswith(".") or ".." in username:
+            # Remove problematic docs
+            username = username.replace(".", "_")
+        if not DOT_ATOM_RE.match(username):
+            # Remove unicode
+            username = unidecode(username)
+        if not DOT_ATOM_RE.match(username) or EMAIL_BLACKLIST.match(username):
+            username = ""
+    if not username:
+        username = f"user-{user_id}"
+
+    return template.format(
+        username=username.lower(),
+        user_id=user_id,
+        site_domain=settings.SITE_DOMAIN.rsplit(":", 1)[0],
+        site_title=settings.SITE_TITLE,
+    )
+
+
+def get_default_contribute_personal_tm() -> bool:
+    """Return default value for personal TM contribution."""
+    return not settings.DEFAULT_AUTOCLEAN_TM
+
+
+class SubscriptionQuerySet(models.QuerySet["Subscription", "Subscription"]):
+    def order(self):
+        """Ordering in project scope by priority."""
+        return self.order_by("user", "scope")
+
+    def prefetch(self):
+        return self.prefetch_related("component", "project")
+
+
+class Subscription(models.Model):
+    SIGNATURE_MAX_AGE: ClassVar[int] = 24 * 3600
+
+    user = models.ForeignKey(User, on_delete=models.deletion.CASCADE)
+    notification = models.CharField(
+        choices=[n.get_choice() for n in NOTIFICATIONS], max_length=100
+    )
+    scope = models.IntegerField(choices=NotificationScope.choices)
+    frequency = models.IntegerField(choices=NotificationFrequency.choices)
+    project = models.ForeignKey(
+        "trans.Project", on_delete=models.deletion.CASCADE, null=True
+    )
+    component = models.ForeignKey(
+        "trans.Component", on_delete=models.deletion.CASCADE, null=True
+    )
+    onetime = models.BooleanField(default=False)
+
+    objects = SubscriptionQuerySet.as_manager()
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        verbose_name = "Notification subscription"
+        verbose_name_plural = "Notification subscriptions"
+        constraints = [  # ruff: ignore[mutable-class-default]
+            models.UniqueConstraint(
+                name="accounts_subscription_notification_unique",
+                fields=("notification", "scope", "project", "component", "user"),
+                nulls_distinct=False,
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user.username}:{self.get_scope_display()},{self.get_notification_display()} ({self.project},{self.component})"
+
+    @staticmethod
+    def sign_id(subscription_id: int | str) -> str:
+        return TimestampSigner().sign(str(subscription_id))
+
+    def get_signed_id(self) -> str:
+        return self.sign_id(self.pk)
+
+    @classmethod
+    async def aget_by_signed_id(cls, signed_id: str) -> Subscription:
+        return await cls.objects.aget(
+            pk=int(TimestampSigner().unsign(signed_id, max_age=cls.SIGNATURE_MAX_AGE))
+        )
+
+    def get_unsubscribe_url(self) -> str:
+        from django.urls import reverse  # ruff: ignore[import-outside-top-level, unsorted-imports]
+
+        # ruff: ignore[import-outside-top-level]
+        from django.utils.http import (
+            urlencode,
+        )
+
+        return f"{reverse('unsubscribe')}?{urlencode({'i': self.get_signed_id()})}"
+
+
+EXTERNAL_CREATE_ACTIVITY = "external-create"
+
+ACCOUNT_ACTIVITY = {
+    # Translators: Audit log entry
+    "password": gettext_lazy("Password changed."),
+    # Translators: Audit log entry
+    "rate-limit": gettext_lazy("Rate limit exceeded for {scope} at {path}."),
+    # Translators: Audit log entry
+    "username": gettext_lazy("Username changed from {old} to {new}."),
+    # Translators: Audit log entry
+    "email": gettext_lazy("E-mail changed from {old} to {new}."),
+    # Translators: Audit log entry
+    "full_name": gettext_lazy("Full name changed from {old} to {new}."),
+    # Translators: Audit log entry
+    "reset-request": gettext_lazy("Password reset requested."),
+    # Translators: Audit log entry
+    "reset": gettext_lazy("Password reset confirmed, password turned off."),
+    # Translators: Audit log entry
+    "auth-connect": gettext_lazy("Configured sign in using {method} ({name})."),
+    # Translators: Audit log entry
+    "auth-disconnect": gettext_lazy("Removed sign in using {method} ({name})."),
+    # Translators: Audit log entry
+    "login": gettext_lazy("Signed in using {method} ({name})."),
+    # Translators: Audit log entry
+    "login-new": gettext_lazy("Signed in using {method} ({name}) from a new device."),
+    # Translators: Audit log entry
+    "register": gettext_lazy("Somebody attempted to register with your e-mail."),
+    # Translators: Audit log entry
+    "connect": gettext_lazy(
+        "Somebody attempted to register using your e-mail address."
+    ),
+    # Translators: Audit log entry
+    "failed-auth": gettext_lazy("Could not sign in using {method} ({name})."),
+    # Translators: Audit log entry
+    "locked": gettext_lazy("Account locked due to many failed sign in attempts."),
+    # Translators: Audit log entry
+    "admin-locked": gettext_lazy("Account locked by the site administrator."),
+    # Translators: Audit log entry
+    "removed": gettext_lazy("Account and all private data removed."),
+    # Translators: Audit log entry
+    "removal-request": gettext_lazy("Account removal confirmation sent to {email}."),
+    # Translators: Audit log entry
+    "tos": gettext_lazy("Agreement with General Terms and Conditions {date}."),
+    # Translators: Audit log entry
+    "invited": gettext_lazy("Invited to {site_title} by {username}."),
+    # Translators: Audit log entry
+    "accepted": gettext_lazy("Accepted invitation from {username}."),
+    # Translators: Audit log entry
+    "trial": gettext_lazy("Started trial period."),
+    # Translators: Audit log entry
+    "sent-email": gettext_lazy("Sent confirmation mail to {email}."),
+    # Translators: Audit log entry
+    "autocreated": gettext_lazy(
+        "The system created a user to track authorship of "
+        "translations uploaded by other user."
+    ),
+    # Translators: Audit log entry
+    EXTERNAL_CREATE_ACTIVITY: gettext_lazy(
+        "Account created externally from weblate.org for access to purchased services."
+    ),
+    # Translators: Audit log entry
+    "blocked": gettext_lazy("Access to project {project} was blocked."),
+    # Translators: Audit log entry
+    "enabled": gettext_lazy("User was enabled by administrator."),
+    # Translators: Audit log entry
+    "disabled": gettext_lazy("User was disabled by administrator."),
+    # Translators: Audit log entry
+    "disabled-expiry": gettext_lazy(
+        "User was disabled because the access has expired."
+    ),
+    # Translators: Audit log entry
+    "sitewide-team-add": gettext_lazy(
+        "User was added to the site-wide {team} team by {username}."
+    ),
+    # Translators: Audit log entry
+    "sitewide-team-change": gettext_lazy(
+        "User access to the site-wide {team} team was changed by {username}."
+    ),
+    # Translators: Audit log entry
+    "sitewide-team-remove": gettext_lazy(
+        "User was removed from the site-wide {team} team by {username}."
+    ),
+    # Translators: Audit log entry
+    "superuser-granted": gettext_lazy("Superuser privileges granted."),
+    # Translators: Audit log entry
+    "superuser-revoked": gettext_lazy("Superuser privileges revoked."),
+    # Translators: Audit log entry
+    "donate": gettext_lazy("Semiannual support status review was displayed."),
+    # Translators: Audit log entry
+    "team-add": gettext_lazy("User was added to the {team} team by {username}."),
+    # Translators: Audit log entry
+    "team-change": gettext_lazy(
+        "User access to the {team} team was changed by {username}."
+    ),
+    # Translators: Audit log entry
+    "team-remove": gettext_lazy("User was removed from the {team} team by {username}."),
+    # Translators: Audit log entry
+    "token-created": gettext_lazy("Project token for {project} was created."),
+    # Translators: Audit log entry
+    "token-removed": gettext_lazy("Project token for {project} was removed."),
+    # Translators: Audit log entry
+    "recovery-generate": gettext_lazy(
+        "Two-factor authentication recovery codes were generated"
+    ),
+    # Translators: Audit log entry
+    "recovery-show": gettext_lazy(
+        "Two-factor authentication recovery codes were viewed"
+    ),
+    # Translators: Audit log entry
+    "twofactor-add": gettext_lazy("Two-factor authentication added: {device}"),
+    # Translators: Audit log entry
+    "twofactor-remove": gettext_lazy("Two-factor authentication removed: {device}"),
+    # Translators: Audit log entry
+    "twofactor-login": gettext_lazy("Two-factor authentication sign in using {device}"),
+    # Translators: Audit log entry
+    "twofactor-failed": gettext_lazy(
+        "Two-factor authentication failed using {device_type}"
+    ),
+}
+AUDIT_WARNING = {
+    "admin-locked",
+    "failed-auth",
+    "locked",
+    "removed",
+    "superuser-granted",
+    "superuser-revoked",
+    "twofactor-failed",
+}
+# Override activity messages based on method
+ACCOUNT_ACTIVITY_METHOD = {
+    "password": {
+        # Translators: Audit log entry
+        "auth-connect": gettext_lazy("Configured password to sign in."),
+        # Translators: Audit log entry
+        "login": gettext_lazy("Signed in using password."),
+        # Translators: Audit log entry
+        "login-new": gettext_lazy("Signed in using password from a new device."),
+        # Translators: Audit log entry
+        "failed-auth": gettext_lazy("Could not sign in using password."),
+    },
+    "project": {
+        # Translators: Audit log entry
+        "invited": gettext_lazy("Invited to {project} by {username}."),
+    },
+    "configured": {
+        # Translators: Audit log entry
+        "password": gettext_lazy("Password configured."),
+    },
+}
+
+EXTRA_MESSAGES = {
+    # Translators: Audit log hint
+    "locked": gettext_lazy(
+        "To restore access to your account, please reset your password."
+    ),
+    # Translators: Audit log hint
+    "blocked": gettext_lazy(
+        "Please contact project maintainers if you feel this is inappropriate."
+    ),
+    # Translators: Audit log hint
+    "register": gettext_lazy(
+        "If it was you, reset your password to regain access to your account."
+    ),
+    # Translators: Audit log hint
+    "connect": gettext_lazy(
+        "If it was you, reset your password to regain access to your account."
+    ),
+}
+
+NOTIFY_ACTIVITY = {
+    "password",
+    "reset",
+    "auth-connect",
+    "auth-disconnect",
+    "register",
+    "connect",
+    "locked",
+    "removed",
+    "login-new",
+    "email",
+    "username",
+    "full_name",
+    "blocked",
+    "recovery-generate",
+    "recovery-show",
+    "superuser-granted",
+    "superuser-revoked",
+    "twofactor-add",
+    "twofactor-remove",
+    "twofactor-failed",
+}
+
+
+# Taken from https://github.com/selwin/python-user-agents/blob/master/user_agents/parsers.py
+USER_AGENT_DEVICE_TYPES: dict[str, StrOrPromise] = {
+    # Translators: User agent device type
+    "PC": pgettext_lazy("User agent device type", "PC"),
+    # Translators: User agent device type
+    "Other": pgettext_lazy("User agent device type", "Other"),
+    # Translators: User agent device type
+    "Generic Smartphone": pgettext_lazy("User agent device type", "Generic Smartphone"),
+    # Translators: User agent device type
+    "Generic Feature Phone": pgettext_lazy(
+        "User agent device type", "Generic Feature Phone"
+    ),
+    # Translators: User agent device type
+    "iOS-Device": pgettext_lazy("User agent device type", "iOS-Device"),
+}
+
+
+class AuditLogManager(models.Manager):
+    def is_new_login(self, user: User, address, user_agent) -> bool:
+        """
+        Check whether this login is coming from a new device.
+
+        Currently based purely on the IP address.
+        """
+        logins = self.filter(user=user, activity="login-new")
+
+        # First login
+        if not logins.exists():
+            return False
+
+        return not logins.filter(Q(address=address) | Q(user_agent=user_agent)).exists()
+
+    def create(  # type: ignore[override]
+        self, user: User, request: HttpRequest | None, activity: str, **params
+    ):
+        address: str | None = None
+        user_agent: str = ""
+        # Log only address for own actions (unauthenticated or when the request user matches audit user)
+        if request and (
+            not hasattr(request, "user")
+            or not request.user
+            or not request.user.is_authenticated
+            or request.user == user
+        ):
+            address = get_ip_address(request)
+            user_agent = get_user_agent(request)
+        if activity == "login" and self.is_new_login(user, address, user_agent):
+            activity = "login-new"
+        return super().create(
+            user=user,
+            activity=activity,
+            address=address,
+            user_agent=user_agent,
+            params=params,
+        )
+
+
+class AuditLogQuerySet(models.QuerySet["AuditLog", "AuditLog"]):
+    def get_after(self, user: User, after: str, activity: str) -> AuditLogQuerySet:
+        """
+        Get user activities of given type after another activity.
+
+        This is mostly used for rate limiting, as it can return the number of failed
+        authentication attempts since last login.
+        """
+        try:
+            latest_login = self.filter(
+                user=user, activity__in={after, "reset"}
+            ).order()[0]
+            kwargs = {"timestamp__gte": latest_login.timestamp}
+        except IndexError:
+            kwargs = {}
+        return self.filter(user=user, activity=activity, **kwargs)
+
+    def get_past_passwords(self, user: User):
+        """Get user activities with password change."""
+        start = timezone.now() - datetime.timedelta(days=settings.AUTH_PASSWORD_DAYS)
+        return self.filter(
+            user=user, activity__in=("reset", "password"), timestamp__gt=start
+        )
+
+    def order(self):
+        return self.order_by("-timestamp")
+
+
+class AuditLog(models.Model):
+    """User audit log storage."""
+
+    user = models.ForeignKey(User, on_delete=models.deletion.CASCADE, null=True)
+    activity = models.CharField(
+        max_length=20,
+        choices=[(a, a) for a in sorted(ACCOUNT_ACTIVITY.keys())],
+        db_index=True,
+    )
+    params = models.JSONField(default=dict)
+    address = models.GenericIPAddressField(null=True)
+    user_agent = models.CharField(max_length=200, default="")
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    objects = AuditLogManager.from_queryset(AuditLogQuerySet)()
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        verbose_name = "Audit log entry"
+        verbose_name_plural = "Audit log entries"
+
+    def __str__(self) -> str:
+        if self.user:
+            return f"{self.activity} for {self.user.username} from {self.address}"
+        return f"{self.activity} from {self.address}"
+
+    def save(self, *args, **kwargs) -> None:
+        super().save(*args, **kwargs)
+
+        # User notification
+        if self.should_notify() and self.user:
+            email = self.user.email
+            notify_auditlog.delay_on_commit(self.pk, email)
+
+        # Log event
+        LOGGER.log(
+            logging.WARNING if self.activity in AUDIT_WARNING else logging.INFO,
+            "audit[%s]: %s from %s",
+            self.activity,
+            self.user.username if self.user else "<no-user>",
+            self.address,
+        )
+
+    def get_params(self) -> dict[str, Any]:
+        from weblate.accounts.templatetags.authnames import (  # ruff: ignore[import-outside-top-level]
+            get_auth_name,
+        )
+
+        result: dict[str, Any] = {
+            "site_title": settings.SITE_TITLE,
+        }
+        for name, value in self.params.items():
+            if value is None:
+                value = format_html("<em>{}</em>", value)
+            elif name in {
+                "old",
+                "new",
+                "name",
+                "email",
+                "username",
+                "scope",
+                "path",
+            }:
+                value = format_html("<code>{}</code>", mail_quote_value(value))
+            elif name == "method":
+                value = format_html("<strong>{}</strong>", get_auth_name(value))
+            elif name in {"device", "project", "site_title"}:
+                value = format_html("<strong>{}</strong>", mail_quote_value(value))
+
+            result[name] = value
+
+        return result
+
+    @admin.display(description=gettext_lazy("Account activity"))
+    def get_message(self):
+        method = self.params.get("method")
+        activity = self.activity
+        if activity in ACCOUNT_ACTIVITY_METHOD.get(method, {}):
+            message = ACCOUNT_ACTIVITY_METHOD[method][activity]
+        else:
+            message = ACCOUNT_ACTIVITY[activity]
+        return format_html(str(message), **self.get_params())
+
+    def get_extra_message(self) -> str | None:
+        if self.activity in {
+            "superuser-granted",
+            "superuser-revoked",
+            "token-created",
+            "token-removed",
+        } and self.params.get("username"):
+            return gettext("Triggered by {username}.").format(**self.params)
+        if self.activity in EXTRA_MESSAGES:
+            return EXTRA_MESSAGES[self.activity].format(**self.params)
+        return None
+
+    def get_user_agent_display(self) -> str:
+        """Return a user agent string with a localized first device-type segment."""
+        ua_string = self.user_agent
+        if not ua_string:
+            return ""
+
+        parts = ua_string.split(" / ")
+        device_type = parts[0].strip()
+        parts[0] = str(USER_AGENT_DEVICE_TYPES.get(device_type, device_type))
+
+        return " / ".join(parts)
+
+    def should_notify(self) -> bool:
+        return (
+            self.user is not None
+            and not self.user.is_bot
+            and self.user.is_active
+            and self.user.email
+            and self.activity in NOTIFY_ACTIVITY
+            and not self.params.get("skip_notify")
+        )
+
+    def check_rate_limit(self, request: AuthenticatedHttpRequest) -> bool:
+        """Check whether the activity should be rate limited."""
+        # ruff: ignore[import-outside-top-level]
+        from weblate.accounts.utils import (
+            lock_user,
+        )
+
+        if (
+            self.activity == "failed-auth"
+            and self.user
+            and self.user.has_usable_password()
+        ):
+            failures = AuditLog.objects.get_after(self.user, "login", "failed-auth")
+            if failures.count() >= settings.AUTH_LOCK_ATTEMPTS:
+                lock_user(self.user, "locked", request, regenerate_api_key=False)
+                return True
+
+        elif (
+            self.activity == "twofactor-failed"
+            and self.user
+            and self.user.has_usable_password()
+        ):
+            failures = AuditLog.objects.get_after(
+                self.user, "twofactor-login", "twofactor-failed"
+            )
+            if failures.count() >= settings.AUTH_LOCK_ATTEMPTS:
+                lock_user(self.user, "locked", request, regenerate_api_key=False)
+                return True
+
+        elif self.activity == "reset-request":
+            failures = AuditLog.objects.filter(
+                user=self.user,
+                timestamp__gte=timezone.now() - datetime.timedelta(days=1),
+                activity="reset-request",
+            )
+            if failures.count() >= settings.AUTH_LOCK_ATTEMPTS:
+                return True
+
+        return False
+
+    @property
+    def shortened_address(self) -> str:
+        if not self.address:
+            return ""
+        network = ip_network(self.address)
+        prefix_len = 48 if isinstance(network, IPv6Network) else 16
+        supernet = network.supernet(new_prefix=prefix_len)
+        return str(supernet.network_address)
+
+
+class VerifiedEmail(models.Model):
+    """Storage for verified e-mails from auth backends."""
+
+    is_deliverable = models.BooleanField(default=True)
+    social = models.ForeignKey(UserSocialAuth, on_delete=models.deletion.CASCADE)
+    email = EmailField()
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        verbose_name = "Verified e-mail"
+        verbose_name_plural = "Verified e-mails"
+        indexes = [  # ruff: ignore[mutable-class-default]
+            models.Index(
+                Upper("email"),
+                name="accounts_verifiedemail_email",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.social.user.username} - {self.email}"
+
+    @property
+    def provider(self):
+        return self.social.provider
+
+
+class Profile(models.Model):
+    """User profiles storage."""
+
+    user = models.OneToOneField(
+        User, unique=True, editable=False, on_delete=models.deletion.CASCADE
+    )
+    language = models.CharField(
+        verbose_name=gettext_lazy("Interface Language"),
+        max_length=10,
+        choices=settings.LANGUAGES,
+    )
+    languages = models.ManyToManyField(
+        Language,
+        verbose_name=gettext_lazy("Translated languages"),
+        blank=True,
+        help_text=gettext_lazy(
+            "Choose the languages you can translate to. "
+            "These will be offered to you on the dashboard "
+            "for easier access to your chosen translations."
+        ),
+    )
+    secondary_languages = models.ManyToManyField(
+        Language,
+        verbose_name=gettext_lazy("Secondary languages"),
+        help_text=gettext_lazy(
+            "Choose languages you can understand, strings in those languages "
+            "will be shown in addition to the source string."
+        ),
+        related_name="secondary_profile_set",
+        blank=True,
+    )
+    suggested = models.IntegerField(default=0, db_index=True)
+    translated = models.IntegerField(default=0, db_index=True)
+    uploaded = models.IntegerField(default=0, db_index=True)
+    commented = models.IntegerField(default=0, db_index=True)
+    theme = models.CharField(
+        max_length=10,
+        verbose_name=gettext_lazy("Theme"),
+        default="auto",
+        choices=ThemeChoices,
+    )
+    hide_completed = models.BooleanField(
+        verbose_name=gettext_lazy("Hide completed translations on the dashboard"),
+        default=False,
+    )
+    secondary_in_zen = models.BooleanField(
+        verbose_name=gettext_lazy("Show secondary translations in the Zen mode"),
+        default=True,
+    )
+    hide_source_secondary = models.BooleanField(
+        verbose_name=gettext_lazy("Hide source if a secondary translation exists"),
+        default=False,
+    )
+    wide_tables = models.BooleanField(
+        verbose_name=gettext_lazy(
+            "Show all columns in lists using horizontal scrolling"
+        ),
+        default=False,
+        help_text=gettext_lazy(
+            "Instead of hiding columns on narrow screens, keep all columns and "
+            "scroll the table horizontally."
+        ),
+    )
+    editor_link = models.CharField(
+        default="",
+        blank=True,
+        max_length=200,
+        verbose_name=gettext_lazy("Editor link"),
+        help_text=gettext_lazy(
+            "Enter a custom URL to be used as link to the source code. "
+            "You can use {{branch}} for branch, "
+            "{{filename}} and {{line}} as filename and line placeholders."
+        ),
+        validators=[validate_editor],
+    )
+    TRANSLATE_FULL = 0
+    TRANSLATE_ZEN = 1
+    translate_mode = models.IntegerField(
+        verbose_name=gettext_lazy("Translation editor mode"),
+        choices=(
+            (TRANSLATE_FULL, gettext_lazy("Full editor")),
+            (TRANSLATE_ZEN, gettext_lazy("Zen mode")),
+        ),
+        default=TRANSLATE_FULL,
+    )
+    ZEN_VERTICAL = 0
+    ZEN_HORIZONTAL = 1
+    zen_mode = models.IntegerField(
+        verbose_name=gettext_lazy("Zen editor mode"),
+        choices=(
+            (ZEN_VERTICAL, gettext_lazy("Top to bottom")),
+            (ZEN_HORIZONTAL, gettext_lazy("Side by side")),
+        ),
+        default=ZEN_VERTICAL,
+    )
+    special_chars = models.CharField(
+        default="",
+        blank=True,
+        max_length=30,
+        verbose_name=gettext_lazy("Special characters"),
+        help_text=gettext_lazy(
+            "You can specify additional special visual keyboard characters "
+            "to be shown while translating. It can be useful for "
+            "characters you use frequently, but are hard to type on your keyboard."
+        ),
+    )
+    nearby_strings = models.SmallIntegerField(
+        verbose_name=gettext_lazy("Number of nearby strings"),
+        default=settings.NEARBY_MESSAGES,
+        validators=[MinValueValidator(1), MaxValueValidator(50)],
+        help_text=gettext_lazy(
+            "Number of nearby strings to show in each direction in the full editor."
+        ),
+    )
+    auto_watch = models.BooleanField(
+        verbose_name=gettext_lazy("Automatically watch projects on contribution"),
+        default=settings.DEFAULT_AUTO_WATCH,
+        help_text=gettext_lazy(
+            "Projects are added to your watched projects when you contribute to them."
+        ),
+    )
+    contribute_personal_tm = models.BooleanField(
+        verbose_name=gettext_lazy("Contribute to personal translation memory"),
+        default=get_default_contribute_personal_tm,
+        help_text=gettext_lazy(
+            "Allow your translations to be added to your personal translation memory."
+        ),
+    )
+
+    DASHBOARD_WATCHED = 1
+    DASHBOARD_COMPONENT_LIST = 4
+    DASHBOARD_SUGGESTIONS = 5
+    DASHBOARD_COMPONENT_LISTS = 6
+    DASHBOARD_MANAGED = 7
+
+    DASHBOARD_CHOICES = (
+        (DASHBOARD_WATCHED, gettext_lazy("Watched translations")),
+        (DASHBOARD_COMPONENT_LISTS, gettext_lazy("All component lists")),
+        (DASHBOARD_COMPONENT_LIST, gettext_lazy("Component list")),
+        (DASHBOARD_SUGGESTIONS, gettext_lazy("Suggested translations")),
+        (DASHBOARD_MANAGED, gettext_lazy("Managed projects")),
+    )
+
+    DASHBOARD_SLUGS: ClassVar[dict[int, str]] = {
+        DASHBOARD_WATCHED: "your-subscriptions",
+        DASHBOARD_COMPONENT_LIST: "list",
+        DASHBOARD_SUGGESTIONS: "suggestions",
+        DASHBOARD_COMPONENT_LISTS: "componentlists",
+        DASHBOARD_MANAGED: "managed",
+    }
+
+    dashboard_view = models.IntegerField(
+        choices=DASHBOARD_CHOICES,
+        verbose_name=gettext_lazy("Default dashboard view"),
+        default=DASHBOARD_WATCHED,
+    )
+
+    dashboard_component_list = models.ForeignKey(
+        "trans.ComponentList",
+        verbose_name=gettext_lazy("Default component list"),
+        on_delete=models.deletion.SET_NULL,
+        blank=True,
+        null=True,
+    )
+
+    watched = models.ManyToManyField(
+        "trans.Project",
+        verbose_name=gettext_lazy("Watched projects"),
+        help_text=gettext_lazy(
+            "You can receive notifications for watched projects and "
+            "they are shown on the dashboard by default."
+        ),
+        blank=True,
+    )
+
+    # Public profile fields
+    website = models.URLField(
+        verbose_name=gettext_lazy("Website URL"),
+        blank=True,
+        validators=[WeblateURLValidator(), validate_profile_url],
+    )
+    contact = models.URLField(
+        verbose_name=gettext_lazy("Contact URL"),
+        blank=True,
+        validators=[WeblateURLValidator(), validate_contact_url],
+        help_text=gettext_lazy(
+            "Link to contact you online using services like Signal, SimpleX or Telegram."
+        ),
+    )
+    liberapay = models.SlugField(
+        verbose_name=gettext_lazy("Liberapay username"),
+        blank=True,
+        help_text=gettext_lazy(
+            "Liberapay is a platform to donate money to teams, "
+            "organizations and individuals."
+        ),
+        db_index=False,
+    )
+    fediverse = models.URLField(
+        verbose_name=gettext_lazy("Fediverse URL"),
+        blank=True,
+        help_text=gettext_lazy(
+            "Link to your Fediverse profile for federated services "
+            "like Mastodon or diaspora*."
+        ),
+        validators=[WeblateURLValidator(), validate_fediverse_url],
+    )
+    codesite = models.URLField(
+        verbose_name=gettext_lazy("Code site URL"),
+        blank=True,
+        help_text=gettext_lazy(
+            "Link to your code profile for services like Codeberg or GitLab."
+        ),
+        validators=[WeblateURLValidator(), validate_code_site_url],
+    )
+    github = models.SlugField(
+        verbose_name=gettext_lazy("GitHub username"),
+        blank=True,
+        db_index=False,
+    )
+    twitter = models.SlugField(
+        verbose_name=gettext_lazy("X username"),
+        blank=True,
+        db_index=False,
+    )
+    linkedin = models.SlugField(
+        verbose_name=gettext_lazy("LinkedIn profile name"),
+        help_text=gettext_lazy(
+            "Your LinkedIn profile name from linkedin.com/in/profilename"
+        ),
+        blank=True,
+        db_index=False,
+        allow_unicode=True,
+    )
+    location = models.CharField(
+        verbose_name=gettext_lazy("Location"),
+        max_length=100,
+        blank=True,
+    )
+    company = models.CharField(
+        verbose_name=gettext_lazy("Company"),
+        max_length=100,
+        blank=True,
+    )
+    public_email = EmailField(
+        verbose_name=gettext_lazy("Public e-mail"),
+        blank=True,
+        max_length=EMAIL_LENGTH,
+    )
+
+    commit_email = EmailField(
+        verbose_name=gettext_lazy("Commit e-mail"),
+        blank=True,
+        max_length=EMAIL_LENGTH,
+    )
+
+    class CommitNameChoices(models.IntegerChoices):
+        DEFAULT = 0, gettext_lazy("Use global default")
+        PUBLIC = 1, gettext_lazy("Public")
+        PRIVATE = 2, gettext_lazy("Private")
+
+    commit_name = models.IntegerField(
+        verbose_name=gettext_lazy("Commit name"),
+        default=CommitNameChoices.DEFAULT,
+        choices=CommitNameChoices.choices,
+    )
+
+    last_2fa = models.CharField(
+        choices=(
+            ("", "None"),
+            ("totp", "TOTP"),
+            ("webauthn", "WebAuthn"),
+        ),
+        blank=True,
+        default="",
+        max_length=15,
+    )
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        verbose_name = "User profile"
+        verbose_name_plural = "User profiles"
+
+    def __str__(self) -> str:
+        return self.user.username
+
+    def get_absolute_url(self) -> str:
+        return self.user.get_absolute_url()
+
+    def get_user_display(self):
+        return get_user_display(self.user)
+
+    def get_user_display_link(self):
+        return get_user_display(self.user, True, True)
+
+    def get_user_name(self):
+        return get_user_display(self.user, False)
+
+    def get_fediverse_share(self):
+        if not self.fediverse:
+            return None
+        parsed = urlparse(self.fediverse)
+        if not parsed.hostname:
+            return None
+        return parsed._replace(path="/share", query="text=", fragment="").geturl()
+
+    def watch_on_contribution(self, project: Project) -> bool:
+        """Watch project when auto-watch on contribution is enabled."""
+        if (
+            self.user.is_anonymous
+            or not self.auto_watch
+            or self.watched.filter(pk=project.pk).exists()
+        ):
+            return False
+        self.watched.add(project)
+        return True
+
+    def increase_count(self, item: str, increase: int = 1) -> None:
+        """Update user actions counter."""
+        # Update our copy
+        setattr(self, item, getattr(self, item) + increase)
+        # Update database
+        update = {item: F(item) + increase}
+        Profile.objects.filter(pk=self.pk).update(**update)
+
+    @cached_property
+    def all_languages(self):
+        return self.languages.all()
+
+    @property
+    def full_name(self):
+        """User's full name."""
+        return self.user.full_name
+
+    def clean(self) -> None:
+        """Check if component list is chosen when required."""
+        # There is matching logic in ProfileBaseForm.add_error to ignore this
+        # validation on partial forms
+        if (
+            self.dashboard_view == Profile.DASHBOARD_COMPONENT_LIST
+            and self.dashboard_component_list is None
+        ):
+            message = gettext(
+                "Please choose which component list you want to display on "
+                "the dashboard."
+            )
+            raise ValidationError(
+                {"dashboard_component_list": message, "dashboard_view": message}
+            )
+        if (
+            self.dashboard_view != Profile.DASHBOARD_COMPONENT_LIST
+            and self.dashboard_component_list is not None
+        ):
+            message = gettext(
+                "Selecting component list has no effect when not shown on "
+                "the dashboard."
+            )
+            raise ValidationError(
+                {"dashboard_component_list": message, "dashboard_view": message}
+            )
+
+    def dump_data(self):
+        def map_attr(attr):
+            if attr.endswith("_id"):
+                return attr[:-3]
+            return attr
+
+        def dump_object(obj, *attrs):
+            return {map_attr(attr): getattr(obj, attr) for attr in attrs}
+
+        result = {
+            "basic": dump_object(
+                self.user, "username", "full_name", "email", "date_joined"
+            ),
+            "profile": dump_object(
+                self,
+                "language",
+                "suggested",
+                "translated",
+                "uploaded",
+                "hide_completed",
+                "theme",
+                "secondary_in_zen",
+                "hide_source_secondary",
+                "wide_tables",
+                "editor_link",
+                "translate_mode",
+                "zen_mode",
+                "special_chars",
+                "dashboard_view",
+                "dashboard_component_list_id",
+            ),
+            "auditlog": [
+                dump_object(log, "address", "user_agent", "timestamp", "activity")
+                for log in self.user.auditlog_set.iterator()
+            ],
+        }
+        result["profile"]["languages"] = [
+            lang.code for lang in self.languages.iterator()
+        ]
+        result["profile"]["secondary_languages"] = [
+            lang.code for lang in self.secondary_languages.iterator()
+        ]
+        result["profile"]["watched"] = [
+            project.slug for project in self.watched.iterator()
+        ]
+        return result
+
+    @cached_property
+    def primary_language_ids(self) -> set[int]:
+        return {language.pk for language in self.all_languages}
+
+    @cached_property
+    def allowed_dashboard_component_lists(self):
+        return ComponentList.objects.filter(
+            show_dashboard=True,
+            components__project__in=self.user.allowed_projects,
+        ).distinct()
+
+    @cached_property
+    def secondary_language_ids(self) -> set[int]:
+        return set(self.secondary_languages.values_list("pk", flat=True))
+
+    def get_translation_orderer(
+        self, request: AuthenticatedHttpRequest | None
+    ) -> Callable[
+        [
+            Unit
+            | Translation
+            | Language
+            | ProjectLanguageStats
+            | CategoryLanguageStats
+            | GhostProjectLanguageStats
+            | GhostCategoryLanguageStats
+            | GhostTranslation
+        ],
+        str,
+    ]:
+        """Create a function suitable for ordering languages based on user preferences."""
+
+        def get_translation_order(
+            obj: Unit
+            | Translation
+            | Language
+            | ProjectLanguageStats
+            | CategoryLanguageStats
+            | GhostProjectLanguageStats
+            | GhostCategoryLanguageStats
+            | GhostTranslation,
+        ) -> str:
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.models import (
+                Unit,
+            )
+
+            language: Language
+            is_source = False
+            if isinstance(obj, Language):
+                language = obj
+            elif isinstance(obj, Unit):
+                translation = obj.translation
+                language = translation.language
+                is_source = translation.is_source
+            elif isinstance(
+                obj,
+                (
+                    Translation,
+                    ProjectLanguageStats,
+                    CategoryLanguageStats,
+                    GhostProjectLanguageStats,
+                    GhostCategoryLanguageStats,
+                    GhostTranslation,
+                ),
+            ):
+                language = obj.language
+                is_source = obj.is_source
+            else:
+                message = f"{obj.__class__.__name__} is not supported"
+                raise TypeError(message)
+
+            if language.pk in self.primary_language_ids:
+                priority = 0
+            elif language.pk in self.secondary_language_ids:
+                priority = 1
+            elif (
+                not self.primary_language_ids
+                and request is not None
+                and language == request.accepted_language
+            ):
+                priority = 2
+            elif is_source:
+                priority = 3
+            else:
+                priority = 4
+
+            return f"{priority}-{language}"
+
+        return get_translation_order
+
+    def fixup_profile(self, request: AuthenticatedHttpRequest) -> None:
+        fields = set()
+        if not self.language:
+            self.language = get_language()
+            fields.add("language")
+
+        allowed = {clist.pk for clist in self.allowed_dashboard_component_lists}
+
+        if not allowed and self.dashboard_view in {
+            Profile.DASHBOARD_COMPONENT_LIST,
+            Profile.DASHBOARD_COMPONENT_LISTS,
+        }:
+            self.dashboard_view = Profile.DASHBOARD_WATCHED
+            fields.add("dashboard_view")
+
+        if self.dashboard_component_list_id and (
+            self.dashboard_component_list_id not in allowed
+            or self.dashboard_view != Profile.DASHBOARD_COMPONENT_LIST
+        ):
+            self.dashboard_component_list = None
+            self.dashboard_view = Profile.DASHBOARD_WATCHED
+            fields.add("dashboard_view")
+            fields.add("dashboard_component_list")
+
+        if (
+            not self.dashboard_component_list_id
+            and self.dashboard_view == Profile.DASHBOARD_COMPONENT_LIST
+        ):
+            self.dashboard_view = Profile.DASHBOARD_WATCHED
+            fields.add("dashboard_view")
+
+        if not self.languages.exists():
+            language = Language.objects.get_request_language(request)
+            if language:
+                self.languages.add(language)
+                messages.info(
+                    request,
+                    gettext(
+                        "Added %(language)s to your translated languages. "
+                        "You can adjust them in the settings."
+                    )
+                    % {"language": language},
+                )
+
+        if fields:
+            self.save(update_fields=fields)
+
+    def get_commit_email(self) -> str:
+        email = self.commit_email
+        if (
+            not email
+            and not settings.PRIVATE_COMMIT_EMAIL_OPT_IN
+            and not self.user.is_bot
+        ):
+            email = self.get_site_commit_email()
+        if not email:
+            email = self.user.email
+        return email
+
+    def get_site_commit_email(self) -> str:
+        return format_private_commit_data(
+            settings.PRIVATE_COMMIT_EMAIL_TEMPLATE, self.user.username, self.user.pk
+        )
+
+    def get_commit_name(self) -> str:
+        """Return the commit name to be used for version-control commits."""
+        visible_name = self.user.get_visible_name()
+        if (
+            self.user.is_bot
+            or self.commit_name == self.CommitNameChoices.PUBLIC
+            or (
+                self.commit_name == self.CommitNameChoices.DEFAULT
+                and settings.PRIVATE_COMMIT_NAME_OPT_IN
+            )
+        ):
+            return visible_name
+        return self.get_site_commit_name() or visible_name
+
+    def get_commit_name_choices(
+        self,
+    ) -> list[tuple[Profile.CommitNameChoices, StrOrPromise]]:
+        site_name = self.get_site_commit_name()
+        if not settings.PRIVATE_COMMIT_NAME_OPT_IN and site_name:
+            default_label = gettext_lazy("Use anonymous account name")
+        else:
+            default_label = gettext_lazy("Use account name")
+        name_choices = [
+            (Profile.CommitNameChoices.DEFAULT, default_label),
+            (Profile.CommitNameChoices.PUBLIC, self.user.get_visible_name()),
+        ]
+        if site_name:
+            name_choices.append((Profile.CommitNameChoices.PRIVATE, site_name))
+        return name_choices
+
+    def get_commit_email_choices(self) -> list[tuple[str, StrOrPromise]]:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.accounts.utils import get_all_user_mails
+
+        commit_emails = get_all_user_mails(self.user, filter_deliverable=False)
+        choices = [("", gettext_lazy("Use account e-mail address"))]
+
+        if site_commit_email := self.get_site_commit_email():
+            if not settings.PRIVATE_COMMIT_EMAIL_OPT_IN:
+                choices = [("", site_commit_email)]
+            else:
+                commit_emails.add(site_commit_email)
+
+        choices.extend((x, x) for x in sorted(commit_emails))
+        return choices
+
+    def get_public_email_choices(self) -> list[tuple[str, StrOrPromise]]:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.accounts.utils import get_all_user_mails
+
+        choices = [
+            ("", gettext_lazy("Hide e-mail address from public view")),
+        ]
+        choices.extend(
+            (x, x)
+            for x in sorted(get_all_user_mails(self.user, filter_deliverable=True))
+        )
+        return choices
+
+    def get_site_commit_name(self) -> str:
+        """Return the generated private commit name from the site template."""
+        return format_private_commit_data(
+            settings.PRIVATE_COMMIT_NAME_TEMPLATE, self.user.username, self.user.pk
+        )
+
+    def _get_second_factors(self) -> Iterable[Device]:
+        backend: type[Device]
+        for backend in (StaticDevice, TOTPDevice, WebAuthnCredential):
+            yield from backend.objects.filter(user=self.user)
+
+    @cached_property
+    def second_factors(self) -> list[Device]:
+        return list(self._get_second_factors())
+
+    @cached_property
+    def second_factor_types(self) -> set[Literal["totp", "webauthn", "recovery"]]:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.accounts.utils import (
+            get_key_type,
+        )
+
+        return {get_key_type(device) for device in self.second_factors}
+
+    @property
+    def has_2fa(self) -> bool:
+        return any(
+            isinstance(device, (TOTPDevice, WebAuthnCredential))
+            for device in self.second_factors
+        )
+
+    def log_2fa(self, request: AuthenticatedHttpRequest, device: Device) -> None:
+        from weblate.accounts.utils import (  # ruff: ignore[import-outside-top-level]
+            get_key_name,
+            get_key_type,
+        )
+
+        # Audit log entry
+        AuditLog.objects.create(
+            self.user, request, "twofactor-login", device=get_key_name(device)
+        )
+        # Store preferred method (skipping recovery codes)
+        device_type = get_key_type(device)
+        if device_type not in {self.last_2fa, "recovery"}:
+            self.last_2fa = device_type
+            self.save(update_fields=["last_2fa"])
+
+    def log_2fa_failed(
+        self, request: AuthenticatedHttpRequest, device_type: DeviceType
+    ) -> None:
+        AuditLog.objects.create(
+            self.user, request, "twofactor-failed", device_type=device_type
+        )
+
+    def get_second_factor_type(self) -> Literal["totp", "webauthn"]:
+        if self.last_2fa in self.second_factor_types:
+            return self.last_2fa  # type: ignore[return-value]
+        for tested in ("webauthn", "totp"):
+            if tested in self.second_factor_types:
+                return tested
+        msg = "No second factor available!"
+        raise ValueError(msg)
+
+
+def set_lang_cookie(response, profile) -> None:
+    """Set session language based on user preferences."""
+    if profile.language:
+        response.set_cookie(
+            settings.LANGUAGE_COOKIE_NAME,
+            profile.language,
+            max_age=settings.LANGUAGE_COOKIE_AGE,
+            path=settings.LANGUAGE_COOKIE_PATH,
+            domain=settings.LANGUAGE_COOKIE_DOMAIN,
+            secure=settings.LANGUAGE_COOKIE_SECURE,
+            httponly=settings.LANGUAGE_COOKIE_HTTPONLY,
+            samesite=settings.LANGUAGE_COOKIE_SAMESITE,
+        )
+
+
+@receiver(user_logged_in)
+def post_login_handler(
+    sender, request: AuthenticatedHttpRequest, user: User, **kwargs
+) -> None:
+    """
+    Signal handler for post login.
+
+    It sets user language and migrates profile if needed.
+    """
+    backend_name = getattr(user, "backend", "")
+    is_email_auth = backend_name.endswith((".EmailAuth", ".WeblateUserBackend"))
+
+    # Warning about setting password
+    if is_email_auth and not user.has_usable_password():
+        request.session["show_set_password"] = True
+
+    # Redirect superuser to donate page twice a year
+    if (
+        settings.SUPPORT_STATUS_CHECK
+        and user.is_superuser
+        and not get_support_status(request)["has_support"]
+        and not user.auditlog_set.filter(
+            timestamp__gt=now() - timedelta(days=180), activity="donate"
+        ).exists()
+        and Change.objects.filter(timestamp__lt=now() - timedelta(days=14)).exists()
+    ):
+        request.session["redirect_to_donate"] = True
+
+    # Migrate django-registration based verification to python-social-auth
+    # and handle external authentication such as LDAP
+    if (
+        is_email_auth
+        and user.has_usable_password()
+        and user.email
+        and not user.social_auth.filter(provider="email").exists()
+    ):
+        social = user.social_auth.create(provider="email", uid=user.email)
+        VerifiedEmail.objects.create(social=social, email=user.email)
+
+    # Fixup accounts with empty name
+    if not user.full_name:
+        user.full_name = user.username
+        user.save(update_fields=["full_name"])
+
+    # Warn about not set e-mail
+    if not user.email:
+        messages.error(
+            request,
+            gettext("Please provide an e-mail address for submitting translations."),
+        )
+
+    # Sanitize profile
+    user.profile.fixup_profile(request)
+
+
+@receiver(post_save, sender=User)
+@disable_for_loaddata
+def create_profile_callback(sender, instance, created=False, **kwargs) -> None:
+    """Automatically create token and profile for user."""
+    if created:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.accounts.utils import (
+            create_api_token,
+        )
+
+        # Create API token
+        instance.auth_token = create_api_token(instance)
+        # Create profile
+        instance.profile = Profile.objects.create(user=instance)
+        # Create subscriptions
+        if not instance.is_anonymous and not instance.is_bot:
+            create_default_notifications(instance)

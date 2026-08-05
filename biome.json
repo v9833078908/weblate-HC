@@ -1,0 +1,83 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.6/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!**/*.svg",
+      "!**/*.html",
+      "!weblate/trans/tests/data/**/*.ts",
+      "!weblate/static/vendor",
+      "!weblate/trans/tests/data/memory-broken.json",
+      "!weblate/templates/site.webmanifest",
+      "!weblate/templates/configuration/custom.css",
+      "!weblate/static/js/vendor",
+      "!weblate/static/styles/vendor"
+    ]
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noParameterAssign": "error",
+        "useDefaultParameterLast": "error",
+        "useSelfClosingElements": "error",
+        "useSingleVarDeclarator": "error",
+        "useNumberNamespace": "error",
+        "useConsistentBuiltinInstantiation": "error",
+        "noDescendingSpecificity": "off",
+        "noUselessElse": "error"
+      },
+      "suspicious": {
+        "noVar": "error",
+        "useGuardForIn": "error"
+      },
+      "complexity": {
+        "noImportantStyles": "off"
+      }
+    }
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space"
+  },
+  "javascript": {
+    "globals": [
+      "hotkeys",
+      "gettext",
+      "ngettext",
+      "Cookies",
+      "submitForm",
+      "autosize",
+      "WLT",
+      "addAlert",
+      "increaseLoading",
+      "decreaseLoading",
+      "initHighlight",
+      "Prism",
+      "interpolate",
+      "django",
+      "slugify",
+      "Tribute",
+      "autoComplete",
+      "moment"
+    ]
+  },
+  "json": {
+    "formatter": {
+      "enabled": false
+    }
+  }
+}

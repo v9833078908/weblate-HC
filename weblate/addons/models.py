@@ -1,0 +1,1053 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+import contextlib
+import logging
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal
+
+from appconf import AppConf
+from django.db import Error as DjangoDatabaseError
+from django.db import models, transaction
+from django.db.models import Q
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.urls import reverse
+from django.utils.functional import cached_property
+from django.utils.translation import gettext
+
+from weblate.logger import LOGGER
+from weblate.trans.actions import ActionEvents
+from weblate.trans.models import Alert, Category, Change, Component, Project, Unit
+from weblate.trans.signals import (
+    change_bulk_create,
+    component_post_update,
+    translation_post_add,
+    translation_post_remove,
+    unit_post_sync,
+    unit_pre_create,
+    vcs_post_commit,
+    vcs_post_push,
+    vcs_post_update,
+    vcs_pre_commit,
+    vcs_pre_push,
+    vcs_pre_update,
+)
+from weblate.utils.classloader import ClassRegistry
+from weblate.utils.decorators import disable_for_loaddata
+from weblate.utils.errors import report_error
+from weblate.utils.tracing import start_span
+
+from .base import BaseAddon
+from .defaults import (
+    DEFAULT_ADDON_ACTIVITY_LOG_EXPIRY,
+    DEFAULT_LOCALIZE_CDN_PATH,
+    DEFAULT_LOCALIZE_CDN_URL,
+    DEFAULT_WEBLATE_ADDONS,
+)
+from .events import (
+    AddonActivityLogReason,
+    AddonActivityLogStatus,
+    AddonEvent,
+    AddonEventOutcome,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from django.db.models import QuerySet
+    from django_stubs_ext import StrOrPromise
+
+    from weblate.auth.models import User
+    from weblate.trans.models import Translation
+
+# Initialize addons registry
+ADDONS = ClassRegistry("WEBLATE_ADDONS", base_class=BaseAddon)
+POT_MSGMERGE_ADDON = "weblate.gettext.msgmerge"
+
+
+@dataclass
+class AddonCache:
+    """
+    Cache for add-ons associated with a component.
+
+    Stores all add-ons, their names, a name-to-addon lookup, and per-event lists.
+    """
+
+    addons: list[Addon] = field(default_factory=list)
+    names: list[str] = field(default_factory=list)
+    lookup: dict[str, Addon] = field(default_factory=dict)
+    events: dict[int, list[Addon]] = field(default_factory=dict)
+
+    def get_event(self, event: int) -> list[Addon]:
+        return self.events.get(event, [])
+
+
+class AddonQuerySet(models.QuerySet["Addon", "Addon"]):
+    def filter_access(self, user: User):
+        """Return add-ons the user is allowed to manage."""
+        if user.is_superuser:
+            return self.all()
+
+        accessible_projects = user.allowed_projects
+        managed_projects = user.managed_projects.filter(pk__in=accessible_projects)
+        component_managed_projects = user.projects_with_perm("component.edit").filter(
+            pk__in=accessible_projects
+        )
+        explicitly_managed_component_ids = [
+            component_id
+            for component_id, scoped_permissions in user.component_permissions.items()
+            if any(
+                "component.edit" in permissions
+                and (languages is None or not languages.membership_limited)
+                for permissions, languages in scoped_permissions
+            )
+        ]
+        managed_components = Component.objects.filter(
+            project__in=accessible_projects
+        ).filter(
+            Q(project__in=component_managed_projects, restricted=False)
+            | Q(pk__in=explicitly_managed_component_ids)
+        )
+
+        if not user.is_bot and not user.profile.has_2fa:
+            managed_projects = managed_projects.filter(enforced_2fa=False)
+            managed_components = managed_components.filter(project__enforced_2fa=False)
+
+        query = (
+            Q(project__in=managed_projects)
+            | Q(category__project__in=managed_projects)
+            | Q(component__in=managed_components)
+        )
+        if user.has_perm("management.addons"):
+            query |= Q(
+                component__isnull=True,
+                category__isnull=True,
+                project__isnull=True,
+            )
+        return self.filter(query)
+
+    def filter_component(self, component):
+        return self.prefetch_related("event_set").filter(component=component)
+
+    def filter_project(self, project):
+        return self.prefetch_related("event_set").filter(project=project)
+
+    def filter_category(self, category):
+        return self.prefetch_related("event_set").filter(category=category)
+
+    def filter_sitewide(self):
+        return self.prefetch_related("event_set").filter(
+            component__isnull=True, category__isnull=True, project__isnull=True
+        )
+
+    def filter_event(self, component, event):
+        return component.addons_cache.get_event(event)
+
+    def prefetch_for_components(
+        self, components: list[Component] | QuerySet[Component]
+    ) -> None:
+        """
+        Prefetch add-ons for multiple components in a single query.
+
+        This builds a combined query that fetches all relevant addons for all
+        components at once, avoiding N+1 queries.
+        """
+        if not components:
+            return
+
+        # Build a combined query for all components
+        combined_query = Q()
+
+        for component in components:
+            # Build query for this component
+            query = (
+                Q(component=component)
+                | Q(project=component.project)
+                | (Q(component__linked_component=component) & Q(repo_scope=True))
+                # Site-wide add-ons
+                | (
+                    Q(component__isnull=True)
+                    & Q(category__isnull=True)
+                    & Q(project__isnull=True)
+                )
+            )
+            if component.linked_component:
+                query |= Q(component=component.linked_component) & Q(repo_scope=True)
+            # Category add-ons: categories are at most 3 levels deep
+            cat = component.category
+            if cat:
+                query |= Q(category=cat)
+                if cat.category:
+                    query |= Q(category=cat.category)
+                    if cat.category.category:
+                        query |= Q(category=cat.category.category)
+
+            combined_query |= query
+
+        # Fetch all relevant addons in a single query
+        all_addons = (
+            self.filter(combined_query).prefetch_related("event_set").distinct()
+        )
+
+        # Group addons by component
+        for component in components:
+            result = AddonCache()
+
+            # Build set of ancestor category IDs for this component
+            ancestor_category_ids = set()
+            category = component.category
+            while category is not None:
+                ancestor_category_ids.add(category.id)
+                category = category.category
+
+            # Filter addons relevant to this specific component
+            for addon in all_addons:
+                # Repository-wide add-ons
+                is_repo_wide_addon = (
+                    addon.component_id
+                    and addon.repo_scope
+                    and component.linked_component_id == addon.component_id
+                )
+                # Category-wide add-on
+                is_category_wide_addon = (
+                    addon.category_id is not None
+                    and addon.category_id in ancestor_category_ids
+                )
+                # Site-wide addon
+                is_sitewide_addon = (
+                    addon.component_id is None
+                    and addon.project_id is None
+                    and addon.category_id is None
+                )
+                if (
+                    # Component-wide add-on
+                    addon.component_id == component.id
+                    # Project-wide add-on
+                    or (addon.project_id == component.project_id)
+                    or is_repo_wide_addon
+                    or is_category_wide_addon
+                    or is_sitewide_addon
+                ):
+                    for installed in addon.event_set.all():
+                        result.events.setdefault(installed.event, []).append(addon)
+                    result.addons.append(addon)
+                    result.names.append(addon.name)
+                    result.lookup[addon.name] = addon
+
+            # Set the cache on the component
+            component.__dict__["addons_cache"] = result
+
+
+class Addon(models.Model):
+    component = models.ForeignKey(
+        Component, on_delete=models.deletion.CASCADE, null=True
+    )
+    project = models.ForeignKey(Project, on_delete=models.deletion.CASCADE, null=True)
+    category = models.ForeignKey(Category, on_delete=models.deletion.CASCADE, null=True)
+    name = models.CharField(max_length=100)
+    configuration = models.JSONField(default=dict)
+    state = models.JSONField(default=dict)
+    repo_scope = models.BooleanField(default=False, db_index=True)
+
+    objects = AddonQuerySet.as_manager()
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        verbose_name = "add-on"
+        verbose_name_plural = "add-ons"
+
+    def __str__(self) -> str:
+        return f"{self.addon.verbose}: {self.component or self.category or self.project or 'site-wide'}"
+
+    def __init__(self, *args, acting_user: User | None = None, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.acting_user = acting_user
+
+    # pylint: disable-next=arguments-differ
+    def save(
+        self, force_insert=False, force_update=False, using=None, update_fields=None
+    ):
+        cls = self.addon_class
+        self.repo_scope = cls.repo_scope
+
+        # Reallocate to repository
+        original_component = None
+        if cls.repo_scope and self.component and self.component.linked_component:
+            original_component = self.component
+            self.component = self.component.linked_component
+
+        # Store history (if not updating state only)
+        if update_fields != ["state"]:
+            self.store_change(
+                ActionEvents.ADDON_CREATE
+                if not self.pk or force_insert
+                else ActionEvents.ADDON_CHANGE
+            )
+
+        super().save(
+            force_insert=force_insert,
+            force_update=force_update,
+            using=using,
+            update_fields=update_fields,
+        )
+
+        # Clear add-on cache after save so the DB state is consistent
+        if update_fields != ["state"]:
+            if original_component:
+                original_component.drop_addons_cache()
+            self._drop_addons_cache()
+            self._clear_pot_guidance_alert()
+            self._clear_recommendation_guidance_alerts()
+
+    def get_absolute_url(self) -> str:
+        return reverse("addon-detail", kwargs={"pk": self.pk})
+
+    def store_change(self, action) -> None:
+        Change.objects.create(
+            action=action,
+            user=self.acting_user,
+            project=self.project,
+            category=self.category,
+            component=self.component,
+            target=self.name,
+            details=self.configuration,
+        )
+
+    def configure_events(self, events: set[AddonEvent]) -> None:
+        for event in events:
+            Event.objects.get_or_create(addon=self, event=event)
+        self.event_set.exclude(event__in=events).delete()
+
+    @cached_property
+    def addon_class(self) -> type[BaseAddon]:
+        return ADDONS[self.name]
+
+    @cached_property
+    def addon(self) -> BaseAddon:
+        return self.addon_class(self)
+
+    @property
+    def is_valid(self) -> bool:
+        return self.name in ADDONS
+
+    @property
+    def addon_name(self) -> str:
+        if not self.is_valid:
+            return self.name
+        return self.addon.name
+
+    def has_event(self, event: AddonEvent) -> bool:
+        prefetched_events = getattr(self, "_prefetched_objects_cache", {}).get(
+            "event_set"
+        )
+        if prefetched_events is not None:
+            return any(item.event == event for item in prefetched_events)
+        return self.event_set.filter(event=event).exists()
+
+    @property
+    def can_run_manually(self) -> bool:
+        return self.is_valid and self.has_event(AddonEvent.EVENT_MANUAL)
+
+    def schedule_manual_run(self) -> None:
+        if not self.can_run_manually:
+            raise ValueError(gettext("This add-on cannot be triggered manually."))
+        if self.pk is None:
+            msg = "Cannot schedule a manual run for an unsaved add-on."
+            raise ValueError(msg)
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.addons.tasks import (
+            run_addon_manually,
+        )
+
+        run_addon_manually.delay_on_commit(self.pk)
+
+    def _drop_addons_cache(self):
+        if self.component:
+            self.component.drop_addons_cache()
+
+    def affected_components(self):
+        if self.component_id:
+            if self.repo_scope:
+                return Component.objects.filter(
+                    Q(pk=self.component_id) | Q(linked_component=self.component_id)
+                )
+            return Component.objects.filter(pk=self.component_id)
+        if self.category:
+            return self.category.all_components.all()
+        if self.project:
+            return self.project.component_set.all()
+        return Component.objects.all()
+
+    def _clear_pot_guidance_alert(self) -> None:
+        if self.name != POT_MSGMERGE_ADDON:
+            return
+        Alert.objects.filter(
+            component__in=self.affected_components(),
+            name="ExtractPotMissingMsgmerge",
+        ).delete()
+
+    def _clear_recommendation_guidance_alerts(self) -> None:
+        from weblate.trans.alerts.registry import (  # ruff: ignore[import-outside-top-level]
+            ALERTS,
+            load_alerts,
+        )
+
+        load_alerts()
+        alert_names = [
+            name
+            for name, alert in ALERTS.items()
+            if getattr(alert, "addon", None) == self.name
+        ]
+        if alert_names:
+            Alert.objects.filter(
+                component__in=self.affected_components(), name__in=alert_names
+            ).delete()
+
+    def delete(self, using=None, keep_parents=False):
+        # Store history
+        self.store_change(ActionEvents.ADDON_REMOVE)
+        # Delete any addon alerts
+        if self.is_valid and self.addon.alert:
+            if self.component:
+                self.component.delete_alert(self.addon.alert)
+            elif self.category:
+                Alert.objects.filter(
+                    component__in=self.category.all_components,
+                    name=self.addon.alert,
+                ).delete()
+            elif self.project:
+                Alert.objects.filter(
+                    component__project=self.project,
+                    name=self.addon.alert,
+                ).delete()
+            else:
+                Alert.objects.filter(name=self.addon.alert).delete()
+
+        result = super().delete(using=using, keep_parents=keep_parents)
+
+        self._drop_addons_cache()
+
+        # Trigger post uninstall action
+        if self.is_valid:
+            self.addon.post_uninstall()
+        return result
+
+    def disable(self) -> None:
+        self.log_warning("disabling no longer compatible add-on: %s", self.name)
+        self.delete()
+
+    @cached_property
+    def logger(self) -> logging.Logger:
+        return logging.getLogger("weblate.addons")
+
+    def log_warning(self, message: str, *args) -> None:
+        if self.component:
+            self.component.log_warning(message, *args)
+        elif self.category:
+            self.category.log_warning(message, *args)
+        elif self.project:
+            self.project.log_warning(message, *args)
+        else:
+            self.logger.warning(message, *args)
+
+    def log_debug(self, message: str, *args) -> None:
+        if self.component:
+            self.component.log_debug(message, *args)
+        elif self.category:
+            self.category.log_debug(message, *args)
+        elif self.project:
+            self.project.log_debug(message, *args)
+        else:
+            self.logger.debug(message, *args)
+
+    def get_addon_activity_logs(self) -> QuerySet[AddonActivityLog]:
+        """Return activity logs for add-on."""
+        return self.addonactivitylog_set.order_by("-created")
+
+
+class Event(models.Model):
+    addon = models.ForeignKey(Addon, on_delete=models.deletion.CASCADE, db_index=False)
+    event = models.IntegerField(choices=AddonEvent.choices)
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        unique_together = [  # ruff: ignore[mutable-class-default]
+            ("addon", "event"),
+        ]
+        verbose_name = "add-on event"
+        verbose_name_plural = "add-on events"
+
+    def __str__(self) -> str:
+        return f"{self.addon}: {self.get_event_display()}"
+
+
+class AddonsConf(AppConf):
+    WEBLATE_ADDONS = DEFAULT_WEBLATE_ADDONS
+
+    LOCALIZE_CDN_URL = DEFAULT_LOCALIZE_CDN_URL
+    LOCALIZE_CDN_PATH = DEFAULT_LOCALIZE_CDN_PATH
+
+    # How long to keep add-on activity log entries
+    ADDON_ACTIVITY_LOG_EXPIRY = DEFAULT_ADDON_ACTIVITY_LOG_EXPIRY
+
+    class Meta:
+        prefix = ""
+
+
+# Events to exclude from logging
+NO_LOG_EVENTS = {
+    AddonEvent.EVENT_UNIT_PRE_CREATE,
+    AddonEvent.EVENT_UNIT_POST_SAVE,
+}
+
+# Repository scoped events
+REPO_EVENTS = {
+    AddonEvent.EVENT_PRE_UPDATE,
+    AddonEvent.EVENT_POST_UPDATE,
+    AddonEvent.EVENT_PRE_PUSH,
+    AddonEvent.EVENT_POST_PUSH,
+    AddonEvent.EVENT_COMPONENT_UPDATE,
+}
+
+
+def _project_for_error(
+    addon: Addon,
+    component: Component | None,
+    scope: Translation | Component | Category | Project | None,
+):
+    if component:
+        return component.project
+    if addon.category:
+        return addon.category.project
+    if isinstance(scope, Project):
+        return scope
+    return addon.project
+
+
+def _report_addon_error(
+    addon: Addon,
+    component: Component | None,
+    scope: Translation | Component | Category | Project | None,
+    error: Exception,
+) -> None:
+    if getattr(error, "_weblate_reported", False):
+        return
+    report_error(
+        f"add-on {addon.name} failed",
+        project=_project_for_error(addon, component, scope),
+    )
+
+
+def execute_addon_event(  # ruff: ignore[complex-structure]
+    addon: Addon,
+    component: Component | None,
+    scope: Translation | Component | Category | Project | None,
+    event: AddonEvent,
+    method: str,
+    args: tuple | None = None,
+    kwargs: dict | None = None,
+) -> None:
+    # Trigger repository scoped add-ons only on the main component
+    if (
+        addon.repo_scope
+        and component
+        and component.linked_component
+        and event in REPO_EVENTS
+    ):
+        return
+
+    # The base daily and manual handlers iterate components. Split those here
+    # so each component and its asynchronous worker own a separate activity
+    # row. Add-ons overriding the scope-level handler keep one scope activity.
+    if (
+        component is None
+        and method in {"daily", "manual"}
+        and getattr(type(addon.addon), method) is getattr(BaseAddon, method)
+    ):
+        scoped_kwargs = kwargs or {}
+        processed_component = False
+        for scoped_component in addon.addon.resolve_components(
+            component=scoped_kwargs.get("component"),
+            category=scoped_kwargs.get("category"),
+            project=scoped_kwargs.get("project"),
+        ):
+            if not addon.addon.can_process(component=scoped_component) or (
+                addon.repo_scope
+                and scoped_component.linked_component
+                and event in REPO_EVENTS
+            ):
+                continue
+            processed_component = True
+            execute_addon_event(
+                addon,
+                scoped_component,
+                scoped_component,
+                event,
+                method,
+                args,
+                scoped_kwargs
+                | {
+                    "component": scoped_component,
+                    "category": None,
+                    "project": None,
+                },
+            )
+        if processed_component:
+            return
+
+    def addon_logger(
+        level: Literal["debug", "error"], message: str, *args: StrOrPromise
+    ) -> None:
+        if scope is None:
+            if level == "debug":
+                LOGGER.debug(message, *args)
+            else:
+                LOGGER.error(message, *args)
+        elif level == "debug":
+            scope.log_debug(message, *args)
+        else:
+            scope.log_error(message, *args)
+
+    log_result = None
+    outcome_status = AddonActivityLogStatus.SUCCESS
+    outcome_reason: AddonActivityLogReason | None = None
+    if args is None:
+        args = ()
+    if kwargs is None:
+        kwargs = {}
+    else:
+        kwargs = kwargs.copy()
+        if "changed_files" in kwargs:
+            kwargs["changed_files"] = list(kwargs["changed_files"])
+
+    activity_log = None
+    if event not in NO_LOG_EVENTS:
+        activity_log = AddonActivityLog.objects.create(
+            addon=addon,
+            component=component,
+            event=event,
+            status=AddonActivityLogStatus.PENDING,
+        )
+
+    with transaction.atomic():
+        addon_logger("debug", "running %s add-on: %s", event.label, addon.name)
+        # Skip unsupported components silently
+        if (
+            component
+            and not addon.component
+            and not addon.addon.can_process(component=component)
+        ):
+            addon_logger(
+                "debug",
+                "Skipping incompatible %s add-on: %s for component: %s",
+                event.label,
+                addon.name,
+                component.name,
+            )
+            if activity_log is not None:
+                activity_log.update_activity(
+                    status=AddonActivityLogStatus.SKIPPED,
+                    reason=AddonActivityLogReason.INCOMPATIBLE_COMPONENT,
+                )
+                activity_log.save(update_fields=["details", "status"])
+            return
+
+        try:
+            # Execute event in tracing span to track performance.
+            with start_span(op=f"addon.{event.name}", name=addon.name):
+                log_result = getattr(addon.addon, method)(
+                    *args,
+                    **kwargs,
+                    activity_log_id=activity_log.pk if activity_log else None,
+                )
+        except DjangoDatabaseError:
+            raise
+        except Exception as error:
+            # Log failure
+            outcome_status = AddonActivityLogStatus.ERROR
+            log_result = str(error)
+            addon_logger(
+                "error", "failed %s add-on: %s: %s", event.label, addon.name, str(error)
+            )
+            _report_addon_error(addon, component, scope, error)
+            # Uninstall no longer compatible add-ons
+            if component and not addon.addon.can_process(component=component):
+                addon.disable()
+                component.drop_addons_cache()
+        else:
+            if isinstance(log_result, AddonEventOutcome):
+                outcome_status = log_result.status
+                outcome_reason = log_result.reason
+                log_result = log_result.result
+            addon_logger("debug", "completed %s add-on: %s", event.label, addon.name)
+        finally:
+            # Check if add-on is still installed and log activity
+            if (
+                activity_log is not None
+                and addon.pk is not None
+                and outcome_status != AddonActivityLogStatus.PENDING
+            ):
+                # Pending outcomes are finalized by their worker. In eager
+                # execution that might happen before this handler returns.
+                activity_log.update_activity(
+                    log_result,
+                    status=outcome_status,
+                    reason=outcome_reason,
+                )
+                activity_log.save(update_fields=["details", "status"])
+
+
+def handle_addon_event(
+    event: AddonEvent,
+    method: str,
+    args: tuple | None = None,
+    kwargs: dict | None = None,
+    *,
+    project: Project | None = None,
+    component: Component | None = None,
+    translation: Translation | None = None,
+    addon_queryset: Iterable[Addon] | None = None,
+) -> None:
+    # Scope is used for logging
+    scope: Translation | Component | Project | None = (
+        translation or component or project
+    )
+
+    # Shortcuts for frequently used variables
+    if component is None and translation is not None:
+        component = translation.component
+
+    if addon_queryset is None:
+        addon_queryset = Addon.objects.filter_event(component, event)
+
+    if not addon_queryset:
+        return
+
+    with transaction.atomic():
+        for addon in addon_queryset:
+            execute_addon_event(addon, component, scope, event, method, args, kwargs)
+
+
+@transaction.atomic
+def handle_daily_addon_event(addon_queryset: Iterable[Addon]) -> None:
+    handle_scoped_addon_event(addon_queryset, AddonEvent.EVENT_DAILY, "daily")
+
+
+@transaction.atomic
+def handle_scoped_addon_event(
+    addon_queryset: Iterable[Addon], event: AddonEvent, method: str
+) -> None:
+    project_kwargs = {"component": None, "category": None, "project": None}
+
+    for addon in addon_queryset:
+        if addon.component:
+            execute_addon_event(
+                addon,
+                addon.component,
+                addon.component,
+                event,
+                method,
+                None,
+                kwargs={
+                    "component": addon.component,
+                    "category": None,
+                    "project": None,
+                },
+            )
+        elif addon.category:
+            execute_addon_event(
+                addon,
+                None,
+                addon.category,
+                event,
+                method,
+                None,
+                kwargs={"component": None, "category": addon.category, "project": None},
+            )
+        elif addon.project:
+            execute_addon_event(
+                addon,
+                None,
+                addon.project,
+                event,
+                method,
+                None,
+                kwargs={"component": None, "category": None, "project": addon.project},
+            )
+        else:
+            for proj in Project.objects.iterator():
+                execute_addon_event(
+                    addon,
+                    None,
+                    proj,
+                    event,
+                    method,
+                    None,
+                    kwargs=project_kwargs | {"project": proj},
+                )
+
+
+@receiver(vcs_pre_push)
+def pre_push(sender, component: Component, **kwargs) -> None:
+    handle_addon_event(
+        AddonEvent.EVENT_PRE_PUSH,
+        "pre_push",
+        (component,),
+        component=component,
+    )
+
+
+@receiver(vcs_post_push)
+def post_push(sender, component: Component, **kwargs) -> None:
+    handle_addon_event(
+        AddonEvent.EVENT_POST_PUSH,
+        "post_push",
+        (component,),
+        component=component,
+    )
+
+
+@receiver(vcs_post_update)
+def post_update(
+    sender,
+    component: Component,
+    previous_head: str,
+    changed_files: list[str],
+    skip_push: bool = False,
+    parse_after_update: bool = False,
+    **kwargs,
+) -> None:
+    handle_addon_event(
+        AddonEvent.EVENT_POST_UPDATE,
+        "post_update",
+        (component, previous_head, skip_push),
+        {"changed_files": changed_files, "parse_after_update": parse_after_update},
+        component=component,
+    )
+
+
+@receiver(component_post_update)
+def component_update(sender, component: Component, **kwargs) -> None:
+    handle_addon_event(
+        AddonEvent.EVENT_COMPONENT_UPDATE,
+        "component_update",
+        (component,),
+        component=component,
+    )
+
+
+@receiver(vcs_pre_update)
+def pre_update(sender, component: Component, **kwargs) -> None:
+    handle_addon_event(
+        AddonEvent.EVENT_PRE_UPDATE,
+        "pre_update",
+        (component,),
+        component=component,
+    )
+
+
+@receiver(vcs_pre_commit)
+def pre_commit(
+    sender, translation: Translation, author: str, store_hash: bool, **kwargs
+) -> None:
+    handle_addon_event(
+        AddonEvent.EVENT_PRE_COMMIT,
+        "pre_commit",
+        (translation, author, store_hash),
+        translation=translation,
+    )
+
+
+@receiver(vcs_post_commit)
+def post_commit(sender, component: Component, store_hash: bool, **kwargs) -> None:
+    handle_addon_event(
+        AddonEvent.EVENT_POST_COMMIT,
+        "post_commit",
+        (component, store_hash),
+        component=component,
+    )
+
+
+@receiver(translation_post_add)
+def post_add(sender, translation: Translation, **kwargs) -> None:
+    handle_addon_event(
+        AddonEvent.EVENT_POST_ADD,
+        "post_add",
+        (translation,),
+        translation=translation,
+    )
+
+
+@receiver(translation_post_remove)
+def post_remove(sender, translation: Translation, **kwargs) -> None:
+    handle_addon_event(
+        AddonEvent.EVENT_POST_REMOVE,
+        "post_remove",
+        (translation,),
+        translation=translation,
+    )
+
+
+def handle_unit_addon_event(
+    event: AddonEvent, method: str, args: tuple, unit: Unit
+) -> None:
+    translation = unit.translation
+    # Unit signals fire for every imported string; use the cached event list
+    # before entering the generic add-on dispatcher.
+    addon_queryset = translation.component.addons_cache.get_event(event)
+    if not addon_queryset:
+        return
+    handle_addon_event(
+        event,
+        method,
+        args,
+        translation=translation,
+        addon_queryset=addon_queryset,
+    )
+
+
+@receiver(unit_pre_create)
+def unit_pre_create_handler(sender, unit: Unit, **kwargs) -> None:
+    handle_unit_addon_event(
+        AddonEvent.EVENT_UNIT_PRE_CREATE,
+        "unit_pre_create",
+        (unit,),
+        unit,
+    )
+
+
+@receiver(post_save, sender=Unit)
+@disable_for_loaddata
+def unit_post_save_handler(sender, instance: Unit, created, **kwargs) -> None:
+    handle_unit_addon_event(
+        AddonEvent.EVENT_UNIT_POST_SAVE,
+        "unit_post_save",
+        (instance, created),
+        instance,
+    )
+
+
+@receiver(post_save, sender=Change)
+@disable_for_loaddata
+def change_post_save_handler(sender, instance: Change, created, **kwargs) -> None:
+    """Handle Change post save signal."""
+    if created:  # ignore Change updates, they should not be updated anyway
+        bulk_change_create_handler(sender, [instance])
+
+
+@receiver(change_bulk_create)
+@disable_for_loaddata
+def bulk_change_create_handler(sender, instances: list[Change], **kwargs) -> None:
+    """Handle Change bulk create signal."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.addons.tasks import (
+        addon_change,
+    )
+
+    # Filter out events that have a subscriber
+    # It currently also includes all project and site-wide events as there is currently
+    # no effective way to filter and these are not that frequent.
+    filtered = [
+        change.pk
+        for change in instances
+        if change.component is None
+        or AddonEvent.EVENT_CHANGE in change.component.addons_cache.events
+    ]
+
+    if filtered:
+        addon_change.delay_on_commit(filtered)
+
+
+@receiver(unit_post_sync)
+def unit_post_sync_handler(sender, unit: Unit, updated_attr: str, **kwargs) -> None:
+    handle_unit_addon_event(
+        AddonEvent.EVENT_UNIT_POST_SYNC,
+        "unit_post_sync",
+        (unit, updated_attr),
+        unit,
+    )
+
+
+class AddonActivityLog(models.Model):
+    Status = AddonActivityLogStatus
+
+    addon = models.ForeignKey(Addon, on_delete=models.deletion.CASCADE)
+    component = models.ForeignKey(
+        Component, on_delete=models.deletion.CASCADE, null=True
+    )
+    event = models.IntegerField(choices=AddonEvent.choices)
+    created = models.DateTimeField(auto_now_add=True)
+    details = models.JSONField(default=dict)
+    status = models.IntegerField(
+        choices=AddonActivityLogStatus,
+        default=AddonActivityLogStatus.SUCCESS,
+    )
+
+    class Meta:
+        required_db_vendor = "postgresql"
+        verbose_name = "add-on activity log"
+        verbose_name_plural = "add-on activity logs"
+        ordering = ["-created"]  # ruff: ignore[mutable-class-default]
+
+    def __str__(self) -> str:
+        return f"{self.addon}: {self.get_event_display()} at {self.created}"
+
+    def get_details_display(self) -> str:
+        reason_label = ""
+        if reason := self.details.get("reason"):
+            with contextlib.suppress(ValueError):
+                reason_label = str(AddonActivityLogReason(reason).label)
+        if self.status == AddonActivityLogStatus.SKIPPED:
+            return reason_label
+        return self.addon.addon.render_activity_log(self) or reason_label
+
+    def update_activity(
+        self,
+        result: object | None = None,
+        *,
+        status: AddonActivityLogStatus | None = None,
+        reason: AddonActivityLogReason | None = None,
+    ) -> None:
+        """Update activity details without saving the instance."""
+        details = self.details or {}
+        if reason is not None:
+            details["reason"] = reason.value
+        elif status is not None:
+            details.pop("reason", None)
+        self.details = details
+        if result is not None:
+            self.update_result(result)
+        if status is not None:
+            self.status = status
+
+    def update_result(self, result: object) -> None:
+        """Update the result field in the details JSON."""
+        details = self.details or {}
+        if current_result := details.get("result"):
+            if isinstance(current_result, str) and isinstance(result, str):
+                result = f"{current_result}\n{result}"
+            else:
+                current_results = (
+                    current_result.get("results")
+                    if isinstance(current_result, dict)
+                    else None
+                )
+                existing_results = (
+                    current_results
+                    if isinstance(current_results, list)
+                    else [current_result]
+                )
+                result = {
+                    "results": [
+                        *existing_results,
+                        result,
+                    ]
+                }
+
+        details["result"] = result
+        self.details = details

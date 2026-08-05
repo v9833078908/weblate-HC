@@ -1,0 +1,236 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Celery integration helper tools."""
+
+# mypy: disable-error-code="attr-defined"
+
+from __future__ import annotations
+
+import os
+import time
+from collections import defaultdict
+from typing import Any
+
+from celery import Celery
+from celery.contrib.django.task import DjangoTask
+from celery.signals import after_setup_logger, before_task_publish, task_failure
+from django.conf import settings
+from django.core.cache import cache
+from django.core.checks import run_checks
+
+# Type annotation compatibility
+# ruff: ignore[unused-lambda-argument]
+Celery.__class_getitem__ = classmethod(lambda cls, *args, **kwargs: cls)
+# ruff: ignore[unused-lambda-argument]
+DjangoTask.__class_getitem__ = classmethod(lambda cls, *args, **kwargs: cls)
+
+# set the default Django settings module for the 'celery' program.
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "weblate.settings")
+
+app = Celery[DjangoTask[..., Any]]("weblate")
+
+# Using a string here means the worker doesn't have to serialize
+# the configuration object to child processes.
+# - namespace='CELERY' means all celery-related configuration keys
+#   should have a `CELERY_` prefix.
+app.config_from_object("django.conf:settings", namespace="CELERY")
+
+# Load task modules from all registered Django app configs.
+app.autodiscover_tasks()
+
+TASK_METADATA_TTL = 6 * 3600
+
+
+def get_task_metadata_key(task_id: str) -> str:
+    return f"task-meta-{task_id}"
+
+
+def store_task_metadata(
+    task_id: str | None,
+    *,
+    component_id: int | None = None,
+    translation_id: int | None = None,
+    user_id: int | None = None,
+) -> None:
+    if not task_id:
+        return
+    data = {
+        "component_id": component_id,
+        "translation_id": translation_id,
+    }
+    if user_id is not None:
+        data["user_id"] = user_id
+    cache.set(
+        get_task_metadata_key(task_id),
+        data,
+        TASK_METADATA_TTL,
+    )
+
+
+def get_task_metadata(task_id: str) -> dict[str, int | None] | None:
+    return cache.get(get_task_metadata_key(task_id))
+
+
+def delete_task_metadata(task_id: str | None) -> None:
+    if not task_id:
+        return
+    cache.delete(get_task_metadata_key(task_id))
+
+
+def extract_task_kwargs(body) -> dict[str, Any]:
+    if isinstance(body, dict):
+        kwargs = body.get("kwargs")
+        return kwargs if isinstance(kwargs, dict) else {}
+    if isinstance(body, (list, tuple)) and len(body) >= 2 and isinstance(body[1], dict):
+        return body[1]
+    return {}
+
+
+@before_task_publish.connect
+def store_published_task_metadata(headers=None, body=None, **kwargs) -> None:
+    if not isinstance(headers, dict):
+        return
+    task_kwargs = extract_task_kwargs(body)
+    component_id = task_kwargs.get("component_id")
+    translation_id = task_kwargs.get("translation_id")
+    if component_id is None and translation_id is None:
+        return
+    store_task_metadata(
+        headers.get("id"),
+        component_id=component_id,
+        translation_id=translation_id,
+    )
+
+
+@task_failure.connect
+def handle_task_failure(task_id="", exception=None, **kwargs) -> None:
+    task_kwargs = kwargs.get("kwargs")
+    if isinstance(task_kwargs, dict) and task_kwargs.get("activity_log_id") is not None:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.addons.events import AddonActivityLogStatus
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.addons.tasks import update_addon_activity_log
+
+        update_addon_activity_log(
+            task_kwargs["activity_log_id"],
+            str(exception),
+            status=AddonActivityLogStatus.ERROR,
+            task_count=task_kwargs.get("activity_log_task_count"),
+        )
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.utils.errors import report_error
+
+    report_error(
+        f"Failure while executing task {task_id}",
+        skip_error_reporting=True,
+        print_tb=True,
+        level="error",
+    )
+
+
+@app.on_after_configure.connect
+def configure_error_handling(sender, **kwargs) -> None:
+    """Rollbar and Sentry integration."""
+    # ruff: ignore[import-outside-top-level]
+    from weblate.utils.errors import init_error_collection
+
+    init_error_collection(celery=True)
+
+
+@after_setup_logger.connect
+def show_failing_system_check(sender, logger, **kwargs) -> None:
+    if settings.DEBUG:
+        for check in run_checks(include_deployment_checks=True):
+            # Skip silenced checks and Celery one
+            # (it fails when started from Celery startup)
+            if check.is_silenced() or check.id == "weblate.E019":
+                continue
+            logger.warning("%s", check)
+
+
+def get_queue_length(queue="celery"):
+    with app.connection_or_acquire() as conn:  # type: ignore[attr-defined]
+        return conn.default_channel.queue_declare(
+            queue=queue, durable=True, auto_delete=False
+        ).message_count
+
+
+def get_queue_list() -> set[str]:
+    """List queues in Celery."""
+    result = {"celery"}
+    for route in settings.CELERY_TASK_ROUTES.values():
+        if "queue" in route:
+            result.add(route["queue"])
+    return result
+
+
+def get_queue_stats() -> dict[str, int]:
+    """Calculate queue stats."""
+    return {queue: get_queue_length(queue) for queue in get_queue_list()}
+
+
+def get_task_progress(task):
+    """Return progress of a Celery task."""
+    # Completed task
+    if task.ready():
+        return 100
+    # In progress
+    result = task.result
+    if task.state == "PROGRESS" and result is not None:
+        return result["progress"]
+
+    # Not yet started
+    return 0
+
+
+def is_celery_queue_long():
+    """
+    Check whether celery queue is too long.
+
+    It does trigger if it is too long for at least one hour. This way peaks are
+    filtered out, and no warning need be issued for big operations (for example
+    site-wide autotranslation).
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import Translation
+
+    cache_key = "celery_queue_stats"
+    queues_data = cache.get(cache_key, {})
+
+    # Hours since epoch
+    current_hour = int(time.time() / 3600)
+    test_hour = current_hour - 1
+
+    # Fetch current stats
+    stats = get_queue_stats()
+
+    # Update counters
+    if current_hour not in queues_data:
+        # Delete stale items
+        for key in list(queues_data.keys()):
+            if key < test_hour:
+                del queues_data[key]
+        # Add current one
+        queues_data[current_hour] = stats
+
+        # Store to cache
+        cache.set(cache_key, queues_data, 7200)
+
+    # Do not fire if we do not have counts for two hours ago
+    if test_hour not in queues_data:
+        return False
+
+    # Check if any queue got bigger
+    base = queues_data[test_hour]
+    thresholds: dict[str, int] = defaultdict(lambda: 50)
+    # Set the limit to avoid trigger on auto-translating all components
+    # nightly.
+    thresholds["translate"] = max(1000, Translation.objects.count() // 30)
+    return any(
+        stat > thresholds[key] and base.get(key, 0) > thresholds[key]
+        for key, stat in stats.items()
+    )

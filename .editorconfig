@@ -1,0 +1,52 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+# This file is maintained in https://github.com/WeblateOrg/meta/
+
+root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+spaces_around_operators = true
+
+[*.bat]
+end_of_line = crlf
+
+[*.html]
+indent_size = 2
+
+[*.py]
+indent_size = 4
+
+[*.rst]
+indent_size = 3
+
+[*.js]
+quote_type = double
+
+[*.{markdown,md}]
+trim_trailing_whitespace = false
+
+[[shell]]
+indent_style = space
+indent_size = 4
+space_redirects = true
+simplify = true
+
+[*.{kt,kts}]
+indent_size = 4
+
+# ktlint configuration
+ktlint_code_style = android_studio
+ktlint_function_naming_ignore_when_annotated_with = Composable
+ktlint_standard_class-signature = disabled
+ktlint_standard_function-expression-body = disabled
+ktlint_standard_mixed-condition-operators = disabled
+ktlint_standard_package-name = disabled
+ktlint_standard_property-naming = disabled

@@ -1,0 +1,79 @@
+.. _markdown:
+
+Markdown files
+--------------
+
+.. versionadded:: 5.0
+
+.. include:: /snippets/format-in-development.rst
+
+The translatable content is extracted from the Markdown files and offered for the translation.
+For Markdown files with JSX syntax, use :ref:`mdx`.
+
+Markdown units automatically get the ``md-text``, ``auto-safe-html`` and ``strict-same`` flags.
+This keeps the unsafe HTML check active for plain text, standard HTML, and
+custom elements while avoiding HTML cleanup on non-HTML angle-bracket syntax
+such as MDX or JSX-like components. Use the explicit ``safe-html`` flag for
+strings that are known to contain HTML and should always be sanitized,
+including SVG or MathML snippets.
+
+.. include:: /snippets/format-database-backed.rst
+
+.. seealso::
+
+   :doc:`tt:formats/md`
+
+Example file:
+
+.. literalinclude:: ../../weblate/trans/tests/data/cs.md
+    :language: md
+
+.. include:: /snippets/format-features/markdown-features.rst
+
+Weblate configuration
++++++++++++++++++++++
+
++--------------------------------+-------------------------------------+
+| Typical Weblate :ref:`component`                                     |
++================================+=====================================+
+| File mask                      | ``path/*.md``                       |
++--------------------------------+-------------------------------------+
+| Monolingual base language file | ``path/en.md``                      |
++--------------------------------+-------------------------------------+
+| Template for new translations  | ``path/en.md``                      |
++--------------------------------+-------------------------------------+
+| File format                    | `Markdown file`                     |
++--------------------------------+-------------------------------------+
+| File format parameters         | ``markdown_merge_duplicates=True``  |
++--------------------------------+-------------------------------------+
+
+.. _markdown-duplicates:
+
+Handling duplicate strings
+++++++++++++++++++++++++++
+
+By default, Weblate treats each occurrence of a string as a separate
+translation unit to provide line-based context. This can be problematic
+in Markdown tables, where reordering rows changes the context and can
+lead to translation loss.
+
+To consolidate identical strings into a single translation unit, enable
+:guilabel:`Deduplicate identical strings` in the
+:ref:`component-file_format_params`.
+
+.. note::
+   Enabling this option disables line-based context for the merged units,
+   ensuring that translations remain stable even if rows or sections
+   are moved within the document.
+
+.. _markdown-frontmatter-values:
+
+Translating front matter values
++++++++++++++++++++++++++++++++
+
+By default, YAML front matter is extracted as a single translatable block.
+Enable :guilabel:`Translate front matter values` in
+:ref:`component-file_format_params` to parse YAML front matter and translate
+only scalar string values while preserving keys, structure, comments, and
+formatting when possible.
+The same setting is available for :ref:`mdx` files.

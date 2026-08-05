@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% load crispy_forms_tags i18n translations %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'manage' %}">{% translate "Manage" %}</a>
+  </li>
+  <li class="breadcrumb-item">
+    <a href="{% url 'manage-backups' %}">{% translate "Backups" %}</a>
+  </li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+
+  {% for service in services %}
+    <form method="post">
+      {% csrf_token %}
+      <div class="card">
+        <div class="card-header">
+          <h4 class="card-title">
+            {% documentation_icon 'admin/backup' right=True %}
+            {% blocktranslate with url=service.repository %}Backup service: {{ url }}{% endblocktranslate %}
+            {% if service.has_errors %}
+              <span class="badge text-bg-danger">{% translate "Failed with an error" %}</span>
+            {% elif service.has_warnings %}
+              <span class="badge text-bg-warning">{% translate "Completed with warnings" %}</span>
+            {% endif %}
+            {% if not service.enabled %}
+              <span class="badge text-bg-warning">{% translate "Turned off" %}</span>
+            {% endif %}
+          </h4>
+        </div>
+        <div class="card-body">
+
+          {% if service.has_errors and support_status.has_expired_support and service.repository == support_status.backup_repository %}
+            <div class="alert alert-warning d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3"
+                 role="alert">
+              <div>
+                <div class="fw-semibold">{% translate "Unpaid service subscription" %}</div>
+                <div>
+                  {% translate "The backup service was temporarily disabled due to an unpaid subscription. Enable backups by renewing your subscription." %}
+                </div>
+              </div>
+              <a class="btn btn-primary" href="https://weblate.org/user/">{% translate "Manage your subscription" %}</a>
+            </div>
+          {% endif %}
+
+          <div class="accordion" id="backup-service-{{ service.pk }}-details">
+            <div class="accordion-item">
+              <h5 class="accordion-header"
+                  id="backup-service-{{ service.pk }}-credentials-heading">
+                <button type="button"
+                        class="accordion-button collapsed"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#backup-service-{{ service.pk }}-credentials"
+                        aria-expanded="false"
+                        aria-controls="backup-service-{{ service.pk }}-credentials">
+                  <span class="d-flex flex-wrap align-items-center gap-2 w-100 me-3">
+                    <span class="fw-semibold">{% translate "Backup service credentials" %}</span>
+                    <span class="small text-body-secondary ms-lg-auto">{{ service.timestamp|naturaltime }}</span>
+                  </span>
+                </button>
+              </h5>
+              <div id="backup-service-{{ service.pk }}-credentials"
+                   class="accordion-collapse collapse"
+                   aria-labelledby="backup-service-{{ service.pk }}-credentials-heading">
+                <div class="accordion-body">{% include "manage/snippets/backup-credentials.html" %}</div>
+              </div>
+            </div>
+
+            {% for log in service.last_logs %}
+              <div class="accordion-item">
+                <h5 class="accordion-header"
+                    id="backup-service-{{ service.pk }}-log-heading-{{ log.pk }}">
+                  <button type="button" class="accordion-button{% if service.current_error %}{% if log.pk != service.current_error.pk %} collapsed{% endif %}{% elif service.current_warning %}{% if log.pk != service.current_warning.pk %} collapsed{% endif %}{% else %} collapsed{% endif %}" data-bs-toggle="collapse" data-bs-target="#backup-service-{{ service.pk }}-log-{{ log.pk }}" aria-expanded="{% if service.current_error and log.pk == service.current_error.pk or not service.current_error and service.current_warning and log.pk == service.current_warning.pk %}true{% else %}false{% endif %}" aria-controls="backup-service-{{ service.pk }}-log-{{ log.pk }}">
+                    <span class="d-flex flex-wrap align-items-center gap-2 w-100 me-3">
+                      <span class="fw-semibold">{{ log.get_event_display }}</span>
+                      {% if log.event == "error" %}
+                        <span class="badge text-bg-danger">{% translate "Failed" %}</span>
+                      {% elif log.warning %}
+                        <span class="badge text-bg-warning">{% translate "Warnings" %}</span>
+                      {% endif %}
+                      <span class="small text-body-secondary ms-lg-auto">{{ log.timestamp|naturaltime }}</span>
+                    </span>
+                  </button>
+                </h5>
+                <div id="backup-service-{{ service.pk }}-log-{{ log.pk }}"
+                     class="accordion-collapse collapse{% if service.current_error and log.pk == service.current_error.pk or not service.current_error and service.current_warning and log.pk == service.current_warning.pk %} show{% endif %}"
+                     aria-labelledby="backup-service-{{ service.pk }}-log-heading-{{ log.pk }}">
+                  <div class="accordion-body">
+                    <pre class="mb-0">{{ log.log }}</pre>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="card-footer">
+          <input type="hidden" name="service" value="{{ service.pk }}" />
+          <input type="submit"
+                 class="btn btn-primary"
+                 name="toggle"
+                 value="{% if service.enabled %}{% translate "Turn off" %}{% else %}{% translate "Turn on" %}{% endif %}" />
+          <input type="submit"
+                 class="btn btn-primary"
+                 name="trigger"
+                 value="{% translate "Perform backup" %}" />
+          <button type="button"
+                  class="btn btn-danger"
+                  data-bs-toggle="modal"
+                  data-bs-target="#remove-{{ service.pk }}">{% translate "Delete" %}</button>
+        </div>
+      </div>
+    </form>
+
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="service" value="{{ service.pk }}" />
+      <div class="modal fade"
+           tabindex="-1"
+           role="dialog"
+           id="remove-{{ service.pk }}"
+           aria-labelledby="remove-{{ service.pk }}Label">
+        <div class="modal-dialog" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h4 class="modal-title" id="remove-{{ service.pk }}Label">{% translate "Are you absolutely sure?" %}</h4>
+              <button type="button"
+                      class="btn-close"
+                      data-bs-dismiss="modal"
+                      aria-label="{% translate "Close" %}"></button>
+            </div>
+            <div class="modal-body">
+              <p>
+                <strong>{% translate "By removing the backup service, the credentials will be removed and you might lose access to the backups." %}</strong>
+              </p>
+              <p>{% translate "In case you want to be able to restore the backups, please record credentials below." %}</p>
+              {% include "manage/snippets/backup-credentials.html" %}
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-primary" data-bs-dismiss="modal">{% translate "Close" %}</button>
+              <input type="submit"
+                     class="btn btn-danger"
+                     name="remove"
+                     value="{% translate "Delete" %}" />
+            </div>
+          </div>
+          <!-- /.modal-content -->
+        </div>
+        <!-- /.modal-dialog -->
+      </div>
+      <!-- /.modal -->
+    </form>
+
+  {% endfor %}
+
+  {% include "manage/snippets/activation-form.html" %}
+
+  <form method="post">
+    <div class="card">
+      <div class="card-header">
+        <h4 class="card-title">
+          {% documentation_icon 'admin/backup' 'custombackup' right=True %}
+          {% translate "Add backup service" %}
+        </h4>
+      </div>
+      <div class="card-body">{% crispy form %}</div>
+      <div class="card-footer">
+        <input type="submit"
+               id="generate-ssh-button"
+               class="btn btn-primary"
+               value="{% translate "Add" %}" />
+      </div>
+    </div>
+  </form>
+
+
+{% endblock content %}

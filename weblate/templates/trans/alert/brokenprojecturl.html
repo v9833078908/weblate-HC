@@ -1,0 +1,10 @@
+{% load i18n %}
+
+<p>{% translate "Weblate could not validate the project website URL:" %}</p>
+
+<ul>
+  <li>
+    <a href="{{ component.project.web }}">{{ component.project.web }}</a>
+    {% if error %}: {{ error }}{% endif %}
+  </li>
+</ul>

@@ -1,0 +1,114 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+name: mypy
+
+on:
+  push:
+    branches-ignore:
+    - renovate/**
+    - weblate
+    - dependabot/**
+    - copilot/**
+    - codex/**
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  mypy:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Get changed files
+      if: github.event_name == 'pull_request'
+      id: changed-files
+      uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+      with:
+        files: '**.py'
+        use_rest_api: true
+    - name: List all changed files
+      if: github.event_name == 'pull_request'
+      env:
+        ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+      run: |
+        touch changed-files.txt
+        for file in ${ALL_CHANGED_FILES}; do
+          echo "$file" >> changed-files.txt
+        done
+        cat changed-files.txt
+
+    - name: Install apt dependencies
+      run: sudo ./ci/apt-install
+    - name: Setup Python
+      id: setup_python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: '3.14'
+    - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      with:
+        save-cache: ${{ github.ref == 'refs/heads/main' }}
+        cache-suffix: ${{ steps.setup_python.outputs.python-version }}
+
+        version: 0.12.1
+    - name: Install deps
+      run: uv sync --no-binary-package lxml --no-binary-package xmlsec --all-extras --group types
+    - name: Run mypy
+      run: |
+        set +e
+        uv run --no-sync mypy --show-column-numbers weblate scripts/*.py ./*.py | ./scripts/filter-mypy.sh | tee mypy.log
+        # Temporary hack until we have mypy fully passing
+        mypy_err="$?"
+        if [ "$mypy_err" -ne 0 ] && [ "$mypy_err" -ne 1 ] ; then
+          exit "$mypy_err"
+        fi
+        if [ ! -s mypy.log ] ; then
+          echo "mypy log not found!"
+          exit 1
+        fi
+        # Use summary as step summary
+        tail -n1 mypy.log >> "$GITHUB_STEP_SUMMARY"
+        # Remove summary and .venv hints from the log
+        cp mypy.log mypy.log.tmp
+        head -n-1 mypy.log.tmp | grep -v '^\.venv/' > mypy.log
+        rm mypy.log.tmp
+    - name: Enforced mypy
+      # TODO: Enforce mypy to pass on certain modules, this should eventually grow to complete codebase
+      env:
+        EXCLUDED_MODULES: |
+          accounts/(admin|auth|avatar|forms|middleware|models|notifications|pipeline|strategy|utils|views|tests/(test_avatars|test_notifications|test_registration|test_twofactor|test_views))
+          addons/(base|gettext|resx|tests|views)
+          api/(docs|serializers|tests|views)
+          auth/(forms|models|permissions|views|management/commands/list_permissions|tests/test_models)
+          billing/(admin|models|tests|views|migrations/0007_migrate_owners)
+          checks/(chars|consistency|format|glossary|markup|placeholders|render|source|utils|views|management/commands/list_same_checks|tests/(test_glossary_checks|test_mdx|test_models))
+          fonts/(utils|views|tests/test_utils)
+          lang/(admin|models|tests|views)
+          machinery/(deepl|forms|llm|microsoft|modernmt|tests|tmserver|yandex|yandexv2|management/commands/list_machinery)
+          trans/(admin|autofixes/__init__|debug|feeds|management/commands/(add_suggestions|import_project|list_file_format_params|list_versions)|models/(agreement|comment|component|pending|translation|unit)|tests|views|widgets)
+          vcs/(git|github|gpg|tests/test_vcs)
+      run: |
+        echo "::add-matcher::.github/matchers/mypy.json"
+        excluded_modules="$(printf '%s' "$EXCLUDED_MODULES" | paste -sd '|' -)"
+        if grep --silent --invert-match --extended-regexp "^weblate/($excluded_modules)" mypy.log ; then
+          grep --invert-match --extended-regexp "^weblate/($excluded_modules)" mypy.log
+          exit 1
+        fi
+        echo "::remove-matcher owner=mypy::"
+    - name: Report mypy
+      run: |
+        echo "::add-matcher::.github/matchers/mypy.json"
+        if [ -f changed-files.txt ] ; then
+          if grep --silent --fixed-strings --file=changed-files.txt mypy.log ; then
+            grep --fixed-strings --file=changed-files.txt mypy.log
+          fi
+        else
+          cat mypy.log
+        fi
+        echo "::remove-matcher owner=mypy::"
