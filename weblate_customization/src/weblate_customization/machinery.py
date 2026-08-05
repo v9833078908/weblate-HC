@@ -57,9 +57,7 @@ class RoutedLLMMachineryForm(BaseOpenAIMachineryForm):
     def clean_routing(self) -> dict[str, str]:
         value = self.cleaned_data["routing"]
         if not isinstance(value, dict) or not value:
-            raise ValidationError(
-                gettext("Routing must be a non-empty JSON object.")
-            )
+            raise ValidationError(gettext("Routing must be a non-empty JSON object."))
 
         result: dict[str, str] = {}
         normalized_keys: dict[str, str] = {}
@@ -200,6 +198,29 @@ class RoutedLLMTranslation(OpenAITranslation):
         token = self._route_target.set(target_language)
         try:
             return super()._download_multiple_translations(
+                source_language,
+                target_language,
+                sources,
+                user,
+                threshold,
+                source_occurrences=source_occurrences,
+            )
+        finally:
+            self._route_target.reset(token)
+
+    async def _adownload_multiple_translations(
+        self,
+        source_language,
+        target_language,
+        sources: list[tuple[str, Unit | None]],
+        user: User | None = None,
+        threshold: int = MACHINERY_DEFAULT_THRESHOLD,
+        *,
+        source_occurrences: list[int] | None = None,
+    ) -> DownloadMultipleTranslations:
+        token = self._route_target.set(target_language)
+        try:
+            return await super()._adownload_multiple_translations(
                 source_language,
                 target_language,
                 sources,

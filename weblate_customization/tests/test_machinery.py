@@ -7,17 +7,20 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING, cast
 
-from typing import cast
-
+from asgiref.sync import async_to_sync
 from django.test import SimpleTestCase, TestCase
-
-from weblate.machinery.types import SettingsDict
-from weblate.utils.tests import http_mock
 from weblate_customization.machinery import (
     RoutedLLMMachineryForm,
     RoutedLLMTranslation,
 )
+
+from weblate.machinery.base import MachineTranslationError
+from weblate.utils.tests import http_mock
+
+if TYPE_CHECKING:
+    from weblate.machinery.types import SettingsDict
 
 DEEPSEEK = "deepseek/deepseek-chat-v3.1"
 GEMINI = "google/gemini-2.5-flash"
@@ -140,9 +143,7 @@ class RoutedLLMFormTest(TestCase):
 
 
 class RoutedResolveTest(SimpleTestCase):
-    def machine(
-        self, routing: dict[str, str] | None = None
-    ) -> RoutedLLMTranslation:
+    def machine(self, routing: dict[str, str] | None = None) -> RoutedLLMTranslation:
         configuration = dict(CONFIGURATION)
         if routing is not None:
             configuration["routing"] = routing
@@ -194,3 +195,93 @@ class RoutedSettingsValidationTest(TestCase):
 
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(sent_models(), [GEMINI])
+
+
+class RoutedDownloadTest(TestCase):
+    def machine(self, routing: dict[str, str] | None = None) -> RoutedLLMTranslation:
+        configuration = dict(CONFIGURATION)
+        if routing is not None:
+            configuration["routing"] = routing
+        machine = RoutedLLMTranslation(as_settings(configuration))
+        machine.delete_cache()
+        machine.cache_translations = False
+        return machine
+
+    @http_mock.activate
+    def test_sync_multiple_routes_cjk(self) -> None:
+        mock_chat()
+        result = self.machine().download_multiple_translations(
+            "en", "ja", [("Hello", None)]
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(sent_models(), [DEEPSEEK])
+
+    @http_mock.activate
+    def test_sync_pending_routes_fallback(self) -> None:
+        mock_chat('["Bonjour"]')
+        result = self.machine().download_pending_translations(
+            "en", "fr", [("Hello", None, 0)]
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(sent_models(), [GEMINI])
+
+    @http_mock.activate
+    def test_async_multiple_routes_cjk(self) -> None:
+        mock_chat()
+        result = async_to_sync(self.machine().adownload_multiple_translations)(
+            "en", "zh_Hans", [("Hello", None)]
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(sent_models(), [DEEPSEEK])
+
+    @http_mock.activate
+    def test_async_pending_routes_cjk(self) -> None:
+        mock_chat()
+        result = async_to_sync(self.machine().adownload_pending_translations)(
+            "en", "ja", [("Hello", None, 0)]
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(sent_models(), [DEEPSEEK])
+
+    @http_mock.activate
+    def test_no_models_endpoint_call(self) -> None:
+        mock_chat()
+        self.machine().download_multiple_translations("en", "ja", [("Hello", None)])
+
+        self.assertTrue(
+            all("/models" not in str(call.request.url) for call in http_mock.calls)
+        )
+
+    @http_mock.activate
+    def test_unsupported_language_fails_before_http(self) -> None:
+        machine = self.machine({"ja": DEEPSEEK})
+
+        with self.assertRaisesRegex(
+            MachineTranslationError, "No routed model for target language: fr"
+        ):
+            machine.download_multiple_translations("en", "fr", [("Hello", None)])
+
+        self.assertEqual(http_mock.calls, [])
+
+    @http_mock.activate
+    def test_route_context_is_reset_after_success(self) -> None:
+        mock_chat()
+        machine = self.machine()
+
+        machine.download_multiple_translations("en", "ja", [("Hello", None)])
+
+        self.assertEqual(machine.get_model(), GEMINI)
+
+    @http_mock.activate
+    def test_route_context_is_reset_after_parser_error(self) -> None:
+        mock_chat("not JSON")
+        machine = self.machine()
+
+        with self.assertRaises(MachineTranslationError):
+            machine.download_multiple_translations("en", "ja", [("Hello", None)])
+
+        self.assertEqual(machine.get_model(), GEMINI)
