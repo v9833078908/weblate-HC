@@ -1,4 +1,9 @@
-"""Hero Craft game markup checks.
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""
+Hero Craft game markup checks.
 
 Validates Unity rich-text tags and engine placeholders that stock Weblate
 checks miss: <color=#RRGGBB>, <link>, <size=N>, <b>, {0}/{c}, %KEY%.
@@ -17,19 +22,17 @@ TAG_PATTERN = regex.compile(
     regex.IGNORECASE,
 )
 # Engine placeholders: {0}, {c}, {1}, {SEASON}, %PLAYER, %SHIP%
-PLACEHOLDER_PATTERN = regex.compile(
-    r"\{[^{}]*\}|%[A-Z][A-Z0-9_]+%"
-)
+PLACEHOLDER_PATTERN = regex.compile(r"\{[^{}]*\}|%[A-Z][A-Z0-9_]+%")
 
 
 def _tokens(text: str) -> list[str]:
     """Extract ordered markup tokens (tags with attrs + placeholders)."""
-    out = []
-    for match in regex.finditer(
-        rf"(?:{TAG_PATTERN.pattern})|(?:{PLACEHOLDER_PATTERN.pattern})", text
-    ):
-        out.append(match.group())
-    return out
+    return [
+        match.group()
+        for match in regex.finditer(
+            rf"(?:{TAG_PATTERN.pattern})|(?:{PLACEHOLDER_PATTERN.pattern})", text
+        )
+    ]
 
 
 class GameMarkupCheck(TargetCheck):

@@ -285,3 +285,15 @@ class RoutedDownloadTest(TestCase):
             machine.download_multiple_translations("en", "ja", [("Hello", None)])
 
         self.assertEqual(machine.get_model(), GEMINI)
+
+    @http_mock.activate
+    def test_async_route_context_is_reset_after_parser_error(self) -> None:
+        mock_chat("not JSON")
+        machine = self.machine()
+
+        with self.assertRaises(MachineTranslationError):
+            async_to_sync(machine.adownload_multiple_translations)(
+                "en", "ja", [("Hello", None)]
+            )
+
+        self.assertEqual(machine.get_model(), GEMINI)

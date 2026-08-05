@@ -27,6 +27,22 @@ SPDX-FileCopyrightText = "Michal Čihař <michal@weblate.org>"
 SPDX-License-Identifier = "GPL-3.0-or-later"
 
 [[annotations]]
+path = [
+  "docs/**.md",
+  "hcgameloc.egg-info/**",
+  "weblate_customization/pyproject.toml"
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "HCGameLoc"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+[[annotations]]
+path = ["weblate-mcp/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "mmntm"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
 path = ["docs/contributing/code_of_conduct.rst"]
 SPDX-FileCopyrightText = "Michal Čihař <michal@weblate.org>"
 SPDX-License-Identifier = "CC-BY-SA-4.0"

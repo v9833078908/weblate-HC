@@ -779,6 +779,7 @@ Vai = "Vai"  # Language name
 # Name
 Automattic = "Automattic"
 billling = "billing"
+Certifi = "Certifi"
 # Used in settings, but could be fixed
 COMMITER = "COMMITER"  # codespell:ignore
 hasttr = "hasattr"

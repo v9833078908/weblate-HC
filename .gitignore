@@ -44,4 +44,6 @@ weblate-*.tar.*
 /.codex
 /.mypy_cache
 /.mcp.json
+/.omx/
+/weblate-mcp/
 /*..egg-info/

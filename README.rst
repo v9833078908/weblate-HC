@@ -146,8 +146,8 @@ Dev-инстанс целиком работает в Docker (``dev-docker/``) �
 
 .. code-block:: sh
 
-   WEBLATE_PORT=3001 ./rundev.sh          # сборка + запуск (пересоздаёт контейнеры)
-   ./rundev.sh logs -f weblate            # смотреть логи
+   WEBLATE_PORT=3001 ./rundev.sh # сборка + запуск (пересоздаёт контейнеры)
+   ./rundev.sh logs -f weblate # смотреть логи
    ./rundev.sh stop
 
 По умолчанию ``rundev.sh`` использует порт ``8080``, но этот деплой работает на
@@ -167,8 +167,8 @@ Dev-инстанс целиком работает в Docker (``dev-docker/``) �
 
 .. code-block:: sh
 
-   ./rundev.sh test weblate/checks/tests/test_markup.py   # pytest в контейнере
-   ./rundev.sh check                                      # django `weblate check`
+   ./rundev.sh test weblate/checks/tests/test_markup.py # pytest в контейнере
+   ./rundev.sh check # django `weblate check`
 
 Проверка game-markup
 --------------------
@@ -229,8 +229,8 @@ MCP-сервер
 .. code-block:: sh
 
    cd weblate-mcp
-   pnpm install && pnpm build   # dist/main.js — stdio-точка входа
-   pnpm dev                     # nest start --watch
+   pnpm install && pnpm build # dist/main.js — stdio-точка входа
+   pnpm dev # nest start --watch
    pnpm test
 
 Его ``.env`` указывает на ``http://localhost:3001/api/``. Если MCP-сервер не
@@ -251,9 +251,9 @@ dev-зависимости:
 
 .. code-block:: sh
 
-   uv run pytest weblate/utils/tests/test_search.py         # один файл
-   uv run pytest weblate/trans/tests/test_views.py -k slug   # один тест
-   uv run prek run --all-files                               # линт/формат (Ruff)
+   uv run pytest weblate/utils/tests/test_search.py # один файл
+   uv run pytest weblate/trans/tests/test_views.py -k slug # один тест
+   uv run prek run --all-files # линт/формат (Ruff)
    uv run pylint weblate/ scripts/
    uv run mypy --show-column-numbers weblate scripts/*.py ./*.py | ./scripts/filter-mypy.sh
 
