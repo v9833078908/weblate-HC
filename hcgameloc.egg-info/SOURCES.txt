@@ -1960,3 +1960,7 @@ weblate/workspaces/migrations/0004_workspace_metric_id.py
 weblate/workspaces/migrations/__init__.py
 weblate_customization/src/weblate_customization/__init__.py
 weblate_customization/src/weblate_customization/checks.py
+weblate_customization/src/weblate_customization/machinery.py
+weblate_customization/tests/__init__.py
+weblate_customization/tests/test_checks.py
+weblate_customization/tests/test_machinery.py

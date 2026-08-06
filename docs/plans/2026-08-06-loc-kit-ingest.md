@@ -1,6 +1,14 @@
 # Loc-kit Ingest Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+>
+> **Status (2026-08-06): implemented and verified.** Deviations from this plan
+> are documented in `docs/specs/loc-kit-ingest.md`: the profile is now inferred
+> from the kit's header row (`infer.py`, `--profile` became optional evidence
+> output), and the component-creation UI accepts kits directly through the
+> universal "Upload translation files" tab (`create_component_from_kit`,
+> discovery skipped). 127 standalone + 14 Weblate contract tests, live LLM
+> smoke passed, manual UI smoke performed on `heart-abyss/temple`.
 
 **Goal:** Build `python -m loc_kit_ingest`, an atomic, profile-driven one-shot
 importer that converts XLSX/CSV/TSV kits into Weblate-compatible monolingual PO
@@ -121,6 +129,7 @@ profile language codes.
 ## Task 0: Create a standalone package harness and anonymized fixtures
 
 **Files:**
+
 - Create: `loc_kit_ingest/__init__.py`
 - Create: `loc_kit_ingest/__main__.py`
 - Create: `loc_kit_ingest/cli.py`
@@ -239,6 +248,7 @@ git commit -m "chore(loc-ingest): scaffold standalone test harness"
 ## Task 1: Add immutable domain records and typed diagnostics
 
 **Files:**
+
 - Create: `loc_kit_ingest/model.py`
 - Test: `loc_kit_ingest/tests/test_model.py`
 
@@ -279,7 +289,9 @@ def test_glossary_term_keeps_explanations_per_language():
 
 
 def test_diagnostic_and_skip_are_typed():
-    diagnostic = Diagnostic(Severity.ERROR, "profile.unknown_field", "UI", "Sheet", 2, "bad")
+    diagnostic = Diagnostic(
+        Severity.ERROR, "profile.unknown_field", "UI", "Sheet", 2, "bad"
+    )
     skipped = SkippedRow("Temple", "Temple", 9, "blank")
     assert diagnostic.severity is Severity.ERROR
     assert skipped.reason == "blank"
@@ -326,6 +338,7 @@ git commit -m "feat(loc-ingest): add normalized units and diagnostics"
 ## Task 2: Parse and validate the strict versioned profile
 
 **Files:**
+
 - Create: `loc_kit_ingest/profile.py`
 - Test: `loc_kit_ingest/tests/test_profile.py`
 
@@ -342,7 +355,9 @@ from loc_kit_ingest.profile import ProfileError, load_profile
 
 def test_profile_requires_the_only_supported_schema_version(tmp_path):
     path = tmp_path / "kit.loc-ingest.json"
-    path.write_text(json.dumps({"schema_version": 2, "components": []}), encoding="utf-8")
+    path.write_text(
+        json.dumps({"schema_version": 2, "components": []}), encoding="utf-8"
+    )
     with pytest.raises(ProfileError, match="schema_version"):
         load_profile(path)
 
@@ -355,7 +370,9 @@ def test_profile_rejects_unknown_fields(tmp_path, valid_profile):
         load_profile(path)
 
 
-def test_profile_rejects_unsafe_or_casefold_colliding_component_names(valid_profile, tmp_path):
+def test_profile_rejects_unsafe_or_casefold_colliding_component_names(
+    valid_profile, tmp_path
+):
     valid_profile["components"][0]["component"] = "../escape"
     path = tmp_path / "kit.loc-ingest.json"
     path.write_text(json.dumps(valid_profile), encoding="utf-8")
@@ -444,6 +461,7 @@ git commit -m "feat(loc-ingest): require strict versioned input profiles"
 ## Task 3: Read source files and validate profile-to-sheet headers
 
 **Files:**
+
 - Create: `loc_kit_ingest/reader.py`
 - Test: `loc_kit_ingest/tests/test_reader.py`
 
@@ -455,7 +473,7 @@ from loc_kit_ingest.reader import read_sheets, validate_sheet_headers
 
 def test_csv_preserves_quoted_newlines_bom_and_trailing_spaces(tmp_path):
     path = tmp_path / "Kit.csv"
-    path.write_bytes(b"\xef\xbb\xbfid,ru,en\r\nkey,\" x\r\ny \",text \r\n")
+    path.write_bytes(b'\xef\xbb\xbfid,ru,en\r\nkey," x\r\ny ",text \r\n')
     rows = read_sheets(path)["Kit"]
     assert rows[1] == ["key", " x\r\ny ", "text "]
 
@@ -510,6 +528,7 @@ git commit -m "feat(loc-ingest): read kits and validate declared sheet headers"
 ## Task 4: Parse explicit keyed rows for PO components
 
 **Files:**
+
 - Create: `loc_kit_ingest/parser.py`
 - Test: `loc_kit_ingest/tests/test_parser_po.py`
 
@@ -519,7 +538,9 @@ git commit -m "feat(loc-ingest): read kits and validate declared sheet headers"
 from loc_kit_ingest.parser import parse_component
 
 
-def test_keyed_parser_keeps_markup_whitespace_comments_and_references(temple_profile, temple_rows):
+def test_keyed_parser_keeps_markup_whitespace_comments_and_references(
+    temple_profile, temple_rows
+):
     result = parse_component(temple_profile, temple_rows)
     unit = result.units[0]
     assert unit.key == "sample_key"
@@ -590,6 +611,7 @@ git commit -m "feat(loc-ingest): parse deterministic keyed PO rows"
 ## Task 5: Parse explicit Terms pair regions with per-language explanations
 
 **Files:**
+
 - Modify: `loc_kit_ingest/parser.py`
 - Test: `loc_kit_ingest/tests/test_parser_tbx.py`
 
@@ -599,7 +621,9 @@ git commit -m "feat(loc-ingest): parse deterministic keyed PO rows"
 from loc_kit_ingest.parser import parse_component
 
 
-def test_glossary_pairs_preserve_source_and_target_explanations(terms_profile, terms_rows):
+def test_glossary_pairs_preserve_source_and_target_explanations(
+    terms_profile, terms_rows
+):
     result = parse_component(terms_profile, terms_rows)
     term = result.units[0]
     assert term.context == "characters.hero"
@@ -668,6 +692,7 @@ git commit -m "feat(loc-ingest): parse profiled glossary term-description pairs"
 ## Task 6: Render PO and bilingual TBX, then parse them back
 
 **Files:**
+
 - Create: `loc_kit_ingest/writer.py`
 - Test: `loc_kit_ingest/tests/test_writer.py`
 
@@ -766,6 +791,7 @@ git commit -m "feat(loc-ingest): render validated PO and bilingual TBX files"
 ## Task 7: Orchestrate all components with staged atomic publication
 
 **Files:**
+
 - Create: `loc_kit_ingest/pipeline.py`
 - Modify: `loc_kit_ingest/cli.py`
 - Modify: `loc_kit_ingest/__main__.py`
@@ -781,7 +807,9 @@ from loc_kit_ingest.cli import main
 def test_cli_publishes_all_components_and_archives(tmp_path, kit_with_profile):
     kit, profile = kit_with_profile
     output = tmp_path / "out"
-    assert main([str(kit), "--profile", str(profile), "--out", str(output), "--zip"]) == 0
+    assert (
+        main([str(kit), "--profile", str(profile), "--out", str(output), "--zip"]) == 0
+    )
     assert (output / "Temple" / "ru.po").is_file()
     assert (output / "Terms" / "tbx" / "en.tbx").is_file()
     assert (output / "Terms.zip").is_file()
@@ -791,7 +819,10 @@ def test_cli_publishes_all_components_and_archives(tmp_path, kit_with_profile):
 def test_late_component_error_leaves_no_artifacts(tmp_path, kit_with_profile):
     kit, profile = kit_with_profile
     output = tmp_path / "out"
-    profile.write_text(profile.read_text(encoding="utf-8").replace('"en"', '"missing"', 1), encoding="utf-8")
+    profile.write_text(
+        profile.read_text(encoding="utf-8").replace('"en"', '"missing"', 1),
+        encoding="utf-8",
+    )
     assert main([str(kit), "--profile", str(profile), "--out", str(output)]) == 2
     assert not output.exists()
 
@@ -860,6 +891,7 @@ git commit -m "feat(loc-ingest): publish profile-driven artifacts atomically"
 ## Task 8: Complete the standalone regression and failure matrix
 
 **Files:**
+
 - Modify: `loc_kit_ingest/tests/conftest.py`
 - Modify: `loc_kit_ingest/tests/fixtures/*`
 - Create: `loc_kit_ingest/tests/test_regressions.py`
@@ -891,10 +923,14 @@ from loc_kit_ingest.cli import main
         ("zip_failure", "zip.failed"),
     ],
 )
-def test_every_fatal_contract_leaves_output_untouched(tmp_path, mutation, expected_code, mutated_kit):
+def test_every_fatal_contract_leaves_output_untouched(
+    tmp_path, mutation, expected_code, mutated_kit
+):
     kit, profile = mutated_kit(mutation)
     output = tmp_path / "out"
-    assert main([str(kit), "--profile", str(profile), "--out", str(output), "--zip"]) == 2
+    assert (
+        main([str(kit), "--profile", str(profile), "--out", str(output), "--zip"]) == 2
+    )
     assert not output.exists()
 ```
 
@@ -929,6 +965,7 @@ git commit -m "test(loc-ingest): cover boundary regressions and atomic failures"
 ## Task 9: Add automated Weblate PO/TBX and LLM-payload contract tests
 
 **Files:**
+
 - Create: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
 - Modify: `loc_kit_ingest/tests/conftest.py` only if a reusable synthetic writer
   fixture is needed
@@ -987,6 +1024,7 @@ git commit -m "test(loc-ingest): verify generated files through Weblate"
 ## Task 10: Add an opt-in live Routed LLM smoke and manual import runbook
 
 **Files:**
+
 - Create: `weblate_customization/tests/test_loc_kit_ingest_live.py`
 - Modify: `docs/specs/loc-kit-ingest.md` only if the observed UI labels differ
 
@@ -1064,6 +1102,7 @@ git commit -m "test(loc-ingest): add opt-in glossary LLM smoke"
 ## Task 11: Final verification and documentation audit
 
 **Files:**
+
 - Modify: `docs/specs/loc-kit-ingest.md` only for observed runbook corrections
 - Modify: `docs/plans/2026-08-06-loc-kit-ingest.md` only if implementation
   discovers a plan defect

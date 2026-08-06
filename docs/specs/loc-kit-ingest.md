@@ -1,8 +1,10 @@
-# Импорт лок-китов: профиль → Weblate (разовый онбординг-сев)
+# Импорт лок-китов: кит → Weblate (разовый онбординг-сев)
 
-Как один раз перенести лок-кит игры Hero Craft из Excel/CSV/TSV в Weblate. CLI
-разбирает таблицу только по явному JSON-профилю, создаёт совместимые с Weblate
-артефакты и передаёт источник правды Weblate.
+Как один раз перенести лок-кит игры Hero Craft из Excel/CSV/TSV в Weblate.
+Два равноправных входа: универсальная загрузка в UI («Отправить файлы
+перевода» принимает сам кит) и CLI `python -m loc_kit_ingest`. Оба выводят
+профиль из заголовка кита, создают совместимые с Weblate артефакты и передают
+источник правды Weblate.
 
 План реализации: `docs/plans/2026-08-06-loc-kit-ingest.md`.
 
@@ -20,9 +22,11 @@ Routed LLM).
 - **Точка невозврата** - первый начатый перевод. До неё неверный seed исправляют
   удалением компонента, исправлением таблицы/профиля и повторным импортом. После
   неё пересев запрещён.
-- **Импортёр не угадывает.** Профиль обязателен, источник языка в нём обязателен,
-  строки и колонки имеют заданную грамматику. Автоопределения, алиасов заголовков,
-  hint-файлов и `--source-lang` нет.
+- **Импортёр не угадывает при парсинге.** Разбор всегда идёт по строгому
+  профилю с закрытой схемой. Профиль выводится из заголовка кита один раз,
+  до разбора, письменно: каждое решение попадает в отчёт, документ
+  сохраняется в выход (`profile.loc-ingest.json`) и может быть поправлен и
+  передан через `--profile`. `--source-lang` переопределяет язык-источник.
 - **Атомарность важнее частичного результата.** Структурная ошибка в любом листе,
   при записи формата или ZIP не публикует ни одного файла и не меняет ранее
   существующий каталог назначения.
@@ -315,33 +319,41 @@ creates one archive per component with the component's files at the ZIP root:
 
 ## UI-сценарии
 
-- **C1 - PO component:** CLI → `Temple.zip`/`UI.zip` → Weblate project →
-  "Upload translation files" → Discover. Check unit count against `report.txt`,
-  key/context, `Character` developer comment, UI Id location and valid markup.
-- **C2 - warning before go-live:** fix table/profile → rerun CLI → delete and
-  recreate component. Warnings are visible evidence, not silent data repair.
+- **C1 - строковый компонент из кита (основной путь):** проект → «Добавить
+  компонент» → вкладка «Отправить файлы перевода» → выбрать сам CSV/TSV/XLSX.
+  Create-форма приходит заполненной (`po-mono`, `*.po`, шаблон и язык-источник
+  из кита), отчёт конверсии - сообщениями интерфейса. Проверить число строк,
+  key/context, `Character` developer comment, UI Id location и разметку.
+  CLI-вариант того же: `Temple.zip` через ту же вкладку (ZIP идёт историческим
+  путём с Discover).
+- **C2 - ошибки до go-live:** дубликаты ключей блокируют загрузку со списком
+  строк («first seen at row N») - починить таблицу и загрузить заново;
+  предупреждения (wrong script, пустые target) видимы, но не блокируют.
+  Warnings are visible evidence, not silent data repair.
 - **C3 - Terms glossary:** upload `Terms.zip`, configure `tbx/*.tbx`, empty
   base/template, source language and glossary checkbox. Check a term's source
   and target explanations in glossary UI.
 - **C4 - glossary before LLM:** translate and review Terms first. An empty target
   glossary term is intentionally omitted by LLM payload construction. Then run
   Routed LLM for a regular component per target language.
-- **C5 - post-import:** add target languages, attach `routed-llm`, enable
-  `game-markup` through `WEBLATE_ADD_CHECK`, and configure PO formatting before
-  the first VCS commit when needed.
+- **C5 - post-import:** add target languages, attach `openrouter` machinery,
+  enable `game-markup` through `WEBLATE_ADD_CHECK`, and configure PO formatting
+  before the first VCS commit when needed.
 
 ## Verification contract
 
 1. Fast standalone tests use anonymized fixtures and exercise strict profile,
-   reader, both parsers, diagnostics, renderers, atomic failure matrix and ZIP
-   contents. No Django database is loaded.
+   header inference, reader, both parsers, diagnostics, renderers, atomic
+   failure matrix and ZIP contents. No Django database is loaded.
 2. Weblate contract tests run under the repository test settings and load the
-   generated PO/TBX through Weblate's actual formats/components. They assert
-   key/context/source/target, comments/references, TBX explanation fields and
-   LLM glossary payload structure.
-3. A live LLM smoke is opt-in (`LOC_INGEST_LIVE_LLM=1`), marked non-CI, scoped
-   to a tiny temporary glossary/component and has an explicit OpenRouter-key
-   prerequisite. It verifies one real routed response only after the deterministic
-   payload contract is green.
-4. The final manual smoke uploads one generated PO ZIP and one TBX ZIP to the
-   local Weblate instance at `localhost:3001` and verifies C1-C4.
+   generated PO/TBX through Weblate's actual formats/components, plus drive the
+   universal upload view end to end (CSV in, live component out: N languages,
+   context=key, developer comments). They assert key/context/source/target,
+   comments/references, TBX explanation fields and LLM glossary payload
+   structure.
+3. A live LLM smoke is opt-in (`LOC_INGEST_LIVE_LLM=1`) and reads the
+   `openrouter` machinery configuration from the live database; it spends
+   exactly one real request through `download_multiple_translations`.
+   Verified passing on 2026-08-06.
+4. The manual smoke uploads a real kit CSV through the UI at `localhost:3001`
+   and verifies C1-C2 on a live component (performed on `heart-abyss/temple`).

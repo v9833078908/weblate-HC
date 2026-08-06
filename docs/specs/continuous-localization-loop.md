@@ -5,7 +5,7 @@ Weblate → переводчик перевёл → перевод сам вер
 
 Проверено живьём на дев-стенде (проект `pirate-ships`, компонент `localization`):
 
-```
+```text
 3f79cb5 chore(l10n): update Russian translation   <- коммит Weblate (автопуш)
 c50f83a feat(loc): add cannon_reload_hint string  <- коммит разработчика
 ```
@@ -17,7 +17,7 @@ c50f83a feat(loc): add cannon_reload_hint string  <- коммит разрабо
 
 ## Схема цикла
 
-```
+```text
 Разработчик                  Weblate                         Переводчик
     |                           |                                |
     | 1. новый ключ в en.json   |                                |
@@ -56,6 +56,12 @@ c50f83a feat(loc): add cannon_reload_hint string  <- коммит разрабо
   «игровой Id» Weblate не хранит: лишние колонки отбрасываются при импорте
   (если Id нужен в каждой выгрузке — класть его в `location` при импорте,
   либо сшивать по ключу на выходе).
+
+Первичный сев таких компонентов из лок-кита (CSV/TSV/XLSX) делает
+`loc_kit_ingest` (см. `docs/specs/loc-kit-ingest.md`): для строковых
+компонентов он выдаёт монолингвальный PO, где игровой Id - это ключ
+(`context`), колонка персонажа - developer comment, числовые колонки -
+`location`.
 
 ### 2. Компонент: поля, которые определяют цикл
 

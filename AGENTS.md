@@ -157,6 +157,19 @@ Repository-specific parts:
   at `http://localhost:3001/api/`.
 - `docs/plans/`, `docs/specs/` - planning and design docs (in Russian) for
   game-localization workflows, e.g. `llm-judge-external-pipeline.md`.
+- `loc_kit_ingest/` (tracked) - standalone loc-kit importer package (no Django
+  imports): `reader.py` (CSV/TSV/XLSX), `infer.py` (derives a strict profile
+  from the kit's own header row), `parser.py`, `writer.py` (monolingual PO +
+  bilingual TBX with parse-back validation), `pipeline.py`/`cli.py` (atomic
+  `python -m loc_kit_ingest`). The component-creation UI consumes it through
+  `weblate/utils/views.py:create_component_from_kit`: the "Upload translation
+  files" tab accepts CSV/TSV/XLSX kits directly (converted to po-mono,
+  discovery skipped) as well as ZIP. Standalone tests:
+  `cd loc_kit_ingest && uv run pytest` (no DB). Weblate-level tests:
+  `weblate/trans/tests/test_loc_kit_ingest_contract.py`. The running container
+  imports the package from `/app/data/python`, so after editing it run
+  `cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/`. Spec:
+  `docs/specs/loc-kit-ingest.md`.
 
 Local modifications to `dev-docker/docker-compose.yml`: Postgres published on
 `5434` (5433 is taken by another project) and `WEBLATE_VCS_ALLOW_SCHEMES` extended
