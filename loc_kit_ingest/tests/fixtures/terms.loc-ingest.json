@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "sheet": "terms",
+      "component": "Terms",
+      "kind": "tbx",
+      "source_lang": "ru",
+      "header_row": 1,
+      "languages": [
+        {"code": "ru", "xml_lang": "ru", "column": 1, "header": "ru"},
+        {"code": "en", "xml_lang": "en", "column": 2, "header": "en"},
+        {"code": "ja", "xml_lang": "ja", "column": 3, "header": "ja"}
+      ],
+      "grammar": {
+        "type": "term-description-pairs",
+        "skip_rows": [2],
+        "regions": [
+          {"section_row": 3, "first_term_row": 4, "last_description_row": 7},
+          {"section_row": 8, "first_term_row": 9, "last_description_row": 10}
+        ]
+      },
+      "key_language": "en",
+      "initial_target_languages": ["en", "ja"]
+    }
+  ]
+}

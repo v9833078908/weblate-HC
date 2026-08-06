@@ -1,180 +1,323 @@
-# Импорт лок-китов: таблица → Weblate (разовый онбординг-сев)
+# Импорт лок-китов: профиль → Weblate (разовый онбординг-сев)
 
-Как загрузить лок-кит игры Hero Craft (Excel / Google Sheets) в Weblate: один
-раз разобрать «сырую» таблицу в чистые пофайловые переводы и завести компоненты.
-Цель — снять продюсеров с таблиц на единое решение (Weblate).
+Как один раз перенести лок-кит игры Hero Craft из Excel/CSV/TSV в Weblate. CLI
+разбирает таблицу только по явному JSON-профилю, создаёт совместимые с Weblate
+артефакты и передаёт источник правды Weblate.
 
 План реализации: `docs/plans/2026-08-06-loc-kit-ingest.md`.
 
-Проверено на реальных китах Heart Abyss: `Temple.csv` (диалоги), `Terms.csv`
-(глоссарий/лор), `UI.xlsx` (UI-строки). Смежные конвенции форка:
-`docs/specs/continuous-localization-loop.md` (git ↔ Weblate, игровой Id → `location`),
-`weblate_customization/` (`game-markup`-чек, routed-LLM).
+Проверено как вход: `Temple.csv` (диалоги), `Terms.csv` (глоссарий/лор) и
+`UI.xlsx` (UI-строки). Реальные киты не попадают в тестовые фикстуры. Смежные
+конвенции форка: `docs/specs/continuous-localization-loop.md` (git ↔ Weblate,
+игровой Id → location), `weblate_customization/` (`game-markup`-check и
+Routed LLM).
 
-## Контекст и принятые решения
+## Контекст и границы
 
-- **Направление правды: Weblate — источник истины, таблица — разовый seed.**
-  Импорт одноразовый на игру. Дальше правки и переводы живут в Weblate + git,
-  движок получает экспорт из Weblate. Двусторонней синхронизации нет — это
-  осознанный отказ (два источника правды = вечные конфликты).
-- **Следствия для продукта:** ключи генерируются один раз; идемпотентность и
-  повторный импорт не нужны; нет политики слияния с правками Weblate; нет
-  обратной записи в таблицу. Пересев возможен только до старта перевода
-  («точка невозврата»).
-- **Канонический формат в git Weblate — монолингвальный PO** (`PO-файл gettext
-  (одноязычный)`), один на все игры HC. Причина — метаданные китов, которые
-  нельзя терять: имя говорящего (`Character`) и числовой Id движка из `UI.xlsx`.
-  PO несёт их штатно; плоский JSON — нет (см. «Канонический формат»).
-- **Парсер стоит ПЕРЕД Weblate.** Weblate не парсит xlsx и разнородные CSV;
-  его нативный ZIP-импорт принимает только уже-совместимые файлы. Поэтому
-  «сырой» кит Weblate не отдаём — только нормализованный PO.
+- **Weblate - источник истины; таблица - одноразовый seed.** После начала
+  перевода правки и переводы живут в Weblate + git. Обратной записи в таблицу,
+  слияния и повторного импорта нет.
+- **Точка невозврата** - первый начатый перевод. До неё неверный seed исправляют
+  удалением компонента, исправлением таблицы/профиля и повторным импортом. После
+  неё пересев запрещён.
+- **Импортёр не угадывает.** Профиль обязателен, источник языка в нём обязателен,
+  строки и колонки имеют заданную грамматику. Автоопределения, алиасов заголовков,
+  hint-файлов и `--source-lang` нет.
+- **Атомарность важнее частичного результата.** Структурная ошибка в любом листе,
+  при записи формата или ZIP не публикует ни одного файла и не меняет ранее
+  существующий каталог назначения.
+- **Формат зависит от назначения.** Диалоги и UI используют монолингвальный PO;
+  Terms использует двуязычный TBX по целевому языку, потому что только TBX
+  сохраняет source/target explanations глоссария для LLM.
 
-## Входные форматы
+Не поддерживаем на старте Google Sheets API, экспорт обратно в формат движка,
+двустороннюю синхронизацию и повторный/idempotent import.
 
-| Формат | Чем читаем | Примечание |
-|---|---|---|
-| `.xlsx` (мультилист) | `openpyxl` | Основной: один файл = весь кит, все листы, надёжные многострочные ячейки |
-| `.csv` / `.tsv` | stdlib `csv` | Выгрузка одной вкладки Google Sheets (UTF-8) |
+## Вход и обязательный JSON-профиль
 
-Не поддерживаем на старте: Google Sheets по API (OAuth — отдельная сложность,
-YAGNI); прочие форматы перевода (их Weblate читает сам).
+Поддерживаются `.xlsx`, `.csv` и `.tsv`: `openpyxl` для XLSX и стандартный
+`csv` для UTF-8/UTF-8-BOM CSV/TSV. CSV/TSV имеет один лист с именем stem файла;
+XLSX использует имена листов без переименования.
 
-## Раскладка листа и автоопределение
-
-Киты разнородны — парсер определяет раскладку каждого листа сам, без кода на файл.
-
-Наблюдаемые раскладки:
-
-| Кит | Ключ | Метаданные | Языки | Особенности |
-|---|---|---|---|---|
-| Temple | `id` | `Character` (без заголовка) | `ru en fr it de ja ko pt-PT zh-CN zh-TC es` | строка-метка `id-ignore`, пустые строки-разделители, теги `[shake][color]` |
-| Terms | нет | нет | те же | строки парами: термин → описание-биография; заголовки секций («Персонажи») — обычные короткие строки; компонент = **глоссарий** |
-| UI | `Key` + числовой `Id` | `Id` (движковый) | `en ru` | титульная строка `UI`, Unity-разметка `<size><color>`, `{value:cond:…}`, `&#13;` |
-
-Алгоритм:
-
-1. **Строка заголовка** — первая строка, где ≥2 ячеек матчатся на языки или есть
-   `id`/`Key`. Титульные строки (`UI`) пропускаются.
-2. **Языковые колонки** — заголовки матчатся через словарь алиасов → коды Weblate:
-   `ru/Russian`, `en/English`, `fr it de es`, `ja/日本語`, `ko`, `pt-PT→pt_PT`,
-   `zh-CN/简体中文→zh_Hans`, `zh-TC/繁體中文→zh_Hant`.
-3. **Ключ** — колонка `id`/`Key`/`ключ`. Если их две (UI: `Key` + числовой `Id`) —
-   нечисловой → ключ юнита, числовой → reference. Ключа нет (Terms) → слаг из
-   исходной строки + префикс секции + счётчик коллизий.
-4. **Метаданные** — незаматченные текстовые колонки (`Character`) → комментарий юнита.
-5. **Исходный язык** — на кит автоматически (самая заполненная из `ru`/`en`),
-   с ручным оверрайдом. В примерах он разный: Terms → `ru`, UI → `en`.
-6. **Мусор:** строки-метки (`id-ignore`; строка со значениями = названиям языков) →
-   skip; строки-секции (заполнены только первые 1–2 колонки) → становятся текущей
-   секцией/группой; пустые строки → skip.
-7. **Пары термин+описание (keyless):** в ките без ключей строка с исходным текстом
-   длиннее ~200 символов присоединяется как описание (`#.`) к предыдущему юниту —
-   биографии Terms не становятся фиктивными «терминами». Слаги строятся из
-   en-значения (латиница), кириллица в слаге не теряется.
-
-**Escape hatch:** рядом с китом можно положить хинт (YAML/JSON: `key_column`,
-`source_lang`, `meta_columns`, `lang_aliases`), переопределяющий автоопределение.
-Convention over configuration — типовое определяется само, странное настраивается.
-
-## Маппинг в Weblate
-
-```
-Heart Abyss.xlsx
-  ├─ лист Temple → компонент "Temple"   маска Temple/*.po, шаблон Temple/ru.po
-  ├─ лист Terms  → компонент "Terms"    маска Terms/*.po,  шаблон Terms/ru.po
-  └─ лист UI     → компонент "UI"       маска UI/*.po,     шаблон UI/en.po
-```
-
-Проект Weblate = игра. Лист таблицы = компонент. На компонент: шаблон исходного
-языка + по файлу на каждый язык.
-
-`Terms` заводится с флагом **«Использовать в качестве словаря»** (glossary):
-его термины матчатся в строках других компонентов проекта и автоматически
-попадают в LLM-промпт автоперевода (`weblate/machinery/llm.py`, `glossary` в
-схеме промпта). Термин без перевода на целевой язык в промпт не попадает
-(`_get_glossary_entry` отбрасывает пустой `target`) — поэтому глоссарий
-переводится первым (сценарий С7).
-
-## Канонический формат: монолингвальный PO
-
-| Элемент кита | В PO | Виден переводчику как |
-|---|---|---|
-| Ключ (`id`/`Key`/слаг) | `msgid` | контекст строки |
-| Строка на языке | `msgstr` (в шаблоне — исходный текст) | source / target |
-| `Character`, заметки | `#.` (extracted comment) | комментарий |
-| Числовой Id движка | `#:` (reference / location) | «расположение» |
-| Игровая разметка | внутри `msgstr`, байт-в-байт | текст (проверит `game-markup`) |
-
-Числовой Id в `#:`/`location` — та же конвенция, что уже описана в
-`continuous-localization-loop.md`: Weblate игровой Id не хранит как поле, он
-живёт в `location`. Так Id доживает до будущего экспорта в формат движка.
-
-## Грязные данные и валидационный отчёт
-
-Импорт не молчит. Предупреждения (не роняют импорт, строка всё равно заводится):
-
-- `en == ru` — непереведённая заглушка;
-- вероятный сдвиг колонки — текст не на том алфавите (кириллица в `en`-ячейке и
-  наоборот; так в Temple стр. 82, 204);
-- заметка вместо перевода — текст в языковой ячейке при пустом исходнике;
-- дубликаты ключей; осиротевшие метаданные.
-
-Структурные ошибки (не найден заголовок / нет языковых колонок) — роняют импорт
-с внятным сообщением. Отчёт (stdout + файл): на лист — взято N, пропущено M
-(с причинами), K предупреждений с адресами `лист!строка`.
-
-## Форма продукта (CLI)
-
-Отдельный трекаемый пакет-препроцессор в форке (рядом с `weblate_customization`,
-вне Django-приложения). Запуск:
+Запуск всегда получает профиль явно; sidecar хранится рядом с китом, но не
+ищется неявно:
 
 ```sh
-loc-ingest "Heart Abyss.xlsx" -o out/
-# -> out/Temple/{ru,en,…}.po (+ шаблон), out/Terms/…, out/UI/…, отчёт
-loc-ingest "Heart Abyss.xlsx" -o out/ --zip   # + архив на компонент под «Отправить файлы перевода»
+uv run python -m loc_kit_ingest \
+  "/path/Heart Abyss_Localization - Temple.csv" \
+  --profile "/path/Temple.loc-ingest.json" \
+  --out /tmp/heart-abyss-seed --zip
 ```
 
-Зависимости: `openpyxl` (xlsx), stdlib `csv`, translate-toolkit `pofile` (уже в
-Weblate) для записи PO.
+Профиль имеет `schema_version: 1`. Загрузчик отклоняет неизвестные поля,
+несовпадающую версию, неверные типы, дубликаты языков/компонентов, небезопасные
+имена компонентов, отсутствующий `source_lang`, несуществующие листы и колонки,
+а также несовпадение заданных заголовков. Все номера строк и колонок в профиле
+**1-based**, как в таблице.
+
+Минимальная форма профиля:
+
+```json
+{
+  "schema_version": 1,
+  "components": [
+    {
+      "sheet": "Temple",
+      "component": "Temple",
+      "kind": "po",
+      "source_lang": "ru",
+      "header_row": 1,
+      "first_data_row": 3,
+      "languages": [
+        {"code": "ru", "xml_lang": "ru", "column": 3, "header": "ru"},
+        {"code": "en", "xml_lang": "en", "column": 4, "header": "en"}
+      ],
+      "key": {"column": 1, "header": "id"},
+      "comments": [{"column": 2, "name": "Character", "header": ""}],
+      "grammar": {
+        "type": "keyed",
+        "skip_rows": [2],
+        "allow_blank_rows": true
+      }
+    },
+    {
+      "sheet": "Terms",
+      "component": "Terms",
+      "kind": "tbx",
+      "source_lang": "ru",
+      "header_row": 1,
+      "languages": [
+        {"code": "ru", "xml_lang": "ru", "column": 1, "header": "ru"},
+        {"code": "en", "xml_lang": "en", "column": 2, "header": "en"},
+        {"code": "ja", "xml_lang": "ja", "column": 6, "header": "ja"}
+      ],
+      "grammar": {
+        "type": "term-description-pairs",
+        "skip_rows": [2, 18],
+        "regions": [
+          {"section_row": 3, "first_term_row": 4, "last_description_row": 17},
+          {"section_row": 19, "first_term_row": 20, "last_description_row": 29}
+        ]
+      },
+      "key_language": "en",
+      "initial_target_languages": ["en", "ja"]
+    }
+  ]
+}
+```
+
+Это пример структуры, не профиль реального содержимого. `header` проверяется
+как ровно та ячейка строки заголовка, а `name` комментария - явная подпись, а не
+выведенное из следующей строки предположение. `component` - безопасный
+идентификатор `[A-Za-z0-9][A-Za-z0-9_-]*`, не имя листа; это исключает path
+traversal, регистронезависимые коллизии и внезапные имена файлов.
+
+### Закрытая схема v1
+
+Все объекты закрыты: поле, не перечисленное ниже, является
+`profile.unknown_field`, а не запасным источником данных.
+
+| Объект | Разрешённые поля | Обязательные поля |
+|---|---|---|
+| Корень | `schema_version`, `components` | оба |
+| Общий component | `sheet`, `component`, `kind`, `source_lang`, `header_row`, `languages`, `grammar` | все |
+| PO component | common + `first_data_row`, `key`, `comments`, `references` | `first_data_row`, `key`; массивы необязательны, default `[]` |
+| TBX component | common + `key_language`, `initial_target_languages` | оба |
+| Языковая колонка | `code`, `xml_lang`, `column`, `header` | все |
+| Key/metadata column | `column`, `header`, `name` | key: `column`, `header`; metadata: все |
+| Keyed grammar | `type`, `skip_rows`, `allow_blank_rows` | `type`; пропущенные `skip_rows` = `[]`, `allow_blank_rows` = `false` |
+| Pair grammar | `type`, `skip_rows`, `regions` | `type`, `regions`; пропущенные `skip_rows` = `[]` |
+| Pair region | `section_row`, `first_term_row`, `last_description_row` | все |
+
+`comments` и `references` используют объект metadata-column. `key` использует
+key-column object, поэтому у него нет `name`. `first_data_row`, `key`,
+`comments` и `references` запрещены для TBX; `key_language` и
+`initial_target_languages` запрещены для PO. Это запрещает полукейсовую или
+полупарную интерпретацию до открытия workbook.
+
+### Детерминированная грамматика
+
+`kind: "po"` поддерживает только `grammar.type: "keyed"`: после
+`first_data_row` разрешены явные `skip_rows` и пустые строки (если
+`allow_blank_rows`); каждая иная строка обязана иметь ключ и source value.
+`comments` и `references` берутся только из колонок профиля.
+
+`kind: "tbx"` поддерживает только `grammar.type: "term-description-pairs"`.
+Каждый region задаёт строку секции и чётный непрерывный диапазон
+`term, description, term, description, ...`. Все непустые строки после
+заголовка должны быть либо явно skipped, либо принадлежать ровно одному region.
+Описание без термина, термин без описания, пересекающиеся/дырявые ranges и
+неожиданная строка являются error, а не эвристикой "длиннее 200 символов".
+
+`key_language` определяет, из какой языковой колонки строится стабильный context
+термина. В context включается section; коллизия context - error. Для PO значения
+ячеек не trim'ятся: пробелы по краям, tab, `\r\n`, переносы, XML/Unity-разметка
+и entities передаются дальше как данные. Для TBX также сохраняются внутренние
+пробелы, переносы, разметка и entities, но leading/trailing whitespace у term
+или description является `tbx.unsupported_outer_whitespace`: Translate Toolkit
+trim'ит его при записи `<descrip>`/`<note>`, поэтому импортёр обязан остановиться,
+а не молча изменить данные. `strip()` допустим только для проверки пустой ячейки,
+контроля структуры и этого явного TBX validation.
+
+`code` - код Weblate, использующийся в имени PO/TBX файла. `xml_lang` - явный
+BCP-47 тег в `xml:lang`: например, `pt_PT` → `pt-PT`, `zh_Hans` → `zh-Hans`,
+`zh_Hant` → `zh-Hant`. Нельзя неявно использовать код Weblate как XML-тег.
+`code` должен соответствовать `[A-Za-z][A-Za-z0-9_]*`; коды уникальны после
+`casefold()` внутри компонента, потому что входят в имена файлов на
+регистронезависимой файловой системе. `xml_lang` должен соответствовать
+`[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*` и также передаётся только как явное
+значение профиля.
+
+## Нормализованная модель и диагностика
+
+После чтения каждый компонент становится одним из двух типов:
+
+- `StringUnit`: key, значения по языкам, developer comments, references и
+  физическая строка источника;
+- `GlossaryTerm`: context, значения по языкам, explanations по языкам, section
+  и физические строки term/description.
+
+Вторая модель сохраняет объяснение отдельно для каждого языка. Для Terms
+source-language description становится `source_explanation`, а description
+целевого языка - `target_explanation`; биография не превращается в отдельный
+термин или безымянный PO comment.
+
+Единый `Diagnostic` имеет `severity`, стабильный `code`, компонент, лист,
+физическую строку и сообщение. `error` блокирует publish; `warning` остаётся в
+отчёте, но не меняет текст и не блокирует чистый seed.
+
+| Severity | Примеры |
+|---|---|
+| `error` | profile/schema/header/column/sheet mismatch, duplicate component/path/key/context, missing source, неизвестная строка, orphan term/description, нечитабельный файл, ошибка записи/ZIP/contract validation |
+| `warning` | target equals source, подозрительный алфавит в языковой колонке, пустой target в PO, заметка вместо перевода, явно пропущенная пустая строка |
+
+Отчёт содержит число юнитов, typed skipped rows и все diagnostics с адресом
+`component:sheet!row`. При error он идёт в stderr, CLI возвращает nonzero и
+`report.txt` не создаётся. При success `report.txt` публикуется внутри output и
+дублируется в stdout.
+
+## Артефакты и импорт в Weblate
+
+### Temple и UI: монолингвальный PO
+
+```
+out/
+  Temple/
+    ru.po                 # source template
+    en.po
+    ...
+  UI/
+    en.po                 # source template
+    ru.po
+```
+
+Для PO: `msgid` = key/context, `msgstr` = значение соответствующего языка;
+source PO содержит исходные строки. `#.` хранит developer comments, `#:` -
+числовые Id. Это сохраняет `Character` для Temple и Id для UI. Игровая разметка
+остаётся внутри `msgstr`; `game-markup` сравнивает её после загрузки в Weblate.
+
+Weblate component для Temple/UI:
+
+| Поле | Значение |
+|---|---|
+| File mask | `*.po` внутри ZIP компонента |
+| Monolingual base language file | `<source_lang>.po` |
+| File format | `gettext PO file (monolingual)` |
+| Source language | `source_lang` из profile |
+
+### Terms: двуязычный TBX по целевому языку
+
+```
+out/
+  Terms/
+    tbx/
+      en.tbx              # ru source + en target
+      ja.tbx              # ru source + ja target
+```
+
+У Terms **нет** `ru.tbx`: Weblate уже хранит source language и воспринимает
+файл с её именем как duplicate language. Для каждого
+`initial_target_languages` writer создаёт отдельный bilingual TBX с двумя
+`langSet`: source и target. Каждый выбранный target обязан иметь непустой term
+во всех Terms entries; иначе import блокируется до publish.
+
+TBX хранит source explanation в `<descrip>`, target explanation в
+`<note from="translator">`. Это ровно то, что читает `TBXUnit` и передаёт
+`weblate.machinery.llm._get_glossary_entry` как `source_explanation` и
+`target_explanation`.
+
+Weblate glossary component для Terms:
+
+| Поле | Значение |
+|---|---|
+| File mask | `tbx/*.tbx` |
+| Monolingual base language file | Empty |
+| Template for new translations | Empty |
+| File format | `TermBase eXchange file` |
+| Source language | `source_lang` из profile |
+| Use as glossary | включить |
+
+Weblate сопоставляет target glossary language с именем TBX файла, даже если TBX
+содержит более двух языков. Поэтому multilanguage TBX не используется.
+
+## Атомарный CLI
+
+```text
+profile + kit
+  -> strict profile and input validation
+  -> deterministic per-kind parsing
+  -> diagnostics
+  -> errors? ----yes----> stderr + exit 2; no output mutation
+       |
+       no
+       v
+  -> sibling staging directory
+  -> PO/TBX render + parse-back validation + ZIP + report
+  -> errors? ----yes----> remove staging + exit 2; output unchanged
+       |
+       no
+       v
+  -> atomic rename staging -> requested output
+  -> stdout report + exit 0
+```
+
+`--out` must not exist. The parent directory must exist and staging is created
+under it, so `os.replace()` is an atomic same-filesystem publish. ZIP files and
+`report.txt` are created in staging and move in the same rename. A previous
+output tree is never merged, overwritten or deleted. A successful `--zip`
+creates one archive per component with the component's files at the ZIP root:
+`Temple.zip` contains `ru.po`, `en.po`, ...; `Terms.zip` contains `tbx/en.tbx`,
+`tbx/ja.tbx`, ... .
 
 ## UI-сценарии
 
-Пользовательские сценарии в веб-интерфейсе Weblate (подробные пошаговые
-прогоны — в плане реализации):
+- **C1 - PO component:** CLI → `Temple.zip`/`UI.zip` → Weblate project →
+  "Upload translation files" → Discover. Check unit count against `report.txt`,
+  key/context, `Character` developer comment, UI Id location and valid markup.
+- **C2 - warning before go-live:** fix table/profile → rerun CLI → delete and
+  recreate component. Warnings are visible evidence, not silent data repair.
+- **C3 - Terms glossary:** upload `Terms.zip`, configure `tbx/*.tbx`, empty
+  base/template, source language and glossary checkbox. Check a term's source
+  and target explanations in glossary UI.
+- **C4 - glossary before LLM:** translate and review Terms first. An empty target
+  glossary term is intentionally omitted by LLM payload construction. Then run
+  Routed LLM for a regular component per target language.
+- **C5 - post-import:** add target languages, attach `routed-llm`, enable
+  `game-markup` through `WEBLATE_ADD_CHECK`, and configure PO formatting before
+  the first VCS commit when needed.
 
-- **С1. Онбординг кита (happy path):** CLI → ZIP на компонент → «Отправить файлы
-  перевода» → filemask/шаблон/исходный язык → Discover → проверка (число юнитов
-  = отчёту, контекст = ключ, `Character` виден, `game-markup` зелёный).
-- **С2. Кит с предупреждениями:** правишь в таблице (Weblate ещё не источник
-  правды) → перезапуск CLI → перезалив.
-- **С3. Глоссарий из keyless-кита (Terms):** галка «Использовать в качестве
-  словаря» при создании; слаги (латинские, из en) видны как контекст; биография —
-  комментарий к термину; для попадания биографии в LLM-промпт как «объяснение» —
-  поле «Объяснение» в UI глоссария.
-- **С4. Двухключевой кит (UI.xlsx):** семантический `Key` → контекст, числовой
-  `Id` → reference; переводчик видит имена, Id доживает до экспорта.
-- **С5. Пересев до go-live:** удалил компонент, перезалил; «точка невозврата» =
-  старт перевода.
-- **С6. Пост-импорт:** добавить целевые языки, привязать routed-LLM, включить
-  `game-markup`, аддон форматирования PO.
-- **С7. Автоперевод с глоссарием:** сначала перевести сам глоссарий на целевые
-  языки (иначе термины не попадают в промпт), затем «Инструменты → Автоматический
-  перевод» (источник = Routed LLM) по языкам основного компонента; для 5+ языков —
-  по запуску на язык или аддон `weblate.autotranslate.autotranslate`.
+## Verification contract
 
-## Тесты
-
-- По урезанной фикстуре на каждую раскладку (Temple/Terms/UI) → проверяем ключи,
-  языки, автоопределённый исходный язык, метаданные в `#.`/`#:`, пропуск
-  меток/секций/пустых, срабатывание каждого предупреждения, сохранность разметки.
-- Отдельный тест на escape-hatch хинт.
-- Пары термин+описание: биография уходит в `#.` предыдущего юнита; слаги
-  латинские (en-приоритет); кириллица в `_slug` не теряется.
-
-## Не входит
-
-- Экспорт из Weblate в формат движка (отдельная задача; метаданные сохраняем,
-  чтобы её не заблокировать).
-- Обратная запись в таблицу; двусторонняя синхронизация.
-- Google Sheets по API.
-- Повторяемый/идемпотентный импорт (Weblate — источник правды, seed разовый).
+1. Fast standalone tests use anonymized fixtures and exercise strict profile,
+   reader, both parsers, diagnostics, renderers, atomic failure matrix and ZIP
+   contents. No Django database is loaded.
+2. Weblate contract tests run under the repository test settings and load the
+   generated PO/TBX through Weblate's actual formats/components. They assert
+   key/context/source/target, comments/references, TBX explanation fields and
+   LLM glossary payload structure.
+3. A live LLM smoke is opt-in (`LOC_INGEST_LIVE_LLM=1`), marked non-CI, scoped
+   to a tiny temporary glossary/component and has an explicit OpenRouter-key
+   prerequisite. It verifies one real routed response only after the deterministic
+   payload contract is green.
+4. The final manual smoke uploads one generated PO ZIP and one TBX ZIP to the
+   local Weblate instance at `localhost:3001` and verifies C1-C4.
