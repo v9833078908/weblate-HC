@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
@@ -12,9 +13,15 @@ import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from loc_kit_ingest.infer import DEFAULT_MIN_FILL, InferenceError, infer_profile
 from loc_kit_ingest.model import Severity
 from loc_kit_ingest.parser import parse_component
-from loc_kit_ingest.profile import ProfileError, load_profile
+from loc_kit_ingest.profile import (
+    SCHEMA_VERSION,
+    ProfileError,
+    load_profile,
+    parse_profile,
+)
 from loc_kit_ingest.reader import ReaderError, read_sheets, validate_sheet_headers
 from loc_kit_ingest.writer import render_component, validate_rendered_component
 
@@ -42,6 +49,7 @@ def _build_report(
     profile: Profile,
     parse_results: dict[str, object],
     diagnostics: tuple[Diagnostic, ...],
+    inference_notes: tuple[str, ...] = (),
 ) -> str:
     lines: list[str] = []
     lines.append("Loc-kit ingest report")
@@ -54,6 +62,13 @@ def _build_report(
                 f"{len(result.units)} units, "
                 f"{len(result.skipped_rows)} skipped"
             )
+        lines.append(
+            f"    source {comp.source_lang}, languages: "
+            f"{', '.join(lang.code for lang in comp.languages)}"
+        )
+    if inference_notes:
+        lines.append("Profile derived from the kit's own header row:")
+        lines.extend(f"  * {note}" for note in inference_notes)
     if diagnostics:
         lines.append("Diagnostics:")
         lines.append(_format_diagnostics(diagnostics))
@@ -64,11 +79,17 @@ def _build_report(
 
 def run(
     kit_paths: list[Path],
-    profile_path: Path,
+    *,
     output: Path,
+    profile_path: Path | None = None,
     zip_components: bool = False,
+    source_lang: str | None = None,
+    component: str | None = None,
+    min_fill: float = DEFAULT_MIN_FILL,
+    include_languages: frozenset[str] = frozenset(),
 ) -> int:
-    """Run the full ingest pipeline.
+    """
+    Run the full ingest pipeline.
 
     Returns 0 on success, 2 on any error.
     """
@@ -95,15 +116,10 @@ def run(
         print(_format_diagnostics(tuple(all_diagnostics)), file=sys.stderr)
         return 2
 
-    # 2. Load profile.
-    try:
-        profile = load_profile(profile_path)
-    except ProfileError as exc:
-        print(f"[{exc.diagnostic.code}] {exc.diagnostic.message}", file=sys.stderr)
-        return 2
-
-    # 3. Read all sheets from all kit files.
+    # 2. Read all sheets from all kit files. Inference needs the sheets, so
+    #    reading precedes profile resolution.
     all_sheets: dict[str, list[list[str]]] = {}
+    per_kit: list[tuple[str, dict[str, list[list[str]]]]] = []
     for kit_path in kit_paths:
         try:
             sheets = read_sheets(Path(kit_path))
@@ -116,7 +132,38 @@ def run(
             )
             print(_format_diagnostics(tuple(all_diagnostics)), file=sys.stderr)
             return 2
+        per_kit.append((Path(kit_path).stem, sheets))
         all_sheets.update(sheets)
+
+    # 3. Use the explicit profile, or derive one from the kits' own headers.
+    inference_notes: list[str] = []
+    try:
+        if profile_path is not None:
+            profile = load_profile(profile_path)
+            profile_text = profile_path.read_text(encoding="utf-8")
+        else:
+            inferred: list[dict] = []
+            for stem, sheets in per_kit:
+                document, notes = infer_profile(
+                    sheets,
+                    kit_stem=stem,
+                    source_lang=source_lang,
+                    component=component,
+                    min_fill=min_fill,
+                    include_languages=include_languages,
+                )
+                inferred.extend(document["components"])
+                inference_notes.extend(notes)
+            merged = {"schema_version": SCHEMA_VERSION, "components": inferred}
+            profile = parse_profile(merged)
+            profile_text = json.dumps(merged, ensure_ascii=False, indent=2) + "\n"
+    except ProfileError as exc:
+        print(f"[{exc.diagnostic.code}] {exc.diagnostic.message}", file=sys.stderr)
+        return 2
+    except InferenceError as exc:
+        all_diagnostics.append(_make_diag("infer.failed", str(exc)))
+        print(_format_diagnostics(tuple(all_diagnostics)), file=sys.stderr)
+        return 2
 
     # 4. Validate headers and parse each component.
     parse_results: dict[str, object] = {}
@@ -151,18 +198,14 @@ def run(
         return 2
 
     # 6. Create staging directory.
-    staging = Path(
-        tempfile.mkdtemp(prefix=f".{output.name}.", dir=str(output.parent))
-    )
+    staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.", dir=str(output.parent)))
 
     try:
         # 7. Render all components, then validate round-trip.
         for comp in profile.components:
             result = parse_results[comp.component]
             render_component(comp, result, staging)
-            render_diagnostics = validate_rendered_component(
-                comp, result, staging
-            )
+            render_diagnostics = validate_rendered_component(comp, result, staging)
             all_diagnostics.extend(render_diagnostics)
 
         # Check render errors.
@@ -183,8 +226,14 @@ def run(
                             arcname = file_path.relative_to(comp_dir)
                             zf.write(file_path, arcname)
 
-        # 9. Write report.
-        report = _build_report(profile, parse_results, tuple(all_diagnostics))
+        # 9. Write the profile that produced this output, then the report.
+        (staging / "profile.loc-ingest.json").write_text(profile_text, encoding="utf-8")
+        report = _build_report(
+            profile,
+            parse_results,
+            tuple(all_diagnostics),
+            tuple(inference_notes),
+        )
         (staging / "report.txt").write_text(report, encoding="utf-8")
 
     except Exception as exc:

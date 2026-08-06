@@ -41,7 +41,8 @@ def _cell(rows: list[list[str]], row_idx: int, col_idx: int) -> str:
 
 
 def _script_ratio(text: str, target_block: str) -> float:
-    """Fraction of alphabetic chars that belong to target Unicode block.
+    """
+    Fraction of alphabetic chars that belong to target Unicode block.
 
     Returns 0.0 for empty text.
     """
@@ -81,9 +82,7 @@ def _is_in_block(ch: str, block: str) -> bool:
 # --------------------------------------------------------------------------- #
 
 
-def parse_component(
-    component: ComponentProfile, rows: list[list[str]]
-) -> ParseResult:
+def parse_component(component: ComponentProfile, rows: list[list[str]]) -> ParseResult:
     """Dispatch to the appropriate parser based on kind/grammar."""
     if component.kind == "po":
         return _parse_keyed(component, rows)
@@ -112,23 +111,19 @@ def parse_component(
 # --------------------------------------------------------------------------- #
 
 
-def _parse_keyed(
-    component: ComponentProfile, rows: list[list[str]]
-) -> ParseResult:
+def _parse_keyed(component: ComponentProfile, rows: list[list[str]]) -> ParseResult:
     grammar = component.grammar
     assert component.first_data_row is not None
     assert component.key is not None
 
     skip_set = set(grammar.skip_rows)  # 0-based
     source_lang = component.source_lang
-    source_col = next(
-        l.column for l in component.languages if l.code == source_lang
-    )
+    source_col = next(l.column for l in component.languages if l.code == source_lang)
 
     units: list[StringUnit] = []
     diagnostics: list[Diagnostic] = []
     skipped: list[SkippedRow] = []
-    seen_keys: set[str] = set()
+    seen_keys: dict[str, int] = {}
 
     # Build column maps
     lang_columns = {l.code: l.column for l in component.languages}
@@ -141,7 +136,9 @@ def _parse_keyed(
         # Explicit skip
         if row_idx in skip_set:
             skipped.append(
-                SkippedRow(component.component, component.sheet, row_1based, "profile_skip")
+                SkippedRow(
+                    component.component, component.sheet, row_1based, "profile_skip"
+                )
             )
             continue
 
@@ -154,7 +151,9 @@ def _parse_keyed(
         if _is_blank_row(row):
             if grammar.allow_blank_rows:
                 skipped.append(
-                    SkippedRow(component.component, component.sheet, row_1based, "blank")
+                    SkippedRow(
+                        component.component, component.sheet, row_1based, "blank"
+                    )
                 )
                 continue
             diagnostics.append(
@@ -220,11 +219,11 @@ def _parse_keyed(
                     component.component,
                     component.sheet,
                     row_1based,
-                    f"duplicate key {key!r}",
+                    f"duplicate key {key!r}, first seen at row {seen_keys[key]}",
                 )
             )
             continue
-        seen_keys.add(key)
+        seen_keys[key] = row_1based
 
         # Build language values
         values: dict[str, str] = {}
@@ -233,12 +232,16 @@ def _parse_keyed(
 
         # Build comments
         comments = tuple(
-            _cell(rows, row_idx, c.column) for c in comment_cols if _cell(rows, row_idx, c.column)
+            _cell(rows, row_idx, c.column)
+            for c in comment_cols
+            if _cell(rows, row_idx, c.column)
         )
 
         # Build references
         references = tuple(
-            _cell(rows, row_idx, r.column) for r in reference_cols if _cell(rows, row_idx, r.column)
+            _cell(rows, row_idx, r.column)
+            for r in reference_cols
+            if _cell(rows, row_idx, r.column)
         )
 
         units.append(
@@ -252,9 +255,7 @@ def _parse_keyed(
         )
 
         # Warnings
-        _add_keyed_warnings(
-            diagnostics, component, row_1based, values, source_lang
-        )
+        _add_keyed_warnings(diagnostics, component, row_1based, values, source_lang)
 
     return ParseResult(
         component=component.component,
@@ -276,7 +277,8 @@ def _add_keyed_warnings(
     values: dict[str, str],
     source_lang: str,
 ) -> None:
-    """Emit warnings without rewriting values.
+    """
+    Emit warnings without rewriting values.
 
     Script checks compare en for Cyrillic and ru for Latin, independently.
     These are the only script checks and do not overlap each other.
@@ -362,9 +364,7 @@ def _has_outer_whitespace(value: str) -> bool:
     return value != value.strip()
 
 
-def _parse_pairs(
-    component: ComponentProfile, rows: list[list[str]]
-) -> ParseResult:
+def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseResult:
     """Parse term-description-pairs grammar for TBX components."""
     grammar = component.grammar
     skip_set = set(grammar.skip_rows)  # 0-based
@@ -381,8 +381,9 @@ def _parse_pairs(
     covered_rows: set[int] = set()
     for region in grammar.regions:
         covered_rows.add(region.section_row)
-        for r in range(region.first_term_row, region.last_description_row + 1):
-            covered_rows.add(r)
+        covered_rows.update(
+            range(region.first_term_row, region.last_description_row + 1)
+        )
 
     units: list[GlossaryTerm] = []
     diagnostics: list[Diagnostic] = []
@@ -541,7 +542,9 @@ def _parse_pairs(
 
             # Build context.
             key_slug = _slug(key_term)
-            context = f"{section_slug}.{key_slug}" if section_slug and key_slug else key_slug
+            context = (
+                f"{section_slug}.{key_slug}" if section_slug and key_slug else key_slug
+            )
             if not context:
                 diagnostics.append(
                     Diagnostic(
@@ -584,7 +587,9 @@ def _parse_pairs(
     for row_idx in range(component.header_row + 1, len(rows)):
         if row_idx in skip_set:
             skipped.append(
-                SkippedRow(component.component, component.sheet, row_idx + 1, "profile_skip")
+                SkippedRow(
+                    component.component, component.sheet, row_idx + 1, "profile_skip"
+                )
             )
             continue
         if row_idx not in covered_rows:
