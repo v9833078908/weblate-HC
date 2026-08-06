@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import time
 from contextlib import suppress
 from pathlib import Path
@@ -17,7 +18,7 @@ from uuid import UUID
 from zipfile import ZipFile
 
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.paginator import EmptyPage, Paginator
 from django.http import (
     FileResponse,
@@ -698,6 +699,115 @@ def create_component_from_zip(data, zipfile=None):
     # Create repository
     LocalRepository.from_zip(fake.full_path, zipfile or data["zipfile"])
     return fake
+
+
+# Loc-kit tables the universal component upload converts into PO files.
+# Extending intake to a new format means adding its suffix here and teaching
+# loc_kit_ingest.reader to read it.
+KIT_TABLE_SUFFIXES = (".csv", ".tsv", ".xlsx")
+
+
+def create_component_from_kit(data, uploaded):
+    """
+    Create a local repository from one uploaded translation file.
+
+    ZIP archives keep their historical behavior: files are extracted as-is.
+    Loc-kit tables (CSV, TSV, XLSX) are converted into one monolingual PO file
+    per populated language column; the table's own header row acts as the
+    profile. Returns (fake_component, kit_info); kit_info is None for ZIP.
+    """
+    filename = os.path.basename(getattr(uploaded, "name", "") or "")
+    suffix = os.path.splitext(filename)[1].lower()
+    if suffix == ".zip":
+        return create_component_from_zip(data, uploaded), None
+    if suffix not in KIT_TABLE_SUFFIXES:
+        raise ValidationError(
+            gettext(
+                "Unsupported file format. Upload a ZIP archive with translation "
+                "files, or a table (%s)."
+            )
+            % ", ".join(KIT_TABLE_SUFFIXES)
+        )
+
+    from loc_kit_ingest.infer import InferenceError, infer_profile
+    from loc_kit_ingest.model import Severity
+    from loc_kit_ingest.parser import parse_component as parse_kit_component
+    from loc_kit_ingest.profile import ProfileError, parse_profile
+    from loc_kit_ingest.reader import ReaderError, read_sheets, validate_sheet_headers
+    from loc_kit_ingest.writer import render_component
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        kit_path = Path(tmpdir) / filename
+        kit_path.write_bytes(uploaded.read())
+
+        try:
+            sheets = read_sheets(kit_path)
+            document, notes = infer_profile(sheets, kit_stem=kit_path.stem)
+            profile = parse_profile(document)
+        except (ReaderError, InferenceError, ProfileError) as error:
+            raise ValidationError(
+                gettext("Could not read the loc-kit: %s") % error
+            ) from error
+
+        if len(profile.components) != 1:
+            raise ValidationError(
+                gettext(
+                    "The workbook holds %d sheets, and one upload creates one "
+                    "component. Upload each sheet separately, or use the "
+                    "loc_kit_ingest command line tool."
+                )
+                % len(profile.components)
+            )
+
+        component = profile.components[0]
+        rows = sheets[component.sheet]
+        diagnostics = list(validate_sheet_headers(component, rows))
+        result = parse_kit_component(component, rows)
+        diagnostics.extend(result.diagnostics)
+
+        errors = [d for d in diagnostics if d.severity is Severity.ERROR]
+        if errors:
+            shown = [
+                gettext("Row %(row)d: %(message)s")
+                % {"row": d.row, "message": d.message}
+                for d in errors[:10]
+            ]
+            if len(errors) > 10:
+                shown.append(gettext("… and %d more errors.") % (len(errors) - 10))
+            raise ValidationError(
+                [gettext("The loc-kit has errors, nothing was imported:"), *shown]
+            )
+
+        staging = Path(tmpdir) / "render"
+        staging.mkdir()
+        render_component(component, result, staging)
+        rendered = staging / component.component
+        files = {path.name: path.read_bytes() for path in sorted(rendered.glob("*.po"))}
+
+    fake = Component(
+        project=data["project"],
+        category=data.get("category", None),
+        slug=data["slug"],
+        name=data["name"],
+    )
+    LocalRepository.from_files(fake.full_path, files)
+
+    kit_info = {
+        "file_format": "po-mono",
+        "filemask": "*.po",
+        "template": f"{component.source_lang}.po",
+        "source_lang": component.source_lang,
+        "languages": [lang.code for lang in component.languages],
+        "units": len(result.units),
+        "skipped": len(result.skipped_rows),
+        "notes": list(notes),
+        "warnings": [
+            f"row {d.row} ({d.code}): {d.message}"
+            for d in diagnostics
+            if d.severity is not Severity.ERROR
+        ],
+    }
+    return fake, kit_info
 
 
 def try_set_language(lang) -> None:

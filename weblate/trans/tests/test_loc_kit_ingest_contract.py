@@ -2,7 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Weblate format contract tests for loc_kit_ingest output.
+"""
+Weblate format contract tests for loc_kit_ingest output.
 
 Generated PO/TBX files are loaded through Weblate's real format classes and,
 for the glossary, through an actual glossary upload so the resulting database
@@ -299,7 +300,8 @@ class LocKitGlossaryImportContractTest(ViewTestCase):
         self.assertEqual(unit.target, "Mudrc")
 
     def test_translation_upload_does_not_carry_explanations(self) -> None:
-        """Documents a Weblate upload-path limitation, not a writer defect.
+        """
+        Documents a Weblate upload-path limitation, not a writer defect.
 
         The translation-upload view imports source/target only. Explanations
         reach the database through repository synchronisation instead, which is
@@ -333,3 +335,146 @@ class LocKitGlossaryImportContractTest(ViewTestCase):
         self.assertEqual(entry["target"], "Mudrc")
         self.assertEqual(entry["source_explanation"], "A wise character")
         self.assertEqual(entry["target_explanation"], "Moudra postava")
+
+
+# --------------------------------------------------------------------------- #
+# Universal component upload: table kits through the real create view
+# --------------------------------------------------------------------------- #
+
+
+class LocKitUniversalUploadContractTest(ViewTestCase):
+    """
+    A table kit uploaded in the create UI becomes a live component.
+
+    Covers the N-language contract: every populated language column arrives
+    as a translation, regardless of how many there are.
+    """
+
+    KIT_CSV = (
+        "id,,ru,en,ja,ko,de\n"
+        "id-ignore,Actor,Russian ,English ,,,\n"
+        "line_1,Ann,Привет,Hello,こんにちは,안녕,Hallo\n"
+        "line_2,Bob,Пока,Bye,さようなら,잘 가,Tschüss\n"
+    )
+
+    def _upload(self, name: str, body: str):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return SimpleUploadedFile(name, body.encode(), content_type="text/csv")
+
+    def _kit_data(self, slug: str) -> dict:
+        return {"project": self.project, "slug": slug, "name": slug.title()}
+
+    def test_five_language_kit_renders_every_language(self) -> None:
+        from weblate.utils.views import create_component_from_kit
+
+        fake, info = create_component_from_kit(
+            self._kit_data("dialogs"),
+            self._upload("Space Kit - Dialogs.csv", self.KIT_CSV),
+        )
+        self.assertEqual(info["languages"], ["ru", "en", "ja", "ko", "de"])
+        self.assertEqual(info["source_lang"], "ru")
+        self.assertEqual(info["units"], 2)
+        self.assertEqual(info["template"], "ru.po")
+        repo = Path(fake.full_path)
+        self.assertEqual(
+            sorted(path.name for path in repo.glob("*.po")),
+            ["de.po", "en.po", "ja.po", "ko.po", "ru.po"],
+        )
+        shutil.rmtree(fake.full_path, ignore_errors=True)
+
+    def test_zip_upload_keeps_historical_behavior(self) -> None:
+        import io
+        import zipfile as zipfile_module
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from weblate.utils.views import create_component_from_kit
+
+        buffer = io.BytesIO()
+        with zipfile_module.ZipFile(buffer, "w") as archive:
+            archive.writestr("cs.po", 'msgid "hello"\nmsgstr "ahoj"\n')
+        fake, info = create_component_from_kit(
+            self._kit_data("zipped"),
+            SimpleUploadedFile(
+                "kit.zip", buffer.getvalue(), content_type="application/zip"
+            ),
+        )
+        self.assertIsNone(info)
+        self.assertTrue((Path(fake.full_path) / "cs.po").exists())
+        shutil.rmtree(fake.full_path, ignore_errors=True)
+
+    def test_duplicate_keys_block_intake(self) -> None:
+        from django.core.exceptions import ValidationError
+
+        from weblate.utils.views import create_component_from_kit
+
+        broken = "id,ru,en\na,Один,One\na,Два,Two\n"
+        with self.assertRaises(ValidationError) as ctx:
+            create_component_from_kit(
+                self._kit_data("broken"), self._upload("Broken.csv", broken)
+            )
+        self.assertIn("duplicate key", "".join(ctx.exception.messages))
+
+    def test_unsupported_suffix_is_rejected(self) -> None:
+        from django.core.exceptions import ValidationError
+
+        from weblate.utils.views import create_component_from_kit
+
+        with self.assertRaises(ValidationError) as ctx:
+            create_component_from_kit(
+                self._kit_data("plain"), self._upload("notes.txt", "hello")
+            )
+        self.assertIn(".csv", "".join(ctx.exception.messages))
+
+    def test_create_view_builds_component_from_csv(self) -> None:
+        from django.test.utils import modify_settings
+
+        from weblate.trans.models import Component
+
+        self.user.is_superuser = True
+        self.user.save()
+
+        with modify_settings(INSTALLED_APPS={"remove": "weblate.billing"}):
+            response = self.client.post(
+                reverse("create-component-zip"),
+                {
+                    "zipfile": self._upload("Space Kit - Dialogs.csv", self.KIT_CSV),
+                    "name": "Dialogs",
+                    "slug": "dialogs",
+                    "project": self.project.pk,
+                    "source_language": self.component.source_language.pk,
+                },
+            )
+            # The kit skips discovery: the create form arrives prefilled.
+            self.assertContains(response, "Loc-kit converted")
+            self.assertContains(response, "ru.po")
+
+            form = response.context["form"]
+            params = {field: form[field].value() or "" for field in form.fields}
+            params.pop("inherit_new_lang", None)
+            params["new_lang"] = "none"
+            response = self.client.post(
+                reverse("create-component-zip"), params, follow=True
+            )
+
+        component = Component.objects.get(slug="dialogs")
+        self.assertEqual(component.file_format, "po-mono")
+        self.assertEqual(component.template, "ru.po")
+        self.assertEqual(component.source_language.code, "ru")
+        codes = sorted(
+            component.translation_set.values_list("language__code", flat=True)
+        )
+        self.assertEqual(codes, ["de", "en", "ja", "ko", "ru"])
+        self.assertEqual(component.source_translation.unit_set.count(), 2)
+
+        # Unit identity: the game key is the context, texts are source/target.
+        ja_unit = component.translation_set.get(language__code="ja").unit_set.get(
+            context="line_1"
+        )
+        self.assertEqual(ja_unit.source, "Привет")
+        self.assertEqual(ja_unit.target, "こんにちは")
+
+        # The Character column survives as a developer comment on the unit.
+        source_unit = component.source_translation.unit_set.get(context="line_1")
+        self.assertIn("Ann", source_unit.note)

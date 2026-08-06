@@ -12,7 +12,7 @@ from zipfile import BadZipfile
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import redirect
@@ -23,6 +23,7 @@ from django.utils.http import urlencode
 from django.utils.translation import gettext
 from django.views.generic.edit import CreateView
 
+from weblate.lang.models import Language
 from weblate.trans.backups import ProjectBackup
 from weblate.trans.forms import (
     ComponentBranchForm,
@@ -48,7 +49,10 @@ from weblate.utils import messages
 from weblate.utils.celery import store_task_metadata
 from weblate.utils.licenses import LICENSE_URLS, detect_license
 from weblate.utils.ratelimit import session_ratelimit_post
-from weblate.utils.views import create_component_from_doc, create_component_from_zip
+from weblate.utils.views import (
+    create_component_from_doc,
+    create_component_from_kit,
+)
 from weblate.vcs.base import RepositoryError
 from weblate.vcs.github import (
     GitHubInstallation,
@@ -569,19 +573,58 @@ class CreateFromZip(CreateComponent):
         if self.stage != "init":
             return super().form_valid(form)
 
+        uploaded = form.cleaned_data["zipfile"]
         try:
-            create_component_from_zip(form.cleaned_data)
+            _fake, kit_info = create_component_from_kit(form.cleaned_data, uploaded)
+        except ValidationError as error:
+            form.add_error("zipfile", error)
+            return self.form_invalid(form)
         except (BadZipfile, OSError, RepositoryError):
             form.add_error("zipfile", gettext("Could not parse uploaded ZIP file."))
             return self.form_invalid(form)
 
-        # Move to discover phase
-        self.stage = "discover"
+        # ZIP moves to the discover phase; a converted kit goes straight to
+        # create: its layout is already decided, discovery would only offer
+        # guesses that drop the template.
+        self.stage = "discover" if kit_info is None else "create"
         self.update_initial(form.cleaned_data)
         self.initial["vcs"] = "local"
         self.initial["repo"] = "local:"
         self.initial["branch"] = "main"
         self.initial.pop("zipfile")
+        if kit_info is not None:
+            # The kit itself decided the layout; prefill it so the user only
+            # confirms instead of typing masks by hand.
+            self.initial["file_format"] = kit_info["file_format"]
+            self.initial["filemask"] = kit_info["filemask"]
+            self.initial["template"] = kit_info["template"]
+            self.initial["new_base"] = kit_info["template"]
+            with suppress(Language.DoesNotExist):
+                self.initial["source_language"] = Language.objects.get(
+                    code=kit_info["source_lang"]
+                )
+            messages.info(
+                self.request,
+                gettext(
+                    "Loc-kit converted: %(units)d strings, languages: "
+                    "%(languages)s, source language %(source)s."
+                )
+                % {
+                    "units": kit_info["units"],
+                    "languages": ", ".join(kit_info["languages"]),
+                    "source": kit_info["source_lang"],
+                },
+            )
+            for note in kit_info["notes"]:
+                messages.info(self.request, note)
+            warnings = kit_info["warnings"]
+            for warning in warnings[:5]:
+                messages.warning(self.request, warning)
+            if len(warnings) > 5:
+                messages.warning(
+                    self.request,
+                    gettext("… and %d more warnings.") % (len(warnings) - 5),
+                )
         self.request.method = "GET"
         return self.get(self.request)
 

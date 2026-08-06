@@ -135,8 +135,8 @@
             {% csrf_token %}
             <input type="hidden" name="project" value="{{ selected_project }}" />
             <p>
-              {% translate "Create a new translation component from an uploaded ZIP file containing strings for translation." %}
-              {% translate "The filenames within the archive need to have locale codes in them." %}
+              {% translate "Create a new translation component from an uploaded file: a ZIP archive with translation files, or a loc-kit table (CSV, TSV, XLSX)." %}
+              {% translate "Filenames in a ZIP archive need locale codes; in a table the languages are recognized from its header row and translations are imported right away." %}
             </p>
             {% crispy zip_form %}
             <input type="submit"
@@ -172,7 +172,7 @@
             <input type="hidden" name="project" value="{{ selected_project }}" />
             <p class="check">
               {% translate "Create a new empty translation component to start from scratch." %}
-              {% blocktranslate with link_start='<a data-bs-target="#zip" data-bs-toggle="tab" href="#">' link_end='</a>' %}Create a ZIP file containing any existing translation files you have, and {{ link_start }}upload it{{ link_end }}.{% endblocktranslate %}
+              {% blocktranslate with link_start='<a data-bs-target="#zip" data-bs-toggle="tab" href="#">' link_end='</a>' %}Have existing translation files or a loc-kit table? {{ link_start }}Upload them{{ link_end }}.{% endblocktranslate %}
             </p>
             {% crispy scratch_form %}
             <input type="submit"

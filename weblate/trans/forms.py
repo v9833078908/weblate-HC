@@ -2967,12 +2967,20 @@ class ComponentScratchCreateForm(ComponentProjectForm):
 
 class ComponentZipCreateForm(ComponentProjectForm):
     zipfile = forms.FileField(
-        label=gettext_lazy("ZIP file containing translations"),
+        label=gettext_lazy("Translation files (ZIP) or loc-kit table (CSV, TSV, XLSX)"),
+        help_text=gettext_lazy(
+            "A ZIP archive is extracted as-is; filenames need locale codes. "
+            "A table is converted automatically: the first column holds keys, "
+            "language columns are recognized by their header, and only populated "
+            "languages are imported."
+        ),
         validators=[
             validate_component_zip_upload_size,
-            FileExtensionValidator(allowed_extensions=["zip"]),
+            FileExtensionValidator(allowed_extensions=["zip", "csv", "tsv", "xlsx"]),
         ],
-        widget=forms.FileInput(attrs={"accept": ".zip,application/zip"}),
+        widget=forms.FileInput(
+            attrs={"accept": ".zip,.csv,.tsv,.xlsx,application/zip"}
+        ),
     )
 
     # ruff: ignore[mutable-class-default]
