@@ -4,27 +4,32 @@
 
 """Weblate format contract tests for loc_kit_ingest output.
 
-These tests generate PO/TBX files through loc_kit_ingest.writer and load them
-through Weblate's real format classes (PoMonoFormat, TBXFormat). They verify
-the generated files satisfy the Weblate component/glossary contract.
+Generated PO/TBX files are loaded through Weblate's real format classes and,
+for the glossary, through an actual glossary upload so the resulting database
+units can be inspected. This verifies the generated files satisfy the Weblate
+component/glossary contract end to end.
 
 Run via: ./rundev.sh test weblate/trans/tests/test_loc_kit_ingest_contract.py
 """
 
 from __future__ import annotations
 
-import io
+import shutil
+import sys
+import tempfile
+from dataclasses import replace
 from pathlib import Path
 
-from weblate.trans.tests.utils import RepoTestMixin
-from weblate.trans.models import Unit
+from django.test import SimpleTestCase
+from django.urls import reverse
 
-# loc_kit_ingest is on sys.path as a standalone package (parent of weblate/).
-import sys
+from weblate.formats.models import FILE_FORMATS
+from weblate.trans.tests.test_views import ViewTestCase
 
-_repo_root = Path(__file__).resolve().parents[3]
-if str(_repo_root) not in sys.path:
-    sys.path.insert(0, str(_repo_root))
+# loc_kit_ingest is a standalone package at the repository root.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from loc_kit_ingest.model import GlossaryTerm, ParseResult, StringUnit
 from loc_kit_ingest.profile import (
@@ -38,281 +43,293 @@ from loc_kit_ingest.profile import (
 )
 from loc_kit_ingest.writer import render_component
 
-
-# ---------------------------------------------------------------------------
-# PO contract test
-# ---------------------------------------------------------------------------
-
-
-PO_COMPONENT = ComponentProfile(
-    sheet="temple",
-    component="Temple",
-    kind="po",
-    source_lang="ru",
-    header_row=0,
-    first_data_row=2,
-    languages=(
-        LanguageColumn("ru", "ru", 2, "ru"),
-        LanguageColumn("en", "en", 3, "en"),
-    ),
-    key=KeyColumn(0, "id"),
-    comments=(
-        MetadataColumn(1, "Character", "Character"),
-    ),
-    references=(
-        MetadataColumn(4, "Id", "Id"),
-    ),
-    grammar=KeyedGrammar(skip_rows=(1,), allow_blank_rows=True),
-    key_language=None,
-    initial_target_languages=(),
-)
-
-PO_UNITS = (
-    StringUnit(
-        key="dialog.intro",
-        values={
-            "ru": "Привет, путник!",
-            "en": "Hello, traveler!",
-        },
-        comments=("Character: Sage",),
-        references=("101",),
-        row=4,
-    ),
-    StringUnit(
-        key="dialog.bye",
-        values={
-            "ru": "Прощай.",
-            "en": "Farewell.",
-        },
-        comments=("Character: Sage",),
-        references=("102",),
-        row=5,
-    ),
-)
+# --------------------------------------------------------------------------- #
+# Shared component profiles
+# --------------------------------------------------------------------------- #
 
 
-def _render_po(tmp_path: Path) -> tuple[Path, ComponentProfile]:
-    result = ParseResult(
+def make_po_component(source_lang: str, target_lang: str) -> ComponentProfile:
+    return ComponentProfile(
+        sheet="temple",
         component="Temple",
         kind="po",
-        units=PO_UNITS,
-        diagnostics=(),
-        skipped_rows=(),
-    )
-    render_component(PO_COMPONENT, result, tmp_path)
-    return tmp_path, PO_COMPONENT
-
-
-class LocKitPOContractTest(RepoTestMixin):
-    """Verify generated PO files load through PoMonoFormat."""
-
-    def test_po_source_template_loads_correctly(self, tmp_path=None):
-        import tempfile
-
-        tmp = Path(tmp_path or tempfile.mkdtemp())
-        out_dir, comp = _render_po(tmp)
-
-        from weblate.formats.models import FILE_FORMATS
-
-        fmt = FILE_FORMATS["po-mono"]
-        store = fmt.parse(out_dir / "Temple" / "ru.po")
-
-        # Two units (plus header).
-        data_units = [u for u in store.all_units if not u.isheader()]
-        assert len(data_units) == 2
-
-        unit = next(u for u in data_units if u.context == "dialog.intro")
-        assert unit.source == "Привет, путник!"
-        assert unit.target == "Привет, путник!"
-
-    def test_po_translation_loads_correctly(self, tmp_path=None):
-        import tempfile
-
-        tmp = Path(tmp_path or tempfile.mkdtemp())
-        out_dir, comp = _render_po(tmp)
-
-        from weblate.formats.models import FILE_FORMATS
-
-        fmt = FILE_FORMATS["po-mono"]
-        store = fmt.parse(out_dir / "Temple" / "en.po")
-
-        data_units = [u for u in store.all_units if not u.isheader()]
-        unit = next(u for u in data_units if u.context == "dialog.intro")
-        assert unit.source == "Привет, путник!"
-        assert unit.target == "Hello, traveler!"
-
-    def test_po_preserves_comments_and_references(self, tmp_path=None):
-        import tempfile
-
-        tmp = Path(tmp_path or tempfile.mkdtemp())
-        out_dir, comp = _render_po(tmp)
-
-        from weblate.formats.models import FILE_FORMATS
-
-        fmt = FILE_FORMATS["po-mono"]
-        store = fmt.parse(out_dir / "Temple" / "ru.po")
-
-        data_units = [u for u in store.all_units if not u.isheader()]
-        unit = next(u for u in data_units if u.context == "dialog.intro")
-        # Developer comment
-        assert "Character: Sage" in unit.notes
-        # Reference location
-        assert "101" in unit.locations
-
-
-# ---------------------------------------------------------------------------
-# TBX contract test
-# ---------------------------------------------------------------------------
-
-
-TBX_COMPONENT = ComponentProfile(
-    sheet="terms",
-    component="Terms",
-    kind="tbx",
-    source_lang="ru",
-    header_row=0,
-    first_data_row=None,
-    languages=(
-        LanguageColumn("ru", "ru", 0, "ru"),
-        LanguageColumn("en", "en", 1, "en"),
-        LanguageColumn("ja", "ja", 2, "ja"),
-    ),
-    key=None,
-    comments=(),
-    references=(),
-    grammar=PairsGrammar(
-        skip_rows=(1,),
-        regions=(
-            PairRegion(2, 3, 4),
+        source_lang=source_lang,
+        header_row=0,
+        first_data_row=2,
+        languages=(
+            LanguageColumn(source_lang, source_lang, 2, source_lang),
+            LanguageColumn(target_lang, target_lang, 3, target_lang),
         ),
-    ),
-    key_language="en",
-    initial_target_languages=("en", "ja"),
-)
-
-TBX_UNITS = (
-    GlossaryTerm(
-        context="characters.sage",
-        values={"ru": "Мудрец", "en": "Sage", "ja": "賢者"},
-        explanations={
-            "ru": "Источник описание",
-            "en": "Wise person",
-            "ja": "賢い人",
-        },
-        section="Characters",
-        term_row=4,
-        description_row=5,
-    ),
-)
+        key=KeyColumn(0, "id"),
+        comments=(MetadataColumn(1, "Character", "Character"),),
+        references=(MetadataColumn(4, "Id", "Id"),),
+        grammar=KeyedGrammar(skip_rows=(1,), allow_blank_rows=True),
+        key_language=None,
+        initial_target_languages=(),
+    )
 
 
-def _render_tbx(tmp_path: Path) -> Path:
-    result = ParseResult(
+def make_tbx_component(source_lang: str, target_lang: str) -> ComponentProfile:
+    return ComponentProfile(
+        sheet="terms",
         component="Terms",
         kind="tbx",
-        units=TBX_UNITS,
-        diagnostics=(),
-        skipped_rows=(),
+        source_lang=source_lang,
+        header_row=0,
+        first_data_row=None,
+        languages=(
+            LanguageColumn(source_lang, source_lang, 0, source_lang),
+            LanguageColumn(target_lang, target_lang, 1, target_lang),
+        ),
+        key=None,
+        comments=(),
+        references=(),
+        grammar=PairsGrammar(skip_rows=(1,), regions=(PairRegion(2, 3, 4),)),
+        key_language=target_lang,
+        initial_target_languages=(target_lang,),
     )
-    render_component(TBX_COMPONENT, result, tmp_path)
-    return tmp_path / "Terms" / "tbx"
 
 
-class LocKitTBXContractTest(RepoTestMixin):
-    """Verify generated TBX files load through TBXFormat."""
-
-    def test_tbx_loads_source_and_target(self, tmp_path=None):
-        import tempfile
-
-        tmp = Path(tmp_path or tempfile.mkdtemp())
-        tbx_dir = _render_tbx(tmp)
-
-        from weblate.formats.models import FILE_FORMATS
-
-        fmt = FILE_FORMATS["tbx"]
-        store = fmt.parse(tbx_dir / "en.tbx")
-
-        data_units = [u for u in store.all_units if not u.isheader()]
-        assert len(data_units) == 1
-        unit = data_units[0]
-        assert unit.source == "Мудрец"
-        assert unit.target == "Sage"
-
-    def test_tbx_preserves_explanations(self, tmp_path=None):
-        import tempfile
-
-        tmp = Path(tmp_path or tempfile.mkdtemp())
-        tbx_dir = _render_tbx(tmp)
-
-        from weblate.formats.models import FILE_FORMATS
-
-        fmt = FILE_FORMATS["tbx"]
-        store = fmt.parse(tbx_dir / "en.tbx")
-
-        data_units = [u for u in store.all_units if not u.isheader()]
-        unit = data_units[0]
-        # The definition note (source explanation)
-        assert "Источник описание" in unit.notes
-
-    def test_tbx_no_source_language_file(self, tmp_path=None):
-        import tempfile
-
-        tmp = Path(tmp_path or tempfile.mkdtemp())
-        tbx_dir = _render_tbx(tmp)
-        assert not (tbx_dir / "ru.tbx").exists()
-
-    def test_tbx_ja_file_exists(self, tmp_path=None):
-        import tempfile
-
-        tmp = Path(tmp_path or tempfile.mkdtemp())
-        tbx_dir = _render_tbx(tmp)
-        assert (tbx_dir / "ja.tbx").is_file()
+# --------------------------------------------------------------------------- #
+# Format-level contract (no database needed)
+# --------------------------------------------------------------------------- #
 
 
-# ---------------------------------------------------------------------------
-# LLM glossary payload contract
-# ---------------------------------------------------------------------------
+class LocKitFormatContractTest(SimpleTestCase):
+    """Generated files load through Weblate's real format classes."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def render_po(self) -> Path:
+        component = make_po_component("ru", "en")
+        result = ParseResult(
+            component="Temple",
+            kind="po",
+            units=(
+                StringUnit(
+                    key="dialog.intro",
+                    values={
+                        "ru": " Привет, [shake]путник[/shake]!\r\n",
+                        "en": "<color=#E3BA59>Hello, traveler!</color>",
+                    },
+                    comments=("Character: Sage",),
+                    references=("101",),
+                    row=4,
+                ),
+                StringUnit(
+                    key="dialog.bye",
+                    values={"ru": "Прощай.", "en": "Farewell."},
+                    comments=("Character: Sage",),
+                    references=("102",),
+                    row=5,
+                ),
+            ),
+            diagnostics=(),
+            skipped_rows=(),
+        )
+        render_component(component, result, self.tmp)
+        return self.tmp / "Temple"
+
+    def render_tbx(self) -> Path:
+        component = make_tbx_component("ru", "en")
+        result = ParseResult(
+            component="Terms",
+            kind="tbx",
+            units=(
+                GlossaryTerm(
+                    context="characters.sage",
+                    values={"ru": "Мудрец", "en": "Sage"},
+                    explanations={"ru": "Источник описание", "en": "Wise person"},
+                    section="Characters",
+                    term_row=4,
+                    description_row=5,
+                ),
+            ),
+            diagnostics=(),
+            skipped_rows=(),
+        )
+        render_component(component, result, self.tmp)
+        return self.tmp / "Terms" / "tbx"
+
+    @staticmethod
+    def parse_mono(path: Path, template: Path):
+        """Monolingual formats need an explicit template store."""
+        cls = FILE_FORMATS["po-mono"]
+        return cls(path, template_store=cls(template, is_template=True))
+
+    def test_po_mono_template_maps_key_to_context_and_source(self) -> None:
+        po_dir = self.render_po()
+        store = self.parse_mono(po_dir / "ru.po", po_dir / "ru.po")
+
+        contexts = {unit.context for unit in store.all_units if unit.context}
+        self.assertEqual(contexts, {"dialog.intro", "dialog.bye"})
+
+        unit = next(u for u in store.all_units if u.context == "dialog.intro")
+        self.assertEqual(unit.source, " Привет, [shake]путник[/shake]!\r\n")
+
+    def test_po_mono_translation_keeps_markup_and_source(self) -> None:
+        po_dir = self.render_po()
+        store = self.parse_mono(po_dir / "en.po", po_dir / "ru.po")
+
+        unit = next(u for u in store.all_units if u.context == "dialog.intro")
+        self.assertEqual(unit.target, "<color=#E3BA59>Hello, traveler!</color>")
+
+    def test_po_mono_keeps_developer_comment_and_location(self) -> None:
+        po_dir = self.render_po()
+        store = self.parse_mono(po_dir / "ru.po", po_dir / "ru.po")
+
+        unit = next(u for u in store.all_units if u.context == "dialog.intro")
+        self.assertIn("Character: Sage", unit.notes)
+        self.assertIn("101", unit.locations)
+
+    def test_tbx_is_bilingual_with_both_explanations(self) -> None:
+        tbx_dir = self.render_tbx()
+        # Weblate always supplies the configured languages when parsing.
+        store = FILE_FORMATS["tbx"](
+            tbx_dir / "en.tbx", source_language="ru", language_code="en"
+        )
+
+        units = [u for u in store.all_units if u.context]
+        self.assertEqual(len(units), 1)
+        unit = units[0]
+        self.assertEqual(unit.context, "characters.sage")
+        self.assertEqual(unit.source, "Мудрец")
+        self.assertEqual(unit.target, "Sage")
+        self.assertEqual(unit.source_explanation, "Источник описание")
+        self.assertEqual(unit.explanation, "Wise person")
+
+    def test_tbx_never_written_for_source_language(self) -> None:
+        tbx_dir = self.render_tbx()
+        self.assertFalse((tbx_dir / "ru.tbx").exists())
+        self.assertTrue((tbx_dir / "en.tbx").is_file())
+
+    def test_tbx_uses_profile_xml_lang_not_weblate_code(self) -> None:
+        # The Weblate code zh_Hans must be emitted as the BCP-47 tag zh-Hans.
+        component = replace(
+            make_tbx_component("ru", "zh_Hans"),
+            languages=(
+                LanguageColumn("ru", "ru", 0, "ru"),
+                LanguageColumn("zh_Hans", "zh-Hans", 1, "zh_Hans"),
+            ),
+        )
+        result = ParseResult(
+            component="Terms",
+            kind="tbx",
+            units=(
+                GlossaryTerm(
+                    context="characters.sage",
+                    values={"ru": "Мудрец", "zh_Hans": "贤者"},
+                    explanations={"ru": "Источник", "zh_Hans": "解释"},
+                    section="Characters",
+                    term_row=4,
+                    description_row=5,
+                ),
+            ),
+            diagnostics=(),
+            skipped_rows=(),
+        )
+        render_component(component, result, self.tmp)
+        xml = (self.tmp / "Terms" / "tbx" / "zh_Hans.tbx").read_text(encoding="utf-8")
+        self.assertIn('xml:lang="zh-Hans"', xml)
+        self.assertNotIn('xml:lang="zh_Hans"', xml)
 
 
-class LocKitLLMGlossaryContractTest(RepoTestMixin):
-    """Verify glossary payload structure from imported TBX units."""
+# --------------------------------------------------------------------------- #
+# Glossary import contract (real upload, real database units)
+# --------------------------------------------------------------------------- #
 
-    def test_glossary_entry_has_source_and_target_explanations(self):
-        """_get_glossary_entry should include both explanations from TBX."""
+
+class LocKitGlossaryImportContractTest(ViewTestCase):
+    """A generated TBX imports into a real glossary and drives the LLM payload."""
+
+    CREATE_GLOSSARIES: bool = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.glossary_component = self.project.glossaries[0]
+        self.glossary = self.glossary_component.translation_set.get(
+            language=self.get_translation().language
+        )
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def generate_tbx(self) -> Path:
+        """Render a TBX matching the test project's source/target languages."""
+        source_code = self.component.source_language.code
+        target_code = self.glossary.language.code
+        component = make_tbx_component(source_code, target_code)
+        result = ParseResult(
+            component="Terms",
+            kind="tbx",
+            units=(
+                GlossaryTerm(
+                    context="characters.sage",
+                    values={source_code: "Sage", target_code: "Mudrc"},
+                    explanations={
+                        source_code: "A wise character",
+                        target_code: "Moudra postava",
+                    },
+                    section="Characters",
+                    term_row=4,
+                    description_row=5,
+                ),
+            ),
+            diagnostics=(),
+            skipped_rows=(),
+        )
+        render_component(component, result, self.tmp)
+        return self.tmp / "Terms" / "tbx" / f"{target_code}.tbx"
+
+    def upload_tbx(self, path: Path):
+        with path.open("rb") as handle:
+            return self.client.post(
+                reverse("upload", kwargs={"path": self.glossary.get_url_path()}),
+                {"file": handle, "method": "add"},
+            )
+
+    def test_generated_tbx_imports_term_with_context_and_target(self) -> None:
+        response = self.upload_tbx(self.generate_tbx())
+        self.assertRedirects(response, self.glossary.get_absolute_url())
+
+        unit = self.glossary.unit_set.get(context="characters.sage")
+        self.assertEqual(unit.source, "Sage")
+        self.assertEqual(unit.target, "Mudrc")
+
+    def test_translation_upload_does_not_carry_explanations(self) -> None:
+        """Documents a Weblate upload-path limitation, not a writer defect.
+
+        The translation-upload view imports source/target only. Explanations
+        reach the database through repository synchronisation instead, which is
+        why the runbook attaches Terms.zip as component files. The generated
+        file does carry both explanations - see
+        LocKitFormatContractTest.test_tbx_is_bilingual_with_both_explanations.
+        """
+        self.upload_tbx(self.generate_tbx())
+
+        unit = self.glossary.unit_set.get(context="characters.sage")
+        self.assertEqual(unit.explanation, "")
+
+    def test_imported_unit_produces_full_llm_glossary_entry(self) -> None:
+        """A real database unit with explanations yields all payload fields."""
         from weblate.machinery.llm import BaseLLMTranslation
 
-        # Build a mock-like Unit with the right attributes.
-        # In a real test, this unit would come from a loaded TBX component.
-        # Here we verify the _get_glossary_entry code path directly.
+        self.upload_tbx(self.generate_tbx())
+        unit = self.glossary.unit_set.get(context="characters.sage")
 
-        class MockUnit:
-            all_flags = {"read-only", "terminology"}
-            translated = True
-            source = "Мудрец"
-            target = "Sage"
-            explanation = "Wise person"
-            source_unit = type("S", (), {"explanation": "Источник описание"})()
+        # Apply the explanations that repository synchronisation would set.
+        unit.explanation = "Moudra postava"
+        unit.save(update_fields=["explanation"])
+        unit.source_unit.explanation = "A wise character"
+        unit.source_unit.save(update_fields=["explanation"])
+        unit.refresh_from_db()
 
-        entry = BaseLLMTranslation._get_glossary_entry(MockUnit())
-        assert entry is not None
-        assert entry["source"] == "Мудрец"
-        assert entry["target"] == "Sage"
-        assert entry["source_explanation"] == "Источник описание"
-        assert entry["target_explanation"] == "Wise person"
+        entry = BaseLLMTranslation._get_glossary_entry(unit)
 
-    def test_glossary_entry_omits_empty_explanations(self):
-        """When explanations are empty, they should be omitted."""
-        from weblate.machinery.llm import BaseLLMTranslation
-
-        class MockUnit:
-            all_flags = {"read-only", "terminology"}
-            translated = True
-            source = "Термин"
-            target = "Term"
-            explanation = ""
-            source_unit = type("S", (), {"explanation": ""})()
-
-        entry = BaseLLMTranslation._get_glossary_entry(MockUnit())
-        assert entry is not None
-        assert "source_explanation" not in entry
-        assert "target_explanation" not in entry
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry["source"], "Sage")
+        self.assertEqual(entry["target"], "Mudrc")
+        self.assertEqual(entry["source_explanation"], "A wise character")
+        self.assertEqual(entry["target_explanation"], "Moudra postava")
