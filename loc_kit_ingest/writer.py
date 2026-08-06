@@ -1,17 +1,25 @@
-# Copyright (C) HCGameLoc
+# Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-from loc_kit_ingest.model import Diagnostic, GlossaryTerm, ParseResult, Severity, StringUnit
 from translate.storage.pypo import pofile
 from translate.storage.tbx import tbxfile
 
+from loc_kit_ingest.model import (
+    Diagnostic,
+    GlossaryTerm,
+    ParseResult,
+    Severity,
+    StringUnit,
+)
+
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from loc_kit_ingest.profile import ComponentProfile
 
 
@@ -23,7 +31,8 @@ if TYPE_CHECKING:
 def _render_po(
     component: ComponentProfile, result: ParseResult, out_dir: Path
 ) -> dict[str, Path]:
-    """Write one PO file per declared language.
+    """
+    Write one PO file per declared language.
 
     Returns {language_code: path}.
     """
@@ -137,7 +146,8 @@ def _validate_po(
 def _render_tbx(
     component: ComponentProfile, result: ParseResult, out_dir: Path
 ) -> dict[str, Path]:
-    """Write one bilingual TBX per initial_target_language.
+    """
+    Write one bilingual TBX per initial_target_language.
 
     Returns {target_code: path}. Source language file is never created.
     """
@@ -293,7 +303,8 @@ def _validate_tbx(
 def render_component(
     component: ComponentProfile, result: ParseResult, out_dir: Path
 ) -> dict[str, Path]:
-    """Render a parsed component to files in out_dir.
+    """
+    Render a parsed component to files in out_dir.
 
     Returns {language_code: path} for PO, {target_code: path} for TBX.
     """
@@ -301,7 +312,8 @@ def render_component(
         return _render_po(component, result, out_dir / component.component)
     if component.kind == "tbx":
         return _render_tbx(component, result, out_dir / component.component)
-    raise ValueError(f"unknown kind {component.kind!r}")
+    msg = f"unknown kind {component.kind!r}"
+    raise ValueError(msg)
 
 
 def validate_rendered_component(
@@ -312,4 +324,5 @@ def validate_rendered_component(
         return _validate_po(component, result, out_dir / component.component)
     if component.kind == "tbx":
         return _validate_tbx(component, result, out_dir / component.component)
-    raise ValueError(f"unknown kind {component.kind!r}")
+    msg = f"unknown kind {component.kind!r}"
+    raise ValueError(msg)

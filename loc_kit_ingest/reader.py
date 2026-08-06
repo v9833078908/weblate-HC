@@ -1,17 +1,18 @@
-# Copyright (C) HCGameLoc
+# Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from __future__ import annotations
 
 import csv
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loc_kit_ingest.model import Diagnostic, Severity
 
 if TYPE_CHECKING:
-    from loc_kit_ingest.profile import ComponentProfile, Profile
+    from pathlib import Path
+
+    from loc_kit_ingest.profile import ComponentProfile
 
 # --------------------------------------------------------------------------- #
 # Reading
@@ -25,7 +26,8 @@ class ReaderError(ValueError):
 
 
 def read_sheets(path: Path) -> dict[str, list[list[str]]]:
-    """Read a kit file into a dict of sheet_name -> list of rows.
+    """
+    Read a kit file into a dict of sheet_name -> list of rows.
 
     Each row is a list of strings. No trimming, no inference.
     CSV/TSV: one sheet named after the file stem.
@@ -36,7 +38,8 @@ def read_sheets(path: Path) -> dict[str, list[list[str]]]:
         return {path.stem: _read_csv(path, _CSV_DIALECTS[suffix])}
     if suffix == ".xlsx":
         return _read_xlsx(path)
-    raise ReaderError(f"unsupported file suffix: {suffix!r}")
+    msg = f"unsupported file suffix: {suffix!r}"
+    raise ReaderError(msg)
 
 
 def _read_csv(path: Path, delimiter: str) -> list[list[str]]:
@@ -68,7 +71,8 @@ def _read_xlsx(path: Path) -> dict[str, list[list[str]]]:
 def validate_sheet_headers(
     component: ComponentProfile, rows: list[list[str]]
 ) -> tuple[Diagnostic, ...]:
-    """Check that every configured header cell matches the sheet's header row.
+    """
+    Check that every configured header cell matches the sheet's header row.
 
     Returns a tuple of ERROR diagnostics for each mismatch.
     """

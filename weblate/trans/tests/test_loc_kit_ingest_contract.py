@@ -1,4 +1,4 @@
-# Copyright (C) HCGameLoc
+# Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -15,24 +15,35 @@ Run via: ./rundev.sh test weblate/trans/tests/test_loc_kit_ingest_contract.py
 
 from __future__ import annotations
 
+import io
 import shutil
 import sys
 import tempfile
+import zipfile
 from dataclasses import replace
 from pathlib import Path
 
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase
+from django.test.utils import modify_settings
 from django.urls import reverse
 
 from weblate.formats.models import FILE_FORMATS
+from weblate.machinery.llm import BaseLLMTranslation
+from weblate.trans.models import Component
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.views import create_component_from_kit
 
 # loc_kit_ingest is a standalone package at the repository root.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+# ruff: ignore[module-import-not-at-top-of-file]
 from loc_kit_ingest.model import GlossaryTerm, ParseResult, StringUnit
+
+# ruff: ignore[module-import-not-at-top-of-file]
 from loc_kit_ingest.profile import (
     ComponentProfile,
     KeyColumn,
@@ -42,6 +53,8 @@ from loc_kit_ingest.profile import (
     PairRegion,
     PairsGrammar,
 )
+
+# ruff: ignore[module-import-not-at-top-of-file]
 from loc_kit_ingest.writer import render_component
 
 # --------------------------------------------------------------------------- #
@@ -316,8 +329,6 @@ class LocKitGlossaryImportContractTest(ViewTestCase):
 
     def test_imported_unit_produces_full_llm_glossary_entry(self) -> None:
         """A real database unit with explanations yields all payload fields."""
-        from weblate.machinery.llm import BaseLLMTranslation
-
         self.upload_tbx(self.generate_tbx())
         unit = self.glossary.unit_set.get(context="characters.sage")
 
@@ -328,6 +339,7 @@ class LocKitGlossaryImportContractTest(ViewTestCase):
         unit.source_unit.save(update_fields=["explanation"])
         unit.refresh_from_db()
 
+        # ruff: ignore[private-member-access]
         entry = BaseLLMTranslation._get_glossary_entry(unit)
 
         self.assertIsNotNone(entry)
@@ -358,16 +370,12 @@ class LocKitUniversalUploadContractTest(ViewTestCase):
     )
 
     def _upload(self, name: str, body: str):
-        from django.core.files.uploadedfile import SimpleUploadedFile
-
         return SimpleUploadedFile(name, body.encode(), content_type="text/csv")
 
     def _kit_data(self, slug: str) -> dict:
         return {"project": self.project, "slug": slug, "name": slug.title()}
 
     def test_five_language_kit_renders_every_language(self) -> None:
-        from weblate.utils.views import create_component_from_kit
-
         fake, info = create_component_from_kit(
             self._kit_data("dialogs"),
             self._upload("Space Kit - Dialogs.csv", self.KIT_CSV),
@@ -384,15 +392,8 @@ class LocKitUniversalUploadContractTest(ViewTestCase):
         shutil.rmtree(fake.full_path, ignore_errors=True)
 
     def test_zip_upload_keeps_historical_behavior(self) -> None:
-        import io
-        import zipfile as zipfile_module
-
-        from django.core.files.uploadedfile import SimpleUploadedFile
-
-        from weblate.utils.views import create_component_from_kit
-
         buffer = io.BytesIO()
-        with zipfile_module.ZipFile(buffer, "w") as archive:
+        with zipfile.ZipFile(buffer, "w") as archive:
             archive.writestr("cs.po", 'msgid "hello"\nmsgstr "ahoj"\n')
         fake, info = create_component_from_kit(
             self._kit_data("zipped"),
@@ -405,10 +406,6 @@ class LocKitUniversalUploadContractTest(ViewTestCase):
         shutil.rmtree(fake.full_path, ignore_errors=True)
 
     def test_duplicate_keys_block_intake(self) -> None:
-        from django.core.exceptions import ValidationError
-
-        from weblate.utils.views import create_component_from_kit
-
         broken = "id,ru,en\na,Один,One\na,Два,Two\n"
         with self.assertRaises(ValidationError) as ctx:
             create_component_from_kit(
@@ -417,10 +414,6 @@ class LocKitUniversalUploadContractTest(ViewTestCase):
         self.assertIn("duplicate key", "".join(ctx.exception.messages))
 
     def test_unsupported_suffix_is_rejected(self) -> None:
-        from django.core.exceptions import ValidationError
-
-        from weblate.utils.views import create_component_from_kit
-
         with self.assertRaises(ValidationError) as ctx:
             create_component_from_kit(
                 self._kit_data("plain"), self._upload("notes.txt", "hello")
@@ -428,10 +421,6 @@ class LocKitUniversalUploadContractTest(ViewTestCase):
         self.assertIn(".csv", "".join(ctx.exception.messages))
 
     def test_create_view_builds_component_from_csv(self) -> None:
-        from django.test.utils import modify_settings
-
-        from weblate.trans.models import Component
-
         self.user.is_superuser = True
         self.user.save()
 

@@ -224,7 +224,7 @@ source-language description становится `source_explanation`, а descri
 
 ### Temple и UI: монолингвальный PO
 
-```
+```text
 out/
   Temple/
     ru.po                 # source template
@@ -251,7 +251,7 @@ Weblate component для Temple/UI:
 
 ### Terms: двуязычный TBX по целевому языку
 
-```
+```text
 out/
   Terms/
     tbx/

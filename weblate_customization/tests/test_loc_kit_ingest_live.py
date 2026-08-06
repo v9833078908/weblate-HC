@@ -1,4 +1,4 @@
-# Copyright (C) HCGameLoc
+# Copyright © HCGameLoc
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -23,7 +23,11 @@ from __future__ import annotations
 
 import os
 
+import psycopg
 import pytest
+from weblate_customization.machinery import RoutedLLMTranslation
+
+from weblate.configuration.models import Setting, SettingCategory
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("LOC_INGEST_LIVE_LLM") != "1",
@@ -35,10 +39,6 @@ SOURCE_TEXT = "Мудрец говорит мудро."
 
 @pytest.mark.django_db(transaction=True)
 def test_routed_llm_returns_one_real_translation():
-    from weblate_customization.machinery import RoutedLLMTranslation
-
-    from weblate.configuration.models import Setting, SettingCategory
-
     service_id = RoutedLLMTranslation.get_identifier()
 
     config = None
@@ -47,8 +47,6 @@ def test_routed_llm_returns_one_real_translation():
     except Setting.DoesNotExist:
         # pytest runs against a fresh test database; the service configured on
         # the dev instance lives in the real one. Read it directly.
-        import psycopg
-
         with psycopg.connect(
             host=os.environ.get("CI_DB_HOST", "database"),
             dbname=os.environ.get("WEBLATE_LIVE_DB", "weblate"),
@@ -76,6 +74,8 @@ def test_routed_llm_returns_one_real_translation():
     result = service.download_multiple_translations("ru", "en", [(SOURCE_TEXT, None)])
 
     translations = result[SOURCE_TEXT]
+    # ruff: ignore[assert]
     assert translations, "routed LLM returned no candidates"
     text = translations[0]["text"]
+    # ruff: ignore[assert]
     assert text and text != SOURCE_TEXT

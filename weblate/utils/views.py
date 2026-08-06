@@ -729,11 +729,25 @@ def create_component_from_kit(data, uploaded):
             % ", ".join(KIT_TABLE_SUFFIXES)
         )
 
+    # The converter is a standalone package deployed next to Weblate; import it
+    # only when a table actually arrives so plain Weblate deployments keep
+    # working without it.
+    # ruff: ignore[import-outside-top-level]
     from loc_kit_ingest.infer import InferenceError, infer_profile
+
+    # ruff: ignore[import-outside-top-level]
     from loc_kit_ingest.model import Severity
+
+    # ruff: ignore[import-outside-top-level]
     from loc_kit_ingest.parser import parse_component as parse_kit_component
+
+    # ruff: ignore[import-outside-top-level]
     from loc_kit_ingest.profile import ProfileError, parse_profile
+
+    # ruff: ignore[import-outside-top-level]
     from loc_kit_ingest.reader import ReaderError, read_sheets, validate_sheet_headers
+
+    # ruff: ignore[import-outside-top-level]
     from loc_kit_ingest.writer import render_component
 
     with tempfile.TemporaryDirectory() as tmpdir:
