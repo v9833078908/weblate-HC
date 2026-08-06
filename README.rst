@@ -1,9 +1,11 @@
 HCGameLoc
 =========
 
-Внутренний сервис непрерывной локализации проектов **Hero Craft**,
-построенный на форке `Weblate <https://weblate.org/>`_. Поддерживается
-v9833078908 (``origin`` = `v9833078908/weblate-HC
+Внутренний сервис непрерывной локализации проектов **Hero Craft**. Код
+производный от `Weblate <https://weblate.org/>`_, но репозиторий развивается
+самостоятельно: апстрим-remote нет, ребейзов на ``WeblateOrg/weblate`` нет,
+править файлы под ``weblate/`` — нормальный способ менять поведение продукта.
+Поддерживается v9833078908 (``origin`` = `v9833078908/weblate-HC
 <https://github.com/v9833078908/weblate-HC>`_).
 
 
@@ -11,21 +13,21 @@ v9833078908 (``origin`` = `v9833078908/weblate-HC
    :local:
    :depth: 1
 
-Что добавлено поверх upstream
------------------------------
+Свои части репозитория
+----------------------
 
-Всё под ``weblate/`` следует за upstream Weblate. Три вещи есть здесь, но
-отсутствуют в upstream:
+Три вещи существуют только здесь и не приходят из исходного Weblate:
 
 ``weblate_customization/``
     Пакет с кастомной проверкой (см. `Проверка game-markup`_ ниже). Содержит
     ``GameMarkupCheck`` (id проверки ``game-markup``), который убеждается, что
     Unity-теги форматирования (``<color=#RRGGBB>``, ``<link>``, ``<size=N>``,
     ``<b>``) и движковые плейсхолдеры (``{0}``, ``%KEY%``) в переводе совпадают
-    с исходником. Пакет также содержит ``RoutedLLMTranslation`` — OpenRouter-совместимый
-    движок автоматических предложений, который выбирает model ID по целевому
-    языку из JSON-карты ``routing``. Движок подключается через
-    ``WEBLATE_ADD_MACHINERY``.
+    с исходником. Пакет также содержит ``RoutedLLMTranslation`` — движок
+    автоматических предложений **OpenRouter** (слаг сервиса ``openrouter``),
+    который выбирает model ID по целевому языку из JSON-карты ``routing``.
+    Движок подключается через ``WEBLATE_ADD_MACHINERY`` и предвыбран в форме
+    автоперевода (``AutoForm.DEFAULT_ENGINE`` в ``weblate/trans/forms.py``).
 
 ``weblate-mcp/``
     Вендоренный MCP-сервер `@mmntm/weblate-mcp
@@ -194,8 +196,8 @@ Dev-инстанс целиком работает в Docker (``dev-docker/``) �
 в ``CHECK_LIST`` через ``modify_env_list`` (``weblate/utils/environment.py``).
 Тот же механизм есть для ``WEBLATE_ADD_ADDONS``, ``WEBLATE_ADD_APPS`` и т. д.
 
-Routed LLM
-----------
+Движок OpenRouter
+-----------------
 
 ``RoutedLLMTranslation`` находится в
 ``weblate_customization/src/weblate_customization/machinery.py``. После каждой
@@ -218,6 +220,13 @@ JSON-объект, где ключом служит код целевого яз
 
 Project-level настройка заменяет весь глобальный конфиг сервиса, поэтому для
 неё нужно повторно задать API key, ``base_url`` и остальные нужные поля.
+
+Сервис называется **OpenRouter** (слаг ``openrouter``, выводится из
+``RoutedLLMTranslation.name``). Он предвыбран в форме автоперевода вместе с
+режимом «машинный перевод»: см. ``AutoForm.DEFAULT_ENGINE`` в
+``weblate/trans/forms.py``. Если переименовать движок, надо переименовать и
+запись настроек (``Setting`` с ``category=2``, ``name`` = слаг сервиса),
+иначе конфигурация «потеряется».
 
 MCP-сервер
 ----------
