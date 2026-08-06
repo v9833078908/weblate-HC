@@ -473,12 +473,15 @@ def test_temple_units_skip_junk_and_keep_markup():
     assert "[/shake]" in shaken.values["ru"]        # markup byte-preserved
 
 
-def test_terms_units_slug_and_sections():
+def test_terms_units_slug_pairing_glossary():
     rows = _rows("terms.csv")
     units = build_units(rows, detect_layout(rows))
-    assert all(u.key for u in units)                # every unit has a (slugged) key
+    assert all(u.key for u in units)                  # every unit has a (slugged) key
     assert len({u.key for u in units}) == len(units)  # keys unique
-    assert any(u.section for u in units)            # section captured
+    leon = next(u for u in units if u.values.get("en") == "Leon")
+    assert leon.key == "leon"                         # slug from en value (latin)
+    assert any(len(c) > 200 for c in leon.comments)   # bio row attached as description
+    assert not any(len(u.values.get("ru", "")) > 200 for u in units)  # no bio-units
 
 
 def test_ui_units_reference(ui_xlsx):
@@ -500,7 +503,7 @@ import re
 from .layout import Layout
 from .model import Unit
 
-_SLUG_RE = re.compile(r"[^a-z0-9]+")
+_SLUG_RE = re.compile(r"[^\w]+")  # \w keeps Cyrillic/CJK; PO msgid is arbitrary UTF-8
 
 
 def _slug(text: str) -> str:
@@ -553,10 +556,17 @@ def build_units(rows, layout: Layout) -> list[Unit]:
         if not values:
             continue
 
+        # Keyless kits (glossary-style): a long row is a description of the
+        # previous term, not a unit of its own (Terms: term row -> bio row).
+        primary = values.get(layout.source_lang) or next(iter(values.values()))
+        if layout.key_col is None and units and len(primary) > 200:
+            units[-1].comments.append(primary)
+            continue
+
         if layout.key_col is not None and layout.key_col < len(row) and row[layout.key_col].strip():
             key = row[layout.key_col].strip()
         else:
-            base = values.get(layout.source_lang) or next(iter(values.values()))
+            base = values.get("en") or primary        # en preferred: readable latin slugs
             key = f"{_slug(section)}_{_slug(base)}" if section else _slug(base)
         if key in seen:
             seen[key] += 1
@@ -912,7 +922,7 @@ Weblate работает на `localhost:3001` (логин `admin`/`admin`), п�
 
 **Сценарий C2 — Кит с предупреждениями:** отчёт показал `en == ru`/сдвиг → правишь в исходной таблице (Weblate ещё не источник правды) → перезапуск CLI → перезалив (компонент пересоздать, п. C5).
 
-**Сценарий C3 — Кит без ключей (Terms):** после загрузки открыть несколько строк — контекст = сгенерённый слаг; убедиться, что слаги читаемые и уникальные (в отчёте нет дублей).
+**Сценарий C3 — Глоссарий из keyless-кита (Terms):** при создании компонента поставить галку **«Использовать в качестве словаря»** (та же вкладка «Отправить файлы перевода»). После загрузки: контекст = сгенерённый слаг (латинский, из en-значения); биография видна как комментарий (`#.`) к термину, а не как отдельный «термин»; в отчёте нет дублей. Чтобы биография попадала в LLM-промпт как «объяснение», заполнить поле «Объяснение» термина в UI глоссария.
 
 **Сценарий C4 — Двухключевой кит (UI):** переводчик видит семантический ключ (`vibration`) как контекст, числовой Id — в «расположении»; Id сохранён под будущий экспорт.
 
@@ -920,7 +930,12 @@ Weblate работает на `localhost:3001` (логин `admin`/`admin`), п�
 
 **Сценарий C6 — Пост-импорт:** добавить целевые языки; привязать `routed-llm` (machinery); включить `game-markup`-чек (`WEBLATE_ADD_CHECK`, см. `AGENTS.md`); при необходимости — аддон форматирования PO, чтобы первый коммит Weblate не переформатировал файл.
 
-**Acceptance:** хотя бы один кит (UI) реально загружен в Heart Abyss, все проверки C1 зелёные, `game-markup` не даёт ложных срабатываний на перенесённой разметке.
+**Сценарий C7 — Автоперевод с глоссарием (порядок обязателен):**
+1. Сначала перевести **сам глоссарий** на целевые языки (тем же «Инструменты → Автоматический перевод» + ручная вычитка — терминов мало): термин без перевода на целевой язык в промпт не попадает (`weblate/machinery/llm.py:_get_glossary_entry` отбрасывает пустой `target`).
+2. Затем автоперевод основного компонента: страница языка → **Инструменты → Автоматический перевод** → «Машинный перевод», источник = Routed LLM. Один запуск = один язык; для 5+ языков — по разу на язык или аддон `weblate.autotranslate.autotranslate`.
+3. Проверка: в переводе термины из глоссария применены («Леон», «Дзинко» и т.п. по словарю); в промпт уходят только термины, чей исходник встречается в строке.
+
+**Acceptance:** хотя бы один кит (UI) реально загружен в Heart Abyss, все проверки C1 зелёные, `game-markup` не даёт ложных срабатываний на перенесённой разметке; Terms создан глоссарием и его термины видны в подсказках при переводе других компонентов.
 
 ---
 
