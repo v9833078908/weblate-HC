@@ -103,7 +103,7 @@ class RoutedLLMMachineryForm(BaseOpenAIMachineryForm):
 class RoutedLLMTranslation(OpenAITranslation):
     """OpenRouter LLM with per-target-language model routing."""
 
-    name = "Routed LLM"
+    name = "OpenRouter"
     settings_form = RoutedLLMMachineryForm
     trusted_error_hosts: ClassVar[set[str]] = {"openrouter.ai"}
 

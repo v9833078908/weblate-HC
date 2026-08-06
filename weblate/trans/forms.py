@@ -1189,6 +1189,8 @@ class AutoForm(forms.Form):
         "Turn on contribution to shared translation memory for the project to "
         "get access to additional components."
     )
+    # Preselected machinery service, falls back to Weblate translation memory.
+    DEFAULT_ENGINE = "openrouter"
 
     mode = forms.ChoiceField(
         label=gettext_lazy("Automatic translation mode"),
@@ -1314,7 +1316,10 @@ class AutoForm(forms.Form):
         self.fields["engines"].choices = [
             (engine.get_identifier(), engine.name) for engine in engines
         ]
-        if "weblate" in engine_ids:
+        if self.DEFAULT_ENGINE in engine_ids:
+            self.fields["engines"].initial = [self.DEFAULT_ENGINE]
+            self.fields["auto_source"].initial = "mt"
+        elif "weblate" in engine_ids:
             self.fields["engines"].initial = ["weblate"]
 
         if "q" not in self.initial:

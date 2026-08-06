@@ -4,8 +4,8 @@ This file captures agent-specific guidance for working in the Weblate codebase.
 For application-developer workflows and broader product integration guidance, use
 `docs/devel/` instead of repeating that material here.
 
-Sections after "Project-specific setup" describe this checkout only (a fork used
-for game localization); the sections before it are upstream Weblate conventions.
+Sections after "Project-specific setup" describe this repository only; the
+sections before it are Weblate conventions inherited from the original codebase.
 
 ## Project overview
 
@@ -128,28 +128,35 @@ for game localization); the sections before it are upstream Weblate conventions.
 
 ## Project-specific setup
 
-A fork of upstream Weblate (`origin` = WeblateOrg/weblate, `fork` =
-v9833078908/weblate-HC) used to localize Hero Craft games. Three
-things exist here that are not upstream:
+HCGameLoc is an independent Weblate-derived repository (`origin` =
+v9833078908/weblate-HC) used to localize Hero Craft games. It is no longer
+tracking WeblateOrg/weblate: there is no upstream remote, no rebase workflow,
+and editing files under `weblate/` directly is a normal way to change product
+behavior. Keep the code GPL-3.0-or-later and keep upstream conventions from the
+sections above, but treat divergence from WeblateOrg as expected rather than as
+debt.
 
-- `weblate_customization/` (untracked) - a custom-check and custom-machinery
-  package following `docs/admin/customize.rst`. Ships `GameMarkupCheck`
+Repository-specific parts:
+
+- `weblate_customization/` - a custom-check and custom-machinery package
+  following `docs/admin/customize.rst`. Ships `GameMarkupCheck`
   (`check_id: game-markup`) in `checks.py`, which asserts that Unity rich-text
   tags (`<color=#RRGGBB>`, `<link>`, `<size=N>`, `<b>`) and engine placeholders
   (`{0}`, `%KEY%`) in the target match the source multiset, and
   `RoutedLLMTranslation` in `machinery.py`, an OpenRouter-backed automatic
-  suggestion service that resolves the model ID per target language from a
-  `routing` JSON map. Routed LLM uses one OpenRouter key and a routing JSON
-  mapping target language codes to model IDs; project-level settings replace
-  the complete global service configuration, they do not merge only the
-  `routing` field. See "Deploying custom checks and machinery" below for how
-  both modules reach the dev container.
-- `weblate-mcp/` (untracked, its own git repo) - vendored `@mmntm/weblate-mcp`,
+  suggestion service (display name and service slug: `OpenRouter` /
+  `openrouter`) that resolves the model ID per target language from a `routing`
+  JSON map. It uses one OpenRouter key; project-level settings replace the
+  complete global service configuration, they do not merge only the `routing`
+  field. `AutoForm.DEFAULT_ENGINE` (`weblate/trans/forms.py`) preselects this
+  service and the "Machine translation" source in the automatic translation
+  form. See "Deploying custom checks and machinery" below for how both modules
+  reach the dev container.
+- `weblate-mcp/` (gitignored, its own git repo) - vendored `@mmntm/weblate-mcp`,
   a NestJS MCP server that talks to the local Weblate REST API. Its `.env` points
   at `http://localhost:3001/api/`.
-- `docs/plans/` - local planning docs (in Russian) for game-localization
-  workflows, e.g. `llm-judge-external-pipeline.md`. These are the only local
-  commits on top of `origin/main`.
+- `docs/plans/`, `docs/specs/` - planning and design docs (in Russian) for
+  game-localization workflows, e.g. `llm-judge-external-pipeline.md`.
 
 Local modifications to `dev-docker/docker-compose.yml`: Postgres published on
 `5434` (5433 is taken by another project) and `WEBLATE_VCS_ALLOW_SCHEMES` extended
