@@ -2,21 +2,21 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Opt-in live Routed LLM smoke test.
+"""
+Opt-in live Routed LLM smoke test.
 
-This test verifies that an imported glossary guides a real routed LLM
-translation. It is SKIPPED by default and must be explicitly enabled:
+Verifies that the configured routed-llm service returns one real translation
+through the actual Weblate machinery entrypoint. SKIPPED by default:
 
     LOC_INGEST_LIVE_LLM=1 ./rundev.sh test \
         weblate_customization/tests/test_loc_kit_ingest_live.py
 
-Prerequisites:
-    - Dev container running on port 3001
-    - RoutedLLMTranslation registered and configured with a valid OpenRouter key
-    - Test database available
+Prerequisites: routed-llm configured in /manage/machinery/ with a live
+OpenRouter key and an "en" routing entry. Makes exactly ONE LLM request.
 
-It creates its own temporary project/glossary/component and cleans up afterwards.
-It makes exactly ONE LLM request.
+The deterministic glossary-payload contract (source/target explanations in the
+LLM glossary entry) is covered without network access by
+weblate/trans/tests/test_loc_kit_ingest_contract.py.
 """
 
 from __future__ import annotations
@@ -30,65 +30,52 @@ pytestmark = pytest.mark.skipif(
     reason="set LOC_INGEST_LIVE_LLM=1 to spend one routed LLM request",
 )
 
+SOURCE_TEXT = "Мудрец говорит мудро."
+
 
 @pytest.mark.django_db(transaction=True)
-def test_imported_glossary_guides_one_routed_translation():
-    """Verify glossary source/target/explanation fields appear in LLM payload."""
-    from weblate.trans.models import Project, Component
-    from weblate.lang.models import Language
+def test_routed_llm_returns_one_real_translation():
+    from weblate_customization.machinery import RoutedLLMTranslation
 
-    # Create temporary project.
-    project = Project.objects.create(
-        name="loc-ingest-smoke",
-        slug="loc-ingest-smoke",
-    )
+    from weblate.configuration.models import Setting, SettingCategory
+
+    service_id = RoutedLLMTranslation.get_identifier()
+
+    config = None
     try:
-        ru = Language.objects.get(code="ru")
-        en = Language.objects.get(code="en")
+        config = Setting.objects.get(category=SettingCategory.MT, name=service_id).value
+    except Setting.DoesNotExist:
+        # pytest runs against a fresh test database; the service configured on
+        # the dev instance lives in the real one. Read it directly.
+        import psycopg
 
-        # The actual verification is that RoutedLLMTranslation can be invoked
-        # and returns a non-empty translation for a source string that contains
-        # a glossary term. This requires the routed-llm service to be configured.
-        from weblate.configuration.models import Setting, SettingCategory
+        with psycopg.connect(
+            host=os.environ.get("CI_DB_HOST", "database"),
+            dbname=os.environ.get("WEBLATE_LIVE_DB", "weblate"),
+            user=os.environ.get("CI_DB_USER", "weblate"),
+            password=os.environ.get("CI_DB_PASSWORD", "weblate"),
+        ) as conn:
+            row = conn.execute(
+                "SELECT value FROM configuration_setting"
+                " WHERE category = %s AND name = %s",
+                (int(SettingCategory.MT), service_id),
+            ).fetchone()
+        if row is None:
+            pytest.skip(f"{service_id} service not configured on the instance")
+        config = row[0]
 
-        try:
-            service_setting = Setting.objects.get(
-                category=SettingCategory.MT, name="routed-llm"
-            )
-        except Setting.DoesNotExist:
-            pytest.skip("routed-llm service not configured")
+    if not config.get("key"):
+        pytest.skip("OpenRouter key not configured for routed-llm")
+    routing = config.get("routing", {})
+    if "en" not in routing and "*" not in routing:
+        pytest.skip("no routing entry (nor '*' fallback) for 'en'")
+    service = RoutedLLMTranslation(configuration=config)
 
-        config = service_setting.value
-        if not config.get("key"):
-            pytest.skip("OpenRouter key not configured for routed-llm")
+    # The real machinery entrypoint, with service language codes as strings —
+    # the same shape validate_settings() uses.
+    result = service.download_multiple_translations("ru", "en", [(SOURCE_TEXT, None)])
 
-        # Verify the routing map has a model for English.
-        routing = config.get("routing", {})
-        if "en" not in routing:
-            pytest.skip("no routing entry for 'en' target language")
-
-        # Import the RoutedLLMTranslation class.
-        from weblate_customization.machinery import RoutedLLMTranslation
-
-        service = RoutedLLMTranslation(configuration=config)
-
-        # Build a minimal unit-like object.
-        from weblate.trans.tests.utils import get_test_file
-
-        # The real smoke creates a temporary glossary, imports one TBX term,
-        # and verifies the LLM payload contains glossary fields. For now we
-        # verify the service is callable and returns a response.
-        result = list(
-            service._download_translations(
-                source_text="Мудрец говорит мудро.",
-                target_language=en,
-                source_language=ru,
-                unit=None,
-                user=None,
-            )
-        )
-        assert len(result) > 0
-        assert result[0].text  # non-empty translation
-
-    finally:
-        project.delete()
+    translations = result[SOURCE_TEXT]
+    assert translations, "routed LLM returned no candidates"
+    text = translations[0]["text"]
+    assert text and text != SOURCE_TEXT
