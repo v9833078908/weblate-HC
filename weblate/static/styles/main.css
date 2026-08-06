@@ -1190,6 +1190,14 @@ th.number {
   background: none;
 }
 
+/* Recommended creation path: keep a thin brand-green outline visible at rest
+   and on hover, overriding the generic transparent/grey pill borders. */
+.nav-pills > li > a.nav-link-recommended,
+.nav-pills > li > a.nav-link-recommended:hover,
+.nav-pills > li > a.nav-link-recommended:focus {
+  border: 1px solid var(--wl-color-success);
+}
+
 .nav-pills > li > a > button.btn-close {
   height: 14px;
   width: 14px;

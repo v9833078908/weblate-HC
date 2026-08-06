@@ -25,7 +25,10 @@
     {% if zip_form %}
       <li class="nav-item" role="presentation">
         {# Translators: Create a component using ZIP upload #}
-        <a class="nav-link" data-bs-target="#zip" data-bs-toggle="tab" href="#">{% translate "Upload translations files" %}</a>
+        <a class="nav-link nav-link-recommended"
+           data-bs-target="#zip"
+           data-bs-toggle="tab"
+           href="#">{% translate "Upload translations files" %}</a>
       </li>
     {% endif %}
     {% if doc_form %}
