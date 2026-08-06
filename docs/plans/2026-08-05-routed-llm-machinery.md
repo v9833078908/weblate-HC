@@ -1,4 +1,12 @@
-# Routed LLM Machinery Implementation Plan
+# Routed LLM Machinery Implementation Plan [ВЫПОЛНЕНО]
+
+> **Статус:** выполнен полностью 2026-08-05. Все 7 задач закоммичены
+> (`709a81a`, `715f69f`, `cb5e8b8`, `a88a37e`, `e153a22`, `bfdf806`,
+> `45b35b6`, `b97fbef`). Проверено 2026-08-06: `routed-llm` в реестре
+> `MACHINERY` резолвится в `weblate_customization.machinery.RoutedLLMTranslation`,
+> сервис сконфигурирован в БД (`Setting` category=2, name=`routed-llm`),
+> `./rundev.sh test weblate_customization/tests/test_machinery.py` — 27 passed.
+> Документ оставлен как есть, для истории.
 
 > **For Claude:** REQUIRED SUB-SKILL: Use @executing-plans to implement this plan task-by-task.
 
