@@ -586,12 +586,17 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         super().setUp()
         self.user.is_superuser = True
         self.user.save()
+        # Component repositories live under a DATA_DIR path that xdist
+        # workers share, so two tests creating the same slug race on disk
+        # even though their databases are separate.
+        self.slug = f"gloss-{uuid.uuid4().hex[:8]}"
 
     def _csv(self, name: str = "Glossary.csv", body: str = GLOSSARY_CSV):
         return SimpleUploadedFile(name, body.encode(), content_type="text/csv")
 
-    def _start(self, upload=None, slug: str = "gloss"):
+    def _start(self, upload=None, slug: str | None = None):
         """Upload a table with the glossary checkbox set."""
+        slug = slug or self.slug
         with modify_settings(INSTALLED_APPS={"remove": "weblate.billing"}):
             return self.client.post(
                 reverse("create-component-zip"),
@@ -660,7 +665,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertEqual(draft.owner, self.user)
         self.assertEqual(draft.state, LocKitImportDraft.State.UPLOADED)
         # No component exists yet.
-        self.assertFalse(Component.objects.filter(slug="gloss").exists())
+        self.assertFalse(Component.objects.filter(slug=self.slug).exists())
 
     def test_failed_draft_insert_leaves_no_orphaned_file(self) -> None:
         """
@@ -726,7 +731,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self._upload_profile(draft, _glossary_profile("Glossary"))
         self._confirm()
 
-        component = Component.objects.get(slug="gloss")
+        component = Component.objects.get(slug=self.slug)
         self.assertEqual(component.file_format, "tbx")
         self.assertEqual(component.filemask, "tbx/*.tbx")
         self.assertEqual(component.template, "")
@@ -754,7 +759,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self._upload_profile(draft, _glossary_profile("Glossary"))
         self._confirm()
 
-        glossary = Component.objects.get(slug="gloss")
+        glossary = Component.objects.get(slug=self.slug)
         self.assertTrue(glossary.is_glossary)
         # Glossary matching keys off the source language.
         self.assertEqual(
@@ -834,7 +839,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
                 response = self.client.get(reverse(name, kwargs={"token": draft.token}))
                 self.assertEqual(response.status_code, 404, name)
 
-        self.assertFalse(Component.objects.filter(slug="gloss").exists())
+        self.assertFalse(Component.objects.filter(slug=self.slug).exists())
 
     def test_confirm_never_writes_into_another_components_repository(self) -> None:
         """
@@ -902,7 +907,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
 
         draft.refresh_from_db()
         self.assertEqual(draft.profile_json, "")
-        self.assertFalse(Component.objects.filter(slug="gloss").exists())
+        self.assertFalse(Component.objects.filter(slug=self.slug).exists())
 
     def test_source_only_profile_creates_no_component(self) -> None:
         self._start()
@@ -924,7 +929,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
             {"action": "confirm"},
         )
         self.assertEqual(response.status_code, 404)
-        self.assertFalse(Component.objects.filter(slug="gloss").exists())
+        self.assertFalse(Component.objects.filter(slug=self.slug).exists())
 
     def test_cancel_deletes_the_draft_and_creates_nothing(self) -> None:
         self._start()
@@ -938,7 +943,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
             follow=True,
         )
         self.assertFalse(LocKitImportDraft.objects.exists())
-        self.assertFalse(Component.objects.filter(slug="gloss").exists())
+        self.assertFalse(Component.objects.filter(slug=self.slug).exists())
 
     def test_another_user_cannot_touch_the_draft(self) -> None:
         self._start()
@@ -1006,7 +1011,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
                 follow=True,
             )
 
-        component = Component.objects.get(slug="gloss")
+        component = Component.objects.get(slug=self.slug)
         self.assertEqual(component.file_format, "tbx")
         self.assertEqual(component.filemask, "tbx/*.tbx")
         self.assertEqual(component.template, "")
