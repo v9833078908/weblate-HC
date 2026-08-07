@@ -85,6 +85,7 @@ from weblate.machinery.management.commands.list_machinery import (
 from weblate.machinery.microsoft import MicrosoftCognitiveTranslation
 from weblate.machinery.mistral import MistralTranslation
 from weblate.machinery.modernmt import ModernMTTranslation
+from weblate.machinery.models import validate_service_configuration
 from weblate.machinery.mymemory import MyMemoryTranslation
 from weblate.machinery.netease import NETEASE_API_ROOT, NeteaseSightTranslation
 from weblate.machinery.ollama import OllamaTranslation
@@ -8921,6 +8922,37 @@ class MachineryValidationTest(TestCase):
             machine.check_failure(response)
 
         self.assertIn("Allowlisted provider error.", str(raised.exception))
+
+    def test_partial_configuration_validates_against_the_base(self) -> None:
+        service, configuration, errors = validate_service_configuration(
+            "openai",
+            {"persona": "You write dialogue."},
+            allow_private_targets=False,
+            base_configuration={"key": "sitewide-key", "model": "auto"},
+        )
+
+        self.assertIsNotNone(service)
+        self.assertEqual(errors, [])
+        self.assertEqual(configuration, {"persona": "You write dialogue."})
+
+    def test_partial_configuration_without_a_base_still_requires_the_key(self) -> None:
+        _service, _configuration, errors = validate_service_configuration(
+            "openai",
+            {"persona": "You write dialogue."},
+            allow_private_targets=False,
+        )
+
+        self.assertTrue(any("key" in error for error in errors))
+
+    def test_partial_configuration_reports_its_own_invalid_field(self) -> None:
+        _service, _configuration, errors = validate_service_configuration(
+            "openai",
+            {"language_instructions": "not-a-mapping"},
+            allow_private_targets=False,
+            base_configuration={"key": "sitewide-key", "model": "auto"},
+        )
+
+        self.assertTrue(any("language_instructions" in error for error in errors))
 
 
 class ProjectMachineryInheritanceTest(TestCase):
