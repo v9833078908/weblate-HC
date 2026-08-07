@@ -364,13 +364,21 @@ class EditMachineryProjectView(MachineryProjectMixin, EditMachineryView):
         only when it carries a value: an empty one overrides nothing and is
         indistinguishable from leaving the field alone.
         """
-        sitewide = self.sitewide_configuration
-        return {
-            field: value
-            for field, value in data.items()
-            if (field in sitewide and sitewide[field] != value)
-            or (field not in sitewide and value not in {"", None, False})
-        }
+        # SettingsDict is a TypedDict, so it cannot be indexed by a variable
+        # key; the field names come from the bound form and are not known here.
+        sitewide = cast("dict[str, object]", self.sitewide_configuration)
+        overrides: dict[str, object] = {}
+        for field, value in cast("dict[str, object]", data).items():
+            if field in sitewide:
+                # Blanking a field the site-wide entry defines is a real
+                # override, so an empty value is kept here.
+                if sitewide[field] != value:
+                    overrides[field] = value
+            # Nothing to inherit: an unticked checkbox or a blank text field
+            # carries no intent. Identity is used so that a numeric 0 survives.
+            elif value is not False and value not in {"", None}:
+                overrides[field] = value
+        return cast("SettingsDict", overrides)
 
     def delete_service(self) -> None:
         if self.machinery_id in self.project.machinery_settings:

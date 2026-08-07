@@ -16,13 +16,13 @@ from weblate.trans.models import Project
 from weblate.utils.management.base import BaseCommand
 
 if TYPE_CHECKING:
-    from argparse import ArgumentParser
+    from django.core.management.base import CommandParser
 
 
 class Command(BaseCommand):
     help = "report glossary term coverage over the source strings of a project"
 
-    def add_arguments(self, parser: ArgumentParser) -> None:
+    def add_arguments(self, parser: CommandParser) -> None:
         super().add_arguments(parser)
         parser.add_argument("project", help="project slug")
         parser.add_argument(
