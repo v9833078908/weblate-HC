@@ -673,6 +673,24 @@ def _parse_record_map_grammar(
                 f"section row {curr.section_row + 1} is inside previous region "
                 f"ending at {prev.last_record_row + 1}",
             )
+    # A skip row inside a region is ambiguous: the record walk would import it
+    # while the skip list claims it was left out, so the same row would be both
+    # a term and a reported skip. Reject the profile instead of guessing.
+    for skip in skip_rows:
+        for region in regions:
+            if region.first_record_row <= skip <= region.last_record_row:
+                msg = "profile.skip_inside_region"
+                raise _err(
+                    msg,
+                    f"skip_rows entry {skip + 1} falls inside record region "
+                    f"{region.first_record_row + 1}-{region.last_record_row + 1}",
+                )
+            if region.section_row is not None and skip == region.section_row:
+                msg = "profile.skip_inside_region"
+                raise _err(
+                    msg,
+                    f"skip_rows entry {skip + 1} is a region section caption row",
+                )
 
     return RecordMapGrammar(
         skip_rows=skip_rows,

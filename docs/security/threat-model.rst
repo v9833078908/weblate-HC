@@ -566,10 +566,16 @@ Size and rate assumptions:
 * Repository size, number of projects, number of components, and worker
   capacity are deployment-sizing concerns unless a single in-scope input
   bypasses documented limits or permissions. *(maintainer)*
-* Loc-kit glossary profile analysis transmits a bounded structural sample
-  hard-capped at :setting:`LOC_KIT_PROFILE_SAMPLE_MAX_BYTES` (128 KiB) and is
-  rate-limited per session by :setting:`RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS`.
-  The complete uploaded file is never transmitted. Drafts live at most
+* Loc-kit glossary profile analysis transmits a structural sample of the one
+  selected worksheet, hard-capped at
+  :setting:`LOC_KIT_PROFILE_SAMPLE_MAX_BYTES` (128 KiB) and rate-limited by
+  :setting:`RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS`. Other worksheets and the
+  uploaded file itself are never sent, and no cell excerpt exceeds 80
+  characters, but within that budget the sample is deliberately
+  representative: for a worksheet whose truncated content fits under the
+  cap - the common case for a glossary - an excerpt of every row is
+  transmitted. Treat the selected worksheet's content as disclosed to the
+  configured provider. Drafts live at most
   :setting:`LOC_KIT_IMPORT_DRAFT_EXPIRY` (one hour), are owner-and-session
   bound, and are removed by periodic cleanup. *(documented)* (source:
   :doc:`/admin/config`)

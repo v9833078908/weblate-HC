@@ -283,6 +283,29 @@ def test_term_row_offset_outside_stride_fails():
         parse_profile(document)
 
 
+def test_skip_row_inside_a_region_fails():
+    # Otherwise the record walk imports the row while the skip list claims it
+    # was left out: the same row becomes both a term and a reported skip.
+    document = _one_row_document()
+    document["components"][0]["grammar"]["skip_rows"] = [4]
+    with pytest.raises(ProfileError, match="profile.skip_inside_region"):
+        parse_profile(document)
+
+
+def test_skip_row_on_a_region_caption_fails():
+    document = _stride_two_document()
+    document["components"][0]["grammar"]["skip_rows"] = [2]
+    with pytest.raises(ProfileError, match="profile.skip_inside_region"):
+        parse_profile(document)
+
+
+def test_skip_row_outside_every_region_is_accepted():
+    document = _one_row_document()
+    document["components"][0]["grammar"]["skip_rows"] = [8]
+    grammar = parse_profile(document).components[0].grammar
+    assert grammar.skip_rows == (7,)
+
+
 def test_note_row_offset_outside_stride_fails():
     document = _one_row_document()
     document["components"][0]["grammar"]["notes"][0]["row_offset"] = 3

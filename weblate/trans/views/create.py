@@ -95,6 +95,27 @@ SESSION_CREATE_KEY = "session_component"
 INTEGRATION_IMPORT_VCS_KEY = "integration_import_vcs"
 
 
+def get_creatable_projects(request: AuthenticatedHttpRequest):
+    """
+    Projects this user may create a component in.
+
+    Single source of truth for the component-creation gate. Every entry
+    point - the ordinary wizard and the glossary draft endpoints alike -
+    must go through here, so a new entry point cannot accidentally be more
+    permissive than the wizard (notably by skipping the billing check).
+    """
+    if request.user.is_superuser:
+        return Project.objects.order()
+    if "weblate.billing" in settings.INSTALLED_APPS:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.billing.models import Billing
+
+        return request.user.managed_projects.filter(
+            workspace__billing__in=Billing.objects.get_valid()
+        ).order()
+    return request.user.managed_projects
+
+
 class BaseCreateView(CreateView):
     request: AuthenticatedHttpRequest
 
@@ -516,17 +537,7 @@ class CreateComponent(BaseCreateView):
             )
         except ValueError:
             self.selected_category = None
-        if request.user.is_superuser:
-            self.projects = Project.objects.order()
-        elif self.has_billing:
-            # ruff: ignore[import-outside-top-level]
-            from weblate.billing.models import Billing
-
-            self.projects = request.user.managed_projects.filter(
-                workspace__billing__in=Billing.objects.get_valid()
-            ).order()
-        else:
-            self.projects = request.user.managed_projects
+        self.projects = get_creatable_projects(request)
         self.initial = {}
         session_data = {}
         if SESSION_CREATE_KEY in request.GET and SESSION_CREATE_KEY in request.session:
@@ -1002,7 +1013,13 @@ class LocKitDraftMixin(View):
         )
         if draft is None:
             raise Http404
-        if not self.request.user.has_perm("project.edit", draft.project):
+        # Exactly the wizard's gate, billing included. A permission revoked
+        # (or billing lapsed) mid-flight makes the draft unavailable.
+        if (
+            not get_creatable_projects(self.request)
+            .filter(pk=draft.project_id)
+            .exists()
+        ):
             raise Http404
         return draft
 
@@ -1060,9 +1077,14 @@ class LocKitSheetSelectView(LocKitDraftMixin, TemplateView):
         if not form.is_valid():
             return self.render_to_response(self.get_context_data(form=form, **kwargs))
 
+        # Changing the sheet invalidates any previously accepted mapping:
+        # leaving it behind would show the old sheet's terms next to the new
+        # sheet's name and keep the create button live.
         draft.sheet = form.cleaned_data["sheet"]
         draft.state = LocKitImportDraft.State.SHEET_SELECTED
-        draft.save(update_fields=["sheet", "state"])
+        draft.profile_json = ""
+        draft.preview_json = ""
+        draft.save(update_fields=["sheet", "state", "profile_json", "preview_json"])
 
         error = _analyze_draft_sheet(draft, sheets[draft.sheet])
         if error is not None:
@@ -1236,7 +1258,18 @@ class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
     # form is the ordinary component form, exactly as stage="create" implies.
     form_class = ComponentCreateForm  # type: ignore[assignment]
     origin = "zip"
-    stage = "create"
+
+    # The base class derives `stage` from raw POST fields, which the client
+    # controls: omitting "new_base" would drive this request down the
+    # non-creating branch while form_valid still wrote a repository and
+    # destroyed the draft. This endpoint is only ever the final create step.
+    @property
+    def stage(self) -> str:
+        return "create"
+
+    @stage.setter
+    def stage(self, value: str) -> None:
+        """Ignore the base class's POST-derived stage."""
 
     @cached_property
     def draft(self) -> LocKitImportDraft:
@@ -1255,10 +1288,16 @@ class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
             "is_glossary": True,
         }
         preview = json.loads(draft.preview_json)
-        with suppress(Language.DoesNotExist):
+        # An unresolvable code must not silently drop source_language out of
+        # the lock: get_form_kwargs skips absent keys, so the client's posted
+        # value would survive for the one field that decides which components
+        # this glossary applies to.
+        try:
             values["source_language"] = Language.objects.get(
                 code=preview["source_language"]
             )
+        except Language.DoesNotExist as error:
+            raise Http404 from error
         return values
 
     def get_initial(self):
@@ -1322,12 +1361,15 @@ class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
             form.add_error(None, str(error))
             return self.form_invalid(form)
 
-        fake = Component(
-            project=draft.project,
-            category=draft.category,
-            slug=form.cleaned_data["slug"],
-            name=form.cleaned_data["name"],
-        )
+        # Build the repository at the path this component will actually
+        # occupy. Taking category from the draft while the form saves a
+        # different one would point full_path at somebody else's component
+        # directory, and LocalRepository.from_files removes an existing
+        # target before cloning - that would destroy a live repository.
+        # form.instance carries exactly the validated, about-to-be-saved
+        # project/category/slug.
+        fake = form.instance
+        fake.project = draft.project
         LocalRepository.from_files(
             fake.full_path,
             {f"tbx/{name}": data for name, data in preview.files.items()},
@@ -1335,6 +1377,10 @@ class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
 
         response = super().form_valid(form)
 
+        # Consume the draft only once the component really exists, so a
+        # non-creating code path can never destroy the operator's upload.
+        if getattr(self, "object", None) is None:
+            return response
         draft.state = LocKitImportDraft.State.CONSUMED
         draft.save(update_fields=["state"])
         draft.delete_storage()

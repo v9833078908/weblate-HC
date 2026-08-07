@@ -35,8 +35,7 @@
 
       {% if analysis_enabled %}
         <div class="alert alert-warning" role="alert">
-          <strong>{% translate "Note:" %}</strong>
-          {% translate "Automatic analysis is enabled. When you continue, a bounded structural sample of the chosen worksheet (its headers, row and column occupancy, and shortened cell excerpts) is sent to the configured OpenRouter model to propose a mapping. The complete file never leaves this server, and the proposal is validated locally before anything is created." %}
+          {% translate "Automatic analysis is enabled. When you continue, a structural sample of the chosen worksheet is sent to the configured OpenRouter model to propose a mapping. No cell excerpt exceeds 80 characters and nothing over 128 KiB is sent, but within that budget the sample is representative: for a worksheet this size, expect an excerpt of every row to be transmitted. Other worksheets and the uploaded file itself stay on this server, and the proposal is validated locally before anything is created." %}
         </div>
       {% else %}
         <div class="alert alert-info" role="alert">

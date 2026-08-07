@@ -3038,7 +3038,9 @@ class LocKitProfileCorrectionForm(forms.Form):
         except UnicodeDecodeError as error:
             msg = gettext("The profile must be UTF-8 encoded.")
             raise ValidationError(msg) from error
-        except json.JSONDecodeError as error:
+        except (json.JSONDecodeError, RecursionError) as error:
+            # A deeply nested but well-formed document exhausts the recursion
+            # limit inside the scanner; that is a bad profile, not a crash.
             msg = gettext("The profile is not valid JSON: %s") % error
             raise ValidationError(msg) from error
         if not isinstance(document, dict):

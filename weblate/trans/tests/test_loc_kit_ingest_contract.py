@@ -42,11 +42,12 @@ from weblate.auth.models import User
 from weblate.formats.models import FILE_FORMATS
 from weblate.lang.models import Language
 from weblate.machinery.llm import BaseLLMTranslation
-from weblate.trans.models import Component
+from weblate.trans.models import Category, Component, Project
 from weblate.trans.models.loc_kit import LOC_KIT_DRAFT_STORAGE, LocKitImportDraft
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.tests import http_mock
 from weblate.utils.views import create_component_from_kit
+from weblate.vcs.git import LocalRepository
 
 # loc_kit_ingest is a standalone package at the repository root.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -804,6 +805,92 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
     # ----------------------------------------------------------------- #
     # Rejections: nothing is ever created
     # ----------------------------------------------------------------- #
+
+    def test_draft_endpoints_enforce_the_same_gate_as_the_wizard(self) -> None:
+        """
+        A draft must never be a laxer way in than the ordinary wizard.
+
+        The wizard gates component creation on get_creatable_projects(), which
+        is managed_projects intersected with valid billing. A draft endpoint
+        that only checked "project.edit" would let a user whose billing has
+        lapsed create a component the wizard refuses.
+        """
+        self._start()
+        draft = self._draft()
+
+        # Drop the user out of the creatable set the wizard itself uses.
+        self.user.is_superuser = False
+        self.user.save()
+
+        with patch(
+            "weblate.trans.views.create.get_creatable_projects",
+            return_value=Project.objects.none(),
+        ):
+            for name in (
+                "loc-kit-sheet-select",
+                "loc-kit-glossary-preview",
+                "loc-kit-glossary-confirm",
+            ):
+                response = self.client.get(reverse(name, kwargs={"token": draft.token}))
+                self.assertEqual(response.status_code, 404, name)
+
+        self.assertFalse(Component.objects.filter(slug="gloss").exists())
+
+    def test_confirm_never_writes_into_another_components_repository(self) -> None:
+        """
+        The staged repo must land on the component's own path.
+
+        LocalRepository.from_files removes an existing target before cloning.
+        Building full_path from the draft's category while the form saves a
+        different one aimed the write at another component's VCS directory:
+        slug uniqueness is per (project, category), so a slug that collides
+        at the draft's category level is perfectly valid at another one.
+        """
+        victim = self.component
+        victim_path = victim.full_path
+
+        # A second category makes the victim's slug reusable, so the final
+        # form accepts it while the draft still carries category=None.
+        category = Category.objects.create(
+            project=self.project, name="Elsewhere", slug="elsewhere"
+        )
+
+        self._start()
+        draft = self._draft()
+        self.assertIsNone(draft.category)
+        self._select_sheet(draft)
+        self._upload_profile(draft, _glossary_profile("Glossary"))
+
+        targets: list[str] = []
+        real_from_files = LocalRepository.from_files
+
+        def spy(target, files):
+            targets.append(target)
+            return real_from_files(target, files)
+
+        with modify_settings(INSTALLED_APPS={"remove": "weblate.billing"}):
+            response = self.client.post(
+                reverse("loc-kit-glossary-preview", kwargs={"token": draft.token}),
+                {"action": "confirm"},
+                follow=True,
+            )
+            form = response.context["form"]
+            params = {field: form[field].value() or "" for field in form.fields}
+            params.pop("inherit_new_lang", None)
+            params["new_lang"] = "none"
+            # Aim the write at the victim: its slug, but another category.
+            params["slug"] = victim.slug
+            params["category"] = category.pk
+            with patch("weblate.trans.views.create.LocalRepository.from_files", spy):
+                self.client.post(
+                    reverse("loc-kit-glossary-confirm", kwargs={"token": draft.token}),
+                    params,
+                    follow=True,
+                )
+
+        self.assertNotIn(
+            victim_path, targets, "the staged repo was written over another component"
+        )
 
     def test_invalid_profile_creates_no_component(self) -> None:
         self._start()

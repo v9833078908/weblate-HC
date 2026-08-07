@@ -440,19 +440,21 @@ def request_profile_proposal(sample: dict[str, object]) -> dict[str, object]:
             {"role": "user", "content": json.dumps(sample, ensure_ascii=False)},
         ],
     }
-    headers = {
-        "Authorization": f"Bearer {settings.LOC_KIT_PROFILE_OPENROUTER_KEY}",
-        "Content-Type": "application/json",
-    }
-
     try:
         response = fetch_validated_url(
             "POST",
             OPENROUTER_CHAT_COMPLETIONS_URL,
-            headers=headers,
+            # Built inline so the bearer token is never bound to a frame
+            # local that an error reporter could serialize.
+            headers={
+                "Authorization": (f"Bearer {settings.LOC_KIT_PROFILE_OPENROUTER_KEY}"),
+                "Content-Type": "application/json",
+            },
             json=payload,
             timeout=OPENROUTER_REQUEST_TIMEOUT,
             raise_for_status=False,
+            # A chat-completions POST has no legitimate reason to redirect.
+            follow_redirects=False,
         )
     except Exception as error:
         raise _short_circuit_failure(

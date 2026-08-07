@@ -8,8 +8,11 @@ import uuid
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.translation import gettext_lazy
 
@@ -122,7 +125,7 @@ class LocKitImportDraft(models.Model):
         """
         try:
             draft = cls.objects.get(token=token)
-        except (cls.DoesNotExist, ValueError):
+        except (cls.DoesNotExist, ValidationError, ValueError):
             return None
         if draft.owner_id != owner.id:
             return None
@@ -133,3 +136,16 @@ class LocKitImportDraft(models.Model):
         if draft.is_expired:
             return None
         return draft
+
+
+@receiver(post_delete, sender=LocKitImportDraft)
+def _delete_draft_storage(sender, instance: LocKitImportDraft, **kwargs) -> None:
+    """
+    Reclaim the uploaded file however the row went away.
+
+    Explicit cancel and the cleanup task call delete_storage themselves, but a
+    cascade from the owner, project or category issues a bulk delete that
+    never touches the model. Because cleanup is row-driven, such a file would
+    otherwise outlive the one-hour lifetime the UI promises, forever.
+    """
+    instance.delete_storage()
