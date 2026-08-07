@@ -1339,7 +1339,11 @@ class Project(models.Model, PathMixin, CacheKeyMixin, LockMixin):
                 if item in mt_settings:
                     del mt_settings[item]
             else:
-                mt_settings[item] = value
+                # Project settings override the site-wide ones field by field so
+                # that a project can change the persona or language instructions
+                # without restating credentials. Building a new dict also keeps
+                # both stored configurations free of the _project marker below.
+                mt_settings[item] = {**mt_settings.get(item, {}), **value}
                 # Include project field so that different projects do not share
                 # cache keys via MachineTranslation.get_cache_key when service
                 # is installed at project level.
