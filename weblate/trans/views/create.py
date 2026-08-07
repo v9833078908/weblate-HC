@@ -690,8 +690,15 @@ class CreateFromZip(CreateComponent):
             name=form.cleaned_data["name"],
             source_filename=filename,
         )
+        # Storage is not transactional: the file lands on disk before the row
+        # is inserted, so a failed insert would strand it where the row-driven
+        # cleanup task can never find it. Undo the write by hand.
         draft.uploaded.save(filename, ContentFile(payload), save=False)
-        draft.save()
+        try:
+            draft.save()
+        except Exception:
+            draft.delete_storage()
+            raise
         return redirect("loc-kit-sheet-select", token=draft.token)
 
 

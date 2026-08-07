@@ -26,8 +26,10 @@ import zipfile
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
+from django.db import DatabaseError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase
 from django.test.utils import modify_settings
@@ -659,6 +661,30 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertEqual(draft.state, LocKitImportDraft.State.UPLOADED)
         # No component exists yet.
         self.assertFalse(Component.objects.filter(slug="gloss").exists())
+
+    def test_failed_draft_insert_leaves_no_orphaned_file(self) -> None:
+        """
+        Storage is not transactional.
+
+        The upload lands on disk before the row is inserted, so a failed
+        insert must not strand a file the row-driven cleanup can never see.
+        """
+        storage = LocKitImportDraft._meta.get_field("uploaded").storage
+
+        def before() -> set[str]:
+            try:
+                return set(storage.listdir("drafts")[1])
+            except FileNotFoundError:
+                return set()
+
+        with patch.object(
+            LocKitImportDraft, "save", side_effect=DatabaseError("boom")
+        ):
+            with self.assertRaises(DatabaseError):
+                self._start()
+
+        self.assertFalse(LocKitImportDraft.objects.exists())
+        self.assertEqual(before(), set())
 
     def test_disabled_analyzer_offers_manual_profile_upload(self) -> None:
         self._start()
