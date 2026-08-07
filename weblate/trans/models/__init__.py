@@ -31,6 +31,7 @@ from weblate.trans.models.comment import Comment, schedule_comment_stats_update
 from weblate.trans.models.component import Component, ComponentLink
 from weblate.trans.models.componentlist import AutoComponentList, ComponentList
 from weblate.trans.models.label import Label
+from weblate.trans.models.loc_kit import LocKitImportDraft
 from weblate.trans.models.pending import PendingUnitChange
 from weblate.trans.models.project import CommitPolicyChoices, Project
 from weblate.trans.models.report import Report
@@ -60,6 +61,7 @@ __all__ = [
     "ComponentList",
     "ContributorAgreement",
     "Label",
+    "LocKitImportDraft",
     "PendingUnitChange",
     "Project",
     "Report",
