@@ -3013,6 +3013,11 @@ class LocKitSheetSelectForm(forms.Form):
     def __init__(self, *args, sheet_choices=(), **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.fields["sheet"].choices = list(sheet_choices)
+        # The template supplies the form element and the submit button.
+        # Letting crispy emit its own nests one form inside another, and the
+        # parser ejects everything after crispy's </form> - including submit.
+        self.helper = FormHelper(self)
+        self.helper.form_tag = False
 
 
 class LocKitProfileCorrectionForm(forms.Form):
@@ -3026,6 +3031,12 @@ class LocKitProfileCorrectionForm(forms.Form):
         ),
         widget=forms.FileInput(attrs={"accept": ".json"}),
     )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # See LocKitSheetSelectForm: the template owns the form element.
+        self.helper = FormHelper(self)
+        self.helper.form_tag = False
 
     def clean_profile(self):
         uploaded = self.cleaned_data["profile"]
