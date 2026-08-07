@@ -84,8 +84,8 @@ from weblate.machinery.management.commands.list_machinery import (
 )
 from weblate.machinery.microsoft import MicrosoftCognitiveTranslation
 from weblate.machinery.mistral import MistralTranslation
-from weblate.machinery.modernmt import ModernMTTranslation
 from weblate.machinery.models import validate_service_configuration
+from weblate.machinery.modernmt import ModernMTTranslation
 from weblate.machinery.mymemory import MyMemoryTranslation
 from weblate.machinery.netease import NETEASE_API_ROOT, NeteaseSightTranslation
 from weblate.machinery.ollama import OllamaTranslation
