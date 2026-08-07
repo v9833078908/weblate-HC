@@ -2998,6 +2998,55 @@ class ComponentZipCreateForm(ComponentProjectForm):
         super().__init__(*args, **kwargs)
 
 
+class LocKitSheetSelectForm(forms.Form):
+    """Choose the one worksheet that becomes one glossary component."""
+
+    sheet = forms.ChoiceField(
+        label=gettext_lazy("Worksheet"),
+        help_text=gettext_lazy(
+            "One worksheet creates one glossary component. Multi-sheet "
+            "workbooks are never merged."
+        ),
+        widget=forms.RadioSelect,
+    )
+
+    def __init__(self, *args, sheet_choices=(), **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["sheet"].choices = list(sheet_choices)
+
+
+class LocKitProfileCorrectionForm(forms.Form):
+    """Upload a corrected profile instead of accepting the proposal."""
+
+    profile = forms.FileField(
+        label=gettext_lazy("Corrected profile (.loc-ingest.json)"),
+        help_text=gettext_lazy(
+            "A UTF-8 JSON profile describing this worksheet. It is validated "
+            "against the same worksheet locally; no external request is made."
+        ),
+        widget=forms.FileInput(attrs={"accept": ".json"}),
+    )
+
+    def clean_profile(self):
+        uploaded = self.cleaned_data["profile"]
+        limit = settings.LOC_KIT_PROFILE_SAMPLE_MAX_BYTES
+        if uploaded.size > limit:
+            msg = gettext("The profile must not exceed %d bytes.") % limit
+            raise ValidationError(msg)
+        try:
+            document = json.loads(uploaded.read().decode("utf-8"))
+        except UnicodeDecodeError as error:
+            msg = gettext("The profile must be UTF-8 encoded.")
+            raise ValidationError(msg) from error
+        except json.JSONDecodeError as error:
+            msg = gettext("The profile is not valid JSON: %s") % error
+            raise ValidationError(msg) from error
+        if not isinstance(document, dict):
+            msg = gettext("The profile must be a JSON object.")
+            raise ValidationError(msg)
+        return document
+
+
 class ComponentDocCreateForm(ComponentProjectForm):
     docfile = forms.FileField(
         label=gettext_lazy("Document to translate"),

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% load crispy_forms_tags i18n %}
+
+{% block breadcrumbs %}
+  <li><a href="{% url 'create-component-zip' %}">{% translate "Create component" %}</a></li>
+  <li><a href="#">{% translate "Choose worksheet" %}</a></li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h4 class="panel-title">{% translate "Choose the glossary worksheet" %}</h4>
+    </div>
+    <div class="panel-body">
+
+      {% if form.errors %}
+        <div class="alert alert-danger" role="alert">
+          <p>{% translate "Please correct the errors below:" %}</p>
+          <ul>
+            {% for field in form %}
+              {% for error in field.errors %}
+                <li><a href="#{{ field.auto_id }}">{{ field.label }}: {{ error }}</a></li>
+              {% endfor %}
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <p>
+        {% blocktranslate with filename=draft.source_filename %}Uploaded file: {{ filename }}.{% endblocktranslate %}
+        {% translate "One worksheet creates one glossary component. Workbooks are never merged and no other worksheet is imported." %}
+      </p>
+
+      {% if analysis_enabled %}
+        <div class="alert alert-warning" role="alert">
+          <strong>{% translate "Note:" %}</strong>
+          {% translate "Automatic analysis is enabled. When you continue, a bounded structural sample of the chosen worksheet (its headers, row and column occupancy, and shortened cell excerpts) is sent to the configured OpenRouter model to propose a mapping. The complete file never leaves this server, and the proposal is validated locally before anything is created." %}
+        </div>
+      {% else %}
+        <div class="alert alert-info" role="alert">
+          {% translate "Automatic analysis is turned off. After choosing a worksheet you will be asked to upload a profile describing it. Nothing is sent anywhere." %}
+        </div>
+      {% endif %}
+
+      <form action="{% url 'loc-kit-sheet-select' token=draft.token %}" method="post">
+        {% csrf_token %}
+        {% crispy form %}
+        <input type="submit" value="{% translate "Continue" %}" class="btn btn-primary" />
+      </form>
+
+    </div>
+  </div>
+
+{% endblock content %}
