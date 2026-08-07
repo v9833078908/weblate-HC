@@ -23,6 +23,8 @@ _CODE_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
 _XML_LANG_RE = re.compile(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*")
 
 SCHEMA_VERSION = 1
+SCHEMA_VERSION_RECORD_MAP = 2
+SUPPORTED_SCHEMA_VERSIONS = frozenset({SCHEMA_VERSION, SCHEMA_VERSION_RECORD_MAP})
 
 # Fields permitted per object, by nesting level.
 _ROOT_FIELDS = frozenset({"schema_version", "components"})
@@ -55,6 +57,18 @@ _TBX_FIELDS = frozenset(
         "initial_target_languages",
     }
 )
+_TBX_FIELDS_V2 = frozenset(
+    {
+        "sheet",
+        "component",
+        "kind",
+        "source_lang",
+        "header_row",
+        "languages",
+        "grammar",
+        "initial_target_languages",
+    }
+)
 _COMMON_FIELDS = frozenset(
     {
         "sheet",
@@ -83,6 +97,31 @@ _REGION_FIELDS = frozenset(
 # Fields exclusive to each kind.
 _PO_ONLY = frozenset({"first_data_row", "key", "comments", "references"})
 _TBX_ONLY = frozenset({"key_language", "initial_target_languages"})
+_TBX_ONLY_V2 = frozenset({"initial_target_languages"})
+
+# Profile v2 record-map grammar.
+_RECORD_MAP_GRAMMAR_FIELDS = frozenset(
+    {
+        "type",
+        "skip_rows",
+        "regions",
+        "term_row_offset",
+        "section_field",
+        "notes",
+    }
+)
+_RECORD_REGION_FIELDS = frozenset(
+    {
+        "first_record_row",
+        "last_record_row",
+        "record_stride",
+        "section_row",
+        "section_column",
+    }
+)
+_SECTION_FIELD_FIELDS = frozenset({"column", "header", "row_offset"})
+_NOTE_FIELD_FIELDS = frozenset({"scope", "column", "header", "row_offset", "language"})
+_NOTE_SCOPES = frozenset({"source", "target"})
 
 
 # --------------------------------------------------------------------------- #
@@ -131,6 +170,40 @@ class PairsGrammar:
 
 
 @dataclass(frozen=True)
+class SectionField:
+    column: int
+    header: str
+    row_offset: int
+
+
+@dataclass(frozen=True)
+class NoteField:
+    scope: str  # "source" | "target"
+    column: int
+    header: str
+    row_offset: int
+    language: str | None  # set only when scope == "target"
+
+
+@dataclass(frozen=True)
+class RecordRegion:
+    first_record_row: int
+    last_record_row: int
+    record_stride: int
+    section_row: int | None
+    section_column: int | None
+
+
+@dataclass(frozen=True)
+class RecordMapGrammar:
+    skip_rows: tuple[int, ...]
+    regions: tuple[RecordRegion, ...]
+    term_row_offset: int
+    section_field: SectionField | None
+    notes: tuple[NoteField, ...]
+
+
+@dataclass(frozen=True)
 class ComponentProfile:
     sheet: str
     component: str
@@ -142,7 +215,7 @@ class ComponentProfile:
     key: KeyColumn | None
     comments: tuple[MetadataColumn, ...]
     references: tuple[MetadataColumn, ...]
-    grammar: KeyedGrammar | PairsGrammar
+    grammar: KeyedGrammar | PairsGrammar | RecordMapGrammar
     key_language: str | None
     initial_target_languages: tuple[str, ...]
 
@@ -278,7 +351,7 @@ def _parse_metadata_list(
 
 
 # --------------------------------------------------------------------------- #
-# Grammar
+# Grammar (v1)
 # --------------------------------------------------------------------------- #
 
 
@@ -392,6 +465,264 @@ def _parse_pairs_grammar(
 
 
 # --------------------------------------------------------------------------- #
+# Grammar (v2 record-map)
+# --------------------------------------------------------------------------- #
+
+
+def _parse_section_field(obj: dict[str, Any]) -> SectionField:
+    _check_unknown(obj, _SECTION_FIELD_FIELDS, label="section_field")
+    column = _require_int(obj, "column", label="section_field")
+    header = _require(obj, "header", label="section_field")
+    row_offset = _require_int(obj, "row_offset", label="section_field", min_val=0)
+    if not isinstance(header, str) or not header:
+        msg = "profile.invalid_header"
+        raise _err(msg, f"section_field header must be a non-empty string, got {header!r}")
+    return SectionField(column=column - 1, header=header, row_offset=row_offset)
+
+
+def _parse_note_field(
+    obj: dict[str, Any], *, target_languages: tuple[str, ...]
+) -> NoteField:
+    _check_unknown(obj, _NOTE_FIELD_FIELDS, label="note field")
+    scope = _require(obj, "scope", label="note field")
+    if scope not in _NOTE_SCOPES:
+        msg = "profile.invalid_note_scope"
+        raise _err(msg, f"note scope must be 'source' or 'target', got {scope!r}")
+    column = _require_int(obj, "column", label="note field")
+    header = _require(obj, "header", label="note field")
+    row_offset = _require_int(obj, "row_offset", label="note field", min_val=0)
+    if not isinstance(header, str) or not header:
+        msg = "profile.invalid_header"
+        raise _err(msg, f"note header must be a non-empty string, got {header!r}")
+
+    language = obj.get("language")
+    if scope == "source":
+        if language is not None:
+            msg = "profile.unexpected_note_language"
+            raise _err(msg, "a source note must not declare 'language'")
+    else:
+        if not isinstance(language, str) or language not in target_languages:
+            msg = "profile.unknown_note_language"
+            raise _err(
+                msg,
+                f"target note language {language!r} is not an initial target "
+                f"language {target_languages}",
+            )
+
+    return NoteField(
+        scope=scope,
+        column=column - 1,
+        header=header,
+        row_offset=row_offset,
+        language=language,
+    )
+
+
+def _parse_record_region(obj: dict[str, Any]) -> RecordRegion:
+    _check_unknown(obj, _RECORD_REGION_FIELDS, label="record region")
+    first_record = _require_int(obj, "first_record_row", label="record region")
+    last_record = _require_int(obj, "last_record_row", label="record region")
+    stride = _require_int(obj, "record_stride", label="record region")
+
+    if first_record > last_record:
+        msg = "profile.invalid_range"
+        raise _err(
+            msg,
+            f"first_record_row ({first_record}) must be <= last_record_row ({last_record})",
+        )
+    span = last_record - first_record + 1
+    if span % stride != 0:
+        msg = "profile.record_span_not_divisible"
+        raise _err(
+            msg,
+            f"region rows {first_record}-{last_record} span {span} rows, "
+            f"not divisible by record_stride {stride}",
+        )
+
+    section_row_raw = obj.get("section_row")
+    section_column_raw = obj.get("section_column")
+    if (section_row_raw is None) != (section_column_raw is None):
+        msg = "profile.incomplete_section_cell"
+        raise _err(
+            msg,
+            "'section_row' and 'section_column' must be declared together",
+        )
+
+    section_row: int | None = None
+    section_column: int | None = None
+    if section_row_raw is not None:
+        if (
+            not isinstance(section_row_raw, int)
+            or isinstance(section_row_raw, bool)
+            or section_row_raw < 1
+        ):
+            msg = "profile.invalid_index"
+            raise _err(
+                msg, f"section_row must be a positive integer, got {section_row_raw!r}"
+            )
+        if (
+            not isinstance(section_column_raw, int)
+            or isinstance(section_column_raw, bool)
+            or section_column_raw < 1
+        ):
+            msg = "profile.invalid_index"
+            raise _err(
+                msg,
+                f"section_column must be a positive integer, got {section_column_raw!r}",
+            )
+        if section_row_raw >= first_record:
+            msg = "profile.section_outside_range"
+            raise _err(
+                msg,
+                f"section_row ({section_row_raw}) must be before "
+                f"first_record_row ({first_record})",
+            )
+        section_row = section_row_raw - 1
+        section_column = section_column_raw - 1
+
+    return RecordRegion(
+        first_record_row=first_record - 1,
+        last_record_row=last_record - 1,
+        record_stride=stride,
+        section_row=section_row,
+        section_column=section_column,
+    )
+
+
+def _parse_record_map_grammar(
+    obj: dict[str, Any], *, target_languages: tuple[str, ...]
+) -> RecordMapGrammar:
+    _check_unknown(obj, _RECORD_MAP_GRAMMAR_FIELDS, label="record-map grammar")
+    skip_rows = _parse_skip_rows(obj, label="record-map grammar")
+
+    regions_raw = _require(obj, "regions", label="record-map grammar")
+    if not isinstance(regions_raw, list) or not regions_raw:
+        msg = "profile.missing_regions"
+        raise _err(msg, "record-map grammar must have at least one region")
+    regions = tuple(_parse_record_region(r) for r in regions_raw)
+
+    term_row_offset = _require_int(
+        obj, "term_row_offset", label="record-map grammar", min_val=0
+    )
+
+    section_field_raw = obj.get("section_field")
+    has_region_section = any(r.section_row is not None for r in regions)
+    if section_field_raw is not None and has_region_section:
+        msg = "profile.section_conflict"
+        raise _err(
+            msg,
+            "a component declares 'grammar.section_field' or per-region section "
+            "cells, never both",
+        )
+    section_field: SectionField | None = None
+    if section_field_raw is not None:
+        if not isinstance(section_field_raw, dict):
+            msg = "profile.invalid_value"
+            raise _err(msg, "'section_field' must be an object")
+        section_field = _parse_section_field(section_field_raw)
+
+    notes_raw = obj.get("notes", [])
+    if not isinstance(notes_raw, list):
+        msg = "profile.invalid_value"
+        raise _err(msg, "'notes' must be a list")
+    notes = tuple(
+        _parse_note_field(n, target_languages=target_languages) for n in notes_raw
+    )
+
+    # record_stride bounds: every declared row_offset must be in [0, stride).
+    strides = {r.record_stride for r in regions}
+    for stride in strides:
+        if term_row_offset >= stride:
+            msg = "profile.offset_out_of_range"
+            raise _err(
+                msg,
+                f"term_row_offset ({term_row_offset}) is out of range for "
+                f"record_stride {stride}",
+            )
+        if section_field is not None and section_field.row_offset >= stride:
+            msg = "profile.offset_out_of_range"
+            raise _err(
+                msg,
+                f"section_field.row_offset ({section_field.row_offset}) is out of "
+                f"range for record_stride {stride}",
+            )
+        for note in notes:
+            if note.row_offset >= stride:
+                msg = "profile.offset_out_of_range"
+                raise _err(
+                    msg,
+                    f"note field row_offset ({note.row_offset}) is out of range "
+                    f"for record_stride {stride}",
+                )
+
+    # Sort regions to check for overlap between records and section captions.
+    sorted_regions = sorted(regions, key=lambda r: r.first_record_row)
+    for prev, curr in zip(sorted_regions, sorted_regions[1:]):
+        if curr.first_record_row <= prev.last_record_row:
+            msg = "profile.region_overlap"
+            raise _err(
+                msg,
+                f"regions overlap: [{prev.first_record_row + 1}-{prev.last_record_row + 1}] "
+                f"and [{curr.first_record_row + 1}-{curr.last_record_row + 1}]",
+            )
+        if curr.section_row is not None and curr.section_row <= prev.last_record_row:
+            msg = "profile.region_overlap"
+            raise _err(
+                msg,
+                f"section row {curr.section_row + 1} is inside previous region "
+                f"ending at {prev.last_record_row + 1}",
+            )
+
+    return RecordMapGrammar(
+        skip_rows=skip_rows,
+        regions=regions,
+        term_row_offset=term_row_offset,
+        section_field=section_field,
+        notes=notes,
+    )
+
+
+def _check_record_map_field_locations(
+    grammar: RecordMapGrammar, *, languages: tuple[LanguageColumn, ...]
+) -> None:
+    """
+    No two of {language term, note} fields may read the same (row_offset,
+    column) cell, and section_field's column may not collide with any
+    language or note column at any offset.
+    """
+    locations: dict[tuple[int, int], str] = {}
+    for lang in languages:
+        loc = (grammar.term_row_offset, lang.column)
+        if loc in locations:
+            msg = "profile.duplicate_field_location"
+            raise _err(
+                msg,
+                f"language {lang.code!r} aliases the same cell as {locations[loc]}",
+            )
+        locations[loc] = f"language {lang.code!r}"
+    for note in grammar.notes:
+        loc = (note.row_offset, note.column)
+        if loc in locations:
+            msg = "profile.duplicate_field_location"
+            raise _err(
+                msg,
+                f"note {note.header!r} aliases the same cell as {locations[loc]}",
+            )
+        locations[loc] = f"note {note.header!r}"
+
+    if grammar.section_field is not None:
+        lang_columns = {lang.column for lang in languages}
+        note_columns = {note.column for note in grammar.notes}
+        if grammar.section_field.column in lang_columns | note_columns:
+            msg = "profile.section_field_column_collision"
+            raise _err(
+                msg,
+                f"section_field column {grammar.section_field.column + 1} collides "
+                "with a language or note column",
+            )
+
+
+# --------------------------------------------------------------------------- #
 # Component
 # --------------------------------------------------------------------------- #
 
@@ -399,6 +730,7 @@ def _parse_pairs_grammar(
 def _parse_component(
     obj: dict[str, Any],
     *,
+    schema_version: int,
     seen_components: dict[str, str],
     seen_sheets: dict[str, str],
     seen_archives: dict[str, str],
@@ -412,7 +744,11 @@ def _parse_component(
         msg = "profile.invalid_kind"
         raise _err(msg, f"unknown kind {kind!r}; must be 'po' or 'tbx'")
 
-    allowed = _PO_FIELDS if kind == "po" else _TBX_FIELDS
+    is_v2_tbx = schema_version == SCHEMA_VERSION_RECORD_MAP and kind == "tbx"
+    if is_v2_tbx:
+        allowed = _TBX_FIELDS_V2
+    else:
+        allowed = _PO_FIELDS if kind == "po" else _TBX_FIELDS
     _check_unknown(obj, allowed, label=f"component ({kind})")
 
     sheet = _require(obj, "sheet", label="component")
@@ -494,31 +830,9 @@ def _parse_component(
             f"source_lang {source_lang!r} is not among language codes {lang_codes}",
         )
 
-    # Grammar.
-    grammar_raw = _require(obj, "grammar", label="component")
-    if not isinstance(grammar_raw, dict):
-        msg = "profile.invalid_value"
-        raise _err(msg, "grammar must be an object")
-    grammar_type = grammar_raw.get("type")
-    if kind == "po":
-        if grammar_type != "keyed":
-            msg = "profile.grammar_mismatch"
-            raise _err(
-                msg,
-                f"PO component requires grammar type 'keyed', got {grammar_type!r}",
-            )
-        grammar: KeyedGrammar | PairsGrammar = _parse_keyed_grammar(grammar_raw)
-    else:
-        if grammar_type != "term-description-pairs":
-            msg = "profile.grammar_mismatch"
-            raise _err(
-                msg,
-                f"TBX component requires grammar type 'term-description-pairs', "
-                f"got {grammar_type!r}",
-            )
-        grammar = _parse_pairs_grammar(grammar_raw, header_row_1based=header_row)
-
-    # Kind-specific fields.
+    # Kind-specific, non-grammar fields. Parsed before grammar because the v2
+    # record-map grammar's target notes must be validated against
+    # initial_target_languages.
     first_data_row: int | None = None
     key: KeyColumn | None = None
     comments: tuple[MetadataColumn, ...] = ()
@@ -543,13 +857,15 @@ def _parse_component(
         references = _parse_metadata_list(obj, "references", component=component)
         first_data_row -= 1  # 0-based
     else:
-        key_language = _require(obj, "key_language", label="component")
-        if not isinstance(key_language, str) or key_language not in lang_codes:
-            msg = "profile.key_language_missing"
-            raise _err(
-                msg,
-                f"key_language {key_language!r} is not among language codes {lang_codes}",
-            )
+        if not is_v2_tbx:
+            key_language = _require(obj, "key_language", label="component")
+            if not isinstance(key_language, str) or key_language not in lang_codes:
+                msg = "profile.key_language_missing"
+                raise _err(
+                    msg,
+                    f"key_language {key_language!r} is not among language codes "
+                    f"{lang_codes}",
+                )
         itl_raw = _require(obj, "initial_target_languages", label="component")
         if not isinstance(itl_raw, list) or not itl_raw:
             msg = "profile.empty_target_languages"
@@ -571,6 +887,44 @@ def _parse_component(
                     f"target language {t!r} is not among language codes",
                 )
         initial_target_languages = tuple(itl_raw)
+
+    # Grammar.
+    grammar_raw = _require(obj, "grammar", label="component")
+    if not isinstance(grammar_raw, dict):
+        msg = "profile.invalid_value"
+        raise _err(msg, "grammar must be an object")
+    grammar_type = grammar_raw.get("type")
+    if kind == "po":
+        if grammar_type != "keyed":
+            msg = "profile.grammar_mismatch"
+            raise _err(
+                msg,
+                f"PO component requires grammar type 'keyed', got {grammar_type!r}",
+            )
+        grammar: KeyedGrammar | PairsGrammar | RecordMapGrammar = _parse_keyed_grammar(
+            grammar_raw
+        )
+    elif is_v2_tbx:
+        if grammar_type != "record-map":
+            msg = "profile.grammar_mismatch"
+            raise _err(
+                msg,
+                f"v2 TBX component requires grammar type 'record-map', "
+                f"got {grammar_type!r}",
+            )
+        grammar = _parse_record_map_grammar(
+            grammar_raw, target_languages=initial_target_languages
+        )
+        _check_record_map_field_locations(grammar, languages=languages)
+    else:
+        if grammar_type != "term-description-pairs":
+            msg = "profile.grammar_mismatch"
+            raise _err(
+                msg,
+                f"TBX component requires grammar type 'term-description-pairs', "
+                f"got {grammar_type!r}",
+            )
+        grammar = _parse_pairs_grammar(grammar_raw, header_row_1based=header_row)
 
     return ComponentProfile(
         sheet=sheet,
@@ -599,7 +953,9 @@ def parse_profile(data: dict[str, Any]) -> Profile:
     Validate an already-decoded profile document.
 
     Inferred profiles go through exactly this path, so a generated document is
-    held to the same closed schema as a hand-written one.
+    held to the same closed schema as a hand-written one. schema_version 1 is
+    the closed keyed-PO/term-description-pairs schema; schema_version 2 adds
+    only the TBX record-map grammar and never reinterprets a v1 document.
     """
     if not isinstance(data, dict):
         msg = "profile.not_object"
@@ -608,11 +964,12 @@ def parse_profile(data: dict[str, Any]) -> Profile:
     _check_unknown(data, _ROOT_FIELDS, label="profile root")
 
     sv = data.get("schema_version")
-    if sv != SCHEMA_VERSION:
+    if sv not in SUPPORTED_SCHEMA_VERSIONS:
         msg = "profile.schema_version"
         raise _err(
             msg,
-            f"unsupported schema_version {sv!r}; expected {SCHEMA_VERSION}",
+            f"unsupported schema_version {sv!r}; expected one of "
+            f"{sorted(SUPPORTED_SCHEMA_VERSIONS)}",
         )
 
     components_raw = data.get("components")
@@ -629,6 +986,7 @@ def parse_profile(data: dict[str, Any]) -> Profile:
     components = tuple(
         _parse_component(
             c,
+            schema_version=sv,
             seen_components=seen_components,
             seen_sheets=seen_sheets,
             seen_archives=seen_archives,

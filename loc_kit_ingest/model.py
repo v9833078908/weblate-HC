@@ -45,10 +45,11 @@ class StringUnit:
 class GlossaryTerm:
     context: str
     values: dict[str, str]
-    explanations: dict[str, str]
+    source_explanation: str
+    target_explanations: dict[str, str]
     section: str
     term_row: int
-    description_row: int
+    note_rows: tuple[int, ...] = ()
 
 
 class ParsedUnit(Protocol):
