@@ -1578,6 +1578,73 @@ The files are served by your web server or CDN, not by Weblate; see
    * :ref:`addon-weblate.cdn.cdnjs`
    * :ref:`addon-weblate.cdn.files`
 
+.. setting:: LOC_KIT_PROFILE_ANALYSIS_ENABLED
+
+LOC_KIT_PROFILE_ANALYSIS_ENABLED
+--------------------------------
+
+.. versionadded:: 5.13
+
+Enables site-wide OpenRouter profile analysis for loc-kit glossary tables.
+Defaults to ``False``. When enabled, a deterministic structural sample of an
+uploaded sheet is sent to OpenRouter to propose a profile; the configured model
+must support strict structured outputs.
+
+.. seealso::
+
+   * :setting:`LOC_KIT_PROFILE_OPENROUTER_KEY`
+   * :setting:`LOC_KIT_PROFILE_OPENROUTER_MODEL`
+   * :setting:`LOC_KIT_PROFILE_SAMPLE_MAX_BYTES`
+
+.. setting:: LOC_KIT_PROFILE_OPENROUTER_KEY
+
+LOC_KIT_PROFILE_OPENROUTER_KEY
+------------------------------
+
+.. versionadded:: 5.13
+
+Site-wide OpenRouter API key used for loc-kit profile analysis. Leave empty to
+disable analysis. It is never exposed per-project.
+
+.. setting:: LOC_KIT_PROFILE_OPENROUTER_MODEL
+
+LOC_KIT_PROFILE_OPENROUTER_MODEL
+--------------------------------
+
+.. versionadded:: 5.13
+
+OpenRouter model identifier (for example ``openai/gpt-4o``) used for loc-kit
+profile analysis. The model must support strict structured outputs.
+
+.. setting:: LOC_KIT_PROFILE_SAMPLE_MAX_BYTES
+
+LOC_KIT_PROFILE_SAMPLE_MAX_BYTES
+--------------------------------
+
+.. versionadded:: 5.13
+
+Maximum size in bytes of the serialized structural sample sent to OpenRouter.
+Defaults to 131072 (128 KiB) and is hard-capped at that value regardless of
+environment input.
+
+.. setting:: LOC_KIT_IMPORT_DRAFT_EXPIRY
+
+LOC_KIT_IMPORT_DRAFT_EXPIRY
+---------------------------
+
+.. versionadded:: 5.13
+
+Lifetime in seconds of a loc-kit import draft. Defaults to 3600 (one hour) and
+is hard-capped at 3600 regardless of environment input.
+
+.. seealso::
+
+   * :envvar:`WEBLATE_LOC_KIT_PROFILE_ANALYSIS_ENABLED`
+   * :envvar:`WEBLATE_LOC_KIT_PROFILE_OPENROUTER_KEY`
+   * :envvar:`WEBLATE_LOC_KIT_PROFILE_OPENROUTER_MODEL`
+   * :envvar:`WEBLATE_LOC_KIT_PROFILE_SAMPLE_MAX_BYTES`
+   * :envvar:`WEBLATE_LOC_KIT_IMPORT_DRAFT_EXPIRY`
+
 .. setting:: PIWIK_SITE_ID
 .. setting:: MATOMO_SITE_ID
 

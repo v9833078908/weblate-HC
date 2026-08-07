@@ -2309,6 +2309,35 @@ Localization CDN
        * :setting:`LOCALIZE_CDN_URL`
        * :setting:`LOCALIZE_CDN_PATH`
 
+Loc-kit glossary analysis
++++++++++++++++++++++++++
+
+.. envvar:: WEBLATE_LOC_KIT_PROFILE_ANALYSIS_ENABLED
+.. envvar:: WEBLATE_LOC_KIT_PROFILE_OPENROUTER_KEY
+.. envvar:: WEBLATE_LOC_KIT_PROFILE_OPENROUTER_MODEL
+.. envvar:: WEBLATE_LOC_KIT_PROFILE_SAMPLE_MAX_BYTES
+.. envvar:: WEBLATE_LOC_KIT_IMPORT_DRAFT_EXPIRY
+
+    .. versionadded:: 5.13
+
+    Configures the optional loc-kit glossary profile analysis via OpenRouter.
+    See :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED` and related settings.
+    :envvar:`WEBLATE_LOC_KIT_PROFILE_SAMPLE_MAX_BYTES` and
+    :envvar:`WEBLATE_LOC_KIT_IMPORT_DRAFT_EXPIRY` are hard-capped regardless of
+    the supplied value.
+
+    The loc-kit analysis rate limits are configured with the generic
+    :envvar:`WEBLATE_RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS` and
+    :envvar:`WEBLATE_RATELIMIT_LOC_KIT_ANALYSIS_WINDOW` variables.
+
+    .. seealso::
+
+       * :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED`
+       * :setting:`LOC_KIT_PROFILE_OPENROUTER_KEY`
+       * :setting:`LOC_KIT_PROFILE_OPENROUTER_MODEL`
+       * :setting:`LOC_KIT_PROFILE_SAMPLE_MAX_BYTES`
+       * :setting:`LOC_KIT_IMPORT_DRAFT_EXPIRY`
+
 
 Changing enabled apps, checks, formats, add-ons, machinery, or autofixes
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
