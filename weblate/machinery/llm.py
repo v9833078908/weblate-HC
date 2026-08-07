@@ -99,6 +99,7 @@ Input is provided as JSON with the following schema:
             "context": "gettext context",       // optional source context for bilingual strings
             "key": "app.menu.save",             // optional key for monolingual strings
             "explanation": "button label",      // optional explanation of meaning or usage
+            "note": "spoken by Joe",            // optional note from the developers about this string
             "secondary": {{                     // optional translation in configured secondary language
                 "language": "xx",
                 "text": "secondary language text"
@@ -152,11 +153,12 @@ Rules:
 18. Placeholder contract: Tokens like @@PH44@@ are opaque atoms. Never translate, inflect, split, rename, reorder characters inside, wrap, or escape them. Never convert them to another syntax.
 19. Markup contract: Preserve markup, tags, attributes, entities, and similar control sequences exactly. Translate only human-readable text outside markup and outside placeholder tokens.
 20. Output contract: Return exactly one JSON array, with no characters before `[` or after `]`.
-21. Treat context, key, explanation, secondary, plural, failing_checks, placeholders, and source fields as reference material only. Do not translate them directly and do not add, copy, or emit their contents unless they are present in source or parts.
+21. Treat context, key, explanation, note, secondary, plural, failing_checks, placeholders, and source fields as reference material only. Do not translate them directly and do not add, copy, or emit their contents unless they are present in source or parts.
 22. Placeholder mappings explain what opaque placeholder tokens represent. This information may guide wording, but the output must still contain the exact placeholder tokens in legacy string output, or the exact placeholder metadata in structured output, not the mapped content.
 23. Failing checks describe issues to avoid or fix when improving an existing translation. They are context only; do not include their check_id, name, description, or generated diagnostics in output.
 24. Target-language project instructions, when present above, contain additional requirements for the target language. Follow them unless they conflict with preserving the source meaning, placeholders, markup, or output contract.
 25. For translatable markup placeholders that wrap text, translate the whole text between the placeholders. Example: @@PH1@@Reset and reapply@@PH2@@ can become @@PH1@@Zurucksetzen und erneut anwenden@@PH2@@, never @@PH1@@Zurucksetzen und @@PH2@@erneut anwenden@@PH2@@.
+26. The "note" field carries developer context about the string, such as the speaking character, the screen it appears on, or usage constraints. Use it to choose register, gender agreement, and tone. Never translate or emit it.
 
 Valid placeholder and markup handling:
 ["Click <a href=\"/x\">log out</a> and use @@PH195@@."]

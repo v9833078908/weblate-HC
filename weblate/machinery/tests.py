@@ -3874,6 +3874,12 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         )
         self.assertIn("Prefer structured objects when", PROMPT)
 
+    def test_prompt_declares_the_developer_note_in_the_schema(self) -> None:
+        self.assertIn('"note"', PROMPT)
+
+    def test_prompt_lists_the_developer_note_as_reference_material(self) -> None:
+        self.assertIn("context, key, explanation, note,", PROMPT)
+
     @http_mock.activate
     def test_translate_traces_resolved_model_breadcrumb(self) -> None:
         self.mock_response()
