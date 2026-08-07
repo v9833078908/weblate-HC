@@ -30,7 +30,8 @@ def main(argv: list[str] | None = None) -> int:
         "--profile",
         help=(
             "Path to a JSON profile. Omit to derive one from the kit's own header "
-            "row; the derived profile is written to the output directory."
+            "row; the derived profile is written to the output directory. A "
+            "schema_version 2 profile can also define a TBX record-map glossary."
         ),
     )
     parser.add_argument(

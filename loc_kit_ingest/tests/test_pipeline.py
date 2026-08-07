@@ -6,10 +6,13 @@
 
 from __future__ import annotations
 
+import csv
+import json
 import zipfile
 from pathlib import Path
 
 import pytest
+from translate.storage.tbx import tbxfile
 
 from loc_kit_ingest.cli import main
 
@@ -186,3 +189,109 @@ def test_missing_output_parent_exits_2(tmp_path, kit_with_profile):
         main([str(temple_csv), str(terms_csv), "--profile", str(profile), "--out", str(output)])
         == 2
     )
+
+
+
+# ---------------------------------------------------------------------------
+# Profile v2 record-map, end to end
+# ---------------------------------------------------------------------------
+
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def _run_record_map(tmp_path, rows=None, profile_document=None):
+    """Run the full local pipeline over the record-map fixture."""
+    kit = FIXTURES / "glossary-record-map.csv"
+    profile_path = FIXTURES / "glossary-record-map.loc-ingest.json"
+    if rows is not None:
+        kit = tmp_path / "glossary-record-map.csv"
+        with kit.open("w", newline="", encoding="utf-8") as handle:
+            csv.writer(handle).writerows(rows)
+    if profile_document is not None:
+        profile_path = tmp_path / "custom.loc-ingest.json"
+        profile_path.write_text(
+            json.dumps(profile_document), encoding="utf-8"
+        )
+    output = tmp_path / "out"
+    code = main([str(kit), "--profile", str(profile_path), "--out", str(output)])
+    return code, output
+
+
+def _fixture_rows():
+    with (FIXTURES / "glossary-record-map.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        return [row for row in csv.reader(handle)]
+
+
+def test_record_map_renders_and_parses_back(tmp_path):
+    code, output = _run_record_map(tmp_path)
+    assert code == 0
+
+    tbx_dir = output / "Glossary" / "tbx"
+    assert sorted(p.name for p in tbx_dir.glob("*.tbx")) == ["en.tbx"]
+    # The source language never gets its own file.
+    assert not (tbx_dir / "ru.tbx").exists()
+
+    store = tbxfile.parsestring((tbx_dir / "en.tbx").read_bytes())
+    by_context = {unit.getid(): unit for unit in store.units}
+    assert '["Персонажи","Герой"]' in by_context
+
+    hero = by_context['["Персонажи","Герой"]']
+    assert hero.source == "Герой"
+    assert hero.target == "Hero"
+    assert "Главный протагонист" in hero.getnotes("definition")
+    assert "Main protagonist" in hero.getnotes("translator")
+
+
+def test_record_map_language_pair_direction_is_source_to_target(tmp_path):
+    _code, output = _run_record_map(tmp_path)
+    xml = (output / "Glossary" / "tbx" / "en.tbx").read_text(encoding="utf-8")
+    assert 'xml:lang="ru"' in xml
+    assert 'xml:lang="en"' in xml
+
+
+def test_record_map_unmapped_status_column_publishes_nothing(tmp_path):
+    rows = _fixture_rows()
+    rows[1].append("status")
+    rows[2].append("approved")
+    code, output = _run_record_map(tmp_path, rows=rows)
+    assert code == 2
+    assert not output.exists()
+
+
+def test_record_map_target_note_for_a_non_target_language_publishes_nothing(tmp_path):
+    document = json.loads(
+        (FIXTURES / "glossary-record-map.loc-ingest.json").read_text(encoding="utf-8")
+    )
+    document["components"][0]["grammar"]["notes"][1]["language"] = "ru"
+    code, output = _run_record_map(tmp_path, profile_document=document)
+    assert code == 2
+    assert not output.exists()
+
+
+def test_record_map_populated_footer_publishes_nothing(tmp_path):
+    rows = _fixture_rows()
+    rows.append(["Всего", "8", "", "", ""])
+    code, output = _run_record_map(tmp_path, rows=rows)
+    assert code == 2
+    assert not output.exists()
+
+
+def test_record_map_range_not_divisible_by_stride_publishes_nothing(tmp_path):
+    document = json.loads(
+        (FIXTURES / "glossary-record-map.loc-ingest.json").read_text(encoding="utf-8")
+    )
+    document["components"][0]["grammar"]["regions"][0]["record_stride"] = 4
+    code, output = _run_record_map(tmp_path, profile_document=document)
+    assert code == 2
+    assert not output.exists()
+
+
+def test_record_map_missing_target_term_publishes_nothing(tmp_path):
+    rows = _fixture_rows()
+    rows[2][2] = ""
+    code, output = _run_record_map(tmp_path, rows=rows)
+    assert code == 2
+    assert not output.exists()
