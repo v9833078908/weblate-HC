@@ -744,8 +744,8 @@ def _parse_record_map(
                             err(
                                 "tbx.unsupported_outer_whitespace",
                                 row_idx + 1,
-                                f"note {note.header!r} has leading or trailing "
-                                "whitespace",
+                                f"note in column {note.column + 1} has leading "
+                                "or trailing whitespace",
                             )
                     values.append(value)
                 return values

@@ -474,11 +474,9 @@ def _parse_section_field(obj: dict[str, Any]) -> SectionField:
     column = _require_int(obj, "column", label="section_field")
     header = _require(obj, "header", label="section_field")
     row_offset = _require_int(obj, "row_offset", label="section_field", min_val=0)
-    if not isinstance(header, str) or not header:
+    if not isinstance(header, str):
         msg = "profile.invalid_header"
-        raise _err(
-            msg, f"section_field header must be a non-empty string, got {header!r}"
-        )
+        raise _err(msg, f"invalid header {header!r}")
     return SectionField(column=column - 1, header=header, row_offset=row_offset)
 
 
@@ -493,9 +491,9 @@ def _parse_note_field(
     column = _require_int(obj, "column", label="note field")
     header = _require(obj, "header", label="note field")
     row_offset = _require_int(obj, "row_offset", label="note field", min_val=0)
-    if not isinstance(header, str) or not header:
+    if not isinstance(header, str):
         msg = "profile.invalid_header"
-        raise _err(msg, f"note header must be a non-empty string, got {header!r}")
+        raise _err(msg, f"invalid header {header!r}")
 
     language = obj.get("language")
     if scope == "source":
@@ -725,9 +723,10 @@ def _check_record_map_field_locations(
             msg = "profile.duplicate_field_location"
             raise _err(
                 msg,
-                f"note {note.header!r} aliases the same cell as {locations[loc]}",
+                f"note in column {note.column + 1} aliases the same cell "
+                f"as {locations[loc]}",
             )
-        locations[loc] = f"note {note.header!r}"
+        locations[loc] = f"note in column {note.column + 1}"
 
     if grammar.section_field is not None:
         lang_columns = {lang.column for lang in languages}

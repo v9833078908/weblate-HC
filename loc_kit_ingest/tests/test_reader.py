@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from loc_kit_ingest.model import Severity
-from loc_kit_ingest.profile import load_profile
+from loc_kit_ingest.profile import load_profile, parse_profile
 from loc_kit_ingest.reader import read_sheets, validate_sheet_headers
 
 # ---------------------------------------------------------------------------
@@ -129,3 +129,61 @@ def test_header_validation_severity_is_error(temple_component, temple_rows):
 def test_all_headers_match(temple_component, temple_rows):
     diagnostics = validate_sheet_headers(temple_component, temple_rows)
     assert diagnostics == ()
+
+
+@pytest.fixture
+def unnamed_description_component():
+    """A record-map glossary whose description column has no header cell."""
+    document = {
+        "schema_version": 2,
+        "components": [
+            {
+                "sheet": "Glossary",
+                "component": "Glossary",
+                "kind": "tbx",
+                "source_lang": "en",
+                "header_row": 1,
+                "languages": [
+                    {"code": "en", "xml_lang": "en", "column": 2, "header": "en"},
+                    {"code": "ru", "xml_lang": "ru", "column": 3, "header": "ru"},
+                ],
+                "grammar": {
+                    "type": "record-map",
+                    "skip_rows": [],
+                    "regions": [
+                        {
+                            "first_record_row": 2,
+                            "last_record_row": 2,
+                            "record_stride": 1,
+                        }
+                    ],
+                    "term_row_offset": 0,
+                    "notes": [
+                        {
+                            "scope": "source",
+                            "column": 1,
+                            "header": "",
+                            "row_offset": 0,
+                        }
+                    ],
+                },
+                "initial_target_languages": ["ru"],
+            }
+        ],
+    }
+    return parse_profile(document).components[0]
+
+
+def test_unnamed_note_column_matches_a_blank_header_cell(
+    unnamed_description_component,
+):
+    rows = [["", "en", "ru"], ["%SHIP% - a ship", "Ship", "Корабль"]]
+    assert validate_sheet_headers(unnamed_description_component, rows) == ()
+
+
+def test_unnamed_note_column_rejects_a_named_header_cell(
+    unnamed_description_component,
+):
+    rows = [["description", "en", "ru"], ["%SHIP% - a ship", "Ship", "Корабль"]]
+    diagnostics = validate_sheet_headers(unnamed_description_component, rows)
+    assert [(item.code, item.row) for item in diagnostics] == [("header.mismatch", 1)]

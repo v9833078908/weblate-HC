@@ -288,6 +288,20 @@ def test_record_map_outer_whitespace_in_note_is_error(
     assert any(d.code == "tbx.unsupported_outer_whitespace" for d in result.diagnostics)
 
 
+def test_record_map_note_diagnostic_names_the_column(
+    record_map_component, record_map_rows
+):
+    """An unnamed note column must still be identifiable in the diagnostic."""
+    record_map_rows[2][3] = " Главный протагонист"
+    result = parse_component(record_map_component, record_map_rows)
+    message = next(
+        d.message
+        for d in result.diagnostics
+        if d.code == "tbx.unsupported_outer_whitespace"
+    )
+    assert "column 4" in message
+
+
 def test_record_map_duplicate_context_is_error(record_map_component, record_map_rows):
     record_map_rows[3][0] = "Персонажи"
     record_map_rows[3][1] = "Герой"
