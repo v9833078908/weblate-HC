@@ -133,11 +133,12 @@ A read-only management command reports matched and unmatched candidate forms per
 
 ---
 
-# Part A - Project settings inherit the site-wide ones
+## Part A - Project settings inherit the site-wide ones
 
 ### Task A1: Failing test for field-by-field inheritance
 
 **Files:**
+
 - Modify: `weblate/machinery/tests.py` (append a new class after `MachineryValidationTest`, which ends at line 8924)
 
 **Step 1: Write the failing tests**
@@ -202,7 +203,8 @@ class ProjectMachineryInheritanceTest(TestCase):
         self.project.get_machinery_settings()
 
         self.assertEqual(
-            self.project.machinery_settings["openai"], {"persona": "You write dialogue."}
+            self.project.machinery_settings["openai"],
+            {"persona": "You write dialogue."},
         )
 
     def test_resolution_does_not_leak_into_the_sitewide_entry(self) -> None:
@@ -236,14 +238,16 @@ git commit -m "test(machinery): pin project settings inheritance semantics"
 
 ---
 
-### Task A2: Implement the merge
+#### Task A2: Implement the merge
 
 **Files:**
+
 - Modify: `weblate/trans/models/project.py:1332-1347`
 
 **Step 1: Replace the loop body**
 
 ```python
+class Project(models.Model):
     def get_machinery_settings(self) -> dict[str, SettingsDict]:
         mt_settings = cast(
             "dict[str, SettingsDict]",
@@ -293,14 +297,16 @@ git commit -m "feat(machinery): inherit site-wide service settings per field"
 
 ---
 
-### Task A3: Failing test for validating a partial configuration
+#### Task A3: Failing test for validating a partial configuration
 
 **Files:**
+
 - Modify: `weblate/machinery/tests.py` (append to `MachineryValidationTest`)
 
 **Step 1: Write the failing tests**
 
 ```python
+class MachineryValidationTest(TestCase):
     @http_mock.activate
     def test_partial_configuration_validates_against_the_base(self) -> None:
         # DeepL is used because its settings form has exactly one required
@@ -365,9 +371,10 @@ git commit -m "test(machinery): cover partial service configuration validation"
 
 ---
 
-### Task A4: Validate the merged configuration, store the difference
+#### Task A4: Validate the merged configuration, store the difference
 
 **Files:**
+
 - Modify: `weblate/machinery/models.py:37-87`
 
 **Step 1: Add the parameter**
@@ -400,18 +407,18 @@ def validate_service_configuration(
 Then, in place of the current `form = service.settings_form(...)` call at lines 71-75:
 
 ```python
-    errors = []
-    if service.settings_form is not None:
-        validated_configuration = service_configuration
-        if base_configuration is not None:
-            validated_configuration = cast(
-                "SettingsDict", {**base_configuration, **service_configuration}
-            )
-        form = service.settings_form(
-            service,
-            data=validated_configuration,
-            allow_private_targets=allow_private_targets,
+errors = []
+if service.settings_form is not None:
+    validated_configuration = service_configuration
+    if base_configuration is not None:
+        validated_configuration = cast(
+            "SettingsDict", {**base_configuration, **service_configuration}
         )
+    form = service.settings_form(
+        service,
+        data=validated_configuration,
+        allow_private_targets=allow_private_targets,
+    )
 ```
 
 `base_configuration` is keyword-only with a default of `None`, so the three existing call sites are unaffected. Two of them are updated in Task A5 (`weblate/api/views.py:2390`, `2431`); the third is the `install_machinery` management command (`weblate/machinery/management/commands/install_machinery.py:34`), which installs site-wide services and must keep validating in full. Leave it alone.
@@ -433,9 +440,10 @@ git commit -m "feat(machinery): validate partial configurations against a base"
 
 ---
 
-### Task A5: Wire the API write path
+#### Task A5: Wire the API write path
 
 **Files:**
+
 - Modify: `weblate/api/views.py:2390-2394` and the `PUT` branch at `2427-2440`
 - Modify: `weblate/api/tests.py` (next to `test_install_machinery`, line 6049)
 
@@ -446,6 +454,7 @@ Add `from weblate.configuration.models import Setting, SettingCategory` to the i
 The three decorators and the `mock_response()` call are what let a provider configuration validate without touching the network; they are copied from `test_install_machinery`.
 
 ```python
+class ProjectAPITest(APIBaseTest):
     @http_mock.activate
     @patch("weblate.utils.requests._get_response_peer_ip", return_value="93.184.216.34")
     @patch(
@@ -504,32 +513,32 @@ Expected: FAIL with a 400 and `Error in key (deepl): This field is required.`
 In `weblate/api/views.py`, inside `machinery_settings`, before the `POST`/`PATCH` branch:
 
 ```python
-        sitewide_settings = cast(
-            "dict[str, SettingsDict]",
-            Setting.objects.get_settings_dict(SettingCategory.MT),
-        )
+sitewide_settings = cast(
+    "dict[str, SettingsDict]",
+    Setting.objects.get_settings_dict(SettingCategory.MT),
+)
 ```
 
 Then in the `POST`/`PATCH` branch replace the validation call:
 
 ```python
-            service, configuration, errors = validate_service_configuration(
-                service_name,
-                request.data.get("configuration", "{}"),
-                allow_private_targets=False,
-                base_configuration=sitewide_settings.get(service_name),
-            )
+service, configuration, errors = validate_service_configuration(
+    service_name,
+    request.data.get("configuration", "{}"),
+    allow_private_targets=False,
+    base_configuration=sitewide_settings.get(service_name),
+)
 ```
 
 And the same for the `PUT` loop:
 
 ```python
-                service, configuration, errors = validate_service_configuration(
-                    service_name,
-                    configuration,
-                    allow_private_targets=False,
-                    base_configuration=sitewide_settings.get(service_name),
-                )
+service, configuration, errors = validate_service_configuration(
+    service_name,
+    configuration,
+    allow_private_targets=False,
+    base_configuration=sitewide_settings.get(service_name),
+)
 ```
 
 Add the imports this needs if they are not already present in the module: `Setting`, `SettingCategory` from `weblate.configuration.models`, and `SettingsDict` under `TYPE_CHECKING`.
@@ -551,17 +560,19 @@ git commit -m "feat(api): accept partial project machinery configuration"
 
 ---
 
-### Task A6: Wire the UI write path
+#### Task A6: Wire the UI write path
 
 Two problems in the form flow, both in `weblate/machinery/views.py`. The form starts empty, so an administrator cannot see what is inherited; and it saves every field, so the first save freezes today's site-wide values into the project.
 
 **Files:**
+
 - Modify: `weblate/machinery/views.py:338-355` (`EditMachineryProjectView`)
 - Modify: `weblate/machinery/tests.py` (`ViewsTest`, line 8060, or a new class beside it)
 
 **Step 1: Write the failing test**
 
 ```python
+class ViewsTest(FixtureTestCase):
     def test_project_machinery_form_stores_only_the_difference(self) -> None:
         Setting.objects.create(
             category=SettingCategory.MT,
@@ -661,7 +672,7 @@ git commit -m "feat(machinery): store only overridden fields for a project"
 
 ---
 
-### Task A7: Prove it on the running instance
+#### Task A7: Prove it on the running instance
 
 No code. This is the acceptance gate for Part A, and it works for any project - substitute the slug.
 
@@ -722,16 +733,73 @@ Open any Heart Abyss string in the editor, request an OpenRouter suggestion, and
 
 ---
 
-# Part B - The developer note reaches the LLM
+#### Task A8: Move the site-wide persona to the project that owns it
+
+Added during execution. Task A2 made isolation *possible*; it did not migrate the data, and the audit afterwards showed the leak this plan exists to remove.
+
+The site-wide `openrouter` record carried a persona written for one specific game. Every project without its own record inherited it, so two unrelated projects were being translated as a sci-fi spaceship game:
+
+| Project | Own record | Persona in effect, before |
+|---|---|---|
+| heart-abyss | persona, style, language_instructions | its own |
+| space-arena | none | site-wide sci-fi - correct by accident |
+| need-for-greed | none | sci-fi spaceship - wrong |
+| pirate-ships | none | sci-fi spaceship - wrong |
+
+**The rule this establishes.** A site-wide machinery record holds transport only - `key`, `base_url`, `routing`, `source_language`. Voice belongs to a project. A site-wide persona is not a default, it is one project's text silently applied to every other.
+
+**Step 1: Move it**
+
+```bash
+./rundev.sh exec -T weblate weblate shell -c "
+from weblate.configuration.models import Setting, SettingCategory
+from weblate.trans.models import Project
+s = Setting.objects.get(category=SettingCategory.MT, name='openrouter')
+persona, style = s.value['persona'], s.value['style']
+sa = Project.objects.get(slug='space-arena')
+sa.machinery_settings['openrouter'] = {'persona': persona, 'style': style}
+sa.save(update_fields=['machinery_settings'])
+s.value = {k: v for k, v in s.value.items() if k not in {'persona', 'style'}}
+s.save(update_fields=['value'])
+"
+```
+
+No text is authored here; the existing string is moved to its owner. To reverse it, copy the two fields back into the site-wide record and drop the project entry.
+
+**Step 2: Verify every project**
+
+```bash
+./rundev.sh exec -T weblate weblate shell -c "
+from weblate.trans.models import Project
+from weblate.machinery.models import MACHINERY
+for p in Project.objects.all().order_by('slug'):
+    cfg = p.get_machinery_settings()['openrouter']
+    lines = [l for l in MACHINERY['openrouter'](cfg)._get_prompt('ja').split(chr(10))[:6] if l.strip()][1:]
+    print(p.slug, 'key=', bool(cfg.get('key')), 'routing=', bool(cfg.get('routing')))
+    print('   ', lines[0][:88] if lines else '(no persona - neutral prompt)')
+"
+```
+
+Result on 2026-08-07: all four projects still resolve `key` and `routing`; heart-abyss and space-arena print their own persona; need-for-greed and pirate-ships print none. A project with no persona gets a neutral prompt, which is correct - the remaining 25 rules and the JSON contract still apply.
+
+**Step 3: What is still owed**
+
+need-for-greed and pirate-ships have no voice of their own. That text is editorial and stays out of scope; the mechanism to add it is `/machinery/<project>/` or the API from Task A5.
+
+---
+
+## Part B - The developer note reaches the LLM
 
 ### Task B1: Failing tests
 
 **Files:**
+
 - Modify: `weblate/machinery/tests.py`, class `OpenAITranslationTest` (line 3789), next to `test_translate_sends_unit_context` (line 3892)
 
 **Step 1: Write the tests**
 
 ```python
+class OpenAITranslationTest(BaseMachineTranslationTest):
     def test_translate_sends_developer_note(self) -> None:
         machine = self.get_machine()
         unit = make_unit(code="fr", source="Get out of here!", note="Joe")
@@ -840,9 +908,10 @@ git commit -m "test(machinery): expect the developer note in LLM context"
 
 ---
 
-### Task B2: Implement the context field
+#### Task B2: Implement the context field
 
 **Files:**
+
 - Modify: `weblate/machinery/llm.py:245-252` (`LLMStringContext`)
 - Modify: `weblate/machinery/llm.py:404-414` (add a helper after `_get_explanation_context`)
 - Modify: `weblate/machinery/llm.py:889-890` (`_get_string_context`)
@@ -864,6 +933,7 @@ class LLMStringContext(TypedDict, total=False):
 **Step 2: Add the resolver right after `_get_explanation_context`**
 
 ```python
+class BaseLLMTranslation(BatchMachineTranslation):
     @classmethod
     def _get_note_context(cls, unit: Unit) -> str:
         source_unit = getattr(unit, "source_unit", None)
@@ -878,11 +948,11 @@ class LLMStringContext(TypedDict, total=False):
 **Step 3: Emit it in `_get_string_context`, directly after the explanation block**
 
 ```python
-        if explanation := self._get_explanation_context(unit):
-            result["explanation"] = explanation
+if explanation := self._get_explanation_context(unit):
+    result["explanation"] = explanation
 
-        if note := self._get_note_context(unit):
-            result["note"] = note
+if note := self._get_note_context(unit):
+    result["note"] = note
 ```
 
 **Step 4: Run the tests**
@@ -902,11 +972,12 @@ git commit -m "feat(machinery): send the developer note as LLM string context"
 
 ---
 
-### Task B3: Declare the field in the prompt
+#### Task B3: Declare the field in the prompt
 
 A field the model receives but the schema never mentions is a field the model may ignore or echo back.
 
 **Files:**
+
 - Modify: `weblate/machinery/llm.py:101` (schema block)
 - Modify: `weblate/machinery/llm.py:155` (rule 21)
 - Modify: `weblate/machinery/llm.py:159` (append rule 26 after rule 25)
@@ -916,6 +987,7 @@ A field the model receives but the schema never mentions is a field the model ma
 In `weblate/machinery/tests.py`, next to `test_prompt_forbids_metadata_output` (line 3863):
 
 ```python
+class OpenAITranslationTest(BaseMachineTranslationTest):
     def test_prompt_declares_the_developer_note_in_the_schema(self) -> None:
         self.assertIn('"note"', PROMPT)
 
@@ -937,7 +1009,7 @@ Expected: FAIL.
 
 After the `"explanation"` line:
 
-```
+```text
             "note": "spoken by Joe",             // optional note from the developers about this string
 ```
 
@@ -945,13 +1017,13 @@ After the `"explanation"` line:
 
 **Step 4: Extend rule 21**
 
-```
+```text
 21. Treat context, key, explanation, note, secondary, plural, failing_checks, placeholders, and source fields as reference material only. Do not translate them directly and do not add, copy, or emit their contents unless they are present in source or parts.
 ```
 
 **Step 5: Add rule 26 after rule 25**
 
-```
+```text
 26. The "note" field carries developer context about the string, such as the speaking character, the screen it appears on, or usage constraints. Use it to choose register, gender agreement, and tone. Never translate or emit it.
 ```
 
@@ -972,7 +1044,7 @@ git commit -m "feat(machinery): document the developer note in the LLM prompt"
 
 ---
 
-### Task B4: Verify on real data
+#### Task B4: Verify on real data
 
 **Step 1: Confirm a real project has notes to send**
 
@@ -1013,11 +1085,12 @@ Required: the printed dict contains `note`.
 
 ---
 
-# Part C - Measure glossary coverage before changing any glossary
+## Part C - Measure glossary coverage before changing any glossary
 
 ### Task C1: Failing test for the report
 
 **Files:**
+
 - Create: `weblate/glossary/management/__init__.py` (empty)
 - Create: `weblate/glossary/management/commands/__init__.py` (empty)
 - Modify: `weblate/glossary/tests.py`
@@ -1106,11 +1179,12 @@ git commit -m "test(glossary): expect a glossary coverage command"
 
 ---
 
-### Task C2: Implement the command
+#### Task C2: Implement the command
 
 Read-only. It must not write to the database.
 
 **Files:**
+
 - Create: `weblate/glossary/management/commands/glossary_coverage.py`
 
 **Step 1: Write it**
@@ -1250,7 +1324,7 @@ git commit -m "feat(glossary): add a glossary coverage report command"
 
 ---
 
-### Task C3: Run it on every project and record the decision
+#### Task C3: Run it on every project and record the decision
 
 **Step 1: Run**
 
@@ -1270,7 +1344,7 @@ done
 
 Append the counts and the decision to this plan file under a new "Measured coverage" heading, then commit. A future reader needs to know the decision was measured, not assumed.
 
-### Measured coverage
+#### Measured coverage
 
 Run on 2026-08-07 against the dev instance, all four projects.
 
@@ -1297,7 +1371,7 @@ Run on 2026-08-07 against the dev instance, all four projects.
 
 ---
 
-# Part D - Terminology flags
+## Part D - Terminology flags
 
 No code. `terminology` is database state (`Unit.extra_flags`), it does not round-trip through TBX (`weblate/formats/ttkit.py:3404-3423` reads `forbidden` only), and Weblate already has the bulk operation.
 
@@ -1363,11 +1437,12 @@ bulk_perform(
 
 ---
 
-# Part E - Documentation and verification
+## Part E - Documentation and verification
 
 ### Task E1: Documentation
 
 **Files:**
+
 - Modify: `docs/admin/machine.rst:69-74` (the `llm-translation-context` section)
 - Modify: `docs/admin/machine.rst:11-14` (the sentence about site-wide versus project configuration)
 - Modify: `docs/api.rst:1464-1473` (the `machinery_settings` POST description)
@@ -1408,9 +1483,10 @@ git commit -m "docs: describe per-field machinery inheritance and the note conte
 
 ---
 
-### Task E2: Changelog
+#### Task E2: Changelog
 
 **Files:**
+
 - Modify: `docs/changes.rst`, the unreleased section at the top
 
 Under :rubric:`Improvements`:
@@ -1435,7 +1511,7 @@ git commit -m "docs(changelog): note per-field machinery inheritance and note co
 
 ---
 
-### Task E3: Full verification pass
+#### Task E3: Full verification pass
 
 Run once, at the end.
 
@@ -1459,7 +1535,7 @@ git commit -m "chore: formatting after project-scoped LLM context"
 
 ---
 
-## Threat model
+### Threat model
 
 `docs/security/threat-model.rst:499-503` already states that configured machine-translation providers are recipients of the data sent to them and that the submitted content varies by provider and enabled feature. Part B sends one more existing unit field to an already-configured recipient; it adds no outbound integration class, no endpoint, and no new trust boundary, so `Conditions that change this model` (line 833) does not apply and the file needs no edit.
 
@@ -1467,7 +1543,7 @@ Part A does change who may set a provider configuration field - but not the perm
 
 ---
 
-## Risks and things that will bite
+### Risks and things that will bite
 
 1. **`{}` changes meaning subtly.** Today a project entry of `{}` means "installed, no settings"; afterwards it means "installed, inherits everything". Identical in every current case because no service with a site-wide entry has an empty project entry, and Task A1's `test_empty_entry_inherits_everything` pins it. Do not delete that test.
 2. **The UI form saves the resolved values if Task A6 is skipped.** Task A2 alone makes inheritance work for the API and for anything writing `machinery_settings` directly, while the UI keeps freezing a full copy into the project. A2 and A6 belong to the same change.
@@ -1478,7 +1554,7 @@ Part A does change who may set a provider configuration field - but not the perm
 
 ---
 
-## Out of scope
+### Out of scope
 
 - Editorial content. Which persona, style, or language instruction a project should carry is a decision for the people who own that project's text; this plan only makes it settable per project without duplication.
 - Morphological glossary matching. Rejected in D5: it needs a per-language stemmer, a new runtime dependency, and a rebuild of a cached hot path, to fix an effect whose size Part C measures first.
