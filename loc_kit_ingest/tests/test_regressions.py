@@ -6,19 +6,15 @@
 
 from __future__ import annotations
 
-import json
+import zipfile
 from pathlib import Path
 
-import pytest
-import zipfile
-
 from loc_kit_ingest.cli import main
-from loc_kit_ingest.model import Diagnostic, Severity, StringUnit
+from loc_kit_ingest.model import Severity, StringUnit
 from loc_kit_ingest.parser import parse_component
 from loc_kit_ingest.profile import load_profile
 from loc_kit_ingest.reader import read_sheets
-from loc_kit_ingest.writer import render_component, validate_rendered_component
-
+from loc_kit_ingest.writer import render_component
 
 # ---------------------------------------------------------------------------
 # Temple-like CSV boundaries

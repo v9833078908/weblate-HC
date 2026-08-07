@@ -1290,7 +1290,8 @@ def cleanup_reports() -> None:
 
 @app.task(trail=False)
 def cleanup_loc_kit_drafts() -> None:
-    """Delete expired loc-kit import drafts and their uploaded files.
+    """
+    Delete expired loc-kit import drafts and their uploaded files.
 
     Idempotent: running it twice (or when a file is already gone) is a no-op.
     ``FileSystemStorage.delete`` on a missing file is already safe.

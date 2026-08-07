@@ -8,7 +8,6 @@ import pytest
 
 from loc_kit_ingest.profile import ProfileError, load_profile
 
-
 # ---------------------------------------------------------------------------
 # Valid profile builder
 # ---------------------------------------------------------------------------

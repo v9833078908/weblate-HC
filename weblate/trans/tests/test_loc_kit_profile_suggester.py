@@ -97,8 +97,7 @@ class StructureSampleShapeTest(SimpleTestCase):
         # Signatures are preserved for every row coordinate.
         covered = set()
         for run in runs:
-            for row in range(int(run["first_row"]), int(run["last_row"]) + 1):
-                covered.add(row)
+            covered.update(range(int(run["first_row"]), int(run["last_row"]) + 1))
         self.assertEqual(covered, set(range(len(rows))))
 
     def test_headers_and_coordinates_preserved(self) -> None:
@@ -165,8 +164,9 @@ class StructureSampleBoundsTest(SimpleTestCase):
         long_term = "Очень длинный термин глоссария с пояснительным текстом " * 3
         long_note = "Подробное пояснение к переводу данного термина. " * 2
         rows = [["section", "ru", "en", "note"]]
-        for i in range(500):
-            rows.append([f"sec{i % 4}", long_term, f"term{i:03d}", long_note])
+        rows.extend(
+            [f"sec{i % 4}", long_term, f"term{i:03d}", long_note] for i in range(500)
+        )
         naive = json.dumps(rows, ensure_ascii=False).encode("utf-8")
         sample = loc_kit.build_glossary_structure_sample(rows, "Big", 131072)
         encoded = json.dumps(
@@ -190,23 +190,21 @@ class PromptAssetTest(SimpleTestCase):
     """The packaged prompt is loadable and carries the required instructions."""
 
     def test_prompt_loadable_via_importlib(self) -> None:
-        prompt = loc_kit._load_profile_prompt()
+        prompt = loc_kit.load_profile_prompt()
         self.assertIsInstance(prompt, str)
         self.assertIn("response envelope", prompt)
         self.assertIn("unsupported", prompt)
 
     def test_prompt_asset_on_disk_matches_module(self) -> None:
-        import weblate.trans.prompts as prompts_pkg
-
         text = (
-            resources.files(prompts_pkg)
+            resources.files("weblate.trans.prompts")
             .joinpath("loc_kit_profile.txt")
             .read_text(encoding="utf-8")
         )
-        self.assertEqual(text, loc_kit._load_profile_prompt())
+        self.assertEqual(text, loc_kit.load_profile_prompt())
 
     def test_prompt_requires_only_envelope_json(self) -> None:
-        prompt = loc_kit._load_profile_prompt()
+        prompt = loc_kit.load_profile_prompt()
         self.assertIn("ONLY", prompt)
         self.assertIn("JSON", prompt)
 
@@ -231,13 +229,27 @@ def _profile_envelope_content() -> str:
                         "kind": "tbx",
                         "source_lang": "ru",
                         "languages": [
-                            {"code": "ru", "xml_lang": "ru", "column": 1, "header": "ru"},
-                            {"code": "en", "xml_lang": "en", "column": 2, "header": "en"},
+                            {
+                                "code": "ru",
+                                "xml_lang": "ru",
+                                "column": 1,
+                                "header": "ru",
+                            },
+                            {
+                                "code": "en",
+                                "xml_lang": "en",
+                                "column": 2,
+                                "header": "en",
+                            },
                         ],
                         "grammar": {
                             "type": "record-map",
                             "regions": [
-                                {"first_record_row": 1, "last_record_row": 2, "record_stride": 1}
+                                {
+                                    "first_record_row": 1,
+                                    "last_record_row": 2,
+                                    "record_stride": 1,
+                                }
                             ],
                             "term_row_offset": 0,
                         },
@@ -254,7 +266,13 @@ def _profile_envelope_content() -> str:
 def _ok_response(content: str | None = None) -> None:
     body = {
         "choices": [
-            {"message": {"content": content if content is not None else _profile_envelope_content()}}
+            {
+                "message": {
+                    "content": content
+                    if content is not None
+                    else _profile_envelope_content()
+                }
+            }
         ]
     }
     http_mock.register("POST", _OPENROUTER_URL, json=body)
@@ -273,31 +291,37 @@ class ProposalShortCircuitTest(SimpleTestCase):
     @_ENABLED
     @http_mock.activate
     def test_disabled_makes_no_calls(self) -> None:
-        with override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False):
-            with self.assertRaises(loc_kit.ProfileProposalError):
-                loc_kit.request_profile_proposal({"metadata": {"sheet": "x"}})
+        with (
+            override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False),
+            self.assertRaises(loc_kit.ProfileProposalError),
+        ):
+            loc_kit.request_profile_proposal({"metadata": {"sheet": "x"}})
         self.assertEqual(len(http_mock.calls), 0)
 
     @http_mock.activate
     def test_missing_key_makes_no_calls(self) -> None:
-        with override_settings(
-            LOC_KIT_PROFILE_ANALYSIS_ENABLED=True,
-            LOC_KIT_PROFILE_OPENROUTER_KEY="",
-            LOC_KIT_PROFILE_OPENROUTER_MODEL="openai/gpt-4o",
+        with (
+            override_settings(
+                LOC_KIT_PROFILE_ANALYSIS_ENABLED=True,
+                LOC_KIT_PROFILE_OPENROUTER_KEY="",
+                LOC_KIT_PROFILE_OPENROUTER_MODEL="openai/gpt-4o",
+            ),
+            self.assertRaises(loc_kit.ProfileProposalError),
         ):
-            with self.assertRaises(loc_kit.ProfileProposalError):
-                loc_kit.request_profile_proposal({"metadata": {"sheet": "x"}})
+            loc_kit.request_profile_proposal({"metadata": {"sheet": "x"}})
         self.assertEqual(len(http_mock.calls), 0)
 
     @http_mock.activate
     def test_missing_model_makes_no_calls(self) -> None:
-        with override_settings(
-            LOC_KIT_PROFILE_ANALYSIS_ENABLED=True,
-            LOC_KIT_PROFILE_OPENROUTER_KEY="sk-test",
-            LOC_KIT_PROFILE_OPENROUTER_MODEL="",
+        with (
+            override_settings(
+                LOC_KIT_PROFILE_ANALYSIS_ENABLED=True,
+                LOC_KIT_PROFILE_OPENROUTER_KEY="sk-test",
+                LOC_KIT_PROFILE_OPENROUTER_MODEL="",
+            ),
+            self.assertRaises(loc_kit.ProfileProposalError),
         ):
-            with self.assertRaises(loc_kit.ProfileProposalError):
-                loc_kit.request_profile_proposal({"metadata": {"sheet": "x"}})
+            loc_kit.request_profile_proposal({"metadata": {"sheet": "x"}})
         self.assertEqual(len(http_mock.calls), 0)
 
 
@@ -358,7 +382,7 @@ class ProposalRequestShapeTest(SimpleTestCase):
         messages = body["messages"]
         self.assertEqual(len(messages), 2)
         self.assertEqual(messages[0]["role"], "system")
-        self.assertEqual(messages[0]["content"], loc_kit._load_profile_prompt())
+        self.assertEqual(messages[0]["content"], loc_kit.load_profile_prompt())
         self.assertEqual(messages[1]["role"], "user")
         self.assertEqual(json.loads(messages[1]["content"]), sample)
 
@@ -369,7 +393,12 @@ class ProposalRequestShapeTest(SimpleTestCase):
 
         def fake_fetch(method, url, **kwargs):
             captured["timeout"] = kwargs.get("timeout")
-            response = httpx2.Response(200, json={"choices": [{"message": {"content": _profile_envelope_content()}}]})
+            response = httpx2.Response(
+                200,
+                json={
+                    "choices": [{"message": {"content": _profile_envelope_content()}}]
+                },
+            )
             response.request = httpx2.Request(method, url)
             return response
 
@@ -594,9 +623,7 @@ class LocKitGlossaryValidationTest(SimpleTestCase):
             "assumptions": ["column 1 is the domain"],
             "reason": None,
         }
-        from_llm = _validate(
-            document=loc_kit.profile_document_from_envelope(envelope)
-        )
+        from_llm = _validate(document=loc_kit.profile_document_from_envelope(envelope))
         from_manual = _validate(document=document)
 
         self.assertEqual(from_llm.profile_json, from_manual.profile_json)
@@ -684,14 +711,14 @@ class LocKitGlossaryValidationTest(SimpleTestCase):
                 ),
             )
 
-        with patch(
-            "loc_kit_ingest.writer.validate_rendered_component", broken_validate
+        with (
+            patch("loc_kit_ingest.writer.validate_rendered_component", broken_validate),
+            self.assertRaises(loc_kit.GlossaryProfileError) as ctx,
         ):
-            with self.assertRaises(loc_kit.GlossaryProfileError) as ctx:
-                real(
-                    profile_document=_record_map_document(),
-                    rows=_record_map_rows(),
-                    sheet_name="Glossary",
-                    component_name="Draft-Glossary",
-                )
+            real(
+                profile_document=_record_map_document(),
+                rows=_record_map_rows(),
+                sheet_name="Glossary",
+                component_name="Draft-Glossary",
+            )
         self.assertIn("parse-back", str(ctx.exception))

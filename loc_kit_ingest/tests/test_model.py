@@ -38,7 +38,9 @@ def test_glossary_term_separates_source_and_target_explanations():
 
 
 def test_diagnostic_and_skip_are_typed():
-    diagnostic = Diagnostic(Severity.ERROR, "profile.unknown_field", "UI", "Sheet", 2, "bad")
+    diagnostic = Diagnostic(
+        Severity.ERROR, "profile.unknown_field", "UI", "Sheet", 2, "bad"
+    )
     skipped = SkippedRow("Temple", "Temple", 9, "blank")
     assert diagnostic.severity is Severity.ERROR
     assert skipped.reason == "blank"

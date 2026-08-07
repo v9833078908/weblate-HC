@@ -62,6 +62,7 @@ def clamp_loc_kit_sample_max_bytes(value: int) -> int:
 def clamp_loc_kit_import_draft_expiry(value: int) -> int:
     return min(int(value), LOC_KIT_IMPORT_DRAFT_EXPIRY_CAP)
 
+
 DEFAULT_COMMITER_EMAIL = "noreply@weblate.org"
 DEFAULT_COMMITER_NAME = "Weblate"
 DEFAULT_TRANSLATION_PROPAGATION = True

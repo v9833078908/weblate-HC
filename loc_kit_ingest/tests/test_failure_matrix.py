@@ -49,7 +49,16 @@ def test_fatal_diagnostics_go_to_stderr_not_stdout(tmp_path, mutated_kit, capsys
     kits, profile = mutated_kit("duplicate_key")
     temple_csv, terms_csv = kits
     output = tmp_path / "out"
-    main([str(temple_csv), str(terms_csv), "--profile", str(profile), "--out", str(output)])
+    main(
+        [
+            str(temple_csv),
+            str(terms_csv),
+            "--profile",
+            str(profile),
+            "--out",
+            str(output),
+        ]
+    )
     captured = capsys.readouterr()
     # stderr has the diagnostic
     assert "po.duplicate_key" in captured.err or "duplicate" in captured.err.lower()
@@ -61,7 +70,16 @@ def test_no_report_file_on_failure(tmp_path, mutated_kit):
     kits, profile = mutated_kit("orphan_description")
     temple_csv, terms_csv = kits
     output = tmp_path / "out"
-    main([str(temple_csv), str(terms_csv), "--profile", str(profile), "--out", str(output)])
+    main(
+        [
+            str(temple_csv),
+            str(terms_csv),
+            "--profile",
+            str(profile),
+            "--out",
+            str(output),
+        ]
+    )
     assert not (output / "report.txt").exists()
 
 
@@ -73,7 +91,16 @@ def test_existing_output_preserved_on_failure(tmp_path, kit_with_profile):
     sentinel = output / "keep.txt"
     sentinel.write_text("keep", encoding="utf-8")
     assert (
-        main([str(temple_csv), str(terms_csv), "--profile", str(profile), "--out", str(output)])
+        main(
+            [
+                str(temple_csv),
+                str(terms_csv),
+                "--profile",
+                str(profile),
+                "--out",
+                str(output),
+            ]
+        )
         == 2
     )
     assert sentinel.read_text(encoding="utf-8") == "keep"

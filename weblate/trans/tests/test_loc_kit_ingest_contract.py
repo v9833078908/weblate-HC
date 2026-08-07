@@ -29,8 +29,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
-from django.db import DatabaseError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import DatabaseError
 from django.test import SimpleTestCase
 from django.test.utils import modify_settings
 from django.urls import reverse
@@ -43,7 +43,7 @@ from weblate.formats.models import FILE_FORMATS
 from weblate.lang.models import Language
 from weblate.machinery.llm import BaseLLMTranslation
 from weblate.trans.models import Component
-from weblate.trans.models.loc_kit import LocKitImportDraft
+from weblate.trans.models.loc_kit import LOC_KIT_DRAFT_STORAGE, LocKitImportDraft
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.tests import http_mock
 from weblate.utils.views import create_component_from_kit
@@ -515,7 +515,6 @@ class LocKitUniversalUploadContractTest(ViewTestCase):
         self.assertIn("Ann", source_unit.note)
 
 
-
 # --------------------------------------------------------------------------- #
 # Glossary intake UI: sheet selection, preview, correction, confirmation
 # --------------------------------------------------------------------------- #
@@ -669,7 +668,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         The upload lands on disk before the row is inserted, so a failed
         insert must not strand a file the row-driven cleanup can never see.
         """
-        storage = LocKitImportDraft._meta.get_field("uploaded").storage
+        storage = LOC_KIT_DRAFT_STORAGE
 
         def before() -> set[str]:
             try:
@@ -677,11 +676,11 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
             except FileNotFoundError:
                 return set()
 
-        with patch.object(
-            LocKitImportDraft, "save", side_effect=DatabaseError("boom")
+        with (
+            patch.object(LocKitImportDraft, "save", side_effect=DatabaseError("boom")),
+            self.assertRaises(DatabaseError),
         ):
-            with self.assertRaises(DatabaseError):
-                self._start()
+            self._start()
 
         self.assertFalse(LocKitImportDraft.objects.exists())
         self.assertEqual(before(), set())
@@ -735,9 +734,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
 
         # A glossary is created for every project language; the two the kit
         # actually carries must be among them.
-        codes = set(
-            component.translation_set.values_list("language__code", flat=True)
-        )
+        codes = set(component.translation_set.values_list("language__code", flat=True))
         self.assertLessEqual({"en", "ru"}, codes)
 
         unit = component.translation_set.get(language__code="en").unit_set.get(
@@ -787,8 +784,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
                 "Book.xlsx",
                 buffer.getvalue(),
                 content_type=(
-                    "application/vnd.openxmlformats-officedocument."
-                    "spreadsheetml.sheet"
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 ),
             )
         )

@@ -57,9 +57,7 @@ def test_numeric_only_column_is_demoted_with_a_note():
 
     codes = [lang["code"] for lang in document["languages"]]
     assert codes == ["ru"]
-    assert any(
-        "holds only numbers" in note and "language en" in note for note in notes
-    )
+    assert any("holds only numbers" in note and "language en" in note for note in notes)
 
 
 def test_empty_column_is_demoted_with_a_note():
@@ -81,13 +79,9 @@ def test_underfilled_column_is_demoted_with_a_note():
     data_rows[0][2] = "Hallo"  # 1 of 4 rows filled: 25% share
     rows = [header, *data_rows]
 
-    document, notes = infer_component(
-        "Sheet1", rows, component="Test", min_fill=50.0
-    )
+    document, notes = infer_component("Sheet1", rows, component="Test", min_fill=50.0)
 
-    assert any(
-        "under the 50% threshold" in note and "-> de" in note for note in notes
-    )
+    assert any("under the 50% threshold" in note and "-> de" in note for note in notes)
 
 
 def test_caption_row_becomes_an_explicit_skip_rows_entry():
@@ -142,9 +136,7 @@ def test_keyless_header_promotes_column_zero_to_a_language():
     assert codes == ["ru", "en", "ja"]
     assert document["key"] == {"column": 1, "header": "ru"}
     assert document["source_lang"] == "ru"
-    assert any(
-        "is both the PO key and a language column" in note for note in notes
-    )
+    assert any("is both the PO key and a language column" in note for note in notes)
 
 
 def test_denylisted_id_header_is_not_promoted_even_with_nonnumeric_data():
@@ -159,6 +151,4 @@ def test_denylisted_id_header_is_not_promoted_even_with_nonnumeric_data():
     assert "id" not in codes
     assert codes == ["ru", "en"]
     assert document["key"] == {"column": 1, "header": "id"}
-    assert not any(
-        "is both the PO key and a language column" in note for note in notes
-    )
+    assert not any("is both the PO key and a language column" in note for note in notes)

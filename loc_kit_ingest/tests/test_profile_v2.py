@@ -227,9 +227,7 @@ def test_v2_rejects_the_v1_pairs_grammar():
     document["components"][0]["grammar"] = {
         "type": "term-description-pairs",
         "skip_rows": [],
-        "regions": [
-            {"section_row": 2, "first_term_row": 3, "last_description_row": 4}
-        ],
+        "regions": [{"section_row": 2, "first_term_row": 3, "last_description_row": 4}],
     }
     with pytest.raises(ProfileError, match="profile.grammar_mismatch"):
         parse_profile(document)

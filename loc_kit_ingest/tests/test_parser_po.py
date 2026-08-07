@@ -11,7 +11,6 @@ import pytest
 from loc_kit_ingest.parser import parse_component
 from loc_kit_ingest.profile import load_profile
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -95,8 +94,6 @@ def test_short_row_is_error(temple_component, temple_rows):
 
 def test_unexpected_nonblank_unkeyed_row_is_error(temple_component):
     """Without allow_blank_rows, a blank row is an error."""
-    from loc_kit_ingest.profile import KeyedGrammar
-
     # Replace grammar with one that disallows blanks
     component = _rebuild_component(temple_component, allow_blank_rows=False)
     rows = [
@@ -154,7 +151,7 @@ def test_target_equals_source_is_warning(temple_component):
 
 
 def test_cyrillic_majority_english_is_warning(temple_component):
-    """en column with mostly Cyrillic gets a warning."""
+    """En column with mostly Cyrillic gets a warning."""
     rows = [
         ["id", "Character", "ru", "en", "Id"],
         ["id-ignore", "label", "label", "label", "label"],
@@ -167,12 +164,18 @@ def test_cyrillic_majority_english_is_warning(temple_component):
 
 
 def test_latin_majority_russian_is_warning(temple_component):
-    """ru column with mostly Latin gets a warning."""
+    """Ru column with mostly Latin gets a warning."""
     rows = [
         ["id", "Character", "ru", "en", "Id"],
         ["id-ignore", "label", "label", "label", "label"],
         ["", "", "", "", ""],
-        ["k1", "Character: Sample", "this is mostly latin text", "mostly latin text", "42"],
+        [
+            "k1",
+            "Character: Sample",
+            "this is mostly latin text",
+            "mostly latin text",
+            "42",
+        ],
     ]
     result = parse_component(temple_component, rows)
     warnings = [d for d in result.diagnostics if d.severity.name == "WARNING"]

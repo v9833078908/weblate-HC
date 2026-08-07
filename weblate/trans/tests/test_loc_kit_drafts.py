@@ -2,7 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for the temporary LocKitImportDraft model and its cleanup task.
+"""
+Tests for the temporary LocKitImportDraft model and its cleanup task.
 
 Run via: ./rundev.sh test weblate/trans/tests/test_loc_kit_drafts.py
 """
@@ -237,9 +238,7 @@ class LocKitDraftCleanupTest(ViewTestCase):
         cleanup_loc_kit_drafts()
         cleanup_loc_kit_drafts()
         self.assertFalse(
-            LocKitImportDraft.objects.filter(
-                expires_at__lt=timezone.now()
-            ).exists()
+            LocKitImportDraft.objects.filter(expires_at__lt=timezone.now()).exists()
         )
 
     def test_cleanup_no_op_when_empty(self) -> None:

@@ -30,7 +30,8 @@ def terms_component(tmp_path):
 
 @pytest.fixture
 def terms_rows():
-    """Rows matching the terms fixture CSV.
+    """
+    Rows matching the terms fixture CSV.
 
     Row layout (1-based):
       1: header: ru,en,ja
@@ -85,9 +86,7 @@ def test_second_region_parsed(terms_component, terms_rows):
     assert term.term_row == 9 and term.note_rows == (10,)
 
 
-def test_orphan_pair_and_uncovered_nonblank_row_are_errors(
-    terms_component, terms_rows
-):
+def test_orphan_pair_and_uncovered_nonblank_row_are_errors(terms_component, terms_rows):
     # Wipe the term row for the second pair in region 1.
     # The description still has data -> orphan_description.
     terms_rows[5] = [""]  # wipe term row 6 (0-based 5)
@@ -170,8 +169,9 @@ def test_preserves_internal_newlines_and_markup(terms_component):
         ["опи\nсание", "descrip\ntion", "説明"],
     ]
     # Adjust component to match this 2-row region
-    from loc_kit_ingest.profile import PairRegion, PairsGrammar
     from dataclasses import replace
+
+    from loc_kit_ingest.profile import PairRegion, PairsGrammar
 
     component = replace(
         terms_component,
@@ -237,9 +237,7 @@ def test_record_map_parses_one_row_records(record_map_component, record_map_rows
     assert first.term_row == 3
 
 
-def test_record_map_allows_records_without_notes(
-    record_map_component, record_map_rows
-):
+def test_record_map_allows_records_without_notes(record_map_component, record_map_rows):
     result = parse_component(record_map_component, record_map_rows)
     settings_term = next(u for u in result.units if u.values["en"] == "Settings")
     assert settings_term.source_explanation == ""
@@ -270,17 +268,13 @@ def test_record_map_unmapped_populated_cell_is_error(
     assert any(d.code == "tbx.unmapped_cell" for d in result.diagnostics)
 
 
-def test_record_map_missing_source_term_is_error(
-    record_map_component, record_map_rows
-):
+def test_record_map_missing_source_term_is_error(record_map_component, record_map_rows):
     record_map_rows[2][1] = ""
     result = parse_component(record_map_component, record_map_rows)
     assert any(d.code == "tbx.missing_term" for d in result.diagnostics)
 
 
-def test_record_map_missing_target_term_is_error(
-    record_map_component, record_map_rows
-):
+def test_record_map_missing_target_term_is_error(record_map_component, record_map_rows):
     record_map_rows[2][2] = ""
     result = parse_component(record_map_component, record_map_rows)
     assert any(d.code == "tbx.missing_target_term" for d in result.diagnostics)
@@ -294,9 +288,7 @@ def test_record_map_outer_whitespace_in_note_is_error(
     assert any(d.code == "tbx.unsupported_outer_whitespace" for d in result.diagnostics)
 
 
-def test_record_map_duplicate_context_is_error(
-    record_map_component, record_map_rows
-):
+def test_record_map_duplicate_context_is_error(record_map_component, record_map_rows):
     record_map_rows[3][0] = "Персонажи"
     record_map_rows[3][1] = "Герой"
     result = parse_component(record_map_component, record_map_rows)

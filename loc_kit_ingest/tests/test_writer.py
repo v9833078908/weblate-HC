@@ -7,14 +7,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from translate.storage.pypo import pofile
 from translate.storage.tbx import tbxfile
 
 from loc_kit_ingest.model import GlossaryTerm, StringUnit
 from loc_kit_ingest.profile import load_profile
 from loc_kit_ingest.writer import render_component, validate_rendered_component
-
 
 # ---------------------------------------------------------------------------
 # Fixtures: build in-memory parsed components
@@ -24,8 +22,6 @@ from loc_kit_ingest.writer import render_component, validate_rendered_component
 @pytest.fixture
 def po_component(tmp_path):
     """A ComponentProfile + ParseResult-like units for a PO component."""
-    from dataclasses import replace
-
     profile_path = Path(__file__).parent / "fixtures" / "temple.loc-ingest.json"
     profile = load_profile(profile_path)
     comp = profile.components[0]

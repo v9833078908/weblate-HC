@@ -24,7 +24,7 @@ from django.utils.decorators import method_decorator
 from django.utils.functional import cached_property
 from django.utils.http import urlencode
 from django.utils.translation import gettext
-from django.views.generic.base import TemplateView
+from django.views.generic.base import TemplateView, View
 from django.views.generic.edit import CreateView
 
 from weblate.lang.models import Language
@@ -44,6 +44,11 @@ from weblate.trans.forms import (
     ProjectImportCreateForm,
     ProjectImportForm,
 )
+from weblate.trans.inherited_settings import (
+    INHERITABLE_COMPONENT_FLAGS,
+    INHERITABLE_COMPONENT_SETTINGS,
+    get_inherit_field_name,
+)
 from weblate.trans.loc_kit import (
     GlossaryProfileError,
     ProfileProposalError,
@@ -52,11 +57,6 @@ from weblate.trans.loc_kit import (
     profile_document_from_envelope,
     request_profile_proposal,
     validate_glossary_profile,
-)
-from weblate.trans.inherited_settings import (
-    INHERITABLE_COMPONENT_FLAGS,
-    INHERITABLE_COMPONENT_SETTINGS,
-    get_inherit_field_name,
 )
 from weblate.trans.models import Category, Component, Project
 from weblate.trans.models.loc_kit import LocKitImportDraft
@@ -680,10 +680,11 @@ class CreateFromZip(CreateComponent):
 
         if not self.request.session.session_key:
             self.request.session.create()
+        session_key = self.request.session.session_key or ""
 
         draft = LocKitImportDraft(
             owner=self.request.user,
-            session_key=self.request.session.session_key,
+            session_key=session_key,
             project=form.cleaned_data["project"],
             category=form.cleaned_data.get("category"),
             slug=form.cleaned_data["slug"],
@@ -977,13 +978,12 @@ class CreateComponentSelection(CreateComponent):
         return super().post(request, *args, **kwargs)
 
 
-
 # --------------------------------------------------------------------------- #
 # Loc-kit glossary intake: sheet selection, preview, confirmation
 # --------------------------------------------------------------------------- #
 
 
-class LocKitDraftMixin:
+class LocKitDraftMixin(View):
     """
     Resolve a temporary glossary draft, or 404.
 
@@ -993,8 +993,6 @@ class LocKitDraftMixin:
     the draft unavailable exactly like an expired one - it must not expose
     staged files, trigger analysis, or create a component.
     """
-
-    request: AuthenticatedHttpRequest
 
     def get_draft(self, token: str) -> LocKitImportDraft:
         draft = LocKitImportDraft.get_active(
@@ -1082,9 +1080,7 @@ def _analyze_draft_sheet(draft: LocKitImportDraft, rows: list) -> str | None:
     error page.
     """
     if not settings.LOC_KIT_PROFILE_ANALYSIS_ENABLED:
-        return gettext(
-            "Automatic analysis is disabled. Upload a profile to continue."
-        )
+        return gettext("Automatic analysis is disabled. Upload a profile to continue.")
     try:
         sample = build_glossary_structure_sample(
             rows, draft.sheet, settings.LOC_KIT_PROFILE_SAMPLE_MAX_BYTES
@@ -1154,7 +1150,9 @@ class LocKitGlossaryPreviewView(LocKitDraftMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         draft = self.get_draft(self.kwargs["token"])
         context["draft"] = draft
-        context["preview"] = json.loads(draft.preview_json) if draft.preview_json else None
+        context["preview"] = (
+            json.loads(draft.preview_json) if draft.preview_json else None
+        )
         context["profile_form"] = kwargs.get("profile_form") or (
             LocKitProfileCorrectionForm()
         )
@@ -1234,7 +1232,9 @@ class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
     exposes still applies. Only the conversion-derived fields are frozen.
     """
 
-    form_class = ComponentCreateForm
+    # mypy: the base declares type[ComponentProjectForm]; the final glossary
+    # form is the ordinary component form, exactly as stage="create" implies.
+    form_class = ComponentCreateForm  # type: ignore[assignment]
     origin = "zip"
     stage = "create"
 

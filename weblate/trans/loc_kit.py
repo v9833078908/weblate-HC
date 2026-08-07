@@ -2,7 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Loc-kit glossary structural sampling and OpenRouter profile proposal.
+"""
+Loc-kit glossary structural sampling and OpenRouter profile proposal.
 
 This module lives in Weblate (not in the standalone ``loc_kit_ingest``
 package): it owns the optional, site-wide OpenRouter profile suggestion,
@@ -19,14 +20,18 @@ import tempfile
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from django.conf import settings
 from django.utils.translation import gettext as _
+
 from weblate.utils.requests import fetch_validated_url
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from loc_kit_ingest.model import Diagnostic
+
 
 # Fixed OpenRouter chat-completions endpoint. Not configurable, never derived
 # from settings or user input.
@@ -54,8 +59,9 @@ class SampleTooLargeError(Exception):
     """Raised when the structural sample cannot fit within ``max_bytes``."""
 
 
-def _load_profile_prompt() -> str:
-    """Load the static OpenRouter profile instruction text.
+def load_profile_prompt() -> str:
+    """
+    Load the static OpenRouter profile instruction text.
 
     The prompt is a packaged asset; this avoids duplicating instruction text in
     Python and lets tests assert against the loaded file rather than a copy.
@@ -68,7 +74,8 @@ def _load_profile_prompt() -> str:
 
 
 def _row_signature(row: Sequence[str]) -> tuple[tuple[int, int], ...]:
-    """Return the structural signature of a row.
+    """
+    Return the structural signature of a row.
 
     The signature is the sorted list of ``(column_index, value_length)`` pairs
     for every nonempty cell. It captures row shape (which columns are filled)
@@ -79,39 +86,57 @@ def _row_signature(row: Sequence[str]) -> tuple[tuple[int, int], ...]:
         if cell is None:
             continue
         text = str(cell)
-        if text == "":
+        if not text:
             continue
         signature.append((index, len(text)))
     return tuple(signature)
 
 
+class _SignatureRun(TypedDict):
+    """One contiguous run of rows sharing an identical structural signature."""
+
+    signature: list[list[int]]
+    first_row: int
+    last_row: int
+    count: int
+
+
+class _Representative(TypedDict):
+    """One row carried verbatim (with bounded excerpts) in the sample."""
+
+    row: int
+    cells: list[str]
+
+
 def _run_length_encode_signatures(
     signatures: Sequence[tuple[tuple[int, int], ...]],
-) -> list[dict[str, object]]:
-    """Run-length encode the per-row signature sequence.
+) -> list[_SignatureRun]:
+    """
+    Run-length encode the per-row signature sequence.
 
     Contiguous runs of an identical signature collapse to one entry with its
     inclusive ``first_row``/``last_row`` 0-based coordinates and ``count``.
     """
-    runs: list[dict[str, object]] = []
+    runs: list[_SignatureRun] = []
     for index, signature in enumerate(signatures):
-        if runs and runs[-1]["signature"] == list(signature):
+        if runs and runs[-1]["signature"] == [list(pair) for pair in signature]:
             runs[-1]["last_row"] = index
-            runs[-1]["count"] = int(runs[-1]["count"]) + 1  # type: ignore[arg-type]
+            runs[-1]["count"] += 1
         else:
             runs.append(
-                {
-                    "signature": list(signature),
-                    "first_row": index,
-                    "last_row": index,
-                    "count": 1,
-                }
+                _SignatureRun(
+                    signature=[list(pair) for pair in signature],
+                    first_row=index,
+                    last_row=index,
+                    count=1,
+                )
             )
     return runs
 
 
 def _looks_like_header(row: Sequence[str], max_index: int) -> bool:
-    """Heuristic: a row whose nonempty cells are all short and distinct.
+    """
+    Heuristic: a row whose nonempty cells are all short and distinct.
 
     Used to flag candidate header rows for the representative payload.
     """
@@ -120,7 +145,7 @@ def _looks_like_header(row: Sequence[str], max_index: int) -> bool:
         if cell is None:
             continue
         text = str(cell)
-        if text == "":
+        if not text:
             continue
         if len(text) > 32:
             return False
@@ -131,11 +156,12 @@ def _looks_like_header(row: Sequence[str], max_index: int) -> bool:
 
 
 def _looks_like_section(row: Sequence[str]) -> bool:
-    """Heuristic: a row with exactly one short, nonempty cell.
+    """
+    Heuristic: a row with exactly one short, nonempty cell.
 
     Such rows often act as section/domain captions above record blocks.
     """
-    nonempty = [str(cell) for cell in row if cell is not None and str(cell) != ""]
+    nonempty = [str(cell) for cell in row if cell is not None and str(cell)]
     if len(nonempty) != 1:
         return False
     return len(nonempty[0]) <= 64
@@ -148,12 +174,63 @@ def _excerpt(value: str) -> str:
     return value[:_CELL_EXCERPT_LIMIT] + _TRUNCATION_MARKER
 
 
+def _select_representative_rows(
+    *,
+    signatures: list[tuple[tuple[int, int], ...]],
+    signature_runs: list[_SignatureRun],
+    header_candidates: list[int],
+    section_candidates: list[int],
+    row_count: int,
+) -> list[int]:
+    """
+    Choose which rows carry verbatim cell excerpts, deterministically.
+
+    Priority order: the first and last row of every contiguous signature run,
+    then the first occurrence of each unique signature, then header and
+    section candidates, then evenly spaced remaining rows. Duplicates are
+    dropped while preserving first-seen order, so identical input always
+    yields an identical list.
+    """
+    selected: list[int] = []
+    selected_set: set[int] = set()
+
+    def add_row(index: int) -> None:
+        if 0 <= index < row_count and index not in selected_set:
+            selected.append(index)
+            selected_set.add(index)
+
+    for run in signature_runs:
+        add_row(run["first_row"])
+        add_row(run["last_row"])
+
+    seen: set[tuple[tuple[int, int], ...]] = set()
+    for index, signature in enumerate(signatures):
+        if signature not in seen:
+            seen.add(signature)
+            add_row(index)
+
+    for index in header_candidates:
+        add_row(index)
+    for index in section_candidates:
+        add_row(index)
+
+    if row_count:
+        remaining = [i for i in range(row_count) if i not in selected_set]
+        if remaining:
+            step = max(1, len(remaining) // 32)
+            for position in range(0, len(remaining), step):
+                add_row(remaining[position])
+
+    return selected
+
+
 def build_glossary_structure_sample(
     rows: Sequence[Sequence[str]],
     sheet_name: str,
     max_bytes: int,
 ) -> dict[str, object]:
-    """Build a bounded, deterministic structural sample of a sheet.
+    """
+    Build a bounded, deterministic structural sample of a sheet.
 
     The sample contains:
 
@@ -216,54 +293,19 @@ def build_glossary_structure_sample(
         msg = SAMPLE_TOO_LARGE
         raise SampleTooLargeError(msg)
 
-    # Deterministic representative selection, in priority order. Duplicates are
-    # removed while preserving first-seen order.
-    unique_signatures: list[tuple[tuple[int, int], ...]] = []
-    seen: set[tuple[tuple[int, int], ...]] = set()
-    for signature in signatures:
-        if signature not in seen:
-            seen.add(signature)
-            unique_signatures.append(signature)
-
-    selected: list[int] = []
-    selected_set: set[int] = set()
-
-    def add_row(index: int) -> None:
-        if 0 <= index < row_count and index not in selected_set:
-            selected.append(index)
-            selected_set.add(index)
-
-    # First and last row of each contiguous signature run.
-    for run in signature_runs:
-        add_row(int(run["first_row"]))  # type: ignore[arg-type]
-        add_row(int(run["last_row"]))  # type: ignore[arg-type]
-    # Every unique signature's first occurrence.
-    for signature in unique_signatures:
-        for index, row_signature in enumerate(signatures):
-            if row_signature == signature:
-                add_row(index)
-                break
-    # Candidate header rows.
-    for index in header_candidates:
-        add_row(index)
-    # Section-like rows.
-    for index in section_candidates:
-        add_row(index)
-    # Evenly spaced remaining rows while capacity allows.
-    if row_count:
-        remaining = [i for i in range(row_count) if i not in selected_set]
-        if remaining:
-            # Spread a modest number of probes across the remaining range.
-            probe_count = min(len(remaining), 50)
-            for step in range(probe_count):
-                position = int(step * len(remaining) / probe_count)
-                add_row(remaining[position])
+    selected = _select_representative_rows(
+        signatures=signatures,
+        signature_runs=signature_runs,
+        header_candidates=header_candidates,
+        section_candidates=section_candidates,
+        row_count=row_count,
+    )
 
     # Greedily add representatives until the encoded sample approaches the cap.
     # We always re-encode to measure exact UTF-8 byte length.
     omitted_rows = 0
     omitted_cells = 0
-    representatives: list[dict[str, object]] = []
+    representatives: list[_Representative] = []
 
     def encode_sample() -> bytes:
         payload = {
@@ -279,12 +321,10 @@ def build_glossary_structure_sample(
 
     for index in selected:
         row = rows[index]
-        excerpt_cells = [_excerpt(str(cell)) if cell is not None else "" for cell in row]
-        candidate = {
-            "row": index,
-            "cells": excerpt_cells,
-        }
-        representatives.append(candidate)
+        excerpt_cells = [
+            _excerpt(str(cell)) if cell is not None else "" for cell in row
+        ]
+        representatives.append(_Representative(row=index, cells=excerpt_cells))
         if len(encode_sample()) > max_bytes:
             # This representative does not fit; drop it and stop adding more.
             # Its signature is still fully present in signature_runs.
@@ -293,14 +333,12 @@ def build_glossary_structure_sample(
 
     # Rows without a verbatim representative are represented solely by their
     # structural signature. Tally them and their omitted cells (informational).
-    represented_rows = {int(r["row"]) for r in representatives}  # type: ignore[arg-type]
+    represented_rows = {r["row"] for r in representatives}
     omitted_rows = row_count - len(represented_rows)
     for index, row in enumerate(rows):
         if index in represented_rows:
             continue
-        omitted_cells += sum(
-            1 for cell in row if cell is not None and str(cell) != ""
-        )
+        omitted_cells += sum(1 for cell in row if cell is not None and str(cell))
 
     encoded = encode_sample()
     if len(encoded) > max_bytes:
@@ -353,7 +391,8 @@ def _short_circuit_failure(reason: str) -> ProfileProposalError:
 
 
 def request_profile_proposal(sample: dict[str, object]) -> dict[str, object]:
-    """Request a loc-kit glossary profile proposal from OpenRouter.
+    """
+    Request a loc-kit glossary profile proposal from OpenRouter.
 
     Refuses without any network call when the feature is disabled or the
     site-wide key/model is absent. On success returns the validated response
@@ -376,11 +415,11 @@ def request_profile_proposal(sample: dict[str, object]) -> dict[str, object]:
         )
 
     try:
-        prompt = _load_profile_prompt()
-    except Exception:  # noqa: BLE001 - packaged asset load failure
+        prompt = load_profile_prompt()
+    except Exception as error:
         raise _short_circuit_failure(
             _("Loc-kit profile analysis prompt could not be loaded.")
-        )
+        ) from error
 
     payload = {
         "model": settings.LOC_KIT_PROFILE_OPENROUTER_MODEL,
@@ -415,10 +454,10 @@ def request_profile_proposal(sample: dict[str, object]) -> dict[str, object]:
             timeout=OPENROUTER_REQUEST_TIMEOUT,
             raise_for_status=False,
         )
-    except Exception:  # noqa: BLE001 - any outbound failure is recoverable
+    except Exception as error:
         raise _short_circuit_failure(
             _("Loc-kit profile analysis request failed.")
-        )
+        ) from error
 
     if response.status_code >= 400:
         raise _short_circuit_failure(
@@ -428,10 +467,10 @@ def request_profile_proposal(sample: dict[str, object]) -> dict[str, object]:
 
     try:
         envelope_raw = response.json()
-    except Exception:  # noqa: BLE001 - malformed JSON is recoverable
+    except Exception as error:
         raise _short_circuit_failure(
             _("Loc-kit profile analysis returned an unreadable response.")
-        )
+        ) from error
 
     content = _extract_message_content(envelope_raw)
     if content is None:
@@ -441,17 +480,17 @@ def request_profile_proposal(sample: dict[str, object]) -> dict[str, object]:
 
     try:
         envelope = json.loads(content)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as error:
         raise _short_circuit_failure(
             _("Loc-kit profile analysis returned an unreadable response.")
-        )
+        ) from error
 
     try:
         _validate_envelope(envelope)
-    except _EnvelopeValidationError:
+    except _EnvelopeValidationError as error:
         raise _short_circuit_failure(
             _("Loc-kit profile analysis returned an unusable response.")
-        )
+        ) from error
 
     return envelope
 
@@ -480,7 +519,8 @@ def _extract_message_content(envelope_raw: object) -> str | None:
 
 
 def _validate_envelope(envelope: object) -> None:
-    """Validate the parsed response envelope shape per the contract.
+    """
+    Validate the parsed response envelope shape per the contract.
 
     Requires ``status``/``profile``/``assumptions``/``reason`` to be present.
     ``profile`` must be null iff ``status == "unsupported"``, in which case
@@ -495,14 +535,14 @@ def _validate_envelope(envelope: object) -> None:
     profile = envelope["profile"]
     assumptions = envelope["assumptions"]
     reason = envelope["reason"]
-    if status not in ("profile", "unsupported"):
+    if status not in {"profile", "unsupported"}:
         raise _EnvelopeValidationError
     if not isinstance(assumptions, list):
         raise _EnvelopeValidationError
     if status == "unsupported":
         if profile is not None:
             raise _EnvelopeValidationError
-        if not isinstance(reason, str) or reason == "":
+        if not isinstance(reason, str) or not reason:
             raise _EnvelopeValidationError
     else:
         if profile is None:
@@ -597,7 +637,7 @@ def _canonical_profile_json(document: dict[str, object]) -> str:
     return json.dumps(document, ensure_ascii=False, indent=2) + "\n"
 
 
-def _format_diagnostics(diagnostics: Sequence[object]) -> list[str]:
+def _format_diagnostics(diagnostics: Sequence[Diagnostic]) -> list[str]:
     return [
         _("Row %(row)d: %(message)s")
         % {"row": diagnostic.row, "message": diagnostic.message}
@@ -626,7 +666,7 @@ def validate_glossary_profile(
     upload never names a component.
     """
     # ruff: ignore[import-outside-top-level]
-    from loc_kit_ingest.model import Severity
+    from loc_kit_ingest.model import GlossaryTerm, Severity
 
     # ruff: ignore[import-outside-top-level]
     from loc_kit_ingest.parser import parse_component
@@ -675,9 +715,7 @@ def validate_glossary_profile(
     try:
         profile = parse_profile(document)
     except ProfileError as error:
-        raise GlossaryProfileError(
-            _("The profile is not valid: %s") % error
-        ) from error
+        raise GlossaryProfileError(_("The profile is not valid: %s") % error) from error
 
     component = profile.components[0]
     sheet_rows = [list(row) for row in rows]
@@ -710,10 +748,13 @@ def validate_glossary_profile(
         tbx_dir = staging / component.component / "tbx"
         files = {path.name: path.read_bytes() for path in sorted(tbx_dir.glob("*.tbx"))}
 
+    # parse_component returns a ParsedUnit protocol; a tbx component always
+    # yields GlossaryTerm, so narrow once for both the tally and the preview.
+    glossary_terms = [u for u in result.units if isinstance(u, GlossaryTerm)]
     note_count = sum(
         bool(unit.source_explanation)
         + sum(1 for value in unit.target_explanations.values() if value)
-        for unit in result.units
+        for unit in glossary_terms
     )
     terms = tuple(
         GlossaryTermPreview(
@@ -726,7 +767,7 @@ def validate_glossary_profile(
             source_explanation=unit.source_explanation,
             target_explanations=dict(unit.target_explanations),
         )
-        for unit in result.units[:PREVIEW_TERM_LIMIT]
+        for unit in glossary_terms[:PREVIEW_TERM_LIMIT]
     )
 
     return GlossaryPreview(
@@ -760,6 +801,7 @@ __all__ = [
     "ProfileProposalError",
     "SampleTooLargeError",
     "build_glossary_structure_sample",
+    "load_profile_prompt",
     "profile_document_from_envelope",
     "request_profile_proposal",
     "validate_glossary_profile",

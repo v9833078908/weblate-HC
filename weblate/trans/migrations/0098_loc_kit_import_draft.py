@@ -1,9 +1,14 @@
+# Copyright © Michal Čihař <michal@weblate.org>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 import uuid
 
 import django.db.models.deletion
-import weblate.trans.models.loc_kit
 from django.conf import settings
 from django.db import migrations, models
+
+import weblate.trans.models.loc_kit
 
 
 class Migration(migrations.Migration):

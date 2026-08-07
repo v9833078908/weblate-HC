@@ -8,19 +8,44 @@
       "source_lang": "ru",
       "header_row": 2,
       "languages": [
-        {"code": "ru", "xml_lang": "ru", "column": 2, "header": "ru"},
-        {"code": "en", "xml_lang": "en", "column": 3, "header": "en"}
+        {
+          "code": "ru",
+          "xml_lang": "ru",
+          "column": 2,
+          "header": "ru"
+        },
+        {
+          "code": "en",
+          "xml_lang": "en",
+          "column": 3,
+          "header": "en"
+        }
       ],
       "grammar": {
         "type": "record-map",
-        "skip_rows": [1],
+        "skip_rows": [
+          1
+        ],
         "regions": [
-          {"first_record_row": 3, "last_record_row": 8, "record_stride": 1}
+          {
+            "first_record_row": 3,
+            "last_record_row": 8,
+            "record_stride": 1
+          }
         ],
         "term_row_offset": 0,
-        "section_field": {"column": 1, "header": "domain", "row_offset": 0},
+        "section_field": {
+          "column": 1,
+          "header": "domain",
+          "row_offset": 0
+        },
         "notes": [
-          {"scope": "source", "column": 4, "header": "note_ru", "row_offset": 0},
+          {
+            "scope": "source",
+            "column": 4,
+            "header": "note_ru",
+            "row_offset": 0
+          },
           {
             "scope": "target",
             "language": "en",
@@ -30,7 +55,9 @@
           }
         ]
       },
-      "initial_target_languages": ["en"]
+      "initial_target_languages": [
+        "en"
+      ]
     }
   ]
 }

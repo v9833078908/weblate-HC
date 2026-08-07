@@ -37,7 +37,9 @@ class LocKitSettingsDefaultsTest(SimpleTestCase):
         self.assertFalse(trans_defaults.DEFAULT_LOC_KIT_PROFILE_ANALYSIS_ENABLED)
         self.assertEqual(trans_defaults.DEFAULT_LOC_KIT_PROFILE_OPENROUTER_KEY, "")
         self.assertEqual(trans_defaults.DEFAULT_LOC_KIT_PROFILE_OPENROUTER_MODEL, "")
-        self.assertEqual(trans_defaults.DEFAULT_LOC_KIT_PROFILE_SAMPLE_MAX_BYTES, 131072)
+        self.assertEqual(
+            trans_defaults.DEFAULT_LOC_KIT_PROFILE_SAMPLE_MAX_BYTES, 131072
+        )
         self.assertEqual(trans_defaults.DEFAULT_LOC_KIT_IMPORT_DRAFT_EXPIRY, 3600)
 
     def test_override_settings_can_enable(self) -> None:
@@ -79,6 +81,6 @@ class LocKitClampTest(SimpleTestCase):
         # Robustness: env parsing always yields an int, but the helper must
         # not crash on a non-int coercible value.
         self.assertEqual(
-            trans_defaults.clamp_loc_kit_sample_max_bytes(int("200000")),  # noqa: FURB123
+            trans_defaults.clamp_loc_kit_sample_max_bytes(int("200000")),
             131072,
         )

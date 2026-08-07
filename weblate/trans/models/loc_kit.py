@@ -25,7 +25,8 @@ LOC_KIT_DRAFT_EXPIRY_CAP = 3600
 
 
 class LocKitImportDraft(models.Model):
-    """Session- and owner-bound temporary glossary upload draft.
+    """
+    Session- and owner-bound temporary glossary upload draft.
 
     Holds an uploaded CSV/TSV/XLSX workbook and the validated profile/preview
     metadata produced by the glossary analysis workflow. Drafts are explicitly
@@ -85,7 +86,9 @@ class LocKitImportDraft(models.Model):
     def save(self, *args, **kwargs) -> None:
         if not self.expires_at:
             expiry = int(
-                getattr(settings, "LOC_KIT_IMPORT_DRAFT_EXPIRY", LOC_KIT_DRAFT_EXPIRY_CAP)
+                getattr(
+                    settings, "LOC_KIT_IMPORT_DRAFT_EXPIRY", LOC_KIT_DRAFT_EXPIRY_CAP
+                )
             )
             self.expires_at = timezone.now() + timedelta(
                 seconds=min(expiry, LOC_KIT_DRAFT_EXPIRY_CAP)
@@ -98,13 +101,16 @@ class LocKitImportDraft(models.Model):
 
     def delete_storage(self) -> None:
         """Delete the uploaded file from storage; safe to call more than once."""
-        if self.uploaded:
+        if self.uploaded and self.uploaded.name:
             self.uploaded.storage.delete(self.uploaded.name)
 
     @classmethod
     def get_active(cls, *, token, owner, session_key):
-        """Return the draft for ``token`` iff it belongs to ``owner``, was
-        created under ``session_key``, is not expired, and is not yet consumed.
+        """
+        Return the draft for ``token`` if it is available to this caller.
+
+        Available means it belongs to ``owner``, was created under
+        ``session_key``, is not expired, and is not yet consumed.
 
         Returns ``None`` for every other case (wrong owner, wrong session,
         expired, consumed, or nonexistent token). Callers must treat all of

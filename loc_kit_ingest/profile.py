@@ -476,7 +476,9 @@ def _parse_section_field(obj: dict[str, Any]) -> SectionField:
     row_offset = _require_int(obj, "row_offset", label="section_field", min_val=0)
     if not isinstance(header, str) or not header:
         msg = "profile.invalid_header"
-        raise _err(msg, f"section_field header must be a non-empty string, got {header!r}")
+        raise _err(
+            msg, f"section_field header must be a non-empty string, got {header!r}"
+        )
     return SectionField(column=column - 1, header=header, row_offset=row_offset)
 
 
@@ -500,14 +502,13 @@ def _parse_note_field(
         if language is not None:
             msg = "profile.unexpected_note_language"
             raise _err(msg, "a source note must not declare 'language'")
-    else:
-        if not isinstance(language, str) or language not in target_languages:
-            msg = "profile.unknown_note_language"
-            raise _err(
-                msg,
-                f"target note language {language!r} is not an initial target "
-                f"language {target_languages}",
-            )
+    elif not isinstance(language, str) or language not in target_languages:
+        msg = "profile.unknown_note_language"
+        raise _err(
+            msg,
+            f"target note language {language!r} is not an initial target "
+            f"language {target_languages}",
+        )
 
     return NoteField(
         scope=scope,

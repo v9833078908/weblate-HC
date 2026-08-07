@@ -192,7 +192,7 @@ def infer_component(
         key_is_language = bool(
             any(v.strip() for v in key_column_values)
         ) and not _is_numeric(key_column_values)
-    if key_is_language:
+    if key_is_language and key_language_code is not None:
         candidates = {_KEY_COLUMN: key_language_code, **candidates}
 
     languages: dict[int, str] = {}

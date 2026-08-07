@@ -16,8 +16,7 @@ from loc_kit_ingest.model import (
     SkippedRow,
     StringUnit,
 )
-
-from loc_kit_ingest.profile import PairsGrammar, RecordMapGrammar
+from loc_kit_ingest.profile import KeyedGrammar, PairsGrammar, RecordMapGrammar
 
 if TYPE_CHECKING:
     from loc_kit_ingest.profile import ComponentProfile
@@ -119,6 +118,7 @@ def parse_component(component: ComponentProfile, rows: list[list[str]]) -> Parse
 
 def _parse_keyed(component: ComponentProfile, rows: list[list[str]]) -> ParseResult:
     grammar = component.grammar
+    assert isinstance(grammar, KeyedGrammar)
     assert component.first_data_row is not None
     assert component.key is not None
 
@@ -602,7 +602,9 @@ def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
 # --------------------------------------------------------------------------- #
 
 
-def _parse_record_map(component: ComponentProfile, rows: list[list[str]]) -> ParseResult:
+def _parse_record_map(
+    component: ComponentProfile, rows: list[list[str]]
+) -> ParseResult:
     """
     Parse the generic record-map grammar for TBX components.
 
@@ -670,7 +672,9 @@ def _parse_record_map(component: ComponentProfile, rows: list[list[str]]) -> Par
             # columns. Those labels are metadata, never terms - but any other
             # populated cell on that row is unaccounted for.
             allowed = {region.section_column, *lang_columns.values()}
-            caption_row = rows[region.section_row] if region.section_row < len(rows) else []
+            caption_row = (
+                rows[region.section_row] if region.section_row < len(rows) else []
+            )
             for col, value in enumerate(caption_row):
                 if col not in allowed and not _is_blank(value):
                     err(
@@ -767,7 +771,11 @@ def _parse_record_map(component: ComponentProfile, rows: list[list[str]]) -> Par
 
             context = _context_key(section_text, source_term)
             if context in seen_contexts:
-                err("tbx.duplicate_context", term_1based, f"duplicate context {context!r}")
+                err(
+                    "tbx.duplicate_context",
+                    term_1based,
+                    f"duplicate context {context!r}",
+                )
             else:
                 seen_contexts.add(context)
 
