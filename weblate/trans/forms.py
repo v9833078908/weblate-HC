@@ -2971,8 +2971,10 @@ class ComponentZipCreateForm(ComponentProjectForm):
         help_text=gettext_lazy(
             "A ZIP archive is extracted as-is; filenames need locale codes. "
             "A table is converted automatically: the first column holds keys, "
-            "language columns are recognized by their header, and only populated "
-            "languages are imported."
+            "unless it is itself a recognized language column, in which case "
+            "it is imported as that language too; other language columns are "
+            "recognized by their header, and only populated languages are "
+            "imported."
         ),
         validators=[
             validate_component_zip_upload_size,

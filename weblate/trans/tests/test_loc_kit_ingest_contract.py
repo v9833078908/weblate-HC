@@ -28,7 +28,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase
 from django.test.utils import modify_settings
 from django.urls import reverse
-
+from translate.storage.pypo import pofile
 from weblate.formats.models import FILE_FORMATS
 from weblate.machinery.llm import BaseLLMTranslation
 from weblate.trans.models import Component
@@ -389,6 +389,39 @@ class LocKitUniversalUploadContractTest(ViewTestCase):
             sorted(path.name for path in repo.glob("*.po")),
             ["de.po", "en.po", "ja.po", "ko.po", "ru.po"],
         )
+        shutil.rmtree(fake.full_path, ignore_errors=True)
+
+    def test_keyless_kit_uses_source_term_as_key(self) -> None:
+        # No dedicated key column: the ru column is both the PO key and the
+        # source language. The "Use as glossary" checkbox does not exist at
+        # this call boundary, so it cannot influence this ordinary PO path.
+        keyless_csv = "ru,en,ja\nПривет,Hello,こんにちは\nПока,Bye,さようなら\n"
+        fake, info = create_component_from_kit(
+            self._kit_data("keyless"), self._upload("Dialogs.csv", keyless_csv)
+        )
+        self.assertEqual(info["source_lang"], "ru")
+        self.assertEqual(info["languages"], ["ru", "en", "ja"])
+        self.assertEqual(info["template"], "ru.po")
+        self.assertEqual(info["units"], 2)
+        self.assertTrue(
+            any(
+                "is both the PO key and a language column" in note
+                for note in info["notes"]
+            )
+        )
+
+        repo = Path(fake.full_path)
+        self.assertEqual(
+            sorted(path.name for path in repo.glob("*.po")),
+            ["en.po", "ja.po", "ru.po"],
+        )
+
+        ru_units = {u.getid(): u for u in pofile.parsefile(str(repo / "ru.po")).units}
+        en_units = {u.getid(): u for u in pofile.parsefile(str(repo / "en.po")).units}
+        self.assertEqual(ru_units["Привет"].target, "Привет")
+        self.assertEqual(en_units["Привет"].target, "Hello")
+        self.assertEqual(en_units["Пока"].target, "Bye")
+
         shutil.rmtree(fake.full_path, ignore_errors=True)
 
     def test_zip_upload_keeps_historical_behavior(self) -> None:
