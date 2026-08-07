@@ -18,6 +18,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -704,6 +705,35 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertEqual(draft.profile_json, "")
         page = self.client.get(response["Location"])
         self.assertContains(page, "Upload corrected profile")
+
+    def test_stage_templates_never_nest_a_form(self) -> None:
+        """
+        Crispy must not emit a form tag of its own.
+
+        Both stage templates supply their own <form> and submit button. When
+        the helper wraps another one the source stays balanced, so only a
+        real parser shows the damage: it closes the outer form at crispy's
+        </form> and every later control - including submit - lands outside
+        any form. The page renders normally and no click can post it.
+        """
+        self._start()
+        draft = self._draft()
+
+        pages = {
+            "sheet": self.client.get(
+                reverse("loc-kit-sheet-select", kwargs={"token": draft.token})
+            ),
+            "preview": self.client.get(
+                self._select_sheet(draft, "Glossary")["Location"]
+            ),
+        }
+        for stage, page in pages.items():
+            depth = 0
+            for tag in re.finditer(r"</?form\b", page.content.decode()):
+                depth += -1 if tag.group().startswith("</") else 1
+                self.assertLessEqual(
+                    depth, 1, f"{stage}: a form is nested inside another form"
+                )
 
     @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
     def test_sheet_selection_is_not_rate_limited_without_analysis(self) -> None:
