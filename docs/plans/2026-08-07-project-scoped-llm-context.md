@@ -1270,6 +1270,31 @@ done
 
 Append the counts and the decision to this plan file under a new "Measured coverage" heading, then commit. A future reader needs to know the decision was measured, not assumed.
 
+### Measured coverage
+
+Run on 2026-08-07 against the dev instance, all four projects.
+
+| Project | Terms | Source strings | Matches | Never matched | Candidates |
+|---|---|---|---|---|---|
+| space-arena | 300 | 4826 | 5037 | 1 (`nanoinjector`) | ~120 forms, 49 of them at 5 or more |
+| heart-abyss | 12 | 688 | 25 | 7 | 1 (`дзинково`, once) |
+| need-for-greed | 0 | - | - | - | no glossary terms |
+| pirate-ships | 0 | - | - | - | no glossary terms |
+
+**Decisions.**
+
+- **need-for-greed, pirate-ships** - nothing to measure, no glossary exists. Revisit if one is created.
+- **heart-abyss** - no action. The single candidate occurs once, far below the five-occurrence threshold. The seven never-matched terms are character names absent from the one imported chapter, which is expected, not a defect.
+- **space-arena** - a real and large loss, but it needs a maintainer's sign-off before ~50 entries are added to a live glossary, so this task stops at the measurement. The numbers are below.
+
+**What the space-arena candidates actually are.** They split into three kinds, and only the first is worth adding:
+
+1. *Plurals of existing terms* - `ships` 338, `modules` 233, `battles` 165, `blueprints` 59, `shields` 49, `pilots` 47, `commanders` 43, `lasers` 41, `missiles` 41, `engines` 34, `weapons` 30, `clans` 26, `chips` 21, `slots` 21, `members` 20, `reactors` 18, `systems` 18, `skins` 14, `events` 10. Every one of these is the same concept as its singular and currently reaches neither the sidebar nor the LLM prompt. These are the entries to add.
+2. *Derivations, not inflections* - `ranking` 59, `ranked` 33, `powerful` 29, `legendary` 14, `armored` 9, `hacking` 9, `massive` 9. Same stem, different part of speech. Adding them would tell a translator to render an adjective as a noun. Do not add.
+3. *False positives from very short terms* - `must` 28, `much` 6, `multi` 1 and `music` 1 all come from the Greek-letter term `mu`; `masse` comes from `mass`. The suffix heuristic has no lower bound on term length. Ignore these, and read any candidate for a term under four characters with suspicion.
+
+**Limitation found while running it.** The `--suffix` heuristic is length-blind: a two-character term generates noise at any threshold. The report is still usable because kind 3 is obvious on sight, but a future revision should skip terms shorter than about four characters, or scale the allowed suffix with term length. Not fixed here - it would be an unmeasured change to a tool whose whole point is measuring first.
+
 ---
 
 # Part D - Terminology flags
