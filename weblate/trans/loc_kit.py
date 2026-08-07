@@ -15,7 +15,10 @@ local validation is the responsibility of later orchestration (Task C4).
 from __future__ import annotations
 
 import json
+import tempfile
+from dataclasses import dataclass
 from importlib import resources
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from django.conf import settings
@@ -508,13 +511,256 @@ def _validate_envelope(envelope: object) -> None:
             raise _EnvelopeValidationError
 
 
+# --------------------------------------------------------------------------- #
+# Local candidate validation (never trusts the model)
+# --------------------------------------------------------------------------- #
+
+# How many terms the preview shows. The preview is a human sanity check, not a
+# data browser.
+PREVIEW_TERM_LIMIT = 10
+
+# Only the record-map schema may be created through this UI flow.
+GLOSSARY_SCHEMA_VERSION = 2
+
+
+class GlossaryProfileError(Exception):
+    """
+    A candidate profile did not survive local validation.
+
+    Always recoverable: the UI shows the message and offers a manual profile
+    upload. It never leads to a component.
+    """
+
+    def __init__(self, message: str, *, details: Sequence[str] = ()) -> None:
+        self.message = message
+        self.details = tuple(details)
+        super().__init__(message)
+
+
+@dataclass(frozen=True)
+class GlossaryTermPreview:
+    """One bounded row of the preview table."""
+
+    section: str
+    source: str
+    targets: dict[str, str]
+    source_explanation: str
+    target_explanations: dict[str, str]
+
+
+@dataclass(frozen=True)
+class GlossaryPreview:
+    """
+    The result of a fully validated candidate profile.
+
+    ``files`` holds the rendered TBX bytes. They belong to the draft
+    lifecycle: nothing is written to a repository until the operator
+    confirms creation.
+    """
+
+    sheet: str
+    component: str
+    source_language: str
+    target_languages: tuple[str, ...]
+    term_count: int
+    note_count: int
+    warnings: tuple[str, ...]
+    terms: tuple[GlossaryTermPreview, ...]
+    profile_json: str
+    files: dict[str, bytes]
+
+
+def profile_document_from_envelope(envelope: dict[str, object]) -> dict[str, object]:
+    """
+    Extract the candidate profile from a validated response envelope.
+
+    ``status: "unsupported"`` is a normal, expected answer: the model could
+    not read the layout. It is surfaced verbatim to the operator and never
+    treated as a profile.
+    """
+    status = envelope.get("status")
+    if status == "unsupported":
+        reason = envelope.get("reason")
+        raise GlossaryProfileError(
+            _("The analyzer could not map this sheet: %s") % reason
+        )
+    if status != "profile":
+        raise GlossaryProfileError(_("The analyzer returned an unusable answer."))
+    profile = envelope.get("profile")
+    if not isinstance(profile, dict):
+        raise GlossaryProfileError(_("The analyzer returned an unusable answer."))
+    return profile
+
+
+def _canonical_profile_json(document: dict[str, object]) -> str:
+    """Serialize a profile for download, preserving Unicode."""
+    return json.dumps(document, ensure_ascii=False, indent=2) + "\n"
+
+
+def _format_diagnostics(diagnostics: Sequence[object]) -> list[str]:
+    return [
+        _("Row %(row)d: %(message)s")
+        % {"row": diagnostic.row, "message": diagnostic.message}
+        for diagnostic in diagnostics
+    ]
+
+
+def validate_glossary_profile(
+    *,
+    profile_document: dict[str, object],
+    rows: Sequence[Sequence[str]],
+    sheet_name: str,
+    component_name: str,
+) -> GlossaryPreview:
+    """
+    Validate a candidate profile against the real sheet, locally.
+
+    This is the publication gate. Whether the candidate came from OpenRouter
+    or from an operator-uploaded correction, it goes through exactly the same
+    deterministic pipeline: profile schema, exact header match, full-sheet
+    parse, TBX render, and parse-back equality. Only a run with zero error
+    diagnostics produces a preview; anything else raises.
+
+    The candidate's own component name is discarded and replaced with
+    ``component_name``, which the server generates. A model or a corrected
+    upload never names a component.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.model import Severity
+
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.parser import parse_component
+
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.profile import ProfileError, parse_profile
+
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.reader import validate_sheet_headers
+
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.writer import render_component, validate_rendered_component
+
+    if not isinstance(profile_document, dict):
+        raise GlossaryProfileError(_("The profile must be a JSON object."))
+
+    if profile_document.get("schema_version") != GLOSSARY_SCHEMA_VERSION:
+        raise GlossaryProfileError(
+            _("A glossary import needs a schema_version %d profile.")
+            % GLOSSARY_SCHEMA_VERSION
+        )
+
+    components = profile_document.get("components")
+    if not isinstance(components, list) or len(components) != 1:
+        raise GlossaryProfileError(
+            _("One selected sheet creates exactly one glossary component.")
+        )
+
+    candidate = components[0]
+    if not isinstance(candidate, dict):
+        raise GlossaryProfileError(_("The profile component must be a JSON object."))
+    if candidate.get("kind") != "tbx":
+        raise GlossaryProfileError(_("A glossary component must be of kind 'tbx'."))
+    if candidate.get("sheet") != sheet_name:
+        raise GlossaryProfileError(
+            _("The profile describes sheet %(profile)s, but %(selected)s is selected.")
+            % {"profile": candidate.get("sheet"), "selected": sheet_name}
+        )
+
+    # The server owns the component name.
+    document = {
+        **profile_document,
+        "components": [{**candidate, "component": component_name}],
+    }
+
+    try:
+        profile = parse_profile(document)
+    except ProfileError as error:
+        raise GlossaryProfileError(
+            _("The profile is not valid: %s") % error
+        ) from error
+
+    component = profile.components[0]
+    sheet_rows = [list(row) for row in rows]
+
+    diagnostics = list(validate_sheet_headers(component, sheet_rows))
+    result = parse_component(component, sheet_rows)
+    diagnostics.extend(result.diagnostics)
+
+    errors = [d for d in diagnostics if d.severity is Severity.ERROR]
+    if errors:
+        raise GlossaryProfileError(
+            _("The sheet does not match the profile."),
+            details=_format_diagnostics(errors[:PREVIEW_TERM_LIMIT]),
+        )
+
+    # Render and parse back before the operator may confirm anything.
+    with tempfile.TemporaryDirectory() as tmpdir:
+        staging = Path(tmpdir)
+        render_component(component, result, staging)
+        render_errors = [
+            d
+            for d in validate_rendered_component(component, result, staging)
+            if d.severity is Severity.ERROR
+        ]
+        if render_errors:
+            raise GlossaryProfileError(
+                _("The generated glossary did not survive parse-back."),
+                details=_format_diagnostics(render_errors[:PREVIEW_TERM_LIMIT]),
+            )
+        tbx_dir = staging / component.component / "tbx"
+        files = {path.name: path.read_bytes() for path in sorted(tbx_dir.glob("*.tbx"))}
+
+    note_count = sum(
+        bool(unit.source_explanation)
+        + sum(1 for value in unit.target_explanations.values() if value)
+        for unit in result.units
+    )
+    terms = tuple(
+        GlossaryTermPreview(
+            section=unit.section,
+            source=unit.values.get(component.source_lang, ""),
+            targets={
+                code: unit.values.get(code, "")
+                for code in component.initial_target_languages
+            },
+            source_explanation=unit.source_explanation,
+            target_explanations=dict(unit.target_explanations),
+        )
+        for unit in result.units[:PREVIEW_TERM_LIMIT]
+    )
+
+    return GlossaryPreview(
+        sheet=component.sheet,
+        component=component.component,
+        source_language=component.source_lang,
+        target_languages=tuple(component.initial_target_languages),
+        term_count=len(result.units),
+        note_count=note_count,
+        warnings=tuple(
+            f"{d.code}: {d.message}"
+            for d in diagnostics
+            if d.severity is not Severity.ERROR
+        ),
+        terms=terms,
+        profile_json=_canonical_profile_json(document),
+        files=files,
+    )
+
+
 __all__ = [
+    "GLOSSARY_SCHEMA_VERSION",
     "OPENROUTER_API_ROOT",
     "OPENROUTER_CHAT_COMPLETIONS_URL",
     "OPENROUTER_REQUEST_TIMEOUT",
+    "PREVIEW_TERM_LIMIT",
     "SAMPLE_TOO_LARGE",
+    "GlossaryPreview",
+    "GlossaryProfileError",
+    "GlossaryTermPreview",
     "ProfileProposalError",
     "SampleTooLargeError",
     "build_glossary_structure_sample",
+    "profile_document_from_envelope",
     "request_profile_proposal",
+    "validate_glossary_profile",
 ]

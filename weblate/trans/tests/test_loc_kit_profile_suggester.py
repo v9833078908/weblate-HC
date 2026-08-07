@@ -483,3 +483,215 @@ class ProposalResponseHandlingTest(SimpleTestCase):
         )
         with self.assertRaises(loc_kit.ProfileProposalError):
             loc_kit.request_profile_proposal({"metadata": {"sheet": "Sheet1"}})
+
+
+# --------------------------------------------------------------------------- #
+# C4: local validation of a candidate profile
+# --------------------------------------------------------------------------- #
+
+
+def _record_map_rows() -> list[list[str]]:
+    return [
+        ["domain", "ru", "en", "note_ru", "note_en"],
+        ["Персонажи", "Герой", "Hero", "Главный протагонист", "Main protagonist"],
+        ["Оружие", "Меч", "Sword", "Ближний бой", "Melee weapon"],
+    ]
+
+
+def _record_map_document(**component_overrides) -> dict:
+    component = {
+        "sheet": "Glossary",
+        # A candidate always proposes some name; the server overrides it.
+        "component": "ModelChosenName",
+        "kind": "tbx",
+        "source_lang": "ru",
+        "header_row": 1,
+        "languages": [
+            {"code": "ru", "xml_lang": "ru", "column": 2, "header": "ru"},
+            {"code": "en", "xml_lang": "en", "column": 3, "header": "en"},
+        ],
+        "grammar": {
+            "type": "record-map",
+            "skip_rows": [],
+            "regions": [
+                {"first_record_row": 2, "last_record_row": 3, "record_stride": 1}
+            ],
+            "term_row_offset": 0,
+            "section_field": {"column": 1, "header": "domain", "row_offset": 0},
+            "notes": [
+                {"scope": "source", "column": 4, "header": "note_ru", "row_offset": 0},
+                {
+                    "scope": "target",
+                    "language": "en",
+                    "column": 5,
+                    "header": "note_en",
+                    "row_offset": 0,
+                },
+            ],
+        },
+        "initial_target_languages": ["en"],
+    }
+    component.update(component_overrides)
+    return {"schema_version": 2, "components": [component]}
+
+
+def _validate(document=None, rows=None, sheet="Glossary", name="Draft-Glossary"):
+    return loc_kit.validate_glossary_profile(
+        profile_document=document if document is not None else _record_map_document(),
+        rows=rows if rows is not None else _record_map_rows(),
+        sheet_name=sheet,
+        component_name=name,
+    )
+
+
+class LocKitGlossaryValidationTest(SimpleTestCase):
+    """A candidate profile is validated against the real sheet, locally."""
+
+    def test_valid_candidate_produces_a_preview(self) -> None:
+        preview = _validate()
+
+        self.assertEqual(preview.source_language, "ru")
+        self.assertEqual(preview.target_languages, ("en",))
+        self.assertEqual(preview.term_count, 2)
+        # Two source notes and two target notes across two records.
+        self.assertEqual(preview.note_count, 4)
+        self.assertEqual(preview.warnings, ())
+        self.assertEqual(sorted(preview.files), ["en.tbx"])
+        self.assertIn(b"Hero", preview.files["en.tbx"])
+
+    def test_preview_exposes_a_bounded_term_sample(self) -> None:
+        preview = _validate()
+        first = preview.terms[0]
+
+        self.assertEqual(first.section, "Персонажи")
+        self.assertEqual(first.source, "Герой")
+        self.assertEqual(first.targets, {"en": "Hero"})
+        self.assertEqual(first.source_explanation, "Главный протагонист")
+        self.assertEqual(first.target_explanations, {"en": "Main protagonist"})
+        self.assertLessEqual(len(preview.terms), loc_kit.PREVIEW_TERM_LIMIT)
+
+    def test_server_generated_component_name_replaces_the_candidate_name(self) -> None:
+        preview = _validate(name="Draft-Glossary")
+
+        self.assertEqual(preview.component, "Draft-Glossary")
+        self.assertNotIn("ModelChosenName", preview.profile_json)
+        self.assertIn("Draft-Glossary", preview.profile_json)
+
+    def test_downloadable_profile_round_trips(self) -> None:
+        """The preview's JSON is exactly what a correction upload accepts."""
+        preview = _validate()
+        reparsed = json.loads(preview.profile_json)
+        again = _validate(document=reparsed)
+
+        self.assertEqual(again.term_count, preview.term_count)
+        self.assertEqual(again.files, preview.files)
+
+    def test_llm_and_manual_paths_produce_identical_results(self) -> None:
+        document = _record_map_document()
+        envelope = {
+            "status": "profile",
+            "profile": document,
+            "assumptions": ["column 1 is the domain"],
+            "reason": None,
+        }
+        from_llm = _validate(
+            document=loc_kit.profile_document_from_envelope(envelope)
+        )
+        from_manual = _validate(document=document)
+
+        self.assertEqual(from_llm.profile_json, from_manual.profile_json)
+        self.assertEqual(from_llm.files, from_manual.files)
+        self.assertEqual(from_llm.term_count, from_manual.term_count)
+
+    def test_unsupported_envelope_surfaces_the_reason(self) -> None:
+        envelope = {
+            "status": "unsupported",
+            "profile": None,
+            "assumptions": [],
+            "reason": "the layout has no consistent record stride",
+        }
+        with self.assertRaises(loc_kit.GlossaryProfileError) as ctx:
+            loc_kit.profile_document_from_envelope(envelope)
+        self.assertIn("no consistent record stride", str(ctx.exception))
+
+    def test_profile_for_another_sheet_is_rejected(self) -> None:
+        with self.assertRaises(loc_kit.GlossaryProfileError) as ctx:
+            _validate(sheet="OtherSheet")
+        self.assertIn("selected", str(ctx.exception).lower())
+
+    def test_more_than_one_component_is_rejected(self) -> None:
+        document = _record_map_document()
+        document["components"].append(dict(document["components"][0]))
+        with self.assertRaises(loc_kit.GlossaryProfileError):
+            _validate(document=document)
+
+    def test_v1_schema_is_rejected_for_this_flow(self) -> None:
+        document = _record_map_document()
+        document["schema_version"] = 1
+        with self.assertRaises(loc_kit.GlossaryProfileError):
+            _validate(document=document)
+
+    def test_po_kind_is_rejected(self) -> None:
+        with self.assertRaises(loc_kit.GlossaryProfileError):
+            _validate(document=_record_map_document(kind="po"))
+
+    def test_source_only_glossary_is_rejected(self) -> None:
+        with self.assertRaises(loc_kit.GlossaryProfileError):
+            _validate(document=_record_map_document(initial_target_languages=[]))
+
+    def test_flag_declaration_is_rejected(self) -> None:
+        document = _record_map_document()
+        document["components"][0]["grammar"]["flags"] = [{"column": 6}]
+        with self.assertRaises(loc_kit.GlossaryProfileError):
+            _validate(document=document)
+
+    def test_header_mismatch_is_rejected(self) -> None:
+        rows = _record_map_rows()
+        rows[0][3] = "comment_ru"  # profile still declares note_ru
+        with self.assertRaises(loc_kit.GlossaryProfileError) as ctx:
+            _validate(rows=rows)
+        self.assertTrue(ctx.exception.details)
+
+    def test_unmapped_populated_cell_is_rejected(self) -> None:
+        rows = _record_map_rows()
+        rows[0].append("status")
+        rows[1].append("approved")
+        with self.assertRaises(loc_kit.GlossaryProfileError):
+            _validate(rows=rows)
+
+    def test_missing_target_term_is_rejected(self) -> None:
+        rows = _record_map_rows()
+        rows[1][2] = ""
+        with self.assertRaises(loc_kit.GlossaryProfileError):
+            _validate(rows=rows)
+
+    def test_parse_back_failure_yields_no_files(self) -> None:
+        """A renderer that loses data must block the preview entirely."""
+        real = loc_kit.validate_glossary_profile
+
+        def broken_validate(component, result, out_dir):
+            # ruff: ignore[import-outside-top-level]
+            from loc_kit_ingest.model import Diagnostic, Severity
+
+            return (
+                Diagnostic(
+                    Severity.ERROR,
+                    "render.value_mismatch",
+                    component.component,
+                    "",
+                    0,
+                    "simulated parse-back mismatch",
+                ),
+            )
+
+        with patch(
+            "loc_kit_ingest.writer.validate_rendered_component", broken_validate
+        ):
+            with self.assertRaises(loc_kit.GlossaryProfileError) as ctx:
+                real(
+                    profile_document=_record_map_document(),
+                    rows=_record_map_rows(),
+                    sheet_name="Glossary",
+                    component_name="Draft-Glossary",
+                )
+        self.assertIn("parse-back", str(ctx.exception))
