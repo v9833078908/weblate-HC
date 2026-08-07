@@ -29,6 +29,14 @@ sections before it are Weblate conventions inherited from the original codebase.
   log, or changes; these messages should not be localized.
 - In templates, use `{% translate %}` / `{% blocktranslate %}` for translatable
   text.
+- When a template supplies its own `<form>` element and submit button, the
+  form class must set `self.helper = FormHelper(self)` and
+  `self.helper.form_tag = False`. The `{% crispy %}` tag otherwise renders a
+  second `<form>`; the source stays balanced, but a browser closes the outer
+  form at crispy's `</form>` and every later control, including the submit
+  button, ends up outside any form. The page renders correctly and no click
+  can submit it. Use the `{{ form|crispy }}` filter when only the fields are
+  wanted.
 - Preserve accessibility and the existing Bootstrap/jQuery-based frontend
   patterns. For user-facing HTML, CSS, or JavaScript changes, follow
   `ACCESSIBILITY.md` and `docs/contributing/frontend.rst`, including keyboard
@@ -234,6 +242,14 @@ pytest needs `DJANGO_SETTINGS_MODULE=weblate.settings_test`, a PostgreSQL server
 (`source scripts/test-database.sh` sets `CI_DB_*`), and a prior
 `DJANGO_SETTINGS_MODULE=weblate.settings_test uv run ./manage.py collectstatic --noinput`.
 Running tests through `./rundev.sh test` avoids all of that setup.
+
+The container shares the host's Docker memory allocation with every other
+running compose project. When a suite is green in isolation but returns mass
+setup errors whose count changes between identical runs, or a test suddenly
+takes twenty times longer, check `docker stats --no-stream` before suspecting
+the code or `pytest-xdist`: the usual cause is the container sitting at its
+memory ceiling. Each xdist worker already gets its own temporary `DATA_DIR`
+(`weblate/settings_test.py`), so worker file collisions are not the cause.
 
 ### weblate-mcp
 
