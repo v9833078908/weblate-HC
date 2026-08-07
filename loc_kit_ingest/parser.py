@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 import unicodedata
 from typing import TYPE_CHECKING
 
@@ -15,6 +16,8 @@ from loc_kit_ingest.model import (
     SkippedRow,
     StringUnit,
 )
+
+from loc_kit_ingest.profile import PairsGrammar, RecordMapGrammar
 
 if TYPE_CHECKING:
     from loc_kit_ingest.profile import ComponentProfile
@@ -87,7 +90,10 @@ def parse_component(component: ComponentProfile, rows: list[list[str]]) -> Parse
     if component.kind == "po":
         return _parse_keyed(component, rows)
     if component.kind == "tbx":
-        return _parse_pairs(component, rows)
+        if isinstance(component.grammar, RecordMapGrammar):
+            return _parse_record_map(component, rows)
+        if isinstance(component.grammar, PairsGrammar):
+            return _parse_pairs(component, rows)
     return ParseResult(
         component=component.component,
         kind=component.kind,
@@ -343,20 +349,25 @@ def _add_keyed_warnings(
 
 
 # --------------------------------------------------------------------------- #
-# Term-description-pairs grammar (TBX)
+# TBX shared helpers
 # --------------------------------------------------------------------------- #
 
 
-def _slug(text: str) -> str:
-    """NFKD ASCII transliteration, lowercase, [a-z0-9_-] only."""
-    import re
+def _context_key(section: str, source_term: str) -> str:
+    """
+    Build a stable, collision-free context from (section, source term).
 
-    decomposed = unicodedata.normalize("NFKD", text)
-    ascii_text = decomposed.encode("ascii", "ignore").decode("ascii")
-    ascii_text = ascii_text.lower()
-    ascii_text = re.sub(r"[^a-z0-9_-]+", "-", ascii_text)
-    ascii_text = ascii_text.strip("-")
-    return ascii_text
+    Compact JSON with ``ensure_ascii=False`` keeps Cyrillic and CJK intact -
+    Weblate stores ``Unit.context`` in a TextField, so a glossary never needs
+    a Latin-script column. JSON quoting is what makes it collision-free: a
+    section or term containing the separator cannot forge another pair's key.
+    """
+    return json.dumps([section, source_term], ensure_ascii=False, separators=(",", ":"))
+
+
+def _join_notes(values: list[str]) -> str:
+    """Concatenate declared note cells in declaration order, blanks dropped."""
+    return "\n".join(value for value in values if not _is_blank(value))
 
 
 def _has_outer_whitespace(value: str) -> bool:
@@ -367,14 +378,11 @@ def _has_outer_whitespace(value: str) -> bool:
 def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseResult:
     """Parse term-description-pairs grammar for TBX components."""
     grammar = component.grammar
+    assert isinstance(grammar, PairsGrammar)
     skip_set = set(grammar.skip_rows)  # 0-based
-    assert component.key_language is not None
 
-    key_lang = component.key_language
     source_lang = component.source_lang
     lang_columns = {l.code: l.column for l in component.languages}
-    source_col = lang_columns[source_lang]
-    key_col = lang_columns[key_lang]
     target_langs = component.initial_target_languages
 
     # Build the set of all covered data rows (0-based).
@@ -409,8 +417,6 @@ def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
                 )
             )
             continue
-
-        section_slug = _slug(section_text)
 
         # Walk term/description pairs.
         row_idx = region.first_term_row
@@ -478,20 +484,6 @@ def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
                     )
                 )
 
-            # Key language term must exist for context.
-            key_term = term_values.get(key_lang, "")
-            if _is_blank(key_term):
-                diagnostics.append(
-                    Diagnostic(
-                        Severity.ERROR,
-                        "tbx.missing_target_term",
-                        component.component,
-                        component.sheet,
-                        term_1based,
-                        f"key_language term in language {key_lang!r} is empty",
-                    )
-                )
-
             # All initial_target_languages require a non-empty term.
             for tlang in target_langs:
                 if _is_blank(term_values.get(tlang, "")):
@@ -540,23 +532,10 @@ def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
                     )
                 )
 
-            # Build context.
-            key_slug = _slug(key_term)
-            context = (
-                f"{section_slug}.{key_slug}" if section_slug and key_slug else key_slug
-            )
-            if not context:
-                diagnostics.append(
-                    Diagnostic(
-                        Severity.ERROR,
-                        "tbx.empty_slug",
-                        component.component,
-                        component.sheet,
-                        term_1based,
-                        "context slug is empty after transliteration",
-                    )
-                )
-            elif context in seen_contexts:
+            # Build context from (section, source term): Unicode-safe and
+            # collision-free, so a glossary needs no Latin-script column.
+            context = _context_key(section_text, source_term)
+            if context in seen_contexts:
                 diagnostics.append(
                     Diagnostic(
                         Severity.ERROR,
@@ -574,10 +553,13 @@ def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
                 GlossaryTerm(
                     context=context,
                     values=term_values,
-                    explanations=desc_values,
+                    source_explanation=source_expl,
+                    target_explanations={
+                        code: desc_values.get(code, "") for code in target_langs
+                    },
                     section=section_text,
                     term_row=term_1based,
-                    description_row=desc_1based,
+                    note_rows=(desc_1based,),
                 )
             )
 
@@ -605,6 +587,217 @@ def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
                         "nonblank row is not covered by any region or skip",
                     )
                 )
+
+    return ParseResult(
+        component=component.component,
+        kind="tbx",
+        units=tuple(units),
+        diagnostics=tuple(diagnostics),
+        skipped_rows=tuple(skipped),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Record-map grammar (TBX, profile v2)
+# --------------------------------------------------------------------------- #
+
+
+def _parse_record_map(component: ComponentProfile, rows: list[list[str]]) -> ParseResult:
+    """
+    Parse the generic record-map grammar for TBX components.
+
+    A record is a fixed group of ``record_stride`` rows. Terms are read at
+    ``term_row_offset``; every other declared field names its own offset. A
+    populated cell inside a record that no declared field consumes is an
+    error, never silently discarded.
+    """
+    grammar = component.grammar
+    assert isinstance(grammar, RecordMapGrammar)
+    skip_set = set(grammar.skip_rows)  # 0-based
+
+    source_lang = component.source_lang
+    lang_columns = {l.code: l.column for l in component.languages}
+    target_langs = component.initial_target_languages
+    source_notes = [n for n in grammar.notes if n.scope == "source"]
+    target_notes: dict[str, list] = {code: [] for code in target_langs}
+    for note in grammar.notes:
+        if note.scope == "target" and note.language is not None:
+            target_notes[note.language].append(note)
+
+    units: list[GlossaryTerm] = []
+    diagnostics: list[Diagnostic] = []
+    skipped: list[SkippedRow] = []
+    seen_contexts: set[str] = set()
+
+    # Every row a region, caption, or skip accounts for. Anything else that
+    # holds data trips grammar.uncovered_row.
+    covered_rows: set[int] = set()
+    for region in grammar.regions:
+        if region.section_row is not None:
+            covered_rows.add(region.section_row)
+        covered_rows.update(range(region.first_record_row, region.last_record_row + 1))
+
+    def err(code: str, row_1based: int, message: str) -> None:
+        diagnostics.append(
+            Diagnostic(
+                Severity.ERROR,
+                code,
+                component.component,
+                component.sheet,
+                row_1based,
+                message,
+            )
+        )
+
+    def read_field(base_row: int, row_offset: int, column: int) -> str:
+        return _cell(rows, base_row + row_offset, column)
+
+    for region in grammar.regions:
+        # A caption cell above the block, when the sheet groups terms under
+        # headings instead of repeating a domain column.
+        region_section = ""
+        if region.section_row is not None:
+            assert region.section_column is not None
+            region_section = _cell(rows, region.section_row, region.section_column)
+            if _is_blank(region_section):
+                err(
+                    "tbx.missing_section",
+                    region.section_row + 1,
+                    "section caption cell is empty",
+                )
+                continue
+            # A caption row may repeat the section label in declared language
+            # columns. Those labels are metadata, never terms - but any other
+            # populated cell on that row is unaccounted for.
+            allowed = {region.section_column, *lang_columns.values()}
+            caption_row = rows[region.section_row] if region.section_row < len(rows) else []
+            for col, value in enumerate(caption_row):
+                if col not in allowed and not _is_blank(value):
+                    err(
+                        "tbx.unmapped_cell",
+                        region.section_row + 1,
+                        f"column {col + 1} on a caption row is not declared",
+                    )
+
+        for base_row in range(
+            region.first_record_row, region.last_record_row + 1, region.record_stride
+        ):
+            term_row_idx = base_row + grammar.term_row_offset
+            term_1based = term_row_idx + 1
+            consumed: set[tuple[int, int]] = set()
+
+            # Section: per-record column, or the region's caption.
+            section_text = region_section
+            if grammar.section_field is not None:
+                field = grammar.section_field
+                section_text = read_field(base_row, field.row_offset, field.column)
+                consumed.add((base_row + field.row_offset, field.column))
+                # A blank domain cell means "no section"; it is never
+                # inherited from the previous record.
+                if _is_blank(section_text):
+                    section_text = ""
+
+            # Terms.
+            term_values: dict[str, str] = {}
+            for code, col in lang_columns.items():
+                value = read_field(base_row, grammar.term_row_offset, col)
+                term_values[code] = value
+                consumed.add((term_row_idx, col))
+                if not _is_blank(value) and _has_outer_whitespace(value):
+                    err(
+                        "tbx.unsupported_outer_whitespace",
+                        term_1based,
+                        f"term in language {code!r} has leading or trailing whitespace",
+                    )
+
+            source_term = term_values.get(source_lang, "")
+            if _is_blank(source_term):
+                err(
+                    "tbx.missing_term",
+                    term_1based,
+                    f"source term in language {source_lang!r} is empty",
+                )
+            for tlang in target_langs:
+                if _is_blank(term_values.get(tlang, "")):
+                    err(
+                        "tbx.missing_target_term",
+                        term_1based,
+                        f"target term in language {tlang!r} is empty",
+                    )
+
+            # Notes, in declaration order.
+            note_rows: list[int] = []
+
+            def collect(notes: list) -> list[str]:
+                values: list[str] = []
+                for note in notes:
+                    row_idx = base_row + note.row_offset
+                    value = _cell(rows, row_idx, note.column)
+                    consumed.add((row_idx, note.column))
+                    if not _is_blank(value):
+                        note_rows.append(row_idx + 1)
+                        if _has_outer_whitespace(value):
+                            err(
+                                "tbx.unsupported_outer_whitespace",
+                                row_idx + 1,
+                                f"note {note.header!r} has leading or trailing "
+                                "whitespace",
+                            )
+                    values.append(value)
+                return values
+
+            source_explanation = _join_notes(collect(source_notes))
+            target_explanations = {
+                code: _join_notes(collect(target_notes[code])) for code in target_langs
+            }
+
+            # Any populated cell in this record that no field claimed.
+            for offset in range(region.record_stride):
+                row_idx = base_row + offset
+                if row_idx >= len(rows):
+                    continue
+                for col, value in enumerate(rows[row_idx]):
+                    if (row_idx, col) not in consumed and not _is_blank(value):
+                        err(
+                            "tbx.unmapped_cell",
+                            row_idx + 1,
+                            f"column {col + 1} holds data but no declared field "
+                            "reads it",
+                        )
+
+            context = _context_key(section_text, source_term)
+            if context in seen_contexts:
+                err("tbx.duplicate_context", term_1based, f"duplicate context {context!r}")
+            else:
+                seen_contexts.add(context)
+
+            units.append(
+                GlossaryTerm(
+                    context=context,
+                    values=term_values,
+                    source_explanation=source_explanation,
+                    target_explanations=target_explanations,
+                    section=section_text,
+                    term_row=term_1based,
+                    note_rows=tuple(note_rows),
+                )
+            )
+
+    # Uncovered nonblank rows after the header.
+    for row_idx in range(component.header_row + 1, len(rows)):
+        if row_idx in skip_set:
+            skipped.append(
+                SkippedRow(
+                    component.component, component.sheet, row_idx + 1, "profile_skip"
+                )
+            )
+            continue
+        if row_idx not in covered_rows and not _is_blank_row(rows[row_idx]):
+            err(
+                "grammar.uncovered_row",
+                row_idx + 1,
+                "nonblank row is not covered by any region or skip",
+            )
 
     return ParseResult(
         component=component.component,

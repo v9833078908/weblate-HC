@@ -174,12 +174,13 @@ def test_tbx_preserves_internal_newlines(tmp_path):
         kind="tbx",
         units=(
             GlossaryTerm(
-                context="test.newline",
+                context='["Test","Терм"]',
                 values={"ru": "Терм", "en": "Term", "ja": "用語"},
-                explanations={"ru": "Опи\nсание", "en": "Expla\nnation", "ja": ""},
+                source_explanation="Опи\nсание",
+                target_explanations={"en": "Expla\nnation", "ja": ""},
                 section="Test",
                 term_row=4,
-                description_row=5,
+                note_rows=(5,),
             ),
         ),
         diagnostics=(),
@@ -189,5 +190,5 @@ def test_tbx_preserves_internal_newlines(tmp_path):
     from translate.storage.tbx import tbxfile
 
     parsed = tbxfile.parsestring(paths["en"].read_bytes())
-    unit = next(u for u in parsed.units if u.getid() == "test.newline")
+    unit = next(u for u in parsed.units if u.getid() == '["Test","Терм"]')
     assert "\n" in unit.getnotes("definition")

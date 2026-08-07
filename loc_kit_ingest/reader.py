@@ -8,6 +8,7 @@ import csv
 from typing import TYPE_CHECKING
 
 from loc_kit_ingest.model import Diagnostic, Severity
+from loc_kit_ingest.profile import RecordMapGrammar
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -136,5 +137,22 @@ def validate_sheet_headers(
     # Reference columns
     for col in component.references:
         _check(f"reference {col.name}", col.column, col.header)
+
+    # Record-map section and note columns (profile v2)
+    grammar = component.grammar
+    if isinstance(grammar, RecordMapGrammar):
+        if grammar.section_field is not None:
+            _check(
+                "section field",
+                grammar.section_field.column,
+                grammar.section_field.header,
+            )
+        for note in grammar.notes:
+            label = (
+                f"{note.scope} note"
+                if note.language is None
+                else f"{note.scope} note ({note.language})"
+            )
+            _check(label, note.column, note.header)
 
     return tuple(diagnostics)

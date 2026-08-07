@@ -64,20 +64,22 @@ def tbx_component(tmp_path):
 
     units = (
         GlossaryTerm(
-            context="characters.hero",
+            context='["Characters","Герой"]',
             values={"ru": "Герой", "en": "Hero", "ja": "ヒーロー"},
-            explanations={"ru": "Источник описание", "en": "Target explanation", "ja": ""},
+            source_explanation="Источник описание",
+            target_explanations={"en": "Target explanation", "ja": ""},
             section="Characters",
             term_row=4,
-            description_row=5,
+            note_rows=(5,),
         ),
         GlossaryTerm(
-            context="weapons.sword",
+            context='["Weapons","Меч"]',
             values={"ru": "Меч", "en": "Sword", "ja": "剣"},
-            explanations={"ru": "Источник меч", "en": "Source sword", "ja": ""},
+            source_explanation="Источник меч",
+            target_explanations={"en": "Source sword", "ja": ""},
             section="Weapons",
             term_row=9,
-            description_row=10,
+            note_rows=(10,),
         ),
     )
     result = ParseResult(
@@ -175,7 +177,7 @@ def test_tbx_parse_back_checks_explanations(tmp_path, tbx_component):
     paths = render_component(comp, result, tmp_path)
     parsed = tbxfile.parsestring(paths["en"].read_bytes())
     for unit in parsed.units:
-        assert unit.getid() in ("characters.hero", "weapons.sword")
+        assert unit.getid() in ('["Characters","Герой"]', '["Weapons","Меч"]')
         assert unit.source  # source term exists
         assert unit.target  # target term exists
         # definition note = source explanation

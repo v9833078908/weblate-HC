@@ -78,8 +78,8 @@ def _write(tmp_path, obj, name="kit.loc-ingest.json"):
 # ---------------------------------------------------------------------------
 
 
-def test_profile_requires_the_only_supported_schema_version(tmp_path):
-    path = _write(tmp_path, {"schema_version": 2, "components": []})
+def test_profile_rejects_an_unsupported_schema_version(tmp_path):
+    path = _write(tmp_path, {"schema_version": 3, "components": []})
     with pytest.raises(ProfileError, match="schema_version"):
         load_profile(path)
 
