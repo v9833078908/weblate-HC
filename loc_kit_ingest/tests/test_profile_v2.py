@@ -419,9 +419,27 @@ def test_source_language_in_targets_fails():
         parse_profile(document)
 
 
-def test_empty_note_header_fails():
+def test_unnamed_note_and_section_columns_parse():
+    """A description column whose header cell is empty is still addressable."""
     document = _one_row_document()
-    document["components"][0]["grammar"]["notes"][0]["header"] = ""
+    grammar_document = document["components"][0]["grammar"]
+    grammar_document["notes"][0]["header"] = ""
+    grammar_document["section_field"]["header"] = ""
+
+    component = parse_profile(document).components[0]
+
+    assert isinstance(component.grammar, RecordMapGrammar)
+    assert component.grammar.notes[0] == NoteField(
+        scope="source", column=3, header="", row_offset=0, language=None
+    )
+    assert component.grammar.section_field == SectionField(
+        column=0, header="", row_offset=0
+    )
+
+
+def test_non_string_note_header_fails():
+    document = _one_row_document()
+    document["components"][0]["grammar"]["notes"][0]["header"] = 7
     with pytest.raises(ProfileError, match="profile.invalid_header"):
         parse_profile(document)
 
