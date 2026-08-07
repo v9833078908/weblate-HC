@@ -246,6 +246,7 @@ class LLMStringContext(TypedDict, total=False):
     context: str
     key: str
     explanation: str
+    note: str
     secondary: LLMSecondaryContext
     plural: LLMPluralContext
     failing_checks: list[LLMFailingCheckContext]
@@ -412,6 +413,16 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 return explanation
 
         return cls._normalize_context_text(getattr(unit, "explanation", ""))
+
+    @classmethod
+    def _get_note_context(cls, unit: Unit) -> str:
+        source_unit = getattr(unit, "source_unit", None)
+        if source_unit is not None:
+            note = cls._normalize_context_text(getattr(source_unit, "note", ""))
+            if note:
+                return note
+
+        return cls._normalize_context_text(getattr(unit, "note", ""))
 
     @classmethod
     def _get_failing_checks_context(
@@ -888,6 +899,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
 
         if explanation := self._get_explanation_context(unit):
             result["explanation"] = explanation
+
+        if note := self._get_note_context(unit):
+            result["note"] = note
 
         if secondary := self._get_secondary_context(
             source_text, unit, source_occurrence
