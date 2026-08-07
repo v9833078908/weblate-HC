@@ -14,6 +14,12 @@ the project settings:
 
 .. image:: /screenshots/project-machinery.webp
 
+A project configuration overrides the site-wide one field by field: fields it
+does not set are inherited, so a project can set its own translator persona,
+style, or language-specific instructions without restating the credentials.
+Removing the project configuration returns the service to the site-wide
+settings.
+
 .. note::
 
    They come subject to their terms of use, so ensure you are allowed to use
@@ -68,10 +74,11 @@ LLM translation context
 
 LLM-based automatic suggestion services receive additional context about each
 translated string, when available. This includes the string context or
-monolingual key, additional explanation, configured secondary-language
-translation, plural information, failing quality checks, and placeholder
-contents. Matching glossary entries are passed with their explanations and
-selected flags, so duplicate glossary terms can be disambiguated.
+monolingual key, additional explanation, the note left by developers,
+configured secondary-language translation, plural information, failing quality
+checks, and placeholder contents. Matching glossary entries are passed with
+their explanations and selected flags, so duplicate glossary terms can be
+disambiguated.
 
 You can add target-language-specific instructions in
 :guilabel:`Language-specific instructions` using a JSON object mapping language

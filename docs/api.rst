@@ -1467,6 +1467,11 @@ Projects
 
     Create or update the service configuration for a project.
 
+    The configuration may contain only the fields it changes. It is validated
+    together with the site-wide configuration for that service, and only the
+    difference is stored, so fields it omits keep following the site-wide
+    settings. See :ref:`machine-translation-setup`.
+
     :param project: Project URL slug
     :type project: string
     :form string service: Service name

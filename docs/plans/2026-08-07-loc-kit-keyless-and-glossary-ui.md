@@ -79,7 +79,14 @@ The old plan required a Latin-script `key_language` because `_slug` drops Cyrill
 
 ### Profile v2 `record-map`
 
-A record is a repeated row group. `record_stride` is the number of rows in that group; language terms are read at `term_row_offset`; note fields name their own offset and column. A region can optionally reference a preceding section cell. This represents a one-row-per-term spreadsheet with `stride: 1`, and an alternating term/description spreadsheet with `stride: 2`.
+A record is a repeated row group. `record_stride` is the number of rows in that group; language terms are read at `term_row_offset`; note fields name their own offset and column. This represents a one-row-per-term spreadsheet with `stride: 1`, and an alternating term/description spreadsheet with `stride: 2`.
+
+A record's section (its domain) comes from exactly one of two sources, never both:
+
+- `grammar.section_field` - a column read once per record. This is the preferred shape: a flat table where every row carries its own domain.
+- `region.section_row` plus `region.section_column` - a caption cell above a block of records. This supports spreadsheets that group terms under headings instead of repeating the domain.
+
+A component with neither has records without a section.
 
 ```json
 {
@@ -87,44 +94,34 @@ A record is a repeated row group. `record_stride` is the number of rows in that 
   "components": [
     {
       "sheet": "Glossary",
-      "component": "Glossary",
+      "component": "CoL4-Glossary",
       "kind": "tbx",
-      "source_lang": "en",
-      "header_row": 10,
+      "source_lang": "ru",
+      "header_row": 1,
       "languages": [
-        {"code": "en", "xml_lang": "en", "column": 1, "header": "Term (EN)"},
-        {"code": "ru", "xml_lang": "ru", "column": 2, "header": "Term (RU)"}
+        {"code": "ru", "xml_lang": "ru", "column": 2, "header": "ru"},
+        {"code": "en", "xml_lang": "en", "column": 3, "header": "en"}
       ],
       "grammar": {
         "type": "record-map",
         "skip_rows": [],
         "regions": [
-          {
-            "section_row": 9,
-            "section_column": 1,
-            "first_record_row": 11,
-            "last_record_row": 16,
-            "record_stride": 1
-          }
+          {"first_record_row": 2, "last_record_row": 7, "record_stride": 1}
         ],
         "term_row_offset": 0,
+        "section_field": {"column": 1, "header": "domain", "row_offset": 0},
         "notes": [
-          {
-            "scope": "source",
-            "column": 3,
-            "header": "Context / Note",
-            "row_offset": 0
-          },
+          {"scope": "source", "column": 4, "header": "note_ru", "row_offset": 0},
           {
             "scope": "target",
-            "language": "ru",
-            "column": 4,
-            "header": "Recommended translation",
+            "language": "en",
+            "column": 5,
+            "header": "note_en",
             "row_offset": 0
           }
         ]
       },
-      "initial_target_languages": ["ru"]
+      "initial_target_languages": ["en"]
     }
   ]
 }
@@ -134,7 +131,7 @@ A record is a repeated row group. `record_stride` is the number of rows in that 
 
 - `record_stride` is a positive integer; each `row_offset` is in `[0, record_stride)`.
 - A region has an inclusive range divisible by its stride; regions, section rows, and skip rows do not overlap ambiguously.
-- `section_row` and `section_column` occur together, are in range, and a missing section is represented by omitting both fields.
+- A component declares `grammar.section_field` or region section cells, never both. `section_row` and `section_column` occur together, are in range, and a missing block caption is represented by omitting both fields. `section_field.row_offset` obeys the same `[0, record_stride)` rule as any other field, and its column may not collide with a language or note column.
 - Language and note header declarations are nonempty strings; `validate_sheet_headers` requires exact equality with the actual header row.
 - A target note names an initial target language; source notes have no `language` field.
 - No term or note field aliases the same `(row_offset, column)` unexpectedly.
@@ -145,13 +142,14 @@ A record is a repeated row group. `record_stride` is the number of rows in that 
 
 For each record:
 
-1. Read source and target terms from declared language columns at `term_row_offset`.
-2. Read declared notes, preserving order. Group source notes and target notes separately.
-3. Require a nonblank source term and a nonblank term for every initial target language. Notes are optional.
-4. Reject leading or trailing whitespace in a TBX term or note. The existing `tbx.unsupported_outer_whitespace` error remains: Translate Toolkit trims such values on write, so accepting them would silently lose data.
-5. Build context with a canonical collision-free serialization of `(section, source term)`, for example compact JSON with `ensure_ascii=False`. Duplicate contexts fail. Do not use `_slug`.
-6. Mark all term and declared note cells as consumed. A populated data cell not consumed by a declared term or note field fails as `tbx.unmapped_cell`. A section row may contain translated section labels in declared language columns; those labels are allowed as section metadata but are never made into terms.
-7. Retain the existing `grammar.uncovered_row` protection for any nonblank row after the header not covered by a region, section, or explicit skip.
+1. Read the section from `section_field` at its offset, or inherit the enclosing region's caption cell. A blank `section_field` cell means the record has no section; it is not an error and it is not inherited from the previous record.
+2. Read source and target terms from declared language columns at `term_row_offset`.
+3. Read declared notes, preserving order. Group source notes and target notes separately.
+4. Require a nonblank source term and a nonblank term for every initial target language. Notes are optional.
+5. Reject leading or trailing whitespace in a TBX term or note. The existing `tbx.unsupported_outer_whitespace` error remains: Translate Toolkit trims such values on write, so accepting them would silently lose data.
+6. Build context with a canonical collision-free serialization of `(section, source term)`, for example compact JSON with `ensure_ascii=False`. Duplicate contexts fail. Do not use `_slug`.
+7. Mark all section, term, and declared note cells as consumed. A populated data cell not consumed by a declared field fails as `tbx.unmapped_cell`. A caption row may contain translated section labels in declared language columns; those labels are section metadata and are never made into terms.
+8. Retain the existing `grammar.uncovered_row` protection for any nonblank row after the header not covered by a region, caption row, or explicit skip.
 
 A model response that classifies a column as a glossary flag is rejected as unsupported. A user may only map descriptive content to a note field; the grammar deliberately has no flag role.
 

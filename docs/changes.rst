@@ -7,6 +7,9 @@ Weblate 2026.8.1
 
 .. rubric:: Improvements
 
+* Project-level :ref:`automatic suggestion <machine-translation-setup>` configuration now overrides the site-wide one field by field, so a project can set its own translator persona, style, and language-specific instructions without restating credentials.
+* Large language model machine translation services now receive the note left by developers for a string, see :ref:`llm-translation-context`.
+
 .. rubric:: Bug fixes
 
 * Large language model machine translation services no longer fail when the optional persona and style settings are absent from the stored configuration, as happens when the service is installed through the REST API.

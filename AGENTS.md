@@ -146,9 +146,10 @@ Repository-specific parts:
   `RoutedLLMTranslation` in `machinery.py`, an OpenRouter-backed automatic
   suggestion service (display name and service slug: `OpenRouter` /
   `openrouter`) that resolves the model ID per target language from a `routing`
-  JSON map. It uses one OpenRouter key; project-level settings replace the
-  complete global service configuration, they do not merge only the `routing`
-  field. `AutoForm.DEFAULT_ENGINE` (`weblate/trans/forms.py`) preselects this
+  JSON map. It uses one OpenRouter key; a project-level configuration overrides
+  the global one field by field, so a project stores only what it changes
+  (persona, style, `language_instructions`) and inherits `key`, `base_url` and
+  `routing`. `AutoForm.DEFAULT_ENGINE` (`weblate/trans/forms.py`) preselects this
   service and the "Machine translation" source in the automatic translation
   form. See "Deploying custom checks and machinery" below for how both modules
   reach the dev container.

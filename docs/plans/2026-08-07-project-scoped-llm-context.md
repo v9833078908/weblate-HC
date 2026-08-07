@@ -1328,6 +1328,39 @@ Required: every source unit is flagged, and every glossary language holds the sa
 
 Deleting and re-importing a glossary component loses the flags, because no glossary file format writes them back. If a glossary is rebuilt - for example by the loc-kit plan's TBX path - repeat this task afterwards.
 
+**Outcome, 2026-08-07.**
+
+Audited first. Every glossary was already complete in every language before the flag was set - space-arena 300 terms across 16 languages, heart-abyss 12 across 3, the other two projects have empty glossaries. So the flag repairs nothing today; it makes that completeness an enforced invariant instead of a coincidence, and that is the only reason to set it.
+
+| Glossary | Terms | Flagged | Action |
+|---|---|---|---|
+| heart-abyss/terms | 12 | 12/12 | done |
+| space-arena/glossary | 300 | 0/300 | needs owner sign-off |
+| need-for-greed/glossary | 0 | - | nothing to flag |
+| pirate-ships/glossary | 0 | - | nothing to flag |
+
+space-arena is left alone deliberately. Flagging 300 terms commits the project to carrying all 300 into every language it ever adds, which is a product decision, not a mechanical one. The command to run once that is agreed is the same bulk edit, or:
+
+```bash
+./rundev.sh exec -T weblate weblate shell -c "
+from weblate.auth.models import User
+from weblate.trans.bulk import bulk_perform
+from weblate.trans.models import Label, Project
+p = Project.objects.get(slug='space-arena')
+bulk_perform(
+    User.objects.get(username='admin'),
+    p.glossaries[0].source_translation.unit_set.all(),
+    query='state:>=empty',
+    target_state=-1,
+    add_flags='terminology',
+    remove_flags='',
+    add_labels=Label.objects.none(),
+    remove_labels=Label.objects.none(),
+    project=p,
+)
+"
+```
+
 ---
 
 # Part E - Documentation and verification
