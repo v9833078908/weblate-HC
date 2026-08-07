@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db import transaction
 from django.urls import reverse
 from lxml import etree
@@ -1069,3 +1071,61 @@ class GlossaryTest(ViewTestCase):
 
     def test_source_string_removal_commit(self) -> None:
         self.removal_test(self.glossary_component.source_translation, commit=True)
+
+
+class GlossaryCoverageCommandTest(ViewTestCase):
+    """The coverage report names what matched, what did not, and writes nothing."""
+
+    CREATE_GLOSSARIES: bool = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.glossary_component = self.project.glossaries[0]
+
+    def add_source_term(self, source: str) -> None:
+        # The report only reads source-language glossary units, so unlike
+        # GlossaryTest.add_term no target-language unit is needed.
+        self.glossary_component.source_translation.unit_set.create(
+            source=source,
+            target=source,
+            context="",
+            id_hash=calculate_hash(source, ""),
+            position=1,
+            state=STATE_TRANSLATED,
+        )
+
+    def run_command(self) -> str:
+        output = StringIO()
+        call_command("glossary_coverage", self.project.slug, stdout=output)
+        return output.getvalue()
+
+    def test_reports_a_term_present_in_the_source_strings(self) -> None:
+        self.add_source_term("world")
+
+        report = self.run_command()
+
+        self.assertIn("matched terms:", report)
+        self.assertIn("world", report)
+
+    def test_reports_a_term_absent_from_the_source_strings(self) -> None:
+        self.add_source_term("dragon")
+
+        report = self.run_command()
+
+        self.assertIn("never matched", report)
+        self.assertIn("dragon", report)
+
+    def test_project_without_glossary_terms_says_so(self) -> None:
+        self.assertIn("no glossary terms", self.run_command())
+
+    def test_unknown_project_fails_loudly(self) -> None:
+        with self.assertRaises(CommandError):
+            call_command("glossary_coverage", "no-such-project", stdout=StringIO())
+
+    def test_the_report_writes_nothing(self) -> None:
+        self.add_source_term("world")
+        before = Unit.objects.count()
+
+        self.run_command()
+
+        self.assertEqual(Unit.objects.count(), before)
