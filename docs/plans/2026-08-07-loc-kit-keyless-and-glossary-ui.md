@@ -132,7 +132,7 @@ A component with neither has records without a section.
 - `record_stride` is a positive integer; each `row_offset` is in `[0, record_stride)`.
 - A region has an inclusive range divisible by its stride; regions, section rows, and skip rows do not overlap ambiguously.
 - A component declares `grammar.section_field` or region section cells, never both. `section_row` and `section_column` occur together, are in range, and a missing block caption is represented by omitting both fields. `section_field.row_offset` obeys the same `[0, record_stride)` rule as any other field, and its column may not collide with a language or note column.
-- Language and note header declarations are nonempty strings; `validate_sheet_headers` requires exact equality with the actual header row.
+- Language, section, and note header declarations are strings and may be empty; `validate_sheet_headers` requires exact equality with the actual header row, so an empty declaration requires an empty header cell. Kits whose description column carries no header are addressable this way.
 - A target note names an initial target language; source notes have no `language` field.
 - No term or note field aliases the same `(row_offset, column)` unexpectedly.
 - The source is present in `languages`; targets are nonempty, unique, and do not contain the source.
@@ -201,11 +201,11 @@ Only cell values may be truncated. If the complete signature encoding or the rep
 
 ---
 
-# Part A - Keyless PO kits
+## Part A - Keyless PO kits
 
 Part A keeps ordinary PO intake independent of glossary analysis. It deliberately does not invoke the LLM or the record-map grammar.
 
-## Task A1 - Establish current PO inference regression tests
+### Task A1 - Establish current PO inference regression tests
 
 **Files:**
 
@@ -228,7 +228,7 @@ cd loc_kit_ingest && uv run pytest tests/test_infer.py -v
 
 The tests must describe current behavior before changing `infer.py`.
 
-## Task A2 - Specify and implement keyless PO detection
+### Task A2 - Specify and implement keyless PO detection
 
 **Files:**
 
@@ -250,7 +250,7 @@ Do not add glossary detection or any project-name heuristic here.
 cd loc_kit_ingest && uv run pytest tests/test_infer.py -v
 ```
 
-## Task A3 - Cover the unchanged Weblate PO path
+### Task A3 - Cover the unchanged Weblate PO path
 
 **Files:**
 
@@ -271,9 +271,9 @@ cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/
 
 ---
 
-# Part B - Profile v2 and deterministic glossary conversion
+## Part B - Profile v2 and deterministic glossary conversion
 
-## Task B1 - Add profile v2 without weakening v1
+### Task B1 - Add profile v2 without weakening v1
 
 **Files:**
 
@@ -296,7 +296,7 @@ Implement immutable profile records for `RecordMapGrammar`, `RecordRegion`, `Sec
 cd loc_kit_ingest && uv run pytest tests/test_profile_v2.py tests/test_parser_tbx.py -v
 ```
 
-## Task B2 - Normalize TBX note data and Unicode context identity
+### Task B2 - Normalize TBX note data and Unicode context identity
 
 **Files:**
 
@@ -330,7 +330,7 @@ Write tests proving:
 cd loc_kit_ingest && uv run pytest tests/test_parser_tbx.py tests/test_writer.py -v
 ```
 
-## Task B3 - Parse `record-map` rows exhaustively
+### Task B3 - Parse `record-map` rows exhaustively
 
 **Files:**
 
@@ -358,7 +358,7 @@ Add a second in-memory stride-two test that uses region caption cells instead of
 cd loc_kit_ingest && uv run pytest tests/test_parser_tbx.py -v -k "record_map or unicode or pairs"
 ```
 
-## Task B4 - Render and validate profile v2 end to end
+### Task B4 - Render and validate profile v2 end to end
 
 **Files:**
 
@@ -384,7 +384,7 @@ The assertion must be that no staging output is published after a failure.
 cd loc_kit_ingest && uv run pytest tests/test_pipeline.py tests/test_failure_matrix.py tests/test_writer.py -v
 ```
 
-## Task B5 - Keep the CLI deterministic
+### Task B5 - Keep the CLI deterministic
 
 **Files:**
 
@@ -406,9 +406,9 @@ Confirm parse-back success and only the expected target TBX files under `/tmp/lo
 
 ---
 
-# Part C - Site-wide OpenRouter profile proposal
+## Part C - Site-wide OpenRouter profile proposal
 
-## Task C1 - Add server-side configuration and defaults
+### Task C1 - Add server-side configuration and defaults
 
 **Files:**
 
@@ -434,7 +434,7 @@ Expose Docker environment variables with the established `WEBLATE_` prefix. The 
 
 **Tests:** configuration defaults, Docker environment parsing, disabled-by-default behavior, and clamping values above those hard limits.
 
-## Task C2 - Build a bounded structural sampler
+### Task C2 - Build a bounded structural sampler
 
 **Files:**
 
@@ -452,7 +452,7 @@ Write tests for:
 - a cap-too-small input returning the local size diagnostic instead of silently dropping structural data; and
 - no raw full-sheet dump when the source has many rows.
 
-## Task C3 - Implement the fixed OpenRouter proposal client
+### Task C3 - Implement the fixed OpenRouter proposal client
 
 **Files:**
 
@@ -474,7 +474,7 @@ Keep the static instruction in `weblate/trans/prompts/loc_kit_profile.txt`, load
 
 Use `http_mock` to assert exact endpoint, headers excluding the literal secret in failure text, payload fields, strict schema, request timeout, malformed response handling, 4xx/5xx handling, and no request when disabled. Do not test against the live network.
 
-## Task C4 - Generate and validate candidate profiles locally
+### Task C4 - Generate and validate candidate profiles locally
 
 **Files:**
 
@@ -493,9 +493,9 @@ Write tests that feed the same fixtures through LLM and manual-profile paths. Th
 
 ---
 
-# Part D - Temporary draft and authenticated UI workflow
+## Part D - Temporary draft and authenticated UI workflow
 
-## Task D1 - Add temporary draft persistence and cleanup
+### Task D1 - Add temporary draft persistence and cleanup
 
 **Files:**
 
@@ -520,7 +520,7 @@ Every draft endpoint must also recheck the same project-level component-creation
 
 Tests must cover owner isolation, session isolation, permission revocation, expiry, cancellation, successful consumption, storage deletion, repeated cleanup, and a stale token that cannot be reused.
 
-## Task D2 - Add explicit glossary-analysis stages
+### Task D2 - Add explicit glossary-analysis stages
 
 **Files:**
 
@@ -547,7 +547,7 @@ Ensure visible focus, labelled radio inputs/file controls, a summary linked to a
 
 Use Django i18n helpers for every new visible string in forms, views, and templates.
 
-## Task D3 - Bind preview output to standard component creation safely
+### Task D3 - Bind preview output to standard component creation safely
 
 **Files:**
 
@@ -582,9 +582,9 @@ After creation, assert `file_format == "tbx"`, `filemask == "tbx/*.tbx"`, `templ
 
 ---
 
-# Part E - Documentation, deployment, and verification
+## Part E - Documentation, deployment, and verification
 
-## Task E1 - Update the ingest specification
+### Task E1 - Update the ingest specification
 
 **Files:**
 
@@ -599,7 +599,7 @@ Update the Russian specification without rewriting unrelated sections:
 - state the LLM data minimization and that flags/source-only glossary imports are unsupported in this flow;
 - correct the UI assertion: TBX now does parse-back before creation.
 
-## Task E2 - Document configuration and threat model
+### Task E2 - Document configuration and threat model
 
 **Files:**
 
@@ -620,7 +620,7 @@ Update the threat model's system scope, trust-boundary table, input assumptions,
 
 Add one concise unreleased changelog item. Update `AGENTS.md` with the new v2/draft deployment and test-copy behavior; do not claim the custom MT machinery is reused.
 
-## Task E3 - Deploy and smoke-test through the browser
+### Task E3 - Deploy and smoke-test through the browser
 
 **Precondition:** Configure the separate site-wide analyzer in `dev-docker/environment` only if a safe development OpenRouter key and structured-output-capable model are available. Do not use the production MT key.
 
@@ -639,7 +639,7 @@ Exercise both paths at `http://localhost:3001/create/component/zip/`:
 
 If a safe development provider configuration is unavailable, smoke the same workflow through the manual-profile branch. The OpenRouter request behavior remains covered by mocked tests.
 
-## Task E4 - Final verification
+### Task E4 - Final verification
 
 Run after all targeted tests and browser smoke are green:
 
@@ -658,7 +658,7 @@ Known repository noise must be compared against an unchanged baseline before att
 
 ---
 
-## Acceptance criteria
+### Acceptance criteria
 
 1. Existing v1 PO and TBX profiles remain accepted with their existing fields and grammar; all current behavior stays covered apart from the intentional Unicode-safe context identity update.
 2. A v2 one-row table and a v2 stride-two table both produce the same valid TBX component shape through local validation.
@@ -670,7 +670,7 @@ Known repository noise must be compared against an unchanged baseline before att
 8. Generated glossary source language, target files, source explanation, target explanation, context, and `is_glossary` behavior are verified through Weblate's real TBX format and glossary matching code.
 9. Documentation names the external-data boundary and threat model update.
 
-## Risks and explicit follow-ups
+### Risks and explicit follow-ups
 
 - A structural sample can be insufficient for an unusual layout. That is a safe manual-profile outcome, not a reason to transmit the entire workbook.
 - A profile can be structurally valid but semantically wrong. Preview and explicit confirmation remain required; the deterministic converter cannot solve semantic judgment.
