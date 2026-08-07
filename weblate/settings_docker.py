@@ -1644,6 +1644,35 @@ OPENTELEMETRY_EXTRA_RESOURCE_ATTRIBUTES = get_env_map(
 )
 ZAMMAD_URL = get_env_str("WEBLATE_ZAMMAD_URL", utils_defaults.DEFAULT_ZAMMAD_URL)
 
+# Loc-kit glossary OpenRouter profile analysis (off by default).
+# Enabling sends a deterministic structural sample to OpenRouter; the
+# configured model must support strict structured outputs. The API base
+# URL is fixed and not configurable here.
+LOC_KIT_PROFILE_ANALYSIS_ENABLED = get_env_bool(
+    "WEBLATE_LOC_KIT_PROFILE_ANALYSIS_ENABLED",
+    trans_defaults.DEFAULT_LOC_KIT_PROFILE_ANALYSIS_ENABLED,
+)
+LOC_KIT_PROFILE_OPENROUTER_KEY = get_env_str(
+    "WEBLATE_LOC_KIT_PROFILE_OPENROUTER_KEY",
+    trans_defaults.DEFAULT_LOC_KIT_PROFILE_OPENROUTER_KEY,
+)
+LOC_KIT_PROFILE_OPENROUTER_MODEL = get_env_str(
+    "WEBLATE_LOC_KIT_PROFILE_OPENROUTER_MODEL",
+    trans_defaults.DEFAULT_LOC_KIT_PROFILE_OPENROUTER_MODEL,
+)
+LOC_KIT_PROFILE_SAMPLE_MAX_BYTES = trans_defaults.clamp_loc_kit_sample_max_bytes(
+    get_env_int(
+        "WEBLATE_LOC_KIT_PROFILE_SAMPLE_MAX_BYTES",
+        trans_defaults.DEFAULT_LOC_KIT_PROFILE_SAMPLE_MAX_BYTES,
+    )
+)
+LOC_KIT_IMPORT_DRAFT_EXPIRY = trans_defaults.clamp_loc_kit_import_draft_expiry(
+    get_env_int(
+        "WEBLATE_LOC_KIT_IMPORT_DRAFT_EXPIRY",
+        trans_defaults.DEFAULT_LOC_KIT_IMPORT_DRAFT_EXPIRY,
+    )
+)
+
 ADDITIONAL_CONFIG = Path("/app/data/settings-override.py")
 if ADDITIONAL_CONFIG.exists():
     code = compile(

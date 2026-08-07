@@ -283,12 +283,12 @@ cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/
 
 Write failing tests before implementation for:
 
-- a valid v2 one-row glossary matching the example contract above;
-- a valid v2 stride-two glossary that represents the old alternating-row shape;
+- a valid v2 one-row glossary with a per-record `section_field`, matching the example contract above;
+- a valid v2 stride-two glossary with region caption cells, representing the old alternating-row shape;
 - an existing v1 `terms.loc-ingest.json` loading with identical component fields;
-- unknown v2 fields, incompatible v1/v2 fields, invalid offsets/strides, overlapping regions, mismatched headers, duplicate field locations, invalid target-note language, omitted target languages, and source-in-targets all failing with stable diagnostics.
+- unknown v2 fields, both section styles declared at once, incompatible v1/v2 fields, invalid offsets/strides, overlapping regions, mismatched headers, duplicate field locations, invalid target-note language, omitted target languages, and source-in-targets all failing with stable diagnostics.
 
-Implement immutable profile records for `RecordMapGrammar`, `RecordRegion`, and `NoteField`. Extend `ComponentProfile` as a tagged union so v1 `PairsGrammar` and v2 `RecordMapGrammar` remain distinguishable. Do not loosen v1 validation to accommodate v2.
+Implement immutable profile records for `RecordMapGrammar`, `RecordRegion`, `SectionField`, and `NoteField`. Extend `ComponentProfile` as a tagged union so v1 `PairsGrammar` and v2 `RecordMapGrammar` remain distinguishable. Do not loosen v1 validation to accommodate v2.
 
 **Run:**
 
@@ -343,14 +343,14 @@ Implement a separate `_parse_record_map` dispatch branch. It must:
 
 - walk each region at exactly `record_stride` rows;
 - read language terms at `term_row_offset` and note fields at their declared offsets;
-- allow only declared language cells on section rows;
+- resolve each record's section from `section_field` or the region caption cell, and allow only declared language cells on caption rows;
 - record consumed cells and reject populated record cells not declared by the profile as `tbx.unmapped_cell`;
 - emit row-accurate diagnostics for blank source, blank required target, invalid outer whitespace, duplicate context, invalid section, and uncovered rows;
 - keep a full `covered_rows` set, including section and explicit skip rows, and preserve `grammar.uncovered_row`.
 
-The new fixture must be anonymous but structurally equivalent to a common spreadsheet glossary: a banner, a header with source/target term columns, a context column, a recommended-target-note column, and one row per term. Do not add the user-provided workbook to the repository.
+The new fixture must be anonymous but structurally equivalent to a common spreadsheet glossary: a banner, a header row, a domain column, source/target term columns, a source-note column, a target-note column, and one row per term. Do not add the user-provided workbook to the repository.
 
-Add a second in-memory stride-two test. It proves that `record-map` is a grammar engine rather than a CoL4-specific reader.
+Add a second in-memory stride-two test that uses region caption cells instead of a domain column. It proves that `record-map` is a grammar engine rather than a CoL4-specific reader.
 
 **Run:**
 

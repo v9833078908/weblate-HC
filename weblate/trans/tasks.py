@@ -1288,6 +1288,23 @@ def cleanup_reports() -> None:
     Report.objects.filter(created__lt=cutoff).delete()
 
 
+@app.task(trail=False)
+def cleanup_loc_kit_drafts() -> None:
+    """
+    Delete expired loc-kit import drafts and their uploaded files.
+
+    Idempotent: running it twice (or when a file is already gone) is a no-op.
+    ``FileSystemStorage.delete`` on a missing file is already safe.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import LocKitImportDraft
+
+    qs = LocKitImportDraft.objects.filter(expires_at__lt=timezone.now())
+    for draft in qs.iterator():
+        draft.delete_storage()
+    qs.delete()
+
+
 def report_restore_component_progress(completed: int, total: int) -> None:
     if total:
         report_task_progress(30 + (60 * completed // total))
@@ -1434,4 +1451,7 @@ def setup_periodic_tasks(sender, **kwargs) -> None:
     )
     sender.add_periodic_task(
         crontab(hour=0, minute=50), cleanup_reports.s(), name="reports-cleanup"
+    )
+    sender.add_periodic_task(
+        900, cleanup_loc_kit_drafts.s(), name="cleanup-loc-kit-drafts"
     )

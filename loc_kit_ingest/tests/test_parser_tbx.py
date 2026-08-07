@@ -8,8 +8,12 @@ from pathlib import Path
 
 import pytest
 
+from loc_kit_ingest.model import Severity
 from loc_kit_ingest.parser import parse_component
-from loc_kit_ingest.profile import load_profile
+from loc_kit_ingest.profile import load_profile, parse_profile
+from loc_kit_ingest.reader import read_sheets
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 # ---------------------------------------------------------------------------
@@ -26,7 +30,8 @@ def terms_component(tmp_path):
 
 @pytest.fixture
 def terms_rows():
-    """Rows matching the terms fixture CSV.
+    """
+    Rows matching the terms fixture CSV.
 
     Row layout (1-based):
       1: header: ru,en,ja
@@ -64,26 +69,24 @@ def test_glossary_pairs_preserve_source_and_target_explanations(
 ):
     result = parse_component(terms_component, terms_rows)
     term = result.units[0]
-    assert term.context == "characters.hero"
+    assert term.context == '["Characters","Герой"]'
     assert term.values == {"ru": "Герой", "en": "Hero", "ja": "ヒーロー"}
-    assert term.explanations["ru"] == "Источник описание"
-    assert term.explanations["en"] == "Target explanation"
-    assert term.term_row == 4 and term.description_row == 5
+    assert term.source_explanation == "Источник описание"
+    assert term.target_explanations["en"] == "Target explanation"
+    assert term.term_row == 4 and term.note_rows == (5,)
 
 
 def test_second_region_parsed(terms_component, terms_rows):
     result = parse_component(terms_component, terms_rows)
     assert len(result.units) == 3
     term = result.units[2]
-    assert term.context == "weapons.sword"
+    assert term.context == '["Weapons","Меч"]'
     assert term.values["en"] == "Sword"
     assert term.section == "Weapons"
-    assert term.term_row == 9 and term.description_row == 10
+    assert term.term_row == 9 and term.note_rows == (10,)
 
 
-def test_orphan_pair_and_uncovered_nonblank_row_are_errors(
-    terms_component, terms_rows
-):
+def test_orphan_pair_and_uncovered_nonblank_row_are_errors(terms_component, terms_rows):
     # Wipe the term row for the second pair in region 1.
     # The description still has data -> orphan_description.
     terms_rows[5] = [""]  # wipe term row 6 (0-based 5)
@@ -123,11 +126,19 @@ def test_missing_initial_target_term_is_error(terms_component, terms_rows):
 
 
 def test_duplicate_context_is_error(terms_component, terms_rows):
-    # Make the second term in region 1 have same key_language term as first.
-    # Region 1 has two pairs: rows 4-5 and rows 6-7. Both in section "Characters".
-    terms_rows[5][1] = "Hero"  # key_language is en; first was "Hero"
+    # Context is (section, source term). Two records in one section sharing a
+    # source term collide; the same source term in another section does not.
+    terms_rows[5][0] = "Герой"  # source language is ru; first term was "Герой"
     result = parse_component(terms_component, terms_rows)
     assert any(d.code == "tbx.duplicate_context" for d in result.diagnostics)
+
+
+def test_same_source_term_in_distinct_sections_is_not_duplicate(
+    terms_component, terms_rows
+):
+    terms_rows[8][0] = "Герой"  # "Weapons" section reuses the "Characters" term
+    result = parse_component(terms_component, terms_rows)
+    assert not any(d.code == "tbx.duplicate_context" for d in result.diagnostics)
 
 
 def test_unknown_extra_nonblank_row_is_error(terms_component, terms_rows):
@@ -158,8 +169,9 @@ def test_preserves_internal_newlines_and_markup(terms_component):
         ["опи\nсание", "descrip\ntion", "説明"],
     ]
     # Adjust component to match this 2-row region
-    from loc_kit_ingest.profile import PairRegion, PairsGrammar
     from dataclasses import replace
+
+    from loc_kit_ingest.profile import PairRegion, PairsGrammar
 
     component = replace(
         terms_component,
@@ -178,11 +190,11 @@ def test_preserves_internal_newlines_and_markup(terms_component):
     assert len(result.units) == 1
     term = result.units[0]
     assert "<b>1</b>" in term.values["ru"]
-    assert "\n" in term.explanations["en"]
+    assert "\n" in term.source_explanation
 
 
-def test_empty_key_language_cell_is_error(terms_component, terms_rows):
-    terms_rows[3][1] = ""  # blank key_language term (en)
+def test_empty_initial_target_term_is_error(terms_component, terms_rows):
+    terms_rows[3][1] = ""  # blank en term (en is an initial target language)
     result = parse_component(terms_component, terms_rows)
     assert any(d.code == "tbx.missing_target_term" for d in result.diagnostics)
 
@@ -192,3 +204,251 @@ def test_skip_rows_recorded(terms_component, terms_rows):
     assert {(skip.row, skip.reason) for skip in result.skipped_rows} == {
         (2, "profile_skip"),
     }
+
+
+# ---------------------------------------------------------------------------
+# Record-map grammar (profile v2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def record_map_component():
+    profile_path = FIXTURES / "glossary-record-map.loc-ingest.json"
+    return load_profile(profile_path).components[0]
+
+
+@pytest.fixture
+def record_map_rows():
+    return read_sheets(FIXTURES / "glossary-record-map.csv")["glossary-record-map"]
+
+
+def test_record_map_parses_one_row_records(record_map_component, record_map_rows):
+    result = parse_component(record_map_component, record_map_rows)
+    errors = [d for d in result.diagnostics if d.severity is Severity.ERROR]
+    assert errors == []
+    assert len(result.units) == 6
+
+    first = result.units[0]
+    assert first.section == "Персонажи"
+    assert first.values == {"ru": "Герой", "en": "Hero"}
+    assert first.source_explanation == "Главный протагонист"
+    assert first.target_explanations == {"en": "Main protagonist"}
+    assert first.context == '["Персонажи","Герой"]'
+    assert first.term_row == 3
+
+
+def test_record_map_allows_records_without_notes(record_map_component, record_map_rows):
+    result = parse_component(record_map_component, record_map_rows)
+    settings_term = next(u for u in result.units if u.values["en"] == "Settings")
+    assert settings_term.source_explanation == ""
+    assert settings_term.target_explanations == {"en": ""}
+
+    quit_term = next(u for u in result.units if u.values["en"] == "Quit")
+    assert quit_term.source_explanation == "Закрывает игру"
+    assert quit_term.target_explanations == {"en": ""}
+
+
+def test_record_map_blank_section_is_not_inherited(
+    record_map_component, record_map_rows
+):
+    record_map_rows[3][0] = ""  # blank the domain cell of the second record
+    result = parse_component(record_map_component, record_map_rows)
+    errors = [d for d in result.diagnostics if d.severity is Severity.ERROR]
+    assert errors == []
+    term = next(u for u in result.units if u.values["ru"] == "Враг")
+    assert term.section == ""
+    assert term.context == '["","Враг"]'
+
+
+def test_record_map_unmapped_populated_cell_is_error(
+    record_map_component, record_map_rows
+):
+    record_map_rows[2].append("approved")  # an undeclared status column
+    result = parse_component(record_map_component, record_map_rows)
+    assert any(d.code == "tbx.unmapped_cell" for d in result.diagnostics)
+
+
+def test_record_map_missing_source_term_is_error(record_map_component, record_map_rows):
+    record_map_rows[2][1] = ""
+    result = parse_component(record_map_component, record_map_rows)
+    assert any(d.code == "tbx.missing_term" for d in result.diagnostics)
+
+
+def test_record_map_missing_target_term_is_error(record_map_component, record_map_rows):
+    record_map_rows[2][2] = ""
+    result = parse_component(record_map_component, record_map_rows)
+    assert any(d.code == "tbx.missing_target_term" for d in result.diagnostics)
+
+
+def test_record_map_outer_whitespace_in_note_is_error(
+    record_map_component, record_map_rows
+):
+    record_map_rows[2][3] = " Главный протагонист"
+    result = parse_component(record_map_component, record_map_rows)
+    assert any(d.code == "tbx.unsupported_outer_whitespace" for d in result.diagnostics)
+
+
+def test_record_map_duplicate_context_is_error(record_map_component, record_map_rows):
+    record_map_rows[3][0] = "Персонажи"
+    record_map_rows[3][1] = "Герой"
+    result = parse_component(record_map_component, record_map_rows)
+    assert any(d.code == "tbx.duplicate_context" for d in result.diagnostics)
+
+
+def test_record_map_uncovered_row_is_error(record_map_component, record_map_rows):
+    record_map_rows.append(["extra", "данные", "data", "", ""])
+    result = parse_component(record_map_component, record_map_rows)
+    assert any(d.code == "grammar.uncovered_row" for d in result.diagnostics)
+
+
+def test_record_map_banner_above_the_header_is_not_scanned(
+    record_map_component, record_map_rows
+):
+    # Rows before the header row are outside the grammar's scan range, so the
+    # banner is neither reported as skipped nor as an uncovered row.
+    result = parse_component(record_map_component, record_map_rows)
+    assert result.skipped_rows == ()
+    assert not any(d.code == "grammar.uncovered_row" for d in result.diagnostics)
+
+
+# --------------------------------------------------------------------------- #
+# The same grammar engine, a completely different sheet shape
+# --------------------------------------------------------------------------- #
+
+
+STRIDE_TWO_PROFILE = {
+    "schema_version": 2,
+    "components": [
+        {
+            "sheet": "Terms",
+            "component": "Terms",
+            "kind": "tbx",
+            "source_lang": "ru",
+            "header_row": 1,
+            "languages": [
+                {"code": "ru", "xml_lang": "ru", "column": 1, "header": "ru"},
+                {"code": "ja", "xml_lang": "ja", "column": 2, "header": "ja"},
+            ],
+            "grammar": {
+                "type": "record-map",
+                "skip_rows": [],
+                "regions": [
+                    {
+                        "section_row": 2,
+                        "section_column": 1,
+                        "first_record_row": 3,
+                        "last_record_row": 6,
+                        "record_stride": 2,
+                    },
+                    {
+                        "section_row": 7,
+                        "section_column": 1,
+                        "first_record_row": 8,
+                        "last_record_row": 9,
+                        "record_stride": 2,
+                    },
+                ],
+                "term_row_offset": 0,
+                "notes": [
+                    {"scope": "source", "column": 1, "header": "ru", "row_offset": 1},
+                    {
+                        "scope": "target",
+                        "language": "ja",
+                        "column": 2,
+                        "header": "ja",
+                        "row_offset": 1,
+                    },
+                ],
+            },
+            "initial_target_languages": ["ja"],
+        }
+    ],
+}
+
+STRIDE_TWO_ROWS = [
+    ["ru", "ja"],
+    ["Персонажи", ""],
+    ["Герой", "ヒーロー"],
+    ["Главный герой", "主人公"],
+    ["Враг", "敵"],
+    ["Противник", "対戦相手"],
+    ["Оружие", ""],
+    ["Меч", "剣"],
+    ["Клинок", "刃"],
+]
+
+
+def test_stride_two_caption_regions_parse_with_the_same_engine():
+    """record-map is a grammar engine, not a one-spreadsheet reader."""
+    component = parse_profile(STRIDE_TWO_PROFILE).components[0]
+    result = parse_component(component, [row[:] for row in STRIDE_TWO_ROWS])
+
+    errors = [d for d in result.diagnostics if d.severity is Severity.ERROR]
+    assert errors == []
+    assert len(result.units) == 3
+
+    hero = result.units[0]
+    assert hero.section == "Персонажи"
+    assert hero.values == {"ru": "Герой", "ja": "ヒーロー"}
+    assert hero.source_explanation == "Главный герой"
+    assert hero.target_explanations == {"ja": "主人公"}
+    assert hero.context == '["Персонажи","Герой"]'
+    assert hero.term_row == 3 and hero.note_rows == (4, 4)
+
+    sword = result.units[2]
+    assert sword.section == "Оружие"
+    assert sword.values["ja"] == "剣"
+
+
+def test_stride_two_cjk_only_terms_keep_their_unicode_context():
+    profile = {
+        "schema_version": 2,
+        "components": [
+            {
+                **STRIDE_TWO_PROFILE["components"][0],
+                "source_lang": "ja",
+                "initial_target_languages": ["ru"],
+                "grammar": {
+                    **STRIDE_TWO_PROFILE["components"][0]["grammar"],
+                    "notes": [
+                        {
+                            "scope": "source",
+                            "column": 2,
+                            "header": "ja",
+                            "row_offset": 1,
+                        },
+                        {
+                            "scope": "target",
+                            "language": "ru",
+                            "column": 1,
+                            "header": "ru",
+                            "row_offset": 1,
+                        },
+                    ],
+                },
+            }
+        ],
+    }
+    component = parse_profile(profile).components[0]
+    result = parse_component(component, [row[:] for row in STRIDE_TWO_ROWS])
+
+    errors = [d for d in result.diagnostics if d.severity is Severity.ERROR]
+    assert errors == []
+    assert result.units[0].context == '["Персонажи","ヒーロー"]'
+    assert result.units[0].source_explanation == "主人公"
+
+
+def test_stride_two_caption_row_extra_cell_is_unmapped():
+    rows = [row[:] for row in STRIDE_TWO_ROWS]
+    rows[1] = ["Персонажи", "", "unexpected"]
+    component = parse_profile(STRIDE_TWO_PROFILE).components[0]
+    result = parse_component(component, rows)
+    assert any(d.code == "tbx.unmapped_cell" for d in result.diagnostics)
+
+
+def test_stride_two_blank_caption_is_error():
+    rows = [row[:] for row in STRIDE_TWO_ROWS]
+    rows[1] = ["", ""]
+    component = parse_profile(STRIDE_TWO_PROFILE).components[0]
+    result = parse_component(component, rows)
+    assert any(d.code == "tbx.missing_section" for d in result.diagnostics)

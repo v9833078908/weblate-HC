@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from contextlib import nullcontext, suppress
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -13,14 +14,17 @@ from zipfile import BadZipfile
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.files.base import ContentFile
 from django.db import transaction
 from django.db.models import Q
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.functional import cached_property
 from django.utils.http import urlencode
 from django.utils.translation import gettext
+from django.views.generic.base import TemplateView, View
 from django.views.generic.edit import CreateView
 
 from weblate.lang.models import Language
@@ -34,6 +38,8 @@ from weblate.trans.forms import (
     ComponentScratchCreateForm,
     ComponentSelectForm,
     ComponentZipCreateForm,
+    LocKitProfileCorrectionForm,
+    LocKitSheetSelectForm,
     ProjectCreateForm,
     ProjectImportCreateForm,
     ProjectImportForm,
@@ -43,17 +49,29 @@ from weblate.trans.inherited_settings import (
     INHERITABLE_COMPONENT_SETTINGS,
     get_inherit_field_name,
 )
+from weblate.trans.loc_kit import (
+    GlossaryProfileError,
+    ProfileProposalError,
+    SampleTooLargeError,
+    build_glossary_structure_sample,
+    profile_document_from_envelope,
+    request_profile_proposal,
+    validate_glossary_profile,
+)
 from weblate.trans.models import Category, Component, Project
+from weblate.trans.models.loc_kit import LocKitImportDraft
 from weblate.trans.tasks import import_project_backup, perform_update
 from weblate.utils import messages
 from weblate.utils.celery import store_task_metadata
 from weblate.utils.licenses import LICENSE_URLS, detect_license
 from weblate.utils.ratelimit import session_ratelimit_post
 from weblate.utils.views import (
+    KIT_TABLE_SUFFIXES,
     create_component_from_doc,
     create_component_from_kit,
 )
 from weblate.vcs.base import RepositoryError
+from weblate.vcs.git import LocalRepository
 from weblate.vcs.github import (
     GitHubInstallation,
     get_github_app_configurations,
@@ -75,6 +93,27 @@ if TYPE_CHECKING:
 
 SESSION_CREATE_KEY = "session_component"
 INTEGRATION_IMPORT_VCS_KEY = "integration_import_vcs"
+
+
+def get_creatable_projects(request: AuthenticatedHttpRequest):
+    """
+    Projects this user may create a component in.
+
+    Single source of truth for the component-creation gate. Every entry
+    point - the ordinary wizard and the glossary draft endpoints alike -
+    must go through here, so a new entry point cannot accidentally be more
+    permissive than the wizard (notably by skipping the billing check).
+    """
+    if request.user.is_superuser:
+        return Project.objects.order()
+    if "weblate.billing" in settings.INSTALLED_APPS:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.billing.models import Billing
+
+        return request.user.managed_projects.filter(
+            workspace__billing__in=Billing.objects.get_valid()
+        ).order()
+    return request.user.managed_projects
 
 
 class BaseCreateView(CreateView):
@@ -498,17 +537,7 @@ class CreateComponent(BaseCreateView):
             )
         except ValueError:
             self.selected_category = None
-        if request.user.is_superuser:
-            self.projects = Project.objects.order()
-        elif self.has_billing:
-            # ruff: ignore[import-outside-top-level]
-            from weblate.billing.models import Billing
-
-            self.projects = request.user.managed_projects.filter(
-                workspace__billing__in=Billing.objects.get_valid()
-            ).order()
-        else:
-            self.projects = request.user.managed_projects
+        self.projects = get_creatable_projects(request)
         self.initial = {}
         session_data = {}
         if SESSION_CREATE_KEY in request.GET and SESSION_CREATE_KEY in request.session:
@@ -574,6 +603,13 @@ class CreateFromZip(CreateComponent):
             return super().form_valid(form)
 
         uploaded = form.cleaned_data["zipfile"]
+        suffix = os.path.splitext(getattr(uploaded, "name", "") or "")[1].lower()
+        if suffix in KIT_TABLE_SUFFIXES and form.cleaned_data.get("is_glossary"):
+            # An explicit glossary intent on a table takes the analysis path:
+            # the file stays local in a temporary draft until the operator has
+            # seen a locally validated preview.
+            return self._start_glossary_draft(form, uploaded)
+
         try:
             _fake, kit_info = create_component_from_kit(form.cleaned_data, uploaded)
         except ValidationError as error:
@@ -627,6 +663,55 @@ class CreateFromZip(CreateComponent):
                 )
         self.request.method = "GET"
         return self.get(self.request)
+
+    def _start_glossary_draft(self, form, uploaded):
+        """Store the upload as a temporary draft and go to sheet selection."""
+        # ruff: ignore[import-outside-top-level]
+        from loc_kit_ingest.reader import ReaderError, read_sheets
+
+        filename = os.path.basename(getattr(uploaded, "name", "") or "")
+        uploaded.seek(0)
+        payload = uploaded.read()
+
+        # Read locally first: an unreadable file must fail here, before a
+        # draft exists and long before anything could leave the host.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            local = Path(tmpdir) / filename
+            local.write_bytes(payload)
+            try:
+                sheets = read_sheets(local)
+            except ReaderError as error:
+                form.add_error(
+                    "zipfile", gettext("Could not read the table: %s") % error
+                )
+                return self.form_invalid(form)
+        if not sheets:
+            form.add_error("zipfile", gettext("The table holds no worksheets."))
+            return self.form_invalid(form)
+
+        if not self.request.session.session_key:
+            self.request.session.create()
+        session_key = self.request.session.session_key or ""
+
+        draft = LocKitImportDraft(
+            owner=self.request.user,
+            session_key=session_key,
+            project=form.cleaned_data["project"],
+            category=form.cleaned_data.get("category"),
+            slug=form.cleaned_data["slug"],
+            name=form.cleaned_data["name"],
+            source_filename=filename,
+        )
+        # Storage is not transactional: the file lands on disk before the row
+        # is inserted, so a failed insert would strand it where the row-driven
+        # cleanup task can never find it. Undo the write by hand.
+        draft.uploaded.save(filename, ContentFile(payload), save=False)
+        try:
+            draft.save()
+        except Exception:
+            draft.delete_storage()
+            raise
+        return redirect("loc-kit-sheet-select", token=draft.token)
 
 
 class CreateFromDoc(CreateComponent):
@@ -902,3 +987,402 @@ class CreateComponentSelection(CreateComponent):
                 kwargs["project"] = self.selected_project
             return self.redirect_create(**kwargs)
         return super().post(request, *args, **kwargs)
+
+
+# --------------------------------------------------------------------------- #
+# Loc-kit glossary intake: sheet selection, preview, confirmation
+# --------------------------------------------------------------------------- #
+
+
+class LocKitDraftMixin(View):
+    """
+    Resolve a temporary glossary draft, or 404.
+
+    Every draft endpoint re-checks the same three things: the token belongs to
+    this user, it was created in this session, and the user still holds the
+    project-level component-creation permission. A revoked permission makes
+    the draft unavailable exactly like an expired one - it must not expose
+    staged files, trigger analysis, or create a component.
+    """
+
+    def get_draft(self, token: str) -> LocKitImportDraft:
+        draft = LocKitImportDraft.get_active(
+            token=token,
+            owner=self.request.user,
+            session_key=self.request.session.session_key or "",
+        )
+        if draft is None:
+            raise Http404
+        # Exactly the wizard's gate, billing included. A permission revoked
+        # (or billing lapsed) mid-flight makes the draft unavailable.
+        if (
+            not get_creatable_projects(self.request)
+            .filter(pk=draft.project_id)
+            .exists()
+        ):
+            raise Http404
+        return draft
+
+    def read_draft_sheets(self, draft: LocKitImportDraft) -> dict:
+        # ruff: ignore[import-outside-top-level]
+        from loc_kit_ingest.reader import ReaderError, read_sheets
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            local = Path(tmpdir) / draft.source_filename
+            with draft.uploaded.open("rb") as handle:
+                local.write_bytes(handle.read())
+            try:
+                return read_sheets(local)
+            except ReaderError as error:
+                raise Http404 from error
+
+
+@method_decorator(login_required, name="dispatch")
+class LocKitSheetSelectView(LocKitDraftMixin, TemplateView):
+    """Pick the single worksheet that becomes a glossary component."""
+
+    template_name = "trans/loc_kit_sheet_select.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        draft = self.get_draft(self.kwargs["token"])
+        sheets = self.read_draft_sheets(draft)
+        choices = [
+            (
+                name,
+                gettext("%(sheet)s (%(rows)d rows, %(columns)d columns)")
+                % {
+                    "sheet": name,
+                    "rows": len(rows),
+                    "columns": max((len(row) for row in rows), default=0),
+                },
+            )
+            for name, rows in sheets.items()
+        ]
+        context["draft"] = draft
+        context["form"] = kwargs.get("form") or LocKitSheetSelectForm(
+            sheet_choices=choices,
+            initial={"sheet": next(iter(sheets), None)},
+        )
+        context["analysis_enabled"] = settings.LOC_KIT_PROFILE_ANALYSIS_ENABLED
+        return context
+
+    @method_decorator(session_ratelimit_post("loc_kit_analysis", logout_user=False))
+    def post(self, request: AuthenticatedHttpRequest, **kwargs):
+        draft = self.get_draft(kwargs["token"])
+        sheets = self.read_draft_sheets(draft)
+        form = LocKitSheetSelectForm(
+            request.POST, sheet_choices=[(name, name) for name in sheets]
+        )
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form, **kwargs))
+
+        # Changing the sheet invalidates any previously accepted mapping:
+        # leaving it behind would show the old sheet's terms next to the new
+        # sheet's name and keep the create button live.
+        draft.sheet = form.cleaned_data["sheet"]
+        draft.state = LocKitImportDraft.State.SHEET_SELECTED
+        draft.profile_json = ""
+        draft.preview_json = ""
+        draft.save(update_fields=["sheet", "state", "profile_json", "preview_json"])
+
+        error = _analyze_draft_sheet(draft, sheets[draft.sheet])
+        if error is not None:
+            messages.error(request, error)
+        return redirect("loc-kit-glossary-preview", token=draft.token)
+
+
+def _analyze_draft_sheet(draft: LocKitImportDraft, rows: list) -> str | None:
+    """
+    Ask OpenRouter for a candidate profile and validate it locally.
+
+    Returns None on success, or a user-facing message explaining why the
+    operator has to supply a profile by hand. Never raises for a provider
+    problem: an unavailable analyzer is a manual-profile outcome, not an
+    error page.
+    """
+    if not settings.LOC_KIT_PROFILE_ANALYSIS_ENABLED:
+        return gettext("Automatic analysis is disabled. Upload a profile to continue.")
+    try:
+        sample = build_glossary_structure_sample(
+            rows, draft.sheet, settings.LOC_KIT_PROFILE_SAMPLE_MAX_BYTES
+        )
+    except SampleTooLargeError:
+        return gettext(
+            "This worksheet is too large to analyze automatically. "
+            "Upload a profile to continue."
+        )
+    try:
+        envelope = request_profile_proposal(sample)
+        document = profile_document_from_envelope(envelope)
+    except (ProfileProposalError, GlossaryProfileError) as error:
+        return str(error)
+
+    return _store_validated_profile(draft, document, rows)
+
+
+def _store_validated_profile(
+    draft: LocKitImportDraft, document: dict, rows: list
+) -> str | None:
+    """Validate a candidate locally and persist the preview, or explain why not."""
+    try:
+        preview = validate_glossary_profile(
+            profile_document=document,
+            rows=rows,
+            sheet_name=draft.sheet,
+            component_name=draft.slug,
+        )
+    except GlossaryProfileError as error:
+        detail = " ".join(error.details)
+        return f"{error.message} {detail}".strip()
+
+    draft.profile_json = preview.profile_json
+    draft.preview_json = json.dumps(
+        {
+            "source_language": preview.source_language,
+            "target_languages": list(preview.target_languages),
+            "term_count": preview.term_count,
+            "note_count": preview.note_count,
+            "warnings": list(preview.warnings),
+            "terms": [
+                {
+                    "section": term.section,
+                    "source": term.source,
+                    "targets": term.targets,
+                    "source_explanation": term.source_explanation,
+                    "target_explanations": term.target_explanations,
+                }
+                for term in preview.terms
+            ],
+        },
+        ensure_ascii=False,
+    )
+    draft.state = LocKitImportDraft.State.PREVIEW_READY
+    draft.save(update_fields=["profile_json", "preview_json", "state"])
+    return None
+
+
+@method_decorator(login_required, name="dispatch")
+class LocKitGlossaryPreviewView(LocKitDraftMixin, TemplateView):
+    """Show the validated preview, accept a correction, cancel, or confirm."""
+
+    template_name = "trans/loc_kit_glossary_preview.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        draft = self.get_draft(self.kwargs["token"])
+        context["draft"] = draft
+        context["preview"] = (
+            json.loads(draft.preview_json) if draft.preview_json else None
+        )
+        context["profile_form"] = kwargs.get("profile_form") or (
+            LocKitProfileCorrectionForm()
+        )
+        return context
+
+    def post(self, request: AuthenticatedHttpRequest, **kwargs):
+        draft = self.get_draft(kwargs["token"])
+        action = request.POST.get("action")
+
+        if action == "cancel":
+            draft.delete_storage()
+            draft.delete()
+            messages.info(request, gettext("Glossary import cancelled."))
+            return redirect("create-component-zip")
+
+        if action == "download-profile":
+            response = HttpResponse(
+                draft.profile_json, content_type="application/json; charset=utf-8"
+            )
+            response["Content-Disposition"] = (
+                f'attachment; filename="{draft.slug}.loc-ingest.json"'
+            )
+            return response
+
+        if action == "upload-profile":
+            form = LocKitProfileCorrectionForm(request.POST, request.FILES)
+            if not form.is_valid():
+                return self.render_to_response(
+                    self.get_context_data(profile_form=form, **kwargs)
+                )
+            sheets = self.read_draft_sheets(draft)
+            if draft.sheet not in sheets:
+                raise Http404
+            # A correction is revalidated against the same worksheet, locally.
+            # The analyzer is never called again.
+            error = _store_validated_profile(
+                draft, form.cleaned_data["profile"], sheets[draft.sheet]
+            )
+            if error is not None:
+                messages.error(request, error)
+            else:
+                messages.info(request, gettext("Profile accepted."))
+            return redirect("loc-kit-glossary-preview", token=draft.token)
+
+        if action == "confirm":
+            if draft.state != LocKitImportDraft.State.PREVIEW_READY:
+                raise Http404
+            return redirect("loc-kit-glossary-confirm", token=draft.token)
+
+        raise Http404
+
+
+# Fields the conversion decides. The operator may not change them at the final
+# form: they are re-applied server-side from the draft on every POST, so a
+# tampered form field cannot repoint the component at another format, mask,
+# template, source language, or drop the glossary flag.
+LOC_KIT_LOCKED_FIELDS = (
+    "file_format",
+    "filemask",
+    "template",
+    "new_base",
+    "vcs",
+    "repo",
+    "branch",
+    "source_language",
+    "is_glossary",
+)
+
+
+@method_decorator(login_required, name="dispatch")
+class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
+    """
+    Final component form for a validated glossary draft.
+
+    Re-enters the ordinary creation flow rather than creating a Component
+    directly, so every normal component setting the final form legitimately
+    exposes still applies. Only the conversion-derived fields are frozen.
+    """
+
+    # mypy: the base declares type[ComponentProjectForm]; the final glossary
+    # form is the ordinary component form, exactly as stage="create" implies.
+    form_class = ComponentCreateForm  # type: ignore[assignment]
+    origin = "zip"
+
+    # The base class derives `stage` from raw POST fields, which the client
+    # controls: omitting "new_base" would drive this request down the
+    # non-creating branch while form_valid still wrote a repository and
+    # destroyed the draft. This endpoint is only ever the final create step.
+    @property
+    def stage(self) -> str:
+        return "create"
+
+    @stage.setter
+    def stage(self, value: str) -> None:
+        """Ignore the base class's POST-derived stage."""
+
+    @cached_property
+    def draft(self) -> LocKitImportDraft:
+        return self.get_draft(self.kwargs["token"])
+
+    def locked_values(self) -> dict:
+        draft = self.draft
+        values = {
+            "file_format": "tbx",
+            "filemask": "tbx/*.tbx",
+            "template": "",
+            "new_base": "",
+            "vcs": "local",
+            "repo": "local:",
+            "branch": "main",
+            "is_glossary": True,
+        }
+        preview = json.loads(draft.preview_json)
+        # An unresolvable code must not silently drop source_language out of
+        # the lock: get_form_kwargs skips absent keys, so the client's posted
+        # value would survive for the one field that decides which components
+        # this glossary applies to.
+        try:
+            values["source_language"] = Language.objects.get(
+                code=preview["source_language"]
+            )
+        except Language.DoesNotExist as error:
+            raise Http404 from error
+        return values
+
+    def get_initial(self):
+        draft = self.draft
+        if draft.state != LocKitImportDraft.State.PREVIEW_READY:
+            raise Http404
+        initial = {
+            **super().get_initial(),
+            "project": draft.project,
+            "category": draft.category,
+            "name": draft.name,
+            "slug": draft.slug,
+            **self.locked_values(),
+        }
+        initial["new_lang"] = "none"
+        return initial
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        if self.request.method == "POST":
+            # Revalidate server-side, not through initial values: overwrite
+            # whatever the client posted for the conversion-derived fields.
+            data = kwargs.get("data")
+            if data is not None:
+                data = data.copy()
+                locked = self.locked_values()
+                for field in LOC_KIT_LOCKED_FIELDS:
+                    if field not in locked:
+                        continue
+                    value = locked[field]
+                    if isinstance(value, Language):
+                        data[field] = str(value.pk)
+                    elif isinstance(value, bool):
+                        data[field] = "on" if value else ""
+                    else:
+                        data[field] = value
+                data["project"] = str(self.draft.project.pk)
+                kwargs["data"] = data
+        return kwargs
+
+    @transaction.atomic
+    def form_valid(self, form):
+        draft = self.draft
+        if draft.state != LocKitImportDraft.State.PREVIEW_READY:
+            raise Http404
+
+        # Re-render from the stored profile and parse back once more before a
+        # repository exists. The draft holds a profile, not staged bytes, so
+        # this is the real publication gate rather than a replay of it.
+        sheets = self.read_draft_sheets(draft)
+        if draft.sheet not in sheets:
+            raise Http404
+        try:
+            preview = validate_glossary_profile(
+                profile_document=json.loads(draft.profile_json),
+                rows=sheets[draft.sheet],
+                sheet_name=draft.sheet,
+                component_name=draft.slug,
+            )
+        except GlossaryProfileError as error:
+            form.add_error(None, str(error))
+            return self.form_invalid(form)
+
+        # Build the repository at the path this component will actually
+        # occupy. Taking category from the draft while the form saves a
+        # different one would point full_path at somebody else's component
+        # directory, and LocalRepository.from_files removes an existing
+        # target before cloning - that would destroy a live repository.
+        # form.instance carries exactly the validated, about-to-be-saved
+        # project/category/slug.
+        fake = form.instance
+        fake.project = draft.project
+        LocalRepository.from_files(
+            fake.full_path,
+            {f"tbx/{name}": data for name, data in preview.files.items()},
+        )
+
+        response = super().form_valid(form)
+
+        # Consume the draft only once the component really exists, so a
+        # non-creating code path can never destroy the operator's upload.
+        if getattr(self, "object", None) is None:
+            return response
+        draft.state = LocKitImportDraft.State.CONSUMED
+        draft.save(update_fields=["state"])
+        draft.delete_storage()
+        draft.delete()
+        return response

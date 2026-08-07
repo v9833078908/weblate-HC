@@ -348,6 +348,21 @@ real_patterns = [
         name="create-component-zip",
     ),
     path(
+        "create/component/glossary/<uuid:token>/sheet/",
+        weblate.trans.views.create.LocKitSheetSelectView.as_view(),
+        name="loc-kit-sheet-select",
+    ),
+    path(
+        "create/component/glossary/<uuid:token>/preview/",
+        weblate.trans.views.create.LocKitGlossaryPreviewView.as_view(),
+        name="loc-kit-glossary-preview",
+    ),
+    path(
+        "create/component/glossary/<uuid:token>/confirm/",
+        weblate.trans.views.create.LocKitGlossaryConfirmView.as_view(),
+        name="loc-kit-glossary-confirm",
+    ),
+    path(
         "create/component/doc/",
         weblate.trans.views.create.CreateFromDoc.as_view(),
         name="create-component-doc",

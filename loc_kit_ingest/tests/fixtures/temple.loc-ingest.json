@@ -9,15 +9,42 @@
       "header_row": 1,
       "first_data_row": 3,
       "languages": [
-        {"code": "ru", "xml_lang": "ru", "column": 3, "header": "ru"},
-        {"code": "en", "xml_lang": "en", "column": 4, "header": "en"}
+        {
+          "code": "ru",
+          "xml_lang": "ru",
+          "column": 3,
+          "header": "ru"
+        },
+        {
+          "code": "en",
+          "xml_lang": "en",
+          "column": 4,
+          "header": "en"
+        }
       ],
-      "key": {"column": 1, "header": "id"},
-      "comments": [{"column": 2, "name": "Character", "header": "Character"}],
-      "references": [{"column": 5, "name": "Id", "header": "Id"}],
+      "key": {
+        "column": 1,
+        "header": "id"
+      },
+      "comments": [
+        {
+          "column": 2,
+          "name": "Character",
+          "header": "Character"
+        }
+      ],
+      "references": [
+        {
+          "column": 5,
+          "name": "Id",
+          "header": "Id"
+        }
+      ],
       "grammar": {
         "type": "keyed",
-        "skip_rows": [2],
+        "skip_rows": [
+          2
+        ],
         "allow_blank_rows": true
       }
     }

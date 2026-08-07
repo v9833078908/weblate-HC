@@ -42,6 +42,27 @@ DEFAULT_HIDE_REPO_CREDENTIALS = True
 DEFAULT_HIDE_SHARED_GLOSSARY_COMPONENTS = False
 DEFAULT_CREATE_GLOSSARIES = True
 
+# Loc-kit glossary OpenRouter profile analysis (off by default)
+DEFAULT_LOC_KIT_PROFILE_ANALYSIS_ENABLED = False
+DEFAULT_LOC_KIT_PROFILE_OPENROUTER_KEY = ""
+DEFAULT_LOC_KIT_PROFILE_OPENROUTER_MODEL = ""
+DEFAULT_LOC_KIT_PROFILE_SAMPLE_MAX_BYTES = 131072
+DEFAULT_LOC_KIT_IMPORT_DRAFT_EXPIRY = 3600
+
+
+# Hard caps enforced regardless of environment input.
+LOC_KIT_PROFILE_SAMPLE_MAX_BYTES_CAP = 131072
+LOC_KIT_IMPORT_DRAFT_EXPIRY_CAP = 3600
+
+
+def clamp_loc_kit_sample_max_bytes(value: int) -> int:
+    return min(int(value), LOC_KIT_PROFILE_SAMPLE_MAX_BYTES_CAP)
+
+
+def clamp_loc_kit_import_draft_expiry(value: int) -> int:
+    return min(int(value), LOC_KIT_IMPORT_DRAFT_EXPIRY_CAP)
+
+
 DEFAULT_COMMITER_EMAIL = "noreply@weblate.org"
 DEFAULT_COMMITER_NAME = "Weblate"
 DEFAULT_TRANSLATION_PROPAGATION = True

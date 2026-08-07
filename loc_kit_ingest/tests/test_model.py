@@ -23,20 +23,24 @@ def test_string_unit_keeps_text_and_metadata_verbatim():
     assert unit.comments == ("Character: Sample",)
 
 
-def test_glossary_term_keeps_explanations_per_language():
+def test_glossary_term_separates_source_and_target_explanations():
     term = GlossaryTerm(
-        context="characters.hero",
+        context='["Characters","Герой"]',
         values={"ru": "Герой", "en": "Hero"},
-        explanations={"ru": "Описание", "en": "Description"},
+        source_explanation="Описание",
+        target_explanations={"en": "Description"},
         section="Characters",
         term_row=4,
-        description_row=5,
+        note_rows=(5,),
     )
-    assert term.explanations == {"ru": "Описание", "en": "Description"}
+    assert term.source_explanation == "Описание"
+    assert term.target_explanations == {"en": "Description"}
 
 
 def test_diagnostic_and_skip_are_typed():
-    diagnostic = Diagnostic(Severity.ERROR, "profile.unknown_field", "UI", "Sheet", 2, "bad")
+    diagnostic = Diagnostic(
+        Severity.ERROR, "profile.unknown_field", "UI", "Sheet", 2, "bad"
+    )
     skipped = SkippedRow("Temple", "Temple", 9, "blank")
     assert diagnostic.severity is Severity.ERROR
     assert skipped.reason == "blank"

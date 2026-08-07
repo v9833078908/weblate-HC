@@ -10,7 +10,6 @@ from loc_kit_ingest.model import Severity
 from loc_kit_ingest.profile import load_profile
 from loc_kit_ingest.reader import read_sheets, validate_sheet_headers
 
-
 # ---------------------------------------------------------------------------
 # CSV / TSV
 # ---------------------------------------------------------------------------
@@ -18,7 +17,7 @@ from loc_kit_ingest.reader import read_sheets, validate_sheet_headers
 
 def test_csv_preserves_quoted_newlines_bom_and_trailing_spaces(tmp_path):
     path = tmp_path / "Kit.csv"
-    path.write_bytes(b"\xef\xbb\xbfid,ru,en\r\nkey,\" x\r\ny \",text \r\n")
+    path.write_bytes(b'\xef\xbb\xbfid,ru,en\r\nkey," x\r\ny ",text \r\n')
     rows = read_sheets(path)["Kit"]
     assert rows[1] == ["key", " x\r\ny ", "text "]
 

@@ -724,7 +724,8 @@ weblate = [
   "examples/git-merge-gettext-po",
   "locale/**/*.mo",
   "static/**/*",
-  "templates/**/*"
+  "templates/**/*",
+  "trans/prompts/*.txt"
 ]
 "weblate.fonts" = ["static/**/*"]
 "weblate.legal" = ["templates/**/*"]

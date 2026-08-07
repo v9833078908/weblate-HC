@@ -102,6 +102,15 @@ Scope and intended use
      - In scope for Weblate's handling of configured backup jobs; Borg itself
        is out of scope. *(documented)* (source: :doc:`/admin/backup`,
        :doc:`/admin/management`)
+   * - Loc-kit glossary table intake
+     - :ref:`uploading-glossary-tables` upload form, sheet-selection, preview,
+       and draft confirmation; :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED`
+       gates the optional outbound proposal
+     - Database (temporary draft), private draft storage under the data
+       directory, bounded outbound OpenRouter request when analysis is enabled
+     - In scope. The outbound request is a fixed-host, site-wide-credentialed
+       proposal only; provider behavior is out of scope. *(documented)*
+       (source: :ref:`uploading-glossary-tables`, :doc:`/admin/config`)
    * - Machine translation and outbound integrations
      - Machine translation, avatars, status reporting, telemetry, error
        reporting, VCS hosts, GitHub App connections, CDN add-on, Fedora
@@ -212,6 +221,15 @@ repository state, background tasks, outbound requests, and rendered UI.
      - Configured URLs, credentials, and provider settings drive outbound
        network connections. *(documented)* (source: :doc:`/admin/code-hosting`,
        :doc:`/admin/config`)
+   * - Loc-kit glossary draft to OpenRouter
+     - An authenticated table upload becomes a fixed outbound request only
+       after explicit :ref:`component-is_glossary` intent and an explicitly
+       selected worksheet. The request carries a bounded structural sample and
+       separate site-wide credentials to a fixed provider host; users cannot
+       supply an endpoint, key, or model. The provider response is untrusted
+       input that is validated locally and can never create a component
+       directly. *(documented)* (source: :ref:`uploading-glossary-tables`,
+       :doc:`/admin/config`)
    * - Project backup archives and Weblate filesystem
      - Uploaded ZIP members and metadata become restored project state;
        generated project backups are written to and read from local backup
@@ -260,6 +278,14 @@ Reachability preconditions:
 * A management-command finding is in model only when untrusted Weblate data is
   processed by the command; arbitrary local shell access is not an attacker
   capability. *(maintainer)*
+* A loc-kit glossary finding is in model only when reachable from the
+  authenticated :ref:`uploading-glossary-tables` workflow, and an outbound
+  proposal finding only when analysis is enabled, credentials are configured,
+  and an explicit glossary intent plus selected worksheet precede the request.
+  A draft finding is in model only across the owner-and-session-bound draft
+  lifecycle, with project-level component-creation permission rechecked on
+  every draft endpoint. *(documented)* (source:
+  :ref:`uploading-glossary-tables`, :doc:`/admin/config`)
 
 Environment assumptions
 -----------------------
@@ -501,6 +527,17 @@ Input assumptions
        *(documented)* (source: :doc:`/admin/machine`, :doc:`/admin/access`)
      - Treat configured providers as recipients of the data sent to them; the
        submitted content varies by provider and enabled feature. *(maintainer)*
+   * - Loc-kit glossary table upload
+     - Uploaded CSV/TSV/XLSX workbook, selected worksheet, corrected profile
+       JSON; an OpenRouter proposal response when analysis is enabled
+     - Yes, the upload and worksheet are attacker-controllable within the
+       authenticated actor's permissions; the provider response is untrusted
+       input. *(documented)* (source: :ref:`uploading-glossary-tables`)
+     - The provider response is validated locally and can never execute code
+       or create a component directly; users cannot supply an endpoint, key,
+       or model. Treat the configured provider as a recipient of the
+       structural sample. *(documented)* (source:
+       :ref:`uploading-glossary-tables`, :doc:`/admin/config`)
    * - Management commands
      - Command-line arguments and files supplied by the local operator
      - Trusted local input unless processing Weblate data or project backups.
@@ -529,6 +566,19 @@ Size and rate assumptions:
 * Repository size, number of projects, number of components, and worker
   capacity are deployment-sizing concerns unless a single in-scope input
   bypasses documented limits or permissions. *(maintainer)*
+* Loc-kit glossary profile analysis transmits a structural sample of the one
+  selected worksheet, hard-capped at
+  :setting:`LOC_KIT_PROFILE_SAMPLE_MAX_BYTES` (128 KiB) and rate-limited by
+  :setting:`RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS`. Other worksheets and the
+  uploaded file itself are never sent, and no cell excerpt exceeds 80
+  characters, but within that budget the sample is deliberately
+  representative: for a worksheet whose truncated content fits under the
+  cap - the common case for a glossary - an excerpt of every row is
+  transmitted. Treat the selected worksheet's content as disclosed to the
+  configured provider. Drafts live at most
+  :setting:`LOC_KIT_IMPORT_DRAFT_EXPIRY` (one hour), are owner-and-session
+  bound, and are removed by periodic cleanup. *(documented)* (source:
+  :doc:`/admin/config`)
 
 Adversary model
 ---------------
@@ -684,6 +734,21 @@ Security properties Weblate provides
      - Public request retrieves raw internal storage, configuration, or
        non-exported repository data.
      - Security-critical.
+   * - A loc-kit glossary proposal response, whether from OpenRouter or an
+       uploaded correction, is untrusted input: it is validated locally against
+       the selected sheet and can never execute code or create a component
+       directly. A draft is owner-and-session bound, every draft endpoint
+       rechecks project-level component-creation permission, and only a
+       successful local render-and-parse-back gate reaches component creation.
+       *(documented)* (source: :ref:`uploading-glossary-tables`,
+       :doc:`/admin/config`)
+     - Analysis is enabled and configured, or a manual profile is supplied.
+     - A model response, malformed profile, unsupported flag, unmapped cell,
+       source-only table, missing target term, parse-back mismatch, wrong
+       owner, wrong session, expired draft, or revoked permission creates or
+       reads a component or draft.
+     - Security-critical for authorization or component creation; availability
+       otherwise.
 
 Resource thresholds in this model are the documented configuration defaults
 where they exist, especially backup import limits and rate limits. For
@@ -796,6 +861,12 @@ Known misuse patterns
   is unsafe because Weblate must transmit content to the configured service, and
   the submitted content varies by provider and enabled feature. Configure
   providers according to the data policy for the project. *(maintainer)*
+* Enabling loc-kit glossary profile analysis and uploading a sensitive
+  glossary table without treating OpenRouter as a data recipient. This is
+  unsafe because the bounded structural sample of the selected sheet is
+  transmitted to the configured provider. Keep analysis disabled for
+  confidential glossaries or use manual profile upload. *(documented)*
+  (source: :ref:`uploading-glossary-tables`, :doc:`/admin/config`)
 * Importing project backups from untrusted sources as an administrative
   convenience. This is unsafe because backups carry project metadata,
   translation content, and repository state. Keep import limits enabled and
@@ -843,6 +914,12 @@ Revise this model when an unsupported component becomes supported product
 surface, when a documented security property is removed or narrowed, or when
 maintainers accept a vulnerability report that cannot be routed to a triage
 disposition below. *(maintainer)*
+
+The loc-kit glossary table intake (see :ref:`uploading-glossary-tables`) is the
+reviewed instance of a new import format plus a fixed-host outbound integration
+class: its owner-and-session-bound temporary draft, bounded sample, per-session
+rate limit, and locally validated proposal response are documented above.
+*(maintainer)*
 
 Triage dispositions
 -------------------

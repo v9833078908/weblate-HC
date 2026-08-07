@@ -174,8 +174,8 @@ def _render_tbx(
             tbx_unit.setid(unit_data.context)
             tbx_unit.target = unit_data.values.get(target_code, "")
 
-            source_explanation = unit_data.explanations.get(source_lang, "")
-            target_explanation = unit_data.explanations.get(target_code, "")
+            source_explanation = unit_data.source_explanation
+            target_explanation = unit_data.target_explanations.get(target_code, "")
 
             if source_explanation:
                 tbx_unit.addnote(source_explanation, origin="definition")
@@ -277,7 +277,7 @@ def _validate_tbx(
                 )
 
             # Check definition note (source explanation).
-            expected_def = expected.explanations.get(source_lang, "")
+            expected_def = expected.source_explanation
             if expected_def:
                 actual_def = tbx_unit.getnotes("definition")
                 if expected_def not in actual_def:
@@ -289,6 +289,22 @@ def _validate_tbx(
                             "",
                             0,
                             f"source explanation mismatch for context {ctx!r}",
+                        )
+                    )
+
+            # Check translator note (target explanation).
+            expected_target_note = expected.target_explanations.get(target_code, "")
+            if expected_target_note:
+                actual_note = tbx_unit.getnotes("translator")
+                if expected_target_note not in actual_note:
+                    diagnostics.append(
+                        Diagnostic(
+                            Severity.ERROR,
+                            "render.explanation_mismatch",
+                            component.component,
+                            "",
+                            0,
+                            f"target explanation mismatch for context {ctx!r}",
                         )
                     )
 

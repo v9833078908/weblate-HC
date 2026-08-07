@@ -1578,6 +1578,153 @@ The files are served by your web server or CDN, not by Weblate; see
    * :ref:`addon-weblate.cdn.cdnjs`
    * :ref:`addon-weblate.cdn.files`
 
+.. setting:: LOC_KIT_PROFILE_ANALYSIS_ENABLED
+
+LOC_KIT_PROFILE_ANALYSIS_ENABLED
+--------------------------------
+
+.. versionadded:: 5.13
+
+Enables site-wide OpenRouter profile analysis for loc-kit glossary tables.
+Defaults to ``False``. Analysis starts only for an uploaded CSV, TSV, or XLSX
+table whose operator checked :ref:`component-is_glossary`; ordinary loc-kit
+table uploads are never sent to a provider. When enabled, a bounded,
+deterministic structural sample of the selected worksheet is transmitted to
+OpenRouter so the configured model can propose a profile. The complete file
+stays on the server; only the sample leaves.
+
+The provider host is fixed and not configurable, and the model cannot be
+chosen per project or per user. The configured model must support strict
+structured outputs so the response conforms to the required JSON schema.
+
+A proposal is only ever a proposal: the response is validated locally against
+every cell before a glossary component can be created, and a malformed,
+unsupported, or invalid response never creates a component.
+
+.. seealso::
+
+   * :setting:`LOC_KIT_PROFILE_OPENROUTER_KEY`
+   * :setting:`LOC_KIT_PROFILE_OPENROUTER_MODEL`
+   * :setting:`LOC_KIT_PROFILE_SAMPLE_MAX_BYTES`
+   * :setting:`LOC_KIT_IMPORT_DRAFT_EXPIRY`
+   * :setting:`RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS`
+   * :ref:`uploading-glossary-tables`
+
+.. setting:: LOC_KIT_PROFILE_OPENROUTER_KEY
+
+LOC_KIT_PROFILE_OPENROUTER_KEY
+------------------------------
+
+.. versionadded:: 5.13
+
+Site-wide OpenRouter API key used for loc-kit profile analysis. Leave empty to
+disable analysis. This key is separate from any machine-translation provider
+configuration and is never exposed per-project or per-user; uploading users
+cannot supply their own key, model, or endpoint.
+
+.. seealso::
+
+   * :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED`
+
+.. setting:: LOC_KIT_PROFILE_OPENROUTER_MODEL
+
+LOC_KIT_PROFILE_OPENROUTER_MODEL
+--------------------------------
+
+.. versionadded:: 5.13
+
+OpenRouter model identifier (for example ``openai/gpt-4o``) used for loc-kit
+profile analysis. The model must support strict structured outputs
+(``response_format`` of type ``json_schema`` with ``strict: true``); a model
+that cannot satisfy the response schema produces a recoverable preview error
+instead of a component.
+
+.. seealso::
+
+   * :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED`
+
+.. setting:: LOC_KIT_PROFILE_SAMPLE_MAX_BYTES
+
+LOC_KIT_PROFILE_SAMPLE_MAX_BYTES
+--------------------------------
+
+.. versionadded:: 5.13
+
+Maximum size in bytes of the serialized structural sample sent to OpenRouter
+for loc-kit profile analysis. Defaults to 131072 (128 KiB) and is hard-capped
+at that value regardless of environment input, so a larger setting never
+enlarges the transmitted sample. A worksheet whose signature payload cannot
+fit even after maximal truncation produces a local ``loc_kit.sample_too_large``
+diagnostic and offers manual profile upload instead of sending a larger
+sample.
+
+.. seealso::
+
+   * :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED`
+   * :setting:`LOC_KIT_IMPORT_DRAFT_EXPIRY`
+
+.. setting:: LOC_KIT_IMPORT_DRAFT_EXPIRY
+
+LOC_KIT_IMPORT_DRAFT_EXPIRY
+---------------------------
+
+.. versionadded:: 5.13
+
+Lifetime in seconds of a loc-kit glossary import draft, the temporary
+record that holds an uploaded workbook between sheet selection, preview,
+correction, and final component creation. Defaults to 3600 (one hour) and is
+hard-capped at 3600 regardless of environment input. A draft is also deleted
+on successful component creation, on explicit cancellation, and by the periodic
+cleanup task. Draft files are stored privately under the data directory and
+every lookup requires the same authenticated owner and session binding.
+
+.. seealso::
+
+   * :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED`
+   * :setting:`RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS`
+
+.. setting:: RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS
+
+RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS
+-----------------------------------
+
+.. versionadded:: 5.13
+
+Maximum number of loc-kit glossary profile analysis requests a single session
+may issue before rate limiting applies. Defaults to 3. Applies only to the
+OpenRouter proposal request triggered after a sheet is selected; it does not
+limit ordinary loc-kit table uploads.
+
+.. seealso::
+
+   * :setting:`RATELIMIT_LOC_KIT_ANALYSIS_WINDOW`
+   * :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED`
+
+.. setting:: RATELIMIT_LOC_KIT_ANALYSIS_WINDOW
+
+RATELIMIT_LOC_KIT_ANALYSIS_WINDOW
+---------------------------------
+
+.. versionadded:: 5.13
+
+Length of the rate-limit window for loc-kit glossary profile analysis, in
+seconds. Defaults to 3600 (one hour).
+
+.. seealso::
+
+   * :setting:`RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS`
+   * :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED`
+
+.. seealso::
+
+   * :envvar:`WEBLATE_LOC_KIT_PROFILE_ANALYSIS_ENABLED`
+   * :envvar:`WEBLATE_LOC_KIT_PROFILE_OPENROUTER_KEY`
+   * :envvar:`WEBLATE_LOC_KIT_PROFILE_OPENROUTER_MODEL`
+   * :envvar:`WEBLATE_LOC_KIT_PROFILE_SAMPLE_MAX_BYTES`
+   * :envvar:`WEBLATE_LOC_KIT_IMPORT_DRAFT_EXPIRY`
+   * :envvar:`WEBLATE_RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS`
+   * :envvar:`WEBLATE_RATELIMIT_LOC_KIT_ANALYSIS_WINDOW`
+
 .. setting:: PIWIK_SITE_ID
 .. setting:: MATOMO_SITE_ID
 

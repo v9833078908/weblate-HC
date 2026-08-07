@@ -6,19 +6,15 @@
 
 from __future__ import annotations
 
-import json
+import zipfile
 from pathlib import Path
 
-import pytest
-import zipfile
-
 from loc_kit_ingest.cli import main
-from loc_kit_ingest.model import Diagnostic, Severity, StringUnit
+from loc_kit_ingest.model import Severity, StringUnit
 from loc_kit_ingest.parser import parse_component
 from loc_kit_ingest.profile import load_profile
 from loc_kit_ingest.reader import read_sheets
-from loc_kit_ingest.writer import render_component, validate_rendered_component
-
+from loc_kit_ingest.writer import render_component
 
 # ---------------------------------------------------------------------------
 # Temple-like CSV boundaries
@@ -174,12 +170,13 @@ def test_tbx_preserves_internal_newlines(tmp_path):
         kind="tbx",
         units=(
             GlossaryTerm(
-                context="test.newline",
+                context='["Test","Терм"]',
                 values={"ru": "Терм", "en": "Term", "ja": "用語"},
-                explanations={"ru": "Опи\nсание", "en": "Expla\nnation", "ja": ""},
+                source_explanation="Опи\nсание",
+                target_explanations={"en": "Expla\nnation", "ja": ""},
                 section="Test",
                 term_row=4,
-                description_row=5,
+                note_rows=(5,),
             ),
         ),
         diagnostics=(),
@@ -189,5 +186,5 @@ def test_tbx_preserves_internal_newlines(tmp_path):
     from translate.storage.tbx import tbxfile
 
     parsed = tbxfile.parsestring(paths["en"].read_bytes())
-    unit = next(u for u in parsed.units if u.getid() == "test.newline")
+    unit = next(u for u in parsed.units if u.getid() == '["Test","Терм"]')
     assert "\n" in unit.getnotes("definition")

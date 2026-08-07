@@ -139,7 +139,7 @@
             <input type="hidden" name="project" value="{{ selected_project }}" />
             <p>
               {% translate "Create a new translation component from an uploaded file: a ZIP archive with translation files, or a loc-kit table (CSV, TSV, XLSX)." %}
-              {% translate "Filenames in a ZIP archive need locale codes; in a table the languages are recognized from its header row and translations are imported right away." %}
+              {% translate "Filenames in a ZIP archive need locale codes; in a table the first column holds keys unless it is itself a recognized language column, other languages are recognized from the header row, and translations are imported right away." %}
             </p>
             {% crispy zip_form %}
             <input type="submit"

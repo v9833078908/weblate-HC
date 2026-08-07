@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -49,11 +48,23 @@ def kit_with_profile(tmp_path):
                         "header_row": 1,
                         "first_data_row": 3,
                         "languages": [
-                            {"code": "ru", "xml_lang": "ru", "column": 3, "header": "ru"},
-                            {"code": "en", "xml_lang": "en", "column": 4, "header": "en"},
+                            {
+                                "code": "ru",
+                                "xml_lang": "ru",
+                                "column": 3,
+                                "header": "ru",
+                            },
+                            {
+                                "code": "en",
+                                "xml_lang": "en",
+                                "column": 4,
+                                "header": "en",
+                            },
                         ],
                         "key": {"column": 1, "header": "id"},
-                        "comments": [{"column": 2, "name": "Character", "header": "Character"}],
+                        "comments": [
+                            {"column": 2, "name": "Character", "header": "Character"}
+                        ],
                         "references": [{"column": 5, "name": "Id", "header": "Id"}],
                         "grammar": {
                             "type": "keyed",
@@ -68,16 +79,39 @@ def kit_with_profile(tmp_path):
                         "source_lang": "ru",
                         "header_row": 1,
                         "languages": [
-                            {"code": "ru", "xml_lang": "ru", "column": 1, "header": "ru"},
-                            {"code": "en", "xml_lang": "en", "column": 2, "header": "en"},
-                            {"code": "ja", "xml_lang": "ja", "column": 3, "header": "ja"},
+                            {
+                                "code": "ru",
+                                "xml_lang": "ru",
+                                "column": 1,
+                                "header": "ru",
+                            },
+                            {
+                                "code": "en",
+                                "xml_lang": "en",
+                                "column": 2,
+                                "header": "en",
+                            },
+                            {
+                                "code": "ja",
+                                "xml_lang": "ja",
+                                "column": 3,
+                                "header": "ja",
+                            },
                         ],
                         "grammar": {
                             "type": "term-description-pairs",
                             "skip_rows": [2],
                             "regions": [
-                                {"section_row": 3, "first_term_row": 4, "last_description_row": 5},
-                                {"section_row": 6, "first_term_row": 7, "last_description_row": 8},
+                                {
+                                    "section_row": 3,
+                                    "first_term_row": 4,
+                                    "last_description_row": 5,
+                                },
+                                {
+                                    "section_row": 6,
+                                    "first_term_row": 7,
+                                    "last_description_row": 8,
+                                },
                             ],
                         },
                         "key_language": "en",

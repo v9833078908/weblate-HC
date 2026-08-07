@@ -63,7 +63,9 @@ except (RepositoryError, OSError):
 if GIT_REVISION:
     GIT_LINK = f"https://github.com/v9833078908/weblate-HC/commits/{GIT_REVISION}"
 elif VERSION == VERSION_BASE:
-    GIT_LINK = f"https://github.com/v9833078908/weblate-HC/releases/tag/weblate-{VERSION}"
+    GIT_LINK = (
+        f"https://github.com/v9833078908/weblate-HC/releases/tag/weblate-{VERSION}"
+    )
 else:
     GIT_LINK = None
 
