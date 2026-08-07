@@ -432,9 +432,9 @@ Add site-wide settings, disabled by default:
 - `RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS = 3`
 - `RATELIMIT_LOC_KIT_ANALYSIS_WINDOW = 3600`
 
-Expose Docker environment variables with the established `WEBLATE_` prefix. The API base URL is a module constant `https://openrouter.ai/api/v1`; it is not configurable. Document that enabling the feature sends structural samples to OpenRouter and that the configured model must support strict structured outputs.
+Expose Docker environment variables with the established `WEBLATE_` prefix. The API base URL is a module constant `https://openrouter.ai/api/v1`; it is not configurable. Clamp `LOC_KIT_PROFILE_SAMPLE_MAX_BYTES` to 131072 and `LOC_KIT_IMPORT_DRAFT_EXPIRY` to 3600 regardless of environment input. Document that enabling the feature sends structural samples to OpenRouter and that the configured model must support strict structured outputs.
 
-**Tests:** configuration defaults, Docker environment parsing, and disabled-by-default behavior.
+**Tests:** configuration defaults, Docker environment parsing, disabled-by-default behavior, and clamping values above those hard limits.
 
 ## Task C2 - Build a bounded structural sampler
 
@@ -459,13 +459,18 @@ Write tests for:
 **Files:**
 
 - Modify: `weblate/trans/loc_kit.py`
+- Create: `weblate/trans/prompts/__init__.py`
+- Create: `weblate/trans/prompts/loc_kit_profile.txt`
+- Modify: `pyproject.toml`
 - Modify: `weblate/trans/tests/test_loc_kit_profile_suggester.py`
 
 Implement a small service with this boundary:
 
+Keep the static instruction in `weblate/trans/prompts/loc_kit_profile.txt`, loaded with `importlib.resources`; include that asset in the wheel through `pyproject.toml`. The prompt receives the structural sample as a separate user message, tells the model to return only the response envelope, and says that insufficient structure must produce `status: "unsupported"`. Test the loaded prompt rather than duplicating it in Python.
+
 1. Refuse when the site-wide service is disabled or its key/model is absent.
 2. Send a POST only to the fixed OpenRouter chat-completions URL through `fetch_validated_url`.
-3. Use `Authorization: Bearer <site key>`, the configured model, `stream: false`, `response_format` strict JSON Schema, and OpenRouter's `provider.require_parameters: true` preference.
+3. Use `Authorization: Bearer <site key>`, the configured model, `stream: false`, `response_format` strict JSON Schema, OpenRouter's `provider.require_parameters: true` preference, and a fixed 120-second request timeout matching Weblate's LLM machinery.
 4. Parse only `choices[0].message.content` as JSON and validate the envelope before returning it.
 5. Never log the key, raw sample, raw model response, or user cell values. Turn provider errors into concise user-facing failure states and preserve the exception for server diagnostics only where project convention permits.
 
@@ -513,7 +518,9 @@ Add `LocKitImportDraft` with:
 
 Files are temporary data, not an audit log. Enforce `expires_at <= created_at + 1 hour`; all draft lookup paths require the same authenticated owner and session binding; expired or consumed drafts behave as absent. Explicit cancel and successful component creation delete the storage object. Add a Celery cleanup task every 15 minutes that deletes expired rows and files idempotently.
 
-Tests must cover owner isolation, session isolation, expiry, cancellation, successful consumption, storage deletion, repeated cleanup, and a stale token that cannot be reused.
+Every draft endpoint must also recheck the same project-level component-creation permission as the normal wizard. A revoked permission makes the draft unavailable and must not trigger analysis, expose staged files, or create a component.
+
+Tests must cover owner isolation, session isolation, permission revocation, expiry, cancellation, successful consumption, storage deletion, repeated cleanup, and a stale token that cannot be reused.
 
 ## Task D2 - Add explicit glossary-analysis stages
 
@@ -533,12 +540,14 @@ Keep the normal ZIP and PO table behavior intact. For a CSV/TSV/XLSX upload with
 2. Render a sheet-selection form when there is more than one sheet. Show sheet names and dimensions as accessible radio choices. One sheet may be preselected, but it remains the sole chosen sheet.
 3. On selection, apply the session rate limit to the proposal POST. If the site-wide analyzer is enabled, build a structural sample and request one candidate. If disabled, unavailable, unsupported, or too large, present the same page with manual profile upload instead of falling back to PO inference.
 4. Run the local validation orchestration and render preview only after it succeeds. The preview must show selected sheet, source/targets, term count, warnings, a bounded term sample, and the downloadable profile.
-5. Let the user upload a replacement JSON profile and repeat local validation against the same draft file and selected sheet. Do not call the LLM for correction.
+5. Let the user upload a replacement UTF-8 `.loc-ingest.json` profile no larger than `LOC_KIT_PROFILE_SAMPLE_MAX_BYTES`, then repeat local validation against the same draft file and selected sheet. Do not call the LLM for correction.
 6. Offer a real POST cancel action with CSRF protection. It deletes the draft.
 
 Do not add a `kit_terms` field. The existing `is_glossary` field is the only intent signal. Adjust its form order, labels, help text, and surrounding upload-tab prose so its external-analysis consequence is clear to the operator-facing feature documentation without presenting a per-user consent dialog.
 
 Ensure visible focus, labelled radio inputs/file controls, a summary linked to any form errors, and no color-only warning/error state.
+
+Use Django i18n helpers for every new visible string in forms, views, and templates.
 
 ## Task D3 - Bind preview output to standard component creation safely
 
@@ -625,9 +634,9 @@ WEBLATE_PORT=3001 ./rundev.sh
 Exercise both paths at `http://localhost:3001/create/component/zip/`:
 
 1. Upload a generic keyless CSV with **Use as glossary** clear. Confirm the existing PO route stays local and correctly selects its source language.
-2. Upload the user-provided CoL4 workbook with **Use as glossary** selected. Choose its glossary sheet, inspect the profile proposal, and confirm that the preview maps terms, context/note, and recommended-translation note instead of treating metadata as terms.
+2. Upload the user-provided CoL4 workbook with **Use as glossary** selected. Choose its glossary sheet, inspect the profile proposal, and confirm that the preview maps terms, context/note, and recommended-translation note instead of treating metadata as terms. Confirm that it identifies `ru` as source and `en` and `ja` as initial targets.
 3. Download the profile, make a harmless valid correction, upload it, and confirm preview is regenerated locally without another external request.
-4. Confirm creation. Verify the resulting TBX component has the expected source language, targets, explanations, Unicode-safe contexts, and a matching glossary panel entry in a regular component with the same source language.
+4. Confirm creation. Verify the resulting TBX component has `ru` as source, `en` and `ja` target files, expected explanations, Unicode-safe contexts, and a matching glossary panel entry in a regular component with the same source language.
 5. Upload a workbook with multiple candidate sheets, cancel it, and confirm the draft is inaccessible afterward.
 
 If a safe development provider configuration is unavailable, smoke the same workflow through the manual-profile branch. The OpenRouter request behavior remains covered by mocked tests.

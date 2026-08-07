@@ -609,44 +609,38 @@ class EditMachineryProjectView(MachineryProjectMixin, EditMachineryView):
 
     def get_initial(self):
         # Show what is currently in effect, so an administrator edits the
-        # resolved configuration rather than an empty form.
+        # resolved configuration rather than a form with empty credentials.
         return {**self.sitewide_configuration, **(super().get_initial() or {})}
 
     def save_settings(self, data: SettingsDict | None) -> None:
         if data is not None:
-            sitewide = self.sitewide_configuration
-            # Store only what differs, so site-wide changes such as a rotated
-            # key keep propagating to this project.
-            data = {
-                field: value
-                for field, value in data.items()
-                if field not in sitewide or sitewide[field] != value
-            }
+            data = self.strip_inherited(data)
         self.project.machinery_settings[self.machinery_id] = data
         self.project.save(update_fields=["machinery_settings"])
 
-    def delete_service(self) -> None:
-        # The button labelled "Remove" in the project machinery UI means
-        # "stop overriding", not "delete the service", whenever an override
-        # exists: dropping the project entry restores the site-wide settings.
-        # Only when there is nothing to drop does it become an opt-out, stored
-        # as None, which get_machinery_settings reads as "disabled here".
-        if self.machinery_id in self.project.machinery_settings:
-            self.discard_override()
-        else:
-            self.save_settings(None)
+    def strip_inherited(self, data: SettingsDict) -> SettingsDict:
+        """
+        Keep only the fields this project actually overrides.
 
-    def enable_service(self) -> None:
-        self.discard_override()
-
-    def discard_override(self) -> None:
-        self.project.machinery_settings.pop(self.machinery_id, None)
-        self.project.save(update_fields=["machinery_settings"])
+        Site-wide changes such as a rotated key keep propagating to the
+        project. A field the site-wide configuration does not define is kept
+        only when it carries a value: an empty one overrides nothing and is
+        indistinguishable from leaving the field alone.
+        """
+        sitewide = self.sitewide_configuration
+        return {
+            field: value
+            for field, value in data.items()
+            if (field in sitewide and sitewide[field] != value)
+            or (field not in sitewide and value not in {"", None, False})
+        }
 ```
 
 `cached_property` and `SettingsDict` are already imported in this module; confirm before adding.
 
-`discard_override` is a new name rather than calling `enable_service` from `delete_service`, which reads as though removal enables something. `enable_service` keeps its name because the base class calls it (`views.py:296-297`).
+**Leave `delete_service` and `enable_service` alone.** They already do the right thing under the new semantics - dropping the project entry restores the site-wide settings, and storing `None` opts out - and renaming them for readability would be a refactor of working upstream code that `test_configure_project` already covers.
+
+**Why the second clause is not just `field not in sitewide`.** A form posts every field it declares, so `cleaned_data` carries `""` for untouched optional fields and `False` for unticked checkboxes. Without the emptiness test, saving an unmodified DeepL form would store `{"context": "", "next_gen": False}` as if the project had deliberately blanked them. When the site-wide entry *does* define the field, an empty value is a deliberate override and is kept - that is D1, pinned by `test_configure_project_can_blank_an_inherited_field`.
 
 Note the interaction with `install_service` (`views.py:263-264`), which calls `save_settings({})`. The comprehension leaves `{}` as `{}`, which under Task A2 means "installed, inherits everything". That is the intended behaviour, so no change there.
 

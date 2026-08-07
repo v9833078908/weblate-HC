@@ -8365,6 +8365,105 @@ class ViewsTest(FixtureTestCase):
         project = Project.objects.get(pk=self.component.project_id)
         self.assertNotIn("dummy", project.machinery_settings)
 
+    @http_mock.activate
+    def test_configure_project_stores_only_the_difference(self) -> None:
+        DeepLTranslationTest.mock_response()
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="deepl",
+            value={"key": "sitewide-key", "url": "https://api.deepl.com/"},
+        )
+        self.make_manager()
+        edit_url = reverse(
+            "machinery-edit",
+            kwargs={"project": self.project.slug, "machinery": "deepl"},
+        )
+
+        self.client.post(
+            edit_url,
+            {
+                "key": "sitewide-key",
+                "url": "https://api.deepl.com/",
+                "formality": "prefer_more",
+            },
+        )
+
+        project = Project.objects.get(pk=self.project.id)
+        self.assertEqual(
+            project.machinery_settings["deepl"], {"formality": "prefer_more"}
+        )
+        self.assertEqual(
+            project.get_machinery_settings()["deepl"]["key"], "sitewide-key"
+        )
+
+    @http_mock.activate
+    def test_configure_project_unchanged_form_inherits_everything(self) -> None:
+        DeepLTranslationTest.mock_response()
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="deepl",
+            value={"key": "sitewide-key", "url": "https://api.deepl.com/"},
+        )
+        self.make_manager()
+        edit_url = reverse(
+            "machinery-edit",
+            kwargs={"project": self.project.slug, "machinery": "deepl"},
+        )
+
+        self.client.post(
+            edit_url, {"key": "sitewide-key", "url": "https://api.deepl.com/"}
+        )
+
+        project = Project.objects.get(pk=self.project.id)
+        self.assertEqual(project.machinery_settings["deepl"], {})
+
+    @http_mock.activate
+    def test_configure_project_form_shows_the_inherited_values(self) -> None:
+        DeepLTranslationTest.mock_response()
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="deepl",
+            value={"key": "sitewide-key", "url": "https://api.deepl.com/"},
+        )
+        self.make_manager()
+
+        response = self.client.get(
+            reverse(
+                "machinery-edit",
+                kwargs={"project": self.project.slug, "machinery": "deepl"},
+            )
+        )
+
+        self.assertContains(response, "sitewide-key")
+
+    @http_mock.activate
+    def test_configure_project_can_blank_an_inherited_field(self) -> None:
+        DeepLTranslationTest.mock_response()
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="deepl",
+            value={
+                "key": "sitewide-key",
+                "url": "https://api.deepl.com/",
+                "context": "Spaceships.",
+            },
+        )
+        self.make_manager()
+
+        self.client.post(
+            reverse(
+                "machinery-edit",
+                kwargs={"project": self.project.slug, "machinery": "deepl"},
+            ),
+            {"key": "sitewide-key", "url": "https://api.deepl.com/", "context": ""},
+        )
+
+        project = Project.objects.get(pk=self.project.id)
+        # Blanking a field the site-wide entry defines is a real override,
+        # unlike leaving a field it never defined empty.
+        self.assertEqual(project.machinery_settings["deepl"], {"context": ""})
+        self.assertEqual(project.get_machinery_settings()["deepl"]["context"], "")
+
     def test_configure_invalid(self) -> None:
         self.user.is_superuser = True
         self.user.save()

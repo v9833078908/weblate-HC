@@ -340,9 +340,37 @@ class EditMachineryProjectView(MachineryProjectMixin, EditMachineryView):
     def allow_private_targets(self) -> bool:
         return False
 
+    @cached_property
+    def sitewide_configuration(self) -> SettingsDict:
+        return self.global_settings_dict.get(self.machinery_id) or {}
+
+    def get_initial(self):
+        # Show what is currently in effect, so an administrator edits the
+        # resolved configuration rather than a form with empty credentials.
+        return {**self.sitewide_configuration, **(super().get_initial() or {})}
+
     def save_settings(self, data: SettingsDict | None) -> None:
+        if data is not None:
+            data = self.strip_inherited(data)
         self.project.machinery_settings[self.machinery_id] = data
         self.project.save(update_fields=["machinery_settings"])
+
+    def strip_inherited(self, data: SettingsDict) -> SettingsDict:
+        """
+        Keep only the fields this project actually overrides.
+
+        Site-wide changes such as a rotated key keep propagating to the
+        project. A field the site-wide configuration does not define is kept
+        only when it carries a value: an empty one overrides nothing and is
+        indistinguishable from leaving the field alone.
+        """
+        sitewide = self.sitewide_configuration
+        return {
+            field: value
+            for field, value in data.items()
+            if (field in sitewide and sitewide[field] != value)
+            or (field not in sitewide and value not in {"", None, False})
+        }
 
     def delete_service(self) -> None:
         if self.machinery_id in self.project.machinery_settings:
