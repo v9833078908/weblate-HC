@@ -56,6 +56,16 @@ XLSX использует имена листов без переименова�
 строгий загрузчик, что и рукописный, и записывается в выходной каталог
 (`profile.loc-ingest.json`) как свидетельство; отчёт перечисляет каждое решение.
 
+**Keyless-киты.** Колонка 0 (ключ PO) сама становится языковой, если её
+заголовок резолвится в код языка, не входит в `_KEY_HEADER_DENYLIST = {"id"}`
+(коды вроде `id` остаются строковым Id, а не индонезийским языком) и содержит
+непустые нечисловые данные. Колонка 0 при этом остаётся ключом PO, поэтому key
+и исходный текст совпадают - в отчёт попадает заметка "column 1 is both the PO
+key and a language column". Так кит без отдельной латинской key-колонки
+(`ru,en,ja` с терминами в `ru`) выводится как монолингвальный PO с `ru` в
+качестве источника. Для подлинно неоднозначной первой колонки остаётся
+`--profile`.
+
 ```sh
 # профиль выводится сам
 uv run python -m loc_kit_ingest "/path/Temple.csv" --out /tmp/seed --zip
@@ -75,9 +85,53 @@ uv run python -m loc_kit_ingest "/path/Temple.csv" \
 с номерами обеих строк) блокируют загрузку до исправления таблицы. Расширение
 на новые форматы = суффикс в `KIT_TABLE_SUFFIXES` + поддержка в `reader.py`.
 
+### Глоссарий через UI: явный «Use as glossary»
+
+Тот же кит CSV/TSV/XLSX становится TBX-глоссарием только когда оператор явно
+отметит галку **Use as glossary** при загрузке. Это единственный сигнал
+намерения: без неё обычный PO-кит остаётся локальным и никогда не уходит в LLM.
+Анализ стартует только после выбора листа.
+
+1. **Выбор листа.** Для многолистового XLSX показывается форма выбора одного
+   листа (имена и размеры как radio-варианты). Один выбранный лист создаёт один
+   глоссарий-компонент; листы не объединяются и не батчатся.
+2. **Кандидат-профиль (опционально).** Если site-wide анализатор включён и
+   настроен, из выбранного листа строится детерминированный структурный сэмпл и
+   отправляется одним POST в фиксированный OpenRouter endpoint. Модель лишь
+   *предлагает* профиль v2; её ответ не исполняет код и не создаёт компонент.
+   При выключенном/недоступном анализаторе или слишком большом сэмпле
+   предлагается ручная загрузка профиля вместо fallback на PO-вывод.
+3. **Локальная валидация (обязательна).** Кандидат-профиль или загруженный
+   вручную `.loc-ingest.json` проходит локальный конвейер: `parse_profile` →
+   точная проверка заголовков → `parse_component` → рендер TBX → parse-back.
+   Один TBX-компонент для выбранного листа; имя компонента генерирует сервер, а
+   не LLM и не исправленный профиль. Предпросмотр (источник, целевые языки,
+   число терминов, предупреждения, bounded-сэмпл терминов и скачиваемый
+   профиль) появляется только при нулевых ошибках.
+4. **Исправление профиля.** Предпросмотр отдаёт профиль JSON как скачиваемый
+   файл и принимает исправленный `.loc-ingest.json` взамен; исправление
+   повторно валидируется против того же черновика и листа, без нового вызова
+   LLM.
+5. **Обязательный parse-back до создания.** Рендер TBX и parse-back выполняются
+   до создания компонента - это ворота публикации, а не пост-проверка. Только
+   после успеха оператор подтверждает создание, которое донастраивает
+   `file_format="tbx"`, `filemask="tbx/*.tbx"`, пустой template, профильный
+   язык-источник и `is_glossary=True`; эти поля неизменяемы в финальной форме.
+6. **Временный черновик.** Загруженный файл хранится в session-bound,
+   owner-bound временном черновике не дольше одного часа; он удаляется при
+   создании, отмене или периодической очистке Celery. Чужой владелец, другая
+   сессия, истёкший или consumed-токен ведут себя как отсутствующий.
+
+**Минимизация данных LLM.** Наружу уходит только bounded структурный сэмпл:
+метаданные листа, заполняемость строк/колонок, заголовки и усечённые выдержки
+ячеек (capped) - никогда весь файл. Флаги глоссария (`forbidden`/`read-only`/
+`terminology`) и source-only импорты в этом потоке не поддерживаются: требуется
+один источник и хотя бы один целевой язык.
+
 ### Рукописный профиль
 
-Профиль имеет `schema_version: 1`. Загрузчик отклоняет неизвестные поля,
+Профиль имеет `schema_version` 1 (PO и `term-description-pairs`) или 2
+(`record-map` глоссарий). Загрузчик отклоняет неизвестные поля,
 несовпадающую версию, неверные типы, дубликаты языков/компонентов, небезопасные
 имена компонентов, отсутствующий `source_lang`, несуществующие листы и колонки,
 а также несовпадение заданных заголовков. Все номера строк и колонок в профиле
@@ -134,16 +188,62 @@ uv run python -m loc_kit_ingest "/path/Temple.csv" \
 }
 ```
 
+Пример профиля v2 `record-map` для табличного глоссария с одной строкой на
+термин и per-record колонкой домена:
+
+```json
+{
+  "schema_version": 2,
+  "components": [
+    {
+      "sheet": "Glossary",
+      "component": "CoL4-Glossary",
+      "kind": "tbx",
+      "source_lang": "ru",
+      "header_row": 1,
+      "languages": [
+        {"code": "ru", "xml_lang": "ru", "column": 2, "header": "ru"},
+        {"code": "en", "xml_lang": "en", "column": 3, "header": "en"}
+      ],
+      "grammar": {
+        "type": "record-map",
+        "skip_rows": [],
+        "regions": [
+          {"first_record_row": 2, "last_record_row": 7, "record_stride": 1}
+        ],
+        "term_row_offset": 0,
+        "section_field": {"column": 1, "header": "domain", "row_offset": 0},
+        "notes": [
+          {"scope": "source", "column": 4, "header": "note_ru", "row_offset": 0},
+          {"scope": "target", "language": "en", "column": 5, "header": "note_en", "row_offset": 0}
+        ]
+      },
+      "initial_target_languages": ["en"]
+    }
+  ]
+}
+```
+
+`record_stride: 2` представляет чередующийся кит term/description; вместо
+`section_field` регион тогда задаёт `section_row`+`section_column` как
+ячейку-заголовок над блоком.
+
 Это пример структуры, не профиль реального содержимого. `header` проверяется
 как ровно та ячейка строки заголовка, а `name` комментария - явная подпись, а не
 выведенное из следующей строки предположение. `component` - безопасный
 идентификатор `[A-Za-z0-9][A-Za-z0-9_-]*`, не имя листа; это исключает path
 traversal, регистронезависимые коллизии и внезапные имена файлов.
 
-### Закрытая схема v1
+### Закрытая схема v1 и v2
 
-Все объекты закрыты: поле, не перечисленное ниже, является
-`profile.unknown_field`, а не запасным источником данных.
+Поддерживаются две версии схемы. `schema_version: 1` сохраняет свою точную
+интерпретацию: PO-киты и `term-description-pairs` TBX. `schema_version: 2`
+добавляет аддитивно и только один TBX-грамматику `record-map`; она никогда не
+выводится из заголовка автоматически, её поставляет либо оператор, либо
+OpenRouter-кандидат с последующей локальной валидацией. Документ v1 читается как
+v1 и не переинтерпретируется как v2. Все объекты обеих версий закрыты: поле, не
+перечисленное ниже, является `profile.unknown_field`, а не запасным источником
+данных.
 
 | Объект | Разрешённые поля | Обязательные поля |
 |---|---|---|
@@ -156,12 +256,30 @@ traversal, регистронезависимые коллизии и внеза
 | Keyed grammar | `type`, `skip_rows`, `allow_blank_rows` | `type`; пропущенные `skip_rows` = `[]`, `allow_blank_rows` = `false` |
 | Pair grammar | `type`, `skip_rows`, `regions` | `type`, `regions`; пропущенные `skip_rows` = `[]` |
 | Pair region | `section_row`, `first_term_row`, `last_description_row` | все |
+| TBX v2 component | common + `initial_target_languages` (без `key_language`) | `initial_target_languages` |
+| Record-map grammar (v2) | `type`, `skip_rows`, `regions`, `term_row_offset`, `section_field`, `notes` | `type`, `regions`, `term_row_offset`; `section_field` и `notes` необязательны |
+| Record region | `first_record_row`, `last_record_row`, `record_stride`, `section_row`, `section_column` | `first_record_row`, `last_record_row`, `record_stride`; `section_row`+`section_column` идут вместе и опциональны |
+| Section field | `column`, `header`, `row_offset` | все |
+| Note field | `scope`, `column`, `header`, `row_offset`, `language` | `scope`, `column`, `header`, `row_offset`; `language` обязателен для `scope: "target"`, запрещён для `scope: "source"` |
 
 `comments` и `references` используют объект metadata-column. `key` использует
 key-column object, поэтому у него нет `name`. `first_data_row`, `key`,
 `comments` и `references` запрещены для TBX; `key_language` и
 `initial_target_languages` запрещены для PO. Это запрещает полукейсовую или
 полупарную интерпретацию до открытия workbook.
+
+Для v2 `key_language` отсутствует (он не нужен: context строится Unicode-безопасно
+из `(section, term)`, а не из латинской key-колонки); v1 сохраняет `key_language`
+только для совместимости схемы. `record_stride` - положительное целое; каждый
+`row_offset` лежит в `[0, record_stride)`. Диапазон региона должен делиться на
+`record_stride` нацело; регионы, строки секций и skip-строки не пересекаются.
+Компонент объявляет либо `grammar.section_field`, либо region-ячейки секции, но
+никогда оба (`profile.section_conflict`). `section_row` и `section_column` идут
+вместе и проверяются по диапазону. Колонка `section_field` не должна совпадать с
+языковой или note-колонкой. target-note обязан назвать один из
+`initial_target_languages`; source-note не имеет поля `language`. Заголовки
+языков, `section_field` и заметок проверяются на точное равенство со строкой
+заголовка листа.
 
 ### Детерминированная грамматика
 
@@ -177,15 +295,59 @@ key-column object, поэтому у него нет `name`. `first_data_row`, `
 Описание без термина, термин без описания, пересекающиеся/дырявые ranges и
 неожиданная строка являются error, а не эвристикой "длиннее 200 символов".
 
-`key_language` определяет, из какой языковой колонки строится стабильный context
-термина. В context включается section; коллизия context - error. Для PO значения
-ячеек не trim'ятся: пробелы по краям, tab, `\r\n`, переносы, XML/Unity-разметка
-и entities передаются дальше как данные. Для TBX также сохраняются внутренние
-пробелы, переносы, разметка и entities, но leading/trailing whitespace у term
-или description является `tbx.unsupported_outer_whitespace`: Translate Toolkit
-trim'ит его при записи `<descrip>`/`<note>`, поэтому импортёр обязан остановиться,
-а не молча изменить данные. `strip()` допустим только для проверки пустой ячейки,
-контроля структуры и этого явного TBX validation.
+### Record-map (v2): глоссарий как повторяющиеся группы строк
+
+`schema_version: 2` вводит единственную новую TBX-грамматику
+`grammar.type: "record-map"`. Это обобщённый движок для табличного глоссария с
+фиксированным повторяющимся макетом, а не специализированный парсер конкретного
+кита. Запись (record) - это повторяющаяся группа из `record_stride` строк.
+Термины языков читаются на смещении `term_row_offset`, а каждое note-поле - на
+своём `row_offset` и в своей `column`. Таким образом таблица с одной строкой на
+термин имеет `stride: 1`, а чередующийся кит term/description - `stride: 2`.
+
+Секция записи (домен) берётся ровно из одного из двух источников, никогда из
+обоих:
+
+- `grammar.section_field` - колонка, читаемая один раз для каждой записи. Это
+  предпочтительная форма: плоская таблица, где каждая строка несёт свой домен.
+  Пустая ячейка `section_field` означает "без секции" - это не ошибка, и секция
+  не наследуется от предыдущей записи.
+- `region.section_row` + `region.section_column` - ячейка-заголовок над блоком
+  записей. Поддерживает таблицы, группирующие термины под заголовками, а не
+  повторяющие домен в каждой строке. Ячейка-заголовок может дублировать
+  перевод названия секции в объявленных языковых колонках - это метаданные
+  секции, они никогда не становятся терминами; любая иная заполненная ячейка на
+  строке-заголовке не учтена полем и падает как `tbx.unmapped_cell`.
+
+Компонент без обоих источников имеет записи без секции. Для каждой записи: термины
+источника и всех целевых языков читаются из объявленных языковых колонок;
+заметки читаются в порядке объявления, source-заметки и target-заметки (по
+целевому языку) группируются отдельно и объединяются переносами строки с
+отбрасыванием пустых. Все объявленные ячейки term/section/note помечаются как
+потреблённые. Заполненная ячейка данных внутри записи, которую не читает ни одно
+объявленное поле, падает как `tbx.unmapped_cell` - данные никогда не
+отбрасываются молча. Сохраняется защита `grammar.uncovered_row` для любой
+непустой строки после заголовка, не покрытой регионом, строкой секции или явным
+skip.
+
+**Context identity.** Стабильный collision-free context термина - это каноническая
+сериализация пары `(section, source_term)`:
+`json.dumps([section, source_term], ensure_ascii=False, separators=(",",":"))` -
+например `["Персонажи","Герой"]`. JSON-quoting делает её collision-free: секция
+или термин, содержащие разделитель, не могут подделать чужой ключ. Weblate хранит
+`Unit.context` в `TextField`, поэтому Unicode (кириллица, CJK) сохраняется
+целиком и глоссарию больше не нужна латинская key-колонка. Коллизия context -
+error. Поле v1 `key_language` больше не определяет context: v1-профили
+сохраняют его только для совместимости схемы, а их runtime-context теперь
+считается тем же Unicode-безопасным помощником; v2 не имеет `key_language`
+вовсе. Для PO значения ячеек не trim'ятся: пробелы по краям, tab, `\r\n`,
+переносы, XML/Unity-разметка и entities передаются дальше как данные. Для TBX
+также сохраняются внутренние пробелы, переносы, разметка и entities, но
+leading/trailing whitespace у term или description является
+`tbx.unsupported_outer_whitespace`: Translate Toolkit trim'ит его при записи
+`<descrip>`/`<note>`, поэтому импортёр обязан остановиться, а не молча изменить
+данные. `strip()` допустим только для проверки пустой ячейки, контроля
+структуры и этого явного TBX validation.
 
 `code` - код Weblate, использующийся в имени PO/TBX файла. `xml_lang` - явный
 BCP-47 тег в `xml:lang`: например, `pt_PT` → `pt-PT`, `zh_Hans` → `zh-Hans`,
@@ -202,13 +364,18 @@ BCP-47 тег в `xml:lang`: например, `pt_PT` → `pt-PT`, `zh_Hans` �
 
 - `StringUnit`: key, значения по языкам, developer comments, references и
   физическая строка источника;
-- `GlossaryTerm`: context, значения по языкам, explanations по языкам, section
-  и физические строки term/description.
+- `GlossaryTerm`: context, значения терминов по языкам, `source_explanation`
+  (объединённые source-заметки), `target_explanations` (заметки по каждому
+  целевому языку), section и физические строки термина и заметок (`term_row`,
+  `note_rows`).
 
-Вторая модель сохраняет объяснение отдельно для каждого языка. Для Terms
-source-language description становится `source_explanation`, а description
-целевого языка - `target_explanation`; биография не превращается в отдельный
-термин или безымянный PO comment.
+Вторая модель хранит объяснения как детерминированную конкатенацию объявленных
+заметок. `source_explanation` - объединение source-заметок в порядке объявления;
+`target_explanations` ставит в соответствие каждому целевому языку объединение
+его target-заметок. Пустые ячейки заметок опускаются, непустые соединяются
+переводом строки. Описание исходного языка, разметка и примечания целевого
+языка не превращаются в отдельный термин или безымянный PO comment; `note_rows`
+фиксирует физические строки заметок для диагностики.
 
 Единый `Diagnostic` имеет `severity`, стабильный `code`, компонент, лист,
 физическую строку и сообщение. `error` блокирует publish; `warning` остаётся в
@@ -216,7 +383,7 @@ source-language description становится `source_explanation`, а descri
 
 | Severity | Примеры |
 |---|---|
-| `error` | profile/schema/header/column/sheet mismatch, duplicate component/path/key/context, missing source, неизвестная строка, orphan term/description, нечитабельный файл, ошибка записи/ZIP/contract validation |
+| `error` | profile/schema/header/column/sheet mismatch, duplicate component/path/key/context, missing source, неизвестная строка, orphan term/description, unmapped cell (`tbx.unmapped_cell`), нечитабельный файл, ошибка записи/ZIP/contract validation |
 | `warning` | target equals source, подозрительный алфавит в языковой колонке, пустой target в PO, заметка вместо перевода, явно пропущенная пустая строка |
 
 Отчёт содержит число юнитов, typed skipped rows и все diagnostics с адресом
@@ -317,6 +484,11 @@ creates one archive per component with the component's files at the ZIP root:
 `Temple.zip` contains `ru.po`, `en.po`, ...; `Terms.zip` contains `tbx/en.tbx`,
 `tbx/ja.tbx`, ... .
 
+CLI остаётся детерминированным и офлайн: `--profile` - единственный вход для
+v2 `record-map` глоссария, и его справка упоминает это. В CLI нет `--terms`,
+`--suggest-profile` и никакой сетевой зависимости или вызова OpenRouter;
+кандидат-профиль и весь UI-воркфлоун живут только в Weblate.
+
 ## UI-сценарии
 
 - **C1 - строковый компонент из кита (основной путь):** проект → «Добавить
@@ -339,6 +511,16 @@ creates one archive per component with the component's files at the ZIP root:
 - **C5 - post-import:** add target languages, attach `openrouter` machinery,
   enable `game-markup` through `WEBLATE_ADD_CHECK`, and configure PO formatting
   before the first VCS commit when needed.
+- **C6 - глоссарий из таблицы (v2 `record-map`):** загрузить CSV/TSV/XLSX с
+  отмеченной **Use as glossary**, выбрать лист, проверить предложенный профиль
+  (источник и цели, термины, заметки, скачиваемый JSON), при желании
+  исправить `.loc-ingest.json` и перезагрузить. Локальная валидация
+  (render → parse-back) обязана пройти до создания компонента. После создания
+  проверить `file_format="tbx"`, `filemask="tbx/*.tbx"`, пустой template,
+  `is_glossary=True`, source/target explanations и Unicode-context в реальном
+  TBX и совпадение с панелью глоссария компонента с тем же языком-источником.
+  Source-only импорт и флаги глоссария (`forbidden`/`read-only`/`terminology`)
+  не поддерживаются.
 
 ## Verification contract
 
