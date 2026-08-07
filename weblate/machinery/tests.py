@@ -8923,6 +8923,81 @@ class MachineryValidationTest(TestCase):
         self.assertIn("Allowlisted provider error.", str(raised.exception))
 
 
+class ProjectMachineryInheritanceTest(TestCase):
+    """Project settings override site-wide ones field by field."""
+
+    SITEWIDE: ClassVar[SettingsDict] = {
+        "key": "sitewide-key",
+        "model": "auto",
+        "persona": "You translate spaceship UI.",
+        "style": "terse",
+    }
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.project = Project.objects.create(name="Test", slug="test")
+        Setting.objects.create(
+            category=SettingCategory.MT, name="openai", value=self.SITEWIDE
+        )
+
+    def test_absent_field_is_inherited(self) -> None:
+        self.project.machinery_settings["openai"] = {"persona": "You write dialogue."}
+
+        resolved = self.project.get_machinery_settings()["openai"]
+
+        self.assertEqual(resolved["persona"], "You write dialogue.")
+        self.assertEqual(resolved["key"], "sitewide-key")
+        self.assertEqual(resolved["style"], "terse")
+
+    def test_empty_string_overrides_rather_than_inherits(self) -> None:
+        self.project.machinery_settings["openai"] = {"style": ""}
+
+        resolved = self.project.get_machinery_settings()["openai"]
+
+        self.assertEqual(resolved["style"], "")
+        self.assertEqual(resolved["persona"], "You translate spaceship UI.")
+
+    def test_empty_entry_inherits_everything(self) -> None:
+        self.project.machinery_settings["openai"] = {}
+
+        resolved = self.project.get_machinery_settings()["openai"]
+
+        self.assertEqual(resolved["key"], "sitewide-key")
+
+    def test_none_entry_still_disables_the_service(self) -> None:
+        self.project.machinery_settings["openai"] = None
+
+        self.assertNotIn("openai", self.project.get_machinery_settings())
+
+    def test_service_without_sitewide_entry_still_works(self) -> None:
+        self.project.machinery_settings["dummy"] = {"key": "x"}
+
+        resolved = self.project.get_machinery_settings()["dummy"]
+
+        self.assertEqual(resolved["key"], "x")
+
+    def test_resolution_does_not_mutate_the_stored_entry(self) -> None:
+        self.project.machinery_settings["openai"] = {"persona": "You write dialogue."}
+
+        self.project.get_machinery_settings()
+
+        self.assertEqual(
+            self.project.machinery_settings["openai"],
+            {"persona": "You write dialogue."},
+        )
+
+    def test_resolution_does_not_leak_into_the_sitewide_entry(self) -> None:
+        self.project.machinery_settings["openai"] = {"persona": "You write dialogue."}
+
+        self.project.get_machinery_settings()
+        other = Project.objects.create(name="Other", slug="other")
+
+        self.assertEqual(
+            other.get_machinery_settings()["openai"]["persona"],
+            "You translate spaceship UI.",
+        )
+
+
 class ListMachineryCommandTest(SimpleTestCase):
     def test_list_machinery_empty_choice(self) -> None:
         field = Mock(
