@@ -8923,36 +8923,45 @@ class MachineryValidationTest(TestCase):
 
         self.assertIn("Allowlisted provider error.", str(raised.exception))
 
+    @http_mock.activate
     def test_partial_configuration_validates_against_the_base(self) -> None:
+        # DeepL is used because its settings form has exactly one required
+        # field beside the overridden one, and its live check is already
+        # mockable from a classmethod.
+        DeepLTranslationTest.mock_response()
+
         service, configuration, errors = validate_service_configuration(
-            "openai",
-            {"persona": "You write dialogue."},
+            "deepl",
+            {"url": "https://api.deepl.com/"},
             allow_private_targets=False,
-            base_configuration={"key": "sitewide-key", "model": "auto"},
+            base_configuration={"key": "sitewide-key"},
         )
 
         self.assertIsNotNone(service)
         self.assertEqual(errors, [])
-        self.assertEqual(configuration, {"persona": "You write dialogue."})
+        # Only the difference is returned, the inherited key is not stored.
+        self.assertEqual(configuration, {"url": "https://api.deepl.com/"})
 
     def test_partial_configuration_without_a_base_still_requires_the_key(self) -> None:
         _service, _configuration, errors = validate_service_configuration(
-            "openai",
-            {"persona": "You write dialogue."},
+            "deepl",
+            {"url": "https://api.deepl.com/"},
             allow_private_targets=False,
         )
 
         self.assertTrue(any("key" in error for error in errors))
 
     def test_partial_configuration_reports_its_own_invalid_field(self) -> None:
+        # A bad scheme is a plain field error, unlike a private address which
+        # surfaces as a non-field error and depends on the host allowlist.
         _service, _configuration, errors = validate_service_configuration(
-            "openai",
-            {"language_instructions": "not-a-mapping"},
+            "deepl",
+            {"url": "ftp://api.deepl.com/"},
             allow_private_targets=False,
-            base_configuration={"key": "sitewide-key", "model": "auto"},
+            base_configuration={"key": "sitewide-key"},
         )
 
-        self.assertTrue(any("language_instructions" in error for error in errors))
+        self.assertTrue(any("url" in error for error in errors))
 
 
 class ProjectMachineryInheritanceTest(TestCase):

@@ -301,39 +301,52 @@ git commit -m "feat(machinery): inherit site-wide service settings per field"
 **Step 1: Write the failing tests**
 
 ```python
+    @http_mock.activate
     def test_partial_configuration_validates_against_the_base(self) -> None:
+        # DeepL is used because its settings form has exactly one required
+        # field beside the overridden one, and its live check is already
+        # mockable from a classmethod.
+        DeepLTranslationTest.mock_response()
+
         service, configuration, errors = validate_service_configuration(
-            "openai",
-            {"persona": "You write dialogue."},
+            "deepl",
+            {"url": "https://api.deepl.com/"},
             allow_private_targets=False,
-            base_configuration={"key": "sitewide-key", "model": "auto"},
+            base_configuration={"key": "sitewide-key"},
         )
 
         self.assertIsNotNone(service)
         self.assertEqual(errors, [])
-        self.assertEqual(configuration, {"persona": "You write dialogue."})
+        # Only the difference is returned, the inherited key is not stored.
+        self.assertEqual(configuration, {"url": "https://api.deepl.com/"})
 
     def test_partial_configuration_without_a_base_still_requires_the_key(self) -> None:
         _service, _configuration, errors = validate_service_configuration(
-            "openai",
-            {"persona": "You write dialogue."},
+            "deepl",
+            {"url": "https://api.deepl.com/"},
             allow_private_targets=False,
         )
 
         self.assertTrue(any("key" in error for error in errors))
 
     def test_partial_configuration_reports_its_own_invalid_field(self) -> None:
+        # A bad scheme is a plain field error, unlike a private address which
+        # surfaces as a non-field error and depends on the host allowlist.
         _service, _configuration, errors = validate_service_configuration(
-            "openai",
-            {"language_instructions": "not-a-mapping"},
+            "deepl",
+            {"url": "ftp://api.deepl.com/"},
             allow_private_targets=False,
-            base_configuration={"key": "sitewide-key", "model": "auto"},
+            base_configuration={"key": "sitewide-key"},
         )
 
-        self.assertTrue(any("language_instructions" in error for error in errors))
+        self.assertTrue(any("url" in error for error in errors))
 ```
 
 The second test asserts that inheritance is opt-in: site-wide edits pass no base and keep failing on a missing key.
+
+Add `from weblate.machinery.models import validate_service_configuration` to the imports (it is not there yet). `http_mock` and `DeepLTranslationTest` are already in the module.
+
+**Why not an LLM service here.** Every LLM settings form verifies the key with a live round trip - OpenAI fetches `/v1/models` and then posts to `/v1/chat/completions` - so a passing case needs both endpoints mocked, and `OpenAITranslationTest.mock_response` is a plain instance method that cannot be borrowed from another test class. `DeepLTranslationTest.mock_response` is a `@classmethod` (`weblate/machinery/tests.py:2480-2488`). The merge being tested is service-independent.
 
 **Step 2: Run them**
 

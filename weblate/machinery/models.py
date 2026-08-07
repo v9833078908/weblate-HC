@@ -39,12 +39,17 @@ def validate_service_configuration(
     configuration: str | SettingsDict,
     *,
     allow_private_targets: bool = True,
+    base_configuration: SettingsDict | None = None,
 ) -> tuple[type[BatchMachineTranslation] | None, SettingsDict, list[str]]:
     """
     Validate given service configuration.
 
     :param service_name: Name of the service as defined in WEBLATE_MACHINERY
     :param configuration: JSON encoded configuration for the service
+    :param base_configuration: Configuration the given one is layered on top of,
+        used for project-level overrides which only carry the changed fields.
+        Validation sees the merged result; the returned configuration is the
+        given one, so only the difference is stored.
     :return: A tuple containing the validated service class, configuration
              and a list of errors
     :raises ValueError: When service is not found or configuration is invalid
@@ -68,9 +73,14 @@ def validate_service_configuration(
 
     errors = []
     if service.settings_form is not None:
+        validated_configuration = service_configuration
+        if base_configuration is not None:
+            validated_configuration = cast(
+                "SettingsDict", {**base_configuration, **service_configuration}
+            )
         form = service.settings_form(
             service,
-            data=service_configuration,
+            data=validated_configuration,
             allow_private_targets=allow_private_targets,
         )
         # validate form
