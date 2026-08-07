@@ -39,6 +39,10 @@ _IGNORE_MARKERS = frozenset({"id-ignore", "id_ignore", "ignore"})
 
 _KEY_COLUMN = 0
 
+# Header text that must never be treated as a language column, even if it
+# resolves to a real code (``id`` is also the Indonesian language code).
+_KEY_HEADER_DENYLIST = frozenset({"id"})
+
 
 class InferenceError(Exception):
     """Raised when a sheet's shape cannot be determined with confidence."""
@@ -176,6 +180,21 @@ def infer_component(
     def column_values(col: int) -> list[str]:
         return [_cell(row, col) for row in data_rows]
 
+    key_header = _cell(header_row, _KEY_COLUMN)
+    key_language_code = _language_code(key_header)
+    key_is_language = (
+        key_language_code is not None
+        and key_header.strip().casefold() not in _KEY_HEADER_DENYLIST
+        and key_language_code not in candidates.values()
+    )
+    if key_is_language:
+        key_column_values = column_values(_KEY_COLUMN)
+        key_is_language = bool(
+            any(v.strip() for v in key_column_values)
+        ) and not _is_numeric(key_column_values)
+    if key_is_language:
+        candidates = {_KEY_COLUMN: key_language_code, **candidates}
+
     languages: dict[int, str] = {}
     # Columns whose header is a language code but whose content proves otherwise.
     demoted: set[int] = set()
@@ -215,6 +234,13 @@ def infer_component(
         notes.append(
             f"column {col + 1} -> language {code} "
             f"({len(filled)}/{content_rows} rows, {share:.1f}%)"
+        )
+
+    if key_is_language and _KEY_COLUMN in languages:
+        notes.append(
+            f"column {_KEY_COLUMN + 1} ({key_header!r} -> "
+            f"{languages[_KEY_COLUMN]}) is both the PO key and a language "
+            "column; key and source text are identical"
         )
 
     if not languages:
