@@ -160,17 +160,40 @@ Repository-specific parts:
   game-localization workflows, e.g. `llm-judge-external-pipeline.md`.
 - `loc_kit_ingest/` (tracked) - standalone loc-kit importer package (no Django
   imports): `reader.py` (CSV/TSV/XLSX), `infer.py` (derives a strict profile
-  from the kit's own header row), `parser.py`, `writer.py` (monolingual PO +
-  bilingual TBX with parse-back validation), `pipeline.py`/`cli.py` (atomic
-  `python -m loc_kit_ingest`). The component-creation UI consumes it through
+  from the kit's own header row), `profile.py` (closed schema with two
+  versions: v1 `term-description-pairs` and v2 `record-map` for TBX glossary
+  tables), `parser.py`, `writer.py` (monolingual PO + bilingual TBX with
+  parse-back validation), `pipeline.py`/`cli.py` (atomic
+  `python -m loc_kit_ingest`). The CLI stays deterministic and offline: no
+  `--terms`, no `--suggest-profile`, no OpenRouter. Context identity is a
+  Unicode-safe serialization of `(section, source term)`, not an ASCII slug.
+  The component-creation UI consumes it through
   `weblate/utils/views.py:create_component_from_kit`: the "Upload translation
   files" tab accepts CSV/TSV/XLSX kits directly (converted to po-mono,
-  discovery skipped) as well as ZIP. Standalone tests:
-  `cd loc_kit_ingest && uv run pytest` (no DB). Weblate-level tests:
-  `weblate/trans/tests/test_loc_kit_ingest_contract.py`. The running container
-  imports the package from `/app/data/python`, so after editing it run
-  `cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/`. Spec:
-  `docs/specs/loc-kit-ingest.md`.
+  discovery skipped) as well as ZIP. When :guilabel:`Use as glossary` is
+  checked, a CSV/TSV/XLSX table instead enters the glossary workflow (sheet
+  selection, optional OpenRouter profile proposal, local validation, TBX
+  component) documented in `docs/specs/loc-kit-ingest.md` and the plan.
+  Standalone tests: `cd loc_kit_ingest && uv run pytest` (no DB).
+  Weblate-level tests: `weblate/trans/tests/test_loc_kit_ingest_contract.py`.
+  The running container imports the package from `/app/data/python`, so after
+  editing it run `cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/`.
+- `weblate/trans/loc_kit.py` + `weblate/trans/models/loc_kit.py` - the
+  Weblate-side glossary analysis surface. `loc_kit.py` owns the bounded
+  deterministic structural sampler, the fixed-host OpenRouter profile proposal
+  client (`https://openrouter.ai/api/v1/chat/completions`, strict JSON Schema,
+  120 s timeout, `provider.require_parameters: true`), and the local
+  publication gate (`validate_glossary_profile`: schema, exact headers, full
+  parse, render, parse-back). `models/loc_kit.py` adds
+  `LocKitImportDraft` (migration `0098_loc_kit_import_draft.py`): an
+  unguessable-token, owner- and session-bound temporary upload draft under
+  private `FileSystemStorage` in `DATA_DIR`, capped at one hour, cleaned by the
+  Celery `cleanup_loc_kit_drafts` task every 900 s. This is a **separate,
+  site-wide OpenRouter configuration** keyed by
+  `LOC_KIT_PROFILE_OPENROUTER_KEY` / `LOC_KIT_PROFILE_OPENROUTER_MODEL` and
+  gated by `LOC_KIT_PROFILE_ANALYSIS_ENABLED` (all off by default); it does
+  **not** reuse `RoutedLLMTranslation` or its machine-translation
+  configuration, and users cannot supply an endpoint, key, or model.
 
 Local modifications to `dev-docker/docker-compose.yml`: Postgres published on
 `5434` (5433 is taken by another project) and `WEBLATE_VCS_ALLOW_SCHEMES` extended

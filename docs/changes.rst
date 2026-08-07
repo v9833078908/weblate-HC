@@ -9,6 +9,7 @@ Weblate 2026.8.1
 
 * Project-level :ref:`automatic suggestion <machine-translation-setup>` configuration now overrides the site-wide one field by field, so a project can set its own translator persona, style, and language-specific instructions without restating credentials.
 * Large language model machine translation services now receive the note left by developers for a string, see :ref:`llm-translation-context`.
+* Added optional :ref:`TBX glossary import from CSV, TSV, and XLSX tables <uploading-glossary-tables>`, with a locally validated profile proposal path.
 
 .. rubric:: Bug fixes
 

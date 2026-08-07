@@ -100,8 +100,46 @@ As a last step, you review the translation component info and fill in optional d
 
 .. image:: /screenshots/user-add-component.webp
 
+.. _uploading-glossary-tables:
+
+Glossary tables from CSV, TSV, and XLSX
++++++++++++++++++++++++++++++++++++++++
+
+The :guilabel:`Upload translations files` flow also accepts a single CSV, TSV,
+or XLSX spreadsheet as a loc-kit. Without further action it is converted into
+monolingual PO files exactly as before.
+
+A spreadsheet can instead become a bilingual TBX glossary component. This is
+the only path that may consult an external provider, and it starts only when
+the operator checks :ref:`component-is_glossary` on the upload form. A plain
+table upload never reaches a provider.
+
+The glossary workflow proceeds in explicit stages:
+
+* One worksheet creates one glossary component. A workbook with several sheets
+  shows a sheet-selection step; the operator chooses a single sheet, and sheets
+  are never merged.
+* When analysis is enabled (see :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED`),
+  a bounded structural sample of the chosen sheet is sent to OpenRouter to
+  propose a profile; otherwise the page offers manual profile upload directly.
+* A preview shows the detected source and target languages, the term count, a
+  bounded sample of terms, and any warnings, and it is produced only after the
+  proposed profile has been validated locally against the sheet.
+* The proposed profile is offered as a downloadable JSON file. The operator may
+  download it, correct it, and upload a replacement ``.loc-ingest.json``; the
+  correction is revalidated locally without another external request.
+* Confirmation re-enters the normal component-creation flow with the validated
+  TBX format, source language, and glossary flag bound server-side.
+* An explicit cancel action removes the draft at any stage.
+
+The uploaded workbook is held only in a temporary, session-bound draft that
+lasts at most one hour (see :setting:`LOC_KIT_IMPORT_DRAFT_EXPIRY`) and is
+deleted on confirmation, cancellation, or periodic cleanup.
+
 .. seealso::
 
+   * :ref:`component-is_glossary`
+   * :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED`
    * :ref:`admin-interface`
    * :ref:`project`
    * :ref:`component`
