@@ -134,6 +134,7 @@ from weblate.api.serializers import (
 from weblate.auth.models import Group, Role, TeamMembership, User
 from weblate.auth.results import PermissionResult
 from weblate.auth.utils import validate_team_assignable_user
+from weblate.configuration.models import Setting, SettingCategory
 from weblate.formats.models import EXPORTERS
 from weblate.lang.forms import validate_language_code
 from weblate.lang.models import Language
@@ -221,6 +222,7 @@ if TYPE_CHECKING:
 
     from weblate.api.serializers import NewUnitSerializer
     from weblate.auth.models import AuthenticatedHttpRequest
+    from weblate.machinery.types import SettingsDict
 
     class AuthenticatedRequest(Request):
         """DRF request after Weblate's authentication middleware."""
@@ -2381,6 +2383,11 @@ class ProjectViewSet(
                 request, "Can not retrieve/edit machinery configuration"
             )
 
+        sitewide_settings = cast(
+            "dict[str, SettingsDict]",
+            Setting.objects.get_settings_dict(SettingCategory.MT),
+        )
+
         if request.method in {"POST", "PATCH"}:
             try:
                 service_name = request.data["service"]
@@ -2391,6 +2398,7 @@ class ProjectViewSet(
                 service_name,
                 request.data.get("configuration", "{}"),
                 allow_private_targets=False,
+                base_configuration=sitewide_settings.get(service_name),
             )
 
             if service is None or errors:
@@ -2432,6 +2440,7 @@ class ProjectViewSet(
                     service_name,
                     configuration,
                     allow_private_targets=False,
+                    base_configuration=sitewide_settings.get(service_name),
                 )
 
                 if service is None or errors:

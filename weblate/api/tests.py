@@ -60,6 +60,7 @@ from weblate.auth.models import (
     User,
     UserBlock,
 )
+from weblate.configuration.models import Setting, SettingCategory
 from weblate.lang.models import Language
 from weblate.memory.models import Memory, MemoryScope
 from weblate.screenshots.models import Screenshot
@@ -6313,6 +6314,48 @@ class ProjectAPITest(APIBaseTest):
         self.assertIn("internal or non-public address", str(response.data))
         self.assertIn("site administrator", str(response.data))
         self.assertIn("site-wide or allowlisted", str(response.data))
+
+    @http_mock.activate
+    @patch("weblate.utils.requests._get_response_peer_ip", return_value="93.184.216.34")
+    @patch(
+        "weblate.utils.outbound.socket.getaddrinfo",
+        return_value=[(0, 0, 0, "", ("93.184.216.34", 443))],
+    )
+    def test_project_machinery_accepts_partial_configuration(
+        self, mocked_getaddrinfo, mocked_get_peer
+    ) -> None:
+        # Deep import to avoid running these as tests
+        # ruff: ignore[import-outside-top-level]
+        from weblate.machinery.tests import DeepLTranslationTest
+
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="deepl",
+            value={"key": "sitewide-key", "url": "https://api.deepl.com/"},
+        )
+        DeepLTranslationTest.mock_response()
+
+        self.do_request(
+            "api:project-machinery-settings",
+            self.project_kwargs,
+            method="post",
+            code=201,
+            superuser=True,
+            request={
+                "service": "deepl",
+                "configuration": {"formality": "prefer_more"},
+            },
+            format="json",
+        )
+
+        project = Project.objects.get(slug=self.project_kwargs["slug"])
+        # Only the difference is stored, the key keeps coming from site-wide.
+        self.assertEqual(
+            project.machinery_settings["deepl"], {"formality": "prefer_more"}
+        )
+        self.assertEqual(
+            project.get_machinery_settings()["deepl"]["key"], "sitewide-key"
+        )
 
     def test_project_backups(self) -> None:
         self.do_request(
