@@ -3955,6 +3955,94 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(translation[cleaned_source][0]["text"], "Bonjour @@PH7@@!")
         self.assertEqual(label_languages, ["en", "en"])
 
+    def test_translate_sends_developer_note(self) -> None:
+        machine = self.get_machine()
+        unit = make_unit(code="fr", source="Get out of here!", note="Joe")
+        typed_unit = cast("Unit", unit)
+        cleaned_source, _replacements = machine.cleanup_text(unit.source, typed_unit)
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            item = json.loads(content)["strings"][0]
+            self.assertEqual(item["note"], "Joe")
+            return json.dumps(["Sors d'ici !"])
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translation = machine.download_multiple_translations(
+                "en", "fr", [(cleaned_source, typed_unit)]
+            )
+
+        self.assertEqual(translation[cleaned_source][0]["text"], "Sors d'ici !")
+
+    def test_translate_omits_an_empty_developer_note(self) -> None:
+        machine = self.get_machine()
+        unit = make_unit(code="fr", source="Get out of here!")
+        typed_unit = cast("Unit", unit)
+        cleaned_source, _replacements = machine.cleanup_text(unit.source, typed_unit)
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            self.assertNotIn("note", json.loads(content)["strings"][0])
+            return json.dumps(["Sors d'ici !"])
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            machine.download_multiple_translations(
+                "en", "fr", [(cleaned_source, typed_unit)]
+            )
+
+    def test_developer_note_comes_from_the_source_unit(self) -> None:
+        machine = self.get_machine()
+        unit = make_unit(code="fr", source="Get out of here!", note="Joe")
+        # In bilingual formats the note lives on the source unit; a stale copy
+        # on the translation must not win.
+        unit.note = "stale copy on the translation"
+        typed_unit = cast("Unit", unit)
+        cleaned_source, _replacements = machine.cleanup_text(unit.source, typed_unit)
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            self.assertEqual(json.loads(content)["strings"][0]["note"], "Joe")
+            return json.dumps(["Sors d'ici !"])
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            machine.download_multiple_translations(
+                "en", "fr", [(cleaned_source, typed_unit)]
+            )
+
+    def test_translation_cache_uses_the_developer_note(self) -> None:
+        machine = self.get_machine()
+        unit = make_unit(code="fr", source="Get out of here!", note="Joe")
+        typed_unit = cast("Unit", unit)
+        cleaned_source, replacements = machine.cleanup_text(unit.source, typed_unit)
+
+        original = machine.get_translation_cache_parts(
+            typed_unit, "en", "fr", cleaned_source, 75, replacements
+        )
+        unit.source_unit.note = "Ray"
+        changed = machine.get_translation_cache_parts(
+            typed_unit, "en", "fr", cleaned_source, 75, replacements
+        )
+
+        self.assertNotEqual(original, changed)
+
     def test_translate_uses_neutral_previous_messages_without_czech(self) -> None:
         machine = self.get_machine()
         unit = make_unit(code="fr", source="Hello, world!")
