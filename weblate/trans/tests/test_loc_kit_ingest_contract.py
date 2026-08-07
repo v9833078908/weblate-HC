@@ -28,11 +28,12 @@ from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError
 from django.test import SimpleTestCase
-from django.test.utils import modify_settings
+from django.test.utils import modify_settings, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from openpyxl import Workbook
@@ -703,6 +704,81 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertEqual(draft.profile_json, "")
         page = self.client.get(response["Location"])
         self.assertContains(page, "Upload corrected profile")
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_sheet_selection_is_not_rate_limited_without_analysis(self) -> None:
+        """
+        Picking a worksheet must stay free.
+
+        A multi-sheet workbook needs several POSTs before the operator even
+        reaches the sheet they want, and with the analyzer off none of them
+        can reach a provider. Spending the analysis budget here locked the
+        operator out of their own upload on the default configuration.
+        """
+        self._start()
+        draft = self._draft()
+        # Superusers bypass check_rate_limit, so the regression is only
+        # visible as an ordinary user. The permission gate has its own test.
+        self.user.is_superuser = False
+        self.user.save()
+
+        # Comfortably more than RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS (3).
+        with patch(
+            "weblate.trans.views.create.get_creatable_projects",
+            return_value=Project.objects.filter(pk=self.project.pk),
+        ):
+            preview = reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
+            for attempt in range(6):
+                response = self._select_sheet(draft, "Glossary")
+                # A throttled POST also answers 302, but back to itself.
+                # Only the destination distinguishes accepted from refused.
+                self.assertEqual(response["Location"], preview, f"attempt {attempt}")
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.sheet, "Glossary")
+        self.assertEqual(draft.state, LocKitImportDraft.State.SHEET_SELECTED)
+
+    @override_settings(
+        LOC_KIT_PROFILE_ANALYSIS_ENABLED=True,
+        LOC_KIT_PROFILE_OPENROUTER_KEY="sk-test-secret-do-not-leak",
+        LOC_KIT_PROFILE_OPENROUTER_MODEL="openai/gpt-4o",
+    )
+    @http_mock.activate
+    def test_analysis_attempts_are_capped_per_session(self) -> None:
+        """
+        The provider budget is bounded and the lockout stays recoverable.
+
+        Superusers bypass check_rate_limit entirely, so the cap can only be
+        observed as an ordinary user.
+        """
+        http_mock.register(
+            "POST",
+            "https://openrouter.ai/api/v1/chat/completions",
+            json={"choices": [{"message": {"content": "not json"}}]},
+        )
+        self._start()
+        draft = self._draft()
+        # Demote only once the draft exists: the upload gate itself needs a
+        # user the wizard would accept. The gate is covered separately, so
+        # hold it open here and let the cap be the only thing under test.
+        self.user.is_superuser = False
+        self.user.save()
+
+        attempts = settings.RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS
+        with patch(
+            "weblate.trans.views.create.get_creatable_projects",
+            return_value=Project.objects.filter(pk=self.project.pk),
+        ):
+            for _ in range(attempts):
+                self._select_sheet(draft)
+            self.assertEqual(len(http_mock.calls), attempts)
+
+            # The next attempt is refused before any request leaves the
+            # server, and the message keeps the manual profile route open.
+            response = self._select_sheet(draft)
+            self.assertEqual(len(http_mock.calls), attempts)
+            page = self.client.get(response["Location"])
+        self.assertContains(page, "Upload a profile to continue")
 
     @http_mock.activate
     def test_manual_profile_produces_a_preview_without_any_outbound_request(

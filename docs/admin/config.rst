@@ -1691,9 +1691,10 @@ RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS
 .. versionadded:: 5.13
 
 Maximum number of loc-kit glossary profile analysis requests a single session
-may issue before rate limiting applies. Defaults to 3. Applies only to the
-OpenRouter proposal request triggered after a sheet is selected; it does not
-limit ordinary loc-kit table uploads.
+may issue before rate limiting applies. Defaults to 3. An attempt is spent
+only when a proposal request can actually be sent to OpenRouter: selecting or
+changing a worksheet costs nothing, and neither does an ordinary loc-kit table
+upload.
 
 .. seealso::
 

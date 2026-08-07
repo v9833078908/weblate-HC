@@ -64,7 +64,7 @@ from weblate.trans.tasks import import_project_backup, perform_update
 from weblate.utils import messages
 from weblate.utils.celery import store_task_metadata
 from weblate.utils.licenses import LICENSE_URLS, detect_license
-from weblate.utils.ratelimit import session_ratelimit_post
+from weblate.utils.ratelimit import check_rate_limit, session_ratelimit_post
 from weblate.utils.views import (
     KIT_TABLE_SUFFIXES,
     create_component_from_doc,
@@ -1067,7 +1067,6 @@ class LocKitSheetSelectView(LocKitDraftMixin, TemplateView):
         context["analysis_enabled"] = settings.LOC_KIT_PROFILE_ANALYSIS_ENABLED
         return context
 
-    @method_decorator(session_ratelimit_post("loc_kit_analysis", logout_user=False))
     def post(self, request: AuthenticatedHttpRequest, **kwargs):
         draft = self.get_draft(kwargs["token"])
         sheets = self.read_draft_sheets(draft)
@@ -1086,13 +1085,15 @@ class LocKitSheetSelectView(LocKitDraftMixin, TemplateView):
         draft.preview_json = ""
         draft.save(update_fields=["sheet", "state", "profile_json", "preview_json"])
 
-        error = _analyze_draft_sheet(draft, sheets[draft.sheet])
+        error = _analyze_draft_sheet(request, draft, sheets[draft.sheet])
         if error is not None:
             messages.error(request, error)
         return redirect("loc-kit-glossary-preview", token=draft.token)
 
 
-def _analyze_draft_sheet(draft: LocKitImportDraft, rows: list) -> str | None:
+def _analyze_draft_sheet(
+    request: AuthenticatedHttpRequest, draft: LocKitImportDraft, rows: list
+) -> str | None:
     """
     Ask OpenRouter for a candidate profile and validate it locally.
 
@@ -1103,6 +1104,14 @@ def _analyze_draft_sheet(draft: LocKitImportDraft, rows: list) -> str | None:
     """
     if not settings.LOC_KIT_PROFILE_ANALYSIS_ENABLED:
         return gettext("Automatic analysis is disabled. Upload a profile to continue.")
+    # Spend an attempt only for a call that can actually reach the provider.
+    # Selecting a worksheet is free: a multi-sheet workbook needs several
+    # POSTs before the operator even sees the sheet they want.
+    if not check_rate_limit("loc_kit_analysis", request):
+        return gettext(
+            "Too many automatic analysis requests. "
+            "Upload a profile to continue, or retry later."
+        )
     try:
         sample = build_glossary_structure_sample(
             rows, draft.sheet, settings.LOC_KIT_PROFILE_SAMPLE_MAX_BYTES
