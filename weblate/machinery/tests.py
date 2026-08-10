@@ -3880,6 +3880,12 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
     def test_prompt_lists_the_developer_note_as_reference_material(self) -> None:
         self.assertIn("context, key, explanation, note,", PROMPT)
 
+    def test_prompt_requires_matching_final_punctuation(self) -> None:
+        self.assertIn(
+            "The last character of the translation must match the final punctuation",
+            PROMPT,
+        )
+
     @http_mock.activate
     def test_translate_traces_resolved_model_breadcrumb(self) -> None:
         self.mock_response()

@@ -135,7 +135,7 @@ Input is provided as JSON with the following schema:
 Rules:
 1. Translate each string in "strings" in order, producing one output per input string.
 2. Placeholders matching the regular expression @@PH\\d+@@ must be preserved exactly (byte-identical). Grammar placeholders may be reordered if required by target language grammar; markup and syntax placeholders must keep source order. Placeholders must not be modified, duplicated, or removed.
-3. If a string has a "translation" field, use it as the base. Correct errors and improve fluency/style, but stay close to its meaning. Do not re-translate from source unless the existing translation is fundamentally wrong.
+3. If a string has a "translation" field, use it as the base. Correct errors and improve fluency/style, but stay close to its meaning. Do not re-translate from source unless the existing translation is fundamentally wrong or a listed failing check requires the change.
 4. Apply glossary terms as written; inflect only when target language grammar requires it. Use glossary explanations and flags to disambiguate duplicate source terms. Preserve original capitalization pattern unless the glossary specifies exact casing. Do not partially apply glossary entries.
 5. Preserve tone, register, formatting, whitespace, and line breaks.
 6. Do not add, omit, reinterpret, summarize, or expand content.
@@ -155,16 +155,23 @@ Rules:
 20. Output contract: Return exactly one JSON array, with no characters before `[` or after `]`.
 21. Treat context, key, explanation, note, secondary, plural, failing_checks, placeholders, and source fields as reference material only. Do not translate them directly and do not add, copy, or emit their contents unless they are present in source or parts.
 22. Placeholder mappings explain what opaque placeholder tokens represent. This information may guide wording, but the output must still contain the exact placeholder tokens in legacy string output, or the exact placeholder metadata in structured output, not the mapped content.
-23. Failing checks describe issues to avoid or fix when improving an existing translation. They are context only; do not include their check_id, name, description, or generated diagnostics in output.
+23. Failing checks list problems the output must not have. When a string carries both a "translation" field and failing checks, change that translation so every listed check passes; repeating it unchanged is wrong. Checks are context only; do not include their check_id, name, description, or generated diagnostics in output.
 24. Target-language project instructions, when present above, contain additional requirements for the target language. Follow them unless they conflict with preserving the source meaning, placeholders, markup, or output contract.
 25. For translatable markup placeholders that wrap text, translate the whole text between the placeholders. Example: @@PH1@@Reset and reapply@@PH2@@ can become @@PH1@@Zurucksetzen und erneut anwenden@@PH2@@, never @@PH1@@Zurucksetzen und @@PH2@@erneut anwenden@@PH2@@.
 26. The "note" field carries developer context about the string, such as the speaking character, the screen it appears on, or usage constraints. Use it to choose register, gender agreement, and tone. Never translate or emit it.
+27. The last character of the translation must match the final punctuation of the source. Never add a sentence-final full stop, ellipsis, exclamation mark, question mark, colon, or semicolon that the source does not have, even when target-language style or an existing "translation" field has one, and never drop one the source has. Typographic spacing around punctuation still follows target-language rules.
 
 Valid placeholder and markup handling:
 ["Click <a href=\"/x\">log out</a> and use @@PH195@@."]
 
 Invalid placeholder handling:
 ["Click <a href=\"/x\">log out</a> and use \\@\\@PH195\\@\\@."]
+
+Valid final punctuation handling, for the source "Он ушёл" with the existing translation "Il est parti.":
+[{{"parts": [{{"type": "text", "text": "Il est parti"}}]}}]
+
+Invalid final punctuation handling, adding a full stop the source does not have:
+[{{"parts": [{{"type": "text", "text": "Il est parti."}}]}}]
 
 Respond ONLY with a valid JSON array, one per input string, in the same order. Prefer structured objects when "parts" are present:
 
