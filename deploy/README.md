@@ -217,13 +217,38 @@ carries no instance data.
 
 ## Upgrading
 
+From the repository on the Mac, with the change committed:
+
 ```sh
-cd /srv/hcgameloc && git pull
-cd deploy && docker compose up -d --build
+./deploy/vps.sh deploy            # push HEAD to origin/main and roll it out
+./deploy/vps.sh deploy --build    # force the image rebuild
+```
+
+The command pushes `HEAD` to `origin/main`, compares it with the commit the
+server is on, and picks the cheapest action that can carry the diff:
+
+| Changed paths | Action | Typical cost |
+| --- | --- | --- |
+| `weblate/`, `weblate_customization/`, `loc_kit_ingest/`, `client/`, `scripts/`, `pyproject.toml`, `deploy/Dockerfile`, `.dockerignore` | rebuild the image, recreate the container | ~2 min |
+| `deploy/docker-compose.yml` | `docker compose up -d` | ~1 min |
+| `deploy/nginx-l10n.conf` | copy the vhost, `nginx -t`, reload | seconds |
+| anything else (docs, plans, tests) | update the checkout only | seconds |
+
+The work runs detached on the VPS and the log is streamed back, so a tunnel
+drop during a build cannot leave the deploy half-finished; re-running the
+command is safe. Each run ends with the health status, the commit baked into
+the image (`org.opencontainers.image.revision`) and the HTTP code of the login
+page, and fails loudly with the last 30 log lines if any of them is wrong.
+
+Editing `.env` is not a code change and stays manual - the file lives only on
+the server:
+
+```sh
+./deploy/vps.sh ssh 'cd /srv/hcgameloc/deploy && sed -i "s/^KEY=.*/KEY=value/" .env && docker compose up -d weblate'
 ```
 
 The image build recompiles locales and reinstalls the package; the container
-applies pending migrations on start.
+applies pending migrations and collects static files on every start.
 
 ## Backups
 

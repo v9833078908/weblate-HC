@@ -10,6 +10,8 @@
 # keeps working. The office network is reachable through a SOCKS5 proxy
 # published on 127.0.0.1:$SOCKS_PORT.
 #
+#   ./deploy/vps.sh deploy           # push HEAD and roll it out (see below)
+#   ./deploy/vps.sh deploy --build   # same, but always rebuild the image
 #   ./deploy/vps.sh up               # build and start the gateway container
 #   ./deploy/vps.sh status           # gateway state and SSH reachability
 #   ./deploy/vps.sh survey           # OS/CPU/RAM/disk/docker state of the VPS
@@ -17,6 +19,12 @@
 #   ./deploy/vps.sh shell            # interactive shell
 #   ./deploy/vps.sh forward <port>   # publish a VPS port on 127.0.0.1:<port>
 #   ./deploy/vps.sh down             # stop the gateway
+#
+# `deploy` picks the cheapest action that can carry the change: it compares the
+# commit running on the server with the one being deployed and only rebuilds
+# the image when a file that ends up inside it changed. Documentation, plans
+# and tests never trigger a rebuild. The work runs detached on the VPS, so a
+# dropped tunnel cannot leave a half-finished deploy behind.
 #
 # Credentials come from deploy/.env.local (gitignored).
 
@@ -30,6 +38,13 @@ CONTAINER=hc-vpn-gw
 IMAGE=hc-vpn-gw
 SOCKS_PORT=${SOCKS_PORT:-11080}
 SECRETS_DIR="${TMPDIR:-/tmp}/hc-vpn-gw-secrets"
+REPO_DIR=/srv/hcgameloc
+WEBLATE_CONTAINER=hcgameloc-weblate-1
+REMOTE_LOG=/tmp/hc-deploy.log
+
+# Files baked into the image by deploy/Dockerfile. A commit that touches none
+# of them cannot change the image, so the deploy skips the build.
+IMAGE_PATHS='^(weblate/|weblate_customization/|loc_kit_ingest/|client/|scripts/|pyproject\.toml|MANIFEST\.in|deploy/Dockerfile|\.dockerignore$)'
 
 proxy_command="nc -X 5 -x 127.0.0.1:$SOCKS_PORT %h %p"
 ssh_opts=(
@@ -39,8 +54,11 @@ ssh_opts=(
     -p "$VPS_SSH_PORT"
 )
 
+# The SOCKS port answering is the property that matters, and probing it keeps
+# the local Docker daemon off the hot path: `docker inspect` blocks for a
+# minute or more whenever another project on this workstation is mid-build.
 gateway_running() {
-    [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2> /dev/null)" = "true" ]
+    nc -z 127.0.0.1 "$SOCKS_PORT" > /dev/null 2>&1
 }
 
 gateway_up() {
@@ -114,7 +132,150 @@ run_root_script() {
     ssh_retry "echo '$VPS_PASSWORD' | sudo -S -v 2>/dev/null; echo $payload | base64 -d | sudo bash"
 }
 
+# Runs a local script on the VPS as $VPS_USER, detached, logging to $REMOTE_LOG.
+# Detached because an image build outlives the tunnel's re-key interval.
+start_remote_script() {
+    local payload
+    payload=$(base64 < "$1" | tr -d '\n')
+    ssh_retry "echo $payload | base64 -d > /tmp/hc-deploy.sh \
+        && setsid nohup bash /tmp/hc-deploy.sh > $REMOTE_LOG 2>&1 < /dev/null & sleep 2; echo started"
+}
+
+# Streams $REMOTE_LOG until the remote script reports a verdict.
+follow_remote_script() {
+    local seen=0 total waited=0 chunk
+    while [ "$waited" -lt 1800 ]; do
+        total=$(ssh_retry "stat -c %s $REMOTE_LOG 2>/dev/null || echo 0")
+        if [ "$total" -gt "$seen" ]; then
+            chunk=$(ssh_retry "tail -c +$((seen + 1)) $REMOTE_LOG")
+            printf '%s\n' "$chunk"
+            seen=$total
+            case $chunk in
+            *DEPLOY-OK*) return 0 ;;
+            *DEPLOY-FAILED*) return 1 ;;
+            esac
+        fi
+        sleep 5
+        waited=$((waited + 5))
+    done
+    >&2 echo "Timed out waiting for the deploy; check $REMOTE_LOG on the VPS."
+    return 1
+}
+
+reload_nginx_vhost() {
+    local tmp
+    tmp=$(mktemp)
+    cat > "$tmp" << EOS
+set -eu
+cp $REPO_DIR/deploy/nginx-l10n.conf /etc/nginx/sites-available/l10n
+nginx -t
+systemctl reload nginx
+echo "nginx: vhost reloaded"
+EOS
+    run_root_script "$tmp"
+    rm -f "$tmp"
+}
+
+deploy_stack() {
+    local force=0
+    [ "${1:-}" = "--build" ] && force=1
+
+    local root
+    root=$(cd .. && pwd)
+
+    if [ -n "$(git -C "$root" status --porcelain)" ]; then
+        >&2 echo "Working tree is dirty; commit or stash first:"
+        >&2 git -C "$root" status --short
+        return 1
+    fi
+
+    local target
+    target=$(git -C "$root" rev-parse HEAD)
+    echo "Pushing $(git -C "$root" rev-parse --short HEAD) to origin/main..."
+    git -C "$root" push -q origin "HEAD:main"
+
+    require_gateway
+    local deployed
+    deployed=$(ssh_retry "git -C $REPO_DIR rev-parse HEAD")
+
+    # The server can be ahead of what this checkout knows about when someone
+    # else deployed in between; fetch before diffing against it.
+    if ! git -C "$root" cat-file -e "${deployed}^{commit}" 2> /dev/null; then
+        git -C "$root" fetch -q origin
+    fi
+
+    local changed action=none nginx=0
+    if git -C "$root" cat-file -e "${deployed}^{commit}" 2> /dev/null; then
+        changed=$(git -C "$root" diff --name-only "$deployed" "$target")
+    else
+        echo "Server commit $deployed is unknown here; rebuilding to be safe."
+        changed=""
+        force=1
+    fi
+
+    if [ "$force" = 1 ] || printf '%s\n' "$changed" | grep -qE "$IMAGE_PATHS"; then
+        action=build
+    elif printf '%s\n' "$changed" | grep -qx 'deploy/docker-compose.yml'; then
+        action=compose
+    fi
+    printf '%s\n' "$changed" | grep -qx 'deploy/nginx-l10n.conf' && nginx=1
+
+    if [ "$deployed" = "$target" ] && [ "$force" = 0 ]; then
+        echo "Server is already on $(git -C "$root" rev-parse --short "$target"); nothing to deploy."
+        return 0
+    fi
+
+    echo "Deploying $(git -C "$root" rev-parse --short "$target") over $(git -C "$root" rev-parse --short "$deployed" 2> /dev/null || echo "$deployed")"
+    printf '%s\n' "$changed" | sed 's/^/  ~ /' | head -20
+    echo "Action: $action$([ "$nginx" = 1 ] && echo " + nginx reload")"
+
+    local tmp
+    tmp=$(mktemp)
+    cat > "$tmp" << EOS
+set -euo pipefail
+cd $REPO_DIR
+git fetch -q origin
+git reset -q --hard $target
+export GIT_SHA=$target
+cd deploy
+started=\$(date +%s)
+case $action in
+build) docker compose up -d --build weblate ;;
+compose) docker compose up -d ;;
+none) docker compose up -d weblate ;;
+esac
+echo "compose: \$((\$(date +%s) - started))s"
+for _ in \$(seq 1 120); do
+    health=\$(docker inspect -f '{{.State.Health.Status}}' $WEBLATE_CONTAINER 2> /dev/null || echo missing)
+    [ "\$health" = healthy ] && break
+    sleep 5
+done
+echo "health: \$health after \$((\$(date +%s) - started))s"
+revision=\$(docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' hcgameloc:latest 2> /dev/null || echo none)
+echo "image revision: \$revision"
+login=\$(curl -s -o /dev/null -m 20 -w '%{http_code}' "http://127.0.0.1:\${WEBLATE_LOCAL_PORT:-8081}/accounts/login/" || echo 000)
+echo "login page: \$login"
+if [ "\$health" = healthy ] && [ "\$login" = 200 ]; then
+    echo DEPLOY-OK
+else
+    docker compose logs --tail 30 weblate
+    echo DEPLOY-FAILED
+fi
+EOS
+    start_remote_script "$tmp" > /dev/null
+    rm -f "$tmp"
+
+    local verdict=0
+    follow_remote_script || verdict=1
+    [ "$nginx" = 1 ] && reload_nginx_vhost
+    return "$verdict"
+}
+
 case ${1:-status} in
+deploy)
+    shift
+    deploy_stack "$@"
+    ;;
 up)
     gateway_up
     ;;
@@ -168,7 +329,7 @@ forward)
         -L "127.0.0.1:$port:127.0.0.1:$port" "$VPS_USER@$VPS_HOST"
     ;;
 *)
-    >&2 echo "usage: $0 {up|down|status|survey|ssh <cmd>|root <script>|shell|forward <port>}"
+    >&2 echo "usage: $0 {deploy [--build]|up|down|status|survey|ssh <cmd>|root <script>|shell|forward <port>}"
     exit 2
     ;;
 esac

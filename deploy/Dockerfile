@@ -29,10 +29,13 @@ ENV UV_LINK_MODE=copy \
 # hypervisor exposes a modern CPU model (libvirt/Proxmox: cpu mode=host).
 ARG NUMPY_VERSION=2.3.5
 
+# Installed before the source is copied: the pin changes about once a year, a
+# code change should not re-download the wheel on every deploy.
+RUN uv pip install --no-config --python /app/venv/bin/python "numpy==${NUMPY_VERSION}"
+
 COPY . /usr/src/hcgameloc
 
 RUN set -eux; \
-    uv pip install --no-config --python /app/venv/bin/python "numpy==${NUMPY_VERSION}"; \
     cd /usr/src/hcgameloc/weblate; \
     env DJANGO_SETTINGS_MODULE=weblate.settings_example \
         /app/venv/bin/django-admin compilemessages; \
@@ -50,5 +53,9 @@ RUN set -eux; \
     cd /; \
     rm -rf /usr/src/hcgameloc; \
     /app/venv/bin/python -c "import importlib.util as u, numpy, matplotlib, weblate, loc_kit_ingest; assert u.find_spec('weblate_customization.machinery') and u.find_spec('weblate_customization.checks'); print(weblate.__file__, numpy.__version__)"
+
+# Lets a deploy prove that the running image was built from the intended commit.
+ARG GIT_SHA=unknown
+LABEL org.opencontainers.image.revision="${GIT_SHA}"
 
 USER 1000
