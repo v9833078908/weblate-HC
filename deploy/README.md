@@ -180,6 +180,29 @@ On a server without a reverse proxy, start the bundled Caddy instead:
 TLS switch - `:80` for plain HTTP, or the public hostname for automatic Let's
 Encrypt certificates.
 
+## Privacy
+
+The site is published on the internet, so nothing may be readable without an
+account:
+
+- `WEBLATE_REQUIRE_LOGIN=1` - every page and every API call needs a session or
+  a token. An anonymous visitor only ever sees the sign-in page.
+- `WEBLATE_REGISTRATION_OPEN=0` - accounts are created by an administrator in
+  `/manage/users/`; nobody can sign themselves up.
+- `WEBLATE_PRIVATE_COMMIT_EMAIL_OPT_IN=0` and
+  `WEBLATE_PRIVATE_COMMIT_NAME_OPT_IN=0` - translations are committed to the
+  game repositories as `Hero Craft Localization user <id>
+  <user-<id>@users.noreply.l10n.herocraft.com>`. Upstream makes this a per-user
+  opt-in, which means the real name and e-mail end up in the repository history
+  by default; here it is the other way round, and a user who wants their own
+  name on their commits selects it in :guilabel:`Profile`.
+
+`weblate/templates/accounts/snippets/login-info.html` no longer carries the
+upstream notice about names being "visible publicly" and about contributing
+under each project's license. Both describe a public hosted service and are
+wrong for this deployment; the template keeps a comment explaining why the
+block is gone.
+
 ## Upgrading
 
 ```sh

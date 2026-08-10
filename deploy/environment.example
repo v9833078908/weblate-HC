@@ -35,6 +35,14 @@ WEBLATE_ADMIN_EMAIL=loc@herocraft.example
 WEBLATE_ADMIN_PASSWORD=CHANGE-ME
 WEBLATE_REGISTRATION_OPEN=0
 WEBLATE_REQUIRE_LOGIN=1
+
+# Private instance: nothing is readable without a login, accounts are created
+# by an administrator, and the identity written into the game repositories is
+# generated instead of personal - `Hero Craft Localization user <id>` and
+# `user-<id>@users.noreply.<site domain>`. Set either to 1 to make the private
+# identity a per-user opt-in again, which is the upstream default.
+WEBLATE_PRIVATE_COMMIT_EMAIL_OPT_IN=0
+WEBLATE_PRIVATE_COMMIT_NAME_OPT_IN=0
 WEBLATE_DEBUG=0
 WEBLATE_LOGLEVEL=INFO
 

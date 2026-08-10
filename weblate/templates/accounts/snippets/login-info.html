@@ -1,5 +1,14 @@
 {% load i18n %}
 
+{% comment %}
+  HCGameLoc is a private, invite-only instance: browsing requires a login,
+  registration is closed, and commits are authored with the private commit
+  name and e-mail. The upstream notice about the name and username being
+  "visible publicly", and about contributing under each project's license,
+  does not hold here, so the whole block is dropped. Only the legal-app
+  branch below is kept, and `weblate.legal` is not installed.
+{% endcomment %}
+
 {% include "accounts/snippets/login-about.html" %}
 
 {% if has_legal %}
@@ -25,32 +34,4 @@
   </p>
 
   {% include 'legal/documents/summary.html' %}
-
-{% else %}
-  <ul>
-    <li>
-      {% translate "By registering, you agree that your name and username will be visible publicly as long as your account exists." %}
-    </li>
-    {% if private_commit_email_opt_in %}
-      <li>
-        {% translate "Additionally, your name and e-mail can be used in version control system commits to author the changes you made; they can be stored there indefinitely." %}
-      </li>
-      <li>
-        {% if private_commit_name_opt_in %}
-          {% translate "You can enable the use of a private commit e-mail and name in your profile." %}
-        {% else %}
-          {% translate "You can enable the use of a private commit e-mail in your profile." %}
-        {% endif %}
-      </li>
-
-    {% else %}
-      {% if private_commit_name_opt_in %}
-        <li>
-          {% translate "Additionally, your name can be used in version control system commits to author the changes you made; it can be stored there indefinitely." %}
-        </li>
-        <li>{% translate "You can enable the use of a private commit name in your profile." %}</li>
-      {% endif %}
-    {% endif %}
-    <li>{% translate "You provide your contribution under the license defined by each project you contributed to." %}</li>
-  </ul>
 {% endif %}
