@@ -252,10 +252,19 @@ for _ in \$(seq 1 120); do
 done
 echo "health: \$health after \$((\$(date +%s) - started))s"
 revision=\$(docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' hcgameloc:latest 2> /dev/null || echo none)
-echo "image revision: \$revision"
+echo "checkout: $target"
+# Only a rebuild is expected to move the image; for the other actions the
+# label legitimately lags behind the checkout.
+if [ "$action" = build ] && [ "\$revision" != "$target" ]; then
+    echo "image revision: \$revision (MISMATCH, expected $target)"
+    stale=1
+else
+    echo "image revision: \$revision"
+    stale=0
+fi
 login=\$(curl -s -o /dev/null -m 20 -w '%{http_code}' "http://127.0.0.1:\${WEBLATE_LOCAL_PORT:-8081}/accounts/login/" || echo 000)
 echo "login page: \$login"
-if [ "\$health" = healthy ] && [ "\$login" = 200 ]; then
+if [ "\$health" = healthy ] && [ "\$login" = 200 ] && [ "\$stale" = 0 ]; then
     echo DEPLOY-OK
 else
     docker compose logs --tail 30 weblate
