@@ -728,9 +728,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
     @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
     def test_term_description_sheet_maps_descriptions_as_explanations(self) -> None:
         """Термин и описание на соседних строках - одна запись, не две."""
-        self._start(
-            upload=self._csv("Terms.csv", GLOSSARY_PAIRS_CSV), slug=self.slug
-        )
+        self._start(upload=self._csv("Terms.csv", GLOSSARY_PAIRS_CSV), slug=self.slug)
         draft = self._draft()
         draft.refresh_from_db()
 
@@ -744,9 +742,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
     @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
     def test_operator_switches_the_layout_from_the_preview(self) -> None:
         """Неверно угаданная раскладка чинится кнопкой, а не JSON-профилем."""
-        self._start(
-            upload=self._csv("Terms.csv", GLOSSARY_PAIRS_CSV), slug=self.slug
-        )
+        self._start(upload=self._csv("Terms.csv", GLOSSARY_PAIRS_CSV), slug=self.slug)
         draft = self._draft()
 
         response = self.client.post(
@@ -767,13 +763,9 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
 
     @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
     def test_unknown_layout_is_refused(self) -> None:
-        self._start(
-            upload=self._csv("Terms.csv", GLOSSARY_PAIRS_CSV), slug=self.slug
-        )
+        self._start(upload=self._csv("Terms.csv", GLOSSARY_PAIRS_CSV), slug=self.slug)
         response = self.client.post(
-            reverse(
-                "loc-kit-glossary-preview", kwargs={"token": self._draft().token}
-            ),
+            reverse("loc-kit-glossary-preview", kwargs={"token": self._draft().token}),
             {"action": "relayout", "layout": "../../etc"},
         )
         self.assertEqual(response.status_code, 404)

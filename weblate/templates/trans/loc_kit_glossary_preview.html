@@ -100,9 +100,7 @@
                 name="layout"
                 value="flat"
                 class="btn {% if layout == 'flat' %}btn-primary{% else %}btn-default{% endif %}"
-                {% if layout == 'flat' %}aria-pressed="true"{% endif %}>
-          {% translate "Each row is a term" %}
-        </button>
+                {% if layout == 'flat' %}aria-pressed="true"{% endif %}>{% translate "Each row is a term" %}</button>
         <button type="submit"
                 name="layout"
                 value="pairs"
