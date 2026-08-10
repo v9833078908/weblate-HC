@@ -796,6 +796,22 @@ Generic settings
         environment:
           WEBLATE_TIME_ZONE: Europe/Prague
 
+.. envvar:: WEBLATE_DEFAULT_LANGUAGE
+
+    Configures the default interface language, see
+    :std:setting:`django:LANGUAGE_CODE`.
+
+    It only applies to visitors whose browser asks for a language the
+    interface is not translated to; a signed-in user keeps the language
+    selected in their profile.
+
+    **Example:**
+
+    .. code-block:: yaml
+
+        environment:
+          WEBLATE_DEFAULT_LANGUAGE: ru
+
 .. envvar:: WEBLATE_ENABLE_HTTPS
 
     Makes Weblate assume it is operated behind a reverse HTTPS proxy, it makes

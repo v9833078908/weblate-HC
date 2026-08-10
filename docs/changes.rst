@@ -12,6 +12,8 @@ Weblate 2026.8.1
 * Added optional :ref:`TBX glossary import from CSV, TSV, and XLSX tables <uploading-glossary-tables>`, with a locally validated profile proposal path.
 * Glossary tables with only language columns are now mapped deterministically without contacting the automatic analyzer, and the sheet-selection step is skipped for single-sheet uploads, see :ref:`uploading-glossary-tables`.
 * Glossary table import now trims leading and trailing whitespace from a term description instead of refusing the table, and reports the trim as a warning; whitespace around a term itself remains an error.
+* Added :envvar:`WEBLATE_DEFAULT_LANGUAGE` to choose the interface language used for visitors whose browser language is not available.
+* The sign-in page no longer states that names and usernames are visible publicly, and the :guilabel:`Full name` field no longer promises that the name is used in version-control commits when the site defaults to a private commit name.
 
 .. rubric:: Bug fixes
 
