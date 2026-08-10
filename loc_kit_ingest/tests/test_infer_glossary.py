@@ -296,3 +296,76 @@ def test_paired_document_survives_parse_profile() -> None:
     grammar = profile.components[0].grammar
     assert grammar.regions[0].record_stride == 2
     assert [note.row_offset for note in grammar.notes] == [1, 1]
+
+
+FLAT_WITH_NOTE = [
+    ["ru", "en", "tr", "fr", "note"],
+    ["Russian", "English", "Turkish", "French", "Note"],
+    ["Партия", "Party", "Parti", "Parti", "Правящая политическая партия."],
+    ["Самосбор", "Samosbor", "Samosbor", "Samosbor", "Термин вселенной."],
+]
+
+
+def test_note_column_becomes_a_source_note_field() -> None:
+    document, notes = infer_glossary_profile("S", FLAT_WITH_NOTE, component="s")
+    (comp,) = document["components"]
+    assert [lang["code"] for lang in comp["languages"]] == ["ru", "en", "tr", "fr"]
+    assert comp["grammar"]["notes"] == [
+        {"scope": "source", "column": 5, "header": "note", "row_offset": 0}
+    ]
+    assert any("explanation of the source term" in note for note in notes)
+    parse_profile(document)
+
+
+@pytest.mark.parametrize("header", ["Notes", "ОПИСАНИЕ", "Comment", " context "])
+def test_note_header_matching_ignores_case_and_padding(header: str) -> None:
+    rows = [row[:] for row in FLAT_WITH_NOTE]
+    rows[0][4] = header
+    document, _notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert comp["grammar"]["notes"][0]["column"] == 5
+
+
+def test_empty_recognised_note_column_does_not_compete() -> None:
+    rows = [
+        ["ru", "en", "note", "comment"],
+        ["Партия", "Party", "", "Правящая политическая партия."],
+        ["Самосбор", "Samosbor", "", "Термин вселенной."],
+    ]
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert comp["grammar"]["notes"][0]["column"] == 4
+    assert any("column 3" in note and "empty" in note for note in notes)
+
+
+def test_two_populated_note_columns_are_refused() -> None:
+    rows = [
+        ["ru", "en", "note", "comment"],
+        ["Партия", "Party", "Проза", "Ещё проза"],
+    ]
+    with pytest.raises(InferenceError, match="columns 3, 4 all look like term notes"):
+        infer_glossary_profile("S", rows, component="s")
+
+
+def test_empty_note_column_is_excluded_with_a_warning() -> None:
+    rows = [["ru", "en", "note"], ["Партия", "Party", ""]]
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert "notes" not in comp["grammar"]
+    assert any("column 3" in note and "empty" in note for note in notes)
+
+
+def test_flat_note_on_a_source_less_row_is_refused() -> None:
+    rows = [
+        ["ru", "en", "note"],
+        ["Партия", "Party", "Правящая политическая партия."],
+        ["", "", "не привязанная к термину заметка"],
+    ]
+    with pytest.raises(InferenceError, match="non-term row"):
+        infer_glossary_profile("S", rows, component="s")
+
+
+def test_unrecognised_extra_column_has_actionable_error() -> None:
+    rows = [["ru", "en", "Character limit"], ["Партия", "Party", "40"]]
+    with pytest.raises(InferenceError, match="recognised term-note header, for example"):
+        infer_glossary_profile("S", rows, component="s")
