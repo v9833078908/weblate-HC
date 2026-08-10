@@ -123,7 +123,9 @@ TIME_ZONE = get_env_str("WEBLATE_TIME_ZONE", "UTC")
 
 # Language code for this installation. All choices can be found here:
 # http://www.i18nguy.com/unicode/language-identifiers.html
-LANGUAGE_CODE = "en-us"
+# Used for visitors whose browser asks for a language the site does not have;
+# a signed-in user keeps whatever they picked in their profile.
+LANGUAGE_CODE = get_env_str("WEBLATE_DEFAULT_LANGUAGE", "en-us")
 
 LANGUAGES = (
     ("ar", "العربية"),

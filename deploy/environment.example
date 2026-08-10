@@ -12,6 +12,11 @@
 WEBLATE_SITE_DOMAIN=l10n.herocraft.com
 WEBLATE_SITE_TITLE=Hero Craft Localization
 
+# Interface language for visitors whose browser asks for something the site
+# does not have. A signed-in user keeps whatever they picked in their profile,
+# and a browser asking for a supported language still wins over this.
+WEBLATE_DEFAULT_LANGUAGE=ru
+
 # Only used when the optional caddy profile is started
 # (`docker compose --profile caddy up -d`). On hc-srv15-localizer the host
 # nginx already owns port 80, so leave the profile off.
@@ -77,10 +82,13 @@ WEBLATE_ADD_MACHINERY=weblate_customization.machinery.RoutedLLMTranslation
 WEBLATE_ADD_CHECK=weblate_customization.checks.GameMarkupCheck
 
 # Loc-kit glossary profile analysis (separate OpenRouter configuration,
-# unrelated to the OpenRouter machinery configured in the web UI).
+# unrelated to the OpenRouter machinery configured in the web UI). The model
+# must support strict structured outputs; OpenRouter is asked to refuse
+# providers that cannot honour the JSON schema. Fill the key, then switch
+# the feature on.
 WEBLATE_LOC_KIT_PROFILE_ANALYSIS_ENABLED=0
 WEBLATE_LOC_KIT_PROFILE_OPENROUTER_KEY=
-WEBLATE_LOC_KIT_PROFILE_OPENROUTER_MODEL=
+WEBLATE_LOC_KIT_PROFILE_OPENROUTER_MODEL=google/gemini-2.5-flash
 
 # --- VCS ----------------------------------------------------------------
 WEBLATE_VCS_ALLOW_SCHEMES=https,ssh,git
