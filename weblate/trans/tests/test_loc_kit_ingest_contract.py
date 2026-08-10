@@ -671,7 +671,9 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
             reverse("loc-kit-sheet-select", kwargs={"token": draft.token}),
         )
         self.assertEqual(draft.owner, self.user)
-        self.assertEqual(draft.state, LocKitImportDraft.State.UPLOADED)
+        # Single sheet: auto-skip fixed it, but GLOSSARY_CSV's domain/note_*
+        # columns refuse deterministic inference, so it stays at sheet-select.
+        self.assertEqual(draft.state, LocKitImportDraft.State.SHEET_SELECTED)
         # No component exists yet.
         self.assertFalse(Component.objects.filter(slug=self.slug).exists())
 

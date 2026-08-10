@@ -713,6 +713,19 @@ class CreateFromZip(CreateComponent):
         except Exception:
             draft.delete_storage()
             raise
+        if len(sheets) == 1:
+            # A CSV/TSV always has exactly one sheet; the selection screen
+            # is noise. Only the deterministic step may run here: this POST
+            # is atomic, a provider call inside it would hold a transaction
+            # open for the whole network timeout.
+            name, rows = next(iter(sheets.items()))
+            draft.sheet = name
+            draft.state = LocKitImportDraft.State.SHEET_SELECTED
+            draft.save(update_fields=["sheet", "state"])
+            error = _infer_draft_profile(draft, rows)
+            if error is None:
+                return redirect("loc-kit-glossary-preview", token=draft.token)
+            messages.info(self.request, error)
         return redirect("loc-kit-sheet-select", token=draft.token)
 
 
@@ -1093,6 +1106,20 @@ class LocKitSheetSelectView(LocKitDraftMixin, TemplateView):
         return redirect("loc-kit-glossary-preview", token=draft.token)
 
 
+def _infer_draft_profile(draft: LocKitImportDraft, rows: list) -> str | None:
+    """Deterministic local mapping. Returns None on success, else the reason."""
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.infer import InferenceError, infer_glossary_profile
+
+    try:
+        document, notes = infer_glossary_profile(
+            draft.sheet, [list(row) for row in rows], component=draft.slug
+        )
+    except InferenceError as error:
+        return str(error)
+    return _store_validated_profile(draft, document, rows, extra_warnings=notes)
+
+
 def _analyze_draft_sheet(
     request: AuthenticatedHttpRequest, draft: LocKitImportDraft, rows: list
 ) -> str | None:
@@ -1104,24 +1131,11 @@ def _analyze_draft_sheet(
     problem: an unavailable analyzer is a manual-profile outcome, not an
     error page.
     """
-    # ruff: ignore[import-outside-top-level]
-    from loc_kit_ingest.infer import InferenceError, infer_glossary_profile
-
     # Deterministic first: local, free, offline. The analyzer is a fallback
     # for layouts the header-driven inference refuses.
-    try:
-        document, notes = infer_glossary_profile(
-            draft.sheet, [list(row) for row in rows], component=draft.slug
-        )
-    except InferenceError as error:
-        infer_reason = str(error)
-    else:
-        error_message = _store_validated_profile(
-            draft, document, rows, extra_warnings=notes
-        )
-        if error_message is None:
-            return None
-        infer_reason = error_message
+    infer_reason = _infer_draft_profile(draft, rows)
+    if infer_reason is None:
+        return None
 
     if not settings.LOC_KIT_PROFILE_ANALYSIS_ENABLED:
         return gettext(
