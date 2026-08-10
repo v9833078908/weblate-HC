@@ -83,6 +83,8 @@ from weblate.vcs.permissions import github_app_installation_workspaces
 from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from django.forms import Form
 
     from weblate.auth.models import AuthenticatedHttpRequest
@@ -1102,8 +1104,30 @@ def _analyze_draft_sheet(
     problem: an unavailable analyzer is a manual-profile outcome, not an
     error page.
     """
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.infer import InferenceError, infer_glossary_profile
+
+    # Deterministic first: local, free, offline. The analyzer is a fallback
+    # for layouts the header-driven inference refuses.
+    try:
+        document, notes = infer_glossary_profile(
+            draft.sheet, [list(row) for row in rows], component=draft.slug
+        )
+    except InferenceError as error:
+        infer_reason = str(error)
+    else:
+        error_message = _store_validated_profile(
+            draft, document, rows, extra_warnings=notes
+        )
+        if error_message is None:
+            return None
+        infer_reason = error_message
+
     if not settings.LOC_KIT_PROFILE_ANALYSIS_ENABLED:
-        return gettext("Automatic analysis is disabled. Upload a profile to continue.")
+        return gettext(
+            "Automatic mapping did not recognize this sheet (%s) "
+            "and analysis is disabled. Upload a profile to continue."
+        ) % infer_reason
     # Spend an attempt only for a call that can actually reach the provider.
     # Selecting a worksheet is free: a multi-sheet workbook needs several
     # POSTs before the operator even sees the sheet they want.
@@ -1131,7 +1155,10 @@ def _analyze_draft_sheet(
 
 
 def _store_validated_profile(
-    draft: LocKitImportDraft, document: dict, rows: list
+    draft: LocKitImportDraft,
+    document: dict,
+    rows: list,
+    extra_warnings: Sequence[str] = (),
 ) -> str | None:
     """Validate a candidate locally and persist the preview, or explain why not."""
     try:
@@ -1152,7 +1179,7 @@ def _store_validated_profile(
             "target_languages": list(preview.target_languages),
             "term_count": preview.term_count,
             "note_count": preview.note_count,
-            "warnings": list(preview.warnings),
+            "warnings": [*extra_warnings, *preview.warnings],
             "terms": [
                 {
                     "section": term.section,

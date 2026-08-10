@@ -529,6 +529,12 @@ GLOSSARY_CSV = (
 )
 
 
+# Языковой кит без служебных колонок: детерминированный разбор обязан дать
+# превью без OpenRouter. GLOSSARY_CSV выше намеренно НЕ разбирается
+# детерминированно (domain/note_*) и покрывает LLM/ручной путь.
+GLOSSARY_LANG_ONLY_CSV = "ru,en\nRussian,English\nГерой,Hero\nМеч,Sword\n"
+
+
 def _glossary_profile(sheet: str, *, source_lang: str = "ru") -> dict:
     return {
         "schema_version": 2,
@@ -668,6 +674,40 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertEqual(draft.state, LocKitImportDraft.State.UPLOADED)
         # No component exists yet.
         self.assertFalse(Component.objects.filter(slug=self.slug).exists())
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_language_only_sheet_gets_deterministic_preview(self) -> None:
+        """Языковая таблица даёт превью локально, без OpenRouter и без JSON."""
+        self._start(
+            upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug
+        )
+        draft = self._draft()
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+        preview = json.loads(draft.preview_json)
+        self.assertEqual(preview["source_language"], "ru")
+        self.assertEqual(preview["target_languages"], ["en"])
+        self.assertEqual(preview["term_count"], 2)
+
+        page = self.client.get(
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
+        )
+        self.assertContains(page, "Герой")
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_deterministic_preview_confirms_into_live_component(self) -> None:
+        self._start(
+            upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug
+        )
+        response = self._confirm()
+        component = Component.objects.get(slug=self.slug)
+        self.assertTrue(component.is_glossary)
+        self.assertEqual(component.source_language.code, "ru")
+        codes = set(
+            component.translation_set.values_list("language__code", flat=True)
+        )
+        self.assertIn("en", codes)
 
     def test_failed_draft_insert_leaves_no_orphaned_file(self) -> None:
         """
