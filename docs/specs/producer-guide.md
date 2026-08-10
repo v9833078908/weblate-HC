@@ -3,12 +3,12 @@
 Пошаговая инструкция для продюсера, который работает только через веб-интерфейс
 Weblate и не трогает код. Всё, что здесь описано, делается мышкой.
 
-Адреса даны относительно корня инстанса. На тестовом стенде это
-`http://localhost:3001`, в бою - адрес, который дал администратор.
+Все примеры - на живом проекте **CoL4** (Choice of Life: Samosbor):
+<https://l10n.herocraft.com/projects/col4/>. Подставляйте свой проект вместо
+`col4` и свой компонент вместо `data`.
 
-Проверено на HCGameLoc (форк Weblate). Интерфейсные подписи приведены так, как
-они выглядят при русском языке интерфейса; часть строк форка пока только на
-английском, они помечены отдельно.
+Интерфейсные подписи приведены так, как они выглядят при русском языке
+интерфейса. Часть строк пока только на английском - они так и записаны.
 
 ## Словарь на три минуты
 
@@ -34,7 +34,7 @@ Weblate и не трогает код. Всё, что здесь описано,
 
 ## Шаг 1. Создать проект
 
-`/create/project/` или меню :guilabel:`Добавить` -> :guilabel:`Добавить новый
+<https://l10n.herocraft.com/create/project/> или меню :guilabel:`Добавить` -> :guilabel:`Добавить новый
 проект перевода`.
 
 | Поле | Обязательно | Что писать |
@@ -51,7 +51,7 @@ Weblate и не трогает код. Всё, что здесь описано,
 
 ## Шаг 2. Создать компонент из файла
 
-`/create/component/` или на странице проекта :guilabel:`Добавить` ->
+<https://l10n.herocraft.com/create/component/> или на странице проекта :guilabel:`Добавить` ->
 :guilabel:`Добавить новый компонент перевода`.
 
 Вкладок пять. Нужна третья: :guilabel:`Отправить файлы перевода`. Она для тех,
@@ -89,7 +89,7 @@ Weblate и не трогает код. Всё, что здесь описано,
 ## Шаг 3. Добавить целевые языки
 
 Страница компонента -> :guilabel:`Языки` -> :guilabel:`Начать новый перевод`
-(адрес `/new-lang/<проект>/<компонент>/`).
+(адрес `https://l10n.herocraft.com/new-lang/col4/data/`).
 
 Языки, которые уже были в файле, добавлять не нужно - они появились сами.
 
@@ -147,7 +147,7 @@ XLIFF-пары). В них строки извлекаются из кода у�
 - :guilabel:`Правка базового файла` - разрешает править файл языка-источника.
 
 **Одна-две строки.** Открыть перевод на **языке-источнике** (например
-`/projects/<проект>/<компонент>/ru/`) -> :guilabel:`Операции` ->
+<https://l10n.herocraft.com/projects/col4/data/ru/>) -> :guilabel:`Операции` ->
 :guilabel:`Добавить новую строку перевода`.
 
 | Поле | Что вписать |
@@ -157,10 +157,35 @@ XLIFF-пары). В них строки извлекаются из кода у�
 | :guilabel:`Ед. число` / :guilabel:`Мн. число` | Множественное - только если в игре у строки есть формы для разных количеств |
 
 **Пачка строк.** Тот же экран -> :guilabel:`Файлы` ->
-:guilabel:`Отправить перевод`, файл того же формата, что у компонента, режим
-:guilabel:`Добавить новые строки`. Существующие строки при этом не меняются.
-Режим :guilabel:`Заменить существующий файл перевода` тоже добавит новые, но
-перезапишет файл целиком, поэтому в нём должны быть и старые строки.
+:guilabel:`Отправить перевод`, режим :guilabel:`Добавить новые строки`.
+Существующие ключи при этом пропускаются, ничего не перезаписывается.
+
+Файл - CSV в UTF-8 с англоязычной шапкой ровно из этих столбцов:
+
+```text
+context,source
+EVENT_601,Пойдём со мной
+EVENT_601_ANSWER_1,Отказаться
+```
+
+- `context` - ключ от разработчика;
+- `source` - исходный текст;
+- третий столбец `target` разрешён, но при загрузке в язык-источник не
+  используется.
+
+Такой файл собирается в Excel или Google Sheets за минуту: две колонки,
+«Сохранить как CSV UTF-8». Шапка обязательна и именно по-английски.
+
+**Лок-кит заливать сюда нельзя.** Таблицу с шапкой вида `key,ru,en,ja`
+Weblate не понимает: он не сообщит об ошибке, отчитается «обработана 1 строка»
+и создаст **пустую строку без ключа и текста**, которую придётся искать и
+удалять руками. Проверено. Кит целиком заводят только как новый компонент
+(шаг 2), а для добавления строк в существующий компонент пересобирают файл в
+формат `context,source` выше или просят разработчика прислать `.po`.
+
+Режим :guilabel:`Заменить существующий файл перевода` тоже добавит новые
+строки, но перезапишет файл целиком: в нём должны быть и все старые строки.
+Без крайней необходимости не используйте.
 
 После добавления строка появляется во всех языках компонента как
 непереведённая. Дальше - автоперевод по фильтру `state:<translated` (шаг 9).
@@ -179,7 +204,8 @@ XLIFF-пары). В них строки извлекаются из кода у�
 
 ## Шаг 5. Настроить движок перевода под свой проект
 
-`/machinery/<проект>/` -> строка `OpenRouter` -> :guilabel:`Настроить`.
+<https://l10n.herocraft.com/machinery/col4/> -> строка `OpenRouter` ->
+:guilabel:`Настроить`.
 
 Это личная настройка вашего проекта. Продюсер соседней игры правит свою
 страницу, ваши тексты он не заденет.
@@ -204,6 +230,46 @@ XLIFF-пары). В них строки извлекаются из кода у�
 
 Право на эту страницу - :guilabel:`Редактирование проекта`. Нет доступа - к
 администратору.
+
+### Универсальная «Личность переводчика» для игр Hero Craft
+
+Заготовка на всю студию, снята с рабочей конфигурации CoL4 (приложение А) и
+обобщена. Скопируйте её в поле :guilabel:`Личность переводчика` своего проекта
+и замените три места в квадратных скобках. Остальное менять не нужно: это
+одинаково верно для любой нашей игры.
+
+```text
+You are a senior game localization specialist working on "[НАЗВАНИЕ ИГРЫ]",
+a [ЖАНР: narrative choice-based / mid-core strategy / arcade] mobile game
+published by HeroCraft for Android and iOS. [ЯЗЫК ОРИГИНАЛА, обычно Russian]
+is the original language of the script and your source.
+
+You have shipped mobile games before, so you know what these strings are:
+each one is either text the player reads on a phone screen or a control the
+player taps. A vague or overlong string is a gameplay bug, not a style issue:
+it either misleads the player or overflows a fixed-width control.
+
+You treat the project glossary as law. You never invent a second name for
+something the glossary has already named, and you never quietly drop a term
+you do not recognise.
+
+You never touch engine markup or placeholders, and you never change a
+string's final punctuation or its leading and trailing whitespace.
+```
+
+Что здесь важно и почему это работает на всех проектах:
+
+- **Роль и платформа.** Модель подстраивает длину и регистр под телефон, а не
+  под книгу.
+- **Что такое строка.** Прямое указание, что переполнение и двусмысленность -
+  это баг, а не вопрос вкуса.
+- **Глоссарий как закон.** Снимает главный источник разнобоя в наших играх.
+- **Разметка и пунктуация.** Дублирует общие правила движка: повтор в
+  «Личности» заметно повышает соблюдение.
+
+Всё, что специфично для конкретной игры - мир, тон, ругательства, формат
+тегов, длина реплик - идёт в :guilabel:`Стиль перевода`, а не сюда. Готовый
+образец такого стиля: приложение А.
 
 ## Шаг 6. Как формулировать инструкции, чтобы модель слушалась
 
@@ -283,7 +349,7 @@ Source "Он ушёл" with existing translation "Il est parti." must produce "I
 
 ## Шаг 9. Запустить автоматический перевод
 
-Страница перевода (например `/projects/<проект>/<компонент>/fr/`) ->
+Страница перевода (<https://l10n.herocraft.com/projects/col4/data/fr/>) ->
 :guilabel:`Операции` -> :guilabel:`Пакетный автоматический перевод`.
 
 | Поле | Значение по умолчанию | Что важно знать |
@@ -387,6 +453,112 @@ Source "Он ушёл" with existing translation "Il est parti." must produce "I
 9. Полный прогон с фильтром `state:<translated`.
 10. :guilabel:`Неудачные проверки` просмотрены, системные проблемы вынесены в
    инструкции, прогон повторён по `has:check`.
+
+## Приложение А. Образец: настройки CoL4
+
+Реальная конфигурация проекта <https://l10n.herocraft.com/machinery/col4/>,
+как она заполнена на момент написания гайда. Берите за образец структуры:
+заголовки-разделы, короткие абзацы, запреты вместо пожеланий, примеры прямо в
+тексте.
+
+### Личность переводчика
+
+````text
+You are a senior game localization specialist working on "Choice of Life: Samosbor", a narrative choice-based mobile game by Blazing Planet Studio and HeroCraft for Android and iOS. Russian is the original language of the script and your source.
+
+You have shipped interactive fiction before, so you know what these strings are: each one is either a card of narrative prose the player reads on a phone screen, or a tappable choice that sends the player down a story branch. A vague choice line is a gameplay bug, not a style issue.
+
+You treat the project glossary as law. You never invent a second name for something the glossary has already named, and you never quietly drop a term you do not recognise.
+````
+
+### Стиль перевода
+
+````text
+## Setting and tone
+
+Soviet-flavoured post-apocalyptic dystopia inside an endless brutalist megastructure. Keep the bureaucratic, hopeless, oppressive atmosphere. The register is dark and serious with black humour.
+
+Do not add slang or casual wording unless the source character speaks that way. Do not soften, sanitise or explain away lines that are crude, cruel or absurd in the source: that is the voice of the game. Equally, do not make neutral narration coarser than it is.
+
+Keep the narrative tense consistent across the whole project: present and past tense as used in everyday speech. Do not switch into a literary or archaic narrative tense for individual strings.
+
+## Terminology and names
+
+Apply the project glossary exactly. Never invent a second rendering for a term the glossary covers, and use the same rendering in every string. Personal names, patronymics and nicknames follow the glossary spelling character for character.
+
+Never leave Cyrillic characters in a target language that does not use Cyrillic. This includes in-world signs, form numbers, bureaucratic codes and joke strings: localise them so the joke still works in the target language, never copy them across unchanged.
+
+If a term looks like project terminology but is not in the glossary, translate it consistently and keep it consistent with the terms that are.
+
+## Player choices
+
+Choice lines drive story branches. Keep them short, concrete and unambiguous: the player must understand the consequence before tapping. Never merge two options into one vague phrase. Never make two different source options read identically in the target.
+
+## Consistency
+
+Identical source strings must receive identical translations. Two different source strings must not collapse into the same target string.
+
+## Markup and placeholders
+
+Strings contain engine markup and substitutions, for example:
+
+ ```
+
+ <size=60>Authors</size>
+ <color=#FF0000>...</color>
+ $$ / $
+ {0} / %KEY%
+
+ ```
+
+Translate only the text inside the tags. Tags, their attributes, their order and their count, and every placeholder ($, $$, {0}, %KEY%), must stay exactly as in the source.
+
+`$` and `$$` are the engine's line separators. Never replace them with real newlines, never add newlines next to them, and never change how many there are.
+
+## Punctuation, whitespace and length
+
+Reproduce the source's final punctuation exactly. If the source ends without a full stop, the translation ends without one. This applies to every choice line and every short label. Keep leading and trailing whitespace as in the source.
+
+Follow the typographic conventions of the target language for quotation marks, spacing around punctuation and apostrophes.
+
+Keep the target close to the source in length. UI labels, buttons and choice lines must not grow noticeably: they render in fixed-width controls on a phone, and overflow is a shipped bug. Prefer the shortest natural wording that keeps the meaning.
+````
+
+### Инструкции для конкретного языка
+
+Для французского. Обратите внимание: правила касаются только того, что
+специфично для языка, всё остальное уже сказано выше. В поле вписывают
+JSON, поэтому переводы строк внутри значения записаны как `\n`:
+
+````json
+{
+  "fr": "Address the player with \"vous\" (narration and NPC lines alike). Use \"tu\"\nonly where the Russian source uses \"ты\"; never mix \"tu\" and \"vous\" inside\none string or one scene.\n\nNarrate in present and passé composé. Never use passé simple or imparfait\ndu subjonctif: this is a game script, not a novel.\n\nTypography: put a non-breaking space (U+00A0) before ! ? ; : and inside\nguillemets. Use « » for quotations, matching the source's quotes one for\none. Use the straight apostrophe ' (U+0027), not '.\n\nDo not add a final full stop that the source does not have; this applies\nespecially to choice lines such as \"Промолчать\" -> \"Se taire\".\n\n\"Партия\" is le Parti (masculine), never la partie."
+}
+````
+
+То же самое в читаемом виде, как это выглядит в запросе к модели:
+
+````text
+Address the player with "vous" (narration and NPC lines alike). Use "tu"
+only where the Russian source uses "ты"; never mix "tu" and "vous" inside
+one string or one scene.
+
+Narrate in present and passé composé. Never use passé simple or imparfait
+du subjonctif: this is a game script, not a novel.
+
+Typography: put a non-breaking space (U+00A0) before ! ? ; : and inside
+guillemets. Use « » for quotations, matching the source's quotes one for
+one. Use the straight apostrophe ' (U+0027), not '.
+
+Do not add a final full stop that the source does not have; this applies
+especially to choice lines such as "Промолчать" -> "Se taire".
+
+"Партия" is le Parti (masculine), never la partie.
+````
+
+Лимит - 1000 символов на язык, поэтому в это поле идут только те правила,
+которые нельзя вывести из :guilabel:`Стиля перевода`: форма обращения,
+времена, типографика, ловушки конкретных слов.
 
 ## Ссылки
 
