@@ -11,7 +11,8 @@ Weblate 2026.8.1
 * Large language model machine translation services now receive the note left by developers for a string, see :ref:`llm-translation-context`.
 * Added optional :ref:`TBX glossary import from CSV, TSV, and XLSX tables <uploading-glossary-tables>`, with a locally validated profile proposal path.
 * Glossary tables with only language columns are now mapped deterministically without contacting the automatic analyzer, and the sheet-selection step is skipped for single-sheet uploads, see :ref:`uploading-glossary-tables`.
-* Glossary table import now trims leading and trailing whitespace from a term description instead of refusing the table, and reports the trim as a warning; whitespace around a term itself remains an error.
+* Glossary tables where a term is followed by its description on the next row are now recognised deterministically: descriptions become explanations, section captions become sections, and the detected layout can be switched from the import preview, see :ref:`uploading-glossary-tables`.
+* Glossary table import now trims leading and trailing whitespace from a term or its description instead of refusing the table, and reports every trim as a warning.
 
 .. rubric:: Bug fixes
 

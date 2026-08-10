@@ -119,12 +119,19 @@ The glossary workflow proceeds in explicit stages:
 * One worksheet creates one glossary component. A workbook with several sheets
   shows a sheet-selection step; the operator chooses a single sheet, and sheets
   are never merged.
+* The sheet layout is detected locally: one term per row, or a term whose
+  description sits on the next row under an optional section caption. When
+  the guess is wrong, the preview offers :guilabel:`Each row is a term` and
+  :guilabel:`Term with its description on the next row` to switch it without
+  editing a profile.
 * When analysis is enabled (see :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED`),
   a bounded structural sample of the chosen sheet is sent to OpenRouter to
   propose a profile; otherwise the page offers manual profile upload directly.
 * A preview shows the detected source and target languages, the term count, a
   bounded sample of terms, and any warnings, and it is produced only after the
   proposed profile has been validated locally against the sheet.
+* Leading and trailing whitespace in a term or a description is trimmed and
+  reported as a warning, because TBX cannot store it.
 * The proposed profile is offered as a downloadable JSON file. The operator may
   download it, correct it, and upload a replacement ``.loc-ingest.json``; the
   correction is revalidated locally without another external request.
