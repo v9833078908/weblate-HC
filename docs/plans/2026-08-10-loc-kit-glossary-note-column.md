@@ -14,7 +14,7 @@
 
 - **UI only.** This changes the existing Weblate `Use as glossary` workflow. Do not add a CLI `--glossary` mode or change generic PO inference.
 - **Exact header matching only.** Use `header.strip().casefold()` against the closed `_NOTE_HEADERS` set. Do not infer a note column from prose length.
-- **One populated source-note column.** Warn for every recognized empty column; refuse only when two or more recognized columns contain data. Do not merge populated note columns.
+- **One populated source-note column.** Warn for every recognized empty column; refuse when two or more recognized columns contain data. Its populated cells must occur only on term rows; do not merge columns or silently skip an unattached note.
 - **`context` and `usage` remain accepted.** The operator explicitly requested them. Preview exposes the imported text before component creation; do not silently remove them from the approved set.
 - **No schema, parser, writer, UI, migration, API, or outbound-provider changes.** A need for any of these is a design regression.
 - **No live OpenRouter assertion.** Verify the deterministic `BaseLLMTranslation._get_glossary_entry` contract instead.
@@ -38,7 +38,7 @@
 | Extra metadata is mistaken for a note | Closed exact header set; preview shows resulting text | Unit test for unknown column and wizard preview |
 | Old empty `note` column blocks a real `comment` column | Empty recognized columns warn and do not compete | Unit test with empty + populated columns |
 | Two populated note columns are ambiguous | Deterministic refusal and existing manual-profile recovery | Unit test |
-| Pairs caption/description note cell is unclaimable | Reject it before profile publication | Explicit-pairs tests |
+| Note cell is outside a term row | Reject it before profile publication, including captions, descriptions, and source-less skipped rows | Flat and pairs inference tests |
 | Explanation does not reach LLM context | Inspect actual created French unit via `_get_glossary_entry` | Wizard contract test |
 | Wide sheet amplifies work | Reuse existing one-pass `populated` column set | Code review and inference tests |
 
@@ -119,6 +119,16 @@ def test_empty_note_column_is_excluded_with_a_warning() -> None:
     assert any("column 3" in note and "empty" in note for note in notes)
 
 
+def test_flat_note_on_a_source_less_row_is_refused() -> None:
+    rows = [
+        ["ru", "en", "note"],
+        ["Партия", "Party", "Правящая политическая партия."],
+        ["", "", "не привязанная к термину заметка"],
+    ]
+    with pytest.raises(InferenceError, match="non-term row"):
+        infer_glossary_profile("S", rows, component="s")
+
+
 def test_unrecognised_extra_column_has_actionable_error() -> None:
     rows = [["ru", "en", "Character limit"], ["Партия", "Party", "40"]]
     with pytest.raises(InferenceError, match="recognised term-note header, for example"):
@@ -184,6 +194,28 @@ def _find_note_column(
         f"column {col + 1} ({_cell(header_row, col)!r}) -> explanation of the source term"
     )
     return col
+
+
+def _reject_note_outside_term_rows(
+    rows: list[list[str]],
+    note_col: int,
+    content_indexes: list[int],
+    term_rows: list[int],
+) -> None:
+    """Refuse note text that no generated record-map field can read."""
+    term_row_set = set(term_rows)
+    offenders = [
+        index + 1
+        for index in content_indexes
+        if index not in term_row_set and _cell(rows[index], note_col).strip()
+    ][:_MISSING_ROWS_SHOWN]
+    if offenders:
+        shown = ", ".join(str(row) for row in offenders)
+        msg = (
+            f"column {note_col + 1} holds text on non-term row(s) {shown}; "
+            "this layout needs an explicit profile"
+        )
+        raise InferenceError(msg)
 ```
 
 **Step 5: call it without a rescan.** Preserve the existing one-pass `populated` loop at `infer.py:555-559`. Immediately after it, add:
@@ -207,7 +239,20 @@ Replace the old `unmapped = sorted(populated - languages.keys())` line. The erro
         )
 ```
 
-**Step 6: emit flat grammar.** Keep current pairs behavior untouched in this task. After its existing `if paired: grammar["notes"] = ...` block, add:
+**Step 6: reject an unattached flat note, then emit the grammar.** The generated
+profile treats source-less rows as `skip_rows`; the record-map parser deliberately
+does not inspect their cells. Do not let a note on such a row be presented as
+imported and then discarded. After `term_rows` is complete and before building
+`grammar`, add:
+
+```python
+    if note_col is not None and not paired:
+        _reject_note_outside_term_rows(rows, note_col, content_indexes, term_rows)
+```
+
+This is deliberately a temporary flat-only shape: leave current pairs behavior
+untouched in Task 1, then replace both branches with the unified path in Task 2.
+After the existing `if paired: grammar["notes"] = ...` block, add:
 
 ```python
     elif note_col is not None:
@@ -277,6 +322,24 @@ def test_explicit_pairs_layout_orders_description_before_note_column() -> None:
     parse_profile(document)
 
 
+def test_automatic_pairs_layout_maps_the_note_column() -> None:
+    document, _notes = infer_glossary_profile("S", PAIRS_WITH_NOTE, component="s")
+    (comp,) = document["components"]
+    assert comp["grammar"]["regions"][0]["record_stride"] == 2
+    assert comp["grammar"]["notes"][-1] == {
+        "scope": "source",
+        "column": 3,
+        "header": "note",
+        "row_offset": 0,
+    }
+
+
+def test_pairs_rejects_note_on_a_source_less_row() -> None:
+    rows = [*PAIRS_WITH_NOTE, ["", "", "не привязанная к термину заметка"]]
+    with pytest.raises(InferenceError, match="non-term row"):
+        infer_glossary_profile("S", rows, component="s", layout="pairs")
+
+
 @pytest.mark.parametrize("row", [1, 3])
 def test_explicit_pairs_rejects_note_outside_term_rows(row: int) -> None:
     rows = [item[:] for item in PAIRS_WITH_NOTE]
@@ -285,43 +348,36 @@ def test_explicit_pairs_rejects_note_outside_term_rows(row: int) -> None:
         infer_glossary_profile("S", rows, component="s", layout="pairs")
 ```
 
-Row 1 is the section caption; row 3 is the first description. Both would otherwise survive profile generation and then fail the parser as an unmapped cell.
+Row 1 is the section caption; row 3 is the first description. Both would otherwise survive profile generation and then fail the parser as an unmapped cell. The separate pairs test covers a source-less row that would otherwise enter `skip_rows` and silently lose its note.
 
 **Step 2: verify red**
 
-Run: `cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py -k 'explicit_pairs' -q`
+Run: `cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py -k 'pairs_layout or pairs_rejects' -q`
 
 Expected: FAIL because Task 1 emits a note column only for flat grammar.
 
-**Step 3: replace the flat-only tail with one ordered list.** Keep the existing pairs term-description validation and collect its fields into `note_fields`. After regions are constructed, retain the `section_rows` alongside `description_rows`:
+**Step 3: replace the Task 1 flat-only guard and tail with one ordered list.** Keep the existing pairs term-description validation and collect its fields into `note_fields`. Reuse `_reject_note_outside_term_rows` after `term_rows` is complete: it considers every nonblank post-header row that is not a term row, so captions, description rows, and source-less rows destined for `skip_rows` are covered by one rule.
+
+Delete both Task 1's `if note_col is not None and not paired` guard and its flat-only `elif`. Start an empty `note_fields` list, populate it with the existing pairs fields, then append the source note column after the shared guard:
 
 ```python
-    section_rows: list[int] = []
-    for block, kind, section in shapes:
-        ...
-        if section is not None:
-            section_rows.append(section)
-            region["section_row"] = section + 1
-            region["section_column"] = source_col + 1
-```
-
-Build `note_fields` from the existing pairs fields first. Then append the source note column only after rejecting every populated non-term row:
-
-```python
+    note_fields: list[dict[str, Any]] = []
+    if paired:
+        # Keep the existing validation that every described language is an
+        # initial target, then preserve its current source/target fields.
+        note_fields.extend(
+            {
+                "scope": "source" if col == source_col else "target",
+                "column": col + 1,
+                "header": _cell(header_row, col),
+                "row_offset": 1,
+            }
+            | ({} if col == source_col else {"language": languages[col]})
+            for col in sorted(languages)
+            if col == source_col or languages[col] in target_langs
+        )
     if note_col is not None:
-        if paired:
-            offenders = [
-                index + 1
-                for index in [*section_rows, *description_rows]
-                if _cell(rows[index], note_col).strip()
-            ][:_MISSING_ROWS_SHOWN]
-            if offenders:
-                shown = ", ".join(str(row) for row in offenders)
-                msg = (
-                    f"column {note_col + 1} holds text on non-term row(s) {shown}; "
-                    "this layout needs an explicit profile"
-                )
-                raise InferenceError(msg)
+        _reject_note_outside_term_rows(rows, note_col, content_indexes, term_rows)
         note_fields.append(
             {
                 "scope": "source",
@@ -334,7 +390,11 @@ Build `note_fields` from the existing pairs fields first. Then append the source
         grammar["notes"] = note_fields
 ```
 
-Delete Task 1's flat-only `elif` while making this replacement. The current pairs fields must precede this append: `_join_notes` preserves declaration order.
+The current pairs fields must precede this append: `_join_notes` preserves declaration order.
+
+The new automatic-layout test is required: the wizard first calls
+`infer_glossary_profile(..., layout="auto")`, so an explicit-layout test alone
+cannot protect its normal path.
 
 **Step 4: verify green**
 
@@ -440,7 +500,7 @@ git commit -m "test(loc-kit): cover note columns through the glossary wizard"
 
 **Files:**
 - Modify: `docs/admin/projects.rst:117-140`
-- Modify: `docs/specs/loc-kit-ingest.md:100-125`
+- Modify: `docs/specs/loc-kit-ingest.md:100-125, 271-278`
 - Modify: `docs/changes.rst` under Weblate 2026.8.1 / Improvements
 
 **Step 1: public documentation.** Add one bullet after the layout bullet in `docs/admin/projects.rst`:
@@ -453,7 +513,7 @@ git commit -m "test(loc-kit): cover note columns through the glossary wizard"
   context.
 ```
 
-**Step 2: specification.** Replace the claim that every non-language column is refused. Document the complete closed `_NOTE_HEADERS` list, exact casefolded matching, one populated column, warning-and-ignore behavior for empty recognized columns, `scope: source`, `row_offset: 0`, and deterministic refusal for any other populated metadata column.
+**Step 2: specification.** Replace the claim that every non-language column is refused. Document the complete closed `_NOTE_HEADERS` list, exact casefolded matching, one populated column, warning-and-ignore behavior for empty recognized columns, `scope: source`, `row_offset: 0`, and deterministic refusal for any other populated metadata column. Also correct the later statement that v2 `record-map` is never inferred from a header: it is now inferred locally for the documented simple layouts, while the manual-profile and OpenRouter paths remain fallbacks for every other shape.
 
 **Step 3: changelog.** Add:
 
@@ -498,7 +558,7 @@ uv run prek run --files \
 
 1. Open the component-create flow in the local instance and upload `GLOSSARY_NOTE_CSV`.
 2. Check **Use as glossary** and click the real continue control.
-3. Confirm preview reports two terms, two notes, displays `мужской род` in **Source note**, and lists the note-column inference warning.
+3. Confirm preview reports two terms, two notes, displays `мужской род` in **Source note**, and lists the note-column inference note.
 4. Click the real confirmation control. Open the new glossary term `Партия` and confirm its Explanation is populated.
 
 Do not invoke automatic translation in this smoke: Task 3 already proves the exact payload seam deterministically.
@@ -512,13 +572,13 @@ git commit -m "fix(loc-kit): close note-column verification defects"
 
 ## Implementation tasks from engineering review
 
-- [ ] **T1 (P1)** - `loc_kit_ingest/infer.py` - classify flat note columns and emit a valid grammar field in the same red-green task.
+- [ ] **T1 (P1)** - `loc_kit_ingest/infer.py` - classify flat note columns, reject note text outside its term row, and emit a valid grammar field in the same red-green task.
   - Verify: `cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py -q`
-- [ ] **T2 (P1)** - `loc_kit_ingest/infer.py` - guard pairs description and caption rows before profile publication.
-  - Verify: explicit-pairs tests.
+- [ ] **T2 (P1)** - `loc_kit_ingest/infer.py` - apply the shared non-term-row guard to pairs and preserve the declaration order of descriptions and the note column.
+  - Verify: automatic and explicit-pairs tests.
 - [ ] **T3 (P1)** - `weblate/trans/tests/test_loc_kit_ingest_contract.py` - assert the actual created French glossary unit exposes CSV text through the LLM glossary-entry contract.
   - Verify: exact `LocKitGlossaryUploadUITest` node.
-- [ ] **T4 (P2)** - `docs/admin/projects.rst` - document the user-facing note column that the changelog links to.
+- [ ] **T4 (P2)** - `docs/admin/projects.rst`, `docs/specs/loc-kit-ingest.md`, and `docs/changes.rst` - document the user-facing note column and remove the stale claim that v2 `record-map` is never inferred locally.
   - Verify: docs source review and configured lint.
 - [ ] **T5 (P2)** - `loc_kit_ingest/infer.py` - classify empty/populated note headers from the one-pass populated set.
   - Verify: empty-plus-populated and duplicate-populated tests.
@@ -532,13 +592,13 @@ Sequential implementation, no parallelization opportunity. Tasks 1 and 2 both al
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | - | - |
-| Codex Review | `/codex review` | Independent second opinion | 1 | issues folded | 4 findings: pairs-caption guard, public docs, accepted context risk, wording drift |
+| Codex Review | `/codex review` | Independent second opinion | 2 | issues folded | Source-less-row guard, automatic-pairs coverage, and record-map documentation consistency |
 | Eng Review | `/plan-eng-review` | Architecture & tests | 1 | CLEAR | 8 accepted decisions: UI scope, TDD, pairs, LLM proof, commands, linear scan |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | - | - |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | - | - |
 
 **CROSS-MODEL:** Both reviews required public documentation and wording alignment. The outside voice flagged `context`/`usage` false-positive risk; the operator explicitly retained them, with preview as the accepted guardrail.
 
-**VERDICT:** ENG CLEARED - ready to implement. Outside-voice correctness and documentation findings are folded into Tasks 2 and 4.
+**VERDICT:** READY TO IMPLEMENT. The current review's source-less-row guard and automatic-pairs coverage are folded into Tasks 1 and 2; documentation consistency is folded into Task 4.
 
 NO UNRESOLVED DECISIONS
