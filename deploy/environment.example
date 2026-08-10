@@ -6,8 +6,10 @@
 # (for interpolation) and by the weblate container (env_file).
 
 # --- Site ---------------------------------------------------------------
-# Hostname (and optional port) users type in the browser.
-WEBLATE_SITE_DOMAIN=loc.office.lan
+# Hostname (and optional port) used for absolute URLs in e-mails and
+# notifications. Routing does not depend on it, so an extra entry point over a
+# bare IP keeps working.
+WEBLATE_SITE_DOMAIN=l10n.herocraft.com
 WEBLATE_SITE_TITLE=Hero Craft Localization
 
 # Only used when the optional caddy profile is started
@@ -15,7 +17,9 @@ WEBLATE_SITE_TITLE=Hero Craft Localization
 # nginx already owns port 80, so leave the profile off.
 CADDY_SITE_ADDRESS=:80
 
-# Set to 1 only when the site is really served over HTTPS.
+# Set to 1 only when *every* entry point is HTTPS: it also enables
+# SECURE_SSL_REDIRECT, secure cookies and HSTS, which break any plain-HTTP
+# access (on hc-srv15-localizer that is the office `http://192.168.0.233/`).
 WEBLATE_ENABLE_HTTPS=0
 WEBLATE_IP_PROXY_HEADER=HTTP_X_FORWARDED_FOR
 WEBLATE_SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https

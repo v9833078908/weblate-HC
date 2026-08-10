@@ -24,14 +24,33 @@ Migrations and `collectstatic` run automatically on every container start.
 ## Current state
 
 Deployed on 2026-08-10 to `hc-srv15-localizer`, `/srv/hcgameloc` (owner
-`dev02`). Live on `http://192.168.0.233/` and, once DNS exists, on
-`http://l10n.herocraft.com/` through the host nginx. Weblate itself listens on
-`127.0.0.1:8081` only.
+`dev02`). Two entry points, both verified with a real login POST:
 
-Open item: `WEBLATE_EMAIL_HOST` is set to `localhost`, and nothing listens
-there, so Weblate cannot send mail. Registration and password reset are
-therefore unusable; accounts have to be created by the admin. Point it at a
-real SMTP relay and restart the `weblate` service to fix that.
+| Audience | URL | Path |
+| --- | --- | --- |
+| Public internet | `https://l10n.herocraft.com/` | edge `195.135.212.209` (TLS, Let's Encrypt) -> office proxy `192.168.0.210` -> host nginx `192.168.0.233:80` -> `127.0.0.1:8081` |
+| Office network | `http://192.168.0.233/` | host nginx -> `127.0.0.1:8081` |
+
+Inside the office the public name is useless: office DNS answers with the
+public address `195.135.212.209` and the perimeter has no hairpin NAT, so the
+connection never comes back. Verified from the server itself and through the
+VPN gateway - both time out. Office users therefore need the IP.
+
+Open items:
+
+- `WEBLATE_EMAIL_HOST` is set to `localhost`, and nothing listens there, so
+  Weblate cannot send mail. Registration and password reset are unusable;
+  accounts have to be created by the admin. Point it at a real SMTP relay and
+  restart the `weblate` service to fix that.
+- `WEBLATE_ENABLE_HTTPS` is still `0`, so session and CSRF cookies are set
+  without the `Secure` flag and HSTS is off. Turning it on also turns on
+  `SECURE_SSL_REDIRECT` and secure cookies, which would cut off the plain-HTTP
+  office entry point entirely. Flip it only together with one of: hairpin NAT
+  for `l10n.herocraft.com`, or split-horizon DNS plus TLS on the host nginx.
+- Every public visitor reaches Weblate as `192.168.0.1`: the edge sends
+  `X-Forwarded-For: 192.168.0.1` instead of the real client address, and
+  `IP_PROXY_OFFSET` is `0`, so that is the address used for rate limiting and
+  the audit log. Ask the edge and `192.168.0.210` to append the real client IP.
 
 ## CPU baseline constraint
 
@@ -142,14 +161,19 @@ sudo nginx -t && sudo systemctl reload nginx
 ```
 
 The existing `fastapi` vhost stays `default_server`, so the new vhost answers
-only for `l10n.herocraft.com`. Before DNS exists, test with an explicit host
-header: `curl -H 'Host: l10n.herocraft.com' http://192.168.0.233/`.
+only for `l10n.herocraft.com`, `192.168.0.233` and `10.39.40.233`.
 
-`WEBLATE_SITE_DOMAIN` must match what users type in the browser; it is used for
-absolute URLs in e-mails and for CSRF. The domain is not needed to bring the
-service up: start with `WEBLATE_SITE_DOMAIN=192.168.0.233`, and when DNS for
-`l10n.herocraft.com` exists change that value (plus `WEBLATE_ENABLE_HTTPS=1`
-once nginx terminates TLS) and run `docker compose up -d`.
+TLS is terminated by the edge, which reaches this server over plain HTTP. The
+vhost therefore passes the incoming `X-Forwarded-Proto` through instead of
+overwriting it with `$scheme`; with `$scheme` Django sees `http` for a request
+the browser made over `https`, and every POST fails CSRF with "Origin checking
+failed". Requests are logged to `/var/log/nginx/l10n.log` with the forwarded
+scheme and address, which is the quickest way to see what the edge sends.
+
+`WEBLATE_SITE_DOMAIN` is `l10n.herocraft.com`: it is used for absolute URLs in
+e-mails and notifications, not for routing, so the office entry point keeps
+working over the IP. `WEBLATE_ENABLE_HTTPS` stays `0` while that plain-HTTP
+entry point exists - see "Current state".
 
 On a server without a reverse proxy, start the bundled Caddy instead:
 `docker compose --profile caddy up -d`. `CADDY_SITE_ADDRESS` is then the only
@@ -182,11 +206,13 @@ docker run --rm -v hcgameloc_weblate-data:/data -v "$PWD":/backup alpine \
 
 ## Access from outside the office
 
-The office VPS is only reachable over the office VPN. API clients outside that
-network (for example `162.55.180.78`) need an explicit path in: either a NAT
-rule and firewall allow-list for that address, or publication of
-`l10n.herocraft.com` through the company's edge proxy. Weblate itself needs no
-extra configuration beyond `WEBLATE_SITE_DOMAIN` matching the public hostname.
+Already done: `l10n.herocraft.com` resolves to `195.135.212.209`, which
+terminates TLS with a Let's Encrypt certificate (`notAfter` 2026-11-08) and
+forwards into the office. Plain HTTP on that name is redirected to HTTPS by
+the edge.
+
+What is still missing is the reverse direction for office clients (no hairpin
+NAT, see "Current state") and the real client address in `X-Forwarded-For`.
 
 ## Operator access (isolated VPN gateway)
 
