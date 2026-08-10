@@ -124,6 +124,11 @@ The glossary workflow proceeds in explicit stages:
   the guess is wrong, the preview offers :guilabel:`Each row is a term` and
   :guilabel:`Term with its description on the next row` to switch it without
   editing a profile.
+* A single column of source-term notes can be named ``note``. Exact aliases
+  such as ``description``, ``comment``, ``explanation``, and ``context`` are
+  also recognised. Its text becomes the glossary term explanation; preview it
+  before confirming because automatic suggestion services receive it as term
+  context.
 * When analysis is enabled (see :setting:`LOC_KIT_PROFILE_ANALYSIS_ENABLED`),
   a bounded structural sample of the chosen sheet is sent to OpenRouter to
   propose a profile; otherwise the page offers manual profile upload directly.

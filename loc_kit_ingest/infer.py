@@ -44,6 +44,37 @@ _KEY_COLUMN = 0
 # resolves to a real code (``id`` is also the Indonesian language code).
 _KEY_HEADER_DENYLIST = frozenset({"id"})
 
+# A column of prose about the term, not a translation of it. Recognised by
+# header text alone: a length rule would accept "Character limit" and route it
+# into every LLM prompt, where a wrong guess is invisible.
+_NOTE_HEADERS = frozenset(
+    {
+        "note",
+        "notes",
+        "comment",
+        "comments",
+        "description",
+        "descriptions",
+        "explanation",
+        "explanations",
+        "context",
+        "usage",
+        "definition",
+        "meaning",
+        "примечание",
+        "примечания",
+        "комментарий",
+        "комментарии",
+        "описание",
+        "описания",
+        "пояснение",
+        "пояснения",
+        "контекст",
+        "определение",
+        "значение",
+    }
+)
+
 # Term/description detection. A glossary term is a name, a description is
 # prose: the gap is an order of magnitude in practice. Both bounds must hold,
 # so a kit of long terms falls back to one term per row instead of guessing.
@@ -459,6 +490,63 @@ def _classify_block(
     return "flat", None, note
 
 
+def _find_note_column(
+    header_row: list[str],
+    populated: set[int],
+    languages: dict[int, str],
+    notes: list[str],
+) -> int | None:
+    """Return the sole populated source-note column, if one exists."""
+    recognised = [
+        col
+        for col in range(len(header_row))
+        if col not in languages
+        and _cell(header_row, col).strip().casefold() in _NOTE_HEADERS
+    ]
+    populated_notes = [col for col in recognised if col in populated]
+    notes.extend(
+        f"column {col + 1} ({_cell(header_row, col)!r}) is empty; excluded"
+        for col in recognised
+        if col not in populated
+    )
+    if len(populated_notes) > 1:
+        shown = ", ".join(str(col + 1) for col in populated_notes)
+        msg = (
+            f"columns {shown} all look like term notes; this layout needs an "
+            "explicit profile"
+        )
+        raise InferenceError(msg)
+    if not populated_notes:
+        return None
+    col = populated_notes[0]
+    notes.append(
+        f"column {col + 1} ({_cell(header_row, col)!r}) -> explanation of the source term"
+    )
+    return col
+
+
+def _reject_note_outside_term_rows(
+    rows: list[list[str]],
+    note_col: int,
+    content_indexes: list[int],
+    term_rows: list[int],
+) -> None:
+    """Refuse note text that no generated record-map field can read."""
+    term_row_set = set(term_rows)
+    offenders = [
+        index + 1
+        for index in content_indexes
+        if index not in term_row_set and _cell(rows[index], note_col).strip()
+    ][:_MISSING_ROWS_SHOWN]
+    if offenders:
+        shown = ", ".join(str(row) for row in offenders)
+        msg = (
+            f"column {note_col + 1} holds text on non-term row(s) {shown}; "
+            "this layout needs an explicit profile"
+        )
+        raise InferenceError(msg)
+
+
 def infer_glossary_profile(
     sheet_name: str,
     rows: list[list[str]],
@@ -557,14 +645,19 @@ def infer_glossary_profile(
         for col, value in enumerate(rows[index]):
             if value.strip():
                 populated.add(col)
-    unmapped = sorted(populated - languages.keys())
+    note_col = _find_note_column(header_row, populated, languages, notes)
+    mapped = set(languages)
+    if note_col is not None:
+        mapped.add(note_col)
+    unmapped = sorted(populated - mapped)
     if unmapped:
         col = unmapped[0]
         header_text = _cell(header_row, col) or f"column{col + 1}"
         msg = (
             f"column {col + 1} ({header_text!r}) holds data but is not a "
-            "recognised language column; this layout needs an explicit "
-            "profile"
+            "recognised language column; rename the header to a recognised "
+            "term-note header, for example note, description, comment, or "
+            "explanation, or supply an explicit profile"
         )
         raise InferenceError(msg)
 
@@ -680,6 +773,7 @@ def infer_glossary_profile(
         "regions": regions,
         "term_row_offset": 0,
     }
+    note_fields: list[dict[str, Any]] = []
     if paired:
         # A description cell is read by a note field, and a note field may
         # only name an initial target language. A language that carries
@@ -702,7 +796,9 @@ def infer_glossary_profile(
                     "is missing terms; this layout needs an explicit profile"
                 )
                 raise InferenceError(msg)
-        grammar["notes"] = [
+        # Keep the existing validation that every described language is an
+        # initial target, then preserve its current source/target fields.
+        note_fields.extend(
             {
                 "scope": "source" if col == source_col else "target",
                 "column": col + 1,
@@ -712,7 +808,19 @@ def infer_glossary_profile(
             | ({} if col == source_col else {"language": languages[col]})
             for col in sorted(languages)
             if col == source_col or languages[col] in target_langs
-        ]
+        )
+    if note_col is not None:
+        _reject_note_outside_term_rows(rows, note_col, content_indexes, term_rows)
+        note_fields.append(
+            {
+                "scope": "source",
+                "column": note_col + 1,
+                "header": _cell(header_row, note_col),
+                "row_offset": 0,
+            }
+        )
+    if note_fields:
+        grammar["notes"] = note_fields
 
     document = {
         "schema_version": SCHEMA_VERSION_RECORD_MAP,

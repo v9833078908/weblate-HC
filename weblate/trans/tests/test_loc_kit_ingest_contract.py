@@ -535,6 +535,14 @@ GLOSSARY_CSV = (
 # (domain/note_*) and keeps covering the LLM/manual path.
 GLOSSARY_LANG_ONLY_CSV = "ru,en\nRussian,English\nГерой,Hero\nМеч,Sword\n"
 
+GLOSSARY_NOTE_CSV = (
+    "ru,en,fr,note\n"
+    "Russian,English,French,Note\n"
+    "Партия,Party,Parti,"
+    '"Правящая политическая партия. Во французском le Parti, мужской род."\n'
+    "Самосбор,Samosbor,Samosbor,Термин вселенной.\n"
+)
+
 # Real terminology exports put a term on one row and its description on the
 # next, under a section caption. Inference must map the descriptions as
 # explanations, not as twice as many terms.
@@ -738,6 +746,35 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertEqual(preview["note_count"], 4)
         self.assertEqual(preview["terms"][0]["section"], "Персонажи")
         self.assertEqual(preview["terms"][0]["source"], "Герой")
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_note_column_reaches_the_created_glossary_llm_entry(self) -> None:
+        self._start(upload=self._csv("Terms.csv", GLOSSARY_NOTE_CSV), slug=self.slug)
+        draft = self._draft()
+        draft.refresh_from_db()
+
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+        preview = json.loads(draft.preview_json)
+        self.assertEqual(preview["term_count"], 2)
+        self.assertEqual(preview["note_count"], 2)
+        self.assertIn("мужской род", preview["terms"][0]["source_explanation"])
+
+        page = self.client.get(
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
+        )
+        self.assertContains(page, "мужской род")
+
+        self._confirm()
+        component = Component.objects.get(slug=self.slug)
+        translation = component.translation_set.get(language__code="fr")
+        unit = translation.unit_set.get(source="Партия")
+        # ruff: ignore[private-member-access]
+        entry = BaseLLMTranslation._get_glossary_entry(unit)
+        self.assertIsNotNone(entry)
+        self.assertEqual(
+            entry["source_explanation"],
+            "Правящая политическая партия. Во французском le Parti, мужской род.",
+        )
 
     @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
     def test_operator_switches_the_layout_from_the_preview(self) -> None:
