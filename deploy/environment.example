@@ -43,6 +43,11 @@ WEBLATE_REQUIRE_LOGIN=1
 # identity a per-user opt-in again, which is the upstream default.
 WEBLATE_PRIVATE_COMMIT_EMAIL_OPT_IN=0
 WEBLATE_PRIVATE_COMMIT_NAME_OPT_IN=0
+
+# Avatars are fetched from gravatar.com by hashing the user's e-mail, which
+# sends that hash off-site on every profile render. Off means local fallback
+# images.
+WEBLATE_ENABLE_AVATARS=0
 WEBLATE_DEBUG=0
 WEBLATE_LOGLEVEL=INFO
 

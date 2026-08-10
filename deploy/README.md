@@ -196,12 +196,24 @@ account:
   opt-in, which means the real name and e-mail end up in the repository history
   by default; here it is the other way round, and a user who wants their own
   name on their commits selects it in :guilabel:`Profile`.
+- `WEBLATE_ENABLE_AVATARS=0` - upstream renders avatars by sending an MD5 of
+  the user's e-mail to `gravatar.com`. Off, the local fallback images are used
+  and no address ever leaves the server.
 
 `weblate/templates/accounts/snippets/login-info.html` no longer carries the
 upstream notice about names being "visible publicly" and about contributing
 under each project's license. Both describe a public hosted service and are
 wrong for this deployment; the template keeps a comment explaining why the
 block is gone.
+
+Outbound calls to `weblate.org`, checked on the live instance: the daily
+`support-status-update` task walks `SupportStatus` rows, and there are none
+(`SupportStatus.objects.count() == 0`), so nothing is reported. Registering a
+support subscription, or ticking :guilabel:`discoverable` in
+:guilabel:`Manage`, starts sending the site URL, the instance counters and -
+when discoverable - the list of public projects. `weblate check --deploy`
+separately fetches the latest release number from `pypi.org`; that request
+carries no instance data.
 
 ## Upgrading
 
