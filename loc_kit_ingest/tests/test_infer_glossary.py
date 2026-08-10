@@ -367,7 +367,9 @@ def test_flat_note_on_a_source_less_row_is_refused() -> None:
 
 def test_unrecognised_extra_column_has_actionable_error() -> None:
     rows = [["ru", "en", "Character limit"], ["Партия", "Party", "40"]]
-    with pytest.raises(InferenceError, match="recognised term-note header, for example"):
+    with pytest.raises(
+        InferenceError, match="recognised term-note header, for example"
+    ):
         infer_glossary_profile("S", rows, component="s")
 
 
@@ -397,7 +399,9 @@ def test_explicit_pairs_layout_orders_description_before_note_column() -> None:
     )
     (comp,) = document["components"]
     assert comp["grammar"]["regions"][0]["record_stride"] == 2
-    scopes = [(n["scope"], n["column"], n["row_offset"]) for n in comp["grammar"]["notes"]]
+    scopes = [
+        (n["scope"], n["column"], n["row_offset"]) for n in comp["grammar"]["notes"]
+    ]
     assert scopes[0] == ("source", 1, 1)
     assert scopes[-1] == ("source", 3, 0)
     parse_profile(document)

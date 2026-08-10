@@ -49,11 +49,29 @@ _KEY_HEADER_DENYLIST = frozenset({"id"})
 # into every LLM prompt, where a wrong guess is invisible.
 _NOTE_HEADERS = frozenset(
     {
-        "note", "notes", "comment", "comments", "description", "descriptions",
-        "explanation", "explanations", "context", "usage", "definition", "meaning",
-        "примечание", "примечания", "комментарий", "комментарии",
-        "описание", "описания", "пояснение", "пояснения", "контекст",
-        "определение", "значение",
+        "note",
+        "notes",
+        "comment",
+        "comments",
+        "description",
+        "descriptions",
+        "explanation",
+        "explanations",
+        "context",
+        "usage",
+        "definition",
+        "meaning",
+        "примечание",
+        "примечания",
+        "комментарий",
+        "комментарии",
+        "описание",
+        "описания",
+        "пояснение",
+        "пояснения",
+        "контекст",
+        "определение",
+        "значение",
     }
 )
 
@@ -486,11 +504,11 @@ def _find_note_column(
         and _cell(header_row, col).strip().casefold() in _NOTE_HEADERS
     ]
     populated_notes = [col for col in recognised if col in populated]
-    for col in recognised:
-        if col not in populated:
-            notes.append(
-                f"column {col + 1} ({_cell(header_row, col)!r}) is empty; excluded"
-            )
+    notes.extend(
+        f"column {col + 1} ({_cell(header_row, col)!r}) is empty; excluded"
+        for col in recognised
+        if col not in populated
+    )
     if len(populated_notes) > 1:
         shown = ", ".join(str(col + 1) for col in populated_notes)
         msg = (
