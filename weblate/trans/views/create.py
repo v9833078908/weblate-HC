@@ -718,14 +718,14 @@ class CreateFromZip(CreateComponent):
             # is noise. Only the deterministic step may run here: this POST
             # is atomic, a provider call inside it would hold a transaction
             # open for the whole network timeout.
-            name, rows = next(iter(sheets.items()))
-            draft.sheet = name
+            sheet_name, rows = next(iter(sheets.items()))
+            draft.sheet = sheet_name
             draft.state = LocKitImportDraft.State.SHEET_SELECTED
             draft.save(update_fields=["sheet", "state"])
-            error = _infer_draft_profile(draft, rows)
-            if error is None:
+            infer_error = _infer_draft_profile(draft, rows)
+            if infer_error is None:
                 return redirect("loc-kit-glossary-preview", token=draft.token)
-            messages.info(self.request, error)
+            messages.info(self.request, infer_error)
         return redirect("loc-kit-sheet-select", token=draft.token)
 
 
