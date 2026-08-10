@@ -8,12 +8,16 @@
 
 set -euo pipefail
 
+# --mssfix is required: without it a full-size TCP segment inside the tunnel
+# (any HTTP POST, git push or file upload) is silently dropped and the request
+# hangs, while small GET requests keep working.
 openvpn \
     --config /vpn/profile.ovpn \
     --auth-user-pass /vpn/auth \
     --askpass /vpn/askpass \
     --auth-nocache \
     --data-ciphers AES-256-GCM:AES-128-GCM:AES-256-CBC \
+    --mssfix "${OPENVPN_MSSFIX:-1300}" \
     --verb "${OPENVPN_VERB:-3}" &
 openvpn_pid=$!
 
