@@ -47,3 +47,8 @@ weblate-*.tar.*
 /.omx/
 /weblate-mcp/
 /*..egg-info/
+
+# Production deployment secrets
+/deploy/.env
+/deploy/.env.local
+/deploy/*.ovpn

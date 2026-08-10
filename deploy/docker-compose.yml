@@ -1,0 +1,91 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Production stack for the HCGameLoc Weblate fork.
+#
+#   cd deploy && cp environment.example .env && $EDITOR .env
+#   docker compose up -d --build
+#
+# The weblate container runs the web server (nginx + granian) and all Celery
+# workers under supervisor; it applies database migrations and collects static
+# files on every start.
+
+name: hcgameloc
+
+services:
+  database:
+    image: postgres:18.4-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+    - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  cache:
+    image: redis:8.10.0-alpine@sha256:978f0e01593e65eed801f2402944efcd936d43b5027e4908a7897baf88ed6241
+    command: [redis-server, --save, '60', '1', --appendonly, yes]
+    volumes:
+    - redis-data:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  weblate:
+    image: hcgameloc:latest
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    env_file:
+    - .env
+    volumes:
+    - weblate-data:/app/data
+    ports:
+      # Local-only port for the host reverse proxy (nginx) and for debugging.
+    - 127.0.0.1:${WEBLATE_LOCAL_PORT:-8081}:8080
+    depends_on:
+      database:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    restart: unless-stopped
+    tmpfs:
+    - /app/cache:exec,uid=1000,gid=1000
+    - /tmp:uid=1000,gid=1000,exec
+    - /run:uid=1000,gid=1000
+
+  # Optional: only started with `docker compose --profile caddy up -d`.
+  # Not used when a reverse proxy already owns port 80 on the host.
+  caddy:
+    profiles: [caddy]
+    image: caddy:2.10-alpine
+    environment:
+      CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-:80}
+    volumes:
+    - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    - caddy-data:/data
+    - caddy-config:/config
+    ports:
+    - 80:80
+    - 443:443
+    - 443:443/udp
+    depends_on:
+    - weblate
+    restart: unless-stopped
+
+volumes:
+  postgres-data: {}
+  redis-data: {}
+  weblate-data: {}
+  caddy-data: {}
+  caddy-config: {}

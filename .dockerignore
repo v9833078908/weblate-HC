@@ -1,0 +1,24 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+.git
+.github
+.venv
+.venv*
+venv
+dev-docker/data
+dev-docker/.env
+data
+data-test
+docs/_build
+weblate-mcp
+node_modules
+client/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+*.pyc
+deploy/.env
+deploy/caddy-data

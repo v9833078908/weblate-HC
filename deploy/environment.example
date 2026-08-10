@@ -1,0 +1,75 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Copy to deploy/.env and fill in. This file is read both by docker compose
+# (for interpolation) and by the weblate container (env_file).
+
+# --- Site ---------------------------------------------------------------
+# Hostname (and optional port) users type in the browser.
+WEBLATE_SITE_DOMAIN=loc.office.lan
+WEBLATE_SITE_TITLE=Hero Craft Localization
+
+# Only used when the optional caddy profile is started
+# (`docker compose --profile caddy up -d`). On hc-srv15-localizer the host
+# nginx already owns port 80, so leave the profile off.
+CADDY_SITE_ADDRESS=:80
+
+# Set to 1 only when the site is really served over HTTPS.
+WEBLATE_ENABLE_HTTPS=0
+WEBLATE_IP_PROXY_HEADER=HTTP_X_FORWARDED_FOR
+WEBLATE_SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
+
+# Port published on 127.0.0.1 for the host reverse proxy.
+# 8000, 8080 and 5432 are already taken on hc-srv15-localizer.
+WEBLATE_LOCAL_PORT=8081
+
+# --- Access -------------------------------------------------------------
+WEBLATE_ADMIN_NAME=Hero Craft Admin
+WEBLATE_ADMIN_EMAIL=loc@herocraft.example
+# Used only when the admin account is created on the first start.
+WEBLATE_ADMIN_PASSWORD=CHANGE-ME
+WEBLATE_REGISTRATION_OPEN=0
+WEBLATE_REQUIRE_LOGIN=1
+WEBLATE_DEBUG=0
+WEBLATE_LOGLEVEL=INFO
+
+# --- Database -----------------------------------------------------------
+POSTGRES_DB=weblate
+POSTGRES_USER=weblate
+POSTGRES_PASSWORD=CHANGE-ME
+POSTGRES_HOST=database
+POSTGRES_PORT=5432
+
+# --- Cache / queue ------------------------------------------------------
+REDIS_HOST=cache
+REDIS_PORT=6379
+
+# --- Mail ---------------------------------------------------------------
+# Required: Weblate refuses to start with an empty SMTP host.
+WEBLATE_EMAIL_HOST=smtp.office.lan
+WEBLATE_EMAIL_PORT=587
+WEBLATE_EMAIL_HOST_USER=
+WEBLATE_EMAIL_HOST_PASSWORD=
+WEBLATE_EMAIL_USE_TLS=1
+WEBLATE_SERVER_EMAIL=loc@herocraft.example
+WEBLATE_DEFAULT_FROM_EMAIL=loc@herocraft.example
+
+# --- Hero Craft customizations -----------------------------------------
+WEBLATE_ADD_MACHINERY=weblate_customization.machinery.RoutedLLMTranslation
+WEBLATE_ADD_CHECK=weblate_customization.checks.GameMarkupCheck
+
+# Loc-kit glossary profile analysis (separate OpenRouter configuration,
+# unrelated to the OpenRouter machinery configured in the web UI).
+WEBLATE_LOC_KIT_PROFILE_ANALYSIS_ENABLED=0
+WEBLATE_LOC_KIT_PROFILE_OPENROUTER_KEY=
+WEBLATE_LOC_KIT_PROFILE_OPENROUTER_MODEL=
+
+# --- VCS ----------------------------------------------------------------
+WEBLATE_VCS_ALLOW_SCHEMES=https,ssh,git
+
+# --- Sizing -------------------------------------------------------------
+# hc-srv15-localizer has 4 vCPU and 7.7 GB RAM shared with the cathedral
+# stack, so cap the workers instead of auto-scaling.
+WEBLATE_WORKERS=2
+WEB_WORKERS=2
