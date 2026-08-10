@@ -535,6 +535,21 @@ GLOSSARY_CSV = (
 # (domain/note_*) and keeps covering the LLM/manual path.
 GLOSSARY_LANG_ONLY_CSV = "ru,en\nRussian,English\nГерой,Hero\nМеч,Sword\n"
 
+# Real terminology exports put a term on one row and its description on the
+# next, under a section caption. Inference must map the descriptions as
+# explanations, not as twice as many terms.
+_DESC_RU = "Главный протагонист истории и первый играбельный персонаж. " * 3
+_DESC_EN = "The main protagonist of the story and the first playable hero. " * 3
+_DESC2_RU = "Клинок ближнего боя и стартовое оружие в первой главе игры. " * 3
+_DESC2_EN = "A melee blade handed to the player in the first chapter. " * 3
+GLOSSARY_PAIRS_CSV = (
+    "ru,en\n"
+    "Russian,English\n"
+    "Персонажи,Characters\n"
+    f"Герой,Hero\n{_DESC_RU},{_DESC_EN}\n"
+    f"Меч,Sword\n{_DESC2_RU},{_DESC2_EN}\n"
+)
+
 
 def _glossary_profile(sheet: str, *, source_lang: str = "ru") -> dict:
     return {
@@ -709,6 +724,77 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertEqual(component.source_language.code, "ru")
         codes = set(component.translation_set.values_list("language__code", flat=True))
         self.assertIn("en", codes)
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_term_description_sheet_maps_descriptions_as_explanations(self) -> None:
+        """Термин и описание на соседних строках - одна запись, не две."""
+        self._start(
+            upload=self._csv("Terms.csv", GLOSSARY_PAIRS_CSV), slug=self.slug
+        )
+        draft = self._draft()
+        draft.refresh_from_db()
+
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+        preview = json.loads(draft.preview_json)
+        self.assertEqual(preview["term_count"], 2)
+        self.assertEqual(preview["note_count"], 4)
+        self.assertEqual(preview["terms"][0]["section"], "Персонажи")
+        self.assertEqual(preview["terms"][0]["source"], "Герой")
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_operator_switches_the_layout_from_the_preview(self) -> None:
+        """Неверно угаданная раскладка чинится кнопкой, а не JSON-профилем."""
+        self._start(
+            upload=self._csv("Terms.csv", GLOSSARY_PAIRS_CSV), slug=self.slug
+        )
+        draft = self._draft()
+
+        response = self.client.post(
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token}),
+            {"action": "relayout", "layout": "flat"},
+        )
+        self.assertEqual(response.status_code, 302)
+        draft.refresh_from_db()
+        # Flat reading turns every description row into its own term.
+        self.assertEqual(json.loads(draft.preview_json)["term_count"], 5)
+
+        self.client.post(
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token}),
+            {"action": "relayout", "layout": "pairs"},
+        )
+        draft.refresh_from_db()
+        self.assertEqual(json.loads(draft.preview_json)["term_count"], 2)
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_unknown_layout_is_refused(self) -> None:
+        self._start(
+            upload=self._csv("Terms.csv", GLOSSARY_PAIRS_CSV), slug=self.slug
+        )
+        response = self.client.post(
+            reverse(
+                "loc-kit-glossary-preview", kwargs={"token": self._draft().token}
+            ),
+            {"action": "relayout", "layout": "../../etc"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_term_with_outer_whitespace_is_trimmed_not_refused(self) -> None:
+        """TBX не хранит внешний пробел: обрезаем и предупреждаем."""
+        self._start(
+            upload=self._csv("Terms.csv", "ru,en\nГерой ,Hero\nМеч,Sword\n"),
+            slug=self.slug,
+        )
+        draft = self._draft()
+        draft.refresh_from_db()
+
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+        preview = json.loads(draft.preview_json)
+        self.assertEqual(preview["terms"][0]["source"], "Герой")
+        self.assertTrue(
+            any("trimmed" in warning for warning in preview["warnings"]),
+            preview["warnings"],
+        )
 
     @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
     def test_stored_preview_warnings_are_bounded(self) -> None:

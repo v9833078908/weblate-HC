@@ -1128,14 +1128,16 @@ class LocKitSheetSelectView(LocKitDraftMixin, TemplateView):
         return redirect("loc-kit-glossary-preview", token=draft.token)
 
 
-def _infer_draft_profile(draft: LocKitImportDraft, rows: list) -> str | None:
+def _infer_draft_profile(
+    draft: LocKitImportDraft, rows: list, layout: str = "auto"
+) -> str | None:
     """Deterministic local mapping. Returns None on success, else the reason."""
     # ruff: ignore[import-outside-top-level]
     from loc_kit_ingest.infer import InferenceError, infer_glossary_profile
 
     try:
         document, notes = infer_glossary_profile(
-            draft.sheet, rows, component=draft.slug
+            draft.sheet, rows, component=draft.slug, layout=layout
         )
     except InferenceError as error:
         return str(error)
@@ -1237,6 +1239,20 @@ def _store_validated_profile(
     return None
 
 
+def _draft_layout(draft: LocKitImportDraft) -> str:
+    """Which table shape the stored profile describes: ``flat`` or ``pairs``."""
+    if not draft.profile_json:
+        return "flat"
+    try:
+        document = json.loads(draft.profile_json)
+        regions = document["components"][0]["grammar"]["regions"]
+        strides = {region.get("record_stride", 1) for region in regions}
+    except (ValueError, LookupError, TypeError):
+        # An operator-uploaded profile may use another grammar entirely.
+        return "flat"
+    return "pairs" if strides == {2} else "flat"
+
+
 @method_decorator(login_required, name="dispatch")
 class LocKitGlossaryPreviewView(LocKitDraftMixin, TemplateView):
     """Show the validated preview, accept a correction, cancel, or confirm."""
@@ -1253,6 +1269,7 @@ class LocKitGlossaryPreviewView(LocKitDraftMixin, TemplateView):
         context["profile_form"] = kwargs.get("profile_form") or (
             LocKitProfileCorrectionForm()
         )
+        context["layout"] = _draft_layout(draft)
         return context
 
     def post(self, request: AuthenticatedHttpRequest, **kwargs):
@@ -1292,6 +1309,21 @@ class LocKitGlossaryPreviewView(LocKitDraftMixin, TemplateView):
                 messages.error(request, error)
             else:
                 messages.info(request, gettext("Profile accepted."))
+            return redirect("loc-kit-glossary-preview", token=draft.token)
+
+        if action == "relayout":
+            # The operator saw the preview and disagrees with the detected
+            # shape. Re-running the local inference costs exactly what an
+            # uploaded correction costs, and the same gate decides.
+            layout = request.POST.get("layout", "")
+            if layout not in {"flat", "pairs"}:
+                raise Http404
+            sheets = self.read_draft_sheets(draft)
+            if draft.sheet not in sheets:
+                raise Http404
+            error = _infer_draft_profile(draft, sheets[draft.sheet], layout)
+            if error is not None:
+                messages.error(request, error)
             return redirect("loc-kit-glossary-preview", token=draft.token)
 
         if action == "confirm":

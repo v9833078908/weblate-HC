@@ -87,6 +87,31 @@
 
       {% endif %}
 
+      <h4>{% translate "Table layout" %}</h4>
+      <p class="help-block">
+        {% translate "Weblate guessed how this worksheet is arranged. Switch it if the terms above look wrong: a description imported as a term is the usual symptom." %}
+      </p>
+      <form action="{% url 'loc-kit-glossary-preview' token=draft.token %}"
+            method="post"
+            class="form-inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="relayout" />
+        <button type="submit"
+                name="layout"
+                value="flat"
+                class="btn {% if layout == 'flat' %}btn-primary{% else %}btn-default{% endif %}"
+                {% if layout == 'flat' %}aria-pressed="true"{% endif %}>
+          {% translate "Each row is a term" %}
+        </button>
+        <button type="submit"
+                name="layout"
+                value="pairs"
+                class="btn {% if layout == 'pairs' %}btn-primary{% else %}btn-default{% endif %}"
+                {% if layout == 'pairs' %}aria-pressed="true"{% endif %}>
+          {% translate "Term with its description on the next row" %}
+        </button>
+      </form>
+
       <div class="row">
         <div class="col-md-6">
           <h4>{% translate "Correct the mapping" %}</h4>
