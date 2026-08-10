@@ -360,12 +360,16 @@ error. Поле v1 `key_language` больше не определяет context
 считается тем же Unicode-безопасным помощником; v2 не имеет `key_language`
 вовсе. Для PO значения ячеек не trim'ятся: пробелы по краям, tab, `\r\n`,
 переносы, XML/Unity-разметка и entities передаются дальше как данные. Для TBX
-также сохраняются внутренние пробелы, переносы, разметка и entities, но
-leading/trailing whitespace у term или description является
-`tbx.unsupported_outer_whitespace`: Translate Toolkit trim'ит его при записи
-`<descrip>`/`<note>`, поэтому импортёр обязан остановиться, а не молча изменить
-данные. `strip()` допустим только для проверки пустой ячейки, контроля
-структуры и этого явного TBX validation.
+также сохраняются внутренние пробелы, переносы, разметка и entities, а
+leading/trailing whitespace различается по роли ячейки. У **term** это
+`tbx.unsupported_outer_whitespace` (error): термин - идентичность записи
+глоссария, его нельзя переписать молча. У **description/note** это
+`tbx.trimmed_outer_whitespace` (warning): Translate Toolkit всё равно trim'ит
+значение при записи `<descrip>`/`<note>`, поэтому импортёр обрезает его сам,
+сообщает об этом в превью и сохраняет parse-back точным - иначе кит с
+переносом строки в конце описания невозможно импортировать вообще. `strip()`
+допустим только для проверки пустой ячейки, контроля структуры, этого явного
+TBX validation и этой нормализации описаний.
 
 `code` - код Weblate, использующийся в имени PO/TBX файла. `xml_lang` - явный
 BCP-47 тег в `xml:lang`: например, `pt_PT` → `pt-PT`, `zh_Hans` → `zh-Hans`,
