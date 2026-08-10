@@ -21,6 +21,32 @@ The image is built from this repository, not pulled from Docker Hub. It reuses
 
 Migrations and `collectstatic` run automatically on every container start.
 
+## Current state
+
+Deployed on 2026-08-10 to `hc-srv15-localizer`, `/srv/hcgameloc` (owner
+`dev02`). Live on `http://192.168.0.233/` and, once DNS exists, on
+`http://l10n.herocraft.com/` through the host nginx. Weblate itself listens on
+`127.0.0.1:8081` only.
+
+Open item: `WEBLATE_EMAIL_HOST` is set to `localhost`, and nothing listens
+there, so Weblate cannot send mail. Registration and password reset are
+therefore unusable; accounts have to be created by the admin. Point it at a
+real SMTP relay and restart the `weblate` service to fix that.
+
+## CPU baseline constraint
+
+The VM exposes a `Common KVM processor` (qemu64, x86-64-v1: no SSE4.2, POPCNT
+or SSSE3). numpy 2.4 raised its wheel baseline to x86-64-v2, and
+`weblate.fonts.render` imports matplotlib - and therefore numpy - while Django
+loads apps. As a result **the stock `weblate/weblate` image cannot start on
+this host at all**; `deploy/Dockerfile` pins `numpy==2.3.5`, the last release
+with x86-64-v1 wheels for CPython 3.14.
+
+The pin is a workaround, not a fix: every future wheel that adopts the same
+baseline will break again. The real fix is one hypervisor setting - give the
+VM `cpu mode=host-passthrough` (libvirt) or CPU type `host` (Proxmox) and
+reboot it. After that, drop the `NUMPY_VERSION` pin from `deploy/Dockerfile`.
+
 ## Target server
 
 `hc-srv15-localizer`, reachable at `192.168.0.233` / `10.39.40.233` over the
@@ -59,10 +85,10 @@ Consequences for this stack:
 - Outbound HTTPS to `openrouter.ai` (machine translation and loc-kit analysis)
   and to the game repositories.
 
-## First deployment (runbook for hc-srv15-localizer)
+## First deployment (runbook, already executed on hc-srv15-localizer)
 
-Verified prerequisites on the server: git 2.39.5, GitHub reachable,
-`docker pull` works, `/srv/hcgameloc` already exists and is owned by `dev02`.
+Every step below was run on 2026-08-10; it is kept as the reproducible
+procedure for a rebuild or a second server.
 
 ```sh
 # 1. Docker access for dev02 (currently only dev01 is in the group).
