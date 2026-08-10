@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 from django.conf import settings
 from django.utils.translation import gettext as _
+from django.utils.translation import ngettext
 
 from weblate.utils.requests import fetch_validated_url
 
@@ -561,6 +562,12 @@ def _validate_envelope(envelope: object) -> None:
 # data browser.
 PREVIEW_TERM_LIMIT = 10
 
+# How many warnings a draft may store. Warnings are emitted per row and per
+# language, so a wide sheet with one systematic defect - say, every description
+# cell exported with a trailing newline - would otherwise write an unbounded
+# blob into the draft row and render all of it into the preview page.
+PREVIEW_WARNING_LIMIT = 50
+
 # Only the record-map schema may be created through this UI flow.
 GLOSSARY_SCHEMA_VERSION = 2
 
@@ -644,6 +651,24 @@ def _format_diagnostics(diagnostics: Sequence[Diagnostic]) -> list[str]:
         _("Row %(row)d: %(message)s")
         % {"row": diagnostic.row, "message": diagnostic.message}
         for diagnostic in diagnostics
+    ]
+
+
+def cap_preview_warnings(warnings: Sequence[str]) -> list[str]:
+    """
+    Bound what one sheet can write into a draft's stored preview.
+
+    Warnings are per row and per language, so row count times language count
+    is attacker-controlled through the uploaded file. Errors and sample terms
+    are already capped; warnings are the remaining unbounded path into the
+    draft row and the preview page.
+    """
+    if len(warnings) <= PREVIEW_WARNING_LIMIT:
+        return list(warnings)
+    hidden = len(warnings) - PREVIEW_WARNING_LIMIT
+    return [
+        *warnings[:PREVIEW_WARNING_LIMIT],
+        ngettext("+%d more warning", "+%d more warnings", hidden) % hidden,
     ]
 
 
@@ -796,6 +821,7 @@ __all__ = [
     "OPENROUTER_CHAT_COMPLETIONS_URL",
     "OPENROUTER_REQUEST_TIMEOUT",
     "PREVIEW_TERM_LIMIT",
+    "PREVIEW_WARNING_LIMIT",
     "SAMPLE_TOO_LARGE",
     "GlossaryPreview",
     "GlossaryProfileError",
@@ -803,6 +829,7 @@ __all__ = [
     "ProfileProposalError",
     "SampleTooLargeError",
     "build_glossary_structure_sample",
+    "cap_preview_warnings",
     "load_profile_prompt",
     "profile_document_from_envelope",
     "request_profile_proposal",

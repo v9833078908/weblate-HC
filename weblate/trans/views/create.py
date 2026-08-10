@@ -54,6 +54,7 @@ from weblate.trans.loc_kit import (
     ProfileProposalError,
     SampleTooLargeError,
     build_glossary_structure_sample,
+    cap_preview_warnings,
     profile_document_from_envelope,
     request_profile_proposal,
     validate_glossary_profile,
@@ -705,27 +706,37 @@ class CreateFromZip(CreateComponent):
             source_filename=filename,
         )
         # Storage is not transactional: the file lands on disk before the row
-        # is inserted, so a failed insert would strand it where the row-driven
-        # cleanup task can never find it. Undo the write by hand.
+        # is inserted, so a failure would strand it where the row-driven
+        # cleanup task can never find it. Undo the write by hand. The guard
+        # spans the mapping too: that parses the sheet, renders TBX and parses
+        # it back, so a MemoryError, a tempdir OSError or a worker killed
+        # mid-parse would roll the row back and leave the file behind.
         draft.uploaded.save(filename, ContentFile(payload), save=False)
         try:
-            draft.save()
+            return self._insert_draft_and_map(draft, sheets)
         except Exception:
             draft.delete_storage()
             raise
-        if len(sheets) == 1:
-            # A CSV/TSV always has exactly one sheet; the selection screen
-            # is noise. Only the deterministic step may run here: this POST
-            # is atomic, a provider call inside it would hold a transaction
-            # open for the whole network timeout.
-            sheet_name, rows = next(iter(sheets.items()))
-            draft.sheet = sheet_name
-            draft.state = LocKitImportDraft.State.SHEET_SELECTED
-            draft.save(update_fields=["sheet", "state"])
-            infer_error = _infer_draft_profile(draft, rows)
-            if infer_error is None:
-                return redirect("loc-kit-glossary-preview", token=draft.token)
-            messages.info(self.request, infer_error)
+
+    def _insert_draft_and_map(self, draft, sheets):
+        """Insert the draft row and, for a single sheet, map it locally."""
+        draft.save()
+        if len(sheets) > 1:
+            # Several worksheets: the operator has to choose one, and that
+            # POST runs the full analysis path.
+            return redirect("loc-kit-sheet-select", token=draft.token)
+        # A CSV/TSV always has exactly one sheet; the selection screen is
+        # noise. Only the deterministic step may run here: this POST is
+        # atomic, a provider call inside it would hold a transaction open
+        # for the whole network timeout.
+        sheet_name, rows = next(iter(sheets.items()))
+        draft.sheet = sheet_name
+        draft.state = LocKitImportDraft.State.SHEET_SELECTED
+        draft.save(update_fields=["sheet", "state"])
+        infer_error = _infer_draft_profile(draft, rows)
+        if infer_error is None:
+            return redirect("loc-kit-glossary-preview", token=draft.token)
+        messages.info(self.request, infer_error)
         return redirect("loc-kit-sheet-select", token=draft.token)
 
 
@@ -1091,6 +1102,17 @@ class LocKitSheetSelectView(LocKitDraftMixin, TemplateView):
         if not form.is_valid():
             return self.render_to_response(self.get_context_data(form=form, **kwargs))
 
+        # A draft that already holds a validated preview must not be pushed
+        # back through the pipeline. Re-selecting the same sheet is free for
+        # the caller but re-runs the full parse, TBX render and parse-back,
+        # so without this an attacker replays one stored upload for the
+        # draft's whole lifetime at no cost.
+        if (
+            draft.state == LocKitImportDraft.State.PREVIEW_READY
+            and draft.sheet == form.cleaned_data["sheet"]
+        ):
+            return redirect("loc-kit-glossary-preview", token=draft.token)
+
         # Changing the sheet invalidates any previously accepted mapping:
         # leaving it behind would show the old sheet's terms next to the new
         # sheet's name and keep the create button live.
@@ -1113,7 +1135,7 @@ def _infer_draft_profile(draft: LocKitImportDraft, rows: list) -> str | None:
 
     try:
         document, notes = infer_glossary_profile(
-            draft.sheet, [list(row) for row in rows], component=draft.slug
+            draft.sheet, rows, component=draft.slug
         )
     except InferenceError as error:
         return str(error)
@@ -1196,7 +1218,7 @@ def _store_validated_profile(
             "target_languages": list(preview.target_languages),
             "term_count": preview.term_count,
             "note_count": preview.note_count,
-            "warnings": [*extra_warnings, *preview.warnings],
+            "warnings": cap_preview_warnings([*extra_warnings, *preview.warnings]),
             "terms": [
                 {
                     "section": term.section,

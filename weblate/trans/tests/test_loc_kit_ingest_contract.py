@@ -44,6 +44,7 @@ from weblate.auth.models import User
 from weblate.formats.models import FILE_FORMATS
 from weblate.lang.models import Language
 from weblate.machinery.llm import BaseLLMTranslation
+from weblate.trans.loc_kit import PREVIEW_WARNING_LIMIT
 from weblate.trans.models import Category, Component, Project
 from weblate.trans.models.loc_kit import LOC_KIT_DRAFT_STORAGE, LocKitImportDraft
 from weblate.trans.tests.test_views import ViewTestCase
@@ -708,6 +709,29 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertEqual(component.source_language.code, "ru")
         codes = set(component.translation_set.values_list("language__code", flat=True))
         self.assertIn("en", codes)
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_stored_preview_warnings_are_bounded(self) -> None:
+        """
+        Warnings must not be an unbounded write path into the draft.
+
+        One note is emitted per skipped row, and the row count comes from the
+        uploaded file. Errors and sample terms are already capped; without a
+        cap here the draft row and the preview page grow with the upload.
+        """
+        # Alternate "has a ru term" / "has only en": every second row is
+        # skipped and contributes a note of its own.
+        body = "".join(
+            f"термин{index},term{index}\n,stray{index}\n" for index in range(60)
+        )
+        self._start(upload=self._csv("Sparse.csv", "ru,en\n" + body), slug=self.slug)
+        draft = self._draft()
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+
+        warnings = json.loads(draft.preview_json)["warnings"]
+        self.assertEqual(len(warnings), PREVIEW_WARNING_LIMIT + 1)
+        self.assertIn("more warning", warnings[-1])
 
     def test_failed_draft_insert_leaves_no_orphaned_file(self) -> None:
         """

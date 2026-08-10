@@ -43,6 +43,17 @@ _KEY_COLUMN = 0
 # resolves to a real code (``id`` is also the Indonesian language code).
 _KEY_HEADER_DENYLIST = frozenset({"id"})
 
+# A deterministically mappable glossary is structurally simple: a few blocks of
+# consecutive terms and a caption row or two. Past these bounds the emitted
+# profile would carry hundreds of regions and skip rows, which the profile
+# validator cross-multiplies, so a small upload becomes a quadratic parse.
+# Refusing here costs nothing: the analyzer and manual-profile paths remain.
+_MAX_REGIONS = 64
+_MAX_SKIPPED_ROWS = 64
+
+# How many row numbers a "missing term" note names before it summarises.
+_MISSING_ROWS_SHOWN = 10
+
 
 class InferenceError(Exception):
     """Raised when a sheet's shape cannot be determined with confidence."""
@@ -258,8 +269,21 @@ def infer_component(
 
     comments: list[dict[str, Any]] = []
     references: list[dict[str, Any]] = []
-    width = max(len(row) for row in rows)
-    for col in range(_KEY_COLUMN + 1, width):
+    # Visit only columns that can produce output. A column that is empty
+    # across the data AND has no header falls through the body below without
+    # any effect, so skipping it is behaviour-preserving - and necessary:
+    # `max(len(row))` spans every row, so one blank-but-wide row would
+    # otherwise drive a full column_values() pass per phantom column, which
+    # is quadratic in an uploaded file.
+    populated: set[int] = set()
+    for row in data_rows:
+        for col, value in enumerate(row):
+            if value.strip():
+                populated.add(col)
+    headed = {col for col in range(len(header_row)) if _cell(header_row, col).strip()}
+    for col in sorted(populated | headed):
+        if col <= _KEY_COLUMN:
+            continue
         # A column rejected as a language must not resurface as a comment: its
         # content is stray spillover and belongs in the report, not in the PO.
         if col in languages or (col in candidates and col not in demoted):
@@ -444,18 +468,25 @@ def infer_glossary_profile(
 
     # Every populated column must be a declared language: the record-map
     # parser errors on any populated cell no field reads (tbx.unmapped_cell).
-    width = max(len(row) for row in rows)
-    for col in range(width):
-        if col in languages:
-            continue
-        if any(_cell(rows[index], col).strip() for index in content_indexes):
-            header_text = _cell(header_row, col) or f"column{col + 1}"
-            msg = (
-                f"column {col + 1} ({header_text!r}) holds data but is not a "
-                "recognised language column; this layout needs an explicit "
-                "profile"
-            )
-            raise InferenceError(msg)
+    # Collect the populated columns in ONE pass over the rows. Looping
+    # range(max_width) and rescanning every row per column costs
+    # rows x width, and a single blank-but-wide row raises width for free,
+    # so that shape is a cheap quadratic from an uploaded file.
+    populated: set[int] = set()
+    for index in content_indexes:
+        for col, value in enumerate(rows[index]):
+            if value.strip():
+                populated.add(col)
+    unmapped = sorted(populated - languages.keys())
+    if unmapped:
+        col = unmapped[0]
+        header_text = _cell(header_row, col) or f"column{col + 1}"
+        msg = (
+            f"column {col + 1} ({header_text!r}) holds data but is not a "
+            "recognised language column; this layout needs an explicit "
+            "profile"
+        )
+        raise InferenceError(msg)
 
     source_col = min(languages)
     source_lang = languages[source_col]
@@ -464,9 +495,18 @@ def infer_glossary_profile(
     for index in content_indexes:
         if _cell(rows[index], source_col).strip():
             record_rows.append(index)
-        else:
-            skip_rows.append(index)
-            notes.append(f"row {index + 1} has no {source_lang} term; skipped")
+            continue
+        skip_rows.append(index)
+        # Bounds skip_rows AND the notes list, both of which are serialized
+        # into the draft and rendered on one page.
+        if len(skip_rows) > _MAX_SKIPPED_ROWS:
+            msg = (
+                f"sheet {sheet_name!r} has more than {_MAX_SKIPPED_ROWS} rows "
+                f"without a {source_lang} term; too fragmented to map "
+                "deterministically"
+            )
+            raise InferenceError(msg)
+        notes.append(f"row {index + 1} has no {source_lang} term; skipped")
     if not record_rows:
         msg = f"sheet {sheet_name!r} has no rows with a {source_lang} term"
         raise InferenceError(msg)
@@ -492,19 +532,35 @@ def infer_glossary_profile(
             "record_stride": 1,
         }
     )
+    # The profile validator cross-multiplies skip_rows by regions, so an
+    # alternating filled/blank source column would otherwise turn a small
+    # sheet into a quadratic parse.
+    if len(regions) > _MAX_REGIONS:
+        msg = (
+            f"sheet {sheet_name!r} splits into {len(regions)} blocks of "
+            f"consecutive terms (limit {_MAX_REGIONS}); too fragmented to map "
+            "deterministically"
+        )
+        raise InferenceError(msg)
 
     target_langs: list[str] = []
     for col in sorted(languages):
         if col == source_col:
             continue
         code = languages[col]
-        missing = [
-            index + 1 for index in record_rows if not _cell(rows[index], col).strip()
-        ]
-        if missing:
-            shown = ", ".join(str(row) for row in missing[:10])
-            if len(missing) > 10:
-                shown += f", +{len(missing) - 10} more"
+        # Count every gap but keep only the head: the message shows ten.
+        missing_head: list[int] = []
+        missing_count = 0
+        for index in record_rows:
+            if _cell(rows[index], col).strip():
+                continue
+            missing_count += 1
+            if len(missing_head) < _MISSING_ROWS_SHOWN:
+                missing_head.append(index + 1)
+        if missing_count:
+            shown = ", ".join(str(row) for row in missing_head)
+            if missing_count > len(missing_head):
+                shown += f", +{missing_count - len(missing_head)} more"
             notes.append(
                 f"language {code} is missing a term on row(s) {shown}; "
                 "recognised but not imported"
