@@ -180,8 +180,9 @@ Repository-specific parts:
   files" tab accepts CSV/TSV/XLSX kits directly (converted to po-mono,
   discovery skipped) as well as ZIP. When :guilabel:`Use as glossary` is
   checked, a CSV/TSV/XLSX table instead enters the glossary workflow (sheet
-  selection, optional OpenRouter profile proposal, local validation, TBX
-  component) documented in `docs/specs/loc-kit-ingest.md` and the plan.
+  selection, deterministic inference first, optional OpenRouter fallback,
+  local validation, TBX component) documented in `docs/specs/loc-kit-ingest.md`
+  and the plan.
   Standalone tests: `cd loc_kit_ingest && uv run pytest` (no DB).
   Weblate-level tests: `weblate/trans/tests/test_loc_kit_ingest_contract.py`.
   The running container imports the package from `/app/data/python`, so after
