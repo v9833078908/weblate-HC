@@ -23,7 +23,7 @@ from typing import Any
 
 from translate.lang import data as lang_data
 
-from loc_kit_ingest.profile import SCHEMA_VERSION
+from loc_kit_ingest.profile import SCHEMA_VERSION, SCHEMA_VERSION_RECORD_MAP
 
 # Language columns filled below this share of content rows are stray spillover,
 # not a translation: real languages in a kit cluster near 100% while accidental
@@ -361,3 +361,190 @@ def infer_profile(
         notes.extend(f"{name}: {note}" for note in sheet_notes)
 
     return {"schema_version": SCHEMA_VERSION, "components": components}, notes
+
+
+def infer_glossary_profile(
+    sheet_name: str,
+    rows: list[list[str]],
+    *,
+    component: str,
+    min_fill: float = DEFAULT_MIN_FILL,
+) -> tuple[dict[str, Any], list[str]]:
+    """
+    Infer a schema v2 record-map TBX profile for one worksheet.
+
+    Deterministic v0: every populated column must be a language column; the
+    leftmost language is the source, targets are languages filled on every
+    record row. The record-map parser treats any unmapped populated cell as
+    an error, so an extra column is a refusal, never a guess.
+    Returns (document, notes).
+    """
+    if not rows:
+        msg = f"sheet {sheet_name!r} is empty"
+        raise InferenceError(msg)
+
+    header_index, candidates = _find_header_row(rows)
+    header_row = rows[header_index]
+    notes: list[str] = []
+
+    # Column 0 is an ordinary column here; promote it when its header is a
+    # language code (a keyless kit like ``ru,en,ja`` keeps terms in column 1).
+    first_header = _cell(header_row, _KEY_COLUMN)
+    first_code = _language_code(first_header)
+    if (
+        first_code is not None
+        and first_header.strip().casefold() not in _KEY_HEADER_DENYLIST
+        and first_code not in candidates.values()
+    ):
+        candidates = {_KEY_COLUMN: first_code, **candidates}
+
+    skip_rows: list[int] = []  # 0-based
+    cursor = header_index + 1
+    while cursor < len(rows) and _is_caption_row(rows[cursor], candidates):
+        skip_rows.append(cursor)
+        cursor += 1
+
+    content_indexes = [
+        index
+        for index in range(cursor, len(rows))
+        if not _is_blank_row(rows[index])
+    ]
+    if not content_indexes:
+        msg = f"sheet {sheet_name!r} has no data rows"
+        raise InferenceError(msg)
+
+    languages: dict[int, str] = {}
+    for col in sorted(candidates):
+        code = candidates[col]
+        values = [_cell(rows[index], col) for index in content_indexes]
+        filled = sum(1 for value in values if value.strip())
+        if not filled:
+            notes.append(
+                f"column {col + 1} ({_cell(header_row, col)!r} -> {code}) "
+                "is empty; excluded"
+            )
+            continue
+        if _is_numeric(values):
+            msg = (
+                f"column {col + 1} ({_cell(header_row, col)!r}) holds only "
+                "numbers; this layout needs an explicit profile"
+            )
+            raise InferenceError(msg)
+        share = 100.0 * filled / len(content_indexes)
+        if share < min_fill:
+            msg = (
+                f"column {col + 1} ({_cell(header_row, col)!r} -> {code}) is "
+                f"filled in {filled}/{len(content_indexes)} rows "
+                f"({share:.1f}%); too sparse to map deterministically"
+            )
+            raise InferenceError(msg)
+        languages[col] = code
+
+    if not languages:
+        msg = f"sheet {sheet_name!r} has no populated language column"
+        raise InferenceError(msg)
+
+    # Every populated column must be a declared language: the record-map
+    # parser errors on any populated cell no field reads (tbx.unmapped_cell).
+    width = max(len(row) for row in rows)
+    for col in range(width):
+        if col in languages:
+            continue
+        if any(_cell(rows[index], col).strip() for index in content_indexes):
+            header_text = _cell(header_row, col) or f"column{col + 1}"
+            msg = (
+                f"column {col + 1} ({header_text!r}) holds data but is not a "
+                "recognised language column; this layout needs an explicit "
+                "profile"
+            )
+            raise InferenceError(msg)
+
+    source_col = min(languages)
+    source_lang = languages[source_col]
+
+    record_rows: list[int] = []
+    for index in content_indexes:
+        if _cell(rows[index], source_col).strip():
+            record_rows.append(index)
+        else:
+            skip_rows.append(index)
+            notes.append(f"row {index + 1} has no {source_lang} term; skipped")
+    if not record_rows:
+        msg = f"sheet {sheet_name!r} has no rows with a {source_lang} term"
+        raise InferenceError(msg)
+
+    regions: list[dict[str, int]] = []
+    start = prev = record_rows[0]
+    for index in record_rows[1:]:
+        if index == prev + 1:
+            prev = index
+            continue
+        regions.append(
+            {
+                "first_record_row": start + 1,
+                "last_record_row": prev + 1,
+                "record_stride": 1,
+            }
+        )
+        start = prev = index
+    regions.append(
+        {
+            "first_record_row": start + 1,
+            "last_record_row": prev + 1,
+            "record_stride": 1,
+        }
+    )
+
+    target_langs: list[str] = []
+    for col in sorted(languages):
+        if col == source_col:
+            continue
+        code = languages[col]
+        missing = [
+            index + 1
+            for index in record_rows
+            if not _cell(rows[index], col).strip()
+        ]
+        if missing:
+            shown = ", ".join(str(row) for row in missing[:10])
+            if len(missing) > 10:
+                shown += f", +{len(missing) - 10} more"
+            notes.append(
+                f"language {code} is missing a term on row(s) {shown}; "
+                "recognised but not imported"
+            )
+            continue
+        target_langs.append(code)
+    if not target_langs:
+        msg = f"sheet {sheet_name!r} has no fully filled target language column"
+        raise InferenceError(msg)
+
+    document = {
+        "schema_version": SCHEMA_VERSION_RECORD_MAP,
+        "components": [
+            {
+                "sheet": sheet_name,
+                "component": component,
+                "kind": "tbx",
+                "source_lang": source_lang,
+                "header_row": header_index + 1,
+                "languages": [
+                    {
+                        "code": languages[col],
+                        "xml_lang": languages[col].replace("_", "-"),
+                        "column": col + 1,
+                        "header": _cell(header_row, col),
+                    }
+                    for col in sorted(languages)
+                ],
+                "initial_target_languages": target_langs,
+                "grammar": {
+                    "type": "record-map",
+                    "skip_rows": sorted(index + 1 for index in skip_rows),
+                    "regions": regions,
+                    "term_row_offset": 0,
+                },
+            }
+        ],
+    }
+    return document, notes
