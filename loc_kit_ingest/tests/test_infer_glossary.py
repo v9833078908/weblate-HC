@@ -7,10 +7,11 @@ from __future__ import annotations
 import pytest
 
 from loc_kit_ingest.infer import InferenceError, infer_glossary_profile
+from loc_kit_ingest.profile import parse_profile
 
-# Стандартный «языковой» кит: заголовок-коды, caption-строка с названиями
-# языков, секционная строка (импортируется как обычный термин), пустая строка,
-# частично заполненный язык (ja) и пустой язык (fr).
+# Standard language-only kit: header codes, a caption row with language
+# names, a section row (imported as an ordinary term), a blank row, a
+# partially filled language (ja), and an empty language (fr).
 STANDARD = [
     ["ru", "en", "fr", "ja"],
     ["Russian", "English", "french", "japanese"],
@@ -22,9 +23,7 @@ STANDARD = [
 
 
 def test_standard_layout_infers_v2_record_map() -> None:
-    document, notes = infer_glossary_profile(
-        "Terms", STANDARD, component="terms"
-    )
+    document, _notes = infer_glossary_profile("Terms", STANDARD, component="terms")
     assert document["schema_version"] == 2
     (comp,) = document["components"]
     assert comp["kind"] == "tbx"
@@ -44,11 +43,9 @@ def test_standard_layout_infers_v2_record_map() -> None:
 
 
 def test_partially_filled_language_is_not_an_initial_target() -> None:
-    document, notes = infer_glossary_profile(
-        "Terms", STANDARD, component="terms"
-    )
+    document, notes = infer_glossary_profile("Terms", STANDARD, component="terms")
     (comp,) = document["components"]
-    # ja пуст в строке 6 -> распознан, но не импортируется.
+    # ja is empty on row 6 -> recognised but not imported.
     assert comp["initial_target_languages"] == ["en"]
     assert any("ja" in note and "6" in note for note in notes)
 
@@ -81,9 +78,7 @@ def test_populated_non_language_column_is_refused() -> None:
 
 def test_no_language_header_is_refused() -> None:
     with pytest.raises(InferenceError):
-        infer_glossary_profile(
-            "S", [["key", "value"], ["a", "b"]], component="s"
-        )
+        infer_glossary_profile("S", [["key", "value"], ["a", "b"]], component="s")
 
 
 def test_no_fully_filled_target_is_refused() -> None:
@@ -97,9 +92,7 @@ def test_no_fully_filled_target_is_refused() -> None:
 
 
 def test_document_survives_parse_profile() -> None:
-    """Выведенный документ обязан быть валидным профилем без правок."""
-    from loc_kit_ingest.profile import parse_profile
-
+    """The inferred document must be a valid profile without edits."""
     document, _ = infer_glossary_profile("Terms", STANDARD, component="terms")
     profile = parse_profile(document)
     assert profile.components[0].source_lang == "ru"

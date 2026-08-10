@@ -529,9 +529,9 @@ GLOSSARY_CSV = (
 )
 
 
-# Языковой кит без служебных колонок: детерминированный разбор обязан дать
-# превью без OpenRouter. GLOSSARY_CSV выше намеренно НЕ разбирается
-# детерминированно (domain/note_*) и покрывает LLM/ручной путь.
+# Language-only kit with no extra columns: deterministic inference must give
+# a preview. GLOSSARY_CSV above is intentionally NOT parsed deterministically
+# (domain/note_*) and keeps covering the LLM/manual path.
 GLOSSARY_LANG_ONLY_CSV = "ru,en\nRussian,English\nГерой,Hero\nМеч,Sword\n"
 
 
@@ -702,13 +702,11 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self._start(
             upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug
         )
-        response = self._confirm()
+        self._confirm()
         component = Component.objects.get(slug=self.slug)
         self.assertTrue(component.is_glossary)
         self.assertEqual(component.source_language.code, "ru")
-        codes = set(
-            component.translation_set.values_list("language__code", flat=True)
-        )
+        codes = set(component.translation_set.values_list("language__code", flat=True))
         self.assertIn("en", codes)
 
     def test_failed_draft_insert_leaves_no_orphaned_file(self) -> None:

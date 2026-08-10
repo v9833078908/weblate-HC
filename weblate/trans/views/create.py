@@ -1138,10 +1138,13 @@ def _analyze_draft_sheet(
         return None
 
     if not settings.LOC_KIT_PROFILE_ANALYSIS_ENABLED:
-        return gettext(
-            "Automatic mapping did not recognize this sheet (%s) "
-            "and analysis is disabled. Upload a profile to continue."
-        ) % infer_reason
+        return (
+            gettext(
+                "Automatic mapping did not recognize this sheet (%s) "
+                "and analysis is disabled. Upload a profile to continue."
+            )
+            % infer_reason
+        )
     # Spend an attempt only for a call that can actually reach the provider.
     # Selecting a worksheet is free: a multi-sheet workbook needs several
     # POSTs before the operator even sees the sheet they want.

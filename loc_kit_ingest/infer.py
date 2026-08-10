@@ -405,9 +405,7 @@ def infer_glossary_profile(
         cursor += 1
 
     content_indexes = [
-        index
-        for index in range(cursor, len(rows))
-        if not _is_blank_row(rows[index])
+        index for index in range(cursor, len(rows)) if not _is_blank_row(rows[index])
     ]
     if not content_indexes:
         msg = f"sheet {sheet_name!r} has no data rows"
@@ -501,9 +499,7 @@ def infer_glossary_profile(
             continue
         code = languages[col]
         missing = [
-            index + 1
-            for index in record_rows
-            if not _cell(rows[index], col).strip()
+            index + 1 for index in record_rows if not _cell(rows[index], col).strip()
         ]
         if missing:
             shown = ", ".join(str(row) for row in missing[:10])
