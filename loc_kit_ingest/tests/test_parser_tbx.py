@@ -153,10 +153,21 @@ def test_outer_whitespace_in_term_is_error(terms_component, terms_rows):
     assert any(d.code == "tbx.unsupported_outer_whitespace" for d in result.diagnostics)
 
 
-def test_outer_whitespace_in_explanation_is_error(terms_component, terms_rows):
+def test_outer_whitespace_in_explanation_is_trimmed_with_a_warning(
+    terms_component, terms_rows
+):
+    """TBX strips it on write, so trim and warn instead of refusing the kit."""
     terms_rows[4][1] = "Target explanation "  # trailing space
     result = parse_component(terms_component, terms_rows)
-    assert any(d.code == "tbx.unsupported_outer_whitespace" for d in result.diagnostics)
+
+    assert [d for d in result.diagnostics if d.severity is Severity.ERROR] == []
+    trimmed = [
+        d for d in result.diagnostics if d.code == "tbx.trimmed_outer_whitespace"
+    ]
+    assert len(trimmed) == 1
+    assert trimmed[0].severity is Severity.WARNING
+    term = result.units[0]
+    assert term.target_explanations["en"] == "Target explanation"
 
 
 def test_preserves_internal_newlines_and_markup(terms_component):
@@ -280,12 +291,21 @@ def test_record_map_missing_target_term_is_error(record_map_component, record_ma
     assert any(d.code == "tbx.missing_target_term" for d in result.diagnostics)
 
 
-def test_record_map_outer_whitespace_in_note_is_error(
+def test_record_map_outer_whitespace_in_note_is_trimmed_with_a_warning(
     record_map_component, record_map_rows
 ):
+    """TBX strips it on write, so trim and warn instead of refusing the kit."""
     record_map_rows[2][3] = " Главный протагонист"
     result = parse_component(record_map_component, record_map_rows)
-    assert any(d.code == "tbx.unsupported_outer_whitespace" for d in result.diagnostics)
+
+    assert [d for d in result.diagnostics if d.severity is Severity.ERROR] == []
+    trimmed = [
+        d for d in result.diagnostics if d.code == "tbx.trimmed_outer_whitespace"
+    ]
+    assert len(trimmed) == 1
+    assert trimmed[0].severity is Severity.WARNING
+    term = next(u for u in result.units if u.values["ru"] == "Герой")
+    assert term.source_explanation == "Главный протагонист"
 
 
 def test_record_map_note_diagnostic_names_the_column(
@@ -297,9 +317,21 @@ def test_record_map_note_diagnostic_names_the_column(
     message = next(
         d.message
         for d in result.diagnostics
-        if d.code == "tbx.unsupported_outer_whitespace"
+        if d.code == "tbx.trimmed_outer_whitespace"
     )
     assert "column 4" in message
+
+
+def test_record_map_outer_whitespace_in_term_is_still_an_error(
+    record_map_component, record_map_rows
+):
+    """A term is the identity of a glossary entry; it is never rewritten."""
+    record_map_rows[2][1] = " Герой"
+    result = parse_component(record_map_component, record_map_rows)
+    assert any(
+        d.code == "tbx.unsupported_outer_whitespace" and d.severity is Severity.ERROR
+        for d in result.diagnostics
+    )
 
 
 def test_record_map_duplicate_context_is_error(record_map_component, record_map_rows):

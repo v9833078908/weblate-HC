@@ -503,20 +503,24 @@ def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
             for code, col in lang_columns.items():
                 desc_values[code] = _cell(rows, desc_row_idx, col)
 
-            # Check outer whitespace on explanations.
+            # TBX strips outer whitespace from descrip/note on write, so
+            # keeping the raw value would break parse-back. Trim it here and
+            # say so: the only loss is whitespace around an explanation.
             for code, col in lang_columns.items():
                 val = desc_values[code]
                 if not _is_blank(val) and _has_outer_whitespace(val):
                     diagnostics.append(
                         Diagnostic(
-                            Severity.ERROR,
-                            "tbx.unsupported_outer_whitespace",
+                            Severity.WARNING,
+                            "tbx.trimmed_outer_whitespace",
                             component.component,
                             component.sheet,
                             desc_1based,
-                            f"explanation in language {code!r} has leading or trailing whitespace",
+                            f"explanation in language {code!r} had leading or "
+                            "trailing whitespace; it was trimmed",
                         )
                     )
+                    desc_values[code] = val.strip()
 
             # Source explanation must exist.
             source_expl = desc_values.get(source_lang, "")
@@ -651,6 +655,18 @@ def _parse_record_map(
             )
         )
 
+    def warn(code: str, row_1based: int, message: str) -> None:
+        diagnostics.append(
+            Diagnostic(
+                Severity.WARNING,
+                code,
+                component.component,
+                component.sheet,
+                row_1based,
+                message,
+            )
+        )
+
     def read_field(base_row: int, row_offset: int, column: int) -> str:
         return _cell(rows, base_row + row_offset, column)
 
@@ -741,12 +757,17 @@ def _parse_record_map(
                     if not _is_blank(value):
                         note_rows.append(row_idx + 1)
                         if _has_outer_whitespace(value):
-                            err(
-                                "tbx.unsupported_outer_whitespace",
+                            # TBX strips outer whitespace from descrip/note on
+                            # write, so keeping the raw value would break
+                            # parse-back. Trim it here and say so: the only
+                            # loss is whitespace around an explanation.
+                            warn(
+                                "tbx.trimmed_outer_whitespace",
                                 row_idx + 1,
-                                f"note in column {note.column + 1} has leading "
-                                "or trailing whitespace",
+                                f"note in column {note.column + 1} had leading "
+                                "or trailing whitespace; it was trimmed",
                             )
+                            value = value.strip()
                     values.append(value)
                 return values
 

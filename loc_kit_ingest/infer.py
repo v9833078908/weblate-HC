@@ -23,7 +23,7 @@ from typing import Any
 
 from translate.lang import data as lang_data
 
-from loc_kit_ingest.profile import SCHEMA_VERSION
+from loc_kit_ingest.profile import SCHEMA_VERSION, SCHEMA_VERSION_RECORD_MAP
 
 # Language columns filled below this share of content rows are stray spillover,
 # not a translation: real languages in a kit cluster near 100% while accidental
@@ -42,6 +42,17 @@ _KEY_COLUMN = 0
 # Header text that must never be treated as a language column, even if it
 # resolves to a real code (``id`` is also the Indonesian language code).
 _KEY_HEADER_DENYLIST = frozenset({"id"})
+
+# A deterministically mappable glossary is structurally simple: a few blocks of
+# consecutive terms and a caption row or two. Past these bounds the emitted
+# profile would carry hundreds of regions and skip rows, which the profile
+# validator cross-multiplies, so a small upload becomes a quadratic parse.
+# Refusing here costs nothing: the analyzer and manual-profile paths remain.
+_MAX_REGIONS = 64
+_MAX_SKIPPED_ROWS = 64
+
+# How many row numbers a "missing term" note names before it summarises.
+_MISSING_ROWS_SHOWN = 10
 
 
 class InferenceError(Exception):
@@ -258,8 +269,21 @@ def infer_component(
 
     comments: list[dict[str, Any]] = []
     references: list[dict[str, Any]] = []
-    width = max(len(row) for row in rows)
-    for col in range(_KEY_COLUMN + 1, width):
+    # Visit only columns that can produce output. A column that is empty
+    # across the data AND has no header falls through the body below without
+    # any effect, so skipping it is behaviour-preserving - and necessary:
+    # `max(len(row))` spans every row, so one blank-but-wide row would
+    # otherwise drive a full column_values() pass per phantom column, which
+    # is quadratic in an uploaded file.
+    populated: set[int] = set()
+    for row in data_rows:
+        for col, value in enumerate(row):
+            if value.strip():
+                populated.add(col)
+    headed = {col for col in range(len(header_row)) if _cell(header_row, col).strip()}
+    for col in sorted(populated | headed):
+        if col <= _KEY_COLUMN:
+            continue
         # A column rejected as a language must not resurface as a comment: its
         # content is stray spillover and belongs in the report, not in the PO.
         if col in languages or (col in candidates and col not in demoted):
@@ -361,3 +385,218 @@ def infer_profile(
         notes.extend(f"{name}: {note}" for note in sheet_notes)
 
     return {"schema_version": SCHEMA_VERSION, "components": components}, notes
+
+
+def infer_glossary_profile(
+    sheet_name: str,
+    rows: list[list[str]],
+    *,
+    component: str,
+    min_fill: float = DEFAULT_MIN_FILL,
+) -> tuple[dict[str, Any], list[str]]:
+    """
+    Infer a schema v2 record-map TBX profile for one worksheet.
+
+    Deterministic v0: every populated column must be a language column; the
+    leftmost language is the source, targets are languages filled on every
+    record row. The record-map parser treats any unmapped populated cell as
+    an error, so an extra column is a refusal, never a guess.
+    Returns (document, notes).
+    """
+    if not rows:
+        msg = f"sheet {sheet_name!r} is empty"
+        raise InferenceError(msg)
+
+    header_index, candidates = _find_header_row(rows)
+    header_row = rows[header_index]
+    notes: list[str] = []
+
+    # Column 0 is an ordinary column here; promote it when its header is a
+    # language code (a keyless kit like ``ru,en,ja`` keeps terms in column 1).
+    first_header = _cell(header_row, _KEY_COLUMN)
+    first_code = _language_code(first_header)
+    if (
+        first_code is not None
+        and first_header.strip().casefold() not in _KEY_HEADER_DENYLIST
+        and first_code not in candidates.values()
+    ):
+        candidates = {_KEY_COLUMN: first_code, **candidates}
+
+    skip_rows: list[int] = []  # 0-based
+    cursor = header_index + 1
+    while cursor < len(rows) and _is_caption_row(rows[cursor], candidates):
+        skip_rows.append(cursor)
+        cursor += 1
+
+    content_indexes = [
+        index for index in range(cursor, len(rows)) if not _is_blank_row(rows[index])
+    ]
+    if not content_indexes:
+        msg = f"sheet {sheet_name!r} has no data rows"
+        raise InferenceError(msg)
+
+    languages: dict[int, str] = {}
+    for col in sorted(candidates):
+        code = candidates[col]
+        values = [_cell(rows[index], col) for index in content_indexes]
+        filled = sum(1 for value in values if value.strip())
+        if not filled:
+            notes.append(
+                f"column {col + 1} ({_cell(header_row, col)!r} -> {code}) "
+                "is empty; excluded"
+            )
+            continue
+        if _is_numeric(values):
+            msg = (
+                f"column {col + 1} ({_cell(header_row, col)!r}) holds only "
+                "numbers; this layout needs an explicit profile"
+            )
+            raise InferenceError(msg)
+        share = 100.0 * filled / len(content_indexes)
+        if share < min_fill:
+            msg = (
+                f"column {col + 1} ({_cell(header_row, col)!r} -> {code}) is "
+                f"filled in {filled}/{len(content_indexes)} rows "
+                f"({share:.1f}%); too sparse to map deterministically"
+            )
+            raise InferenceError(msg)
+        languages[col] = code
+
+    if not languages:
+        msg = f"sheet {sheet_name!r} has no populated language column"
+        raise InferenceError(msg)
+
+    # Every populated column must be a declared language: the record-map
+    # parser errors on any populated cell no field reads (tbx.unmapped_cell).
+    # Collect the populated columns in ONE pass over the rows. Looping
+    # range(max_width) and rescanning every row per column costs
+    # rows x width, and a single blank-but-wide row raises width for free,
+    # so that shape is a cheap quadratic from an uploaded file.
+    populated: set[int] = set()
+    for index in content_indexes:
+        for col, value in enumerate(rows[index]):
+            if value.strip():
+                populated.add(col)
+    unmapped = sorted(populated - languages.keys())
+    if unmapped:
+        col = unmapped[0]
+        header_text = _cell(header_row, col) or f"column{col + 1}"
+        msg = (
+            f"column {col + 1} ({header_text!r}) holds data but is not a "
+            "recognised language column; this layout needs an explicit "
+            "profile"
+        )
+        raise InferenceError(msg)
+
+    source_col = min(languages)
+    source_lang = languages[source_col]
+
+    record_rows: list[int] = []
+    for index in content_indexes:
+        if _cell(rows[index], source_col).strip():
+            record_rows.append(index)
+            continue
+        skip_rows.append(index)
+        # Bounds skip_rows AND the notes list, both of which are serialized
+        # into the draft and rendered on one page.
+        if len(skip_rows) > _MAX_SKIPPED_ROWS:
+            msg = (
+                f"sheet {sheet_name!r} has more than {_MAX_SKIPPED_ROWS} rows "
+                f"without a {source_lang} term; too fragmented to map "
+                "deterministically"
+            )
+            raise InferenceError(msg)
+        notes.append(f"row {index + 1} has no {source_lang} term; skipped")
+    if not record_rows:
+        msg = f"sheet {sheet_name!r} has no rows with a {source_lang} term"
+        raise InferenceError(msg)
+
+    regions: list[dict[str, int]] = []
+    start = prev = record_rows[0]
+    for index in record_rows[1:]:
+        if index == prev + 1:
+            prev = index
+            continue
+        regions.append(
+            {
+                "first_record_row": start + 1,
+                "last_record_row": prev + 1,
+                "record_stride": 1,
+            }
+        )
+        start = prev = index
+    regions.append(
+        {
+            "first_record_row": start + 1,
+            "last_record_row": prev + 1,
+            "record_stride": 1,
+        }
+    )
+    # The profile validator cross-multiplies skip_rows by regions, so an
+    # alternating filled/blank source column would otherwise turn a small
+    # sheet into a quadratic parse.
+    if len(regions) > _MAX_REGIONS:
+        msg = (
+            f"sheet {sheet_name!r} splits into {len(regions)} blocks of "
+            f"consecutive terms (limit {_MAX_REGIONS}); too fragmented to map "
+            "deterministically"
+        )
+        raise InferenceError(msg)
+
+    target_langs: list[str] = []
+    for col in sorted(languages):
+        if col == source_col:
+            continue
+        code = languages[col]
+        # Count every gap but keep only the head: the message shows ten.
+        missing_head: list[int] = []
+        missing_count = 0
+        for index in record_rows:
+            if _cell(rows[index], col).strip():
+                continue
+            missing_count += 1
+            if len(missing_head) < _MISSING_ROWS_SHOWN:
+                missing_head.append(index + 1)
+        if missing_count:
+            shown = ", ".join(str(row) for row in missing_head)
+            if missing_count > len(missing_head):
+                shown += f", +{missing_count - len(missing_head)} more"
+            notes.append(
+                f"language {code} is missing a term on row(s) {shown}; "
+                "recognised but not imported"
+            )
+            continue
+        target_langs.append(code)
+    if not target_langs:
+        msg = f"sheet {sheet_name!r} has no fully filled target language column"
+        raise InferenceError(msg)
+
+    document = {
+        "schema_version": SCHEMA_VERSION_RECORD_MAP,
+        "components": [
+            {
+                "sheet": sheet_name,
+                "component": component,
+                "kind": "tbx",
+                "source_lang": source_lang,
+                "header_row": header_index + 1,
+                "languages": [
+                    {
+                        "code": languages[col],
+                        "xml_lang": languages[col].replace("_", "-"),
+                        "column": col + 1,
+                        "header": _cell(header_row, col),
+                    }
+                    for col in sorted(languages)
+                ],
+                "initial_target_languages": target_langs,
+                "grammar": {
+                    "type": "record-map",
+                    "skip_rows": sorted(index + 1 for index in skip_rows),
+                    "regions": regions,
+                    "term_row_offset": 0,
+                },
+            }
+        ],
+    }
+    return document, notes

@@ -44,6 +44,7 @@ from weblate.auth.models import User
 from weblate.formats.models import FILE_FORMATS
 from weblate.lang.models import Language
 from weblate.machinery.llm import BaseLLMTranslation
+from weblate.trans.loc_kit import PREVIEW_WARNING_LIMIT
 from weblate.trans.models import Category, Component, Project
 from weblate.trans.models.loc_kit import LOC_KIT_DRAFT_STORAGE, LocKitImportDraft
 from weblate.trans.tests.test_views import ViewTestCase
@@ -529,6 +530,12 @@ GLOSSARY_CSV = (
 )
 
 
+# Language-only kit with no extra columns: deterministic inference must give
+# a preview. GLOSSARY_CSV above is intentionally NOT parsed deterministically
+# (domain/note_*) and keeps covering the LLM/manual path.
+GLOSSARY_LANG_ONLY_CSV = "ru,en\nRussian,English\nГерой,Hero\nМеч,Sword\n"
+
+
 def _glossary_profile(sheet: str, *, source_lang: str = "ru") -> dict:
     return {
         "schema_version": 2,
@@ -665,9 +672,66 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
             reverse("loc-kit-sheet-select", kwargs={"token": draft.token}),
         )
         self.assertEqual(draft.owner, self.user)
-        self.assertEqual(draft.state, LocKitImportDraft.State.UPLOADED)
+        # Single sheet: auto-skip fixed it, but GLOSSARY_CSV's domain/note_*
+        # columns refuse deterministic inference, so it stays at sheet-select.
+        self.assertEqual(draft.state, LocKitImportDraft.State.SHEET_SELECTED)
         # No component exists yet.
         self.assertFalse(Component.objects.filter(slug=self.slug).exists())
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_language_only_sheet_gets_deterministic_preview(self) -> None:
+        """Языковая таблица даёт превью локально, без OpenRouter и без JSON."""
+        self._start(
+            upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug
+        )
+        draft = self._draft()
+
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+        preview = json.loads(draft.preview_json)
+        self.assertEqual(preview["source_language"], "ru")
+        self.assertEqual(preview["target_languages"], ["en"])
+        self.assertEqual(preview["term_count"], 2)
+
+        page = self.client.get(
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
+        )
+        self.assertContains(page, "Герой")
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_deterministic_preview_confirms_into_live_component(self) -> None:
+        self._start(
+            upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug
+        )
+        self._confirm()
+        component = Component.objects.get(slug=self.slug)
+        self.assertTrue(component.is_glossary)
+        self.assertEqual(component.source_language.code, "ru")
+        codes = set(component.translation_set.values_list("language__code", flat=True))
+        self.assertIn("en", codes)
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_stored_preview_warnings_are_bounded(self) -> None:
+        """
+        Warnings must not be an unbounded write path into the draft.
+
+        One note is emitted per skipped row, and the row count comes from the
+        uploaded file. Errors and sample terms are already capped; without a
+        cap here the draft row and the preview page grow with the upload.
+        """
+        # Alternate "has a ru term" / "has only en": every second row is
+        # skipped and contributes a note of its own.
+        body = "".join(
+            f"термин{index},term{index}\n,stray{index}\n" for index in range(60)
+        )
+        self._start(upload=self._csv("Sparse.csv", "ru,en\n" + body), slug=self.slug)
+        draft = self._draft()
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+
+        warnings = json.loads(draft.preview_json)["warnings"]
+        self.assertEqual(len(warnings), PREVIEW_WARNING_LIMIT + 1)
+        self.assertIn("more warning", warnings[-1])
 
     def test_failed_draft_insert_leaves_no_orphaned_file(self) -> None:
         """
