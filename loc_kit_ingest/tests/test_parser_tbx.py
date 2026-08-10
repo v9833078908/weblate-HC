@@ -147,10 +147,19 @@ def test_unknown_extra_nonblank_row_is_error(terms_component, terms_rows):
     assert any(d.code == "grammar.uncovered_row" for d in result.diagnostics)
 
 
-def test_outer_whitespace_in_term_is_error(terms_component, terms_rows):
+def test_outer_whitespace_in_term_is_trimmed_with_a_warning(
+    terms_component, terms_rows
+):
+    """TBX cannot store it, so trim and warn instead of refusing the kit."""
     terms_rows[3][0] = " Герой"  # leading space
     result = parse_component(terms_component, terms_rows)
-    assert any(d.code == "tbx.unsupported_outer_whitespace" for d in result.diagnostics)
+
+    assert [d for d in result.diagnostics if d.severity is Severity.ERROR] == []
+    assert any(
+        d.code == "tbx.trimmed_outer_whitespace" and d.severity is Severity.WARNING
+        for d in result.diagnostics
+    )
+    assert result.units[0].values["ru"] == "Герой"
 
 
 def test_outer_whitespace_in_explanation_is_trimmed_with_a_warning(
@@ -322,16 +331,20 @@ def test_record_map_note_diagnostic_names_the_column(
     assert "column 4" in message
 
 
-def test_record_map_outer_whitespace_in_term_is_still_an_error(
+def test_record_map_outer_whitespace_in_term_is_trimmed(
     record_map_component, record_map_rows
 ):
-    """A term is the identity of a glossary entry; it is never rewritten."""
+    """The trimmed term is what TBX stores, so it must also drive identity."""
     record_map_rows[2][1] = " Герой"
     result = parse_component(record_map_component, record_map_rows)
+
+    assert [d for d in result.diagnostics if d.severity is Severity.ERROR] == []
     assert any(
-        d.code == "tbx.unsupported_outer_whitespace" and d.severity is Severity.ERROR
+        d.code == "tbx.trimmed_outer_whitespace" and d.severity is Severity.WARNING
         for d in result.diagnostics
     )
+    assert result.units[0].values["ru"] == "Герой"
+    assert "Герой" in result.units[0].context
 
 
 def test_record_map_duplicate_context_is_error(record_map_component, record_map_rows):

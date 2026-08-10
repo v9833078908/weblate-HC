@@ -19,6 +19,7 @@ only when the registry knows the code *and* the column holds non-numeric data.
 from __future__ import annotations
 
 import re
+from statistics import median
 from typing import Any
 
 from translate.lang import data as lang_data
@@ -42,6 +43,14 @@ _KEY_COLUMN = 0
 # Header text that must never be treated as a language column, even if it
 # resolves to a real code (``id`` is also the Indonesian language code).
 _KEY_HEADER_DENYLIST = frozenset({"id"})
+
+# Term/description detection. A glossary term is a name, a description is
+# prose: the gap is an order of magnitude in practice. Both bounds must hold,
+# so a kit of long terms falls back to one term per row instead of guessing.
+_DESCRIPTION_MIN_CHARS = 80
+_DESCRIPTION_RATIO = 4.0
+
+_LAYOUTS = frozenset({"auto", "flat", "pairs"})
 
 # A deterministically mappable glossary is structurally simple: a few blocks of
 # consecutive terms and a caption row or two. Past these bounds the emitted
@@ -387,22 +396,93 @@ def infer_profile(
     return {"schema_version": SCHEMA_VERSION, "components": components}, notes
 
 
+def _classify_block(
+    rows: list[list[str]], block: list[int], source_col: int, layout: str
+) -> tuple[str, int | None, str | None]:
+    """
+    Decide how one contiguous block of term rows is laid out.
+
+    Returns (kind, section row index or None, note). ``kind`` is ``"flat"``
+    for one term per row or ``"pairs"`` for a term followed by its
+    description. A block of odd length can only be paired when its first row
+    is a section caption, which is what makes the count work out.
+
+    This is a proposal, never the parse semantics: the emitted profile still
+    goes through the full parse, render and parse-back gate, and a human sees
+    the terms before anything is created. That is why measuring text length
+    is acceptable here and forbidden in the parser.
+    """
+    size = len(block)
+    if layout == "flat":
+        return "flat", None, None
+
+    section = block[0] if size % 2 else None
+    if layout == "pairs":
+        if size < 2 or (section is not None and size < 3):
+            msg = (
+                f"row {block[0] + 1} stands alone; a term/description block "
+                "needs at least one pair"
+            )
+            raise InferenceError(msg)
+        return "pairs", section, None
+
+    lengths = [len(_cell(rows[index], source_col).strip()) for index in block]
+    long_rows = [
+        block[offset] + 1
+        for offset, length in enumerate(lengths)
+        if length >= _DESCRIPTION_MIN_CHARS
+    ]
+    if not long_rows:
+        return "flat", None, None
+
+    body = lengths[1:] if section is not None else lengths
+    terms, descriptions = body[0::2], body[1::2]
+    floor = max(
+        _DESCRIPTION_MIN_CHARS,
+        _DESCRIPTION_RATIO * median(terms) if terms else _DESCRIPTION_MIN_CHARS,
+    )
+    alternates = (
+        len(body) >= 2
+        and len(terms) == len(descriptions)
+        and all(length < _DESCRIPTION_MIN_CHARS for length in terms)
+        and all(length >= floor for length in descriptions)
+        and (section is None or lengths[0] < _DESCRIPTION_MIN_CHARS)
+    )
+    if alternates:
+        return "pairs", section, None
+
+    shown = ", ".join(str(row) for row in long_rows[:_MISSING_ROWS_SHOWN])
+    note = (
+        f"row(s) {shown} hold long text but do not alternate with terms; "
+        "imported as terms - switch the layout if they are descriptions"
+    )
+    return "flat", None, note
+
+
 def infer_glossary_profile(
     sheet_name: str,
     rows: list[list[str]],
     *,
     component: str,
     min_fill: float = DEFAULT_MIN_FILL,
+    layout: str = "auto",
 ) -> tuple[dict[str, Any], list[str]]:
     """
     Infer a schema v2 record-map TBX profile for one worksheet.
 
-    Deterministic v0: every populated column must be a language column; the
-    leftmost language is the source, targets are languages filled on every
-    record row. The record-map parser treats any unmapped populated cell as
-    an error, so an extra column is a refusal, never a guess.
+    Every populated column must be a language column; the leftmost language
+    is the source, targets are languages filled on every term row. The
+    record-map parser treats any unmapped populated cell as an error, so an
+    extra column is a refusal, never a guess.
+
+    ``layout`` is ``"auto"`` (classify each block), ``"flat"`` (one term per
+    row) or ``"pairs"`` (a term followed by its description). The operator
+    overrides a wrong guess from the preview instead of writing a profile.
     Returns (document, notes).
     """
+    if layout not in _LAYOUTS:
+        msg = f"unknown layout {layout!r}"
+        raise InferenceError(msg)
     if not rows:
         msg = f"sheet {sheet_name!r} is empty"
         raise InferenceError(msg)
@@ -511,37 +591,60 @@ def infer_glossary_profile(
         msg = f"sheet {sheet_name!r} has no rows with a {source_lang} term"
         raise InferenceError(msg)
 
-    regions: list[dict[str, int]] = []
-    start = prev = record_rows[0]
-    for index in record_rows[1:]:
-        if index == prev + 1:
-            prev = index
-            continue
-        regions.append(
-            {
-                "first_record_row": start + 1,
-                "last_record_row": prev + 1,
-                "record_stride": 1,
-            }
-        )
-        start = prev = index
-    regions.append(
-        {
-            "first_record_row": start + 1,
-            "last_record_row": prev + 1,
-            "record_stride": 1,
-        }
-    )
+    blocks: list[list[int]] = []
+    for index in record_rows:
+        if blocks and index == blocks[-1][-1] + 1:
+            blocks[-1].append(index)
+        else:
+            blocks.append([index])
+
     # The profile validator cross-multiplies skip_rows by regions, so an
     # alternating filled/blank source column would otherwise turn a small
     # sheet into a quadratic parse.
-    if len(regions) > _MAX_REGIONS:
+    if len(blocks) > _MAX_REGIONS:
         msg = (
-            f"sheet {sheet_name!r} splits into {len(regions)} blocks of "
+            f"sheet {sheet_name!r} splits into {len(blocks)} blocks of "
             f"consecutive terms (limit {_MAX_REGIONS}); too fragmented to map "
             "deterministically"
         )
         raise InferenceError(msg)
+
+    shapes: list[tuple[list[int], str, int | None]] = []
+    for block in blocks:
+        kind, section, note = _classify_block(rows, block, source_col, layout)
+        shapes.append((block, kind, section))
+        if note is not None:
+            notes.append(note)
+    kinds = {kind for _block, kind, _section in shapes}
+    if len(kinds) > 1:
+        # ``notes`` and ``term_row_offset`` are grammar-wide, so a stride-2
+        # note offset would read the next term of a stride-1 region as its
+        # description. One sheet, one layout.
+        msg = (
+            f"sheet {sheet_name!r} mixes term/description blocks with blocks "
+            "of plain terms; this layout needs an explicit profile"
+        )
+        raise InferenceError(msg)
+    paired = kinds == {"pairs"}
+
+    regions: list[dict[str, int]] = []
+    term_rows: list[int] = []
+    description_rows: list[int] = []
+    for block, kind, section in shapes:
+        first = block[0] if section is None else block[1]
+        region = {
+            "first_record_row": first + 1,
+            "last_record_row": block[-1] + 1,
+            "record_stride": 2 if kind == "pairs" else 1,
+        }
+        if section is not None:
+            region["section_row"] = section + 1
+            region["section_column"] = source_col + 1
+        regions.append(region)
+        step = 2 if kind == "pairs" else 1
+        rows_in_region = range(first, block[-1] + 1)
+        term_rows.extend(rows_in_region[::step])
+        description_rows.extend(rows_in_region[1::step] if step == 2 else [])
 
     target_langs: list[str] = []
     for col in sorted(languages):
@@ -551,7 +654,7 @@ def infer_glossary_profile(
         # Count every gap but keep only the head: the message shows ten.
         missing_head: list[int] = []
         missing_count = 0
-        for index in record_rows:
+        for index in term_rows:
             if _cell(rows[index], col).strip():
                 continue
             missing_count += 1
@@ -570,6 +673,46 @@ def infer_glossary_profile(
     if not target_langs:
         msg = f"sheet {sheet_name!r} has no fully filled target language column"
         raise InferenceError(msg)
+
+    grammar: dict[str, Any] = {
+        "type": "record-map",
+        "skip_rows": sorted(index + 1 for index in skip_rows),
+        "regions": regions,
+        "term_row_offset": 0,
+    }
+    if paired:
+        # A description cell is read by a note field, and a note field may
+        # only name an initial target language. A language that carries
+        # descriptions but misses a term has nowhere to put them, and every
+        # unread populated cell is a parse error - refuse instead of
+        # emitting a profile that cannot survive its own gate.
+        for col in sorted(languages):
+            code = languages[col]
+            if col == source_col or code in target_langs:
+                continue
+            offenders = [
+                index + 1
+                for index in description_rows
+                if _cell(rows[index], col).strip()
+            ][:_MISSING_ROWS_SHOWN]
+            if offenders:
+                shown = ", ".join(str(row) for row in offenders)
+                msg = (
+                    f"language {code} has descriptions on row(s) {shown} but "
+                    "is missing terms; this layout needs an explicit profile"
+                )
+                raise InferenceError(msg)
+        grammar["notes"] = [
+            {
+                "scope": "source" if col == source_col else "target",
+                "column": col + 1,
+                "header": _cell(header_row, col),
+                "row_offset": 1,
+            }
+            | ({} if col == source_col else {"language": languages[col]})
+            for col in sorted(languages)
+            if col == source_col or languages[col] in target_langs
+        ]
 
     document = {
         "schema_version": SCHEMA_VERSION_RECORD_MAP,
@@ -590,12 +733,7 @@ def infer_glossary_profile(
                     for col in sorted(languages)
                 ],
                 "initial_target_languages": target_langs,
-                "grammar": {
-                    "type": "record-map",
-                    "skip_rows": sorted(index + 1 for index in skip_rows),
-                    "regions": regions,
-                    "term_row_offset": 0,
-                },
+                "grammar": grammar,
             }
         ],
     }

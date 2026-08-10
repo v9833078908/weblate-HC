@@ -455,20 +455,23 @@ def _parse_pairs(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
             for code, col in lang_columns.items():
                 term_values[code] = _cell(rows, term_row_idx, col)
 
-            # Check outer whitespace on terms.
+            # TBX drops outer whitespace on write, so keeping it would break
+            # parse-back. Trim and say so, exactly as for an explanation.
             for code, col in lang_columns.items():
                 val = term_values[code]
                 if not _is_blank(val) and _has_outer_whitespace(val):
                     diagnostics.append(
                         Diagnostic(
-                            Severity.ERROR,
-                            "tbx.unsupported_outer_whitespace",
+                            Severity.WARNING,
+                            "tbx.trimmed_outer_whitespace",
                             component.component,
                             component.sheet,
                             term_1based,
-                            f"term in language {code!r} has leading or trailing whitespace",
+                            f"term in language {code!r} had leading or "
+                            "trailing whitespace; it was trimmed",
                         )
                     )
+                    term_values[code] = val.strip()
 
             # Source term must exist.
             source_term = term_values.get(source_lang, "")
@@ -721,14 +724,20 @@ def _parse_record_map(
             term_values: dict[str, str] = {}
             for code, col in lang_columns.items():
                 value = read_field(base_row, grammar.term_row_offset, col)
-                term_values[code] = value
                 consumed.add((term_row_idx, col))
                 if not _is_blank(value) and _has_outer_whitespace(value):
-                    err(
-                        "tbx.unsupported_outer_whitespace",
+                    # TBX drops outer whitespace on write, so keeping it would
+                    # break parse-back. Trim and say so: refusing the sheet
+                    # would mean a stray space makes a kit unimportable, and a
+                    # space around a term name is never meaningful.
+                    warn(
+                        "tbx.trimmed_outer_whitespace",
                         term_1based,
-                        f"term in language {code!r} has leading or trailing whitespace",
+                        f"term in language {code!r} had leading or trailing "
+                        "whitespace; it was trimmed",
                     )
+                    value = value.strip()
+                term_values[code] = value
 
             source_term = term_values.get(source_lang, "")
             if _is_blank(source_term):

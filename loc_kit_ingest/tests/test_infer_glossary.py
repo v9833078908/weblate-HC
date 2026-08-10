@@ -147,3 +147,152 @@ def test_too_many_regions_is_refused() -> None:
 
     with pytest.raises(InferenceError, match="fragmented"):
         infer_glossary_profile("S", rows, component="s")
+
+
+# Term/description kit: every term row is followed by a prose row, exactly
+# like the real Heart Abyss terminology export.
+DESC_RU = "Леон - дзинко, главный герой игры. " * 5
+DESC_EN = "Leon is a jinko, the main character of the game. " * 5
+PAIRS = [
+    ["ru", "en"],
+    ["Russian", "English"],
+    ["Леон", "Leon"],
+    [DESC_RU, DESC_EN],
+    ["Аки", "Aki"],
+    [DESC_RU, DESC_EN],
+]
+
+
+def test_pairs_layout_yields_stride_two() -> None:
+    document, _notes = infer_glossary_profile("Terms", PAIRS, component="terms")
+    grammar = document["components"][0]["grammar"]
+    assert grammar["regions"] == [
+        {"first_record_row": 3, "last_record_row": 6, "record_stride": 2}
+    ]
+    assert grammar["term_row_offset"] == 0
+    assert grammar["notes"] == [
+        {"scope": "source", "column": 1, "header": "ru", "row_offset": 1},
+        {
+            "scope": "target",
+            "column": 2,
+            "header": "en",
+            "row_offset": 1,
+            "language": "en",
+        },
+    ]
+
+
+def test_section_row_above_pairs_is_declared() -> None:
+    rows = [PAIRS[0], PAIRS[1], ["Персонажи", "Characters"], *PAIRS[2:]]
+    document, _notes = infer_glossary_profile("Terms", rows, component="terms")
+    grammar = document["components"][0]["grammar"]
+    assert grammar["regions"] == [
+        {
+            "first_record_row": 4,
+            "last_record_row": 7,
+            "record_stride": 2,
+            "section_row": 3,
+            "section_column": 1,
+        }
+    ]
+
+
+def test_flat_sheet_keeps_stride_one_and_declares_no_notes() -> None:
+    document, _notes = infer_glossary_profile("Terms", STANDARD, component="terms")
+    grammar = document["components"][0]["grammar"]
+    assert all(region["record_stride"] == 1 for region in grammar["regions"])
+    assert "notes" not in grammar
+
+
+def test_long_rows_without_alternation_stay_flat_with_a_note() -> None:
+    rows = [
+        ["ru", "en"],
+        ["Леон", "Leon"],
+        [DESC_RU, DESC_EN],
+        [DESC_RU, DESC_EN],
+        ["Аки", "Aki"],
+    ]
+    document, notes = infer_glossary_profile("Terms", rows, component="terms")
+    grammar = document["components"][0]["grammar"]
+    assert grammar["regions"][0]["record_stride"] == 1
+    assert any("switch the layout" in note for note in notes)
+
+
+def test_mixed_layout_blocks_are_refused() -> None:
+    rows = [
+        ["ru", "en"],
+        ["Леон", "Leon"],
+        [DESC_RU, DESC_EN],
+        [],
+        ["Меч", "Sword"],
+        ["Щит", "Shield"],
+    ]
+    with pytest.raises(InferenceError, match="mixes"):
+        infer_glossary_profile("Terms", rows, component="terms")
+
+
+def test_target_language_without_descriptions_is_still_a_target() -> None:
+    rows = [
+        ["ru", "en", "ja"],
+        ["Леон", "Leon", "レオン"],
+        [DESC_RU, DESC_EN, ""],
+        ["Аки", "Aki", "アキ"],
+        [DESC_RU, DESC_EN, ""],
+    ]
+    document, _notes = infer_glossary_profile("Terms", rows, component="terms")
+    comp = document["components"][0]
+    assert comp["initial_target_languages"] == ["en", "ja"]
+
+
+def test_language_with_descriptions_but_missing_terms_is_refused() -> None:
+    rows = [
+        ["ru", "en", "ja"],
+        ["Леон", "Leon", "レオン"],
+        [DESC_RU, DESC_EN, DESC_EN],
+        ["Аки", "Aki", ""],
+        [DESC_RU, DESC_EN, DESC_EN],
+    ]
+    with pytest.raises(InferenceError, match="descriptions"):
+        infer_glossary_profile("Terms", rows, component="terms")
+
+
+def test_explicit_pairs_layout_overrides_detection() -> None:
+    rows = [
+        ["ru", "en"],
+        ["Леон", "Leon"],
+        ["дзинко, герой", "a jinko, the hero"],
+    ]
+    document, _notes = infer_glossary_profile(
+        "Terms", rows, component="terms", layout="pairs"
+    )
+    grammar = document["components"][0]["grammar"]
+    assert grammar["regions"][0]["record_stride"] == 2
+    assert len(grammar["notes"]) == 2
+
+
+def test_explicit_flat_layout_overrides_detection() -> None:
+    document, _notes = infer_glossary_profile(
+        "Terms", PAIRS, component="terms", layout="flat"
+    )
+    grammar = document["components"][0]["grammar"]
+    assert grammar["regions"][0]["record_stride"] == 1
+    assert "notes" not in grammar
+
+
+def test_explicit_pairs_layout_on_a_lone_row_is_refused() -> None:
+    rows = [["ru", "en"], ["Леон", "Leon"]]
+    with pytest.raises(InferenceError, match="stands alone"):
+        infer_glossary_profile("Terms", rows, component="terms", layout="pairs")
+
+
+def test_unknown_layout_is_refused() -> None:
+    with pytest.raises(InferenceError, match="unknown layout"):
+        infer_glossary_profile("Terms", PAIRS, component="terms", layout="guess")
+
+
+def test_paired_document_survives_parse_profile() -> None:
+    document, _notes = infer_glossary_profile("Terms", PAIRS, component="terms")
+    profile = parse_profile(document)
+    grammar = profile.components[0].grammar
+    assert grammar.regions[0].record_stride == 2
+    assert [note.row_offset for note in grammar.notes] == [1, 1]
