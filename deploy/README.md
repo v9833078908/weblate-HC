@@ -227,12 +227,18 @@ From the repository on the Mac, with the change committed:
 The command pushes `HEAD` to `origin/main`, compares it with the commit the
 server is on, and picks the cheapest action that can carry the diff:
 
-| Changed paths | Action | Typical cost |
+| Changed paths | Action | Measured cost |
 | --- | --- | --- |
-| `weblate/`, `weblate_customization/`, `loc_kit_ingest/`, `client/`, `scripts/`, `pyproject.toml`, `deploy/Dockerfile`, `.dockerignore` | rebuild the image, recreate the container | ~2 min |
+| `weblate/`, `weblate_customization/`, `loc_kit_ingest/`, `client/`, `scripts/`, `pyproject.toml`, `deploy/Dockerfile`, `.dockerignore` | rebuild the image, recreate the container | 2 min 25 s |
 | `deploy/docker-compose.yml` | `docker compose up -d` | ~1 min |
 | `deploy/nginx-l10n.conf` | copy the vhost, `nginx -t`, reload | seconds |
-| anything else (docs, plans, tests) | update the checkout only | seconds |
+| anything else (docs, plans, tests) | update the checkout only | ~20 s |
+
+Inside a rebuild: 46 s of image build (24 s of it building the `hcgameloc`
+wheel, 6 s compiling locales), then ~100 s for the container to become healthy
+because `/app/bin/start` runs migrations and `collectstatic` on every boot.
+The `numpy` pin is installed in its own layer before the source is copied, so
+a code change no longer re-downloads it.
 
 The work runs detached on the VPS and the log is streamed back, so a tunnel
 drop during a build cannot leave the deploy half-finished; re-running the
