@@ -143,8 +143,13 @@ class FullNameField(forms.CharField):
     def __init__(self, *args, **kwargs) -> None:
         kwargs["max_length"] = FULLNAME_LENGTH
         kwargs["label"] = gettext_lazy("Full name")
-        kwargs["help_text"] = gettext_lazy(
-            "Name is also used in version control commits."
+        # With a private commit name as the site default, the name reaches the
+        # repositories only for users who opt out of it further down the
+        # profile, so do not promise otherwise.
+        kwargs["help_text"] = (
+            gettext_lazy("Name is also used in version control commits.")
+            if settings.PRIVATE_COMMIT_NAME_OPT_IN
+            else ""
         )
         kwargs["required"] = True
         super().__init__(*args, **kwargs)
