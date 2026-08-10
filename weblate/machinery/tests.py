@@ -5220,6 +5220,144 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         )
 
     @http_mock.activate
+    def test_translate_accepts_structured_item_with_echoed_key(self) -> None:
+        source = "Synthetic source string for echoed key tolerance."
+        self.mock_response(
+            '[{"parts":[{"type":"text","text":"Synthetic echoed key translation"}],'
+            '"key":"EVENT_100_RESULT_187"}]'
+        )
+
+        translation = self.assert_translate("cs", source, 1)
+
+        self.assertEqual(
+            translation[0][0]["text"],
+            "Synthetic echoed key translation",
+        )
+
+    @http_mock.activate
+    def test_translate_accepts_unwrapped_single_structured_item(self) -> None:
+        source = "Synthetic source string for unwrapped item tolerance."
+        self.mock_response(
+            '{"parts":[{"type":"text","text":"Synthetic unwrapped translation"}]}'
+        )
+
+        translation = self.assert_translate("cs", source, 1)
+
+        self.assertEqual(
+            translation[0][0]["text"],
+            "Synthetic unwrapped translation",
+        )
+
+    @http_mock.activate
+    def test_translate_retries_failed_batch_in_halves(self) -> None:
+        machine = self.get_machine()
+        sources = ["Alpha", "Beta", "Gamma", "Delta"]
+        requested: list[int] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            batch = [item["source"] for item in json.loads(content)["strings"]]
+            requested.append(len(batch))
+            if len(batch) == len(sources):
+                # Truncated reply: fewer items than requested strings.
+                batch = batch[:-1]
+            return json.dumps([f"{text} (fr)" for text in batch])
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in sources]
+            )
+
+        self.assertEqual(requested, [4, 2, 2])
+        for text in sources:
+            self.assertEqual(translations[text][0]["text"], f"{text} (fr)")
+
+    @http_mock.activate
+    def test_async_translate_retries_failed_batch_in_halves(self) -> None:
+        machine = self.get_machine()
+        sources = ["Alpha", "Beta", "Gamma", "Delta"]
+        requested: list[int] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            batch = [item["source"] for item in json.loads(content)["strings"]]
+            requested.append(len(batch))
+            if len(batch) == len(sources):
+                batch = batch[:-1]
+            return json.dumps([f"{text} (fr)" for text in batch])
+
+        with patch.object(
+            machine,
+            "afetch_llm_translations",
+            new=AsyncMock(side_effect=request_callback),
+        ):
+            translations = async_to_sync(machine.adownload_multiple_translations)(
+                "en", "fr", [(text, None) for text in sources]
+            )
+
+        self.assertEqual(requested, [4, 2, 2])
+        for text in sources:
+            self.assertEqual(translations[text][0]["text"], f"{text} (fr)")
+
+    @http_mock.activate
+    def test_translate_keeps_half_when_other_half_keeps_failing(self) -> None:
+        machine = self.get_machine()
+        sources = ["Alpha", "Beta"]
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            batch = [item["source"] for item in json.loads(content)["strings"]]
+            if batch == ["Beta"]:
+                return json.dumps(["Beta (fr)"])
+            return json.dumps([f"{text} (fr)" for text in batch] + ["spurious"])
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in sources]
+            )
+
+        self.assertNotIn("Alpha", translations)
+        self.assertEqual(translations["Beta"][0]["text"], "Beta (fr)")
+
+    @http_mock.activate
+    def test_translate_reports_failure_when_every_half_fails(self) -> None:
+        machine = self.get_machine()
+
+        def request_callback(
+            _prompt: str,
+            _content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            return json.dumps(["one", "two", "three"])
+
+        with (
+            patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ),
+            self.assertRaises(MachineTranslationError),
+        ):
+            machine.download_multiple_translations(
+                "en", "fr", [("Alpha", None), ("Beta", None)]
+            )
+
+    @http_mock.activate
     def test_translate_repairs_truncated_structured_json_container(self) -> None:
         self.mock_response(
             '[{"parts":[{"type":"text","text":"Genel Müdür"}]},'

@@ -1843,6 +1843,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
     def _normalize_translations(
         cls, translations: JSONValue, expected_length: int
     ) -> JSONValue:
+        if expected_length == 1 and isinstance(translations, (str, dict)):
+            # A single string batch often comes back unwrapped.
+            return [translations]
         if isinstance(translations, list) and len(translations) > expected_length:
             expected_items = translations[:expected_length]
             extra_items = translations[expected_length:]
@@ -2127,7 +2130,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
         unit: Unit | None,
         source_occurrence: int,
     ) -> str | None:
-        if not isinstance(translation, dict) or set(translation) != {"parts"}:
+        # Models routinely echo reference fields (notably "key" for monolingual
+        # units) next to "parts"; only "parts" is consumed here.
+        if not isinstance(translation, dict) or "parts" not in translation:
             return None
 
         parts = translation["parts"]
@@ -2385,6 +2390,74 @@ class BaseLLMTranslation(BatchMachineTranslation):
         *,
         source_occurrences: list[int] | None = None,
     ) -> DownloadMultipleTranslations:
+        try:
+            return self._fetch_llm_batch(
+                source_language, target_language, sources, source_occurrences
+            )
+        except MachineTranslationError as error:
+            halves = self._split_sources(sources, source_occurrences)
+            if halves is None:
+                raise
+            # A single malformed, truncated or missing item invalidates the whole
+            # reply, so retry in halves to keep the remaining strings.
+            results: list[DownloadMultipleTranslations | None] = []
+            for half_sources, half_occurrences in halves:
+                try:
+                    results.append(
+                        self._download_multiple_translations_with_context_cache(
+                            source_language,
+                            target_language,
+                            half_sources,
+                            user,
+                            threshold,
+                            source_occurrences=half_occurrences,
+                        )
+                    )
+                except MachineTranslationError:
+                    results.append(None)
+            return self._merge_half_translations(results, error)
+
+    @staticmethod
+    def _split_sources(
+        sources: list[tuple[str, Unit | None]],
+        source_occurrences: list[int] | None,
+    ) -> list[tuple[list[tuple[str, Unit | None]], list[int] | None]] | None:
+        if len(sources) < 2:
+            return None
+        middle = len(sources) // 2
+        return [
+            (
+                sources[:middle],
+                None if source_occurrences is None else source_occurrences[:middle],
+            ),
+            (
+                sources[middle:],
+                None if source_occurrences is None else source_occurrences[middle:],
+            ),
+        ]
+
+    @staticmethod
+    def _merge_half_translations(
+        results: list[DownloadMultipleTranslations | None],
+        error: MachineTranslationError,
+    ) -> DownloadMultipleTranslations:
+        merged: DownloadMultipleTranslations = defaultdict(list)
+        if all(result is None for result in results):
+            raise error
+        for result in results:
+            if result is None:
+                continue
+            for text, items in result.items():
+                merged[text].extend(items)
+        return merged
+
+    def _fetch_llm_batch(
+        self,
+        source_language,
+        target_language,
+        sources: list[tuple[str, Unit | None]],
+        source_occurrences: list[int] | None,
+    ) -> DownloadMultipleTranslations:
         prompt, content, previous_content, previous_response = (
             self._prepare_llm_translation(
                 source_language,
@@ -2412,22 +2485,73 @@ class BaseLLMTranslation(BatchMachineTranslation):
     ) -> DownloadMultipleTranslations:
         started_cache = await sync_to_async(self._ensure_secondary_context_cache)()
         try:
-            prompt, content, previous_content, previous_response = await sync_to_async(
-                self._prepare_llm_translation
-            )(
+            return await self._adownload_multiple_translations_with_context_cache(
                 source_language,
                 target_language,
                 sources,
-                source_occurrences,
-            )
-            translations_string = await self.afetch_llm_translations(
-                prompt, content, previous_content, previous_response
-            )
-            return await sync_to_async(self._parse_llm_translations)(
-                translations_string, sources, source_occurrences
+                user,
+                threshold,
+                source_occurrences=source_occurrences,
             )
         finally:
             await sync_to_async(self._clear_secondary_context_cache)(started_cache)
+
+    async def _adownload_multiple_translations_with_context_cache(
+        self,
+        source_language,
+        target_language,
+        sources: list[tuple[str, Unit | None]],
+        user=None,
+        threshold: int = MACHINERY_DEFAULT_THRESHOLD,
+        *,
+        source_occurrences: list[int] | None = None,
+    ) -> DownloadMultipleTranslations:
+        try:
+            return await self._afetch_llm_batch(
+                source_language, target_language, sources, source_occurrences
+            )
+        except MachineTranslationError as error:
+            halves = self._split_sources(sources, source_occurrences)
+            if halves is None:
+                raise
+            results: list[DownloadMultipleTranslations | None] = []
+            for half_sources, half_occurrences in halves:
+                try:
+                    results.append(
+                        await self._adownload_multiple_translations_with_context_cache(
+                            source_language,
+                            target_language,
+                            half_sources,
+                            user,
+                            threshold,
+                            source_occurrences=half_occurrences,
+                        )
+                    )
+                except MachineTranslationError:
+                    results.append(None)
+            return self._merge_half_translations(results, error)
+
+    async def _afetch_llm_batch(
+        self,
+        source_language,
+        target_language,
+        sources: list[tuple[str, Unit | None]],
+        source_occurrences: list[int] | None,
+    ) -> DownloadMultipleTranslations:
+        prompt, content, previous_content, previous_response = await sync_to_async(
+            self._prepare_llm_translation
+        )(
+            source_language,
+            target_language,
+            sources,
+            source_occurrences,
+        )
+        translations_string = await self.afetch_llm_translations(
+            prompt, content, previous_content, previous_response
+        )
+        return await sync_to_async(self._parse_llm_translations)(
+            translations_string, sources, source_occurrences
+        )
 
     def _prepare_llm_translation(
         self,
