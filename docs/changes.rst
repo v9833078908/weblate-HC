@@ -18,6 +18,7 @@ Weblate 2026.8.1
 * Large language model machine translation services no longer fail when the optional persona and style settings are absent from the stored configuration, as happens when the service is installed through the REST API.
 * Repository actions now require permission on every component sharing the affected repository, including linked components in other projects.
 * Large language model machine translation services now tolerate replies that echo reference fields such as the string key, accept an unwrapped single result, and retry a rejected batch in halves instead of discarding all its strings.
+* Loc-kit table import no longer scales superlinearly with the uploaded sheet, and refuses a sheet whose structure would otherwise be mapped into hundreds of regions; the stored import preview now bounds the number of warnings it keeps.
 
 .. rubric:: Compatibility
 
