@@ -1,34 +1,65 @@
-# Glossary note column in profile inference — implementation plan
+# Glossary note column in profile inference - implementation plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Плоская глоссарная таблица с колонкой прозы о термине (`ru,en,tr,fr,note`) импортируется галкой «Use as glossary» без рукописного профиля, и текст колонки доезжает до модели как `source_explanation`.
+**Goal:** A flat glossary table with `ru,en,tr,fr,note` imports through Weblate's **Use as glossary** flow without a handwritten profile; its note becomes the source term Explanation and reaches OpenRouter as `source_explanation`.
 
-**Architecture:** Правка живёт в одной функции — `loc_kit_ingest.infer.infer_glossary_profile`. Колонка с заголовком из закрытого списка объявляется полем `grammar.notes[scope=source, row_offset=0]`. Схема профиля v2, парсер, writer, гейт публикации и шаблон превью уже это принимают и отображают — проверено прогоном рукописного профиля, менять их не нужно.
+**Architecture:** Extend only `loc_kit_ingest.infer.infer_glossary_profile`. An exactly named, populated source-note column is emitted as `grammar.notes` with `scope: source` and `row_offset: 0`. Existing profile validation, TBX rendering, component creation, glossary storage, preview, and LLM payload construction remain the only downstream path.
 
-**Tech Stack:** Python, `loc_kit_ingest` (standalone, без Django), Django-контракт в `weblate/trans/tests/`.
+**Tech Stack:** Python, standalone `loc_kit_ingest`, Django `ViewTestCase`, TBX, pytest.
 
-**Дизайн:** `docs/plans/2026-08-10-loc-kit-glossary-note-column-design.md` (утверждён).
+**Design:** `docs/plans/2026-08-10-loc-kit-glossary-note-column-design.md`.
 
-**Ключевые решения (не пересматривать по ходу):**
+## Scope locked by review
 
-- **Опознание только по тексту заголовка.** Правило по форме данных (пороги `_DESCRIPTION_MIN_CHARS = 80` / `_DESCRIPTION_RATIO = 4.0`, `infer.py:50-51`) отвергнуто: колонка «Character limit» прошла бы порог и молча уехала бы в каждый промпт к модели. Отказ дешевле ложного срабатывания.
-- **Точное совпадение, не префиксное.** Префикс принял бы `Context ID` и `Note count`. `Комментарий переводчику` остаётся случаем отказа.
-- **Одна колонка на лист, только `scope: source`.** Заметки к целевому языку (`fr note` → `<note from="translator">`) схема поддерживает, но не выводятся.
-- **Порядок в `grammar.notes`.** Для pairs: сначала запись строки-описания (`row_offset: 1`), затем колонка (`row_offset: 0`). `_join_notes` (`parser.py:368`) склеивает в порядке объявления, основное описание идёт первым.
-- **Никаких правок схемы, парсера, writer'а и UI.** Если по ходу кажется, что нужна — остановиться, это признак ошибки в реализации.
+- **UI only.** This changes the existing Weblate `Use as glossary` workflow. Do not add a CLI `--glossary` mode or change generic PO inference.
+- **Exact header matching only.** Use `header.strip().casefold()` against the closed `_NOTE_HEADERS` set. Do not infer a note column from prose length.
+- **One populated source-note column.** Warn for every recognized empty column; refuse only when two or more recognized columns contain data. Do not merge populated note columns.
+- **`context` and `usage` remain accepted.** The operator explicitly requested them. Preview exposes the imported text before component creation; do not silently remove them from the approved set.
+- **No schema, parser, writer, UI, migration, API, or outbound-provider changes.** A need for any of these is a design regression.
+- **No live OpenRouter assertion.** Verify the deterministic `BaseLLMTranslation._get_glossary_entry` contract instead.
 
-**Общие правила исполнения:** после правок `loc_kit_ingest/*.py` — `cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/`; контейнерные тесты `./rundev.sh test <path> -n0`; линтеры и полный сьют — один раз в конце (Task 6).
+## What already exists
+
+| Existing layer | Reuse |
+|---|---|
+| `infer_glossary_profile` | Detects language columns, flat/pairs layout, regions, and unmapped data. Add the note-column rule here. |
+| Profile v2 record-map | Already accepts `notes[]` with `scope`, `column`, `header`, and `row_offset`. |
+| `parse_component` | Reads source notes, joins them in declaration order, validates unclaimed cells, and produces `GlossaryTerm.source_explanation`. |
+| `writer._render_tbx` | Writes source explanations to TBX `<descrip>`. |
+| `validate_glossary_profile` | Executes closed-schema validation, full parse, render, and parse-back before a preview or component exists. |
+| Glossary preview | Already renders `Source note` and `note_count`. |
+| `BaseLLMTranslation._get_glossary_entry` | Already maps source-unit Explanation to the `source_explanation` payload field. |
+
+## Failure modes and guards
+
+| Failure | Guard | Evidence |
+|---|---|---|
+| Extra metadata is mistaken for a note | Closed exact header set; preview shows resulting text | Unit test for unknown column and wizard preview |
+| Old empty `note` column blocks a real `comment` column | Empty recognized columns warn and do not compete | Unit test with empty + populated columns |
+| Two populated note columns are ambiguous | Deterministic refusal and existing manual-profile recovery | Unit test |
+| Pairs caption/description note cell is unclaimable | Reject it before profile publication | Explicit-pairs tests |
+| Explanation does not reach LLM context | Inspect actual created French unit via `_get_glossary_entry` | Wizard contract test |
+| Wide sheet amplifies work | Reuse existing one-pass `populated` column set | Code review and inference tests |
+
+## NOT in scope
+
+- Target-language note columns such as `fr note` to `<note from="translator">`: the schema supports them, but this request is a single source explanation column.
+- Prefix/fuzzy headers such as `Комментарий переводчику`: they can collide with metadata and stay a manual-profile case.
+- Header-shape/prose-length detection: it risks routing `Character limit` into every LLM request.
+- Glossary flags (`terminology`, `read-only`, `forbidden`) from a table: the writer does not emit them.
+- Updating an existing glossary: tracked separately in `docs/plans/2026-08-10-loc-kit-glossary-update-existing.md`.
+- Automatic glossary inference in the standalone CLI: the accepted scope is the Weblate wizard only.
 
 ---
 
-### Task 1: список заголовков и поиск колонки
+### Task 1: emit a flat source-note column with linear detection
 
 **Files:**
-- Modify: `loc_kit_ingest/infer.py:41-53` (константы), новая функция перед `infer_glossary_profile:462`
+- Modify: `loc_kit_ingest/infer.py:41-53, 462-570, 677-715`
 - Test: `loc_kit_ingest/tests/test_infer_glossary.py`
 
-**Step 1: падающие тесты** — в конец файла:
+**Step 1: write failing public-inference tests** - append these fixtures and tests:
 
 ```python
 FLAT_WITH_NOTE = [
@@ -47,7 +78,7 @@ def test_note_column_becomes_a_source_note_field() -> None:
         {"scope": "source", "column": 5, "header": "note", "row_offset": 0}
     ]
     assert any("explanation of the source term" in note for note in notes)
-    parse_profile(document)  # closed schema accepts it
+    parse_profile(document)
 
 
 @pytest.mark.parametrize("header", ["Notes", "ОПИСАНИЕ", "Comment", " context "])
@@ -59,7 +90,19 @@ def test_note_header_matching_ignores_case_and_padding(header: str) -> None:
     assert comp["grammar"]["notes"][0]["column"] == 5
 
 
-def test_two_note_columns_are_refused() -> None:
+def test_empty_recognised_note_column_does_not_compete() -> None:
+    rows = [
+        ["ru", "en", "note", "comment"],
+        ["Партия", "Party", "", "Правящая политическая партия."],
+        ["Самосбор", "Samosbor", "", "Термин вселенной."],
+    ]
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert comp["grammar"]["notes"][0]["column"] == 4
+    assert any("column 3" in note and "empty" in note for note in notes)
+
+
+def test_two_populated_note_columns_are_refused() -> None:
     rows = [
         ["ru", "en", "note", "comment"],
         ["Партия", "Party", "Проза", "Ещё проза"],
@@ -68,33 +111,27 @@ def test_two_note_columns_are_refused() -> None:
         infer_glossary_profile("S", rows, component="s")
 
 
-def test_empty_note_column_is_excluded_with_a_note() -> None:
-    rows = [
-        ["ru", "en", "note"],
-        ["Партия", "Party", ""],
-        ["Самосбор", "Samosbor", ""],
-    ]
+def test_empty_note_column_is_excluded_with_a_warning() -> None:
+    rows = [["ru", "en", "note"], ["Партия", "Party", ""]]
     document, notes = infer_glossary_profile("S", rows, component="s")
     (comp,) = document["components"]
     assert "notes" not in comp["grammar"]
     assert any("column 3" in note and "empty" in note for note in notes)
 
 
-def test_unrecognised_extra_column_names_the_accepted_headers() -> None:
-    rows = [
-        ["ru", "en", "Character limit"],
-        ["Партия", "Party", "40"],
-    ]
-    with pytest.raises(InferenceError, match="rename the header to one of"):
+def test_unrecognised_extra_column_has_actionable_error() -> None:
+    rows = [["ru", "en", "Character limit"], ["Партия", "Party", "40"]]
+    with pytest.raises(InferenceError, match="recognised term-note header, for example"):
         infer_glossary_profile("S", rows, component="s")
 ```
 
-**Step 2: убедиться, что падают**
+**Step 2: verify red**
 
-Run: `cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py -k note -q`
-Expected: FAIL — первые тесты падают на `InferenceError: column 5 ('note') holds data but is not a recognised language column`.
+Run: `cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py -k 'note_column or note_header or recognised_note or populated_note or unrecognised_extra' -q`
 
-**Step 3: константа** — после `_KEY_HEADER_DENYLIST` (`infer.py:45`):
+Expected: FAIL because a populated `note` column is currently rejected as a non-language column.
+
+**Step 3: add the approved header set** - after `_KEY_HEADER_DENYLIST`:
 
 ```python
 # A column of prose about the term, not a translation of it. Recognised by
@@ -102,220 +139,189 @@ Expected: FAIL — первые тесты падают на `InferenceError: co
 # into every LLM prompt, where a wrong guess is invisible.
 _NOTE_HEADERS = frozenset(
     {
-        "note",
-        "notes",
-        "comment",
-        "comments",
-        "description",
-        "descriptions",
-        "explanation",
-        "explanations",
-        "context",
-        "usage",
-        "definition",
-        "meaning",
-        "примечание",
-        "примечания",
-        "комментарий",
-        "комментарии",
-        "описание",
-        "описания",
-        "пояснение",
-        "пояснения",
-        "контекст",
-        "определение",
-        "значение",
+        "note", "notes", "comment", "comments", "description", "descriptions",
+        "explanation", "explanations", "context", "usage", "definition", "meaning",
+        "примечание", "примечания", "комментарий", "комментарии",
+        "описание", "описания", "пояснение", "пояснения", "контекст",
+        "определение", "значение",
     }
 )
 ```
 
-**Step 4: функция поиска** — перед `infer_glossary_profile` (`infer.py:462`):
+**Step 4: add the classifier** - before `infer_glossary_profile`:
 
 ```python
 def _find_note_column(
-    rows: list[list[str]],
     header_row: list[str],
-    content_indexes: list[int],
+    populated: set[int],
     languages: dict[int, str],
     notes: list[str],
 ) -> int | None:
-    """
-    Return the column holding prose about the term, or None.
-
-    Appends the decision to ``notes`` so it reaches the import preview: the
-    text of this column ends up in every LLM prompt for a matching string,
-    and the operator has to see that before creating the component.
-    """
-    candidates = [
+    """Return the sole populated source-note column, if one exists."""
+    recognised = [
         col
         for col in range(len(header_row))
         if col not in languages
         and _cell(header_row, col).strip().casefold() in _NOTE_HEADERS
     ]
-    if not candidates:
-        return None
-    if len(candidates) > 1:
-        shown = ", ".join(str(col + 1) for col in candidates)
+    populated_notes = [col for col in recognised if col in populated]
+    for col in recognised:
+        if col not in populated:
+            notes.append(
+                f"column {col + 1} ({_cell(header_row, col)!r}) is empty; excluded"
+            )
+    if len(populated_notes) > 1:
+        shown = ", ".join(str(col + 1) for col in populated_notes)
         msg = (
             f"columns {shown} all look like term notes; this layout needs an "
             "explicit profile"
         )
         raise InferenceError(msg)
-
-    col = candidates[0]
-    header_text = _cell(header_row, col)
-    if not any(_cell(rows[index], col).strip() for index in content_indexes):
-        notes.append(f"column {col + 1} ({header_text!r}) is empty; excluded")
+    if not populated_notes:
         return None
+    col = populated_notes[0]
     notes.append(
-        f"column {col + 1} ({header_text!r}) -> explanation of the source term"
+        f"column {col + 1} ({_cell(header_row, col)!r}) -> explanation of the source term"
     )
     return col
 ```
 
-**Step 5: вызов и вычитание из проверки** — в `infer_glossary_profile`, после блока «no populated language column» (`infer.py:545-547`) вставить:
+**Step 5: call it without a rescan.** Preserve the existing one-pass `populated` loop at `infer.py:555-559`. Immediately after it, add:
 
 ```python
-    note_col = _find_note_column(rows, header_row, content_indexes, languages, notes)
-```
-
-и заменить строку `unmapped = sorted(populated - languages.keys())` (`infer.py:560`) на:
-
-```python
-    mapped = languages.keys() | ({note_col} if note_col is not None else set())
+    note_col = _find_note_column(header_row, populated, languages, notes)
+    mapped = set(languages)
+    if note_col is not None:
+        mapped.add(note_col)
     unmapped = sorted(populated - mapped)
 ```
 
-**Step 6: новый текст отказа** — заменить тело `msg` (`infer.py:564-568`):
+Replace the old `unmapped = sorted(populated - languages.keys())` line. The error should say:
 
 ```python
         msg = (
             f"column {col + 1} ({header_text!r}) holds data but is not a "
-            "recognised language column; rename the header to one of "
-            "note, description, comment, explanation, примечание, описание, "
-            "комментарий, пояснение to import it as a term explanation, or "
-            "supply an explicit profile"
+            "recognised language column; rename the header to a recognised "
+            "term-note header, for example note, description, comment, or "
+            "explanation, or supply an explicit profile"
         )
 ```
 
-**Step 7: прогон**
+**Step 6: emit flat grammar.** Keep current pairs behavior untouched in this task. After its existing `if paired: grammar["notes"] = ...` block, add:
+
+```python
+    elif note_col is not None:
+        grammar["notes"] = [
+            {
+                "scope": "source",
+                "column": note_col + 1,
+                "header": _cell(header_row, note_col),
+                "row_offset": 0,
+            }
+        ]
+```
+
+**Step 7: verify green**
 
 Run: `cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py -q`
-Expected: PASS — четыре теста про `note` зелёные; `test_note_column_becomes_a_source_note_field` пока падает на `assert comp["grammar"]["notes"] == [...]`, потому что грамматика ещё не собирает поле. Это ожидаемо, чинится в Task 2.
 
-Если падают старые тесты — остановиться: значит вычитание `note_col` задело язык.
+Expected: PASS. Every Task 1 test is green; do not leave an expected red assertion for a later task.
 
-**Step 8: коммит**
+**Step 8: commit**
 
 ```bash
 git add loc_kit_ingest/infer.py loc_kit_ingest/tests/test_infer_glossary.py
-git commit -m "feat(loc-kit): recognise a glossary note column by its header"
+git commit -m "feat(loc-kit): infer a flat glossary note column"
 ```
 
 ---
 
-### Task 2: поле в грамматике
+### Task 2: support the note column in explicit pairs layout
 
 **Files:**
-- Modify: `loc_kit_ingest/infer.py:677-715`
+- Modify: `loc_kit_ingest/infer.py:630-715`
 - Test: `loc_kit_ingest/tests/test_infer_glossary.py`
 
-**Step 1: тест на порядок для pairs** — в конец файла:
+**Step 1: write failing pairs tests.** Use the existing explicit layout override, not auto-detection heuristics:
 
 ```python
 PAIRS_WITH_NOTE = [
     ["ru", "en", "note"],
+    ["Персонажи", "Characters", ""],
     ["Партия", "Party", "Мужской род во французском."],
-    ["Правящая политическая партия страны, а не партия товара.", "The ruling party of the country, not a batch of goods.", ""],
+    [
+        "Правящая политическая партия страны, а не партия товара; "
+        "не обозначает набор одинаковых предметов.",
+        "The ruling party of the country, not a batch of goods.",
+        "",
+    ],
     ["Самосбор", "Samosbor", "Транслитерируется."],
-    ["Аномальное явление, разрушающее материю вокруг себя.", "An anomaly that dissolves the matter around it.", ""],
+    [
+        "Аномальное явление, разрушающее материю вокруг себя и меняющее "
+        "поведение персонажей поблизости.",
+        "An anomaly that dissolves the matter around it.",
+        "",
+    ],
 ]
 
 
-def test_pairs_layout_declares_the_description_before_the_column() -> None:
-    document, _notes = infer_glossary_profile("S", PAIRS_WITH_NOTE, component="s")
+def test_explicit_pairs_layout_orders_description_before_note_column() -> None:
+    document, _notes = infer_glossary_profile(
+        "S", PAIRS_WITH_NOTE, component="s", layout="pairs"
+    )
     (comp,) = document["components"]
     assert comp["grammar"]["regions"][0]["record_stride"] == 2
     scopes = [(n["scope"], n["column"], n["row_offset"]) for n in comp["grammar"]["notes"]]
-    # The description row first: _join_notes concatenates in declaration order.
     assert scopes[0] == ("source", 1, 1)
     assert scopes[-1] == ("source", 3, 0)
     parse_profile(document)
 
 
-def test_note_column_on_a_description_row_is_refused() -> None:
-    rows = [row[:] for row in PAIRS_WITH_NOTE]
-    rows[2][2] = "проза на строке описания"
-    with pytest.raises(InferenceError, match="row\\(s\\) 3"):
-        infer_glossary_profile("S", rows, component="s")
+@pytest.mark.parametrize("row", [1, 3])
+def test_explicit_pairs_rejects_note_outside_term_rows(row: int) -> None:
+    rows = [item[:] for item in PAIRS_WITH_NOTE]
+    rows[row][2] = "необъявленная заметка"
+    with pytest.raises(InferenceError, match="non-term row"):
+        infer_glossary_profile("S", rows, component="s", layout="pairs")
 ```
 
-**Step 2: убедиться, что падают**
+Row 1 is the section caption; row 3 is the first description. Both would otherwise survive profile generation and then fail the parser as an unmapped cell.
 
-Run: `cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py -k pairs_layout_declares -q`
-Expected: FAIL — `KeyError`/несовпадение, поля колонки в `notes` нет.
+**Step 2: verify red**
 
-**Step 3: сборка списка** — заменить блок `infer.py:677-715` на:
+Run: `cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py -k 'explicit_pairs' -q`
+
+Expected: FAIL because Task 1 emits a note column only for flat grammar.
+
+**Step 3: replace the flat-only tail with one ordered list.** Keep the existing pairs term-description validation and collect its fields into `note_fields`. After regions are constructed, retain the `section_rows` alongside `description_rows`:
 
 ```python
-    grammar: dict[str, Any] = {
-        "type": "record-map",
-        "skip_rows": sorted(index + 1 for index in skip_rows),
-        "regions": regions,
-        "term_row_offset": 0,
-    }
-    note_fields: list[dict[str, Any]] = []
-    if paired:
-        # A description cell is read by a note field, and a note field may
-        # only name an initial target language. A language that carries
-        # descriptions but misses a term has nowhere to put them, and every
-        # unread populated cell is a parse error - refuse instead of
-        # emitting a profile that cannot survive its own gate.
-        for col in sorted(languages):
-            code = languages[col]
-            if col == source_col or code in target_langs:
-                continue
-            offenders = [
-                index + 1
-                for index in description_rows
-                if _cell(rows[index], col).strip()
-            ][:_MISSING_ROWS_SHOWN]
-            if offenders:
-                shown = ", ".join(str(row) for row in offenders)
-                msg = (
-                    f"language {code} has descriptions on row(s) {shown} but "
-                    "is missing terms; this layout needs an explicit profile"
-                )
-                raise InferenceError(msg)
-        note_fields.extend(
-            {
-                "scope": "source" if col == source_col else "target",
-                "column": col + 1,
-                "header": _cell(header_row, col),
-                "row_offset": 1,
-            }
-            | ({} if col == source_col else {"language": languages[col]})
-            for col in sorted(languages)
-            if col == source_col or languages[col] in target_langs
-        )
+    section_rows: list[int] = []
+    for block, kind, section in shapes:
+        ...
+        if section is not None:
+            section_rows.append(section)
+            region["section_row"] = section + 1
+            region["section_column"] = source_col + 1
+```
+
+Build `note_fields` from the existing pairs fields first. Then append the source note column only after rejecting every populated non-term row:
+
+```python
     if note_col is not None:
         if paired:
-            # The note field reads offset 0 only. A populated cell on the
-            # description row would be claimed by nothing and fail the parse
-            # as tbx.unmapped_cell, after the profile passed the schema.
             offenders = [
                 index + 1
-                for index in description_rows
+                for index in [*section_rows, *description_rows]
                 if _cell(rows[index], note_col).strip()
             ][:_MISSING_ROWS_SHOWN]
             if offenders:
                 shown = ", ".join(str(row) for row in offenders)
                 msg = (
-                    f"column {note_col + 1} holds text on description row(s) "
-                    f"{shown}; this layout needs an explicit profile"
+                    f"column {note_col + 1} holds text on non-term row(s) {shown}; "
+                    "this layout needs an explicit profile"
                 )
                 raise InferenceError(msg)
-        # Declared last: the description row carries the primary text.
         note_fields.append(
             {
                 "scope": "source",
@@ -328,78 +334,29 @@ Expected: FAIL — `KeyError`/несовпадение, поля колонки 
         grammar["notes"] = note_fields
 ```
 
-**Step 4: прогон**
+Delete Task 1's flat-only `elif` while making this replacement. The current pairs fields must precede this append: `_join_notes` preserves declaration order.
+
+**Step 4: verify green**
 
 Run: `cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py -q`
-Expected: PASS, все тесты файла, включая `test_note_column_becomes_a_source_note_field` из Task 1.
 
-**Step 5: коммит**
+Expected: PASS.
+
+**Step 5: commit**
 
 ```bash
 git add loc_kit_ingest/infer.py loc_kit_ingest/tests/test_infer_glossary.py
-git commit -m "feat(loc-kit): emit the glossary note column as a source note field"
+git commit -m "feat(loc-kit): support note columns in pairs glossaries"
 ```
 
 ---
 
-### Task 3: сквозной прогон CLI
+### Task 3: pin the complete Weblate wizard and LLM-context contract
 
 **Files:**
-- Test: `loc_kit_ingest/tests/test_pipeline.py`
+- Modify: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
 
-**Step 1: тест** — в конец файла (стиль существующих тестов файла: временный каталог, запуск пайплайна, проверка артефактов):
-
-```python
-def test_flat_glossary_with_a_note_column_needs_no_profile(tmp_path) -> None:
-    kit = tmp_path / "Glossary.csv"
-    kit.write_text(
-        "ru,en,fr,note\n"
-        "Russian,English,French,Note\n"
-        "Партия,Party,Parti,"
-        '"Правящая политическая партия. Во французском le Parti, мужской род."\n'
-        "Самосбор,Samosbor,Samosbor,Термин вселенной.\n",
-        encoding="utf-8",
-    )
-    out = tmp_path / "out"
-
-    report = run_pipeline(kit, profile_path=None, out_dir=out, glossary=True)
-
-    assert report.exit_code == 0
-    rendered = (out / "Glossary" / "tbx" / "fr.tbx").read_text(encoding="utf-8")
-    assert "<descrip>Правящая политическая партия." in rendered
-    assert "le Parti, мужской род.</descrip>" in rendered
-```
-
-Точную сигнатуру запуска взять из соседних тестов файла: если там вызывается CLI через `subprocess`, а не `run_pipeline`, повторить их способ, не изобретая свой.
-
-**Step 2: прогон**
-
-Run: `cd loc_kit_ingest && uv run pytest tests/test_pipeline.py -k note_column -q`
-Expected: PASS.
-
-**Step 3: коммит**
-
-```bash
-git add loc_kit_ingest/tests/test_pipeline.py
-git commit -m "test(loc-kit): cover the note column end to end in the CLI"
-```
-
----
-
-### Task 4: контракт визарда Weblate
-
-**Files:**
-- Modify: `weblate/trans/tests/test_loc_kit_ingest_contract.py` (фикстуры рядом с `GLOSSARY_PAIRS_CSV:545`)
-
-**Step 1: синхронизировать пакет в контейнер**
-
-```bash
-cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/
-```
-
-Без этого тест увидит старую версию `infer.py` и упадёт по причине, не связанной с кодом.
-
-**Step 2: фикстура и тест** — фикстура рядом с существующими:
+**Step 1: add the CSV fixture** near `GLOSSARY_LANG_ONLY_CSV`:
 
 ```python
 GLOSSARY_NOTE_CSV = (
@@ -411,12 +368,11 @@ GLOSSARY_NOTE_CSV = (
 )
 ```
 
-Тест — в тот же класс, где лежит `test_term_description_sheet_maps_descriptions_as_explanations:729`:
+**Step 2: add the contract test** to `LocKitGlossaryUploadUITest`, beside `test_term_description_sheet_maps_descriptions_as_explanations`:
 
 ```python
     @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
-    def test_note_column_reaches_the_live_term_explanation(self) -> None:
-        """Колонка note доезжает до Explanation, откуда её берёт промпт."""
+    def test_note_column_reaches_the_created_glossary_llm_entry(self) -> None:
         self._start(upload=self._csv("Terms.csv", GLOSSARY_NOTE_CSV), slug=self.slug)
         draft = self._draft()
         draft.refresh_from_db()
@@ -425,9 +381,7 @@ GLOSSARY_NOTE_CSV = (
         preview = json.loads(draft.preview_json)
         self.assertEqual(preview["term_count"], 2)
         self.assertEqual(preview["note_count"], 2)
-        self.assertIn(
-            "мужской род", preview["terms"][0]["source_explanation"]
-        )
+        self.assertIn("мужской род", preview["terms"][0]["source_explanation"])
 
         page = self.client.get(
             reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
@@ -436,107 +390,155 @@ GLOSSARY_NOTE_CSV = (
 
         self._confirm()
         component = Component.objects.get(slug=self.slug)
-        unit = component.source_translation.unit_set.get(source="Партия")
-        self.assertIn("мужской род", unit.explanation)
+        translation = component.translation_set.get(language__code="fr")
+        unit = translation.unit_set.get(source="Партия")
+        # ruff: ignore[private-member-access]
+        entry = BaseLLMTranslation._get_glossary_entry(unit)
+        self.assertIsNotNone(entry)
+        self.assertEqual(
+            entry["source_explanation"],
+            "Правящая политическая партия. Во французском le Parti, мужской род.",
+        )
 ```
 
-**Step 3: прогон**
+This intentionally verifies the deterministic contract. Do not call OpenRouter, assert a model output, or attempt to observe a server-to-provider request from the browser.
 
-Run: `./rundev.sh test weblate/trans/tests/test_loc_kit_ingest_contract.py::LocKitGlossaryWizardTest::test_note_column_reaches_the_live_term_explanation -n0`
-
-Имя класса взять фактическое — из строки 729 файла.
-
-Expected: PASS. Если падает `note_count` — проверить, что `cp` из шага 1 выполнен.
-
-**Step 4: весь файл**
-
-Run: `./rundev.sh test weblate/trans/tests/test_loc_kit_ingest_contract.py -n0`
-Expected: PASS целиком. Особое внимание — тест на строке ~690: `GLOSSARY_CSV` (`domain,ru,en,note_ru,note_en`) обязан по-прежнему оставаться на `SHEET_SELECTED`, потому что `domain` и `note_ru`/`note_en` не входят в список. Если он позеленел — список заголовков стал шире задуманного.
-
-**Step 5: коммит**
+**Step 3: copy the standalone package for the container test only**
 
 ```bash
-git add weblate/trans/tests/test_loc_kit_ingest_contract.py dev-docker/data/python/loc_kit_ingest/
-git commit -m "test(loc-kit): pin the note column through the glossary wizard"
+cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/
+```
+
+The destination is ignored and must never appear in `git add`.
+
+**Step 4: verify the focused test**
+
+Run:
+
+```bash
+./rundev.sh test weblate/trans/tests/test_loc_kit_ingest_contract.py::LocKitGlossaryUploadUITest::test_note_column_reaches_the_created_glossary_llm_entry -n0
+```
+
+Expected: PASS.
+
+**Step 5: verify the contract file**
+
+Run: `./rundev.sh test weblate/trans/tests/test_loc_kit_ingest_contract.py -n0`
+
+Expected: PASS. `GLOSSARY_CSV` (`domain,ru,en,note_ru,note_en`) must still remain at `SHEET_SELECTED`: `domain` and `note_ru`/`note_en` are not accepted source-note headers.
+
+**Step 6: commit**
+
+```bash
+git add weblate/trans/tests/test_loc_kit_ingest_contract.py
+git commit -m "test(loc-kit): cover note columns through the glossary wizard"
 ```
 
 ---
 
-### Task 5: документация
+### Task 4: document the supported table shape
 
 **Files:**
-- Modify: `docs/specs/loc-kit-ingest.md:106-108`
-- Modify: `docs/changes.rst` (секция `Weblate 2026.8.1`, rubric `Improvements`)
+- Modify: `docs/admin/projects.rst:117-140`
+- Modify: `docs/specs/loc-kit-ingest.md:100-125`
+- Modify: `docs/changes.rst` under Weblate 2026.8.1 / Improvements
 
-**Step 1: спека.** Заменить предложение «Любая заполненная не-языковая колонка отклоняется (`InferenceError`) - парсер не угадывает назначение колонки.» на:
+**Step 1: public documentation.** Add one bullet after the layout bullet in `docs/admin/projects.rst`:
 
 ```rst
-Колонка, чей заголовок точно совпадает с одним из закрытого списка
-(`note`, `notes`, `comment`, `comments`, `description`, `descriptions`,
-`explanation`, `explanations`, `context`, `usage`, `definition`, `meaning`,
-`примечание`, `примечания`, `комментарий`, `комментарии`, `описание`,
-`описания`, `пояснение`, `пояснения`, `контекст`, `определение`,
-`значение`), объявляется полем `grammar.notes` со `scope: source` и
-`row_offset: 0` - её текст становится пояснением к исходному термину.
-Таких колонок допускается не больше одной на лист. Опознание идёт только по
-заголовку: правило по длине текста приняло бы колонку вроде «Лимит символов»
-и молча отправило бы её в каждый промпт. Любая другая заполненная
-не-языковая колонка отклоняется (`InferenceError`) - парсер не угадывает
-назначение колонки.
+* A single column of source-term notes can be named ``note``. Exact aliases
+  such as ``description``, ``comment``, ``explanation``, and ``context`` are
+  also recognised. Its text becomes the glossary term explanation; preview it
+  before confirming because automatic suggestion services receive it as term
+  context.
 ```
 
-**Step 2: changelog.** Одна запись в конец rubric `Improvements`:
+**Step 2: specification.** Replace the claim that every non-language column is refused. Document the complete closed `_NOTE_HEADERS` list, exact casefolded matching, one populated column, warning-and-ignore behavior for empty recognized columns, `scope: source`, `row_offset: 0`, and deterministic refusal for any other populated metadata column.
+
+**Step 3: changelog.** Add:
 
 ```rst
 * Glossary table import now recognises a column of term notes by its header and imports it as the source term explanation, which automatic suggestion services receive as context, see :ref:`uploading-glossary-tables`.
 ```
 
-**Step 3: коммит**
+**Step 4: commit**
 
 ```bash
-git add docs/specs/loc-kit-ingest.md docs/changes.rst
-git commit -m "docs(loc-kit): document the glossary note column"
+git add docs/admin/projects.rst docs/specs/loc-kit-ingest.md docs/changes.rst
+git commit -m "docs(loc-kit): document glossary note columns"
 ```
 
 ---
 
-### Task 6: полный прогон и живой smoke
+### Task 5: full verification and browser smoke
 
-**Step 1: сьюты**
+**Step 1: standalone and Weblate contract suites**
+
+Run from the repository root:
 
 ```bash
-cd loc_kit_ingest && uv run pytest
-cd .. && cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/
+(cd loc_kit_ingest && uv run pytest) && \
+cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/ && \
 ./rundev.sh test weblate/trans/tests/test_loc_kit_ingest_contract.py -n0
 ```
 
-Expected: оба зелёные.
-
-**Step 2: линтеры**
+**Step 2: lint changed paths**
 
 ```bash
-uv run prek run --files loc_kit_ingest/infer.py loc_kit_ingest/tests/test_infer_glossary.py loc_kit_ingest/tests/test_pipeline.py weblate/trans/tests/test_loc_kit_ingest_contract.py docs/specs/loc-kit-ingest.md docs/changes.rst
+uv run prek run --files \
+  loc_kit_ingest/infer.py \
+  loc_kit_ingest/tests/test_infer_glossary.py \
+  weblate/trans/tests/test_loc_kit_ingest_contract.py \
+  docs/admin/projects.rst \
+  docs/specs/loc-kit-ingest.md \
+  docs/changes.rst
 ```
 
-**Step 3: живой smoke кликами.** Не `form.submit()` и не прямой POST — только настоящие клики по контролам, иначе проверяется не тот путь.
+**Step 4: live smoke through actual controls.** Do not submit the form programmatically.
 
-1. Собрать файл `Glossary.csv` с содержимым `GLOSSARY_NOTE_CSV`.
-2. `http://localhost:3001/create/component/?project=<id>` → вкладка «Upload translation files» → файл → галка «Use as glossary» → Continue.
-3. Превью: 2 термина, в колонке «Source note» видно «Правящая политическая партия…», в предупреждениях — `column 4 ('note') -> explanation of the source term`.
-4. Создать компонент. В глоссарии открыть термин «Партия» → поле Explanation заполнено.
-5. Автоперевод строки, содержащей слово «Партия», на fr движком OpenRouter: убедиться, что перевод `Parti`, а не `la partie`.
+1. Open the component-create flow in the local instance and upload `GLOSSARY_NOTE_CSV`.
+2. Check **Use as glossary** and click the real continue control.
+3. Confirm preview reports two terms, two notes, displays `мужской род` in **Source note**, and lists the note-column inference warning.
+4. Click the real confirmation control. Open the new glossary term `Партия` and confirm its Explanation is populated.
 
-**Step 4: финальный коммит, если что-то поправилось**
+Do not invoke automatic translation in this smoke: Task 3 already proves the exact payload seam deterministically.
+
+**Step 5: commit only if verification fixes require one**
 
 ```bash
-git add -A -- loc_kit_ingest weblate/trans/tests docs dev-docker/data/python/loc_kit_ingest
-git commit -m "fix(loc-kit): close defects found in the note column smoke test"
+git add -- loc_kit_ingest/infer.py loc_kit_ingest/tests/test_infer_glossary.py weblate/trans/tests/test_loc_kit_ingest_contract.py docs/admin/projects.rst docs/specs/loc-kit-ingest.md docs/changes.rst
+git commit -m "fix(loc-kit): close note-column verification defects"
 ```
 
-## После этого
+## Implementation tasks from engineering review
 
-Остаются открытыми и не входят в этот план:
+- [ ] **T1 (P1)** - `loc_kit_ingest/infer.py` - classify flat note columns and emit a valid grammar field in the same red-green task.
+  - Verify: `cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py -q`
+- [ ] **T2 (P1)** - `loc_kit_ingest/infer.py` - guard pairs description and caption rows before profile publication.
+  - Verify: explicit-pairs tests.
+- [ ] **T3 (P1)** - `weblate/trans/tests/test_loc_kit_ingest_contract.py` - assert the actual created French glossary unit exposes CSV text through the LLM glossary-entry contract.
+  - Verify: exact `LocKitGlossaryUploadUITest` node.
+- [ ] **T4 (P2)** - `docs/admin/projects.rst` - document the user-facing note column that the changelog links to.
+  - Verify: docs source review and configured lint.
+- [ ] **T5 (P2)** - `loc_kit_ingest/infer.py` - classify empty/populated note headers from the one-pass populated set.
+  - Verify: empty-plus-populated and duplicate-populated tests.
 
-- заметки к конкретному целевому языку (`note_ru` / `note_en` → `<note from="translator">`) — фикстура `GLOSSARY_CSV` в контрактном тесте всё ещё их не принимает;
-- глоссарные флаги (`terminology`, `read-only`, `forbidden`) из таблицы — `writer.py` не пишет их вообще;
-- повторный импорт в существующий глоссарий — `docs/plans/2026-08-10-loc-kit-glossary-update-existing.md`.
+## Worktree parallelization
+
+Sequential implementation, no parallelization opportunity. Tasks 1 and 2 both alter the same inference function; Task 3 depends on its final behavior. Documentation can be edited after Task 2, but keeping it with the verification pass avoids a merge conflict for negligible benefit.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | - | - |
+| Codex Review | `/codex review` | Independent second opinion | 1 | issues folded | 4 findings: pairs-caption guard, public docs, accepted context risk, wording drift |
+| Eng Review | `/plan-eng-review` | Architecture & tests | 1 | CLEAR | 8 accepted decisions: UI scope, TDD, pairs, LLM proof, commands, linear scan |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | - | - |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | - | - |
+
+**CROSS-MODEL:** Both reviews required public documentation and wording alignment. The outside voice flagged `context`/`usage` false-positive risk; the operator explicitly retained them, with preview as the accepted guardrail.
+
+**VERDICT:** ENG CLEARED - ready to implement. Outside-voice correctness and documentation findings are folded into Tasks 2 and 4.
+
+NO UNRESOLVED DECISIONS
