@@ -146,21 +146,30 @@ debt.
 
 Repository-specific parts:
 
-- `weblate_customization/` - a custom-check and custom-machinery package
-  following `docs/admin/customize.rst`. Ships `GameMarkupCheck`
-  (`check_id: game-markup`) in `checks.py`, which asserts that Unity rich-text
-  tags (`<color=#RRGGBB>`, `<link>`, `<size=N>`, `<b>`) and engine placeholders
-  (`{0}`, `%KEY%`) in the target match the source multiset, and
-  `RoutedLLMTranslation` in `machinery.py`, an OpenRouter-backed automatic
-  suggestion service (display name and service slug: `OpenRouter` /
-  `openrouter`) that resolves the model ID per target language from a `routing`
-  JSON map. It uses one OpenRouter key; a project-level configuration overrides
-  the global one field by field, so a project stores only what it changes
-  (persona, style, `language_instructions`) and inherits `key`, `base_url` and
-  `routing`. `AutoForm.DEFAULT_ENGINE` (`weblate/trans/forms.py`) preselects this
-  service and the "Machine translation" source in the automatic translation
-  form. See "Deploying custom checks and machinery" below for how both modules
-  reach the dev container.
+- `weblate_customization/` - a custom-check, custom-autofix, and
+  custom-machinery package following `docs/admin/customize.rst`. `checks.py`
+  ships `GameMarkupCheck` (`check_id: game-markup`), which asserts that Unity
+  rich-text tags (`<color=#RRGGBB>`, `<link>`, `<size=N>`, `<b>`) and engine
+  placeholders (`{0}`, `%KEY%`) in the target match the source multiset, and
+  `GameLineBreakCheck` (`check_id: game-line-break`), which asserts that the
+  Hero Craft engine line separator `$` is neither lost nor added, and that no
+  whitespace hugs it, whenever the source uses `$` tightly as a separator.
+  `autofixes.py` ships `LineSeparatorSpacing`, which deterministically strips
+  whitespace hugging a tight `$` separator before the target is stored,
+  importing the shared separator regexes from `checks.py` (mirroring how
+  `weblate/trans/autofixes/chars.py` imports from `weblate/checks/chars.py`);
+  both `GameLineBreakCheck` and `LineSeparatorSpacing` honour the same
+  `ignore-game-line-break` flag. `machinery.py` ships `RoutedLLMTranslation`,
+  an OpenRouter-backed automatic suggestion service (display name and service
+  slug: `OpenRouter` / `openrouter`) that resolves the model ID per target
+  language from a `routing` JSON map. It uses one OpenRouter key; a
+  project-level configuration overrides the global one field by field, so a
+  project stores only what it changes (persona, style,
+  `language_instructions`) and inherits `key`, `base_url` and `routing`.
+  `AutoForm.DEFAULT_ENGINE` (`weblate/trans/forms.py`) preselects this service
+  and the "Machine translation" source in the automatic translation form. See
+  "Deploying custom checks and machinery" below for how these modules reach
+  the dev container.
 - `weblate-mcp/` (gitignored, its own git repo) - vendored `@mmntm/weblate-mcp`,
   a NestJS MCP server that talks to the local Weblate REST API. Its `.env` points
   at `http://localhost:3001/api/`.
@@ -274,23 +283,31 @@ pnpm test
 `weblate_customization/` is a `uv_build` package, but the dev container does not
 install it - the module is **copied** into `dev-docker/data/python/`, which is on
 the container's `sys.path` via `/app/data/python`. After editing
-`weblate_customization/src/weblate_customization/checks.py` or
+`weblate_customization/src/weblate_customization/checks.py`,
+`weblate_customization/src/weblate_customization/autofixes.py`, or
 `weblate_customization/src/weblate_customization/machinery.py`:
 
 ```sh
 cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
 ```
 
-`GameMarkupCheck` is currently importable but **not registered**. To activate
-it, add `WEBLATE_ADD_CHECK: weblate_customization.checks.GameMarkupCheck` to
-the `weblate` service environment in `dev-docker/docker-compose.yml` and
-restart; `settings_docker.py` folds `WEBLATE_ADD_CHECK` / `WEBLATE_REMOVE_CHECK`
-into `CHECK_LIST` through `modify_env_list`
+`GameMarkupCheck` and `GameLineBreakCheck` are registered through
+`WEBLATE_ADD_CHECK: weblate_customization.checks.GameMarkupCheck,weblate_customization.checks.GameLineBreakCheck`,
+and `LineSeparatorSpacing` through
+`WEBLATE_ADD_AUTOFIX: weblate_customization.autofixes.LineSeparatorSpacing`,
+both in the `weblate` service environment in `dev-docker/docker-compose.yml`
+and (as `WEBLATE_ADD_CHECK=` / `WEBLATE_ADD_AUTOFIX=`) in
+`deploy/environment.example`; `settings_docker.py` folds `WEBLATE_ADD_CHECK` /
+`WEBLATE_REMOVE_CHECK` into `CHECK_LIST`, and `WEBLATE_ADD_AUTOFIX` /
+`WEBLATE_REMOVE_AUTOFIX` into `AUTOFIX_LIST`, through `modify_env_list`
 (`weblate/utils/environment.py:182`). `RoutedLLMTranslation` is registered the
 same way through `WEBLATE_ADD_MACHINERY:
 weblate_customization.machinery.RoutedLLMTranslation`, already present in
 `dev-docker/docker-compose.yml`. The same mechanism exists for
-`WEBLATE_ADD_ADDONS`, `WEBLATE_ADD_APPS`, etc.
+`WEBLATE_ADD_ADDONS`, `WEBLATE_ADD_APPS`, etc. A restart after editing
+`dev-docker/docker-compose.yml` needs a full `./rundev.sh` (rebuild + start),
+not just a container restart, because the environment block is baked in at
+container creation.
 
 `dev-docker/data/python/customize/` is a separate, older customization module -
 unrelated to `weblate_customization/`.

@@ -24,6 +24,22 @@ TAG_PATTERN = regex.compile(
 # Engine placeholders: {0}, {c}, {1}, {SEASON}, %PLAYER, %SHIP%
 PLACEHOLDER_PATTERN = regex.compile(r"\{[^{}]*\}|%[A-Z][A-Z0-9_]+%")
 
+# `$` is the engine's line separator, not a character. Whitespace beside one
+# renders as a stray indent; a lost one merges two lines.
+SEPARATOR_SPACE = r"[ \t\u00a0\u2009\u202f]"
+SEPARATOR_HUGGED = regex.compile(rf"{SEPARATOR_SPACE}\$|\${SEPARATOR_SPACE}")
+# A separator sits tight between two lines. A source that spaces its dollar
+# signs is using them for something else - currency, most likely - and its
+# spacing is not ours to police.
+SEPARATOR_LOOSE_IN_SOURCE = regex.compile(
+    rf"{SEPARATOR_SPACE}\$|\${SEPARATOR_SPACE}|^\$|\$$"
+)
+
+
+def separator_is_tight(source: str) -> bool:
+    """Whether the source uses `$` as a line separator we can reason about."""
+    return "$" in source and not SEPARATOR_LOOSE_IN_SOURCE.search(source)
+
 
 def _tokens(text: str) -> list[str]:
     """Extract ordered markup tokens (tags with attrs + placeholders)."""
@@ -52,3 +68,23 @@ class GameMarkupCheck(TargetCheck):
         if not source_tokens:
             return False
         return sorted(source_tokens) != sorted(_tokens(target))
+
+
+class GameLineBreakCheck(TargetCheck):
+    """`$` is a line break: the count must match and nothing may hug it."""
+
+    check_id = "game-line-break"
+    name = gettext_lazy("Game line break")
+    description = gettext_lazy(
+        "The number of $ line separators does not match the source, or "
+        "whitespace sits next to a separator."
+    )
+    # Always on: a separator is engine syntax, not a per-component preference.
+    default_disabled = False
+
+    def check_single(self, source: str, target: str, unit) -> bool:
+        if not separator_is_tight(source):
+            return False
+        return source.count("$") != target.count("$") or bool(
+            SEPARATOR_HUGGED.search(target)
+        )
