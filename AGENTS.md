@@ -46,6 +46,9 @@ sections before it are Weblate conventions inherited from the original codebase.
   `<type>(<optional scope>): <description>`. Common types include `feat`,
   `fix`, `docs`, `refactor`, `test`, `ci`, and `chore`. Example:
   `fix(translations): handle empty component slug`.
+- Always finish by committing and pushing. When implementation is complete
+  and verified, commit the changes and push to the remote; do not stop with
+  uncommitted or unpushed work.
 - Keep new project code under GPL-3.0-or-later and include the repository's
   usual copyright and SPDX license header in new Python files.
 
