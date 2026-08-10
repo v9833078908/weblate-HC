@@ -749,15 +749,13 @@ def infer_glossary_profile(
         msg = f"sheet {sheet_name!r} has no fully filled target language column"
         raise InferenceError(msg)
 
-    if note_col is not None and not paired:
-        _reject_note_outside_term_rows(rows, note_col, content_indexes, term_rows)
-
     grammar: dict[str, Any] = {
         "type": "record-map",
         "skip_rows": sorted(index + 1 for index in skip_rows),
         "regions": regions,
         "term_row_offset": 0,
     }
+    note_fields: list[dict[str, Any]] = []
     if paired:
         # A description cell is read by a note field, and a note field may
         # only name an initial target language. A language that carries
@@ -780,7 +778,9 @@ def infer_glossary_profile(
                     "is missing terms; this layout needs an explicit profile"
                 )
                 raise InferenceError(msg)
-        grammar["notes"] = [
+        # Keep the existing validation that every described language is an
+        # initial target, then preserve its current source/target fields.
+        note_fields.extend(
             {
                 "scope": "source" if col == source_col else "target",
                 "column": col + 1,
@@ -790,16 +790,19 @@ def infer_glossary_profile(
             | ({} if col == source_col else {"language": languages[col]})
             for col in sorted(languages)
             if col == source_col or languages[col] in target_langs
-        ]
-    elif note_col is not None:
-        grammar["notes"] = [
+        )
+    if note_col is not None:
+        _reject_note_outside_term_rows(rows, note_col, content_indexes, term_rows)
+        note_fields.append(
             {
                 "scope": "source",
                 "column": note_col + 1,
                 "header": _cell(header_row, note_col),
                 "row_offset": 0,
             }
-        ]
+        )
+    if note_fields:
+        grammar["notes"] = note_fields
 
     document = {
         "schema_version": SCHEMA_VERSION_RECORD_MAP,
