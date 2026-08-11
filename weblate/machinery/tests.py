@@ -3888,11 +3888,15 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
     def test_prompt_lists_the_developer_note_as_reference_material(self) -> None:
         self.assertIn("context, key, explanation, note,", PROMPT)
 
-    def test_prompt_leaves_final_punctuation_to_the_autofix(self) -> None:
-        # The rule was stated with both a positive and a negative example and
-        # was still violated on 1356 of 3941 strings of a measured run. It is
-        # enforced deterministically after the reply instead.
-        self.assertNotIn("final punctuation", PROMPT)
+    def test_prompt_requires_matching_final_punctuation(self) -> None:
+        # Measured on a 150-string production sample: dropping this rule and
+        # relying on the autofix alone tripled the defect in the raw reply,
+        # from 18-29 occurrences to 58-71. The autofix is the backstop, not a
+        # replacement.
+        self.assertIn(
+            "The last character of the translation must match the final punctuation",
+            PROMPT,
+        )
 
     @http_mock.activate
     def test_translate_traces_resolved_model_breadcrumb(self) -> None:
