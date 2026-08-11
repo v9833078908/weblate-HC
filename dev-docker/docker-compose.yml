@@ -58,8 +58,8 @@ services:
       WEBLATE_VCS_ALLOW_SCHEMES: https,ssh,git,file
       GRANIAN_ARGS: --reload --reload-paths /app/src/weblate
       WEBLATE_ADD_MACHINERY: weblate_customization.machinery.RoutedLLMTranslation
-      WEBLATE_ADD_CHECK: weblate_customization.checks.GameMarkupCheck,weblate_customization.checks.GameLineBreakCheck
-      WEBLATE_ADD_AUTOFIX: weblate_customization.autofixes.LineSeparatorSpacing
+      WEBLATE_ADD_CHECK: weblate_customization.checks.GameMarkupCheck,weblate_customization.checks.GameLineBreakCheck,weblate_customization.checks.CyrillicLeakCheck
+      WEBLATE_ADD_AUTOFIX: weblate_customization.autofixes.LineSeparatorSpacing,weblate_customization.autofixes.RemoveAddedFinalStop,weblate_customization.autofixes.AddFrenchPunctuationSpacing
     env_file:
     - ./environment
     ports:

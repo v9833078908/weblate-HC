@@ -34,6 +34,33 @@ SEPARATOR_HUGGED = regex.compile(rf"{SEPARATOR_SPACE}\$|\${SEPARATOR_SPACE}")
 SEPARATOR_LOOSE_IN_SOURCE = regex.compile(
     rf"{SEPARATOR_SPACE}\$|\${SEPARATOR_SPACE}|^\$|\$$"
 )
+# A Cyrillic codepoint in a target whose language is not written in Cyrillic is
+# either untranslated text or a homoglyph. Weblate carries no script metadata
+# for a language, so the ones that legitimately write in Cyrillic are listed.
+CYRILLIC = regex.compile(r"\p{Script=Cyrillic}")
+CYRILLIC_SCRIPT_LANGUAGES = frozenset(
+    {
+        "ab",
+        "av",
+        "ba",
+        "be",
+        "bg",
+        "ce",
+        "cv",
+        "kk",
+        "ky",
+        "mk",
+        "mn",
+        "os",
+        "ru",
+        "sah",
+        "sr",
+        "tg",
+        "tt",
+        "udm",
+        "uk",
+    }
+)
 
 
 def separator_is_tight(source: str) -> bool:
@@ -88,3 +115,32 @@ class GameLineBreakCheck(TargetCheck):
         return source.count("$") != target.count("$") or bool(
             SEPARATOR_HUGGED.search(target)
         )
+
+
+class CyrillicLeakCheck(TargetCheck):
+    """
+    Cyrillic in a target whose language does not write in it.
+
+    An LLM leaves a name, an interjection or a whole clause in the source
+    script, and a homoglyph is the same defect one character wide, because a
+    homoglyph is a Cyrillic codepoint sitting inside a Latin word. The source
+    is irrelevant: this project translates out of Russian, so a source
+    condition would silence the check on every string it exists for.
+    """
+
+    check_id = "cyrillic-leak"
+    name = gettext_lazy("Cyrillic in the translation")
+    description = gettext_lazy(
+        "The translation contains Cyrillic characters, but its language does "
+        "not use them."
+    )
+    default_disabled = False
+
+    def should_skip(self, unit) -> bool:
+        language = unit.translation.language
+        if "cyrillic" in language.code or language.is_base(CYRILLIC_SCRIPT_LANGUAGES):
+            return True
+        return super().should_skip(unit)
+
+    def check_single(self, source: str, target: str, unit) -> bool:
+        return bool(target) and bool(CYRILLIC.search(target))
