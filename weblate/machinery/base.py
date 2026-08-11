@@ -133,6 +133,11 @@ class BatchMachineTranslation(DocVersionsMixin):
     retry_statuses: ClassVar[frozenset[int]] = frozenset({429, 503})
     retry_attempts = 3
     max_retry_delay = 30
+    # How long a service that kept refusing is left alone afterwards. A spent
+    # quota needs a long stop, so this default stays conservative; a service
+    # refusing only because a shared upstream is momentarily full should
+    # shorten it, because every string of a run started meanwhile is skipped.
+    rate_limit_period = 1800
     is_available = True
     replacement_start = "[X"
     replacement_end = "X]"
@@ -488,8 +493,8 @@ class BatchMachineTranslation(DocVersionsMixin):
     def is_rate_limited(self) -> bool:
         return cache.get(self.rate_limit_cache, False)
 
-    def set_rate_limit(self) -> None:
-        cache.set(self.rate_limit_cache, True, 1800)
+    def set_rate_limit(self, period: int | None = None) -> None:
+        cache.set(self.rate_limit_cache, True, period or self.rate_limit_period)
 
     def is_rate_limit_error(self, exc: Exception) -> bool:
         if isinstance(exc, MachineryRateLimitError):

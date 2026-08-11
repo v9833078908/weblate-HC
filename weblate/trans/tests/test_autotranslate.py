@@ -1178,18 +1178,35 @@ class RecordingTranslation(DummyTranslation):
         barrier: threading.Barrier | None = None,
         failing_ids: frozenset[int] = frozenset(),
         rate_limited: bool = False,
+        stop_clears_after: int | None = None,
+        rate_limit_period: int = 0,
     ) -> None:
         super().__init__({})
         self.batch_concurrency = concurrency
         self.barrier = barrier
         self.failing_ids = failing_ids
         self.rate_limited = rate_limited
+        # A stop lifted once it has been observed this many times, standing in
+        # for one that expires while a run is still going.
+        self.stop_clears_after = stop_clears_after
+        self.rate_limit_period = rate_limit_period
+        self.stop_checks = 0
         self.lock = threading.Lock()
         self.batches: list[list[int]] = []
         self.threads: set[int] = set()
 
     def is_rate_limited(self) -> bool:
-        return self.rate_limited
+        if not self.rate_limited:
+            return False
+        with self.lock:
+            self.stop_checks += 1
+            if (
+                self.stop_clears_after is not None
+                and self.stop_checks > self.stop_clears_after
+            ):
+                self.rate_limited = False
+                return False
+        return True
 
     def batch_translate(
         self,
@@ -1283,6 +1300,33 @@ class MachineryBatchFetchTest(SimpleTestCase):
         self.assertEqual(result, {})
         self.assertEqual(service.batches, [])
         self.assertEqual(progress, [2, 4, 6])
+
+    def test_batches_a_short_stop_skipped_are_asked_again(self) -> None:
+        # Three batches are refused, the stop is lifted while the run is still
+        # going, and the strings arrive instead of being dropped.
+        service = RecordingTranslation(
+            rate_limited=True, stop_clears_after=3, rate_limit_period=5
+        )
+        result, progress = self.fetch(service, self.make_units(6))
+
+        self.assertEqual(sorted(result), [0, 1, 2, 3, 4, 5])
+        self.assertEqual(service.batches, [[0, 1], [2, 3], [4, 5]])
+        self.assertEqual(progress, [2, 4, 6])
+
+    def test_batch_callback_runs_once_for_a_batch_asked_again(self) -> None:
+        service = RecordingTranslation(
+            rate_limited=True, stop_clears_after=1, rate_limit_period=5
+        )
+        stored: list[list[int]] = []
+
+        _result, progress = self.fetch(
+            service,
+            self.make_units(4),
+            lambda batch: stored.append([unit.id for unit in batch]),
+        )
+
+        self.assertEqual(sorted(stored), [[0, 1], [2, 3]])
+        self.assertEqual(progress, [2, 4])
 
     def test_batch_callback_receives_every_batch(self) -> None:
         service = RecordingTranslation()

@@ -9719,3 +9719,29 @@ class RequestRetryTest(SimpleTestCase):
         self.assertLessEqual(
             service.get_retry_delay(response, 0), service.max_retry_delay * 1.3
         )
+
+
+class RateLimitStopTest(SimpleTestCase):
+    """How long a refusing service is left alone."""
+
+    class ShortStop(DummyTranslation):
+        rate_limit_period = 7
+
+    def test_stop_lasts_what_the_service_asks_for(self) -> None:
+        with patch("weblate.machinery.base.cache.set") as cache_set:
+            self.ShortStop({}).set_rate_limit()
+
+        self.assertEqual(cache_set.call_args.args[1:], (True, 7))
+
+    def test_stop_accepts_an_explicit_period(self) -> None:
+        with patch("weblate.machinery.base.cache.set") as cache_set:
+            DummyTranslation({}).set_rate_limit(5)
+
+        self.assertEqual(cache_set.call_args.args[1:], (True, 5))
+
+    def test_upstream_capacity_stop_is_shorter_than_a_quota_stop(self) -> None:
+        # A spent quota lasts; a momentarily full upstream does not, and a long
+        # stop there costs every string of a run started meanwhile.
+        self.assertLess(
+            BaseLLMTranslation.rate_limit_period, DummyTranslation.rate_limit_period
+        )

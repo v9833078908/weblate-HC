@@ -300,6 +300,11 @@ class BaseLLMTranslation(BatchMachineTranslation):
     # unlikely to start refusing, because a refusal outliving the retries stops
     # the service for everyone.
     batch_concurrency = 2
+    # A gateway refuses an LLM request when the upstream capacity for the model
+    # is momentarily full, and asks to retry shortly; measured against
+    # OpenRouter, the refusal cleared within a minute. Leaving the service alone
+    # for the conservative half hour instead costs the rest of the run.
+    rate_limit_period = 60
     glossary_support = True
     llm_context_support = True
     replacement_start = "@@PH"
