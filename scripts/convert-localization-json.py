@@ -35,6 +35,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from translate.storage.jsonl10n import GoI18NJsonFile, JsonFile
+
 RECORD_KEY = "text_id"
 ID_LINE_RE = re.compile(r'\s*"text_id"\s*:\s*"([^"]+)"')
 
@@ -143,8 +145,6 @@ def render(
 
 def validate(blob: bytes, records: list[dict[str, str]], language: str, shape: str):
     """Parse the generated file back with the library Weblate uses."""
-    from translate.storage.jsonl10n import GoI18NJsonFile, JsonFile
-
     store = (JsonFile if shape == "flat" else GoI18NJsonFile)(blob)
     got = [(unit.getid().lstrip("."), unit.target) for unit in store.units]
     expected = [(record[RECORD_KEY], record[language]) for record in records]
