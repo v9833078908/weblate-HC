@@ -121,6 +121,67 @@
     "missing_fr_spacing": 12,
     "missing_fr_spacing_repaired": 12
   },
+  "prompt_rule_27_experiment": {
+    "_comment": "The review proposed removing the final-punctuation rule because it failed on 1356 of 3941 strings, and letting the autofix own the defect. Measured on the same 150-string sample: the rule is load-bearing, so it was restored.",
+    "with_rule_end_stop": [
+      18,
+      27,
+      28,
+      29
+    ],
+    "without_rule_end_stop": [
+      58,
+      71
+    ],
+    "_commit_without": "9ca1344",
+    "_commit_restored": "6a7a9a7",
+    "stored_output": "Unchanged either way: the autofix repairs 706 of 707 occurrences at write time. Only the raw reply differs."
+  },
+  "final": [
+    {
+      "_captured": "2026-08-11T17:05Z",
+      "_commit": "6a7a9a7",
+      "cached_tokens": 24298,
+      "checks": {
+        "end_stop": 17,
+        "multiple_capital": 1,
+        "reused": 2
+      },
+      "cost_usd": 0.02871,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "final_punctuation_added": 17,
+      "finish_reasons": {
+        "content_filter": 1,
+        "stop": 9
+      },
+      "glossary_adherence_pct": 100.0,
+      "rejects": {
+        "json_error": 2
+      },
+      "requests": 10
+    },
+    {
+      "_captured": "2026-08-11T17:07Z",
+      "_commit": "6a7a9a7",
+      "cached_tokens": 19445,
+      "checks": {
+        "end_stop": 27,
+        "multiple_capital": 1,
+        "reused": 2
+      },
+      "cost_usd": 0.02893,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "final_punctuation_added": 27,
+      "finish_reasons": {
+        "stop": 8
+      },
+      "glossary_adherence_pct": 100.0,
+      "rejects": {},
+      "requests": 8
+    }
+  ],
   "known_residue": {
     "content_filter": "One batch of the sample always trips the provider safety filter on this corpus; bisecting recovers every string at the cost of two extra requests.",
     "rate_limit": "batch_concurrency=8 against a single model can exhaust the upstream limit; the retry loop now backs off instead of splitting the batch."
