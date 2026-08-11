@@ -198,7 +198,9 @@ Repository-specific parts:
   a NestJS MCP server that talks to the local Weblate REST API. Its `.env` points
   at `http://localhost:3001/api/`.
 - `docs/plans/`, `docs/specs/` - planning and design docs (in Russian) for
-  game-localization workflows, e.g. `llm-judge-external-pipeline.md`.
+  game-localization workflows; the LLM-first pipeline docs (research,
+  architecture, judge plans, measurements) live in `docs/LLM-first/`,
+  e.g. `docs/LLM-first/llm-judge-external-pipeline.md`.
 - `loc_kit_ingest/` (tracked) - standalone loc-kit importer package (no Django
   imports): `reader.py` (CSV/TSV/XLSX), `infer.py` (derives a strict profile
   from the kit's own header row), `profile.py` (closed schema with two

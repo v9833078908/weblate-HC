@@ -11,14 +11,14 @@
   качестве, либо максимально прозрачный процесс. «Человек ревьюит
   low-confidence строки» из ресеча — персона, которой не существует.
 - Ревизия LLM-пути по коду:
-  `docs/specs/2026-08-11-llm-first-prompt-and-pipeline-review.md`.
+  `docs/LLM-first/2026-08-11-llm-first-prompt-and-pipeline-review.md`.
 - Замер глоссарного гейта:
-  `docs/misc/2026-08-11-glossary-enforcement-analysis.md` и план
-  `docs/plans/2026-08-11-glossary-morphological-enforcement.md`.
+  `docs/LLM-first/2026-08-11-glossary-enforcement-analysis.md` и план
+  `docs/LLM-first/2026-08-11-glossary-morphological-enforcement.md`.
 - План релизного гейта:
   `docs/plans/2026-08-10-git-localization-quality-gate.md`.
 - Три исследования 2026-08-11 (полные отчёты с источниками в
-  `docs/misc/`): дизайн LLM-судьи
+  `docs/LLM-first/`): дизайн LLM-судьи
   (`2026-08-11-llm-judge-design-research.md`), UX конкурентов
   (`2026-08-11-judge-ux-competitor-research.md`), поверхности
   интеграции в UI Weblate

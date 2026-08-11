@@ -112,7 +112,7 @@ Routing нельзя дублировать в management-команде: prefli
 
 ## Контекст для исполнителя
 
-- `docs/specs/llm-first-product-research.md` — часть 4, P1.
+- `docs/LLM-first/llm-first-product-research.md` — часть 4, P1.
 - `weblate/addons/autotranslate.py:65-173` — configuration и постановка задач.
 - `weblate/addons/base.py:165-185,268-304,379-386` — create/configure и initial sweep.
 - `weblate/addons/management/commands/install_addon.py:33-72` — form validation.

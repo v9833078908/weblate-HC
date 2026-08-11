@@ -1,0 +1,115 @@
+# План: фаза 0 — эксперимент json_schema и калибровка LLM-судьи
+
+Статус: **дизайн согласован 2026-08-11** (оба трека; судьи — Anthropic
+mid-tier + OpenAI mini-tier). Основание:
+`docs/LLM-first/llm-first-product-architecture.md` (часть 5, фаза 0),
+`docs/LLM-first/2026-08-11-llm-judge-design-research.md`,
+`docs/LLM-first/2026-08-11-llm-first-prompt-and-pipeline-review.md`
+(пп. 8.2, 3.5).
+
+Цель: закрыть последний транспортный пункт ревизии
+(`response_format: json_schema`) измерением, а не верой, и получить
+go/no-go для фазы 2 (судья): выбранную модель-судью, промпт и измеренные
+пороги точности на размеченном наборе.
+
+## Трек A. `response_format: json_schema` на пути OpenRouter
+
+### Задача A1. Код
+
+Файлы: `weblate/machinery/openai.py`, `weblate/machinery/llm.py` (шов
+парсинга), `weblate_customization/src/weblate_customization/machinery.py`,
+тесты в `weblate/machinery/tests.py`.
+
+- Схема включается только для `RoutedLLMTranslation` (OpenRouter):
+  дженерик OpenAI-сервис не трогаем, часть провайдеров схему не
+  поддерживает. Прецедент — `weblate/trans/loc_kit.py:425-443`, включая
+  `provider.require_parameters: true`.
+- Корень strict-схемы обязан быть объектом, поэтому ответ заворачивается
+  в конверт `{"translations": [{"parts": [...]}, ...]}`. Парсинг
+  разворачивает конверт до `_normalize_translations`; plain-массив
+  остаётся принимаемым (другие сервисы, выключенная схема).
+- Recovery-парсер (`_repair_json_*`) не удаляется: он общий для всех
+  LLM-сервисов, на пути OpenRouter просто перестаёт срабатывать.
+- Приёмка: юнит-тесты — payload OpenRouter-сервиса содержит
+  `response_format.json_schema.strict` и `provider.require_parameters`;
+  конверт разворачивается; payload и парсинг остальных сервисов
+  байт-в-байт прежние.
+
+### Задача A2. Замер
+
+Инструмент: `docs/misc/col4-eval-harness.py`, та же выборка 150 строк
+COL4 ru->fr (fingerprint `4db4b89dfd4b`). Среда: **dev-docker**, не прод
+(A1 меняет код ядра; прод-образ не пересобирается ради эксперимента).
+Плечи сравниваются только внутри одной среды.
+
+- Плечи (4): baseline b20 | schema b20 | schema b10 | baseline b10,
+  concurrency 2, back-to-back с паузой ~20 с; второй раунд через
+  ~20 минут (протокол `docs/misc/col4-batch-size-eval.json`).
+- Критерии успеха: `rejects.json_error` 2 -> 0 на b20; coverage 100%;
+  `end_stop` в полосе базлайна 18-29; glossary 100%; cost в пределах
+  +/-10%.
+- Решение: schema чистит b20 -> остаёмся на batch 20 (меньше запросов);
+  иначе подтверждается кандидат batch 10.
+- Результат: `docs/misc/col4-schema-eval.json` (EVAL_JSON всех плеч +
+  выводы), бюджет ~$0.30.
+
+## Трек B. Калибровка судьи на золотом наборе
+
+Standalone-скрипты без Django: ключ OpenRouter через переменную
+окружения, строки выгружаются read-only через REST API прода.
+
+### Задача B1. Золотой набор
+
+Файлы: `docs/misc/col4-judge-goldenset-build.py`,
+`docs/misc/col4-judge-golden.json`.
+
+~200 записей `{unit_id, source, target, label, defect_class}`, три
+страты из прод-вывода COL4 fr:
+
+1. **85 известных глоссарных дефектов** (разметка из
+   `docs/LLM-first/2026-08-11-glossary-enforcement-analysis.md`, п. 10)
+   — класс `terminology`.
+2. **~75 чистых строк**: 0 failing checks, глоссарий соблюдён; ручная
+   сверка случайных 20 фиксируется в наборе.
+3. **~40 синтетических мутаций** поверх чистых, детерминированный seed,
+   по классам MQM: порча/потеря `@@PHn@@` (critical), инверсия
+   смысла/отрицание (critical), непереведённый кириллический фрагмент
+   (critical), потеря числа (major), пропуск куска (major), подмена
+   глоссарного термина (major).
+
+### Задача B2. Прогон судей
+
+Файлы: `docs/misc/col4-judge-eval.py`, результат в
+`docs/LLM-first/2026-08-XX-judge-calibration.md`.
+
+- Судьи: Anthropic mid-tier и OpenAI mini-tier через OpenRouter; точные
+  ID фиксируются в результатах из каталога моделей на момент прогона.
+  Оба семейства отличны от переводчика (`google/gemini-2.5-flash`) —
+  инвариант 3 архитектуры.
+- Промпт: MQM error-first, structured output
+  `{errors: [{span, category, severity}], verdict}`, глоссарий и note в
+  контексте; вердикт из инвентаря: critical -> reject, major -> flag,
+  иначе pass. Батч ~10 строк.
+- Плечи: {2 модели} x {один прогон | 3x-агрегация на flag/reject}.
+- Метрики: confusion matrix по классам; reject-recall на
+  critical-мутациях; (flag u reject)-recall на глоссарных дефектах;
+  false-reject и false-flag на чистых; цена и латентность на 1000 строк.
+- Пороги go для фазы 2: reject-recall (critical) >= 95%;
+  (flag u reject)-recall (terminology) >= 80%; false-reject <= 2%;
+  false-flag <= 10%. Терминологический recall < 80% -> терминология
+  остаётся детерминированной (план морфологии), судья судит только
+  семантику.
+- Бюджет ~$2-5. Набор становится постоянным регрессионным для промпта
+  судьи: любое изменение промпта/модели гоняется по нему, как изменения
+  промпта переводчика — по eval-харнессу.
+
+## Вне объёма
+
+- Запись вердиктов в Weblate, auto-approve, UI — фаза 2 и далее.
+- Короткий промпт переводчика — отдельный эксперимент после схемы.
+- CometKiwi и low-resource языки — фаза 4.
+- Изменение прод-инстанса в любом виде.
+
+## Порядок
+
+A1 -> A2; B1 -> B2. Треки независимы и могут идти параллельно.

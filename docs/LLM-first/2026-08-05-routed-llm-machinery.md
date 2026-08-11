@@ -20,7 +20,7 @@
 
 ## Контекст и принятые решения
 
-Подтверждённый дизайн: `docs/plans/2026-08-05-routed-llm-machinery-design.md`.
+Подтверждённый дизайн: `docs/LLM-first/2026-08-05-routed-llm-machinery-design.md`.
 
 Маршрут выбирается в следующем порядке:
 
