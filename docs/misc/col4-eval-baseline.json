@@ -1,35 +1,128 @@
 {
-  "_comment": "Baseline of docs/misc/col4-eval-harness.py against the deployed prod image (commit 5c68a26): no ensure_ascii=False, no temperature, no max_tokens, no response_format, bisect retry.",
-  "_captured": "2026-08-11T11:10Z",
-  "cached_tokens": 5197,
-  "checks": {
-    "end_stop": 50,
-    "multiple_capital": 1,
-    "reused": 3
+  "_comment": "docs/misc/col4-eval-harness.py against production, same 150-string sample (fingerprint 4db4b89dfd4b). 'baseline' is commit 5c68a26: no ensure_ascii, no temperature, no reply schema, bisect-only retry, matched glossary. 'after' are three consecutive runs of commit 9247c2c.",
+  "baseline": {
+    "_captured": "2026-08-11T11:10Z",
+    "_commit": "5c68a26",
+    "cached_tokens": 5197,
+    "checks": {
+      "end_stop": 50,
+      "multiple_capital": 1,
+      "reused": 3
+    },
+    "completion_tokens": 6386,
+    "cost_usd": 0.029392,
+    "coverage_pct": 100.0,
+    "cyrillic_leaked": 0,
+    "final_punctuation_added": 50,
+    "finish_reasons": {
+      "stop": 10
+    },
+    "glossary_adherence_pct": 100.0,
+    "glossary_occurrences": 16,
+    "prompt_tokens": 49433,
+    "rejects": {
+      "mismatch": 2
+    },
+    "requests": 10,
+    "seconds": 22.2
   },
-  "completion_tokens": 6386,
-  "cost_usd": 0.029392,
-  "coverage_pct": 100.0,
-  "cyrillic_leaked": 0,
-  "final_punctuation_added": 50,
-  "fingerprint": "4db4b89dfd4b",
-  "finish_reasons": {
-    "stop": 10
+  "after": [
+    {
+      "_captured": "2026-08-11T15:40Z",
+      "_commit": "9247c2c",
+      "cached_tokens": 16531,
+      "checks": {
+        "end_stop": 29,
+        "multiple_capital": 1,
+        "reused": 3
+      },
+      "completion_tokens": 8043,
+      "cost_usd": 0.028134,
+      "coverage_pct": 93.3,
+      "cyrillic_leaked": 0,
+      "final_punctuation_added": 29,
+      "finish_reasons": {
+        "content_filter": 1,
+        "stop": 8
+      },
+      "glossary_adherence_pct": 100.0,
+      "glossary_occurrences": 16,
+      "prompt_tokens": 41634,
+      "rejects": {
+        "json_error": 2
+      },
+      "requests": 9,
+      "requests_logged": 22,
+      "seconds": 36.1,
+      "_note": "Ran while the service was still backing off from the previous storm; the lost 10 strings did not recur."
+    },
+    {
+      "_captured": "2026-08-11T15:52Z",
+      "_commit": "9247c2c",
+      "cached_tokens": 15534,
+      "checks": {
+        "end_stop": 28,
+        "multiple_capital": 1,
+        "reused": 3
+      },
+      "completion_tokens": 8593,
+      "cost_usd": 0.031094,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "final_punctuation_added": 28,
+      "finish_reasons": {
+        "content_filter": 1,
+        "stop": 9
+      },
+      "glossary_adherence_pct": 100.0,
+      "glossary_occurrences": 16,
+      "prompt_tokens": 46018,
+      "rejects": {
+        "json_error": 2
+      },
+      "requests": 10,
+      "requests_logged": 11,
+      "seconds": 37.7
+    },
+    {
+      "_captured": "2026-08-11T15:54Z",
+      "_commit": "9247c2c",
+      "cached_tokens": 28176,
+      "checks": {
+        "end_stop": 18,
+        "multiple_capital": 1,
+        "reused": 2
+      },
+      "completion_tokens": 8594,
+      "cost_usd": 0.027683,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "final_punctuation_added": 18,
+      "finish_reasons": {
+        "content_filter": 1,
+        "stop": 9
+      },
+      "glossary_adherence_pct": 100.0,
+      "glossary_occurrences": 16,
+      "prompt_tokens": 46018,
+      "rejects": {
+        "json_error": 2
+      },
+      "requests": 10,
+      "requests_logged": 20,
+      "seconds": 47.9
+    }
+  ],
+  "autofix_check": {
+    "_comment": "docs/misc/col4-autofix-check.py over the first 2000 stored COL4 fr units.",
+    "_captured": "2026-08-11T15:47Z",
+    "added_final_stop": 707,
+    "added_final_stop_repaired": 706,
+    "missing_fr_spacing": 12,
+    "missing_fr_spacing_repaired": 12
   },
-  "glossary_adherence_pct": 100.0,
-  "glossary_applied": 16,
-  "glossary_missed_terms": {},
-  "glossary_occurrences": 16,
-  "length_ratio_avg": 1.277,
-  "length_ratio_over_130pct": 65,
-  "prompt_tokens": 49433,
-  "rejects": {
-    "mismatch": 2
-  },
-  "rejects_total": 2,
-  "requests": 10,
-  "requests_logged": 10,
-  "seconds": 22.2,
-  "set_size": 150,
-  "translated": 150
+  "known_residue": {
+    "content_filter": "One batch of the sample always trips the provider safety filter on this corpus; bisecting recovers every string at the cost of two extra requests.",
+    "rate_limit": "batch_concurrency=8 against a single model can exhaust the upstream limit; the retry loop now backs off instead of splitting the batch."
+  }
 }

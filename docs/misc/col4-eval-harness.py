@@ -137,6 +137,11 @@ def main() -> None:
     service = MACHINERY[ENGINE](machinery_settings[ENGINE])
     # A cached reply would measure the cache, not the pipeline.
     service.cache_translations = False
+    # A service stopped by an earlier run answers nothing at all, which would
+    # otherwise be reported as a run with zero defects.
+    was_rate_limited = service.is_rate_limited()
+    if was_rate_limited:
+        service.delete_cache()
 
     # The provider reports tokens, cost and finish_reason per reply; the
     # machinery drops all three, so record them at the parse seam.
@@ -250,6 +255,8 @@ def main() -> None:
         "seconds": round(elapsed, 1),
         "requests": len(replies),
         "requests_logged": capture.requests,
+        "rate_limited_before": was_rate_limited,
+        "rate_limited_after": service.is_rate_limited(),
         "rejects": dict(capture.rejects),
         "rejects_total": sum(capture.rejects.values()),
         "finish_reasons": {str(k): v for k, v in finish_reasons.items()},
