@@ -126,10 +126,10 @@ def validate_sbom(data: dict) -> None:
         errors.append("SBOM metadata has to include software producer")
 
     component = metadata.get("component", {})
-    if component.get("name") != "weblate":
-        errors.append("SBOM metadata component has to identify Weblate")
+    if component.get("name") != "hcgameloc":
+        errors.append("SBOM metadata component has to identify HCGameLoc")
     elif not component.get("version"):
-        errors.append("SBOM metadata component has to include Weblate version")
+        errors.append("SBOM metadata component has to include HCGameLoc version")
 
     properties = metadata.get("properties", [])
     if not any(

@@ -4,11 +4,9 @@
 
 """Tests for data exports."""
 
-from json import JSONDecodeError
 from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
-from django.core.cache import cache
 from django.templatetags.static import static
 from django.test.client import RequestFactory
 from django.test.utils import override_settings
@@ -17,7 +15,7 @@ from django.urls import reverse
 from weblate.auth.models import User
 from weblate.trans.context_processors import weblate_context
 from weblate.trans.tests.test_views import FixtureTestCase
-from weblate.trans.views.about import FALLBACK_STATS, AboutView, DonateView
+from weblate.trans.views.about import AboutView
 from weblate.trans.views.error import server_error
 from weblate.utils.version import GIT_VERSION, VERSION
 from weblate.utils.version_display import (
@@ -99,7 +97,7 @@ class BasicViewTest(FixtureTestCase):
 
     def test_stats(self) -> None:
         response = self.client.get(reverse("stats"))
-        self.assertContains(response, "Weblate statistics")
+        self.assertContains(response, "HCGameLoc statistics")
 
     def test_stats_without_active_users(self) -> None:
         self.client.logout()
@@ -107,23 +105,11 @@ class BasicViewTest(FixtureTestCase):
 
         response = self.client.get(reverse("stats"))
 
-        self.assertContains(response, "Weblate statistics")
+        self.assertContains(response, "HCGameLoc statistics")
 
     def test_donate(self) -> None:
         response = self.client.get(reverse("donate"))
-        self.assertContains(response, "Support Weblate")
-
-    def test_donate_falls_back_on_malformed_github_json(self) -> None:
-        errors = (
-            JSONDecodeError("Invalid JSON", "", 0),
-            UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte"),
-        )
-
-        for error in errors:
-            with self.subTest(error=error):
-                cache.delete(DonateView.cache_key)
-                with patch.object(DonateView, "fetch_url", side_effect=error):
-                    self.assertEqual(DonateView().get_stats(), FALLBACK_STATS)
+        self.assertContains(response, "Support")
 
     def test_healthz(self) -> None:
         response = self.client.get(reverse("healthz"))
@@ -162,21 +148,21 @@ class BasicViewTest(FixtureTestCase):
     def test_context_processor_hosted_description(self) -> None:
         self.assertEqual(
             self.get_context_description(),
-            "Hosted Weblate, the place to localize your software project.",
+            "Hosted HCGameLoc, the place to localize your software project.",
         )
 
     @override_settings(OFFER_HOSTING=False, SINGLE_PROJECT=False)
     def test_context_processor_multi_project_description(self) -> None:
         self.assertEqual(
             self.get_context_description(),
-            "This site runs Weblate for localizing various software projects.",
+            "This site runs HCGameLoc for localizing various software projects.",
         )
 
     @override_settings(OFFER_HOSTING=False, SINGLE_PROJECT=True)
     def test_context_processor_single_project_description(self) -> None:
         self.assertEqual(
             self.get_context_description(),
-            "This site runs Weblate for localizing a software project.",
+            "This site runs HCGameLoc for localizing a software project.",
         )
 
     @override_settings(VERSION_DISPLAY=VERSION_DISPLAY_SHOW, HIDE_VERSION=False)
@@ -184,7 +170,7 @@ class BasicViewTest(FixtureTestCase):
         response = self.client.get(reverse("about"))
         self.assertContains(
             response,
-            f'Powered by <a href="https://weblate.org/">Weblate {VERSION}</a>',
+            f'Powered by <a href="https://github.com/v9833078908/weblate-HC">HCGameLoc {VERSION} (based on Weblate)</a>',
             html=True,
         )
         self.assertContains(response, f"<span>{GIT_VERSION}</span>", html=True)
@@ -194,7 +180,7 @@ class BasicViewTest(FixtureTestCase):
         response = self.client.get(reverse("about"))
         self.assertContains(
             response,
-            'Powered by <a href="https://weblate.org/">Weblate</a>',
+            'Powered by <a href="https://github.com/v9833078908/weblate-HC">HCGameLoc (based on Weblate)</a>',
             html=True,
         )
         self.assertContains(response, f"<span>{GIT_VERSION}</span>", html=True)
@@ -204,7 +190,7 @@ class BasicViewTest(FixtureTestCase):
         response = self.client.get(reverse("about"))
         self.assertContains(
             response,
-            'Powered by <a href="https://weblate.org/">Weblate</a>',
+            'Powered by <a href="https://github.com/v9833078908/weblate-HC">HCGameLoc (based on Weblate)</a>',
             html=True,
         )
         self.assertNotContains(response, f"<span>{GIT_VERSION}</span>", html=False)
