@@ -2,13 +2,18 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for the game markup quality check."""
+"""Tests for the game markup and script quality checks."""
 
 from __future__ import annotations
 
-from weblate_customization.checks import GameLineBreakCheck, GameMarkupCheck
+from weblate_customization.checks import (
+    CyrillicLeakCheck,
+    GameLineBreakCheck,
+    GameMarkupCheck,
+)
 
 from weblate.checks.tests.test_checks import CheckTestCase
+from weblate.trans.tests.factories import make_unit
 
 
 class GameMarkupCheckTest(CheckTestCase):
@@ -50,3 +55,26 @@ class GameLineBreakCheckTest(CheckTestCase):
 
     def test_separator_free_strings_pass(self) -> None:
         self.assertFalse(self.check.check_single("Plain", "Simple", None))
+
+
+class CyrillicLeakCheckTest(CheckTestCase):
+    check = CyrillicLeakCheck()
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.test_good_matching = ("Гигахрущ", "Gigastructure", "")
+        # A clause left in the source script.
+        self.test_failure_1 = ("Самосбор окончен", "ATTENTION: САМОСБОР ОКОНЧЕН", "")
+        # A homoglyph is the same defect one character wide.
+        self.test_failure_2 = ("Samosbor", "Sam\u043esbor", "")
+
+    def test_a_cyrillic_target_language_is_not_policed(self) -> None:
+        unit = make_unit(source="Gathering over", code="ru")
+        self.assertTrue(self.check.should_skip(unit))
+
+    def test_a_latin_target_language_is_policed(self) -> None:
+        unit = make_unit(source="Самосбор окончен", code="fr")
+        self.assertFalse(self.check.should_skip(unit))
+
+    def test_an_empty_target_passes(self) -> None:
+        self.assertFalse(self.check.check_single("Самосбор", "", None))

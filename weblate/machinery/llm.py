@@ -164,19 +164,12 @@ Rules:
 24. Target-language project instructions, when present above, contain additional requirements for the target language. Follow them unless they conflict with preserving the source meaning, placeholders, markup, or output contract.
 25. For translatable markup placeholders that wrap text, translate the whole text between the placeholders. Example: @@PH1@@Reset and reapply@@PH2@@ can become @@PH1@@Zurucksetzen und erneut anwenden@@PH2@@, never @@PH1@@Zurucksetzen und @@PH2@@erneut anwenden@@PH2@@.
 26. The "note" field carries developer context about the string, such as the speaking character, the screen it appears on, or usage constraints. Use it to choose register, gender agreement, and tone. Never translate or emit it.
-27. The last character of the translation must match the final punctuation of the source. Never add a sentence-final full stop, ellipsis, exclamation mark, question mark, colon, or semicolon that the source does not have, even when target-language style or an existing "translation" field has one, and never drop one the source has. Typographic spacing around punctuation still follows target-language rules.
 
 Valid placeholder and markup handling:
 ["Click <a href=\"/x\">log out</a> and use @@PH195@@."]
 
 Invalid placeholder handling:
 ["Click <a href=\"/x\">log out</a> and use \\@\\@PH195\\@\\@."]
-
-Valid final punctuation handling, for the source "Он ушёл" with the existing translation "Il est parti.":
-[{{"parts": [{{"type": "text", "text": "Il est parti"}}]}}]
-
-Invalid final punctuation handling, adding a full stop the source does not have:
-[{{"parts": [{{"type": "text", "text": "Il est parti."}}]}}]
 
 Respond ONLY with a valid JSON array, one per input string, in the same order. Prefer structured objects when "parts" are present:
 
