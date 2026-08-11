@@ -162,11 +162,21 @@ def main() -> int:
     parser.add_argument("table", type=Path, help="combined Localization.json")
     parser.add_argument("output", type=Path, help="directory for the split files")
     parser.add_argument("--prefix", default="Localization_")
-    parser.add_argument("--shape", choices=("go-i18n", "flat"), default="go-i18n")
+    parser.add_argument("--shape", choices=("flat", "go-i18n"), default="flat")
+    parser.add_argument(
+        "--descriptions",
+        choices=("sidecar", "inline", "drop"),
+        default="sidecar",
+        help=(
+            "sidecar: write explanations.json for upload into Weblate and keep "
+            "the translation files clean; inline: keep them in the source "
+            "language file (go-i18n only); drop: discard them"
+        ),
+    )
     parser.add_argument(
         "--source-language",
         default="ru",
-        help="only this file carries the descriptions",
+        help="only this file carries inline descriptions",
     )
     args = parser.parse_args()
 
@@ -181,22 +191,33 @@ def main() -> int:
         msg = f"records missing a language column: {missing[:5]}"
         raise SystemExit(msg)
 
+    if args.descriptions == "inline" and args.shape == "flat":
+        msg = "a flat object has no place for descriptions, use --descriptions sidecar"
+        raise SystemExit(msg)
+
     args.output.mkdir(parents=True, exist_ok=True)
     for code in codes:
-        blob = render(
-            records,
-            code,
-            descriptions if code == args.source_language else {},
-            args.shape,
+        inline = (
+            descriptions
+            if args.descriptions == "inline" and code == args.source_language
+            else {}
         )
+        blob = render(records, code, inline, args.shape)
         validate(blob, records, code, args.shape)
         target = args.output / f"{args.prefix}{code}.json"
         target.write_bytes(blob)
         print(f"{target.name:30s} {len(blob):>9,d} bytes")
 
+    if args.descriptions == "sidecar" and descriptions:
+        sidecar = args.output / "explanations.json"
+        sidecar.write_bytes(
+            (json.dumps(descriptions, indent="\t", ensure_ascii=False) + "\n").encode()
+        )
+        print(f"{sidecar.name:30s} {sidecar.stat().st_size:>9,d} bytes")
+
     print(
         f"\n{len(records)} strings, {len(codes)} languages, "
-        f"{len(descriptions)} descriptions kept in {args.source_language}"
+        f"{len(descriptions)} descriptions ({args.descriptions})"
     )
     return 0
 
