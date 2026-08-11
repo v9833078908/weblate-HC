@@ -15,6 +15,7 @@ from operator import itemgetter
 from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, TypeGuard
 
 from asgiref.sync import sync_to_async
+from django.db.models import OuterRef, Subquery
 from django.utils.html import strip_tags
 from django.utils.translation import override, pgettext
 
@@ -23,6 +24,7 @@ from weblate.glossary.models import (
     cleanup_glossary_term,
     fetch_glossary_terms,
     get_glossary_terms,
+    prepare_glossary_units,
 )
 from weblate.lang.models import Language, PluralMapper
 from weblate.machinery.base import (
@@ -32,10 +34,12 @@ from weblate.machinery.base import (
 )
 from weblate.utils.errors import add_breadcrumb
 from weblate.utils.hash import calculate_hash, hash_to_checksum
-from weblate.utils.state import STATE_READONLY, STATE_TRANSLATED
+from weblate.utils.state import STATE_APPROVED, STATE_READONLY, STATE_TRANSLATED
 from weblate.utils.translation import pgettext_noop
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from django_stubs_ext import StrOrPromise
 
     from weblate.checks.base import Highlight, HighlightKind
@@ -198,6 +202,23 @@ LLM_JSON_ARRAY_STRING_TERMINATORS = frozenset({",", "]"})
 LLM_JSON_OBJECT_KEY_STRING_TERMINATORS = frozenset({":"})
 # Accept "]" to repair object values missing a closing "}" before a parent array.
 LLM_JSON_OBJECT_VALUE_STRING_TERMINATORS = frozenset({",", "}", "]"})
+# A reply that ends early is re-asked from the first missing string. The budget
+# bounds how many times one batch may be continued before falling back to
+# halving, so a model that answers one string at a time cannot fan out.
+LLM_PREFIX_RESCUE_LIMIT = 2
+# Below this many terms the whole glossary travels with every batch instead of
+# being matched against the source, which no longer loses inflected terms and
+# keeps the request prefix identical across batches.
+LLM_FULL_GLOSSARY_LIMIT = 300
+
+
+class PartialLLMReplyError(MachineTranslationError):
+    """Raised when a reply is valid but covers only the first strings."""
+
+    def __init__(self, translations: DownloadMultipleTranslations, count: int) -> None:
+        super().__init__("Incomplete assistant reply.")
+        self.translations = translations
+        self.count = count
 
 
 class LLMGlossaryEntry(TypedDict, total=False):
@@ -584,12 +605,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
         return entry
 
     @classmethod
-    def _get_glossary_entries(cls, units: list[Unit]) -> list[LLMGlossaryEntry]:
+    def _get_glossary_entries(cls, terms: Iterable[Unit]) -> list[LLMGlossaryEntry]:
         result: list[LLMGlossaryEntry] = []
         included: set[str] = set()
-        for term in chain.from_iterable(
-            get_glossary_terms(unit, include_variants=False) for unit in units
-        ):
+        for term in terms:
             entry = cls._get_glossary_entry(term)
             if entry is None:
                 continue
@@ -602,10 +621,49 @@ class BaseLLMTranslation(BatchMachineTranslation):
             result.append(entry)
         return result
 
+    def _get_full_glossary(self, unit: Unit) -> list[Unit] | None:
+        """
+        Return the whole term base, when it is small enough to always send.
+
+        Matching is exact, so an inflected term is invisible to it and the
+        model never learns the term exists. Below the limit the entire
+        glossary is cheaper than that loss, and being identical in every
+        request it also extends the cacheable prefix of the prompt.
+        """
+        translation = getattr(unit, "translation", None)
+        component = getattr(translation, "component", None)
+        if component is None:
+            return None
+        terms = list(
+            prepare_glossary_units(
+                component.project, component.source_language, translation.language
+            ).filter(state__gte=STATE_TRANSLATED)[: LLM_FULL_GLOSSARY_LIMIT + 1]
+        )
+        if len(terms) > LLM_FULL_GLOSSARY_LIMIT:
+            return None
+        return terms
+
+    def _get_batch_glossary(self, units: list[Unit]) -> list[LLMGlossaryEntry]:
+        """Glossary sent with a batch, and the one its cache key must match."""
+        if not units:
+            return []
+        full = self._get_full_glossary(units[0])
+        if full is not None:
+            return self._get_glossary_entries(full)
+        missing = [
+            unit for unit in units if getattr(unit, "glossary_terms", None) is None
+        ]
+        if missing:
+            fetch_glossary_terms(missing, include_variants=False)
+        return self._get_glossary_entries(
+            chain.from_iterable(
+                get_glossary_terms(unit, include_variants=False) for unit in units
+            )
+        )
+
     def get_llm_glossary_cache_part(self, unit: Unit) -> str:
         try:
-            fetch_glossary_terms([unit], include_variants=False)
-            entries = self._get_glossary_entries([unit])
+            entries = self._get_batch_glossary([unit])
         except (AttributeError, TypeError, ValueError):
             return ""
         return hash_to_checksum(calculate_hash(json.dumps(entries, sort_keys=True)))
@@ -1039,16 +1097,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None = None,
     ) -> str:
-        glossary: list[LLMGlossaryEntry] = []
-
         units = [unit for _text, unit in sources if unit is not None]
-        if units:
-            missing_glossary_terms = [
-                unit for unit in units if getattr(unit, "glossary_terms", None) is None
-            ]
-            if missing_glossary_terms:
-                fetch_glossary_terms(missing_glossary_terms, include_variants=False)
-            glossary = self._get_glossary_entries(units)
+        glossary = self._get_batch_glossary(units)
 
         inputs = []
         occurrence_counts: dict[tuple[int | None, str], int] = defaultdict(int)
@@ -1135,6 +1185,36 @@ class BaseLLMTranslation(BatchMachineTranslation):
             return PluralMapper(source_plural, target_plural).map(unit, secondary_unit)
         return secondary_unit.get_target_plurals()
 
+    @staticmethod
+    def _filter_confirmed_examples(candidates, translation):
+        """
+        Drop examples the engine itself produced.
+
+        Examples are picked by recency, so on any run after the first the
+        freshest strings are this engine's own output and its defects come
+        back as something to imitate. Review state is the strongest signal of
+        human confirmation; without review, the last content change tells
+        whether a human touched the string.
+        """
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.actions import ActionEvents
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models import Change
+
+        if getattr(translation, "enable_review", False):
+            return candidates.filter(state__gte=STATE_APPROVED)
+        last_content_action = (
+            Change.objects.filter(
+                unit=OuterRef("pk"), action__in=Change.ACTIONS_CONTENT
+            )
+            .order_by("-timestamp")
+            .values("action")[:1]
+        )
+        return candidates.annotate(
+            last_content_action=Subquery(last_content_action)
+        ).exclude(last_content_action=ActionEvents.AUTO)
+
     def _get_project_previous_examples(
         self,
         source_language: str,
@@ -1156,10 +1236,13 @@ class BaseLLMTranslation(BatchMachineTranslation):
         ]
 
         try:
-            candidates = unit_set.filter(
-                state__gte=STATE_TRANSLATED,
-                state__lt=STATE_READONLY,
-            ).exclude(target="")
+            candidates = self._filter_confirmed_examples(
+                unit_set.filter(
+                    state__gte=STATE_TRANSLATED,
+                    state__lt=STATE_READONLY,
+                ).exclude(target=""),
+                translation,
+            )
             if current_unit_ids:
                 candidates = candidates.exclude(pk__in=current_unit_ids)
             candidates = candidates.order_by("-last_updated")[
@@ -1283,7 +1366,16 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 ],
                 [],
             ),
-            json.dumps([example["target"] for example in examples], ensure_ascii=False),
+            # The demonstration is the strongest signal in the prompt, so it
+            # answers in the structured form the rules ask for rather than the
+            # legacy flat array of strings.
+            json.dumps(
+                [
+                    {"parts": self._get_string_parts(example["target"], None)}
+                    for example in examples
+                ],
+                ensure_ascii=False,
+            ),
         )
 
     def _get_previous_messages(
@@ -2323,6 +2415,51 @@ class BaseLLMTranslation(BatchMachineTranslation):
 
         return normalized_translations
 
+    @classmethod
+    def _validate_translation_prefix(
+        cls,
+        translations: JSONValue,
+        sources: list[tuple[str, Unit | None]],
+        source_occurrences: list[int] | None = None,
+    ) -> list[str]:
+        """
+        Validate the leading replies, stopping at the first unusable one.
+
+        Every item is checked exactly as in :meth:`_validate_translations`, so a
+        returned entry is as trustworthy as one from a complete reply.
+        """
+        if not isinstance(translations, list):
+            return []
+
+        occurrence_counts: dict[tuple[int | None, str], int] = defaultdict(int)
+        result: list[str] = []
+        for index, (source_text, unit) in enumerate(sources):
+            if index >= len(translations):
+                break
+            if source_occurrences is None:
+                occurrence_key = (id(unit) if unit is not None else None, source_text)
+                source_occurrence = occurrence_counts[occurrence_key]
+                occurrence_counts[occurrence_key] += 1
+            else:
+                source_occurrence = source_occurrences[index]
+
+            normalized = cls._normalize_translation_item(
+                translations[index], source_text, unit, source_occurrence
+            )
+            if normalized is None:
+                break
+            normalized = cls._placeholderize_assistant_reply(
+                normalized, source_text, unit
+            )
+            if cls._extract_placeholders(normalized) != cls._extract_placeholders(
+                source_text
+            ) or cls._extract_literal_at_suffixes(
+                normalized
+            ) != cls._extract_literal_at_suffixes(source_text):
+                break
+            result.append(normalized)
+        return result
+
     def download_multiple_translations(
         self,
         source_language,
@@ -2417,11 +2554,32 @@ class BaseLLMTranslation(BatchMachineTranslation):
         threshold: int = MACHINERY_DEFAULT_THRESHOLD,
         *,
         source_occurrences: list[int] | None = None,
+        rescue_budget: int = LLM_PREFIX_RESCUE_LIMIT,
     ) -> DownloadMultipleTranslations:
         try:
             return self._fetch_llm_batch(
                 source_language, target_language, sources, source_occurrences
             )
+        except PartialLLMReplyError as error:
+            if rescue_budget < 1:
+                tail = None
+            else:
+                rest, rest_occurrences = self._tail_sources(
+                    sources, source_occurrences, error.count
+                )
+                try:
+                    tail = self._download_multiple_translations_with_context_cache(
+                        source_language,
+                        target_language,
+                        rest,
+                        user,
+                        threshold,
+                        source_occurrences=rest_occurrences,
+                        rescue_budget=rescue_budget - 1,
+                    )
+                except MachineTranslationError:
+                    tail = None
+            return self._merge_half_translations([error.translations, tail], error)
         except MachineTranslationError as error:
             halves = self._split_sources(sources, source_occurrences)
             if halves is None:
@@ -2444,6 +2602,17 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 except MachineTranslationError:
                     results.append(None)
             return self._merge_half_translations(results, error)
+
+    @staticmethod
+    def _tail_sources(
+        sources: list[tuple[str, Unit | None]],
+        source_occurrences: list[int] | None,
+        start: int,
+    ) -> tuple[list[tuple[str, Unit | None]], list[int] | None]:
+        return (
+            sources[start:],
+            None if source_occurrences is None else source_occurrences[start:],
+        )
 
     @staticmethod
     def _split_sources(
@@ -2533,11 +2702,34 @@ class BaseLLMTranslation(BatchMachineTranslation):
         threshold: int = MACHINERY_DEFAULT_THRESHOLD,
         *,
         source_occurrences: list[int] | None = None,
+        rescue_budget: int = LLM_PREFIX_RESCUE_LIMIT,
     ) -> DownloadMultipleTranslations:
         try:
             return await self._afetch_llm_batch(
                 source_language, target_language, sources, source_occurrences
             )
+        except PartialLLMReplyError as error:
+            if rescue_budget < 1:
+                tail = None
+            else:
+                rest, rest_occurrences = self._tail_sources(
+                    sources, source_occurrences, error.count
+                )
+                try:
+                    tail = (
+                        await self._adownload_multiple_translations_with_context_cache(
+                            source_language,
+                            target_language,
+                            rest,
+                            user,
+                            threshold,
+                            source_occurrences=rest_occurrences,
+                            rescue_budget=rescue_budget - 1,
+                        )
+                    )
+                except MachineTranslationError:
+                    tail = None
+            return self._merge_half_translations([error.translations, tail], error)
         except MachineTranslationError as error:
             halves = self._split_sources(sources, source_occurrences)
             if halves is None:
@@ -2611,7 +2803,6 @@ class BaseLLMTranslation(BatchMachineTranslation):
             self.log_handled_error(msg, extra_log=translations_string)
             raise MachineTranslationError(msg)
 
-        result: DownloadMultipleTranslations = defaultdict(list)
         try:
             translations = json.loads(translations_string)
         except json.JSONDecodeError as error:
@@ -2637,10 +2828,31 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 translations, sources, source_occurrences
             )
         except MachineTranslationError as error:
+            # A reply that ends early still answered its first strings
+            # correctly; keep them and let the caller ask for the rest.
+            prefix = self._validate_translation_prefix(
+                self._normalize_translations(translations, len(sources)),
+                sources,
+                source_occurrences,
+            )
+            if prefix and len(prefix) < len(sources):
+                msg = f"Incomplete assistant reply: {len(prefix)}/{len(sources)}."
+                self.log_handled_error(msg, extra_log=translations_string)
+                raise PartialLLMReplyError(
+                    self._build_translation_results(prefix, sources), len(prefix)
+                ) from error
             msg = "Mismatching assistant reply."
             self.log_handled_error(msg, extra_log=translations_string)
             raise MachineTranslationError(msg) from error
 
+        return self._build_translation_results(translations, sources)
+
+    def _build_translation_results(
+        self,
+        translations: list[str],
+        sources: list[tuple[str, Unit | None]],
+    ) -> DownloadMultipleTranslations:
+        result: DownloadMultipleTranslations = defaultdict(list)
         for index, translation in enumerate(translations):
             text = sources[index][0]
             result[text].append(

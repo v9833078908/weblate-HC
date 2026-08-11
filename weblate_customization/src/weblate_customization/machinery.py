@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, ClassVar, cast
@@ -230,3 +231,80 @@ class RoutedLLMTranslation(OpenAITranslation):
             )
         finally:
             self._route_target.reset(token)
+
+    def get_chat_payload(
+        self,
+        model: str,
+        prompt: str,
+        content: str,
+        previous_content: str,
+        previous_response: str,
+    ) -> dict:
+        payload = super().get_chat_payload(
+            model, prompt, content, previous_content, previous_response
+        )
+        count = self._expected_reply_length(content)
+        if count:
+            payload["response_format"] = self._reply_format(count)
+            # A provider that silently ignores the schema would answer in a
+            # shape the parser rejects, so route only to ones that honour it.
+            provider = cast("dict[str, object]", payload.setdefault("provider", {}))
+            provider["require_parameters"] = True
+        return payload
+
+    @staticmethod
+    def _expected_reply_length(content: str) -> int:
+        """Return how many strings the batch asks for, taken from the request."""
+        try:
+            strings = json.loads(content)["strings"]
+        except (TypeError, KeyError, json.JSONDecodeError):
+            return 0
+        return len(strings) if isinstance(strings, list) else 0
+
+    @staticmethod
+    def _reply_format(count: int) -> dict:
+        """
+        Constrain the reply to one structured object per requested string.
+
+        The element count is the part that matters: a reply that ends early is
+        the dominant failure mode, and no prompt rule enforces the length.
+        Part fields stay optional because only placeholders carry them, and a
+        text part is rejected downstream unless it holds exactly type and text.
+        """
+        return {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "translations",
+                "schema": {
+                    "type": "array",
+                    "minItems": count,
+                    "maxItems": count,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "parts": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {
+                                            "type": "string",
+                                            "enum": ["text", "placeholder"],
+                                        },
+                                        "text": {"type": "string"},
+                                        "id": {"type": "string"},
+                                        "kind": {"type": "string"},
+                                        "role": {"type": "string"},
+                                        "close_id": {"type": "string"},
+                                        "translatable": {"type": "boolean"},
+                                    },
+                                    "required": ["type", "text"],
+                                },
+                            }
+                        },
+                        "required": ["parts"],
+                    },
+                },
+            },
+        }

@@ -9,6 +9,8 @@ from urllib.parse import quote, urljoin
 
 from django.core.cache import cache
 
+from weblate.logger import LOGGER
+
 from .base import (
     MachineryRateLimitError,
     MachineTranslationError,
@@ -60,16 +62,19 @@ class BaseOpenAITranslation(BaseLLMTranslation):
         )
         return self.parse_chat_response(response.json())
 
-    @staticmethod
     def get_chat_payload(
+        self,
         model: str,
         prompt: str,
         content: str,
         previous_content: str,
         previous_response: str,
     ) -> dict:
-        return {
+        payload = {
             "model": model,
+            # Translation under a strict markup contract needs determinism,
+            # not sampling variety.
+            "temperature": 0,
             "messages": [
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": previous_content},
@@ -77,6 +82,13 @@ class BaseOpenAITranslation(BaseLLMTranslation):
                 {"role": "user", "content": content},
             ],
         }
+        # Only sent when configured: a cap that is too low truncates a valid
+        # batch reply, and the provider default has not been observed to
+        # truncate one.
+        max_tokens = self.settings.get("max_tokens")
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
+        return payload
 
     @staticmethod
     def parse_chat_response(payload) -> str | None:
@@ -84,6 +96,14 @@ class BaseOpenAITranslation(BaseLLMTranslation):
         if choices:
             first_choice = choices[0]
             if isinstance(first_choice, dict):
+                # A reply that did not end on its own is truncated, and the
+                # resulting JSON is unparsable for a reason the caller cannot
+                # see otherwise.
+                finish_reason = first_choice.get("finish_reason")
+                if finish_reason not in {None, "stop"}:
+                    LOGGER.warning(
+                        "LLM reply ended with finish_reason=%s", finish_reason
+                    )
                 message = first_choice.get("message", {})
                 if isinstance(message, dict):
                     return message.get("content")

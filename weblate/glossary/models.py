@@ -116,6 +116,47 @@ def get_glossary_units(project, source_language, target_language):
     )
 
 
+def prepare_glossary_units(project, source_language, language, *, full: bool = False):
+    """Return glossary units carrying what flags, ordering and rendering need."""
+    from weblate.trans.models import (  # ruff: ignore[import-outside-top-level]
+        Component,
+        Project,
+    )
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.workspaces.models import Workspace
+
+    # Variant is used for variant grouping, source unit for flags
+    base_units = get_glossary_units(project, source_language, language).select_related(
+        "source_unit", "variant"
+    )
+    if full:
+        # Include full details needed for rendering
+        return base_units.prefetch()
+    # Component priority is needed for ordering, file format and flags for flags
+    return base_units.prefetch_related(
+        Prefetch(
+            "translation__component",
+            queryset=Component.objects.only(
+                "priority",
+                "file_format",
+                "check_flags",
+                "project",
+            ),
+        ),
+        Prefetch(
+            "translation__component__project",
+            queryset=Project.objects.only(
+                "check_flags",
+            ),
+        ),
+        Prefetch(
+            "translation__component__project__workspace",
+            queryset=Workspace.objects.defer_huge(),
+        ),
+    )
+
+
 def get_glossary_terms(
     unit: Unit, *, full: bool = False, include_variants: bool = True
 ) -> list[Unit]:
@@ -129,16 +170,6 @@ def fetch_glossary_terms(  # ruff: ignore[complex-structure]
     units: list[Unit], *, full: bool = False, include_variants: bool = True
 ) -> None:
     """Fetch glossary terms for list of units."""
-    from weblate.trans.models import (  # ruff: ignore[import-outside-top-level]
-        Component,
-        Project,
-    )
-
-    # ruff: ignore[import-outside-top-level]
-    from weblate.workspaces.models import (
-        Workspace,
-    )
-
     if len(units) == 0:
         return
 
@@ -197,41 +228,14 @@ def fetch_glossary_terms(  # ruff: ignore[complex-structure]
             if not terms:
                 continue
 
-            base_units = get_glossary_units(project, source_language, language)
-            # Variant is used for variant grouping below, source unit for flags
-            base_units = base_units.select_related("source_unit", "variant")
+            base_units = prepare_glossary_units(
+                project, source_language, language, full=full
+            )
 
             # Exclude currently edited unit items to prevent self-referencing glossary items
             current_unit_ids = [u.pk for u in translation_units[translation_id] if u.pk]
             if current_unit_ids:
                 base_units = base_units.exclude(pk__in=current_unit_ids)
-
-            if full:
-                # Include full details needed for rendering
-                base_units = base_units.prefetch()
-            else:
-                # Component priority is needed for ordering, file format and flags for flags
-                base_units = base_units.prefetch_related(
-                    Prefetch(
-                        "translation__component",
-                        queryset=Component.objects.only(
-                            "priority",
-                            "file_format",
-                            "check_flags",
-                            "project",
-                        ),
-                    ),
-                    Prefetch(
-                        "translation__component__project",
-                        queryset=Project.objects.only(
-                            "check_flags",
-                        ),
-                    ),
-                    Prefetch(
-                        "translation__component__project__workspace",
-                        queryset=Workspace.objects.defer_huge(),
-                    ),
-                )
 
             glossary_units = list(
                 base_units.filter(

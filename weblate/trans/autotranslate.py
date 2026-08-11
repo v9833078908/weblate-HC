@@ -148,7 +148,8 @@ def fetch_machinery_matches(
     log_translation: Translation | None = None,
     on_batch: Callable[[list[Unit]], None] | None = None,
 ) -> dict[int, UnitMemoryResultDict]:
-    """Fetch machinery matches without applying them to units.
+    """
+    Fetch machinery matches without applying them to units.
 
     ``on_batch`` receives every batch as soon as it is fetched, on the calling
     thread. It is ignored for more than one service, because a unit's best
