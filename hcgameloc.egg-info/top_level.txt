@@ -1,3 +1,0 @@
-weblate
-weblate-mcp
-weblate_customization

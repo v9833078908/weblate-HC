@@ -46,7 +46,7 @@ weblate-*.tar.*
 /.mcp.json
 /.omx/
 /weblate-mcp/
-/*..egg-info/
+/*.egg-info/
 
 # Production deployment secrets
 /deploy/.env
