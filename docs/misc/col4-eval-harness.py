@@ -18,6 +18,10 @@ Run inside the Weblate container::
         "import base64; exec(base64.b64decode('$B64').decode())"
 
 The last output line is ``EVAL_JSON {...}`` for diffing two runs.
+
+``EVAL_BATCH_SIZE`` and ``EVAL_CONCURRENCY`` override how many strings one
+request carries and how many requests fly at once, for measuring either against
+the same sample.
 """
 
 from __future__ import annotations
@@ -44,6 +48,9 @@ GLOSSARY_SLUG = os.environ.get("EVAL_GLOSSARY", "glossariy")
 ENGINE = os.environ.get("EVAL_ENGINE", "openrouter")
 SET_SIZE = int(os.environ.get("EVAL_SIZE", "150"))
 THRESHOLD = int(os.environ.get("EVAL_THRESHOLD", "75"))
+# Both default to what the service ships with.
+BATCH_SIZE = int(os.environ.get("EVAL_BATCH_SIZE", "0"))
+CONCURRENCY = int(os.environ.get("EVAL_CONCURRENCY", "0"))
 
 TERMINAL_PUNCTUATION = ".!?…:;"
 CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
@@ -137,6 +144,10 @@ def main() -> None:
     service = MACHINERY[ENGINE](machinery_settings[ENGINE])
     # A cached reply would measure the cache, not the pipeline.
     service.cache_translations = False
+    if BATCH_SIZE:
+        service.batch_size = BATCH_SIZE
+    if CONCURRENCY:
+        service.batch_concurrency = CONCURRENCY
     # A service stopped by an earlier run answers nothing at all, which would
     # otherwise be reported as a run with zero defects.
     was_rate_limited = service.is_rate_limited()
@@ -252,6 +263,8 @@ def main() -> None:
     result = {
         "set_size": len(units),
         "fingerprint": fingerprint(units),
+        "batch_size": service.batch_size,
+        "concurrency": service.batch_concurrency,
         "seconds": round(elapsed, 1),
         "requests": len(replies),
         "requests_logged": capture.requests,
