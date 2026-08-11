@@ -19,6 +19,7 @@ Weblate 2026.8.1
 * The sign-in page no longer states that names and usernames are visible publicly, and the :guilabel:`Full name` field no longer promises that the name is used in version-control commits when the site defaults to a private commit name.
 * The engine line separator ``$`` is now enforced where it is used tightly in the source: whitespace around a separator is removed automatically, and a separator lost or added by a translation is reported by the ``game-line-break`` check.
 * :ref:`Automatic translation <auto-translation>` now sends two batches of a large language model service at a time instead of one, fetches the glossary terms of a whole batch at once, and stores every batch as soon as it arrives, so a crash no longer discards the whole run.
+* A large language model machine translation request now carries ten strings instead of twenty, which answers no slower and no longer wastes replies on truncation or on the model's content filter.
 
 .. rubric:: Bug fixes
 

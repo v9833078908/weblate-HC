@@ -294,6 +294,13 @@ class BaseLLMTranslation(BatchMachineTranslation):
     settings_form: type[LLMBasicMachineryForm]
     max_score = 90
     request_timeout = 120
+    # Measured against production, 150 strings, three rounds each
+    # (docs/misc/col4-batch-size-eval.json): 20 strings per request wasted two
+    # replies of ten on truncation and had one blocked by the model's content
+    # filter, while 10 per request wasted none and answered no slower, because a
+    # reply is generated token by token. Fewer than 10 costs the prompt's
+    # punctuation contract instead: 5 per request tripled that defect.
+    batch_size = 10
     # An LLM reply is generated token by token, so a bigger batch takes
     # proportionally longer to answer and only parallel requests raise
     # throughput. Two keeps the request rate low enough that a provider is

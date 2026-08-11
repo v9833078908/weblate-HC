@@ -3895,6 +3895,12 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
         fetch_terms.assert_called_once_with(units, include_variants=False)
 
+    def test_batch_size(self) -> None:
+        # Measured, see docs/misc/col4-batch-size-eval.json: the generic 20 wasted
+        # replies on truncation and the content filter, and answered no faster.
+        self.assertEqual(self.MACHINE_CLS.batch_size, 10)
+        self.assertLess(self.MACHINE_CLS.batch_size, DummyTranslation.batch_size)
+
     def test_prompt_forbids_metadata_output(self) -> None:
         self.assertIn('object containing only "parts"', PROMPT)
         self.assertIn(
