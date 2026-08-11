@@ -639,7 +639,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 component.project, component.source_language, translation.language
             ).filter(state__gte=STATE_TRANSLATED)[: LLM_FULL_GLOSSARY_LIMIT + 1]
         )
-        if len(terms) > LLM_FULL_GLOSSARY_LIMIT:
+        # Above the limit, or with nothing visible to read, leave it to the
+        # matcher rather than sending an empty glossary.
+        if not terms or len(terms) > LLM_FULL_GLOSSARY_LIMIT:
             return None
         return terms
 

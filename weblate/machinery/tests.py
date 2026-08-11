@@ -136,6 +136,14 @@ def make_error_response(
     return httpx2.Response(status_code, request=request, text=text)
 
 
+def previous_response_texts(previous_response: str) -> list[str]:
+    """Flatten the structured few-shot reply back into plain strings."""
+    return [
+        "".join(part["text"] or part.get("id", "") for part in item["parts"])
+        for item in json.loads(previous_response)
+    ]
+
+
 class InternalTestTranslation(InternalMachineTranslation):
     name = "Test Internal"
     settings_form = BaseMachineryForm
@@ -4074,7 +4082,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 list(LLM_NEUTRAL_PREVIOUS_EXAMPLE_SOURCES),
             )
             self.assertEqual(
-                json.loads(previous_response),
+                previous_response_texts(previous_response),
                 list(LLM_NEUTRAL_PREVIOUS_EXAMPLE_SOURCES),
             )
             self.assertNotIn("Nazdar", previous_content)
@@ -4121,7 +4129,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 list(LLM_CURATED_PREVIOUS_EXAMPLE_SOURCES),
             )
             self.assertEqual(
-                json.loads(previous_response),
+                previous_response_texts(previous_response),
                 [
                     curated_translations[source]
                     for source in LLM_CURATED_PREVIOUS_EXAMPLE_SOURCES
@@ -4181,7 +4189,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 ],
             )
             self.assertEqual(
-                json.loads(previous_response),
+                previous_response_texts(previous_response),
                 [
                     curated_translations[source]
                     for source in LLM_CURATED_PREVIOUS_EXAMPLE_SOURCES
@@ -4242,7 +4250,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 [*LLM_CURATED_PREVIOUS_EXAMPLE_SOURCES, "Project source"],
             )
             self.assertEqual(
-                json.loads(previous_response),
+                previous_response_texts(previous_response),
                 [
                     *[
                         curated_translations[source]
@@ -5255,7 +5263,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         )
 
     @http_mock.activate
-    def test_translate_retries_failed_batch_in_halves(self) -> None:
+    def test_translate_continues_a_reply_that_ends_early(self) -> None:
         machine = self.get_machine()
         sources = ["Alpha", "Beta", "Gamma", "Delta"]
         requested: list[int] = []
@@ -5280,12 +5288,13 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 "en", "fr", [(text, None) for text in sources]
             )
 
-        self.assertEqual(requested, [4, 2, 2])
+        # The answered prefix is kept, so only the missing string is re-asked.
+        self.assertEqual(requested, [4, 1])
         for text in sources:
             self.assertEqual(translations[text][0]["text"], f"{text} (fr)")
 
     @http_mock.activate
-    def test_async_translate_retries_failed_batch_in_halves(self) -> None:
+    def test_async_translate_continues_a_reply_that_ends_early(self) -> None:
         machine = self.get_machine()
         sources = ["Alpha", "Beta", "Gamma", "Delta"]
         requested: list[int] = []
@@ -5311,9 +5320,40 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 "en", "fr", [(text, None) for text in sources]
             )
 
-        self.assertEqual(requested, [4, 2, 2])
+        self.assertEqual(requested, [4, 1])
         for text in sources:
             self.assertEqual(translations[text][0]["text"], f"{text} (fr)")
+
+    @http_mock.activate
+    def test_translate_stops_continuing_a_reply_that_never_finishes(self) -> None:
+        machine = self.get_machine()
+        sources = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta"]
+        requested: list[int] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            batch = [item["source"] for item in json.loads(content)["strings"]]
+            requested.append(len(batch))
+            # Every reply covers only half of what was asked, so continuing
+            # would never terminate on its own.
+            return json.dumps([f"{text} (fr)" for text in batch[: len(batch) // 2]])
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in sources]
+            )
+
+        # One request, then two continuations, then the budget hands over.
+        self.assertEqual(requested, [8, 4, 2])
+        for text in sources[:7]:
+            self.assertEqual(translations[text][0]["text"], f"{text} (fr)")
+        self.assertNotIn("Theta", translations)
 
     @http_mock.activate
     def test_translate_keeps_half_when_other_half_keeps_failing(self) -> None:
@@ -5420,7 +5460,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             )
             self.assertNotIn("[X", previous_content)
 
-            previous_translations = json.loads(previous_response)
+            previous_translations = previous_response_texts(previous_response)
             self.assertIn(
                 "<code>API</code> @@PH2@@",
                 previous_translations,
@@ -7276,7 +7316,7 @@ class OpenAILLMContextTest(FixtureComponentTestCase):
         ) -> str:
             previous_payload = json.loads(previous_content)
             previous_sources = [item["source"] for item in previous_payload["strings"]]
-            previous_translations = json.loads(previous_response)
+            previous_translations = previous_response_texts(previous_response)
             self.assertEqual(previous_payload["source_language"], "en")
             self.assertEqual(previous_payload["target_language"], "cs")
             self.assertEqual(
@@ -7354,7 +7394,7 @@ class OpenAILLMContextTest(FixtureComponentTestCase):
         ) -> str:
             previous_payload = json.loads(previous_content)
             previous_sources = [item["source"] for item in previous_payload["strings"]]
-            previous_translations = json.loads(previous_response)
+            previous_translations = previous_response_texts(previous_response)
             self.assertEqual(previous_payload["source_language"], "de")
             self.assertEqual(previous_payload["target_language"], "cs")
             self.assertIn("Danke, dass Weblate verwendet wird.", previous_sources)
