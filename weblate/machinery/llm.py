@@ -30,6 +30,7 @@ from weblate.lang.models import Language, PluralMapper
 from weblate.machinery.base import (
     MACHINERY_DEFAULT_THRESHOLD,
     BatchMachineTranslation,
+    MachineryRateLimitError,
     MachineTranslationError,
 )
 from weblate.utils.errors import add_breadcrumb
@@ -2562,6 +2563,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
             return self._fetch_llm_batch(
                 source_language, target_language, sources, source_occurrences
             )
+        except MachineryRateLimitError:
+            # Splitting a refused batch only sends more refused requests.
+            raise
         except PartialLLMReplyError as error:
             if rescue_budget < 1:
                 tail = None
@@ -2579,6 +2583,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
                         source_occurrences=rest_occurrences,
                         rescue_budget=rescue_budget - 1,
                     )
+                except MachineryRateLimitError:
+                    raise
                 except MachineTranslationError:
                     tail = None
             return self._merge_half_translations([error.translations, tail], error)
@@ -2601,6 +2607,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
                             source_occurrences=half_occurrences,
                         )
                     )
+                except MachineryRateLimitError:
+                    raise
                 except MachineTranslationError:
                     results.append(None)
             return self._merge_half_translations(results, error)
@@ -2710,6 +2718,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
             return await self._afetch_llm_batch(
                 source_language, target_language, sources, source_occurrences
             )
+        except MachineryRateLimitError:
+            # Splitting a refused batch only sends more refused requests.
+            raise
         except PartialLLMReplyError as error:
             if rescue_budget < 1:
                 tail = None
@@ -2729,6 +2740,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
                             rescue_budget=rescue_budget - 1,
                         )
                     )
+                except MachineryRateLimitError:
+                    raise
                 except MachineTranslationError:
                     tail = None
             return self._merge_half_translations([error.translations, tail], error)
@@ -2749,6 +2762,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
                             source_occurrences=half_occurrences,
                         )
                     )
+                except MachineryRateLimitError:
+                    raise
                 except MachineTranslationError:
                     results.append(None)
             return self._merge_half_translations(results, error)

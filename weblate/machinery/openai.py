@@ -10,6 +10,7 @@ from urllib.parse import quote, urljoin
 from django.core.cache import cache
 
 from weblate.logger import LOGGER
+from weblate.utils.requests import JSON_RESPONSE_ERRORS
 
 from .base import (
     MachineryRateLimitError,
@@ -30,11 +31,57 @@ class BaseOpenAITranslation(BaseLLMTranslation):
     def join_api_url(base_url: str, path: str) -> str:
         return urljoin(f"{base_url.rstrip('/')}/", path)
 
+    @staticmethod
+    def _get_upstream_error(response) -> dict | None:
+        """
+        Return the failure a gateway reports inside a successful response.
+
+        OpenRouter answers 200, puts the upstream refusal in the body and still
+        sends a truncated fragment of a reply. Read at the failure seam, that
+        fragment never reaches the parser, and the shared retry loop can back
+        off instead of the caller splitting the batch into more refused
+        requests.
+        """
+        try:
+            payload = response.json()
+        except JSON_RESPONSE_ERRORS:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        choices = payload.get("choices") or []
+        first_choice = choices[0] if choices and isinstance(choices[0], dict) else {}
+        error = first_choice.get("error") or payload.get("error")
+        return error if isinstance(error, dict) else None
+
+    @staticmethod
+    def _get_upstream_error_status(error: dict) -> int | None:
+        try:
+            return int(error.get("code"))
+        except (TypeError, ValueError):
+            return None
+
     def check_failure(self, response) -> None:
         if response.status_code == 429:
             message = self.get_error_detail(response) or "Rate limit exceeded"
             raise MachineryRateLimitError(message)
+        error = self._get_upstream_error(response)
+        if error is not None:
+            message = str(error.get("message") or "Upstream error")
+            if self._get_upstream_error_status(error) in self.retry_statuses:
+                raise MachineryRateLimitError(message)
+            raise MachineTranslationError(message)
         super().check_failure(response)
+
+    def should_retry(self, response, attempt: int) -> bool:
+        if super().should_retry(response, attempt):
+            return True
+        if attempt >= self.retry_attempts:
+            return False
+        error = self._get_upstream_error(response)
+        return (
+            error is not None
+            and self._get_upstream_error_status(error) in self.retry_statuses
+        )
 
     def fetch_llm_translations(
         self, prompt: str, content: str, previous_content: str, previous_response: str
@@ -92,21 +139,18 @@ class BaseOpenAITranslation(BaseLLMTranslation):
 
     @staticmethod
     def parse_chat_response(payload) -> str | None:
-        choices = payload.get("choices", []) if isinstance(payload, dict) else []
-        if choices:
-            first_choice = choices[0]
-            if isinstance(first_choice, dict):
-                # A reply that did not end on its own is truncated, and the
-                # resulting JSON is unparsable for a reason the caller cannot
-                # see otherwise.
-                finish_reason = first_choice.get("finish_reason")
-                if finish_reason not in {None, "stop"}:
-                    LOGGER.warning(
-                        "LLM reply ended with finish_reason=%s", finish_reason
-                    )
-                message = first_choice.get("message", {})
-                if isinstance(message, dict):
-                    return message.get("content")
+        if not isinstance(payload, dict):
+            return None
+        choices = payload.get("choices", [])
+        first_choice = choices[0] if choices and isinstance(choices[0], dict) else {}
+        # A reply that did not end on its own is truncated, and the resulting
+        # JSON is unparsable for a reason the caller cannot see otherwise.
+        finish_reason = first_choice.get("finish_reason")
+        if finish_reason not in {None, "stop"}:
+            LOGGER.warning("LLM reply ended with finish_reason=%s", finish_reason)
+        message_payload = first_choice.get("message", {})
+        if isinstance(message_payload, dict):
+            return message_payload.get("content")
         return None
 
 

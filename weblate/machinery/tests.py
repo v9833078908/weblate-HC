@@ -5355,6 +5355,60 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             self.assertEqual(translations[text][0]["text"], f"{text} (fr)")
         self.assertNotIn("Theta", translations)
 
+    def test_check_failure_raises_on_an_upstream_refusal(self) -> None:
+        machine = self.get_machine()
+        # A gateway answers 200, reports the upstream failure in the body and
+        # still sends a truncated fragment of a reply.
+        response = make_error_response(
+            "https://example.com/chat/completions",
+            200,
+            json_data={
+                "choices": [
+                    {
+                        "finish_reason": "error",
+                        "error": {"code": 429, "message": "rate-limited upstream"},
+                        "message": {"content": '[\n  {\n    "parts": [\n'},
+                    }
+                ]
+            },
+        )
+
+        with self.assertRaises(MachineryRateLimitError):
+            machine.check_failure(response)
+        # The shared retry loop backs off instead of giving up, but only for
+        # as many attempts as it is allowed.
+        self.assertTrue(machine.should_retry(response, 0))
+        self.assertFalse(machine.should_retry(response, machine.retry_attempts))
+
+    @http_mock.activate
+    def test_translate_does_not_split_a_refused_batch(self) -> None:
+        machine = self.get_machine()
+        sources = ["Alpha", "Beta", "Gamma", "Delta"]
+        requested: list[int] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            requested.append(len(json.loads(content)["strings"]))
+            msg = "rate-limited upstream"
+            raise MachineryRateLimitError(msg)
+
+        with (
+            patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ),
+            self.assertRaises(MachineryRateLimitError),
+        ):
+            machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in sources]
+            )
+
+        # Halving a refused batch would only send more refused requests.
+        self.assertEqual(requested, [4])
+
     @http_mock.activate
     def test_translate_keeps_half_when_other_half_keeps_failing(self) -> None:
         machine = self.get_machine()
