@@ -4,8 +4,29 @@ This file captures agent-specific guidance for working in the Weblate codebase.
 For application-developer workflows and broader product integration guidance, use
 `docs/devel/` instead of repeating that material here.
 
-Sections after "Project-specific setup" describe this repository only; the
-sections before it are Weblate conventions inherited from the original codebase.
+"Working agreement" and every section from "Project-specific setup" onwards
+describe this repository only; the sections in between are Weblate conventions
+inherited from the original codebase.
+
+## Working agreement
+
+- Start every task with a plan and wait for approval. Before editing any file,
+  state what will change, in which files, how it will be verified, and what is
+  deliberately out of scope. Do not implement until the user approves it. For
+  multi-step work, put the plan in `docs/plans/` following the existing files
+  there. Answering questions, reading code, and research need no plan.
+- Implement only what the approved plan covers. When the work turns out to
+  need something the plan does not mention, stop and get that increment
+  approved instead of widening the change silently.
+- Never deploy without explicit approval. Deployment is anything that changes a
+  running instance: `deploy/vps.sh`, any command against `l10n.herocraft.com`
+  or the `hcgameloc-*` containers, production image builds, management commands
+  or `weblate shell` against production, and rebuilding or restarting the
+  shared `dev-docker` stack through `./rundev.sh`.
+- Committing and pushing is not deployment. The "Always finish by committing
+  and pushing" rule under "Code expectations" applies once an approved
+  implementation is complete and verified; it never authorises starting work or
+  deploying.
 
 ## Project overview
 
