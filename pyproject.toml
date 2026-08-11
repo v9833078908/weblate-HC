@@ -386,7 +386,7 @@ count = true
 dictionary = "scripts/codespell.txt,-"
 # Vai is a language name
 ignore-words-list = "assertIn,Vai,master"
-skip = '*.po,*.pot,*.json,*.tmx,*.tbx,*.csv,*/vendor/*,weblate/trans/specialchars.py,weblate/trans/tests/data/known_hosts,docs/changes/contributors/*.rst'
+skip = '*.po,*.pot,*.json,*.tmx,*.tbx,*.csv,*/vendor/*,weblate/trans/specialchars.py,weblate/trans/tests/data/known_hosts,docs/changes/contributors/*.rst,docs/misc/*'
 
 [tool.coverage.paths]
 source = [
@@ -797,6 +797,7 @@ extend-exclude = [
   "**.po",
   "**.pot",
   "docs/changes/contributors",
+  "docs/misc",
   "docs/specs",
   "scripts/codespell.txt",
   "scripts/spdx-license-list",

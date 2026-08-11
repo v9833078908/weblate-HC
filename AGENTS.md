@@ -176,8 +176,9 @@ Repository-specific parts:
 - `weblate-mcp/` (gitignored, its own git repo) - vendored `@mmntm/weblate-mcp`,
   a NestJS MCP server that talks to the local Weblate REST API. Its `.env` points
   at `http://localhost:3001/api/`.
-- `docs/plans/`, `docs/specs/` - planning and design docs (in Russian) for
-  game-localization workflows, e.g. `llm-judge-external-pipeline.md`.
+- `docs/plans/`, `docs/specs/`, `docs/misc/` - planning and design docs (in
+  Russian) for game-localization workflows, e.g.
+  `llm-judge-external-pipeline.md`. See "Where new files go" below.
 - `loc_kit_ingest/` (tracked) - standalone loc-kit importer package (no Django
   imports): `reader.py` (CSV/TSV/XLSX), `infer.py` (derives a strict profile
   from the kit's own header row), `profile.py` (closed schema with two
@@ -219,6 +220,19 @@ Repository-specific parts:
 Local modifications to `dev-docker/docker-compose.yml`: Postgres published on
 `5434` (5433 is taken by another project) and `WEBLATE_VCS_ALLOW_SCHEMES` extended
 with `file` so local git repos can be used as translation sources.
+
+### Where new files go
+
+Every file and document produced while working in this repository belongs under
+`docs/`. Do not leave deliverables, exports, or notes in the repository root.
+
+- `docs/plans/` - development plans.
+- `docs/specs/` - specifications and the plans developers implement against.
+- `docs/misc/` - everything else, including data files, exports, and one-off
+  deliverables.
+
+Sphinx builds only `.rst`, so Markdown and data files in these directories are
+ignored by the documentation build and need no toctree entry.
 
 ## Development environment
 

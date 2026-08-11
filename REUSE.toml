@@ -29,6 +29,7 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 [[annotations]]
 path = [
   "docs/**.md",
+  "docs/misc/**",
   "hcgameloc.egg-info/**",
   "loc_kit_ingest/.gitignore",
   "loc_kit_ingest/pytest.ini",
