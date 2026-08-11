@@ -5,98 +5,173 @@
     "The content filter and the unparsable replies are artefacts of the 20-string batch. A batch of 10 or 5 finished every reply with stop and produced no rejects.",
     "A batch of 5 costs the punctuation contract: end_stop goes 18 -> 28 -> 63 of 150 strings. Both batch-5 arms report identical defect counts twenty minutes apart, so this is the model, not sampling. For scale, dropping the punctuation rule from the prompt altogether measured 58-71 (see 6a7a9a7).",
     "Prompt caching absorbs the repeated prompt, so four times the requests cost 10-25% more, not four times more.",
-    "Batch 10 at concurrency 2 is the candidate: no transport defects, end_stop inside the batch-20 variance band (29/28/18 across the runs in col4-eval-baseline.json), same cost."
+    "Batch 10 at concurrency 2 is the candidate: no transport defects, end_stop inside the batch-20 variance band (29/28/18 across the runs in col4-eval-baseline.json), same cost.",
+    "Confirmed on a second round: batch 10 reports end_stop 28 twice and batch 20 reports 18 with the same content filter and two unparsable replies. Every count reproduces, so the model is deterministic here and the difference is structural, not sampling. Batch 10 was also the faster arm of that round, 28.6 s and 29.6 s against 35.6 s."
   ],
   "arms": [
     {
       "batch_size": 20,
-      "concurrency": 2,
-      "requests": 10,
-      "requests_logged": 10,
-      "coverage_pct": 100.0,
-      "rejects": {
-        "json_error": 2
-      },
-      "finish_reasons": {
-        "content_filter": 1,
-        "stop": 9
-      },
-      "rate_limited_after": false,
+      "cached_tokens": 28176,
       "checks": {
         "end_stop": 18,
         "multiple_capital": 1,
         "reused": 2
       },
-      "glossary_adherence_pct": 100.0,
-      "cyrillic_leaked": 0,
-      "cached_tokens": 28176,
+      "concurrency": 2,
       "cost_usd": 0.033435,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "finish_reasons": {
+        "content_filter": 1,
+        "stop": 9
+      },
+      "glossary_adherence_pct": 100.0,
+      "rate_limited_after": false,
+      "rejects": {
+        "json_error": 2
+      },
+      "requests": 10,
+      "requests_logged": 10,
       "seconds": 34.3
     },
     {
       "batch_size": 10,
-      "concurrency": 2,
-      "requests": 15,
-      "requests_logged": 15,
-      "coverage_pct": 100.0,
-      "rejects": {},
-      "finish_reasons": {
-        "stop": 15
-      },
-      "rate_limited_after": false,
       "checks": {
         "end_stop": 28,
         "multiple_capital": 1,
         "reused": 2
       },
-      "glossary_adherence_pct": 100.0,
-      "cyrillic_leaked": 0,
+      "concurrency": 2,
       "cost_usd": 0.033006,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "finish_reasons": {
+        "stop": 15
+      },
+      "glossary_adherence_pct": 100.0,
+      "rate_limited_after": false,
+      "rejects": {},
+      "requests": 15,
+      "requests_logged": 15,
       "seconds": 58.1
     },
     {
       "batch_size": 5,
-      "concurrency": 2,
-      "requests": 30,
-      "requests_logged": 30,
-      "coverage_pct": 100.0,
-      "rejects": {},
-      "finish_reasons": {
-        "stop": 30
-      },
-      "rate_limited_after": false,
+      "cached_tokens": 61448,
       "checks": {
         "end_stop": 63,
         "multiple_capital": 1,
         "reused": 2
       },
-      "glossary_adherence_pct": 100.0,
-      "cyrillic_leaked": 0,
-      "cached_tokens": 61448,
+      "concurrency": 2,
       "cost_usd": 0.04167,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "finish_reasons": {
+        "stop": 30
+      },
+      "glossary_adherence_pct": 100.0,
+      "rate_limited_after": false,
+      "rejects": {},
+      "requests": 30,
+      "requests_logged": 30,
       "seconds": 92.8
     },
     {
       "batch_size": 5,
-      "concurrency": 4,
-      "requests": 30,
-      "requests_logged": 30,
-      "coverage_pct": 100.0,
-      "rejects": {},
-      "finish_reasons": {
-        "stop": 30
-      },
-      "rate_limited_after": false,
+      "cached_tokens": 78726,
       "checks": {
         "end_stop": 63,
         "multiple_capital": 1,
         "reused": 2
       },
-      "glossary_adherence_pct": 100.0,
-      "cyrillic_leaked": 0,
-      "cached_tokens": 78726,
+      "concurrency": 4,
       "cost_usd": 0.036997,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "finish_reasons": {
+        "stop": 30
+      },
+      "glossary_adherence_pct": 100.0,
+      "rate_limited_after": false,
+      "rejects": {},
+      "requests": 30,
+      "requests_logged": 30,
       "seconds": 53.1
     }
-  ]
+  ],
+  "repeat": {
+    "_comment": "Second round twenty minutes later, same sample, to check whether the defect counts reproduce. They do, exactly. Batch 10 also came back faster than batch 20 here: a 20-string reply is generated token by token and two of its replies are wasted.",
+    "arms": [
+      {
+        "batch_size": 10,
+        "cached_tokens": 31864,
+        "checks": {
+          "end_stop": 28,
+          "multiple_capital": 1,
+          "reused": 2
+        },
+        "concurrency": 2,
+        "cost_usd": 0.033268,
+        "coverage_pct": 100.0,
+        "cyrillic_leaked": 0,
+        "finish_reasons": {
+          "stop": 15
+        },
+        "glossary_adherence_pct": 100.0,
+        "rate_limited_after": false,
+        "rejects": {},
+        "requests": 15,
+        "requests_logged": 15,
+        "seconds": 28.6
+      },
+      {
+        "batch_size": 10,
+        "cached_tokens": 49245,
+        "checks": {
+          "end_stop": 28,
+          "multiple_capital": 1,
+          "reused": 2
+        },
+        "concurrency": 2,
+        "cost_usd": 0.028575,
+        "coverage_pct": 100.0,
+        "cyrillic_leaked": 0,
+        "finish_reasons": {
+          "stop": 15
+        },
+        "glossary_adherence_pct": 100.0,
+        "rate_limited_after": false,
+        "rejects": {},
+        "requests": 15,
+        "requests_logged": 15,
+        "seconds": 29.6
+      },
+      {
+        "batch_size": 20,
+        "cached_tokens": 27191,
+        "checks": {
+          "end_stop": 18,
+          "multiple_capital": 1,
+          "reused": 2
+        },
+        "concurrency": 2,
+        "cost_usd": 0.027921,
+        "coverage_pct": 100.0,
+        "cyrillic_leaked": 0,
+        "finish_reasons": {
+          "content_filter": 1,
+          "stop": 9
+        },
+        "glossary_adherence_pct": 100.0,
+        "rate_limited_after": false,
+        "rejects": {
+          "json_error": 2
+        },
+        "requests": 10,
+        "requests_logged": 10,
+        "seconds": 35.6
+      }
+    ]
+  }
 }
