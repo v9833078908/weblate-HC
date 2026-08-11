@@ -1,0 +1,35 @@
+{
+  "_comment": "Baseline of docs/misc/col4-eval-harness.py against the deployed prod image (commit 5c68a26): no ensure_ascii=False, no temperature, no max_tokens, no response_format, bisect retry.",
+  "_captured": "2026-08-11T11:10Z",
+  "cached_tokens": 5197,
+  "checks": {
+    "end_stop": 50,
+    "multiple_capital": 1,
+    "reused": 3
+  },
+  "completion_tokens": 6386,
+  "cost_usd": 0.029392,
+  "coverage_pct": 100.0,
+  "cyrillic_leaked": 0,
+  "final_punctuation_added": 50,
+  "fingerprint": "4db4b89dfd4b",
+  "finish_reasons": {
+    "stop": 10
+  },
+  "glossary_adherence_pct": 100.0,
+  "glossary_applied": 16,
+  "glossary_missed_terms": {},
+  "glossary_occurrences": 16,
+  "length_ratio_avg": 1.277,
+  "length_ratio_over_130pct": 65,
+  "prompt_tokens": 49433,
+  "rejects": {
+    "mismatch": 2
+  },
+  "rejects_total": 2,
+  "requests": 10,
+  "requests_logged": 10,
+  "seconds": 22.2,
+  "set_size": 150,
+  "translated": 150
+}

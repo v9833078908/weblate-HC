@@ -687,6 +687,8 @@ max-complexity = 16  # TODO: should be lower
 "docs/_ext/*.py" = ["INP001"]
 "docs/_ext/test_*.py" = ["S101"]
 "docs/conf.py" = ["ERA001", "INP001"]
+# One-off operator scripts piped into `weblate shell`, not importable modules
+"docs/misc/*.py" = ["C901", "INP001", "PLR0914", "T201"]
 "fuzzing/targets.py" = ["PLC0415"]
 "scripts/*" = ["T201", "T203"]
 "weblate/*/migrations/*.py" = ["RUF012"]
@@ -792,6 +794,8 @@ Vai = "Vai"  # Language name
 [tool.typos.default.extend-words]
 # Name
 Automattic = "Automattic"
+# ISO 639-1 language codes that read as misspellings
+ba = "ba"  # Bashkir
 billling = "billing"
 Certifi = "Certifi"
 # Used in settings, but could be fixed
