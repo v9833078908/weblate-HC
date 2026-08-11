@@ -79,8 +79,8 @@ WEBLATE_DEFAULT_FROM_EMAIL=loc@herocraft.example
 
 # --- Hero Craft customizations -----------------------------------------
 WEBLATE_ADD_MACHINERY=weblate_customization.machinery.RoutedLLMTranslation
-WEBLATE_ADD_CHECK=weblate_customization.checks.GameMarkupCheck,weblate_customization.checks.GameLineBreakCheck
-WEBLATE_ADD_AUTOFIX=weblate_customization.autofixes.LineSeparatorSpacing
+WEBLATE_ADD_CHECK=weblate_customization.checks.GameMarkupCheck,weblate_customization.checks.GameLineBreakCheck,weblate_customization.checks.CyrillicLeakCheck
+WEBLATE_ADD_AUTOFIX=weblate_customization.autofixes.LineSeparatorSpacing,weblate_customization.autofixes.RemoveAddedFinalStop,weblate_customization.autofixes.AddFrenchPunctuationSpacing
 
 # Loc-kit glossary profile analysis (separate OpenRouter configuration,
 # unrelated to the OpenRouter machinery configured in the web UI). The model
@@ -92,7 +92,15 @@ WEBLATE_LOC_KIT_PROFILE_OPENROUTER_KEY=
 WEBLATE_LOC_KIT_PROFILE_OPENROUTER_MODEL=google/gemini-2.5-flash
 
 # --- VCS ----------------------------------------------------------------
-WEBLATE_VCS_ALLOW_SCHEMES=https,ssh,git
+# `http` is needed for the office SCM-Manager, which serves Git over plain
+# HTTP only (http://192.168.0.3:8080/scm/git/<repo>).
+WEBLATE_VCS_ALLOW_SCHEMES=https,ssh,git,http
+
+# Hosts Weblate may clone from. Weblate refuses private or non-public targets
+# unless the host is listed here, so the office SCM-Manager needs an entry.
+# The list is exclusive: once it is non-empty, every other repository host has
+# to be added as well. Internal `local:` and `weblate://` URLs are unaffected.
+WEBLATE_VCS_ALLOW_HOSTS=192.168.0.3
 
 # --- Sizing -------------------------------------------------------------
 # hc-srv15-localizer has 4 vCPU and 7.7 GB RAM shared with the cathedral
