@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import random
 import re
@@ -126,6 +127,12 @@ class BatchMachineTranslation(DocVersionsMixin):
     sends_data_to_third_party = True
     settings_form: type[BaseMachineryForm] | None = BaseMachineryForm
     request_timeout = 5
+    # A request answered with one of these is repeated instead of raising: the
+    # caller turns such a failure into a service-wide stop that silently drops
+    # every string left in a batch run.
+    retry_statuses: ClassVar[frozenset[int]] = frozenset({429, 503})
+    retry_attempts = 3
+    max_retry_delay = 30
     is_available = True
     replacement_start = "[X"
     replacement_end = "X]"
@@ -339,48 +346,81 @@ class BatchMachineTranslation(DocVersionsMixin):
             "raise_for_status": False,
         }
 
+    def should_retry(self, response: httpx2.Response, attempt: int) -> bool:
+        return (
+            attempt < self.retry_attempts
+            and response.status_code in self.retry_statuses
+        )
+
+    def get_retry_delay(self, response: httpx2.Response, attempt: int) -> float:
+        """Wait as long as the service asks, or back off exponentially."""
+        retry_after = response.headers.get("Retry-After", "").strip()
+        delay = float(retry_after) if retry_after.isdigit() else 2.0**attempt
+        # Concurrent requests are answered at slightly different times, but a
+        # shared Retry-After would align their retries into a new burst.
+        # ruff: ignore[suspicious-non-cryptographic-random-usage]
+        return min(delay, self.max_retry_delay) * random.uniform(0.8, 1.3)
+
     def request(self, method, url, skip_auth=False, **kwargs):
-        """Perform JSON request."""
-        request_kwargs = self._prepare_request_kwargs(skip_auth, kwargs)
-        # Fire request
-        if self.allow_private_targets:
-            response = fetch_url(
-                method,
-                url,
-                **request_kwargs,
-            )
-        else:
-            response = fetch_validated_url(
-                method,
-                url,
-                allow_private_targets=False,
-                private_allowlist=settings.ALLOWED_MACHINERY_DOMAINS,
-                **request_kwargs,
-            )
+        """Perform JSON request, repeating it while the service asks to wait."""
+        attempt = 0
+        while True:
+            request_kwargs = self._prepare_request_kwargs(skip_auth, kwargs)
+            # Fire request
+            if self.allow_private_targets:
+                response = fetch_url(
+                    method,
+                    url,
+                    **request_kwargs,
+                )
+            else:
+                response = fetch_validated_url(
+                    method,
+                    url,
+                    allow_private_targets=False,
+                    private_allowlist=settings.ALLOWED_MACHINERY_DOMAINS,
+                    **request_kwargs,
+                )
 
-        self.check_failure(response)
+            try:
+                self.check_failure(response)
+            except Exception:
+                if not self.should_retry(response, attempt):
+                    raise
+            else:
+                return response
 
-        return response
+            time.sleep(self.get_retry_delay(response, attempt))
+            attempt += 1
 
     async def arequest(self, method, url, skip_auth=False, **kwargs):
         """Perform JSON request without blocking the event loop."""
-        request_kwargs = await sync_to_async(self._prepare_request_kwargs)(
-            skip_auth, kwargs
-        )
-        if self.allow_private_targets:
-            response = await async_fetch_url(method, url, **request_kwargs)
-        else:
-            response = await async_fetch_validated_url(
-                method,
-                url,
-                allow_private_targets=False,
-                private_allowlist=settings.ALLOWED_MACHINERY_DOMAINS,
-                **request_kwargs,
+        attempt = 0
+        while True:
+            request_kwargs = await sync_to_async(self._prepare_request_kwargs)(
+                skip_auth, kwargs
             )
+            if self.allow_private_targets:
+                response = await async_fetch_url(method, url, **request_kwargs)
+            else:
+                response = await async_fetch_validated_url(
+                    method,
+                    url,
+                    allow_private_targets=False,
+                    private_allowlist=settings.ALLOWED_MACHINERY_DOMAINS,
+                    **request_kwargs,
+                )
 
-        self.check_failure(response)
+            try:
+                self.check_failure(response)
+            except Exception:
+                if not self.should_retry(response, attempt):
+                    raise
+            else:
+                return response
 
-        return response
+            await asyncio.sleep(self.get_retry_delay(response, attempt))
+            attempt += 1
 
     def download_languages(self):
         """Download list of supported languages from a service."""

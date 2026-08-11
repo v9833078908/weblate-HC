@@ -27,6 +27,7 @@ Weblate 2026.8.1
 * Large language model machine translation services now tolerate replies that echo reference fields such as the string key, accept an unwrapped single result, and retry a rejected batch in halves instead of discarding all its strings.
 * Loc-kit table import no longer scales superlinearly with the uploaded sheet, and refuses a sheet whose structure would otherwise be mapped into hundreds of regions; the stored import preview now bounds the number of warnings it keeps.
 * Large language model machine translation services now require the translation to end with the same punctuation as the source, and to repair an existing translation that fails a check instead of treating the check as context only.
+* A machine translation service answering HTTP 429 or 503 is now asked again after a delay instead of being stopped for everyone for half an hour, which used to leave the rest of an :ref:`automatic translation <auto-translation>` run untranslated without saying so. A stop that does happen is now reported as a warning of the run.
 
 .. rubric:: Compatibility
 

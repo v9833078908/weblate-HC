@@ -9524,3 +9524,74 @@ class SourceLanguageTranslateTestCase(FixtureTestCase):
                 "quality": [100],
             },
         )
+
+
+class RequestRetryTest(SimpleTestCase):
+    """Repeating a request the service refused for now."""
+
+    URL = "https://example.net/machinery-retry"
+
+    @staticmethod
+    def register(*responses: httpx2.Response) -> list[httpx2.Response]:
+        remaining = list(responses)
+
+        def callback(request: httpx2.Request) -> httpx2.Response:
+            return remaining.pop(0) if len(remaining) > 1 else remaining[0]
+
+        http_mock.register_callback("GET", RequestRetryTest.URL, callback=callback)
+        return remaining
+
+    @http_mock.activate
+    def test_retries_rate_limited(self) -> None:
+        self.register(
+            httpx2.Response(429, headers={"Retry-After": "0"}, text="slow down"),
+            httpx2.Response(200, text="{}"),
+        )
+        response = DummyTranslation({}).request("GET", self.URL)
+
+        self.assertEqual(response.status_code, 200)
+        http_mock.assert_call_count(self.URL, 2)
+
+    @http_mock.activate
+    def test_retries_unavailable(self) -> None:
+        self.register(
+            httpx2.Response(503, headers={"Retry-After": "0"}, text="try later"),
+            httpx2.Response(200, text="{}"),
+        )
+        response = DummyTranslation({}).request("GET", self.URL)
+
+        self.assertEqual(response.status_code, 200)
+        http_mock.assert_call_count(self.URL, 2)
+
+    @http_mock.activate
+    def test_gives_up_after_last_attempt(self) -> None:
+        self.register(httpx2.Response(429, headers={"Retry-After": "0"}, text="no"))
+        service = DummyTranslation({})
+
+        with self.assertRaises(httpx2.HTTPStatusError):
+            service.request("GET", self.URL)
+
+        http_mock.assert_call_count(self.URL, service.retry_attempts + 1)
+
+    @http_mock.activate
+    def test_does_not_retry_other_failures(self) -> None:
+        self.register(httpx2.Response(500, text="broken"))
+
+        with self.assertRaises(httpx2.HTTPStatusError):
+            DummyTranslation({}).request("GET", self.URL)
+
+        http_mock.assert_call_count(self.URL, 1)
+
+    def test_retry_delay_honours_retry_after(self) -> None:
+        service = DummyTranslation({})
+        response = httpx2.Response(429, headers={"Retry-After": "5"})
+
+        self.assertAlmostEqual(service.get_retry_delay(response, 0), 5, delta=5 * 0.3)
+
+    def test_retry_delay_is_capped(self) -> None:
+        service = DummyTranslation({})
+        response = httpx2.Response(429, headers={"Retry-After": "3600"})
+
+        self.assertLessEqual(
+            service.get_retry_delay(response, 0), service.max_retry_delay * 1.3
+        )

@@ -1146,14 +1146,19 @@ class RecordingTranslation(DummyTranslation):
         concurrency: int = 1,
         barrier: threading.Barrier | None = None,
         failing_ids: frozenset[int] = frozenset(),
+        rate_limited: bool = False,
     ) -> None:
         super().__init__({})
         self.batch_concurrency = concurrency
         self.barrier = barrier
         self.failing_ids = failing_ids
+        self.rate_limited = rate_limited
         self.lock = threading.Lock()
         self.batches: list[list[int]] = []
         self.threads: set[int] = set()
+
+    def is_rate_limited(self) -> bool:
+        return self.rate_limited
 
     def batch_translate(
         self,
@@ -1235,3 +1240,11 @@ class MachineryBatchFetchTest(SimpleTestCase):
 
         self.assertEqual(sorted(result), [0, 1, 2, 3])
         self.assertEqual(len(service.threads), 2)
+
+    def test_rate_limited_service_is_not_asked(self) -> None:
+        service = RecordingTranslation(concurrency=3, rate_limited=True)
+        result, progress = self.fetch(service, self.make_units(6))
+
+        self.assertEqual(result, {})
+        self.assertEqual(service.batches, [])
+        self.assertEqual(progress, [2, 4, 6])

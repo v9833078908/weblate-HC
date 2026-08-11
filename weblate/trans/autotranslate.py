@@ -58,6 +58,10 @@ def _fetch_machinery_batch(
 ) -> None:
     """Fetch a single batch, keeping a failure local to it."""
     try:
+        if service.is_rate_limited():
+            # The service refused often enough to be stopped for everyone; every
+            # remaining string would be dropped without a request anyway.
+            return
         service.batch_translate(batch, user, threshold=threshold)
     except MachineTranslationError as error:
         if log_translation is not None:
@@ -85,13 +89,19 @@ def _fetch_machinery_service(
     set_progress: Callable[[int], None] | None,
     progress_offset: int,
     concurrency: int,
+    on_batch: Callable[[list[Unit]], None] | None,
 ) -> None:
     """Fetch all batches of one service, in parallel when it allows it."""
     fetched = 0
 
-    def report(count: int) -> None:
+    def done(batch: list[Unit]) -> None:
+        nonlocal fetched
+        # Runs on the calling thread, so the callback may touch the database.
+        if on_batch is not None:
+            on_batch(batch)
+        fetched += len(batch)
         if set_progress is not None:
-            set_progress(progress_offset + count)
+            set_progress(progress_offset + fetched)
 
     if concurrency < 2:
         for batch in batches:
@@ -103,8 +113,7 @@ def _fetch_machinery_service(
                 log_translation=log_translation,
                 close_connections=False,
             )
-            fetched += len(batch)
-            report(fetched)
+            done(batch)
         return
 
     # Progress is reported from this thread because Celery keeps the current
@@ -126,8 +135,7 @@ def _fetch_machinery_service(
         }
         for future in as_completed(futures):
             future.result()
-            fetched += len(futures[future])
-            report(fetched)
+            done(futures[future])
 
 
 def fetch_machinery_matches(
@@ -138,9 +146,17 @@ def fetch_machinery_matches(
     threshold: int,
     set_progress: Callable[[int], None] | None = None,
     log_translation: Translation | None = None,
+    on_batch: Callable[[list[Unit]], None] | None = None,
 ) -> dict[int, UnitMemoryResultDict]:
-    """Fetch machinery matches without applying them to units."""
+    """Fetch machinery matches without applying them to units.
+
+    ``on_batch`` receives every batch as soon as it is fetched, on the calling
+    thread. It is ignored for more than one service, because a unit's best
+    result is only known once every service has answered.
+    """
     num_units = len(units)
+    if len(services) != 1:
+        on_batch = None
 
     for pos, translation_service in enumerate(services):
         batch_size = translation_service.batch_size
@@ -167,6 +183,7 @@ def fetch_machinery_matches(
             set_progress=set_progress,
             progress_offset=pos * num_units,
             concurrency=concurrency,
+            on_batch=on_batch,
         )
 
     return {
@@ -274,6 +291,7 @@ class AutoTranslate(BaseAutoTranslate):
         self.translation: Translation = translation
         translation.component.start_batched_checks()
         self.progress_base = 0
+        self.written: set[int] = set()
         self.target_state = STATE_TRANSLATED
         if self.mode == "fuzzy":
             self.target_state = STATE_FUZZY
@@ -514,7 +532,10 @@ class AutoTranslate(BaseAutoTranslate):
         self.post_process()
 
     def fetch_mt(
-        self, engines_list: list[str], threshold: int
+        self,
+        engines_list: list[str],
+        threshold: int,
+        on_batch: Callable[[list[Unit]], None] | None = None,
     ) -> dict[int, UnitMemoryResultDict]:
         """Get the translations."""
         units: list[Unit] = list(self.get_units().select_related("source_unit"))
@@ -532,7 +553,11 @@ class AutoTranslate(BaseAutoTranslate):
             reverse=True,
         )
 
-        self.progress_base = len(engines) * num_units
+        # With a single service each batch is fetched and stored in one step,
+        # so the bar counts strings once; otherwise fetching fills its first
+        # half and storing the second.
+        incremental = on_batch is not None and len(engines) == 1
+        self.progress_base = 0 if incremental else len(engines) * num_units
         # Estimate number of strings to translate, this is adjusted in process_mt
         self.progress_steps = self.progress_base + num_units
 
@@ -543,21 +568,59 @@ class AutoTranslate(BaseAutoTranslate):
             threshold=threshold,
             set_progress=self.set_progress,
             log_translation=self.translation,
+            on_batch=on_batch,
         )
-        self.set_progress(self.progress_base)
+        for engine in engines:
+            if not engine.is_rate_limited():
+                continue
+            self.translation.log_error(
+                "%s is rate limited, some strings were left untranslated",
+                engine.name,
+            )
+            self.add_warning(
+                gettext(
+                    "%(service)s refused further requests, so some strings were "
+                    "left untranslated. Try again later."
+                )
+                % {"service": engine.name}
+            )
+        if not incremental:
+            self.set_progress(self.progress_base)
         return translations
 
     def process_mt(self, engines: list[str], threshold: int) -> None:
         """Perform automatic translation based on machine translation."""
-        translations = self.fetch_mt(engines, int(threshold))
+        translations = self.fetch_mt(engines, int(threshold), on_batch=self.store_batch)
 
         # Adjust total number to show correct progress
         self.progress_steps = self.progress_base + len(translations)
 
+        # Anything a batch callback did not cover, for instance when several
+        # services were queried.
+        remaining = {
+            unit_id: result
+            for unit_id, result in translations.items()
+            if unit_id not in self.written
+        }
+        if remaining:
+            self.store_results(remaining)
+
+        self.post_process()
+
+    def store_batch(self, units: list[Unit]) -> None:
+        """Store one fetched batch so a crash cannot discard the whole run."""
+        results = {
+            unit.id: unit.machinery
+            for unit in units
+            if unit.machinery and any(unit.machinery["quality"])
+        }
+        if results:
+            self.store_results(results)
+
+    def store_results(self, translations: dict[int, UnitMemoryResultDict]) -> None:
         with transaction.atomic():
-            # Perform the translation
             self.translation.log_info("updating %d strings", len(translations))
-            for pos, unit in enumerate(
+            for unit in (
                 self.translation.unit_set.filter(id__in=translations.keys())
                 .prefetch_bulk()
                 .select_for_update()
@@ -577,9 +640,11 @@ class AutoTranslate(BaseAutoTranslate):
                     translation["translation"],
                     user=user,
                 )
-                self.set_progress(self.progress_base + pos + 1)
-
-            self.post_process()
+            # Flush the deferred changes of this transaction; a later crash
+            # then leaves stored translations with their history intact.
+            self.translation.store_update_changes()
+        self.written.update(translations)
+        self.set_progress(self.progress_base + len(self.written))
 
     def perform(
         self,
