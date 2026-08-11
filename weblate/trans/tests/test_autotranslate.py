@@ -4,11 +4,15 @@
 
 """Test for automatic translation."""
 
+import threading
+from types import SimpleNamespace
+from typing import Any
 from unittest.mock import patch
 
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.test import SimpleTestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
@@ -19,9 +23,13 @@ from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Role, TeamMembership, User
 from weblate.configuration.models import Setting, SettingCategory
 from weblate.lang.models import Language, Plural
+from weblate.machinery.base import (
+    MACHINERY_DEFAULT_THRESHOLD,
+    MachineTranslationError,
+)
 from weblate.machinery.dummy import DummyTranslation
 from weblate.trans.actions import ActionEvents
-from weblate.trans.autotranslate import BatchAutoTranslate
+from weblate.trans.autotranslate import BatchAutoTranslate, fetch_machinery_matches
 from weblate.trans.forms import AutoForm
 from weblate.trans.models import (
     Change,
@@ -1125,3 +1133,105 @@ class AutoTranslationMtTest(ViewTestCase):
 
     def test_overwrite(self) -> None:
         self.perform_auto(overwrite="1", engines=["weblate"], threshold=80)
+
+
+class RecordingTranslation(DummyTranslation):
+    """Records received batches instead of translating them."""
+
+    batch_size = 2
+
+    def __init__(
+        self,
+        *,
+        concurrency: int = 1,
+        barrier: threading.Barrier | None = None,
+        failing_ids: frozenset[int] = frozenset(),
+    ) -> None:
+        super().__init__({})
+        self.batch_concurrency = concurrency
+        self.barrier = barrier
+        self.failing_ids = failing_ids
+        self.lock = threading.Lock()
+        self.batches: list[list[int]] = []
+        self.threads: set[int] = set()
+
+    def batch_translate(
+        self,
+        units,
+        user=None,
+        threshold: int = MACHINERY_DEFAULT_THRESHOLD,
+        *,
+        source_language=None,
+    ) -> None:
+        if self.barrier is not None:
+            self.barrier.wait()
+        with self.lock:
+            self.batches.append([unit.id for unit in units])
+            self.threads.add(threading.get_ident())
+        if self.failing_ids.intersection(unit.id for unit in units):
+            msg = "Recorded failure"
+            raise MachineTranslationError(msg)
+        for unit in units:
+            unit.machinery = {
+                "translation": ["translated"],
+                "quality": [90],
+                "origin": [self],
+            }
+
+
+class MachineryBatchFetchTest(SimpleTestCase):
+    """Batch scheduling done by fetch_machinery_matches."""
+
+    @staticmethod
+    def make_units(count: int) -> list[Any]:
+        return [SimpleNamespace(id=number, machinery={}) for number in range(count)]
+
+    def fetch(
+        self, service: RecordingTranslation, units: list[Any]
+    ) -> tuple[dict, list[int]]:
+        progress: list[int] = []
+        result = fetch_machinery_matches(
+            units=units,
+            user=None,
+            services=[service],
+            threshold=75,
+            set_progress=progress.append,
+        )
+        return result, progress
+
+    def test_serial(self) -> None:
+        service = RecordingTranslation()
+        result, progress = self.fetch(service, self.make_units(5))
+
+        self.assertEqual(sorted(result), [0, 1, 2, 3, 4])
+        self.assertEqual(service.batches, [[0, 1], [2, 3], [4]])
+        self.assertEqual(len(service.threads), 1)
+        self.assertEqual(progress, [2, 4, 5])
+
+    def test_parallel(self) -> None:
+        # The barrier makes a serial execution fail instead of just being slow.
+        service = RecordingTranslation(
+            concurrency=3, barrier=threading.Barrier(3, timeout=60)
+        )
+        result, progress = self.fetch(service, self.make_units(6))
+
+        self.assertEqual(sorted(result), [0, 1, 2, 3, 4, 5])
+        self.assertEqual(len(service.batches), 3)
+        self.assertEqual(len(service.threads), 3)
+        self.assertEqual(progress, [2, 4, 6])
+
+    def test_parallel_keeps_other_batches_on_failure(self) -> None:
+        service = RecordingTranslation(concurrency=3, failing_ids=frozenset({2}))
+        result, progress = self.fetch(service, self.make_units(6))
+
+        self.assertEqual(sorted(result), [0, 1, 4, 5])
+        self.assertEqual(progress, [2, 4, 6])
+
+    def test_concurrency_limited_to_batch_count(self) -> None:
+        service = RecordingTranslation(
+            concurrency=8, barrier=threading.Barrier(2, timeout=60)
+        )
+        result, _progress = self.fetch(service, self.make_units(4))
+
+        self.assertEqual(sorted(result), [0, 1, 2, 3])
+        self.assertEqual(len(service.threads), 2)

@@ -115,6 +115,9 @@ class BatchMachineTranslation(DocVersionsMixin):
     do_cleanup = True
     # Batch size is currently used in autotranslate
     batch_size = 20
+    # Number of batches autotranslate fetches in parallel. Only services whose
+    # requests are dominated by remote latency gain from more than one.
+    batch_concurrency = 1
     accounting_key = "external"
     force_uncleanup = False
     highlight_syntax = False

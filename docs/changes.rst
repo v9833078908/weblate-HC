@@ -18,6 +18,7 @@ Weblate 2026.8.1
 * Added :envvar:`WEBLATE_DEFAULT_LANGUAGE` to choose the interface language used for visitors whose browser language is not available.
 * The sign-in page no longer states that names and usernames are visible publicly, and the :guilabel:`Full name` field no longer promises that the name is used in version-control commits when the site defaults to a private commit name.
 * The engine line separator ``$`` is now enforced where it is used tightly in the source: whitespace around a separator is removed automatically, and a separator lost or added by a translation is reported by the ``game-line-break`` check.
+* :ref:`Automatic translation <auto-translation>` now sends the batches of a large language model service in parallel and fetches the glossary terms of a whole batch at once, which shortens a component-wide run several times.
 
 .. rubric:: Bug fixes
 

@@ -4,12 +4,13 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any, Literal
 
 from celery import current_task
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
+from django.db import connections, transaction
 from django.db.models import Case, IntegerField, QuerySet, Value, When
 from django.db.models.functions import MD5, Lower
 from django.utils.translation import gettext, ngettext
@@ -46,6 +47,89 @@ if TYPE_CHECKING:
     from weblate.utils.state import StringState
 
 
+def _fetch_machinery_batch(
+    *,
+    service: BatchMachineTranslation,
+    batch: list[Unit],
+    user: User | None,
+    threshold: int,
+    log_translation: Translation | None,
+    close_connections: bool,
+) -> None:
+    """Fetch a single batch, keeping a failure local to it."""
+    try:
+        service.batch_translate(batch, user, threshold=threshold)
+    except MachineTranslationError as error:
+        if log_translation is not None:
+            log_translation.log_error("failed automatic translation: %s", error)
+        else:
+            LOGGER.warning(
+                "failed machinery translation from %s: %s",
+                service.name,
+                error,
+            )
+    finally:
+        # Django only closes connections it opened for a request or a task, so a
+        # worker thread has to release its own.
+        if close_connections:
+            connections.close_all()
+
+
+def _fetch_machinery_service(
+    *,
+    service: BatchMachineTranslation,
+    batches: list[list[Unit]],
+    user: User | None,
+    threshold: int,
+    log_translation: Translation | None,
+    set_progress: Callable[[int], None] | None,
+    progress_offset: int,
+    concurrency: int,
+) -> None:
+    """Fetch all batches of one service, in parallel when it allows it."""
+    fetched = 0
+
+    def report(count: int) -> None:
+        if set_progress is not None:
+            set_progress(progress_offset + count)
+
+    if concurrency < 2:
+        for batch in batches:
+            _fetch_machinery_batch(
+                service=service,
+                batch=batch,
+                user=user,
+                threshold=threshold,
+                log_translation=log_translation,
+                close_connections=False,
+            )
+            fetched += len(batch)
+            report(fetched)
+        return
+
+    # Progress is reported from this thread because Celery keeps the current
+    # task in thread-local storage.
+    with ThreadPoolExecutor(
+        max_workers=concurrency, thread_name_prefix="machinery-batch"
+    ) as pool:
+        futures = {
+            pool.submit(
+                _fetch_machinery_batch,
+                service=service,
+                batch=batch,
+                user=user,
+                threshold=threshold,
+                log_translation=log_translation,
+                close_connections=True,
+            ): batch
+            for batch in batches
+        }
+        for future in as_completed(futures):
+            future.result()
+            fetched += len(futures[future])
+            report(fetched)
+
+
 def fetch_machinery_matches(
     *,
     units: list[Unit],
@@ -60,32 +144,30 @@ def fetch_machinery_matches(
 
     for pos, translation_service in enumerate(services):
         batch_size = translation_service.batch_size
+        batches = [
+            units[batch_start : batch_start + batch_size]
+            for batch_start in range(0, num_units, batch_size)
+        ]
+        concurrency = max(1, min(translation_service.batch_concurrency, len(batches)))
         if log_translation is not None:
             log_translation.log_info(
-                "fetching translations for %d units from %s, %d per request",
+                "fetching translations for %d units from %s, %d per request, %d in parallel",
                 num_units,
                 translation_service.name,
                 batch_size,
+                concurrency,
             )
 
-        for batch_start in range(0, num_units, batch_size):
-            if set_progress is not None:
-                set_progress(pos * num_units + batch_start)
-            try:
-                translation_service.batch_translate(
-                    units[batch_start : batch_start + batch_size],
-                    user,
-                    threshold=threshold,
-                )
-            except MachineTranslationError as error:
-                if log_translation is not None:
-                    log_translation.log_error("failed automatic translation: %s", error)
-                else:
-                    LOGGER.warning(
-                        "failed machinery translation from %s: %s",
-                        translation_service.name,
-                        error,
-                    )
+        _fetch_machinery_service(
+            service=translation_service,
+            batches=batches,
+            user=user,
+            threshold=threshold,
+            log_translation=log_translation,
+            set_progress=set_progress,
+            progress_offset=pos * num_units,
+            concurrency=concurrency,
+        )
 
     return {
         unit.id: unit.machinery

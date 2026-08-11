@@ -272,6 +272,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
     settings_form: type[LLMBasicMachineryForm]
     max_score = 90
     request_timeout = 120
+    # An LLM reply is generated token by token, so a bigger batch takes
+    # proportionally longer to answer and only parallel requests raise
+    # throughput.
+    batch_concurrency = 8
     glossary_support = True
     llm_context_support = True
     replacement_start = "@@PH"
@@ -361,6 +365,22 @@ class BaseLLMTranslation(BatchMachineTranslation):
         if started_cache:
             self._secondary_context_cache = None
 
+    @staticmethod
+    def _prefetch_glossary_terms(sources: list[tuple[str, Unit | None]]) -> None:
+        """
+        Fetch glossary terms for the whole batch at once.
+
+        The cache key of every string embeds its glossary terms, so without
+        this the terms are fetched one unit at a time, which costs a query per
+        unit instead of a query per batch.
+        """
+        units: dict[int, Unit] = {}
+        for _text, unit in sources:
+            if unit is not None and unit.glossary_terms is None:
+                units.setdefault(id(unit), unit)
+        if units:
+            fetch_glossary_terms(list(units.values()), include_variants=False)
+
     def _translate_sources(
         self,
         source_language,
@@ -371,6 +391,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
     ) -> list[list[TranslationResultDict]]:
         started_cache = self._ensure_secondary_context_cache()
         try:
+            self._prefetch_glossary_terms(sources)
             return super()._translate_sources(
                 source_language, target_language, sources, user, threshold
             )
@@ -488,7 +509,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
             "glossary": glossary,
             "strings": texts,
         }
-        return json.dumps(result)
+        return json.dumps(result, ensure_ascii=False)
 
     @staticmethod
     def _get_language_base_code(language: str) -> str:
@@ -1262,7 +1283,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 ],
                 [],
             ),
-            json.dumps([example["target"] for example in examples]),
+            json.dumps([example["target"] for example in examples], ensure_ascii=False),
         )
 
     def _get_previous_messages(
