@@ -2343,8 +2343,8 @@ Loc-kit glossary analysis
     the supplied value.
 
     The loc-kit analysis rate limits are configured with the generic
-    :envvar:`WEBLATE_RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS` and
-    :envvar:`WEBLATE_RATELIMIT_LOC_KIT_ANALYSIS_WINDOW` variables.
+    ``WEBLATE_RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS`` and
+    ``WEBLATE_RATELIMIT_LOC_KIT_ANALYSIS_WINDOW`` variables.
 
     .. seealso::
 
