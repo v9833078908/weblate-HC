@@ -51,6 +51,7 @@ THRESHOLD = int(os.environ.get("EVAL_THRESHOLD", "75"))
 # Both default to what the service ships with.
 BATCH_SIZE = int(os.environ.get("EVAL_BATCH_SIZE", "0"))
 CONCURRENCY = int(os.environ.get("EVAL_CONCURRENCY", "0"))
+MODEL = os.environ.get("EVAL_MODEL", "")
 
 TERMINAL_PUNCTUATION = ".!?…:;"
 CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
@@ -148,6 +149,14 @@ def main() -> None:
         service.batch_size = BATCH_SIZE
     if CONCURRENCY:
         service.batch_concurrency = CONCURRENCY
+    if MODEL:
+        # Route every language to one model for this instance only; the stored
+        # configuration is left alone.
+        service.settings = {
+            **service.settings,
+            "model": MODEL,
+            "routing": {"*": MODEL},
+        }
     # A service stopped by an earlier run answers nothing at all, which would
     # otherwise be reported as a run with zero defects.
     was_rate_limited = service.is_rate_limited()
@@ -263,6 +272,7 @@ def main() -> None:
     result = {
         "set_size": len(units),
         "fingerprint": fingerprint(units),
+        "model": MODEL or "configured",
         "batch_size": service.batch_size,
         "concurrency": service.batch_concurrency,
         "seconds": round(elapsed, 1),
