@@ -24,6 +24,7 @@ permissions:
 jobs:
   rundev:
     runs-on: ubuntu-24.04-arm
+    if: ${{ github.repository == 'WeblateOrg/weblate' }}
     name: Test development Docker
     env:
       PYTHONUNBUFFERED: 1
