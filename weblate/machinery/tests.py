@@ -3869,6 +3869,32 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN
         )
 
+    @http_mock.activate
+    def test_batch_fetches_glossary_terms_once(self) -> None:
+        """One query for a batch, not one per string of it."""
+        self.mock_response('["Ahoj", "Nazdar"]')
+        units = [
+            make_unit(code=self.SUPPORTED, source="Hello", target="target"),
+            make_unit(code=self.SUPPORTED, source="Hi", target="target"),
+        ]
+
+        def fetch(fetched: list[Unit], *, include_variants: bool) -> None:
+            # What the real function does, and what lets every later user of the
+            # terms, the cache key of a string and the prompt of a batch, reuse
+            # this one query.
+            for unit in fetched:
+                unit.glossary_terms = []
+
+        with (
+            patch(
+                "weblate.machinery.llm.fetch_glossary_terms", side_effect=fetch
+            ) as fetch_terms,
+            patch("weblate.machinery.llm.get_glossary_terms", return_value=[]),
+        ):
+            self.get_machine(use_cache=True).batch_translate(units)
+
+        fetch_terms.assert_called_once_with(units, include_variants=False)
+
     def test_prompt_forbids_metadata_output(self) -> None:
         self.assertIn('object containing only "parts"', PROMPT)
         self.assertIn(

@@ -296,8 +296,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
     request_timeout = 120
     # An LLM reply is generated token by token, so a bigger batch takes
     # proportionally longer to answer and only parallel requests raise
-    # throughput.
-    batch_concurrency = 8
+    # throughput. Two keeps the request rate low enough that a provider is
+    # unlikely to start refusing, because a refusal outliving the retries stops
+    # the service for everyone.
+    batch_concurrency = 2
     glossary_support = True
     llm_context_support = True
     replacement_start = "@@PH"

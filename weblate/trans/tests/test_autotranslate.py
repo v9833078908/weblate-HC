@@ -4,9 +4,11 @@
 
 """Test for automatic translation."""
 
+from __future__ import annotations
+
 import threading
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
 from django.conf import settings
@@ -45,6 +47,9 @@ from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.state import STATE_APPROVED, STATE_READONLY, STATE_TRANSLATED
 from weblate.utils.stats import ProjectLanguage
 from weblate.workspaces.models import Workspace
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class AutoTranslationTest(ViewTestCase):
@@ -1134,6 +1139,32 @@ class AutoTranslationMtTest(ViewTestCase):
     def test_overwrite(self) -> None:
         self.perform_auto(overwrite="1", engines=["weblate"], threshold=80)
 
+    def test_rate_limited_engine_reports_a_warning(self) -> None:
+        """A run that skipped strings may not look like a complete one."""
+        self.make_different()
+        path_params = {"path": [*self.component3.get_url_path(), "cs"]}
+
+        with patch(
+            "weblate.machinery.base.InternalMachineTranslation.is_rate_limited",
+            return_value=True,
+        ):
+            response = self.client.post(
+                reverse("auto_translation", kwargs=path_params),
+                {
+                    "auto_source": "mt",
+                    "q": "state:<translated",
+                    "mode": "translate",
+                    "engines": ["weblate"],
+                    "threshold": 80,
+                },
+                follow=True,
+            )
+
+        self.assertContains(response, "left untranslated")
+        translation = self.component3.translation_set.get(language_code="cs")
+        translation.invalidate_cache()
+        self.assertEqual(translation.stats.translated, 0)
+
 
 class RecordingTranslation(DummyTranslation):
     """Records received batches instead of translating them."""
@@ -1192,7 +1223,10 @@ class MachineryBatchFetchTest(SimpleTestCase):
         return [SimpleNamespace(id=number, machinery={}) for number in range(count)]
 
     def fetch(
-        self, service: RecordingTranslation, units: list[Any]
+        self,
+        service: RecordingTranslation,
+        units: list[Any],
+        on_batch: Callable[[list[Any]], None] | None = None,
     ) -> tuple[dict, list[int]]:
         progress: list[int] = []
         result = fetch_machinery_matches(
@@ -1201,6 +1235,7 @@ class MachineryBatchFetchTest(SimpleTestCase):
             services=[service],
             threshold=75,
             set_progress=progress.append,
+            on_batch=on_batch,
         )
         return result, progress
 
@@ -1248,3 +1283,53 @@ class MachineryBatchFetchTest(SimpleTestCase):
         self.assertEqual(result, {})
         self.assertEqual(service.batches, [])
         self.assertEqual(progress, [2, 4, 6])
+
+    def test_batch_callback_receives_every_batch(self) -> None:
+        service = RecordingTranslation()
+        stored: list[list[int]] = []
+
+        result, progress = self.fetch(
+            service,
+            self.make_units(5),
+            lambda batch: stored.append([unit.id for unit in batch]),
+        )
+
+        self.assertEqual(sorted(result), [0, 1, 2, 3, 4])
+        self.assertEqual(stored, [[0, 1], [2, 3], [4]])
+        self.assertEqual(progress, [2, 4, 5])
+
+    def test_batch_callback_runs_on_the_calling_thread(self) -> None:
+        # The callback writes the batch to the database, and both a Django
+        # connection and the Celery task of a run are thread-local.
+        service = RecordingTranslation(
+            concurrency=3, barrier=threading.Barrier(3, timeout=60)
+        )
+        callers: set[int] = set()
+
+        result, _progress = self.fetch(
+            service,
+            self.make_units(6),
+            lambda _batch: callers.add(threading.get_ident()),
+        )
+
+        self.assertEqual(len(result), 6)
+        self.assertEqual(len(service.threads), 3)
+        self.assertEqual(callers, {threading.get_ident()})
+
+    def test_batch_callback_skipped_for_several_services(self) -> None:
+        # A unit's best result is only known once every service has answered.
+        first = RecordingTranslation()
+        second = RecordingTranslation()
+        stored: list[list[int]] = []
+
+        fetch_machinery_matches(
+            units=self.make_units(4),
+            user=None,
+            services=[first, second],
+            threshold=75,
+            on_batch=lambda batch: stored.append([unit.id for unit in batch]),
+        )
+
+        self.assertEqual(stored, [])
+        self.assertEqual(len(first.batches), 2)
+        self.assertEqual(len(second.batches), 2)
