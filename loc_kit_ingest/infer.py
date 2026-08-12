@@ -74,6 +74,8 @@ _NOTE_HEADERS = frozenset(
     }
 )
 
+
+_IGNORABLE_HEADERS = frozenset({"id"})
 # Term/description detection. A glossary term is a name, a description is
 # prose: the gap is an order of magnitude in practice. Both bounds must hold,
 # so a kit of long terms falls back to one term per row instead of guessing.
@@ -622,15 +624,21 @@ def infer_glossary_profile(
     mapped = set(languages)
     if note_col is not None:
         mapped.add(note_col)
-    unmapped = sorted(populated - mapped)
-    if unmapped:
-        col = unmapped[0]
-        header_text = _cell(header_row, col) or f"column{col + 1}"
+    ignored_cols: list[int] = []
+    for col in sorted(populated - mapped):
+        header_text = _cell(header_row, col)
+        if header_text.strip().casefold() in _IGNORABLE_HEADERS:
+            ignored_cols.append(col)
+            notes.append(
+                f"column {col + 1} ({header_text!r}) is a technical "
+                "identifier; not imported"
+            )
+            continue
         msg = (
-            f"column {col + 1} ({header_text!r}) holds data but is not a "
-            "recognised language column; rename the header to a recognised "
-            "term-note header, for example note, description, comment, or "
-            "explanation, or supply an explicit profile"
+            f"column {col + 1} ({header_text or f'column{col + 1}'!r}) holds "
+            "data but is not a recognised language column; rename the header "
+            "to a recognised term-note header, for example note, description, "
+            "comment, or explanation, or supply an explicit profile"
         )
         raise InferenceError(msg)
 
@@ -746,6 +754,11 @@ def infer_glossary_profile(
         "regions": regions,
         "term_row_offset": 0,
     }
+    if ignored_cols:
+        grammar["ignored_columns"] = [
+            {"column": col + 1, "header": _cell(header_row, col)}
+            for col in ignored_cols
+        ]
     note_fields: list[dict[str, Any]] = []
     if paired:
         # A description cell is read by a note field, and a note field may

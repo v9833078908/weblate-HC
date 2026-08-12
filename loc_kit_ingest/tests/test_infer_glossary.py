@@ -450,3 +450,24 @@ def test_explicit_pairs_rejects_note_outside_term_rows(row: int) -> None:
     rows[row][2] = "необъявленная заметка"
     with pytest.raises(InferenceError, match="non-term row"):
         infer_glossary_profile("S", rows, component="s", layout="pairs")
+
+
+@pytest.mark.parametrize("header", ["id", "ID"])
+def test_technical_id_column_becomes_an_ignored_column(header: str) -> None:
+    rows = [
+        [header, "ru", "en"],
+        ["char_leon", "Леон", "Leon"],
+        ["char_aki", "Аки", "Aki"],
+    ]
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert comp["grammar"]["ignored_columns"] == [{"column": 1, "header": header}]
+    assert [lang["code"] for lang in comp["languages"]] == ["ru", "en"]
+    assert any("column 1" in note and "not imported" in note for note in notes)
+    parse_profile(document)
+
+
+def test_ignored_columns_absent_when_every_column_maps() -> None:
+    rows = [["ru", "en"], ["Леон", "Leon"], ["Аки", "Aki"]]
+    document, _notes = infer_glossary_profile("S", rows, component="s")
+    assert "ignored_columns" not in document["components"][0]["grammar"]
