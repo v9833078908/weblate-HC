@@ -734,6 +734,19 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertIn("en", codes)
 
     @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_confirmed_glossary_flags_terminology(self) -> None:
+        self._start(
+            upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug
+        )
+        with patch.object(Component, "update_branch", return_value=True):
+            self._confirm()
+        component = Component.objects.get(slug=self.slug, is_glossary=True)
+        sources = component.source_translation.unit_set.all()
+        self.assertTrue(sources)
+        for unit in sources:
+            self.assertIn("terminology", unit.all_flags)
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
     def test_term_description_sheet_maps_descriptions_as_explanations(self) -> None:
         """Термин и описание на соседних строках - одна запись, не две."""
         self._start(upload=self._csv("Terms.csv", GLOSSARY_PAIRS_CSV), slug=self.slug)
