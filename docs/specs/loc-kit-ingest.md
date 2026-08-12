@@ -43,6 +43,13 @@ Routed LLM).
 `csv` для UTF-8/UTF-8-BOM CSV/TSV. CSV/TSV имеет один лист с именем stem файла;
 XLSX использует имена листов без переименования.
 
+Для `.csv` импортёр выбирает между запятой, точкой с запятой и tab тем
+разделителем, при котором в верхних строках впервые распознаётся заголовок с
+кодами языков. Ничья и файл без языкового заголовка остаются запятой, как в
+прежнем поведении. Это устойчивость чтения, а не новая эвристика парсера:
+после чтения парсер по-прежнему принимает только явно объявленную структуру и
+не использует длину текста для угадывания полей.
+
 Профиль **выводится автоматически** из заголовка кита (`loc_kit_ingest/infer.py`):
 строка заголовка находится по первому распознанному коду языка (баннеры вроде
 `UI,,,` отсеиваются), ключ - колонка 1, языковые колонки распознаются по кодам
@@ -376,6 +383,15 @@ key-column object, поэтому у него нет `name`. `first_data_row`, `
 непустой строки после заголовка, не покрытой регионом, строкой секции или явным
 skip.
 
+`grammar.ignored_columns` перечисляет технические колонки как пары
+`column`/`header`. Заголовок каждой такой колонки обязан совпасть с листом,
+иначе profile отклоняется. Заполненная ячейка допустима без
+`tbx.unmapped_cell` только в объявленной ignored-колонке; неизвестная
+заполненная колонка остаётся error. `grammar.allow_empty_targets: true`
+разрешает пустой term в целевом языке record-map. Сгенерированный профиль
+ставит этот флаг только если target-язык содержит хотя бы один term, но имеет
+пропуски; иначе `tbx.missing_target_term` остаётся error.
+
 **Context identity.** Стабильный collision-free context термина - это каноническая
 сериализация пары `(section, source_term)`:
 `json.dumps([section, source_term], ensure_ascii=False, separators=(",",":"))` -
@@ -434,7 +450,7 @@ BCP-47 тег в `xml:lang`: например, `pt_PT` → `pt-PT`, `zh_Hans` �
 
 | Severity | Примеры |
 |---|---|
-| `error` | profile/schema/header/column/sheet mismatch, duplicate component/path/key/context, missing source, неизвестная строка, orphan term/description, unmapped cell (`tbx.unmapped_cell`), нечитабельный файл, ошибка записи/ZIP/contract validation |
+| `error` | profile/schema/header/column/sheet mismatch, duplicate component/path/key/context, missing source, missing target term without `allow_empty_targets`, неизвестная строка, orphan term/description, unmapped cell (`tbx.unmapped_cell`), нечитабельный файл, ошибка записи/ZIP/contract validation |
 | `warning` | target equals source, подозрительный алфавит в языковой колонке, пустой target в PO, заметка вместо перевода, явно пропущенная пустая строка |
 
 Отчёт содержит число юнитов, typed skipped rows и все diagnostics с адресом
