@@ -98,12 +98,14 @@ OpenAI только на Fable-размеченных стратах, но не 
 Файлы: `docs/misc/col4-judge-annotation.md` (протокол и разметка),
 записи вливаются в `col4-judge-golden.json`.
 
-**Выполнена 2026-08-12**: `docs/misc/col4-judge-annotation.md` +
-`docs/misc/col4-b0-annotations.jsonl` (260 юнитов по dev-зеркалу
-прод-прогона, seed 20260812: 183 pass / 77 defect; чистый пул
-78.3% pass, Wilson CI [72.3%, 83.3%], 5 скрытых major; чистая страта
-для B1 — 166 юнитов, цель >=150 закрыта). Дамп:
-`docs/misc/col4-b0-dump.py`.
+**Выполнена и дополнена 2026-08-12**:
+`docs/misc/col4-judge-annotation.md` +
+`docs/misc/col4-b0-annotations.jsonl` (исходные 260 юнитов) +
+`docs/misc/col4-b0-annotations-topup-20260812.jsonl` (300 новых
+кандидатов random-clean). Всего 560 юнитов: 436 pass / 124 defect;
+чистый пул - 419/512 = 81.8%, Wilson 95% CI [78.3%, 84.9%].
+Дамп: `docs/misc/col4-b0-dump.py`. Top-up размечен отдельно
+`openai-codex-gpt-5.6-terra-2026-08-12`; provenance хранится в записи.
 
 До сборки набора Fable размечает ~150-200 реальных строк прод-вывода
 COL4 fr (стратифицированная выборка: случайные + строки с failing
@@ -127,10 +129,11 @@ source ru, глоссарий, note, failing_checks. Два выхода:
 Файлы: `docs/misc/col4-judge-goldenset-build.py`,
 `docs/misc/col4-judge-golden.json`.
 
-**Выполнена 2026-08-12**: 599 записей, детерминированная сборка
-воспроизводима (`uv run python docs/misc/col4-judge-goldenset-build.py`,
-вывод байт-стабилен). Состав: clean 166 (train 25 / dev 75 / test 66),
-terminology 195 (23 / 95 / 77), mutation 238 (20 / 87 / 131).
+**Выполнена и дополнена 2026-08-12**: 919 записей, детерминированная
+сборка воспроизводима (`uv run python
+docs/misc/col4-judge-goldenset-build.py`, вывод байт-стабилен). Состав:
+clean 419 (train 63 / dev 189 / test 167), terminology 195
+(23 / 95 / 77), mutation 305 (24 / 92 / 189).
 
 Отклонения от плана и их основания:
 
@@ -159,13 +162,14 @@ terminology 195 (23 / 95 / 77), mutation 238 (20 / 87 / 131).
   другим. Проверено: 0 юнитов в двух сплитах, 0 пересечений train с
   dev/test, 0 юнитов одновременно clean и terminology.
 
-Мощность на test: critical n=94-90 — 95% даёт нижнюю границу CI 88-89%,
-гейт `reject-recall` проверяем. **Не проверяем** продуктовый гейт
-`auto-pass >= 90%`: чистых строк в test 66, false-flag 10% даёт
-CI [5.2%, 20.3%]. Аргумент плана про n=150 относится к измеряемому
-срезу, а сплит 15/45/40 оставляет в нём 40%. Решение (нужен выбор
-заказчика): либо доразметить ~210 чистых строк, либо принять широкий
-интервал и не заявлять «на порядок» числом из фазы 0.
+Мощность на test: critical n=120 даёт измеримый гейт
+`reject-recall`; чистых строк n=167 закрывает исходный дефицит
+(`n >= 150`) для измерения false-flag и auto-pass. Для 95% Wilson
+upper bound `false-flag <= 10%` допускается не более 9 false flags
+(5.4%). Строгий CI-гейт `false-reject <= 2%` ещё не сертифицируем:
+даже 0/167 даёт upper bound 2.25%; нужны n >= 189 чистых строк в test
+или пересмотр порога. Это отдельный узкий разрыв, а не основание
+заявлять точечную оценку без интервала.
 
 ~400 записей `{unit_id, source, target, label, defect_class,
 annotator, split}`, три страты из прод-вывода COL4 fr:

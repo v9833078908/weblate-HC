@@ -38,14 +38,16 @@ import snowballstemmer
 
 ROOT = Path(__file__).resolve().parents[2]
 DUMP = ROOT / "dev-docker" / "data" / "col4-b0-units.jsonl"
-ANNOTATIONS = ROOT / "docs" / "misc" / "col4-b0-annotations.jsonl"
+ANNOTATION_FILES = (
+    ROOT / "docs" / "misc" / "col4-b0-annotations.jsonl",
+    ROOT / "docs" / "misc" / "col4-b0-annotations-topup-20260812.jsonl",
+)
 OUT = ROOT / "docs" / "misc" / "col4-judge-golden.json"
 
 TERM_CAP = 8
 TERM_SEED = 20260812
 SPLIT_SEED = 20260812
 MUTATION_SEEDS = {"train": 20260812001, "dev": 20260812002, "test": 20260812003}
-ANNOTATOR = "fable-anthropic-frontier-2026-08-12"
 
 WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 FR_STEM = snowballstemmer.stemmer("french")
@@ -529,7 +531,8 @@ def main() -> None:
 
     annotated = [
         json.loads(line)
-        for line in ANNOTATIONS.read_text(encoding="utf-8").splitlines()
+        for annotation_file in ANNOTATION_FILES
+        for line in annotation_file.read_text(encoding="utf-8").splitlines()
     ]
     terminology = terminology_stratum(units, glossary)
     defective = {c["unit"]["unit_id"] for c in terminology}
@@ -539,6 +542,7 @@ def main() -> None:
         for a in annotated
         if a["label"] == "pass" and a["stratum"].startswith("random-clean")
     ]
+    clean_annotators = {a["unit_id"]: a["annotator"] for a in annotated}
     # A unit cannot be both a clean pass and a terminology defect. The count is
     # printed rather than swallowed: anything above zero means the annotator
     # missed a glossary breach, which is the bias B0 exists to keep out of the
@@ -571,7 +575,7 @@ def main() -> None:
             "defect_class": None,
             "severity": None,
             "label_origin": "annotation",
-            "annotator": ANNOTATOR,
+            "annotator": clean_annotators[unit["unit_id"]],
         }
         for unit in clean
     ]

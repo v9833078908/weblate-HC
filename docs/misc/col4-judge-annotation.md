@@ -27,37 +27,50 @@
 
 ## Протокол
 
-Выборка 260 юнитов, seed 20260812, страты:
+Исходная выборка: 260 юнитов, seed 20260812, страты:
 
 | Страта | n | Правило |
 | --- | --- | --- |
-| random-clean (+topup) | 212 | 0 failing checks, наивный глоссарный матч чист |
+| random-clean | 212 | 0 failing checks, наивный глоссарный матч чист |
 | check:* | 28 | стратифицированно по типам чеков (кэп на тип) |
 | gloss-miss | 10 | наивный промах глоссария (containment, без стемминга) |
 | longest | 10 | самые длинные таргеты |
+
+Дополнение 2026-08-12: 300 ранее неразмеченных кандидатов
+`random-clean-topup-20260812`. Равномерная выборка без возвращения с тем же
+seed 20260812 из 1 409 юнитов, исключая уже размеченные, строки с
+`failing_checks`, наивные промахи глоссария и юниты терминологической страты
+B1. Метки: 253 pass / 47 defect (26 minor / 20 major / 1 critical).
+Разметчик top-up: `openai-codex-gpt-5.6-terra-2026-08-12`; каждая запись
+сохраняет annotator для раздельной калибровки по семействам моделей.
 
 На юнит: вердикт pass/defect; для дефекта — MQM-теги
 (terminology / accuracy / omission / fluency / punctuation / markup),
 severity (critical/major/minor), span, критика. Улики разметчика:
 source ru, глоссарий (term -> rendering), note, failing checks.
 Граница pass: «профессиональный fr-локализатор игр опубликует без
-правки». Полная разметка: `docs/misc/col4-b0-annotations.jsonl`
-(260 записей, поля label/mqm/severity/span/critique + provenance).
+правки». Полные разметки: `docs/misc/col4-b0-annotations.jsonl`
+(исходные 260 строк) и
+`docs/misc/col4-b0-annotations-topup-20260812.jsonl` (300 строк); поля
+label/mqm/severity/span/critique + provenance.
 
 ## Сводка
 
 | Метрика | Значение |
 | --- | --- |
-| Всего размечено | 260 |
-| pass | 183 (70.4%) |
-| defect | 77 (50 minor / 26 major / 1 critical) |
-| MQM-теги дефектов | fluency 38, accuracy 30, terminology 20, punctuation 4, markup 2 |
-| **Чистый пул: pass** | **166/212 = 78.3%, Wilson 95% CI [72.3%, 83.3%]** |
-| Чистый пул: скрытые major | 5 |
+| Всего размечено | 560 |
+| pass | 436 (77.9%) |
+| defect | 124 (76 minor / 46 major / 2 critical) |
+| MQM-теги дефектов | accuracy 61, fluency 50, terminology 28, punctuation 8, omission 3, markup 2 |
+| **Чистый пул: pass** | **419/512 = 81.8%, Wilson 95% CI [78.3%, 84.9%]** |
+| Чистый пул: скрытые major | 25 |
 | longest: дефектных | 9/10 (6 major) |
 | gloss-miss: дефектных | 10/10 (9 major) |
 
-Стабильность: первая волна 119/152 = 78.3%, топ-ап 47/60 = 78.3%.
+Стабильность: исходная первая волна 119/152 = 78.3%, исходный топ-ап
+47/60 = 78.3%; новая выборка 253/300 = 84.3% pass. Сдвиг положительный,
+но CI двух волн перекрываются, поэтому не интерпретируется как улучшение
+переводчика.
 
 ## Ключевые выводы
 
@@ -137,9 +150,11 @@ source ru, глоссарий (term -> rendering), note, failing checks.
 
 ## Выходы B0
 
-- **Чистая страта B1: 166 юнитов** (label=pass, random-clean+topup) —
-  цель >=150 закрыта; `unit_id` в JSONL.
-- База для мутаций: те же 166 чистых строк.
+- **Чистая страта B1: 419 юнитов** (label=pass, random-clean и
+  random-clean-topup-20260812), сплиты 63 train / 189 dev / 167 test.
+  Цель n >= 150 на измеряемом test-срезе закрыта; `unit_id` и annotator
+  хранятся в JSONL.
+- База для мутаций: те же 419 чистых строк, строго внутри их сплита.
 - Дрейф повторов для трека C: «Следить» -> Surveiller (180745) /
   Observer (180646), papa/Père (178838/178852), fauteuil/chaise
   (179603/180974) — реальные пары для пробника.
