@@ -184,5 +184,7 @@ def validate_sheet_headers(
                 else f"{note.scope} note ({note.language})"
             )
             _check(label, note.column, note.header)
+        for ignored in grammar.ignored_columns:
+            _check("ignored column", ignored.column, ignored.header)
 
     return tuple(diagnostics)

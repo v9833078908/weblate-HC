@@ -243,3 +243,52 @@ def test_unnamed_note_column_rejects_a_named_header_cell(
     rows = [["description", "en", "ru"], ["%SHIP% - a ship", "Ship", "Корабль"]]
     diagnostics = validate_sheet_headers(unnamed_description_component, rows)
     assert [(item.code, item.row) for item in diagnostics] == [("header.mismatch", 1)]
+
+
+@pytest.fixture
+def ignored_id_component():
+    document = {
+        "schema_version": 2,
+        "components": [
+            {
+                "sheet": "Glossary",
+                "component": "Glossary",
+                "kind": "tbx",
+                "source_lang": "ru",
+                "header_row": 1,
+                "languages": [
+                    {"code": "ru", "xml_lang": "ru", "column": 2, "header": "ru"},
+                    {"code": "en", "xml_lang": "en", "column": 3, "header": "en"},
+                ],
+                "grammar": {
+                    "type": "record-map",
+                    "skip_rows": [],
+                    "regions": [
+                        {
+                            "first_record_row": 2,
+                            "last_record_row": 2,
+                            "record_stride": 1,
+                        }
+                    ],
+                    "term_row_offset": 0,
+                    "ignored_columns": [{"column": 1, "header": "id"}],
+                },
+                "initial_target_languages": ["en"],
+            }
+        ],
+    }
+    return parse_profile(document).components[0]
+
+
+def test_ignored_column_header_matches_the_sheet(ignored_id_component):
+    rows = [["id", "ru", "en"], ["char_leon", "Леон", "Leon"]]
+    assert validate_sheet_headers(ignored_id_component, rows) == ()
+
+
+@pytest.mark.parametrize(
+    "header",
+    [["build", "ru", "en"], ["id", "ru"]],
+)
+def test_ignored_column_header_mismatch_is_an_error(ignored_id_component, header):
+    diagnostics = validate_sheet_headers(ignored_id_component, [header])
+    assert [(item.code, item.row) for item in diagnostics] == [("header.mismatch", 1)]
