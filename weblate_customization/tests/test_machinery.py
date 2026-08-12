@@ -17,6 +17,7 @@ from weblate_customization.machinery import (
 )
 
 from weblate.machinery.base import MachineTranslationError
+from weblate.machinery.openai import OpenAITranslation
 from weblate.utils.tests import http_mock
 
 if TYPE_CHECKING:
@@ -171,6 +172,67 @@ class RoutedResolveTest(SimpleTestCase):
         machine = self.machine({"ja": DEEPSEEK})
         self.assertTrue(machine.is_supported("en", "ja"))
         self.assertFalse(machine.is_supported("en", "fr"))
+
+
+def batch_content(count: int) -> str:
+    return json.dumps({"strings": [f"s{i}" for i in range(count)]})
+
+
+class RoutedReplyFormatTest(SimpleTestCase):
+    """
+    Cover the reply-length ``json_schema`` shipped for the routed service.
+
+    Non-strict and array-rooted, applied unconditionally to every chat
+    payload; a hardening pass to ``strict`` mode plus an object envelope is
+    tracked separately and deliberately out of scope here (see
+    ``docs/LLM-first/plans/2026-08-12-phase0-implementation.md``, task 1).
+    """
+
+    def machine(self) -> RoutedLLMTranslation:
+        return RoutedLLMTranslation(as_settings(dict(CONFIGURATION)))
+
+    def payload(self, content: str) -> dict[str, object]:
+        return self.machine().get_chat_payload(GEMINI, "prompt", content, "", "")
+
+    def test_schema_fixes_element_count(self) -> None:
+        payload = self.payload(batch_content(3))
+        response_format = cast("dict", payload["response_format"])
+        schema = response_format["json_schema"]["schema"]
+
+        self.assertEqual(response_format["type"], "json_schema")
+        self.assertEqual(schema["minItems"], 3)
+        self.assertEqual(schema["maxItems"], 3)
+
+    def test_single_string_batch_still_gets_schema(self) -> None:
+        payload = self.payload(batch_content(1))
+        schema = cast("dict", payload["response_format"])["json_schema"]["schema"]
+
+        self.assertEqual(schema["minItems"], 1)
+        self.assertEqual(schema["maxItems"], 1)
+
+    def test_provider_requires_parameters(self) -> None:
+        payload = self.payload(batch_content(2))
+
+        self.assertIs(cast("dict", payload["provider"])["require_parameters"], True)
+
+    def test_malformed_content_omits_schema(self) -> None:
+        payload = self.payload("not json")
+
+        self.assertNotIn("response_format", payload)
+        self.assertNotIn("provider", payload)
+
+    def test_content_without_strings_list_omits_schema(self) -> None:
+        payload = self.payload(json.dumps({"other": "shape"}))
+
+        self.assertNotIn("response_format", payload)
+        self.assertNotIn("provider", payload)
+
+    def test_plain_openai_translation_is_unaffected(self) -> None:
+        machine = OpenAITranslation(as_settings({}))
+        payload = machine.get_chat_payload(GEMINI, "prompt", batch_content(3), "", "")
+
+        self.assertNotIn("response_format", payload)
+        self.assertNotIn("provider", payload)
 
 
 class RoutedSettingsValidationTest(TestCase):
