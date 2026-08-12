@@ -27,6 +27,7 @@ from django.utils.translation import gettext
 from django.views.generic.base import TemplateView, View
 from django.views.generic.edit import CreateView
 
+from weblate.glossary.tasks import flag_glossary_terminology
 from weblate.lang.models import Language
 from weblate.trans.backups import ProjectBackup
 from weblate.trans.forms import (
@@ -1492,4 +1493,7 @@ class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
         draft.save(update_fields=["state"])
         draft.delete_storage()
         draft.delete()
+        transaction.on_commit(
+            lambda: flag_glossary_terminology.delay(self.object.pk)
+        )
         return response

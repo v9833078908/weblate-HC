@@ -739,7 +739,8 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
             upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug
         )
         with patch.object(Component, "update_branch", return_value=True):
-            self._confirm()
+            with self.captureOnCommitCallbacks(execute=True):
+                self._confirm()
         component = Component.objects.get(slug=self.slug, is_glossary=True)
         sources = component.source_translation.unit_set.all()
         self.assertTrue(sources)
