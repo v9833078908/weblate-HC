@@ -100,8 +100,6 @@ class InferenceError(Exception):
     """Raised when a sheet's shape cannot be determined with confidence."""
 
 
-
-
 def _cell(row: list[str], col: int) -> str:
     return row[col] if len(row) > col else ""
 

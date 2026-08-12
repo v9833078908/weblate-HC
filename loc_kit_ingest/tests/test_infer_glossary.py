@@ -6,14 +6,13 @@ from __future__ import annotations
 
 import pytest
 
-from loc_kit_ingest.langcode import language_code
-
 from loc_kit_ingest.infer import (
     _MAX_REGIONS,
     _MAX_SKIPPED_ROWS,
     InferenceError,
     infer_glossary_profile,
 )
+from loc_kit_ingest.langcode import language_code
 from loc_kit_ingest.profile import parse_profile
 from loc_kit_ingest.reader import read_sheets
 
@@ -28,6 +27,7 @@ STANDARD = [
     [],
     ["Меч", "Sword", "", ""],
 ]
+
 
 @pytest.mark.parametrize(
     ("header", "code"),

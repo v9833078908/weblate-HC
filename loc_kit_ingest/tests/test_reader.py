@@ -21,6 +21,7 @@ def test_csv_preserves_quoted_newlines_bom_and_trailing_spaces(tmp_path):
     rows = read_sheets(path)["Kit"]
     assert rows[1] == ["key", " x\r\ny ", "text "]
 
+
 def test_csv_detects_semicolon_with_bom_quoted_commas_and_newlines(tmp_path):
     path = tmp_path / "Kit.csv"
     path.write_bytes(
@@ -73,7 +74,7 @@ def test_csv_single_column_falls_back_to_comma(tmp_path):
 
 def test_tsv_keeps_tab_even_when_a_cell_holds_semicolons(tmp_path):
     path = tmp_path / "Kit.tsv"
-    path.write_bytes("id\tru\ten\nkey\ta;b;c\ttext\n".encode())
+    path.write_bytes(b"id\tru\ten\nkey\ta;b;c\ttext\n")
     rows = read_sheets(path)["Kit"]
     assert rows[1] == ["key", "a;b;c", "text"]
 

@@ -563,9 +563,7 @@ GLOSSARY_PAIRS_CSV = (
 )
 
 GLOSSARY_SEMICOLON_CSV = (
-    "ru;en;notes\n"
-    'Леон;Leon;"Имя собственное, мужской род."\n'
-    "Аки;Aki;Сестра Леона.\n"
+    'ru;en;notes\nЛеон;Leon;"Имя собственное, мужской род."\nАки;Aki;Сестра Леона.\n'
 )
 
 GLOSSARY_ID_PARTIAL_CSV = (
@@ -576,9 +574,7 @@ GLOSSARY_ID_PARTIAL_CSV = (
 )
 
 GLOSSARY_SEMICOLON_PARTIAL_CSV = (
-    "ru;en;ja;zh-TC;notes\n"
-    "Леон;Leon;レオン;;главный герой\n"
-    "Аки;Aki;;阿姬;\n"
+    "ru;en;ja;zh-TC;notes\nЛеон;Leon;レオン;;главный герой\nАки;Aki;;阿姬;\n"
 )
 
 

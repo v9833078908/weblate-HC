@@ -452,7 +452,6 @@ def test_round_trips_through_json():
     assert reparsed == parse_profile(document)
 
 
-
 def test_ignored_columns_parse_to_zero_based_records():
     document = _one_row_document()
     document["components"][0]["grammar"]["ignored_columns"] = [
