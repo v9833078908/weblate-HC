@@ -623,6 +623,7 @@ def _parse_record_map(
     grammar = component.grammar
     assert isinstance(grammar, RecordMapGrammar)
     skip_set = set(grammar.skip_rows)  # 0-based
+    ignored_columns = {ignored.column for ignored in grammar.ignored_columns}
 
     source_lang = component.source_lang
     lang_columns = {l.code: l.column for l in component.languages}
@@ -690,7 +691,11 @@ def _parse_record_map(
             # A caption row may repeat the section label in declared language
             # columns. Those labels are metadata, never terms - but any other
             # populated cell on that row is unaccounted for.
-            allowed = {region.section_column, *lang_columns.values()}
+            allowed = {
+                region.section_column,
+                *lang_columns.values(),
+                *ignored_columns,
+            }
             caption_row = (
                 rows[region.section_row] if region.section_row < len(rows) else []
             )
@@ -746,13 +751,14 @@ def _parse_record_map(
                     term_1based,
                     f"source term in language {source_lang!r} is empty",
                 )
-            for tlang in target_langs:
-                if _is_blank(term_values.get(tlang, "")):
-                    err(
-                        "tbx.missing_target_term",
-                        term_1based,
-                        f"target term in language {tlang!r} is empty",
-                    )
+            if not grammar.allow_empty_targets:
+                for tlang in target_langs:
+                    if _is_blank(term_values.get(tlang, "")):
+                        err(
+                            "tbx.missing_target_term",
+                            term_1based,
+                            f"target term in language {tlang!r} is empty",
+                        )
 
             # Notes, in declaration order.
             note_rows: list[int] = []
@@ -791,6 +797,8 @@ def _parse_record_map(
                 if row_idx >= len(rows):
                     continue
                 for col, value in enumerate(rows[row_idx]):
+                    if col in ignored_columns:
+                        continue
                     if (row_idx, col) not in consumed and not _is_blank(value):
                         err(
                             "tbx.unmapped_cell",

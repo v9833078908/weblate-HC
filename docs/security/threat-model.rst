@@ -743,10 +743,15 @@ Security properties Weblate provides
        *(documented)* (source: :ref:`uploading-glossary-tables`,
        :doc:`/admin/config`)
      - Analysis is enabled and configured, or a manual profile is supplied.
-     - A model response, malformed profile, unsupported flag, unmapped cell,
-       source-only table, missing target term, parse-back mismatch, wrong
-       owner, wrong session, expired draft, or revoked permission creates or
-       reads a component or draft.
+     - A model response, malformed profile, unsupported flag, an unmapped
+       populated cell whose column is declared neither as a language, note,
+       section, nor an ``ignored_columns`` entry with a matching header, a
+       source-only table, a missing target term without
+       ``allow_empty_targets``, parse-back mismatch, wrong owner, wrong
+       session, expired draft, or revoked permission creates or reads a
+       component or draft. ``ignored_columns`` and ``allow_empty_targets`` are
+       locally validated profile fields: both a model proposal and an operator
+       upload pass the same render-and-parse-back gate.
      - Security-critical for authorization or component creation; availability
        otherwise.
 

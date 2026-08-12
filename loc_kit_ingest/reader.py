@@ -5,8 +5,10 @@
 from __future__ import annotations
 
 import csv
+from itertools import islice
 from typing import TYPE_CHECKING
 
+from loc_kit_ingest.langcode import language_code
 from loc_kit_ingest.model import Diagnostic, Severity
 from loc_kit_ingest.profile import RecordMapGrammar
 
@@ -19,7 +21,8 @@ if TYPE_CHECKING:
 # Reading
 # --------------------------------------------------------------------------- #
 
-_CSV_DIALECTS = {".csv": ",", ".tsv": "\t"}
+_CSV_DELIMITERS = (",", ";", "\t")
+_DELIMITER_SCAN_ROWS = 20
 
 
 class ReaderError(ValueError):
@@ -35,8 +38,10 @@ def read_sheets(path: Path) -> dict[str, list[list[str]]]:
     XLSX: one sheet per worksheet, using its name.
     """
     suffix = path.suffix.lower()
-    if suffix in _CSV_DIALECTS:
-        return {path.stem: _read_csv(path, _CSV_DIALECTS[suffix])}
+    if suffix == ".csv":
+        return {path.stem: _read_csv(path, _detect_delimiter(path))}
+    if suffix == ".tsv":
+        return {path.stem: _read_csv(path, "\t")}
     if suffix == ".xlsx":
         return _read_xlsx(path)
     msg = f"unsupported file suffix: {suffix!r}"
@@ -46,6 +51,31 @@ def read_sheets(path: Path) -> dict[str, list[list[str]]]:
 def _read_csv(path: Path, delimiter: str) -> list[list[str]]:
     with path.open(newline="", encoding="utf-8-sig") as f:
         return [row for row in csv.reader(f, delimiter=delimiter)]
+
+
+def _detect_delimiter(path: Path) -> str:
+    """Choose the delimiter under which the sheet has a recognisable header."""
+    best: tuple[int, int, int, str] | None = None
+    for priority, delimiter in enumerate(_CSV_DELIMITERS):
+        for index, row in enumerate(_scan_rows(path, delimiter)):
+            hits = sum(1 for cell in row if language_code(cell) is not None)
+            if hits:
+                candidate = (index, -hits, priority, delimiter)
+                if best is None or candidate < best:
+                    best = candidate
+                break
+    return best[3] if best is not None else ","
+
+
+def _scan_rows(path: Path, delimiter: str) -> list[list[str]]:
+    """Parse the top of the file with one delimiter candidate."""
+    try:
+        with path.open(newline="", encoding="utf-8-sig") as f:
+            return list(
+                islice(csv.reader(f, delimiter=delimiter), _DELIMITER_SCAN_ROWS)
+            )
+    except csv.Error:
+        return []
 
 
 def _read_xlsx(path: Path) -> dict[str, list[list[str]]]:
@@ -154,5 +184,7 @@ def validate_sheet_headers(
                 else f"{note.scope} note ({note.language})"
             )
             _check(label, note.column, note.header)
+        for ignored in grammar.ignored_columns:
+            _check("ignored column", ignored.column, ignored.header)
 
     return tuple(diagnostics)

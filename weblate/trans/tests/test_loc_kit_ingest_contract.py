@@ -48,6 +48,7 @@ from weblate.trans.loc_kit import PREVIEW_WARNING_LIMIT
 from weblate.trans.models import Category, Component, Project
 from weblate.trans.models.loc_kit import LOC_KIT_DRAFT_STORAGE, LocKitImportDraft
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.state import STATE_EMPTY
 from weblate.utils.tests import http_mock
 from weblate.utils.views import create_component_from_kit
 from weblate.vcs.git import LocalRepository
@@ -531,8 +532,11 @@ GLOSSARY_CSV = (
 
 
 # Language-only kit with no extra columns: deterministic inference must give
-# a preview. GLOSSARY_CSV above is intentionally NOT parsed deterministically
-# (domain/note_*) and keeps covering the LLM/manual path.
+# a preview. GLOSSARY_CSV above is intentionally NOT parsed deterministically:
+# `domain` and `note_ru`/`note_en` are in neither _NOTE_HEADERS nor
+# _IGNORABLE_HEADERS (loc_kit_ingest/infer.py), so it keeps covering the
+# LLM/manual path. Widening either set breaks that coverage - re-point these
+# tests at a new fixture instead of relaxing them.
 GLOSSARY_LANG_ONLY_CSV = "ru,en\nRussian,English\nГерой,Hero\nМеч,Sword\n"
 
 GLOSSARY_NOTE_CSV = (
@@ -556,6 +560,21 @@ GLOSSARY_PAIRS_CSV = (
     "Персонажи,Characters\n"
     f"Герой,Hero\n{_DESC_RU},{_DESC_EN}\n"
     f"Меч,Sword\n{_DESC2_RU},{_DESC2_EN}\n"
+)
+
+GLOSSARY_SEMICOLON_CSV = (
+    'ru;en;notes\nЛеон;Leon;"Имя собственное, мужской род."\nАки;Aki;Сестра Леона.\n'
+)
+
+GLOSSARY_ID_PARTIAL_CSV = (
+    "id,ru,en,ja,zh-TC,notes\n"
+    "char_leon,Леон,Leon,レオン,,главный герой\n"
+    "char_aki,Аки,Aki,,阿姬,\n"
+    "char_joe,Джо,Joe,,,паук\n"
+)
+
+GLOSSARY_SEMICOLON_PARTIAL_CSV = (
+    "ru;en;ja;zh-TC;notes\nЛеон;Leon;レオン;;главный герой\nАки;Aki;;阿姬;\n"
 )
 
 
@@ -1341,3 +1360,61 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertEqual(component.template, "")
         self.assertTrue(component.is_glossary)
         self.assertEqual(component.source_language.code, "ru")
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_semicolon_kit_gets_a_deterministic_preview(self) -> None:
+        self._start(
+            upload=self._csv("Temple.csv", GLOSSARY_SEMICOLON_CSV), slug=self.slug
+        )
+        draft = self._draft()
+        draft.refresh_from_db()
+
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+        preview = json.loads(draft.preview_json)
+        self.assertEqual(preview["source_language"], "ru")
+        self.assertEqual(preview["target_languages"], ["en"])
+        self.assertEqual(preview["term_count"], 2)
+        self.assertIn("мужской род", preview["terms"][0]["source_explanation"])
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_semicolon_partial_kit_maps_the_vendor_code(self) -> None:
+        self._start(
+            upload=self._csv("Terms.csv", GLOSSARY_SEMICOLON_PARTIAL_CSV),
+            slug=self.slug,
+        )
+        draft = self._draft()
+        draft.refresh_from_db()
+
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+        preview = json.loads(draft.preview_json)
+        self.assertIn("zh_Hant", preview["target_languages"])
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_id_partial_kit_creates_a_component_with_untranslated_terms(self) -> None:
+        self._start(
+            upload=self._csv("Terms.csv", GLOSSARY_ID_PARTIAL_CSV), slug=self.slug
+        )
+        draft = self._draft()
+        draft.refresh_from_db()
+
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+        preview = json.loads(draft.preview_json)
+        self.assertEqual(preview["source_language"], "ru")
+        self.assertEqual(preview["term_count"], 3)
+        self.assertIn("zh_Hant", preview["target_languages"])
+        self.assertTrue(
+            any("untranslated" in warning for warning in preview["warnings"]),
+            preview["warnings"],
+        )
+
+        self._confirm()
+        component = Component.objects.get(slug=self.slug, project=self.project)
+        self.assertTrue(component.is_glossary)
+        self.assertEqual(component.source_language.code, "ru")
+
+        translation = component.translation_set.get(language__code="zh_Hant")
+        filled = translation.unit_set.get(source="Аки")
+        self.assertEqual(filled.target, "阿姬")
+        blank = translation.unit_set.get(source="Джо")
+        self.assertEqual(blank.target, "")
+        self.assertEqual(blank.state, STATE_EMPTY)

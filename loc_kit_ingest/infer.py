@@ -24,6 +24,7 @@ from typing import Any
 
 from translate.lang import data as lang_data
 
+from loc_kit_ingest.langcode import language_code
 from loc_kit_ingest.profile import SCHEMA_VERSION, SCHEMA_VERSION_RECORD_MAP
 
 # Language columns filled below this share of content rows are stray spillover,
@@ -31,8 +32,6 @@ from loc_kit_ingest.profile import SCHEMA_VERSION, SCHEMA_VERSION_RECORD_MAP
 # paste-overs sit under 1%.
 DEFAULT_MIN_FILL = 5.0
 
-_PARENS_CODE = re.compile(r"\(\s*([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*)\s*\)\s*$")
-_BARE_CODE = re.compile(r"^\s*([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*)\s*$")
 _UNSAFE_COMPONENT = re.compile(r"[^A-Za-z0-9_-]+")
 
 # Markers some kits put in the key cell of a caption row.
@@ -75,6 +74,8 @@ _NOTE_HEADERS = frozenset(
     }
 )
 
+
+_IGNORABLE_HEADERS = frozenset({"id"})
 # Term/description detection. A glossary term is a name, a description is
 # prose: the gap is an order of magnitude in practice. Both bounds must hold,
 # so a kit of long terms falls back to one term per row instead of guessing.
@@ -97,34 +98,6 @@ _MISSING_ROWS_SHOWN = 10
 
 class InferenceError(Exception):
     """Raised when a sheet's shape cannot be determined with confidence."""
-
-
-def _known_language(token: str) -> str | None:
-    """Return a Weblate-style code for ``token``, or None if it is no language."""
-    norm = token.strip().replace("-", "_")
-    if not norm:
-        return None
-    if norm in lang_data.languages:
-        return norm
-    if "_" in norm:
-        base, _, region = norm.partition("_")
-        canonical = f"{base.lower()}_{region.upper()}"
-        if canonical in lang_data.languages or base.lower() in lang_data.languages:
-            return canonical
-        return None
-    lowered = norm.lower()
-    return lowered if lowered in lang_data.languages else None
-
-
-def _language_code(header_cell: str) -> str | None:
-    """Extract a language code from a header cell, ``en`` or ``English(en)``."""
-    match = _PARENS_CODE.search(header_cell)
-    if match:
-        return _known_language(match.group(1))
-    match = _BARE_CODE.match(header_cell)
-    if match:
-        return _known_language(match.group(1))
-    return None
 
 
 def _cell(row: list[str], col: int) -> str:
@@ -154,7 +127,7 @@ def _find_header_row(rows: list[list[str]]) -> tuple[int, dict[int, str]]:
         found = {
             col: code
             for col in range(_KEY_COLUMN + 1, len(row))
-            if (code := _language_code(_cell(row, col))) is not None
+            if (code := language_code(_cell(row, col))) is not None
         }
         if found:
             return index, found
@@ -232,7 +205,7 @@ def infer_component(
         return [_cell(row, col) for row in data_rows]
 
     key_header = _cell(header_row, _KEY_COLUMN)
-    key_language_code = _language_code(key_header)
+    key_language_code = language_code(key_header)
     key_is_language = (
         key_language_code is not None
         and key_header.strip().casefold() not in _KEY_HEADER_DENYLIST
@@ -558,14 +531,11 @@ def infer_glossary_profile(
     """
     Infer a schema v2 record-map TBX profile for one worksheet.
 
-    Every populated column must be a language column; the leftmost language
-    is the source, targets are languages filled on every term row. The
-    record-map parser treats any unmapped populated cell as an error, so an
-    extra column is a refusal, never a guess.
-
-    ``layout`` is ``"auto"`` (classify each block), ``"flat"`` (one term per
-    row) or ``"pairs"`` (a term followed by its description). The operator
-    overrides a wrong guess from the preview instead of writing a profile.
+    Targets have at least one term and meet ``min_fill`` across term rows.
+    Target gaps declare ``allow_empty_targets``. A technical ``id`` column is
+    declared in ``ignored_columns``; every other populated unmapped column is
+    refused. ``layout`` is ``"auto"`` (classify each block), ``"flat"`` (one
+    term per row) or ``"pairs"`` (a term followed by its description).
     Returns (document, notes).
     """
     if layout not in _LAYOUTS:
@@ -582,7 +552,7 @@ def infer_glossary_profile(
     # Column 0 is an ordinary column here; promote it when its header is a
     # language code (a keyless kit like ``ru,en,ja`` keeps terms in column 1).
     first_header = _cell(header_row, _KEY_COLUMN)
-    first_code = _language_code(first_header)
+    first_code = language_code(first_header)
     if (
         first_code is not None
         and first_header.strip().casefold() not in _KEY_HEADER_DENYLIST
@@ -649,15 +619,21 @@ def infer_glossary_profile(
     mapped = set(languages)
     if note_col is not None:
         mapped.add(note_col)
-    unmapped = sorted(populated - mapped)
-    if unmapped:
-        col = unmapped[0]
-        header_text = _cell(header_row, col) or f"column{col + 1}"
+    ignored_cols: list[int] = []
+    for col in sorted(populated - mapped):
+        header_text = _cell(header_row, col)
+        if header_text.strip().casefold() in _IGNORABLE_HEADERS:
+            ignored_cols.append(col)
+            notes.append(
+                f"column {col + 1} ({header_text!r}) is a technical "
+                "identifier; not imported"
+            )
+            continue
         msg = (
-            f"column {col + 1} ({header_text!r}) holds data but is not a "
-            "recognised language column; rename the header to a recognised "
-            "term-note header, for example note, description, comment, or "
-            "explanation, or supply an explicit profile"
+            f"column {col + 1} ({header_text or f'column{col + 1}'!r}) holds "
+            "data but is not a recognised language column; rename the header "
+            "to a recognised term-note header, for example note, description, "
+            "comment, or explanation, or supply an explicit profile"
         )
         raise InferenceError(msg)
 
@@ -738,33 +714,38 @@ def infer_glossary_profile(
         rows_in_region = range(first, block[-1] + 1)
         term_rows.extend(rows_in_region[::step])
         description_rows.extend(rows_in_region[1::step] if step == 2 else [])
-
     target_langs: list[str] = []
+    allow_empty_targets = False
     for col in sorted(languages):
         if col == source_col:
             continue
         code = languages[col]
-        # Count every gap but keep only the head: the message shows ten.
-        missing_head: list[int] = []
-        missing_count = 0
-        for index in term_rows:
-            if _cell(rows[index], col).strip():
-                continue
-            missing_count += 1
-            if len(missing_head) < _MISSING_ROWS_SHOWN:
-                missing_head.append(index + 1)
-        if missing_count:
-            shown = ", ".join(str(row) for row in missing_head)
-            if missing_count > len(missing_head):
-                shown += f", +{missing_count - len(missing_head)} more"
-            notes.append(
-                f"language {code} is missing a term on row(s) {shown}; "
-                "recognised but not imported"
-            )
+        missing_rows = [
+            index + 1 for index in term_rows if not _cell(rows[index], col).strip()
+        ]
+        term_filled = len(term_rows) - len(missing_rows)
+        if not term_filled:
             continue
+        share = 100.0 * term_filled / len(term_rows)
+        if share < min_fill:
+            msg = (
+                f"column {col + 1} ({_cell(header_row, col)!r} -> {code}) is "
+                f"filled in {term_filled}/{len(term_rows)} term rows "
+                f"({share:.1f}%); too sparse to map deterministically"
+            )
+            raise InferenceError(msg)
         target_langs.append(code)
+        if missing_rows:
+            allow_empty_targets = True
+            shown = ", ".join(str(row) for row in missing_rows[:_MISSING_ROWS_SHOWN])
+            if len(missing_rows) > _MISSING_ROWS_SHOWN:
+                shown += f", +{len(missing_rows) - _MISSING_ROWS_SHOWN} more"
+            notes.append(
+                f"language {code} has no term on {len(missing_rows)} row(s) "
+                f"({shown}); imported untranslated"
+            )
     if not target_langs:
-        msg = f"sheet {sheet_name!r} has no fully filled target language column"
+        msg = f"sheet {sheet_name!r} has no target language with a term"
         raise InferenceError(msg)
 
     grammar: dict[str, Any] = {
@@ -773,6 +754,13 @@ def infer_glossary_profile(
         "regions": regions,
         "term_row_offset": 0,
     }
+    if ignored_cols:
+        grammar["ignored_columns"] = [
+            {"column": col + 1, "header": _cell(header_row, col)}
+            for col in ignored_cols
+        ]
+    if allow_empty_targets:
+        grammar["allow_empty_targets"] = True
     note_fields: list[dict[str, Any]] = []
     if paired:
         # A description cell is read by a note field, and a note field may

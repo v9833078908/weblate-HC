@@ -12,7 +12,9 @@ from loc_kit_ingest.infer import (
     InferenceError,
     infer_glossary_profile,
 )
+from loc_kit_ingest.langcode import language_code
 from loc_kit_ingest.profile import parse_profile
+from loc_kit_ingest.reader import read_sheets
 
 # Standard language-only kit: header codes, a caption row with language
 # names, a section row (imported as an ordinary term), a blank row, a
@@ -25,6 +27,24 @@ STANDARD = [
     [],
     ["Меч", "Sword", "", ""],
 ]
+
+
+@pytest.mark.parametrize(
+    ("header", "code"),
+    [
+        ("zh-TC", "zh_Hant"),
+        ("zh_TC", "zh_Hant"),
+        ("zh-tc", "zh_Hant"),
+        ("zh-SC", "zh_Hans"),
+        ("zh-Hant", "zh_Hant"),
+        ("zh-CN", "zh_CN"),
+        ("pt-PT", "pt_PT"),
+        ("en", "en"),
+        ("id", "id"),
+    ],
+)
+def test_vendor_language_codes_alias_to_canonical(header: str, code: str) -> None:
+    assert language_code(header) == code
 
 
 def test_standard_layout_infers_v2_record_map() -> None:
@@ -47,12 +67,12 @@ def test_standard_layout_infers_v2_record_map() -> None:
     ]
 
 
-def test_partially_filled_language_is_not_an_initial_target() -> None:
+def test_partially_filled_language_is_imported_as_a_target() -> None:
     document, notes = infer_glossary_profile("Terms", STANDARD, component="terms")
     (comp,) = document["components"]
-    # ja is empty on row 6 -> recognised but not imported.
-    assert comp["initial_target_languages"] == ["en"]
-    assert any("ja" in note and "6" in note for note in notes)
+    assert comp["initial_target_languages"] == ["en", "ja"]
+    assert comp["grammar"]["allow_empty_targets"] is True
+    assert any("ja" in note and "untranslated" in note for note in notes)
 
 
 def test_row_without_source_term_is_skipped_with_note() -> None:
@@ -86,14 +106,45 @@ def test_no_language_header_is_refused() -> None:
         infer_glossary_profile("S", [["key", "value"], ["a", "b"]], component="s")
 
 
-def test_no_fully_filled_target_is_refused() -> None:
-    rows = [
-        ["ru", "en"],
-        ["Герой", "Hero"],
-        ["Меч", ""],
-    ]
-    with pytest.raises(InferenceError, match="target"):
+def test_target_with_gaps_is_imported_instead_of_refused() -> None:
+    rows = [["ru", "en"], ["Леон", ""], ["Аки", "Aki"]]
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert comp["initial_target_languages"] == ["en"]
+    assert comp["grammar"]["allow_empty_targets"] is True
+    assert any("en" in note and "untranslated" in note for note in notes)
+
+
+def test_complete_kit_does_not_declare_allow_empty_targets() -> None:
+    rows = [["ru", "en"], ["Леон", "Leon"], ["Аки", "Aki"]]
+    document, _notes = infer_glossary_profile("S", rows, component="s")
+    assert "allow_empty_targets" not in document["components"][0]["grammar"]
+
+
+def test_sheet_without_any_target_language_is_refused() -> None:
+    rows = [["ru", "en"], ["Леон", ""], ["Аки", ""]]
+    with pytest.raises(InferenceError, match="no target language"):
         infer_glossary_profile("S", rows, component="s")
+
+
+def test_sparse_language_column_is_still_refused() -> None:
+    rows = [["ru", "en"], *[[f"термин{i}", ""] for i in range(40)]]
+    rows[1][1] = "Leon"
+    with pytest.raises(InferenceError, match="too sparse"):
+        infer_glossary_profile("S", rows, component="s")
+
+
+def test_target_descriptions_do_not_bypass_term_min_fill() -> None:
+    rows = [["ru", "en", "ja"]]
+    for index in range(40):
+        rows.extend(
+            [
+                [f"термин{index}", f"term{index}", "訳" if index == 0 else ""],
+                [DESC_RU, DESC_EN, DESC_EN],
+            ]
+        )
+    with pytest.raises(InferenceError, match="too sparse"):
+        infer_glossary_profile("Terms", rows, component="terms")
 
 
 def test_document_survives_parse_profile() -> None:
@@ -247,7 +298,7 @@ def test_target_language_without_descriptions_is_still_a_target() -> None:
 def test_language_with_descriptions_but_missing_terms_is_refused() -> None:
     rows = [
         ["ru", "en", "ja"],
-        ["Леон", "Leon", "レオン"],
+        ["Леон", "Leon", ""],
         [DESC_RU, DESC_EN, DESC_EN],
         ["Аки", "Aki", ""],
         [DESC_RU, DESC_EN, DESC_EN],
@@ -431,3 +482,101 @@ def test_explicit_pairs_rejects_note_outside_term_rows(row: int) -> None:
     rows[row][2] = "необъявленная заметка"
     with pytest.raises(InferenceError, match="non-term row"):
         infer_glossary_profile("S", rows, component="s", layout="pairs")
+
+
+@pytest.mark.parametrize("header", ["id", "ID"])
+def test_technical_id_column_becomes_an_ignored_column(header: str) -> None:
+    rows = [
+        [header, "ru", "en"],
+        ["char_leon", "Леон", "Leon"],
+        ["char_aki", "Аки", "Aki"],
+    ]
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert comp["grammar"]["ignored_columns"] == [{"column": 1, "header": header}]
+    assert [lang["code"] for lang in comp["languages"]] == ["ru", "en"]
+    assert any("column 1" in note and "not imported" in note for note in notes)
+    parse_profile(document)
+
+
+def test_ignored_columns_absent_when_every_column_maps() -> None:
+    rows = [["ru", "en"], ["Леон", "Leon"], ["Аки", "Aki"]]
+    document, _notes = infer_glossary_profile("S", rows, component="s")
+    assert "ignored_columns" not in document["components"][0]["grammar"]
+
+
+def _render_round_trip(document, rows, tmp_path):
+    from loc_kit_ingest.model import Severity
+    from loc_kit_ingest.parser import parse_component
+    from loc_kit_ingest.reader import validate_sheet_headers
+    from loc_kit_ingest.writer import render_component, validate_rendered_component
+
+    component = parse_profile(document).components[0]
+    diagnostics = list(validate_sheet_headers(component, rows))
+    result = parse_component(component, rows)
+    diagnostics.extend(result.diagnostics)
+    render_component(component, result, tmp_path)
+    diagnostics.extend(validate_rendered_component(component, result, tmp_path))
+    assert [d for d in diagnostics if d.severity is Severity.ERROR] == []
+    return component, result
+
+
+def _infer_csv(tmp_path, name: str, body: str):
+    path = tmp_path / name
+    path.write_text(body, encoding="utf-8-sig")
+    rows = read_sheets(path)[path.stem]
+    document, notes = infer_glossary_profile(path.stem, rows, component=path.stem)
+    return rows, document, notes
+
+
+@pytest.mark.parametrize(
+    ("name", "body", "targets", "ignored_columns", "blank_target"),
+    [
+        (
+            "Temple.csv",
+            "ru;en;notes\nЛеон;Leon;Имя собственное, мужской род.\nАки;Aki;Сестра Леона.\n",
+            ["en"],
+            None,
+            None,
+        ),
+        (
+            "Terms.csv",
+            "id,ru,en,ja,zh-TC,notes\n"
+            "char_leon,Леон,Leon,レオン,,главный герой\n"
+            "char_aki,Аки,Aki,,阿姬,\n"
+            "char_joe,Джо,Joe,,,паук\n",
+            ["en", "ja", "zh_Hant"],
+            [{"column": 1, "header": "id"}],
+            ("Джо", "zh_Hant"),
+        ),
+        (
+            "Terms-semicolon.csv",
+            "ru;en;ja;zh-TC;notes\nЛеон;Leon;レオン;;главный герой\nАки;Aki;;阿姬;\n",
+            ["en", "ja", "zh_Hant"],
+            None,
+            ("Аки", "ja"),
+        ),
+    ],
+)
+def test_real_kit_csv_shapes_survive_infer_and_render(
+    tmp_path, name, body, targets, ignored_columns, blank_target
+) -> None:
+    rows, document, notes = _infer_csv(tmp_path, name, body)
+    (component,) = document["components"]
+    assert component["source_lang"] == "ru"
+    assert component["initial_target_languages"] == targets
+    if ignored_columns is None:
+        assert "ignored_columns" not in component["grammar"]
+    else:
+        assert component["grammar"]["ignored_columns"] == ignored_columns
+    if blank_target is None:
+        assert "allow_empty_targets" not in component["grammar"]
+    else:
+        assert component["grammar"]["allow_empty_targets"] is True
+        assert any("untranslated" in note for note in notes)
+
+    _component, result = _render_round_trip(document, rows, tmp_path)
+    if blank_target is not None:
+        source, language = blank_target
+        blank = next(unit for unit in result.units if unit.values["ru"] == source)
+        assert blank.values[language] == ""

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -511,3 +512,91 @@ def test_stride_two_blank_caption_is_error():
     component = parse_profile(STRIDE_TWO_PROFILE).components[0]
     result = parse_component(component, rows)
     assert any(d.code == "tbx.missing_section" for d in result.diagnostics)
+
+
+def _flat_record_map(*, ignored_columns=(), allow_empty_targets=False, last_row=2):
+    document = {
+        "schema_version": 2,
+        "components": [
+            {
+                "sheet": "Glossary",
+                "component": "Glossary",
+                "kind": "tbx",
+                "source_lang": "ru",
+                "header_row": 1,
+                "languages": [
+                    {"code": "ru", "xml_lang": "ru", "column": 1, "header": "ru"},
+                    {"code": "en", "xml_lang": "en", "column": 2, "header": "en"},
+                ],
+                "grammar": {
+                    "type": "record-map",
+                    "skip_rows": [],
+                    "regions": [
+                        {
+                            "first_record_row": 2,
+                            "last_record_row": last_row,
+                            "record_stride": 1,
+                        }
+                    ],
+                    "term_row_offset": 0,
+                    "ignored_columns": [
+                        {"column": column, "header": header}
+                        for column, header in ignored_columns
+                    ],
+                    "allow_empty_targets": allow_empty_targets,
+                },
+                "initial_target_languages": ["en"],
+            }
+        ],
+    }
+    return parse_profile(document).components[0]
+
+
+IGNORED_ROWS = [["ru", "en", "id"], ["Леон", "Leon", "char_leon"]]
+
+
+def test_record_map_ignored_column_is_not_unmapped():
+    component = _flat_record_map(ignored_columns=((3, "id"),))
+    result = parse_component(component, [row[:] for row in IGNORED_ROWS])
+    assert [d.code for d in result.diagnostics] == []
+    assert len(result.units) == 1
+    assert result.units[0].values == {"ru": "Леон", "en": "Leon"}
+
+
+def test_record_map_populated_column_without_a_declaration_is_unmapped():
+    component = _flat_record_map()
+    result = parse_component(component, [row[:] for row in IGNORED_ROWS])
+    assert any(d.code == "tbx.unmapped_cell" for d in result.diagnostics)
+
+
+def test_record_map_ignored_column_is_allowed_on_a_caption_row():
+    profile = deepcopy(STRIDE_TWO_PROFILE)
+    profile["components"][0]["grammar"]["ignored_columns"] = [
+        {"column": 3, "header": "id"}
+    ]
+    rows = [[*row, f"id_{index}"] for index, row in enumerate(STRIDE_TWO_ROWS)]
+    component = parse_profile(profile).components[0]
+    result = parse_component(component, rows)
+    assert not any(d.code == "tbx.unmapped_cell" for d in result.diagnostics)
+
+
+def test_record_map_blank_target_is_an_error_by_default():
+    component = _flat_record_map()
+    rows = [["ru", "en"], ["Леон", ""]]
+    result = parse_component(component, rows)
+    assert any(d.code == "tbx.missing_target_term" for d in result.diagnostics)
+
+
+def test_record_map_blank_target_is_untranslated_when_allowed():
+    component = _flat_record_map(allow_empty_targets=True)
+    rows = [["ru", "en"], ["Леон", ""]]
+    result = parse_component(component, rows)
+    assert [d.code for d in result.diagnostics] == []
+    assert result.units[0].values == {"ru": "Леон", "en": ""}
+
+
+def test_record_map_blank_source_stays_an_error_when_targets_are_allowed():
+    component = _flat_record_map(allow_empty_targets=True)
+    rows = [["ru", "en"], ["", "Leon"]]
+    result = parse_component(component, rows)
+    assert any(d.code == "tbx.missing_term" for d in result.diagnostics)
