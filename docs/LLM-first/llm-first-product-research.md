@@ -292,10 +292,10 @@ IPE (Intelligent Post-Editing) — автоматический LLM-шаг до�
 
 ### P4 — LLM-judge и петля качества (уже спланировано)
 
-- Реализовать `docs/LLM-first/llm-judge-external-pipeline.md` как ночной
+- Реализовать `docs/LLM-first/plans/llm-judge-external-pipeline.md` как ночной
   Celery-проход по auto-approved строкам — сэмплированный аудит того, что
   человек не видел.
-- Реализовать `docs/LLM-first/2026-08-07-project-scoped-llm-context.md`
+- Реализовать `docs/LLM-first/plans/2026-08-07-project-scoped-llm-context.md`
   (project-scoped persona / glossary coverage) — контекст per-игра; для
   геймдева контекст-инъекция важнее выбора модели (консенсус
   Crowdin/Gridly/Loxily).

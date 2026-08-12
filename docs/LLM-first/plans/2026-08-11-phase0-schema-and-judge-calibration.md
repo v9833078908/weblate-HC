@@ -6,7 +6,7 @@ Cathedral (`2026-08-11-cathedral-localizer-analysis.md`, пп. 6, 10):
 трек A — предусловие фазы 2, инвариант транспорта в B2, трек C.
 Основание:
 `docs/LLM-first/llm-first-product-architecture.md` (часть 5, фаза 0),
-`docs/LLM-first/2026-08-11-llm-judge-design-research.md`,
+`docs/LLM-first/agent_researches/2026-08-11-llm-judge-design-research.md`,
 `docs/LLM-first/2026-08-11-llm-first-prompt-and-pipeline-review.md`
 (пп. 8.2, 3.5).
 

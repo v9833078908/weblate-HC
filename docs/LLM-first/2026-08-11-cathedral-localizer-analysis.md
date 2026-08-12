@@ -910,8 +910,8 @@ else:
 не мелкая небрежность, а самый дорогой дефект системы. 19.6 % потерянных
 вердиктов и вдвое перегруженная стадия правки — прямая цена отказа от
 structured output. Наш собственный трек LLM-судьи
-(`docs/LLM-first/llm-judge-external-pipeline.md`,
-`docs/LLM-first/2026-08-11-phase0-schema-and-judge-calibration.md`) уже
+(`docs/LLM-first/plans/llm-judge-external-pipeline.md`,
+`docs/LLM-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md`) уже
 закладывает строгую JSON-схему, судью из другого семейства моделей, чем
 переводчик, и калибровку на золотом наборе — Cathedral даёт полевое
 подтверждение, что все три решения обязательны, а не факультативны.

@@ -200,7 +200,7 @@ Repository-specific parts:
 - `docs/plans/`, `docs/specs/` - planning and design docs (in Russian) for
   game-localization workflows; the LLM-first pipeline docs (research,
   architecture, judge plans, measurements) live in `docs/LLM-first/`,
-  e.g. `docs/LLM-first/llm-judge-external-pipeline.md`.
+  e.g. `docs/LLM-first/plans/llm-judge-external-pipeline.md`.
 - `loc_kit_ingest/` (tracked) - standalone loc-kit importer package (no Django
   imports): `reader.py` (CSV/TSV/XLSX), `infer.py` (derives a strict profile
   from the kit's own header row), `profile.py` (closed schema with two

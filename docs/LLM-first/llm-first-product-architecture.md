@@ -14,11 +14,11 @@
   `docs/LLM-first/2026-08-11-llm-first-prompt-and-pipeline-review.md`.
 - Замер глоссарного гейта:
   `docs/LLM-first/2026-08-11-glossary-enforcement-analysis.md` и план
-  `docs/LLM-first/2026-08-11-glossary-morphological-enforcement.md`.
+  `docs/LLM-first/plans/2026-08-11-glossary-morphological-enforcement.md`.
 - План релизного гейта:
   `docs/plans/2026-08-10-git-localization-quality-gate.md`.
 - Три исследования 2026-08-11 (полные отчёты с источниками в
-  `docs/LLM-first/`): дизайн LLM-судьи
+  `docs/LLM-first/agent_researches/`): дизайн LLM-судьи
   (`2026-08-11-llm-judge-design-research.md`), UX конкурентов
   (`2026-08-11-judge-ux-competitor-research.md`), поверхности
   интеграции в UI Weblate
@@ -311,7 +311,7 @@ IPE (Intelligent Post-Editing) — автоматический LLM-шаг до�
 5. Back-translation — display-only артефакт доверия, не скоринговый
    сигнал. Литература единодушна: RTT как оценщик ненадёжен — ошибки
    гасятся в round-trip, парафраз даёт ложные тревоги (WMT22 QE, ACL
-   2023). Это **меняет черновик `llm-judge-external-pipeline.md`**, где
+   2023). Это **меняет черновик `plans/llm-judge-external-pipeline.md`**, где
    BT был основным критерием: BT остаётся, но переезжает из механизма
    оценки в слой улик.
 6. Терминология: детерминированный матч первым, LLM — только на
@@ -376,7 +376,7 @@ low-resource языков и эскалация при разногласии с
 ### 4.3 Запись вердикта в Weblate
 
 Судья остаётся внешним пайплайном поверх REST API (архитектура
-черновика `llm-judge-external-pipeline.md`: курсор, хэш target,
+черновика `plans/llm-judge-external-pipeline.md`: курсор, хэш target,
 идемпотентность, dry-run — всё в силе). Контракт записи:
 
 | Вердикт | Действия |
@@ -400,7 +400,7 @@ low-resource языков и эскалация при разногласии с
    critical-разметку молча.)
 
 Механика подтверждена сканом кода
-(`2026-08-11-judge-weblate-ui-integration.md`):
+(`agent_researches/2026-08-11-judge-weblate-ui-integration.md`):
 
 - Check-строки, созданные внешним процессом, полноценно живут в UI:
   красный бейдж в списках, карточка «Things to check», фильтры
@@ -417,7 +417,7 @@ low-resource языков и эскалация при разногласии с
 ### 4.4 Прозрачность: UI по фазам
 
 Консенсус конкурентов и cross-domain паттерны — в
-`2026-08-11-judge-ux-competitor-research.md`. Два главных: Phrase
+`agent_researches/2026-08-11-judge-ux-competitor-research.md`. Два главных: Phrase
 отделяет вкладку «AI checks» от детерминированных «QA checks» — судья
 не должен визуально смешиваться с фактами; SPF.io и Crowdin показывают
 back-translation именно для ревьюера, не читающего целевой язык.
@@ -493,7 +493,7 @@ end_stop 58-71 против 18-28).
   доказательство, что свободнотекстовый контракт с моделью деградирует
   на два десятка процентов и бьёт по стоимости (19.6% потерянных
   вердиктов = вдвое раздутая стадия правки). Дизайн эксперимента —
-  `2026-08-11-phase0-schema-and-judge-calibration.md`.
+  `plans/2026-08-11-phase0-schema-and-judge-calibration.md`.
 - **Трек B:** калибровка судьи на размеченном золотом наборе COL4 (три
   страты: известные глоссарные дефекты, чистые строки, синтетические
   мутации по классам MQM) — выбор модели-судьи, промпта и порогов
@@ -519,7 +519,7 @@ end_stop 58-71 против 18-28).
 
 ### Фаза 1 — терминология и hard/advisory (план морфологии, усечённый)
 
-Порядок внутри `2026-08-11-glossary-morphological-enforcement.md`
+Порядок внутри `plans/2026-08-11-glossary-morphological-enforcement.md`
 меняется под судью:
 
 - Задачи 3 и 4 (hard/advisory + пер-термин/пер-язык режим) — первыми:
@@ -531,7 +531,7 @@ end_stop 58-71 против 18-28).
 - Задача 1 (стемминг источника) — **отложена**: глоссарий <=300 уже
   уходит в промпт целиком; стемминг нужен только термбейсам >300.
 
-### Фаза 2 — судья v1 (переработка `llm-judge-external-pipeline.md`)
+### Фаза 2 — судья v1 (переработка `plans/llm-judge-external-pipeline.md`)
 
 - MQM-судья по 4.2-4.3: structured output, другое семейство моделей,
   BT как улика. Запись: комментарии + Check-строки; сначала
