@@ -1493,7 +1493,5 @@ class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
         draft.save(update_fields=["state"])
         draft.delete_storage()
         draft.delete()
-        transaction.on_commit(
-            lambda: flag_glossary_terminology.delay(self.object.pk)
-        )
+        transaction.on_commit(lambda: flag_glossary_terminology.delay(self.object.pk))
         return response
