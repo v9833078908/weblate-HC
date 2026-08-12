@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>HCGameLoc - Статус автоматического перевода</title>
+    <style>
+      :root {
+        --ink: #2a3744;
+        --muted: #667085;
+        --surface: #ffffff;
+        --surface-alt: #f5f5f5;
+        --border: #e9eaec;
+        --border-strong: #bfc3c7;
+        --header: #2a3744;
+        --primary: #144d3f;
+        --link: #107a62;
+        --success: #107a62;
+        --success-bg: #e7f3ee;
+        --success-text: #155e4b;
+        --warning: #8a6d3b;
+        --warning-bg: #fcf8e3;
+        --danger: #cc3d20;
+        --danger-bg: #fbe9e4;
+        --danger-text: #9b2d18;
+        --info-bg: #e0eaf1;
+        --focus: #2eccaa;
+        --radius-sm: 4px;
+        --radius: 10px;
+        --shadow: 0 6px 12px rgb(0 0 0 / 10%);
+      }
+
+      * { box-sizing: border-box; }
+
+      .visually-hidden {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+      }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        color: var(--ink);
+        background: var(--surface-alt);
+        font-family: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+        font-size: 16px;
+        line-height: 1.45;
+      }
+
+      button, summary { font: inherit; }
+
+      button {
+        min-height: 38px;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+        padding: 7px 12px;
+        color: var(--ink);
+        background: var(--surface);
+        cursor: pointer;
+      }
+
+      button:hover { border-color: var(--border-strong); }
+
+      button:focus-visible,
+      summary:focus-visible,
+      a:focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      .button-primary {
+        border-color: var(--primary);
+        color: #fff;
+        background: var(--primary);
+      }
+
+      .button-primary:hover { background: #0a2b23; }
+
+      .button-danger {
+        border-color: var(--danger);
+        color: var(--danger-text);
+        background: var(--surface);
+      }
+
+      .app-header {
+        color: #fff;
+        background: var(--header);
+        box-shadow: 0 1px 0 rgb(0 0 0 / 16%);
+      }
+
+      .header-inner,
+      .page {
+        width: min(1160px, calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      .header-inner {
+        display: flex;
+        min-height: 60px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: #fff;
+        font-size: 18px;
+        font-weight: 650;
+        text-decoration: none;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border: 1px solid rgb(255 255 255 / 33%);
+        border-radius: 50%;
+        color: var(--focus);
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .header-user {
+        color: #d8dde2;
+        font-size: 14px;
+      }
+
+      .breadcrumb-wrap { border-bottom: 1px solid var(--border); background: var(--surface); }
+
+      .breadcrumb {
+        display: flex;
+        min-height: 42px;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        overflow-x: auto;
+        color: var(--muted);
+        font-size: 14px;
+        list-style: none;
+        white-space: nowrap;
+      }
+
+      .breadcrumb a { color: var(--link); text-decoration: none; }
+      .breadcrumb li + li::before { padding-right: 8px; color: #98a2b3; content: "/"; }
+
+      .page { padding: 26px 0 48px; }
+
+      .page-title-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 18px;
+      }
+
+      h1, h2, h3, p { margin-top: 0; }
+
+      h1 {
+        margin-bottom: 4px;
+        font-size: 25px;
+        font-weight: 650;
+        line-height: 1.2;
+        text-wrap: balance;
+      }
+
+      .subtitle { margin-bottom: 0; color: var(--muted); }
+
+      .language-badge {
+        flex: 0 0 auto;
+        margin-top: 3px;
+        border: 1px solid var(--border-strong);
+        border-radius: 999px;
+        padding: 3px 10px;
+        color: var(--ink);
+        background: var(--surface);
+        font-size: 14px;
+        font-weight: 650;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 2px;
+        margin: 0 0 22px;
+        border-bottom: 1px solid var(--border-strong);
+        padding: 0;
+        list-style: none;
+      }
+
+      .tabs a {
+        display: block;
+        margin-bottom: -1px;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+        padding: 8px 13px;
+        color: var(--link);
+        text-decoration: none;
+      }
+
+      .tabs a[aria-current="page"] {
+        border-color: var(--border-strong) var(--border-strong) var(--surface);
+        color: var(--ink);
+        background: var(--surface);
+        font-weight: 650;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 260px;
+        gap: 22px;
+        align-items: start;
+      }
+
+      .operation {
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+      }
+
+      .operation[data-state="running"],
+      .operation[data-state="queued"] { border-color: #99c9bc; }
+
+      .operation[data-state="completed"] { border-color: #9acfbf; }
+      .operation[data-state="failed"] { border-color: #e7aa9d; }
+
+      .operation-main { padding: 18px; }
+
+      .operation-heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .operation-title {
+        display: flex;
+        min-width: 0;
+        align-items: flex-start;
+        gap: 11px;
+      }
+
+      .state-icon {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        flex: 0 0 34px;
+        place-items: center;
+        border-radius: 50%;
+        color: #fff;
+        background: var(--success);
+        font-size: 17px;
+        font-weight: 750;
+      }
+
+      [data-state="completed"] .state-icon { background: var(--success); }
+      [data-state="failed"] .state-icon { background: var(--danger); }
+      [data-state="queued"] .state-icon { background: var(--warning); }
+
+      .operation h2 {
+        margin: 0 0 2px;
+        font-size: 18px;
+        font-weight: 650;
+        line-height: 1.25;
+        text-wrap: balance;
+      }
+
+      .scope { margin: 0; color: var(--muted); font-size: 14px; }
+
+      .state-label {
+        flex: 0 0 auto;
+        margin: 2px 0 0;
+        border-radius: 999px;
+        padding: 3px 9px;
+        color: var(--success-text);
+        background: var(--success-bg);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      [data-state="queued"] .state-label { color: #725a2f; background: var(--warning-bg); }
+      [data-state="failed"] .state-label { color: var(--danger-text); background: var(--danger-bg); }
+
+      .operation-copy {
+        max-width: 70ch;
+        margin: 16px 0 0;
+        color: var(--ink);
+      }
+
+      .progress-meta {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 14px;
+        margin: 18px 0 7px;
+        font-size: 14px;
+      }
+
+      .progress-meta strong { font-weight: 700; }
+      .progress-percent { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+      .progress-track {
+        height: 9px;
+        overflow: hidden;
+        border-radius: 99px;
+        background: #e4ebe8;
+      }
+
+      .progress-fill {
+        width: 100%;
+        height: 100%;
+        transform: scaleX(0);
+        transform-origin: left center;
+        border-radius: inherit;
+        background: var(--success);
+        transition: transform 200ms cubic-bezier(.22, 1, .36, 1), background-color 150ms ease-out;
+      }
+
+      [data-state="queued"] .progress-fill { background: var(--warning); }
+      [data-state="failed"] .progress-fill { background: var(--danger); }
+
+      .operation-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px 20px;
+        margin: 12px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .operation-meta strong { color: var(--ink); font-weight: 600; }
+
+      .operation-footer {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 9px;
+        border-top: 1px solid var(--border);
+        padding: 12px 18px;
+        background: #fcfcfc;
+      }
+
+      .button-link {
+        min-height: 34px;
+        padding: 5px 7px;
+        color: var(--link);
+        background: transparent;
+      }
+
+      .button-link:hover { color: var(--primary); background: var(--surface-alt); }
+
+      details { margin-left: auto; }
+      summary { color: var(--link); cursor: pointer; font-size: 14px; }
+      .operation-details { width: min(420px, 100%); margin: 11px 0 0; color: var(--muted); font-size: 14px; }
+      .operation-details code { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+
+      .translation-card {
+        margin-top: 22px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .card-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        border-bottom: 1px solid var(--border);
+        padding: 14px 17px;
+      }
+
+      .card-heading h2 { margin: 0; font-size: 17px; font-weight: 650; }
+      .card-heading span { color: var(--muted); font-size: 14px; }
+
+      table { width: 100%; border-collapse: collapse; font-size: 15px; }
+      th, td { border-bottom: 1px solid var(--border); padding: 11px 17px; text-align: left; vertical-align: top; }
+      th { color: var(--muted); background: #fcfcfc; font-size: 13px; font-weight: 650; }
+      tr:last-child td { border-bottom: 0; }
+      td:first-child { width: 50%; }
+      .status-cell { width: 42px; text-align: right; }
+      .translated-mark { color: var(--success); font-weight: 800; }
+
+      .demo-panel {
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        padding: 15px;
+        background: var(--surface);
+      }
+
+      .demo-panel h2 { margin-bottom: 5px; font-size: 16px; font-weight: 650; }
+      .demo-panel p { margin-bottom: 14px; color: var(--muted); font-size: 14px; }
+      .demo-actions { display: grid; gap: 8px; }
+      .demo-actions button { width: 100%; text-align: left; }
+      .demo-actions .button-primary { text-align: center; }
+      .demo-note { margin: 15px 0 0; border-top: 1px solid var(--border); padding: 13px 0 0; color: var(--muted); font-size: 13px; }
+      .demo-note strong { color: var(--ink); }
+
+      .empty-state {
+        display: none;
+        padding: 18px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      [data-state="idle"] .operation-main,
+      [data-state="idle"] .operation-footer { display: none; }
+      [data-state="idle"] .empty-state { display: block; }
+
+      @media (max-width: 820px) {
+        .layout { grid-template-columns: 1fr; }
+      }
+
+      @media (max-width: 560px) {
+        .header-inner, .page { width: min(100% - 24px, 1160px); }
+        .header-user { display: none; }
+        .page { padding-top: 18px; }
+        .page-title-row { gap: 10px; }
+        h1 { font-size: 22px; }
+        .breadcrumb {
+          gap: 5px;
+          overflow: hidden;
+          font-size: 13px;
+        }
+        .breadcrumb li:first-child { display: none; }
+        .breadcrumb li:nth-child(2)::before { content: ""; padding-right: 0; }
+        .breadcrumb li + li::before { padding-right: 5px; }
+        .tabs { overflow-x: auto; }
+        .tabs a { white-space: nowrap; }
+        .operation-main, .operation-footer { padding-right: 14px; padding-left: 14px; }
+        .operation-heading { align-items: flex-start; }
+        .state-label { margin-top: 0; }
+        .card-heading { align-items: flex-start; flex-direction: column; }
+        th, td { padding: 10px 12px; }
+        td:first-child { width: auto; }
+        table { font-size: 14px; }
+        details { width: 100%; margin-left: 0; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="header-inner">
+        <a class="brand" href="#page-title">
+          <span class="brand-mark" aria-hidden="true">H</span>
+          Hero Craft Localization
+        </a>
+        <span class="header-user">i.efimov@herocraft.com</span>
+      </div>
+    </header>
+
+    <div class="breadcrumb-wrap">
+      <nav class="page" aria-label="Навигационная цепочка">
+        <ol class="breadcrumb">
+          <li><a href="#project">Проекты</a></li>
+          <li><a href="#heart-abyss">Heart Abyss</a></li>
+          <li><a href="#glossary">Глоссарий храма</a></li>
+          <li aria-current="page">Французский</li>
+        </ol>
+      </nav>
+    </div>
+
+    <main class="page">
+      <div class="page-title-row">
+        <div>
+          <h1 id="page-title">Глоссарий храма</h1>
+          <p class="subtitle">Перевод терминологии для Heart Abyss</p>
+        </div>
+        <span class="language-badge" aria-label="Язык перевода: французский">FR</span>
+      </div>
+
+      <nav aria-label="Разделы перевода">
+        <ul class="tabs">
+          <li><a aria-current="page" href="#translation">Перевод</a></li>
+          <li><a href="#overview">Обзор</a></li>
+          <li><a href="#search">Поиск</a></li>
+          <li><a href="#history">История</a></li>
+        </ul>
+      </nav>
+
+      <div class="layout">
+        <div>
+          <section class="operation" id="operation" data-state="running" aria-labelledby="operation-title">
+            <div class="empty-state" id="empty-state">
+              <h2>Автоматический перевод</h2>
+              <p>Нет активных запусков для французского глоссария.</p>
+            </div>
+
+            <div class="operation-main" aria-live="polite">
+              <div class="operation-heading">
+                <div class="operation-title">
+                  <span class="state-icon" id="state-icon" aria-hidden="true">↻</span>
+                  <div>
+                    <h2 id="operation-title">Автоматический перевод</h2>
+                    <p class="scope">Французский · Глоссарий храма · 57 строк</p>
+                  </div>
+                </div>
+                <span class="state-label" id="state-label">Выполняется</span>
+              </div>
+
+              <p class="operation-copy" id="operation-copy">Перевод продолжается в фоне. Можно обновить страницу или перейти в другой раздел - статус останется доступен здесь.</p>
+
+              <div class="progress-meta">
+                <strong id="progress-label">34 из 57 строк переведено</strong>
+                <span class="progress-percent" id="progress-percent">60%</span>
+              </div>
+              <div class="progress-track" aria-hidden="true">
+                <div class="progress-fill" id="progress-fill"></div>
+              </div>
+              <div class="visually-hidden" id="progress-accessible" role="status"></div>
+
+              <div class="operation-meta">
+                <span>Запущен: <strong id="started-at">12:55</strong></span>
+                <span>Последнее обновление: <strong id="updated-at">только что</strong></span>
+                <span>Источник: <strong>OpenRouter</strong></span>
+              </div>
+            </div>
+
+            <div class="operation-footer">
+              <button class="button-link" id="refresh-status" type="button">Обновить состояние</button>
+              <button class="button-link" id="view-results" type="button">Показать переведённые строки</button>
+              <details>
+                <summary>Детали операции</summary>
+                <p class="operation-details" id="operation-details">Задача <code>auto-translate:fr-glossary</code> выполняется в очереди перевода.</p>
+              </details>
+            </div>
+          </section>
+
+          <section class="translation-card" id="translation-results" aria-labelledby="strings-title">
+            <div class="card-heading">
+              <h2 id="strings-title">Строки глоссария</h2>
+              <span id="table-caption">Часть строк будет доступна сразу после перевода</span>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Исходный термин</th>
+                  <th scope="col">Французский</th>
+                  <th class="status-cell" scope="col"><span class="visually-hidden">Статус</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Коджо-13</td><td>Kojo-13</td><td class="status-cell"><span class="translated-mark" aria-label="Переведено">✓</span></td></tr>
+                <tr><td>культисты</td><td>cultistes</td><td class="status-cell"><span class="translated-mark" aria-label="Переведено">✓</span></td></tr>
+                <tr><td>священные колокола</td><td>cloches sacrées</td><td class="status-cell"><span class="translated-mark" aria-label="Переведено">✓</span></td></tr>
+                <tr><td>Имперская шавка</td><td>Chien de l'Empire</td><td class="status-cell"><span class="translated-mark" aria-label="Переведено">✓</span></td></tr>
+                <tr><td>главное святилище</td><td>sanctuaire principal</td><td class="status-cell"><span class="translated-mark" aria-label="Переведено">✓</span></td></tr>
+              </tbody>
+            </table>
+          </section>
+        </div>
+
+        <aside class="demo-panel" aria-labelledby="demo-title">
+          <h2 id="demo-title">Сценарий prototype</h2>
+          <p>Управляет только демонстрацией. В рабочем интерфейсе этих кнопок не будет.</p>
+          <div class="demo-actions" role="group" aria-label="Управление сценарием">
+            <button class="button-primary" id="start-run" type="button">Запустить перевод</button>
+            <button id="advance-run" type="button">Продвинуть на 7 строк</button>
+            <button id="complete-run" type="button">Завершить успешно</button>
+            <button class="button-danger" id="fail-run" type="button">Симулировать сбой</button>
+            <button id="reload-page" type="button">Обновить страницу</button>
+            <button id="reset-demo" type="button">Сбросить сценарий</button>
+          </div>
+          <p class="demo-note"><strong>Проверка ключевого UX:</strong> нажмите «Обновить страницу» во время выполнения. Панель и точный прогресс сохранятся.</p>
+        </aside>
+      </div>
+    </main>
+
+    <script>
+      (() => {
+        const key = "hcgl-auto-translation-status-prototype";
+        const total = 57;
+        const initial = () => ({
+          status: "running",
+          processed: 34,
+          startedAt: Date.now() - 86_000,
+          updatedAt: Date.now(),
+        });
+
+        const load = () => {
+          try {
+            const saved = JSON.parse(localStorage.getItem(key));
+            if (saved && ["idle", "queued", "running", "completed", "failed"].includes(saved.status)) {
+              return saved;
+            }
+          } catch (_) {
+            // A prototype remains usable when localStorage is unavailable.
+          }
+          return initial();
+        };
+
+        const save = () => {
+          try {
+            localStorage.setItem(key, JSON.stringify(state));
+          } catch (_) {
+            // State persistence is demonstrated when the browser permits it.
+          }
+        };
+
+        const formatTime = (time) => new Intl.DateTimeFormat("ru-RU", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(time);
+
+        const elapsed = (time) => {
+          const seconds = Math.max(0, Math.round((Date.now() - time) / 1000));
+          if (seconds < 8) return "только что";
+          if (seconds < 60) return `${seconds} с назад`;
+          return `${Math.floor(seconds / 60)} мин назад`;
+        };
+
+        let state = load();
+        const operation = document.getElementById("operation");
+        const icon = document.getElementById("state-icon");
+        const label = document.getElementById("state-label");
+        const copy = document.getElementById("operation-copy");
+        const progressLabel = document.getElementById("progress-label");
+        const percent = document.getElementById("progress-percent");
+        const fill = document.getElementById("progress-fill");
+        const accessible = document.getElementById("progress-accessible");
+        const startedAt = document.getElementById("started-at");
+        const updatedAt = document.getElementById("updated-at");
+        const details = document.getElementById("operation-details");
+        const tableCaption = document.getElementById("table-caption");
+        const viewResults = document.getElementById("view-results");
+
+        const content = {
+          idle: {
+            icon: "·",
+            label: "Нет запуска",
+            copy: "",
+            details: "Нет активной фоновой операции.",
+            caption: "Запустите перевод, чтобы увидеть прогресс здесь.",
+          },
+          queued: {
+            icon: "…",
+            label: "В очереди",
+            copy: "Задача принята и ожидает свободного worker. Страница безопасно переживает обновление.",
+            details: "Задача auto-translate:fr-glossary ожидает worker в очереди translate.",
+            caption: "Перевод ещё не начал обрабатывать строки.",
+          },
+          running: {
+            icon: "↻",
+            label: "Выполняется",
+            copy: "Перевод продолжается в фоне. Можно обновить страницу или перейти в другой раздел - статус останется доступен здесь.",
+            details: "Задача auto-translate:fr-glossary выполняется в очереди перевода.",
+            caption: "Часть строк будет доступна сразу после перевода.",
+          },
+          completed: {
+            icon: "✓",
+            label: "Завершено",
+            copy: "Переведены все 57 строк. Проверки не обнаружили проблем; строки готовы к проверке редактором.",
+            details: "Операция успешно завершена. 57 строк переведено, 0 failing checks.",
+            caption: "Все строки доступны для проверки.",
+          },
+          failed: {
+            icon: "!",
+            label: "Требует внимания",
+            copy: "Состояние операции не удалось подтвердить. Перевод мог продолжиться в фоне; обновите статус перед повторным запуском.",
+            details: "Последний ответ worker недоступен. Повторный запуск следует предложить только после проверки текущих строк.",
+            caption: "Проверьте текущее число переведённых строк перед повторным запуском.",
+          },
+        };
+
+        let queueTimer;
+        const scheduleQueuedStart = () => {
+          window.clearTimeout(queueTimer);
+          if (state.status !== "queued") return;
+          const delay = Math.max(0, 500 - (Date.now() - state.updatedAt));
+          queueTimer = window.setTimeout(() => {
+            if (state.status === "queued") setState({ status: "running", processed: 7 });
+          }, delay);
+        };
+
+
+        const render = () => {
+          const definition = content[state.status];
+          const actualProcessed = state.status === "completed" ? total : state.processed || 0;
+          const value = Math.round((actualProcessed / total) * 100);
+          operation.dataset.state = state.status;
+          icon.textContent = definition.icon;
+          label.textContent = definition.label;
+          copy.textContent = definition.copy;
+          progressLabel.textContent = state.status === "failed"
+            ? `${actualProcessed} из ${total} строк были переведены до потери статуса`
+            : `${actualProcessed} из ${total} строк переведено`;
+          percent.textContent = `${value}%`;
+          fill.style.transform = `scaleX(${value / 100})`;
+          startedAt.textContent = state.startedAt ? formatTime(state.startedAt) : "-";
+          updatedAt.textContent = elapsed(state.updatedAt || Date.now());
+          details.textContent = definition.details;
+          tableCaption.textContent = definition.caption;
+          accessible.textContent = `${definition.label}. ${progressLabel.textContent}.`;
+          viewResults.textContent = state.status === "completed" ? "Перейти к проверке строк" : "Показать переведённые строки";
+          save();
+          scheduleQueuedStart();
+        };
+
+        const setState = (next) => {
+          state = { ...state, ...next, updatedAt: Date.now() };
+          render();
+        };
+
+        document.getElementById("start-run").addEventListener("click", () => {
+          const now = Date.now();
+          setState({ status: "queued", processed: 0, startedAt: now });
+        });
+
+        document.getElementById("advance-run").addEventListener("click", () => {
+          if (!["queued", "running"].includes(state.status)) return;
+          const next = Math.min(total, (state.processed || 0) + 7);
+          setState({ status: next === total ? "completed" : "running", processed: next });
+        });
+
+        document.getElementById("complete-run").addEventListener("click", () => {
+          setState({ status: "completed", processed: total });
+        });
+
+        document.getElementById("fail-run").addEventListener("click", () => {
+          setState({ status: "failed", processed: state.processed || 0 });
+        });
+
+        document.getElementById("reload-page").addEventListener("click", () => location.reload());
+        document.getElementById("reset-demo").addEventListener("click", () => {
+          try { localStorage.removeItem(key); } catch (_) {}
+          state = initial();
+          render();
+        });
+
+        document.getElementById("refresh-status").addEventListener("click", () => {
+          setState({});
+        });
+
+        viewResults.addEventListener("click", () => {
+          document.getElementById("translation-results").scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+
+        render();
+      })();
+    </script>
+  </body>
+</html>
