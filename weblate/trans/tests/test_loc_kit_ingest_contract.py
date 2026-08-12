@@ -799,7 +799,11 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         )
         self.assertContains(page, "мужской род")
 
-        self._confirm()
+        with (
+            patch.object(Component, "update_branch", return_value=True),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self._confirm()
         component = Component.objects.get(slug=self.slug)
         translation = component.translation_set.get(language__code="fr")
         unit = translation.unit_set.get(source="Партия")
