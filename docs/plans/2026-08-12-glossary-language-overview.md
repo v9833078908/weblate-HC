@@ -10,12 +10,13 @@
 
 ---
 
-### Task 1: Add a glossary overview regression test
+## Task 1: Add a glossary overview regression test
 
 **Files:**
+
 - Modify: `weblate/trans/tests/test_views.py` in `BasicViewTest`
 
-**Step 1: Write the failing test**
+### Step 1: Write the failing test
 
 Add a test that creates the project's glossary and loads its component overview. Assert that the glossary table:
 
@@ -28,6 +29,7 @@ In the same test, load the ordinary component overview and assert that it still 
 Add `from lxml import html` with the other third-party imports, then use this test:
 
 ```python
+class BasicViewTest(ViewTestCase):
     def test_glossary_component_hides_unfinished_character_statistics(self) -> None:
         self.component.create_glossary()
         glossary = Component.objects.get(project=self.project, is_glossary=True)
@@ -51,7 +53,7 @@ Add `from lxml import html` with the other third-party imports, then use this te
         self.assertContains(response, "Unfinished characters")
 ```
 
-**Step 2: Run the test to verify it fails**
+### Step 2: Run the test to verify it fails
 
 Run:
 
@@ -64,30 +66,31 @@ uv run pytest weblate/trans/tests/test_views.py::BasicViewTest::test_glossary_co
 
 Expected: FAIL because the shared template currently renders `Unfinished characters` for glossaries.
 
-### Task 2: Hide non-actionable glossary statistics
+## Task 2: Hide non-actionable glossary statistics
 
 **Files:**
+
 - Modify: `weblate/templates/snippets/list-objects.html:116-124,331-347`
 
-**Step 1: Conditionally render the header**
+### Step 1: Conditionally render the header
 
 Wrap the existing `Unfinished characters` `<th>` in `{% if not is_glossary %}` / `{% endif %}`. Keep its sort link, CSS class, and translation unchanged for non-glossary tables.
 
-**Step 2: Conditionally render the value cell**
+### Step 2: Conditionally render the value cell
 
 Wrap the matching `object.stats.todo_chars` `{% list_objects_number %}` call in the same `{% if not is_glossary %}` condition. Do not change the `todo`, `todo_words`, or `nottranslated` cells.
 
-**Step 3: Use the shared zero display for glossary translations**
+### Step 3: Use the shared zero display for glossary translations
 
 Remove `show_zero=True` from the glossary `object.stats.translated` call. This lets `list_objects_number` use its existing accessible, visually hidden zero rendering, matching the rest of the glossary metrics.
 
-**Step 4: Run the regression test**
+### Step 4: Run the regression test
 
 Run the Task 1 command again.
 
 Expected: PASS.
 
-**Step 5: Run the focused view-test class**
+### Step 5: Run the focused view-test class
 
 Run:
 
@@ -100,13 +103,14 @@ uv run pytest weblate/trans/tests/test_views.py::BasicViewTest -q
 
 Expected: PASS.
 
-### Task 3: Verify the rendered UI and commit
+## Task 3: Verify the rendered UI and commit
 
 **Files:**
+
 - Verify: `weblate/templates/snippets/list-objects.html`
 - Verify: `weblate/trans/tests/test_views.py`
 
-**Step 1: Check formatting and linting only for touched files**
+### Step 1: Check formatting and linting only for touched files
 
 Run:
 
@@ -116,11 +120,11 @@ uv run prek run --files weblate/templates/snippets/list-objects.html weblate/tra
 
 Expected: PASS.
 
-**Step 2: Browser-smoke the glossary overview**
+### Step 2: Browser-smoke the glossary overview
 
 Use the existing local Weblate instance without restarting or rebuilding it. Open a glossary component overview and confirm that `Unfinished characters` is absent while zero-valued metrics remain blank rather than visibly rendered as `0`.
 
-**Step 3: Commit and push the scoped change**
+### Step 3: Commit and push the scoped change
 
 ```bash
 git add docs/plans/2026-08-12-glossary-language-overview.md \

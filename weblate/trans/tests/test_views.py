@@ -28,6 +28,7 @@ from django.test.client import RequestFactory
 from django.test.utils import CaptureQueriesContext, override_settings
 from django.urls import reverse
 from django.utils.translation import activate
+from lxml import html
 from openpyxl import load_workbook
 from PIL import Image
 
@@ -1114,6 +1115,28 @@ class BasicViewTest(ViewTestCase):
         response = self.client.get(self.component.get_absolute_url())
         self.assertContains(response, "Test/Test")
         self.assertNotContains(response, "Spanish")
+
+    def test_glossary_component_hides_unfinished_character_statistics(self) -> None:
+        self.component.create_glossary()
+        glossary = Component.objects.get(project=self.project, is_glossary=True)
+
+        response = self.client.get(glossary.get_absolute_url())
+
+        self.assertNotContains(response, "Unfinished characters")
+        self.assertContains(response, "Unfinished words")
+        tree = html.fromstring(response.content)
+        translated_cells = tree.xpath(
+            '//div[@id="translations"]//tbody/tr[th]/td[@data-value][1]'
+        )
+        self.assertTrue(translated_cells)
+        for cell in translated_cells:
+            self.assertTrue(
+                cell.xpath('.//span[@class="visually-hidden" and text()="0"]')
+            )
+
+        response = self.client.get(self.component.get_absolute_url())
+
+        self.assertContains(response, "Unfinished characters")
 
     def test_view_component_upload_placeholder(self) -> None:
         response = self.client.get(self.component.get_absolute_url())
