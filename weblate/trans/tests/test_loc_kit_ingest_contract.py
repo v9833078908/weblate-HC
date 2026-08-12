@@ -738,9 +738,11 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self._start(
             upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug
         )
-        with patch.object(Component, "update_branch", return_value=True):
-            with self.captureOnCommitCallbacks(execute=True):
-                self._confirm()
+        with (
+            patch.object(Component, "update_branch", return_value=True),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self._confirm()
         component = Component.objects.get(slug=self.slug, is_glossary=True)
         sources = component.source_translation.unit_set.all()
         self.assertTrue(sources)
@@ -752,6 +754,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         """Термин и описание на соседних строках - одна запись, не две."""
         self._start(upload=self._csv("Terms.csv", GLOSSARY_PAIRS_CSV), slug=self.slug)
         draft = self._draft()
+
         draft.refresh_from_db()
 
         self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
@@ -760,6 +763,24 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertEqual(preview["note_count"], 4)
         self.assertEqual(preview["terms"][0]["section"], "Персонажи")
         self.assertEqual(preview["terms"][0]["source"], "Герой")
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_confirmed_glossary_populates_a_new_language(self) -> None:
+        self._start(
+            upload=self._csv("Terms.csv", GLOSSARY_LANG_ONLY_CSV), slug=self.slug
+        )
+        with (
+            patch.object(Component, "update_branch", return_value=True),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self._confirm()
+
+        component = Component.objects.get(slug=self.slug, is_glossary=True)
+        expected = component.source_translation.unit_set.count()
+        component.add_new_language(Language.objects.get(code="fr"), None)
+
+        added = component.translation_set.get(language__code="fr")
+        self.assertEqual(added.unit_set.count(), expected)
 
     @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
     def test_note_column_reaches_the_created_glossary_llm_entry(self) -> None:

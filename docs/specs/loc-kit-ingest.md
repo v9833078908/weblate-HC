@@ -154,6 +154,7 @@ uv run python -m loc_kit_ingest "/path/Temple.csv" \
    после успеха оператор подтверждает создание, которое донастраивает
    `file_format="tbx"`, `filemask="tbx/*.tbx"`, пустой template, профильный
    язык-источник и `is_glossary=True`; эти поля неизменяемы в финальной форме.
+   Imported terms are marked as terminology, so they also appear in glossary languages added later.
 7. **Временный черновик.** Загруженный файл хранится в session-bound,
    owner-bound временном черновике не дольше одного часа; он удаляется при
    создании, отмене или периодической очистке Celery. Чужой владелец, другая
