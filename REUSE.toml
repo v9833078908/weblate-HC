@@ -32,6 +32,7 @@ path = [
   "docs/**.md",
   "docs/misc/**.csv",
   "docs/misc/**.json",
+  "docs/misc/**.jsonl",
   "docs/misc/**.log",
   "hcgameloc.egg-info/**",
   "loc_kit_ingest/.gitignore",

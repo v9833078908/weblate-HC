@@ -2,7 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""B0 dump: col4/data/fr units + glossary, layer-0 normalized (read-only).
+"""
+B0 dump: col4/data/fr units + glossary, layer-0 normalized (read-only).
 
 Runs inside the dev container:
     docker exec -i dev-docker-weblate-1 weblate shell < docs/misc/col4-b0-dump.py
@@ -12,13 +13,14 @@ Writes /app/data/col4-b0-units.jsonl (host: dev-docker/data/).
 import json
 import re
 
-from weblate.trans.autofixes import fix_target
-from weblate.trans.models import Project, Translation
-from weblate.utils.state import STATE_TRANSLATED
 from weblate_customization.autofixes import (
     AddFrenchPunctuationSpacing,
     RemoveAddedFinalStop,
 )
+
+from weblate.trans.autofixes import fix_target
+from weblate.trans.models import Project, Translation
+from weblate.utils.state import STATE_TRANSLATED
 
 # The running container predates the compose edit registering these two,
 # so fix_target() only applies LineSeparatorSpacing; chain them manually
@@ -41,9 +43,7 @@ pairs = {
     if unit.target.strip() and unit.source.strip()
 }
 
-out = open("/app/data/col4-b0-units.jsonl", "w", encoding="utf-8")
-json.dump({"glossary": pairs}, out, ensure_ascii=False)
-out.write("\n")
+records: list[dict] = [{"glossary": pairs}]
 
 plural_sep_hits = 0
 for unit in translation.unit_set.prefetch_related("check_set").order_by("id"):
@@ -82,7 +82,7 @@ for unit in translation.unit_set.prefetch_related("check_set").order_by("id"):
             gloss_terms.append(term)
             if rendering.lower() not in fixed.lower():
                 gloss_missing.append(term)
-    json.dump(
+    records.append(
         {
             "unit_id": unit.id,
             "context": unit.context,
@@ -94,10 +94,11 @@ for unit in translation.unit_set.prefetch_related("check_set").order_by("id"):
             "checks": checks,
             "gloss_terms": gloss_terms,
             "gloss_missing": gloss_missing,
-        },
-        out,
-        ensure_ascii=False,
+        }
     )
-    out.write("\n")
-out.close()
+
+with open("/app/data/col4-b0-units.jsonl", "w", encoding="utf-8") as out:
+    for record in records:
+        json.dump(record, out, ensure_ascii=False)
+        out.write("\n")
 print("DONE plural_sep_hits", plural_sep_hits)
