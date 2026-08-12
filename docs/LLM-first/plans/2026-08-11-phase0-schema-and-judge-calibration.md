@@ -7,7 +7,7 @@ Cathedral (`2026-08-11-cathedral-localizer-analysis.md`, пп. 6, 10):
 Основание:
 `docs/LLM-first/llm-first-product-architecture.md` (часть 5, фаза 0),
 `docs/LLM-first/agent_researches/2026-08-11-llm-judge-design-research.md`,
-`docs/LLM-first/2026-08-11-llm-first-prompt-and-pipeline-review.md`
+`docs/specs/2026-08-11-llm-first-prompt-and-pipeline-review.md`
 (пп. 8.2, 3.5).
 
 Цель: закрыть последний транспортный пункт ревизии
@@ -70,7 +70,7 @@ Standalone-скрипты без Django: ключ OpenRouter через пере
 страты из прод-вывода COL4 fr:
 
 1. **85 известных глоссарных дефектов** (разметка из
-   `docs/LLM-first/2026-08-11-glossary-enforcement-analysis.md`, п. 10)
+   `docs/specs/2026-08-11-glossary-enforcement-analysis.md`, п. 10)
    — класс `terminology`.
 2. **~75 чистых строк**: 0 failing checks, глоссарий соблюдён; ручная
    сверка случайных 20 фиксируется в наборе.

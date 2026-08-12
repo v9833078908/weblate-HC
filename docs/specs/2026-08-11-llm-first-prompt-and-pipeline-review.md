@@ -2,7 +2,7 @@
 
 Дата: 2026-08-11.
 
-Разбор двух документов - `docs/LLM-first/2026-08-11-col4-fr-autotranslate-report.md` (замеренный
+Разбор двух документов - `docs/specs/2026-08-11-col4-fr-autotranslate-report.md` (замеренный
 прогон COL4 ru->fr на проде) и `docs/LLM-first/llm-first-product-research.md` (продуктовое
 предложение) - с проверкой каждой рекомендации по коду.
 

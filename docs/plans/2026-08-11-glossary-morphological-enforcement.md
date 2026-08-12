@@ -1,7 +1,7 @@
 # План: морфологическое сравнение для глоссарного гейта
 
 Статус: **ожидает согласования**. Обоснование и все числа -
-`docs/LLM-first/2026-08-11-glossary-enforcement-analysis.md`.
+`docs/specs/2026-08-11-glossary-enforcement-analysis.md`.
 
 Цель: довести до модели те термины, которые она сейчас не видит, и отдельно
 сделать глоссарный чек пригодным как автоматический гейт - не раздувая
@@ -118,7 +118,7 @@
 `docs/misc/col4-check-severity-probe.py`,
 `docs/misc/col4-visibility-adherence-probe.py`,
 `docs/misc/col4-source-stem-probe.py`, результат в
-`docs/LLM-first/2026-08-11-glossary-enforcement-analysis.md`.
+`docs/specs/2026-08-11-glossary-enforcement-analysis.md`.
 
 Прогнать замеры через продуктовые функции вместо локальных копий правил.
 Отдельно посчитать hard, advisory, снятые морфологией и ошибочно снятые случаи,
