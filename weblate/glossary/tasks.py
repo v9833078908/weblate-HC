@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING
 
 from django.db import transaction
 
-from weblate.auth.models import get_anonymous
+from weblate.auth.models import User, get_anonymous
+from weblate.checks.flags import Flags
 from weblate.lang.models import Language
 from weblate.trans.models import Component, Project, Translation
 from weblate.utils.celery import app
@@ -130,3 +131,38 @@ def sync_terminology(pk: int, component: Component | None = None):
     component.source_translation.sync_terminology()
 
     return {"component": pk}
+
+
+@app.task(
+    trail=False,
+    autoretry_for=(Component.DoesNotExist, WeblateLockTimeoutError),
+    retry_backoff=60,
+    bind=True,
+)
+def flag_glossary_terminology(self, pk: int) -> None:
+    """
+    Mark every source string of an imported glossary as terminology.
+
+    Terms written straight into TBX carry no flags, and `sync_terminology`
+    copies only flagged strings into the other languages, so without this the
+    glossary exists in the source pair alone. The component is created by a
+    background task, so the source strings may not exist yet: retry rather
+    than flag nothing.
+    """
+    component = Component.objects.get(pk=pk)
+    source = component.source_translation
+    if not source.unit_set.exists():
+        raise self.retry(countdown=10, max_retries=30)
+
+    author = User.objects.get_or_create_bot(
+        scope="glossary", name="sync", verbose="Glossary sync"
+    )
+    with transaction.atomic():
+        for unit in source.unit_set.select_for_update().order_by("id"):
+            flags = Flags(unit.extra_flags)
+            if "terminology" in flags:
+                continue
+            flags.merge("terminology")
+            unit.update_extra_flags(flags.format(), author)
+
+    component.schedule_sync_terminology()
