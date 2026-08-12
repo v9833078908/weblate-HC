@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import pytest
 
+from loc_kit_ingest.langcode import language_code
+
 from loc_kit_ingest.infer import (
     _MAX_REGIONS,
     _MAX_SKIPPED_ROWS,
@@ -25,6 +27,23 @@ STANDARD = [
     [],
     ["Меч", "Sword", "", ""],
 ]
+
+@pytest.mark.parametrize(
+    ("header", "code"),
+    [
+        ("zh-TC", "zh_Hant"),
+        ("zh_TC", "zh_Hant"),
+        ("zh-tc", "zh_Hant"),
+        ("zh-SC", "zh_Hans"),
+        ("zh-Hant", "zh_Hant"),
+        ("zh-CN", "zh_CN"),
+        ("pt-PT", "pt_PT"),
+        ("en", "en"),
+        ("id", "id"),
+    ],
+)
+def test_vendor_language_codes_alias_to_canonical(header: str, code: str) -> None:
+    assert language_code(header) == code
 
 
 def test_standard_layout_infers_v2_record_map() -> None:

@@ -13,12 +13,22 @@ from translate.lang import data as lang_data
 _PARENS_CODE = re.compile(r"\(\s*([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*)\s*\)\s*$")
 _BARE_CODE = re.compile(r"^\s*([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*)\s*$")
 
+_LANGUAGE_ALIASES = {
+    "zh_tc": "zh_Hant",
+    "zh_hant": "zh_Hant",
+    "zh_sc": "zh_Hans",
+    "zh_hans": "zh_Hans",
+}
+
 
 def known_language(token: str) -> str | None:
     """Return a Weblate-style code for ``token``, or None if it is no language."""
     norm = token.strip().replace("-", "_")
     if not norm:
         return None
+    alias = _LANGUAGE_ALIASES.get(norm.casefold())
+    if alias is not None:
+        return alias
     if norm in lang_data.languages:
         return norm
     if "_" in norm:
