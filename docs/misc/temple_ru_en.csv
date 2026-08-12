@@ -1,0 +1,689 @@
+context,source,target,developer_comments
+intro_temple_1_1,Не расслабляйтесь.,Don't slack off.,Joe
+intro_temple_1_2,Нужно подняться наверх.,We have to climb to the top.,Joe
+intro_temple_1_3,Да что ты говоришь!,Are you kidding me?,Leon
+intro_temple_1_4,"А я-то думал, сейчас увижу цветочки и прилягу на часок.",And here I was thinking I'd get to see some flowers and take a little nap.,Leon
+intro_temple_1_5,Встретимся на вершине.,See you at the top.,Joe
+intro_temple_1_6,Надо научиться так же.,"I need to learn how to do that, too.",Ray
+intro_temple_1_7,Сваливать в ответственный момент?,Bail out at the crucial moment?,Leon
+intro_temple_1_8,Полезный навык.,That’s a useful skill.,Leon
+intro_temple_1_9,Ну и? Я-то поднимусь.,So what? I’ll make it to the top.,Leon
+intro_temple_1_10,А ты доползешь?,Will you be able to crawl all the way up?,Leon
+intro_temple_1_11,Ну… ты можешь нести меня на спине.,Well… you could carry me on your back.,Ray
+intro_temple_1_12,Чего?,What?,Ray
+intro_temple_1_13,Так быстрее… и…,It’d be faster… and…,Ray
+intro_temple_1_14,"Ну… ладно, забей.","well… fine, forget it.",Ray
+intro_temple_1_15,Вот и он свалил.,"And just like that, he bailed.",Leon
+intro_temple_1_16,Было бы здорово научится так делать...,It would be great to learn how to do that...,Leon
+intro_temple_3_1,Че это за фигня?,What's this nonsense?,
+intro_temple_3_2,"Пожалуйста, не сдавайте меня....",Please don't turn me in....,
+intro_temple_3_3,Я туда не вернусь.,I'm not going back there.,
+intro_temple_4_1,Давно я не видел гор....,It's been a long time since I've seen the mountains....,
+intro_temple_4_2,Напоминает родную деревню.,It reminds me of my hometown.,
+intro_temple_4_3,...,,
+intro_temple_4_4,Наконец-то я на свободе.,I'm finally free.,
+intro_temple_2_1,Я так давно не видел солнца.,I haven't seen the sun in such a long time.,Ray
+intro_temple_2_2,Слишком ярко.,Too bright.,Leon
+intro_temple_2_3,"Если постоишь здесь еще немного, ты привыкнешь.","If you stay here a little longer, you'll get used to it.",Ray
+intro_temple_2_4,Ага…я ведь хочу ослепнуть нахрен.,Yeah… like I want to go blind or something.,Leon
+intro_temple_2_5,Ваш первый глоток свободы.,Your first breath of freedom.,Joe
+intro_temple_2_6,Завораживает.,It's mesmerizing.,Joe
+intro_temple_2_7,Но нам еще предстоит путь.,But we still have a long way to go.,Joe
+intro_temple_2_8,Какая же ты заеба.,You're such a pain in the ass.,Leon
+intro_temple_2_9,Пройдем через разрушенный горный храм.,Let's walk through the ruined mountain temple.,Joe
+intro_temple_2_10,Кар!,Сaw-caw!,Raven
+intro_temple_2_11,Кар-кар-кар!,Сaw-caw!!,Raven
+intro_temple_2_12,Это… это ворон? Я так давно их не видел.,Is that… a raven? I haven't seen one in so long,Ray
+intro_temple_2_13,Самые умные птицы.,The smartest birds.,Ray
+intro_temple_2_14,Этот пернатый обрубок с интеллектом камня?,Is this feathered stump as smart as a rock?,Leon
+intro_temple_2_15,Тебя легко удивить.,It's easy to surprise you.,Leon
+temple_sign_1,Смерть - это только начало,Death is just the beginning,
+intro_temple_5_1,А вот и храм...,Here's the temple...,
+intro_temple_5_2,Почему заброшен?,Why is it abandoned?,Ray
+intro_temple_5_3,Внутри узнаешь. Пошли уже.,You'll find out once we're inside. Let's go already.,Leon
+intro_temple_5_4,"Может, есть другой путь?",Maybe there's another way?,Ray
+intro_temple_5_5,Да. В шахты.,Yes. Into the mines.,Leon
+intro_temple_5_6,Хочешь — дорога открыта.,"If you want to, the road is open.",Leon
+intro_temple_6_1,И что это вообще за место?,"And what kind of place is this, anyway?",Leon
+intro_temple_6_2,Когда-то это был храм Возвышения.,,Joe
+intro_temple_6_3,"Символ силы, знаний...","A symbol of strength, knowledge...",Joe
+intro_temple_6_4,"...и, как это обычно бывает, гордыни. Прекрасная история падения. Хочешь, расскажу?","...and, as is usually the case, pride. A wonderful tale of a fall from grace. Would you like me to tell it to you?",Joe
+intro_temple_6_5,Нет. Эта хрень мне ни к чему.,No. I don't need that crap.,Leon
+intro_temple_6_6,А я бы послушал.,I'd be interested in hearing that.,Ray
+intro_temple_6_7,Да пожалуйста.,"Sure, go ahead.",Leon
+intro_temple_6_8,А я пошёл наверх.,And I went upstairs.,Leon
+intro_temple_6_9,Если вы там в процессе влюбитесь...,If you happen to fall in love while you're there...,Leon
+intro_temple_6_10,....позовите меня на свадьбу.,....invite me to the wedding.,Leon
+intro_temple_7_1,"Это чё, святилище звона в жопу?","What is this, some kind of “bell-ringing up the ass” shrine?",Leon
+intro_temple_8_1,Это что ещё за [shake][color=red]ЕБ ТВОЮ МАТЬ?![/color][/shake],"What the FUCK is this, for God's sake?!",Leon
+intro_temple_8_2,Что с тобой?,What's wrong with you?,Ray
+intro_temple_8_3,Я только что провалился....,I just failed...,Leon
+intro_temple_8_4,В другое время?,Some other time?,Leon
+intro_temple_8_5,О чем ты?,What are you talking about?,Ray
+intro_temple_8_6,"Тот же зал, колокольчики, но здесь были люди.","The same hall, the same bells, but there were people here.",Leon
+intro_temple_8_7,"Я не уверен, что это возможно.",I'm not sure if that's possible.,Ray
+intro_temple_8_8,"Я предупреждал, что это необычное место.",I warned you that this was an unusual place.,Joe
+intro_temple_8_9,Здесь произошла трагедия.,A tragedy occurred here.,Joe
+intro_temple_8_10,"Настолько сильная, что время тут сломано.",So powerful that time itself is broken here.,Joe
+intro_temple_8_11,"Твою мать…[shake][color=red]СПАСИБО, ЧТО ПРЕДУПРЕДИЛ[/color][/shake]",Damn… THANKS FOR THE WARNING,Leon
+intro_temple_9_1,Этот храм Бога Смерти.,This is the temple of the God of Death.,Joe
+intro_temple_9_2,Но когда-то он был просто мальчишкой из деревни.,But he used to be just a country boy.,Joe
+intro_temple_9_3,"Ему предсказали, что он погубит множество жизней.",He was told that he would cause the loss of many lives.,Joe
+intro_temple_9_4,Страшная история.,A scary story.,Joe
+intro_temple_9_5,Он дал обет молчания и пришёл сюда.,He took a vow of silence and came here.,Joe
+intro_temple_9_6,"Не ел, не пил, не двигался. Только сидел. Годами.","He didn't eat, drink, or move. He just sat there. For years.",Joe
+intro_temple_9_7,Но однажды…он услышал голоса мертвых.,But one day… he heard the voices of the dead.,Joe
+intro_temple_9_8,И что потом?,And then what?,Ray
+intro_temple_9_9,Он обрел истину.,He found the truth.,Ray
+templerun_1_1,Это зал для …. осмысления.,This is a room for … reflection.,Joe
+templerun_1_2,Первый этап обретения веры.,The first stage of finding faith.,Joe
+templerun_1_3,Пройди путь своего бога.,Walk the path of your god.,Joe
+templerun_1_4,Пока на тебя не снизойдёт озарение.,Until a flash of inspiration strikes you.,Joe
+templerun_1_5,Но... если захочешь даже просто пошевелиться — смерть.,But... if you even try to move—it's death.,Joe
+templerun_1_6,[shake]Миленько…[/shake],That's cute…,Ray
+templerun_1_7,Ага. Просто супер место для медитаций.,Yeah. It's just a great place to meditate.,Leon
+templerun_1_8,Этот бог не особо дорожил своими верующими.,This god didn't think much of his followers.,Leon
+templerun_1_9,Поднимайся выше.,Reach higher.,Joe
+templerun_1_10,"Там ты и узнаешь, в чём ""глубина"" этого учения.",That's where you'll discover the “depth” of this teaching.,Joe
+templerun_1_11,[shake]У меня от тебя мурашки по чешуе![/shake],You give me goosebumps all over my scales!,Ray
+templerun_2_1,Ну как тебе зал молчания?,"So, what do you think of the silence room?",Joe
+templerun_2_2,Я впервые вижу такие… методы покаяния.,This is the first time I've seen such... methods of repentance,Leon
+templerun_2_3,Это же не просто храм.,It's not just a temple.,Joe
+templerun_2_4,Это храм Бога Смерти.,This is the temple of the God of Death.,Joe
+templerun_2_5,Здесь каждый шаг...,"Here, every step...",Joe
+templerun_2_6,"...либо к просветлению, либо к забвению.",...either to enlightenment or to oblivion.,Joe
+templerun_2_7,"Но ты же говорил, что он был обычным человеком.",But you said he was just an ordinary person.,Ray
+templerun_2_8,Так и есть.,That's right.,Joe
+templerun_2_9,Но даже обычный человек может стать богом…,But even an ordinary person can become a god…,Joe
+templerun_2_10,Если поверит в свою силу.,If he believes in his own strength.,Joe
+shiftarena_1_1,Лжепророк должен быть уничтожен.,The false prophet must be destroyed.,Pawwaro
+shiftarena_1_2,Всех кто сеет бред о божественной силе...,Anyone who spouts nonsense about divine power...,Pawwaro
+shiftarena_1_3,Устранить.,Resolve.,Pawwaro
+shiftarena_1_4,Если сектанты поднимут оружие...,If the cult members take up arms...,Pawwaro
+shiftarena_1_5,Устранить.,Resolve.,Pawwaro
+shiftarena_1_6,"Да, Господин!","Yes, sir!",Melee
+shiftarena_1_7,Будь рядом.,Stay close.,Pawwaro
+shiftarena_1_8,Если Лжепророк попытается сбежать ...,If the False Prophet tries to escape...,Pawwaro
+shiftarena_1_9,"Ты знаешь, что делать.",You know what to do.,Pawwaro
+belltutor_1_1,Давно надо было вырезать эту опухоль с тела Империи!,This cancer should have been cut out of the Empire's body a long time ago!,Pawwaro
+belltutor_1_2,Вниз!,Down!,Pawwaro
+belltutor_1_3,Дзюро!,Juro!,Pawwaro
+belltutor_1_4,Это что за машина?!,What kind of car is that?!,Leon
+belltutor_1_5,Господин… это место…,Sir… this place…,Melee
+belltutor_1_6,...здесь что-то не так.,...something's not right here.,Melee
+belltutor_1_7,Нам лучше отступить...,We'd better retreat...,Melee
+belltutor_1_8,Нам не по пути со слабыми.,We have no time for the weak.,Pawwaro
+belltutor_1_9,"Понятно, кто устроил здесь заварушку.",It's clear who caused all this commotion here.,Leon
+belltutor_1_10,Кажется этот культ не поделил что то с Империей,It seems this cult didn't share something with the Empire,Leon
+belltutor_2_1,Сука... Ну ты и зверь.,Bitch... You're such a beast.,Leon
+belltutor_2_2,Ну давай.,"Well, let's do it.",Leon
+belltutor_2_3,Мне не впервой.,This isn't the first time for me.,Leon
+belltutor_3_1,Вот это хреновина.,That's a real piece of crap.,
+belltutor_3_2,И как мне пройти?,"So, how do I get there?",
+followray_2_1,Чёрт... Это чё вообще?,Damn... What the heck is this?,Melee
+followray_2_2,"Их что, живьём подвесили?","So, did they hang them alive or what?",Melee
+followray_2_3,"Не бойтесь, сейчас спасем вас!","Don't worry, we'll save you right now!",Melee
+followray_2_4,Во имя Бога Бессмертного...,In the name of the Immortal God...,Monk
+followray_2_5,Мы уже спасены!,We're already saved!,Monk
+followray_2_6,Пусть сольются плоть и дух в огне!,Let flesh and spirit merge in the fire!,Monk
+followray_2_7,Что?,,Melee
+followray_2_8,Что?,What?,Melee
+followray_2_9,Да они тут все психи!,"Man, they're all crazy here!",Leon
+followray_1_1,Это статуя?,Is that a statue?,Melee
+followray_1_2,Снимите покрывало.,Remove the cover.,Pawwaro
+followray_1_3,"Жутко, но красиво.","Creepy, but beautiful.",Melee
+followray_1_4,Сколько ж костей они туда влепили…,Just how many bones did they cram in there…,Melee
+followray_1_5,"Они что, настоящие?",Are those real?,Melee
+followray_1_6,Вот и Бог смерти.,And here is the God of Death.,Pawwaro
+followray_1_7,Черт!,Damn!,Melee
+followray_1_8,"Дзюро… господин, он… он же…","Juro… sir, he… he’s…",Melee
+followray_1_9,Разберите обломки.,Sort through the debris.,Pawwaro
+followray_1_10,Я не дам своему лучшему воину вот так погибнуть.,Я не дам своему лучшему воину вот так погибнуть.,Pawwaro
+followray_1_11,Он дышит!,He's breathing!,Melee
+followray_1_12,Но... уже не поднимется...,But... he won't get up again...,Melee
+followray_1_13,Это решать ни тебе и ни ему.,It's not up to you or him to decide.,Pawwaro
+ray_temple_1_1,Леон!..,Leon!...,Ray
+ray_temple_1_2,Скорее!,Hurry up!,Ray
+ray_temple_1_3,Да не ори ты! Я уже здесь!,Stop yelling! I'm already here!,Leon
+ray_temple_1_4,ПОМОГИ!,HELP!,Ray
+ray_temple_1_5,[shake]Блядь.[/shake],[shake]Fuck.[/shake],Leon
+ray_temple_1_6,"Я вас догоню, петушары в масках.","I'll catch up with you, you masked cockerels.",Leon
+ray_temple_3_1,Леон!,Leon!,
+ray_temple_3_2,"О, а вот и ты!","Oh, there you are!",
+ray_temple_3_3,Вы реально принесли его в гнездо?,Did you really bring him to the nest?,Leon
+ray_temple_3_4,"Он че, червяк?","What is he, a worm?",Leon
+ray_temple_3_5,Спаси меня!,Save me!,Ray
+ray_temple_3_6,"Не, я хочу посмотреть, что они будут делать дальше.","No, I want to see what they'll do next.",Leon
+ray_temple_3_7,Я СЕРЬЕЗНО!,I'M SERIOUS!,Ray
+ray_temple_3_8,"Ну лан, лан.","Well, okay, okay.",Leon
+ray_temple_3_9,"Если ты откроешь эту заслонку, то я помогу тебе!","If you open that flap, I'll help you!",
+ray_temple_3_10,Чем? Добрым словом?,With what? A kind word?,
+ray_temple_3_11,Увидишь!,You'll see!,
+ray_temple_3_12,У меня еще остались склянки с ядом.,I still have some vials of poison left.,
+ray_temple_4_1,"Ну что...где мое ""спасибо"" за то, что...",So... where's my “thank you” for...,Leon
+ray_temple_4_2,ОСТАНОВИ ЕГО!,STOP HIM!,Ray
+ray_temple_4_3,"Да все в порядке, он тебя не тронет….","It's okay, he won't hurt you…",Leon
+ray_temple_4_4,"[wave]Мы с вам поквитаемся, дзинково отродье![/wave]","[wave]We'll settle the score with you, you zinc-headed scum![/wave]",
+ray_temple_4_5,У него моя фигурка!,He has my figurine!,Ray
+ray_temple_4_6,"Та змеиная херня, которую ты прячешь в кимоно?",That snake-related crap you're hiding in your kimono?,Leon
+ray_temple_4_7,Да ты издеваешься!,Are you kidding me!,Leon
+ray_temple_4_8,"Пожалуйста, Леон.","Please, Leon.",Ray
+ray_temple_4_9,Это действительно очень важно.,That really is very important.,Ray
+ray_temple_4_10,ДА БЛЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯЯ..........,FUCK,Leon
+ray_temple_4_11,Ладно.,Okay.,Leon
+tengufight_1_1,Семья!,Family!,Demon
+tengufight_1_2,Я дал обет молчания...,I took a vow of silence...,Demon
+tengufight_1_3,...но мертвые заговорили со мной.,...but the dead spoke to me.,Demon
+tengufight_1_4,И я пришел к вам.,And so I came to you.,Demon
+tengufight_1_5,Чтобы спасти их мертвые души.,To save their dead souls.,Demon
+tengufight_1_6,Чтобы спасти ваши живые души.,To save your living souls.,Demon
+tengufight_1_7,Чтобы вы стали не живыми и мертвыми...,So that you may become neither living nor dead...,Demon
+tengufight_1_8,...а ВОСКРЕСШИМИ.,...but the RISEN ONES.,Demon
+tengufight_1_9,"Только те, кто веруют в меня - спасутся.",Only those who believe in me will be saved.,Demon
+tengufight_1_10,Кто следуют за мной услышат мертвых.,Those who follow me will hear the dead.,Demon
+tengufight_1_11,Нихуя себе он заливает.,Holy shit he's pouring it on.,Leon
+tengufight_1_12,"Души мертвых, что говорят со мной...",The souls of the dead who speak to me...,Demon
+tengufight_1_13,"Ценнее тех, кто за стенами нашего дома.",More precious than those outside our home.,Demon
+tengufight_1_14,Увидимся на той стороне…,See you on the other side…,Demon
+tengufight_1_15,Среди нас чужак!,There's a stranger among us!,Demon
+tengufight_1_16,Дальше ты не пройдешь!,You won't get any further!,Demon
+tengufight_1_17,Блять!,Damn it!,Leon
+tengufight_2_1,Воскреси моего сына,Bring my son back to life,
+tengufight_2_2,Хочу слышать мертвых!,I want to hear the dead!,
+tengufight_2_3,Я подожгу себя!,I'm going to set myself on fire!,
+tengufight_2_4,Светочь!,Saint!,
+tengufight_2_5,Мы любим тебя!,We love you!,
+tengufight_2_6,Бог Смерти!,God of Death!,
+tengufight_2_7,[shake]Светочь!,Saint!,
+tengufight_3_1,Неофит...,Neophyte...,
+tengufight_3_2,Месса скоро начнется.,Mass is about to begin.,
+doubledoor_1_1,Убийца!,Murderer!,Monk
+doubledoor_1_2,Что?,What?,Leon
+doubledoor_1_3,Вы не доберетесь до Светочи.,You won't get to the Saint.,Monk
+doubledoor_1_4,Ты и твои мясники.,You and your butchers.,Monk
+doubledoor_1_5,"Стой, ты думаешь, что я с ними?","Wait, do you think I'm with them?",Leon
+doubledoor_1_6,"Ты хочешь убить того, кто вернул мне мою дочь.",You want to kill the person who brought my daughter back to me.,Monk
+doubledoor_1_7,Мне так похуй.,I really don't give a shit.,Leon
+doubledoor_1_8,Я знаю что ты идешь за ним!,I know you're following him!,Monk
+doubledoor_1_9,"Моя дочка утонула, когда ей было 2 года.",My daughter drowned when she was 2 years old.,Monk
+doubledoor_1_10,И Светоч ее вернул мне! Она живая!,And the Saint brought her back to me! She's alive!,Monk
+doubledoor_1_11,Че тебе от меня надо?,What do you want from me?,Leon
+doubledoor_1_12,Оставь его!,Leave him alone!,Monk
+doubledoor_1_13,Он делает для нас доброе дело!,He's doing us a favor!,Monk
+doubledoor_1_14,Возвращает тех кого мы потеряли.,It brings back those we've lost.,Monk
+doubledoor_1_15,Ты ведь тоже кого то потерял?,"You’ve lost someone too, haven’t you?",Monk
+doubledoor_1_16,...,...,Leon
+sacrifice_1_1,С этим закончили.,We're done with that.,Demon
+sacrifice_1_2,Теперь пришла твоя очередь!,Now it's your turn!,Demon
+sacrifice_1_3,Пора тебе воссоединиться с мужем.,It's time for you to get back together with your husband.,Demon
+sacrifice_1_4,Я молилась тебе каждый день.,I prayed to you every day.,Wife
+sacrifice_1_5,Сегодня я услышал его голос.,Today I heard his voice.,Demon
+sacrifice_1_6,"[shake]Извините, а я вам не мешаю?!!","[shake]Excuse me, am I bothering you?!!",Brother
+sacrifice_1_7,И я вижу ты привела - жертву.,And I see you've brought a sacrifice.,Demon
+sacrifice_1_8,Тело не слушается.....,My body won't listen to me.....,Brother
+sacrifice_1_9,[shake][wave][color=red]ПОМОГИТЕ!!!!!,[shake][wave][color=red]HELP!!!!!,Brother
+sacrifice_1_10,Мой брат мне все равно никогда не нравился.,I never liked my brother anyway.,Wife
+sacrifice_1_11,Именем моим...да свершится смерть!,In my name... let death be done!,Demon
+sacrifice_1_12,Да свершится перерождение!,Let the rebirth begin!,Demon
+sacrifice_1_13,Вот это обмен.,Now that's an exchange.,Leon
+sacrifice_1_14,Не могу поверить!,I can't believe it!,Wife
+sacrifice_1_15,"Любимый, ты жив!","My love, you're alive!",Wife
+sacrifice_1_16,Кто это сказал?,Who said that?,Tengu1
+sacrifice_1_17,Это я - твоя жена!,It's me—your wife!,Wife
+sacrifice_1_18,"Точно, моя жена!","That's right, my wife!",Tengu1
+sacrifice_1_19,Я так рад вернуться!,I'm so happy to be back!,Tengu1
+sacrifice_1_20,Тревога!,Alert!,Monk
+sacrifice_1_21,Империя штурмует Храм.,The Empire is storming the Temple.,Monk
+sacrifice_1_23,Мы найдем укрытие в верхней часовне.,We'll take cover in the upper chapel.,Demon
+sacrifice_1_24,Все за мной!,"Everyone, follow me!",Demon
+sacrifice_3_1,С прибытием!,Welcome!,Tengu2
+sacrifice_3_2,Забавно оказаться на этой стороне.,It's funny to find myself on this side.,Tengu1
+sacrifice_3_3,Муж!,Husband!,Wife
+sacrifice_3_4,"Я так счастлива, что ты снова живой.",I'm so happy you're alive again.,Wife
+sacrifice_3_5,Грязный человечишка!,You filthy little man!,Tengu1
+sacrifice_3_6,"Как жаль, что Империя закроет лавочку.",It's a shame that the Empire is going out of business.,Tengu2
+sacrifice_3_7,Дурить этого лоха было несложно.,It wasn't hard to fool that sucker.,Tengu2
+sacrifice_3_8,Но нас тут хоть много?,But are there at least a lot of us here?,Tengu1
+sacrifice_3_9,"О, да!","Oh, yeah!",Tengu2
+sacrifice_3_10,"Достаточно, чтобы как следует повеселиться!",That's enough to have a really good time!,Tengu2
+sacrifice_3_11,Я вам не мешаю?,Am I bothering you?,Leon
+sacrifice_3_12,Дзинко!,Dzinko!,Tengu1
+sacrifice_3_13,Я думал мы их всех перебили!,I thought we'd killed them all!,Tengu2
+sacrifice_3_14,Кажется нет.,I don't think so.,Tengu1
+sacrifice_3_15,Исправим это недоразумение.,Let's clear up this misunderstanding.,Tengu2
+final_tengu_1_1,Рассказывай!,"Go on, tell me!",Demon
+final_tengu_1_2,Как далеко они продвинулись?,How far have they gotten?,Demon
+final_tengu_1_3,Они уже везде.,They're already everywhere.,Tengu1
+final_tengu_1_4,Скоро они будут тут.,They'll be here soon.,
+final_tengu_1_5,"Не знаю, стоило ли это того.",I don't know if it was worth it.,Demon
+final_tengu_1_6,Я подвел свою паству.,I have let my flock down.,Demon
+final_tengu_1_7,Не время для сомнений.,This is no time for doubts.,Tengu1
+final_tengu_1_8,Разве ты не слышишь мертвых?,Can't you hear the dead?,Demon
+final_tengu_1_9,Прикажи пастве умереть.,Command the flock to die.,Tengu1
+final_tengu_1_10,Верни всех обратно.,Bring everyone back.,Tengu1
+final_tengu_1_11,Сейчас это уже не имеет значение.,It doesn't matter anymore.,Demon
+final_tengu_1_12,"Все что я могу,",All I can do is spend these last few minutes with my flock.,Demon
+final_tengu_1_13,это провести последние минуты со своей паствой.,,
+final_tengu_1_14,Воскреси голоса мертвых!,Bring the voices of the dead back to life!,Tengu1
+final_tengu_1_15,Я не могу пожертвовать людьми ради голосов.,I can't sacrifice people just to win votes.,Demon
+final_tengu_1_16,И если головорезы Империи их тут же перебьют...,And if the Empire's thugs kill them right then and there...,Demon
+final_tengu_1_17,...зачем их воскрешать?,...why bring them back to life?,
+final_tengu_1_18,КАК ТЫ МЕНЯ ДОСТАЛ!!!,YOU REALLY PISSED ME OFF!!!,Tengu1
+final_tengu_1_19,Что?,What?,Demon
+final_tengu_1_20,"Как только люди пошли за тобой, слизняк?","So, did people start following you, you slug?",Tengu1
+final_tengu_1_21,Глупые людишки.,Silly little people.,Tengu1
+final_tengu_1_22,...,...,Demon
+final_tengu_1_23,Твоя работа не терзаться моральными вопросами!,It's not your job to agonize over moral issues!,Tengu1
+final_tengu_1_24,А приводить нас сюда!,And to bring us here!,Tengu1
+final_tengu_1_25,Так что давай поживее!,So let's get a move on!,Tengu1
+final_tengu_1_26,Кого это нас?,Who are “us”?,Demon
+final_tengu_1_27,Твоя наивность поражает.,Your naivety is astonishing.,Tengu1
+final_tengu_1_28,"Ты не слышал в детстве, что твоя мама спуталась с йокаем?",Didn't you hear when you were a kid that your mom had a fling with a yokai?,Tengu1
+final_tengu_1_29,"Сюрприз, сюрприз, это правда!","Surprise, surprise—it's true!",Tengu1
+final_tengu_1_30,Водить тебя за нос все это время было весьма утомительно.,It's been really exhausting stringing you along all this time.,Tengu1
+final_tengu_1_31,...,...,Demon
+final_tengu_1_32,"Наполовину человек, наполовину йокай.","Half human, half yokai.",Tengu1
+final_tengu_1_33,Это объясняет...,This explains...,Tengu1
+final_tengu_1_34,Почему ты так легко соглашался...,Why did you agree so easily...,
+final_tengu_1_35,...убивать всех этих людей.,...to kill all those people.,Tengu1
+final_tengu_1_36,А ты реально считал себя Богом смерти?....,Did you really think of yourself as the God of Death?....,Tengu1
+final_tengu_1_37,Возьми себя в руки и заверши работу.,Pull yourself together and finish the job.,Tengu1
+final_tengu_1_38,Я понял. Хорошо…,I see. Okay…,Demon
+final_tengu_1_39,"Фу-ух, сразу полегчало.","Phew, I feel so much better already.",Tengu1
+final_tengu_1_40,Давно надо было это сделать.,This should have been done a long time ago.,Tengu1
+belltrail_1_1,"Нет, нет, нет….","No, no, no….",Pawwaro
+belltrail_1_2,Только не это.,Anything but that.,Pawwaro
+belltrail_1_3,Я не видел йокаев со времен Великой войны.,I haven't seen any yokai since the Great War.,Pawwaro
+belltrail_1_4,Я надеялся что все только слухи.,I was hoping it was all just rumors.,Pawwaro
+belltrail_1_5,"Они не только фанатики, еще и демонопоклонники.",They're not just fanatics—they're also devil worshippers.,Pawwaro
+belltrail_1_6,Как у них получилось просочиться с той стороны?....,How did they manage to sneak in from that side?....,Pawwaro
+belltrail_1_7,Этих двоих доставьте в Коджо-13.,Take these two to Kojo-13.,Pawwaro
+belltrail_1_8,Пускай светлые умы ими займутся.,Let the brightest minds take care of that.,Pawwaro
+belltrail_1_9,Господин! Эти демоны неостановимы!,Sir! These demons are unstoppable!,Melee
+belltrail_1_10,Только попробуйте струсить.,Just try to back down.,Pawwaro
+belltrail_1_11,И вы будете завидовать своим мертвым товарищам.,And you will envy your dead comrades.,Pawwaro
+belltrail_1_12,А что нам делать с оставшимися фанатиками?,So what should we do about the remaining fanatics?,Melee
+belltrail_1_13,Вырезать всех до одного.,Kill every last one of them.,Pawwaro
+final_tengu_2_1,Слушайте меня.,Listen to me. Listen to me.,Demon
+final_tengu_2_2,Мне сложно это говорить.,It's hard for me to say this.,Demon
+final_tengu_2_3,Меня обманули.,I was deceived.,Demon
+final_tengu_2_4,А я обманул вас и ваше доверие.,But I betrayed you and your trust.,Demon
+final_tengu_2_5,Я не вернул ваших близких.,I didn't bring your loved ones back.,Demon
+final_tengu_2_6,Я открыл дорогу демонам.,I opened the way for the demons.,Demon
+final_tengu_2_7,И я же ее и закрою.,And I'll be the one to close it.,Demon
+final_tengu_2_8,Вы встретитесь с близкими когда наступит время.,You'll be reunited with your loved ones when the time comes.,Demon
+final_tengu_2_9,Мы готовы войти в мир мертвых.,We are ready to enter the realm of the dead.,Monk
+final_tengu_2_10,За тобой!,I'm coming for you!,Monk
+final_tengu_2_11,Мы верим тебе!,We believe in you!,Monk
+final_tengu_2_12,Это уже будет ваш выбор.,That will be up to you.,Demon
+final_tengu_2_13,Мое тело станет печатью.,My body will become a seal.,Demon
+final_tengu_3_1,"Че притих, паук?","What's up, spider?",Leon
+final_tengu_3_2,Впервые нечего сказать?,Is this the first time you have nothing to say?,Leon
+final_tengu_3_3,Тут и произошел грандиозный финал..,That's where the grand finale took place...,Joe
+final_tengu_3_4,Они перерезали друг другу глотки.,They slit each other's throats.,Joe
+final_tengu_3_5,Наматывали на лезвия свои внутренности.,They wound their entrails around the blades.,Joe
+final_tengu_3_6,Они душили друг друга пока глаза не вылезали….,They were choking each other until their eyes nearly popped out….,Joe
+final_tengu_3_7,"Я понял, понял.","I get it, I get it.",Leon
+final_tengu_3_8,Ты тащишься по этой херне.,You're really into this crap.,Leon
+final_tengu_3_9,А это что такое?,What is this?,Leon
+final_tengu_3_10,А это и есть сосуд Бога смерти.,And this is the vessel of the god of death.,Joe
+final_tengu_3_11,Разрушь его.,Destroy it.,Joe
+final_tengu_3_12,"И получишь силу, чтобы продолжить свой путь.",And you'll find the strength to continue on your journey.,Joe
+final_tengu_3_13,"Извините, я может не имею права голоса...","Sorry, I might not have a say in this...",Ray
+final_tengu_3_14,"Но,возможно...","But, maybe...",Ray
+final_tengu_3_15,...мы не будем разрушать зловещую статую посреди могильника?,...aren't we going to tear down that sinister statue in the middle of the graveyard?,Ray
+final_tengu_3_16,Ему нужно стать сильнее.,He needs to get stronger.,Joe
+final_tengu_3_17,И для этого ему нужно много ци.,"And to do that, he needs a lot of qi.",Joe
+final_tengu_3_18,Вот тут много ци.,There are a lot of quotes here.,Joe
+final_tengu_3_19,"Это звучит логично, но…","That sounds logical, but…",Ray
+final_tengu_3_20,Хватит базара!,Stop blabbering!,Leon
+final_tengu_3_21,Мне нужна сила!,I need strength!,Leon
+final_tengu_4_1,Паук?!,Spider?!,Leon
+final_tengu_4_2,А ты ничего не забыл уточнить?,Did you forget to clarify anything?,Leon
+final_tengu_4_3,Покажи на что ты способен!,Show us what you can do!,Joe
+final_tengu_5_1,Впереди очень много йокаев!,There are a lot of yokai ahead!,Ray
+final_tengu_5_2,Но я могу тебе помочь.,But I can help you.,Ray
+final_tengu_5_3,Тебе надо открыть мне проход.,You need to let me through.,Ray
+final_tengu_5_4,Позади меня - подъем наверх.,Behind me is the climb up.,Ray
+final_tengu_5_5,Там хороший вид на проход.,There's a good view of the passageway from there.,Ray
+final_tengu_5_6,Посмотрим...,Let's see...,Leon
+raven_4_1,Хм...[color=yellow]колокольчик[/color].,Hmm...[color=yellow]bell[/color].,Leon
+raven_4_2,Это то что мне нужно.,That's exactly what I need.,Leon
+raven_1_1,КАР! КАР! КАР!,Сaw-caw!,Raven
+raven_1_2,Это гнидское карканье я узнаю из тысячи.,I'd recognize that nasty cackling anywhere.,Leon
+raven_1_3,КАР! КАР! КАР!,Сaw-caw!,Raven
+raven_1_4,А вот и ты...,And here you are...,Leon
+raven_1_5,Мне нужен этот колокольчик.,I need that little bell.,Leon
+raven_2_1,Кар!,Сaw-caw!,Raven
+raven_2_2,"О, ты ""супер умная"" птица!","Oh, you “super smart” bird!",Leon
+raven_2_3,Ты же у нас дохера крутой!,You're so damn cool!,Leon
+raven_2_4,Кар-кар!,Сaw-caw!,Raven
+raven_2_5,Да слышу я!,"Yeah, I can hear you!",Leon
+raven_3_1,Кар-кар!,Сaw-caw!,Raven
+raven_3_2,О нет.,Oh no.,Leon
+raven_3_3,Только не ты.,Anyone but you.,Leon
+raven_3_4,Кар-кар-кар!,Сaw-caw!,Raven
+raven_3_5,Даже не думай.,Don't even think about it.,Leon
+raven_3_6,Кар!,Сaw-caw!,Raven
+raven_3_7,БЛЯТЬ!,FUCK!,Leon
+raven_3_8,Ебучие догонялки с птицей…,Fucking tag games with a bird…,Leon
+raven_3_9,Я все равно до тебя доберусь…,I'll get to you anyway…,Leon
+final_tengu_6_1,Я потратил столько времени ради это хуеты…,I wasted so much time on this bullshit…,Leon
+final_tengu_6_2,"С другой стороны, навалять крылатой твари...","On the other hand, to beat the crap out of that winged creature...",Leon
+final_tengu_6_3,...лучшая трата времени.,...the best way to spend your time.,Leon
+final_tengu_6_4,"На, лови свою хрень!","Here, catch your crap!",Leon
+final_tengu_6_5,Ты настоящий друг.,You're a true friend.,Ray
+final_tengu_6_6,"Спасибо, что вернул ее!",Thank you for bringing it back!,Ray
+final_tengu_6_7,"Эй, полегче!","Hey, take it easy!",Leon
+final_tengu_6_8,Каждый сам за себя.,It's every man for himself.,Leon
+final_tengu_6_9,И все-таки ты помог.,But you did help after all.,Ray
+final_tengu_6_10,Я очень благодарен…,I am very grateful…,Leon
+final_tengu_6_11,"В следующий раз сам решай свои заебы, дружбан.","Next time, deal with your own problems, buddy.",Leon
+final_tengu_6_12,По идеи- это самый вверх этого Храма.,"In theory, this is the very top of this temple.",Leon
+final_tengu_6_13,Здесь и должен быть проход дальше.,This is where the passage should continue.,Leon
+final_tengu_6_14,Здесь и должен быть проход дальше.,,Leon
+shiftarena_2_1,Да что за ебанина тут происходит!,What the hell is going on here!,Leon
+shiftarena_2_2,"Где этот сраный Джо, когда он мне нужен?!?",Where is that damn Joe when I need him?!?,Leon
+shiftarena_2_3,А я предлагал тебе послушать историю храма…,And I suggested you listen to the story of the temple…,Joe
+shiftarena_2_4,"Не подкрадывайся, чудила!","Don't sneak up on me, you weirdo!",Leon
+shiftarena_2_5,Че тут происходит?,What's going on here?,
+shiftarena_2_6,Это место стало могильником для сотни душ…,This place has become a graveyard for hundreds of souls…,Joe
+shiftarena_2_7,Оно пропитано кишками и кровью…,It's soaked in guts and blood…,Joe
+shiftarena_2_8,Временные петли и хаос вросли в храм смерти…,Temporal loops and chaos have taken root in the Temple of Death…,Joe
+shiftarena_2_9,"Что все это это, блять, значит?...",What the fuck does all this mean?...,Leon
+shiftarena_2_10,Прошлое и настоящее слились в этом месте воедино.,The past and the present have merged into one in this place.,Joe
+shiftarena_2_11,В смысле?,What do you mean?,Leon
+shiftarena_2_12,"Ты можешь умереть и в прошлом и в настоящем, Леон.","You could die in the past or in the present, Leon.",Joe
+shiftarena_2_13,Твою мать.,Fuck you.,Leon
+final_tengu_7_1,Это и есть главное святилище?,Is this the main sanctuary?,
+final_tengu_7_2,Ну и жуть.,That's just awful.,
+pistol_tutor_1_1,Бляяяяяяяяяяяяяяяяяяяяяяяяяяяя........,Fuck fuck fuck fuck fuck fuck,Leon
+pistol_tutor_2_1,Твою ж!,Damn it!,Leon
+pistol_tutor_2_2,Охуенный мост!,What an awesome bridge!,Leon
+pistol_tutor_2_3,Каждый день бы по нему гулял!,I'd love to walk there every day!,Leon
+pistol_tutor_2_4,А это что?,What's this?,Leon
+pistol_tutor_2_5,Снова статуя Дзинко?.....,The Jinko statue again?.....,Leon
+pistol_tutor_3_1,"О, Леон!","Oh, Leon!",
+pistol_tutor_3_2,"Я уже испугался, что ты упал в пропасть.",I was already afraid you'd fallen into the abyss.,
+pistol_tutor_3_3,"Как хорошо, что ты цел!",I'm so glad you're okay!,
+ringfell_1_1,На Храм напали!,The temple was attacked!,
+ringfell_1_2,Всем монахам - защищать Светочь!,To all the monks—defend the Saint!,
+ringfell_1_3,Империя не заставит его замолчать!,The Empire won't silence him!,
+ringfell_1_4,Черт!,Damn!,
+ringfell_1_5,Дальше не пройти.,You can't go any further.,
+ringfell_1_6,Нужно заткнуть этот колокол!,We need to silence that bell!,
+belltrail_2_1,Теперь у них целая комната под пепелище.,Now they have an entire room filled with ashes.,Leon
+belltrail_2_2,Воняет жареной плотью.,It reeks of burnt flesh.,Leon
+belltrail_2_3,“Жертва - ключ к новой жизни”,“Sacrifice Is the Key to a New Life”,Melee1
+belltrail_2_4,Как же здесь стремно.,This place is so weird.,Melee1
+belltrail_2_5,Зачем нас сюда послали?,Why did they send us here?,Melee1
+belltrail_2_6,Ты че не знаешь?,Don't you know?,Melee2
+belltrail_2_7,Эти монахи похитили дохрена людей.,Those monks kidnapped a whole bunch of people.,Melee2
+belltrail_2_8,Зачем?,Why?,Melee1
+belltrail_2_9,Без понятия.,I have no idea.,Melee2
+belltrail_2_10,Живыми их больше никто не видел.,No one has seen them alive since then.,Melee2
+boss_1_1,Ну и что мы будем делать?,"So, what are we going to do?",Leon
+boss_1_2,"Джо, ты же всю биографию этого чмошника рассказал.","Joe, you've already told the whole story about that jerk.",Leon
+boss_1_3,Я никогда не слышал про вторую фазу.,I've never heard of the second phase.,Joe
+boss_1_4,"А ты, ящерица?","What about you, lizard?",Leon
+boss_1_5,Мы так уютно сидим.,We're sitting here so comfortably.,Ray
+boss_1_6,Может еще что покушать найдем?,Maybe we'll find something else to eat?,Ray
+boss_1_7,Я тоже проголодался.,"I'm hungry, too.",Joe
+boss_1_8,..?!?!,..?!?!,Leon
+boss_1_9,Вы ОХУЕЛИ?!,Are you out of your fucking minds?!,Leon
+boss_1_10,Все! Я не собираюсь здесь подыхать.,That's it! I'm not going to die here.,Leon
+boss_1_11,Пойду и сломаю ему лицо.,I'm going to go beat him up.,Leon
+boss_1_12,"Возможно, это не сработает…",It might not work…,Joe
+boss_1_13,Всегда работало.,It has always worked.,Leon
+boss_1_14,Не вижу причин почему сейчас - нет.,I don't see any reason why not right now.,Leon
+final_choice_1_1,Почему я снова здесь?,Why am I here again?,Leon
+final_choice_1_2,"Подойди ближе, дитя.","Come closer, my child.",monk
+final_choice_1_3,Я предскажу твою судьбу…,I will predict your fate…,monk
+final_choice_1_4,Так будет лучше для всех.,That will be best for everyone.,monk
+final_choice_1_5,Дед был прав.,The old man was right.,Leon
+final_choice_1_6,Этот пацан станет абсолютным злом...,This kid is going to become pure evil...,Leon
+final_choice_1_7,Но именно его слова и сделали из мелкого Демона Смерти.,But it was his words that turned the child into the Demon of Death.,Leon
+final_choice_1_8,Я могу решить это здесь и сейчас.,I can resolve this right here and now.,Leon
+final_choice_2_1,"Закрой ебальник, древность.","Shut the hell up, old-timer.",Leon
+final_choice_2_2,Никаких предсказаний на сегодня.,No predictions for today.,Leon
+final_choice_2_3,Так будет лучше.,That will be better.,Leon
+flashback_1_1,Чего это он выбрал нашего Юсэи?,Why on earth did he pick our Yusei?,crowd1
+flashback_1_2,Так он герой!,So he's a hero!,crowd2
+flashback_1_3,"Дом старосты сгорел дотла, если бы не он…",The village headman's house would have burned to the ground if it weren't for him…,crowd2
+flashback_1_4,"Видимо, видит его великую судьбу…","Apparently, he sees his great destiny…",crowd2
+flashback_1_5,Точно.,Exactly.,crowd1
+flashback_2_1,"Спасибо, что посетили нашу деревню!",Thank you for visiting our village!,
+flashback_2_2,Долг монахов помогать страждущим.,It is the monks' duty to help those who are suffering.,
+flashback_2_3,У вас чудесная деревня.,You have a wonderful village.,
+flashback_2_4,Что за место?,What kind of place is this?,Leon
+flashback_3_1,"Подойди ближе, дитя.","Come closer, my child.",Monk
+flashback_3_2,Я предскажу твою судьбу…,I will predict your fate…,Monk
+flashback_3_3,Кто твой отец?,Who is your father?,Monk
+flashback_3_4,"Можешь не говорить, я и так знаю…",You don't have to say it—I already know…,Monk
+flashback_3_5,От тебя несет демонами.,You reek of demons.,Monk
+flashback_3_6,….,….,Leon
+flashback_3_7,Это шутка? Он же ребёнок.,Are you kidding? He's just a kid.,crowd1
+flashback_3_8,Что это значит?..,What does that mean?..,
+flashback_3_9,В нём не только человеческая кровь.,It's not just human blood that flows through it.,
+flashback_3_10,"Мам, я ничего не делал!","Mom, I didn't do anything!",
+flashback_3_11,"Я знаю, сынок.","I know, son.",
+flashback_3_12,"Эх, пацан...","Oh, kid...",
+flashback_3_13,Мне кажется ему все равно.,I think he doesn't care.,
+flashback_3_14,Сделал ты что-то или нет.,Did you do something or not.,
+flashback_3_15,Сделаешь.,You'll do it.,
+flashback_3_16,"Ты принесешь смерть каждому, кто окажется рядом с тобой!",You will bring death to everyone around you!,
+flashback_3_17,Этот ребёнок переживёт всех вас.,This child will outlive all of you.,Monk
+flashback_3_18,"И будет стоять там, где лежат тысячи тел.",And he will stand where thousands of bodies lie.,Monk
+flashback_3_19,Среди людей тебе не место.,You don't belong among people.,Monk
+flashback_3_20,Он погубит вас всех.,He'll destroy all of you.,Monk
+flashback_3_21,"Вы слышали, что он сказал?",Did you hear what he said?,crowd1
+flashback_3_22,ОН погубит нас всех!,He's going to ruin us all!,crowd2
+flashback_3_23,Юсэи должен уйти!,Yusei has to leave!,crowd1
+flashback_3_24,Может он и виноват в том пожаре!,Maybe he really is to blame for that fire!,crowd2
+flashback_3_25,Отличное переобувание на ходу.,A great way to change your shoes on the go.,Leon
+flashback_3_27,Оставьте его!,Leave him alone!,Mother
+flashback_3_28,Если он останется — смерть ещё вернётся сюда.,"If he stays, death will return here.",Monk
+flashback_3_29,Пусть уходит.,Let him go.,crowd1
+flashback_3_30,Да. Пусть уходит.,Yes. Let him go.,crowd2
+flashback_3_32,Я… никому не причиню зла.,I… won't hurt anyone.,Demon
+flashback_3_33,Мне лучше уйти.,I'd better leave.,Demon
+flashback_3_34,"Юсэи, нет…","Yusei, no…",Mother
+flashback_3_35,Так будет лучше для всех.,It will be better for everyone.,Demon
+flashback_3_36,"О, понятно.","Oh, I see.",Leon
+flashback_3_37,"Легче выгнать пацана, чем разбираться.",It's easier to kick the kid out than to figure it out.,Leon
+flashback_3_38,Его судьба предрешена.,His fate is sealed.,Leon
+flashback_3_39,Если он станет монстром — поздравляю.,If he turns into a monster—congratulations.,Leon
+flashback_3_40,Ты его создал.,You created it.,Leon
+flashback_4_1,…Он реально сюда ушёл.,. . . He really did go there.,Leon
+flashback_4_2,Если монах прав…,If the monk is right…,Demon
+flashback_4_3,люди будут умирать рядом со мной.,People will die right next to me.,Demon
+flashback_4_4,Я чудовище?,Am I a monster?,Demon
+flashback_4_5,Если я буду молчать… если ни с кем не заговорю больше…,If I stay silent… if I never speak to anyone again…,Demon
+flashback_4_6,Я не смогу причинить вред людям.,I won't be able to hurt people.,Demon
+flashback_4_7,Если я буду один…никто не пострадает.,If I'm alone… no one will get hurt.,Demon
+flashback_4_8,Пацан… ты сейчас серьёзно?,Kid… are you serious right now?,Demon
+flashback_4_9,Я больше не буду говорить.,I won't say anything else.,Demon
+flashback_4_10,Никогда.,Never.,Demon
+flashback_4_11,…Помоги.,…Help me.,Spirit
+flashback_4_12,Я потерялся…,I'm lost…,Spirit
+flashback_4_13,Кто здесь?,Who's there?,Demon
+flashback_4_14,Верни меня к жизни…,Bring me back to life…,Spirit
+flashback_4_15,Ты слышишь меня?,Can you hear me?,Spirit
+flashback_4_16,…Да.,…Yes.,Demon
+flashback_4_17,Вот это уже совсем пиздец.,Now that's just fucking ridiculous.,Leon
+temple_end_1_1,…Подождите.,…Wait a minute.,Ray
+temple_end_1_2,Где храм?,Where is the temple?,Ray
+temple_end_1_3,Мы же были внутри.,"We were inside, after all.",Ray
+temple_end_1_4,Алтари. Статуи. Тысячи костей…,Altars. Statues. Thousands of bones…,Ray
+temple_end_1_5,А теперь — просто пещера?,And now—just a cave?,Ray
+temple_end_1_6,Леон… что произошло?,Leon… what happened?,Ray
+temple_end_2_1,…Разобрался с одной проблемой.,…I figured out how to solve one problem.,Leon
+temple_end_2_2,Какой проблемой?,What's the problem?,Ray
+temple_end_2_3,"Той, из-за которой этот храм вообще появился.",The one who was the reason this temple was built in the first place.,Leon
+temple_end_2_4,"О, не скромничай, лис.","Oh, don't be so modest, fox.",Joe
+temple_end_2_5,Скажи как есть.,Tell it like it is.,Joe
+temple_end_2_6,Он просто… избавился от мальчишки.,He just… got rid of the kid.,Joe
+temple_end_2_7,Будущего бога смерти.,The future god of death.,Joe
+temple_end_2_8,Будущего демона бесконечности.,The future demon of infinity.,Joe
+temple_end_2_9,Леон всегда выбирает самый… прямой путь.,Leon always takes the most… direct route.,Joe
+temple_end_2_10,Завали.,Shut up.,Leon
+temple_end_2_11,О чем он говорит?,What is he talking about?,Ray
+temple_end_2_12,Мы выбрались.,We made it out.,Leon
+temple_end_2_13,И храма больше нет.,And the temple is no more.,Leon
+temple_end_2_14,Это главное.,That's the main thing.,Leon
+temple_end_2_15,……,……,Leon
+temple_end_2_16,Ну что ж.,"Well, then.",Joe
+temple_end_2_17,Раз храм исчез — значит и наше маленькое путешествие по прошлому закончилось.,"Now that the temple is gone, our little journey into the past has come to an end.",Joe
+temple_end_2_18,Впереди столица.,The capital lies ahead.,Joe
+temple_end_2_19,Пора продолжать путь.,It's time to move on.,Joe
+temple_end_2_20,…Я готов.,…I'm ready.,Ray
+temple_end_2_21,Пошли.,Let's go.,Leon
+temple_end_3_1,Леон… что произошло?,Leon… what happened?,Ray
+temple_end_3_2,Да так…..,"Yeah, well...",Leon
+temple_end_3_3,Раздал по ебальнику одному пророку.,I punched some prophet in the face.,Leon
+temple_end_3_4,…Что?,…What?,Leon
+temple_end_3_5,"Сказал ему в следующий раз думать, кому и что он предсказывает.",I told him to think carefully next time about who he's making predictions for and what he's predicting.,Leon
+temple_end_3_6,Ты серьёзно?,Are you serious?,Joe
+temple_end_3_7,Ты мог просто избавиться от мальчика.,You could have just gotten rid of the boy.,Joe
+temple_end_3_8,А теперь кто знает…,"Now, who knows…",Joe
+temple_end_3_9,...где и как он уничтожит чью-нибудь жизнь.,...where and how he will ruin someone's life.,Joe
+temple_end_3_10,"Благими намерениями выстлана дорога в ад, лисёнок.","The road to hell is paved with good intentions, little fox.",Joe
+temple_end_3_11,"Завали, Паук.","Shut up, Spider.",Leon
+temple_end_4_1,Храма смерти с тысячами трупов больше нет.,"The Temple of Death, with its thousands of corpses, is no more.",Leon
+temple_end_4_2,Мы выбрались.,We made it out.,Leon
+temple_end_4_3,Но… как?,But… how?,Ray
+temple_end_4_4,Как целый храм может просто исчезнуть?,How can an entire temple just disappear?,Ray
+temple_end_4_5,Не парься. Как-нибудь потом объясню.,Don't worry about it. I'll explain it to you later.,Leon
+temple_end_4_6,Как бы там ни было…,Be that as it may…,Leon
+temple_end_4_7,Нам пора двигаться дальше.,It's time for us to move on.,Joe
+temple_end_4_8,Столица ждёт.,The capital is waiting.,Joe
+temple_end_4_9,Я готов.,I'm ready.,Ray
+temple_end_4_10,Тогда пошли.,"Let's go, then.",Leon
+altar_1_1,Вот он… [color=purple]момент истины[/color].,Here it is… [color=purple]the moment of truth[/color].,Joe
+altar_1_2,Здесь было решено всё!,Everything was decided right here!,Joe
+altar_1_3,"Этот мальчик, Юсэи, был героем.","That boy, Yusai, was a hero.",Joe
+altar_1_4,Но стоило появиться пророку — и всё изменилось.,"But as soon as the prophet appeared, everything changed.",Joe
+altar_1_5,"Его статуи стали священны для всех,",His statues have become sacred to all,Joe
+altar_1_6,кто жаждет связи с мёртвыми.,who long for a connection with the dead.,
+altar_1_7,Ведь он… он стал их голосом.,"After all, he… he became their voice.",Joe
+altar_1_8,Он… мог говорить с мёртвыми?,Could he… talk to the dead?,Leon
+altar_1_9,Да и ему поклонялись…со всей отдачей.,"And he was worshipped, too… with all their hearts.",Joe
+altar_1_10,Что ты имеешь в виду?,What do you mean?,Joe
+altar_1_11,"Верующие отдавали свои жизни, чтобы доказать свою преданность Юсэи.",Believers gave their lives to prove their devotion to Yusei.,Joe
+altar_1_12,За это им было дозволено поговорить с мертвыми!,"For that, they were allowed to talk to the dead!",Joe
+altar_1_13,А сейчас…это возможно?,And now… is that possible?,Leon
+altar_1_14,"А ты что, хочешь семью Масты позвать на чаёк?","What, do you want to invite the Masta family over for tea?",Leon
+altar_1_15,О чём он? Какая ещё семья?,What's it about? What family?,Ray
+altar_2_1,Я… убил их. Это была ошибка.,I… killed them. It was a mistake.,Leon
+altar_2_2,"Я искал Аки, всё вышло из-под контроля.","I was looking for Aki, and things got out of hand.",Leon
+altar_2_3,Я просто хочу поговорить с сестрой…,I just want to talk to my sister…,Leon
+altar_2_4,Это не твоё дело.,That's none of your business.,Leon
+altar_2_5,"Кажется, я тебя совсем не знаю…",It seems like I don't know you at all…,Ray
+altar_3_1,Мне нужно услышать Аки.,I need to hear from Aki.,Leon
+altar_3_2,Ты так привязан к сестре?,Are you that close to your sister?,Joe
+altar_3_3,Надеешься услышать её голос?,Are you hoping to hear her voice?,Joe
+altar_3_4,Просто хочу услышать Аки.,I just want to hear from Aki.,Leon
+altar_3_5,Тогда тебе придётся провести ритуал.,"In that case, you'll have to perform the ritual.",Joe
+altar_3_6,Давненько никто этого не делал…,It's been a while since anyone did that…,Joe
+altar_3_7,И предупреждаю — всё может пойти не так.,And just a heads-up—things might not go as planned.,Joe
+altar_3_8,"Особенно если… кто-то не хочет, чтобы ты услышал ответ.",Especially if… someone doesn't want you to hear the answer.,Joe
+altar_3_9,"Леон, может, не стоит?","Leon, maybe you shouldn't?",Ray
+altar_3_10,Мы вообще-то просто хотим добраться до выхода.,"Actually, we just want to get to the exit.",Ray
+altar_3_11,Мертвых боишься? Я тебя не держу.,Are you afraid of dead people? I'm not holding you back.,Leon
+altar_3_12,"Что нужно делать, Джо?","What should I do, Joe?",Leon
+altar_3_13,Найди [color=yellow]колокольчик[/color]. Монахи использовали их в ритуалах.,Find the [color=yellow]bell[/color]. The monks used them in their rituals.,Joe
+altar_3_14,Мне нужна маска [color=red]демона[/color]. Она откроет дорогу в мир духов.,I need a [color=red]demon[/color] mask. It will open the way to the spirit world.,Joe
+altar_3_15,"И мне нужно [color=blue]ритуальное масло[/color], чтобы возжечь благовония.",And I need [color=blue]ritual oil[/color] to light the incense.,Joe
+altar_3_16,"Соберешь все, и сможешь поговорить с сестрой.","Once you've gathered everything, you'll be able to talk to your sister.",Joe
+altar_3_17,…Леон…,…Leon…,Aki
+altar_3_18,Аки?.. Ты?..,Aki...? You...?,Leon
+altar_3_19,"Нет, ее нет среди мертвых.…","No, she's not among the dead…",Joe
+altar_3_20,…её сердце ещё бьётся.,…her heart is still beating.,Joe
+altar_3_21,Твоя сестра [wave][color=red]жива[/color]!,Your sister [wave][color=red]is alive[/color]!,Joe
+altar_3_22,Кажется мы потревожили призраков этого места....,It seems we've disturbed the ghosts of this place....,Joe
+altar_3_23,Леон! Я нашел проход дальше.,Leon! I found a way through.,Ray
+altar_3_24,Давай заканчивай со своими ритуалами и...,"Come on, stop with your rituals and...",Ray
+altar_3_25,...так стоп...,...wait a minute...,Ray
+altar_3_26,ААААААААААААААААААА.........,ААААААААААААААААААА.........,Ray
+altar_3_27,....,....,Leon
+altar_3_28,Он вам не [shake][color=red]ЧЕРВЯК...,He's not [shake][color=red]a WORM...,Leon
+altar_3_29,Ладно...это была тупая шутка.,Okay... that was a dumb joke.,Leon
+altar_3_30,Тебе лучше поторопиться.,You'd better hurry up.,Joe
+altar_3_31,"Да, это точно.","Yes, that's for sure.",Leon
+pistol_dream_1_1,Да вы издеваетесь. Ты кто такой?,You've got to be kidding me. Who are you?,
+pistol_dream_1_2,Кай. Твой предок. Когда-то жил тут.,Kai. Your ancestor. I used to live here.,
+pistol_dream_1_3,"Теперь — то, что от меня осталось.",Now—what remains of me.,
+pistol_dream_1_4,Ага. Ещё один предок.,Yeah. Another ancestor.,
+pistol_dream_1_5,"У вас тут очередь, что ли чтобы доебаться до меня?","Is there a line here or something, just to get on my nerves?",
+pistol_dream_1_6,Нет. Просто тебе везёт на родственников с плохим характером.,No. You're just unlucky when it comes to relatives with bad tempers.,
+pistol_dream_1_7,Видишь это?,Do you see that?,
+pistol_dream_1_8,Сложно не заметить.,It's hard not to notice.,
+pistol_dream_1_9,Прямо посреди земли дзинко застава империи?,"Right in the middle of the land, a Zinko outpost of the empire?",
+pistol_dream_1_10,Мы пытались остановить стройку. Говорили и спорили.,We tried to stop the construction. We talked and argued.,
+pistol_dream_1_11,"И солдаты быстро приструнили тех, кто был несогласен.",And the soldiers quickly put those who disagreed in their place.,
+pistol_dream_1_12,Классика.,A classic.,
+pistol_dream_1_13,Я тоже мог выйти с криком. Мог умереть красиво.,"I could have stormed out screaming, too. I could have gone out in style.",
+pistol_dream_1_14,"Но ты, я так понимаю, выбрал вариант “похуже”.","But you, as I understand it, chose the “worse” option.",
+pistol_dream_1_15,Я выбрал рабочий вариант.,I chose the working version.,
+pistol_dream_1_16,"Подождал, пока они закончат. Пока приедут проверяющие.",I waited until they were done. Until the inspectors arrived.,
+pistol_dream_1_17,"Пока все будут уверены, что всё получилось.",Until everyone is convinced that everything worked out.,
+pistol_dream_1_18,И?,So?,
+pistol_dream_1_19,А потом разобрал за пару часов их заставу!,And then he took out their outpost in just a couple of hours!,
+pistol_dream_1_20,В одиночку?,By yourself?,
+pistol_dream_1_21,Ага.,Yeah.,
+pistol_dream_1_22,…Ты больной.,…You're sick.,
+pistol_dream_1_23,Зато больше они тут ничего не строили.,But they didn't build anything else here.,
+pistol_dream_1_24,И не совались на нашу землю.,And they didn't set foot on our land.,
+pistol_dream_1_25,И что дальше?,So what happened next?,
+pistol_dream_1_26,Меня нашли. Арестовали.,They found me. They arrested me.,
+pistol_dream_1_27,Оставшуюся жизнь я провёл в камере.,I spent the rest of my life in a prison cell.,
+pistol_dream_1_28,И ты всё равно доволен?,And you're still happy with it?,
+pistol_dream_1_29,Земля осталась нашей. Оно того стоило.,The land is still ours. It was worth it.,
+pistol_dream_1_30,"Ты дерёшься громко, парень, и эффектно.","You fight loud and hard, man—and it's quite a show.",
+pistol_dream_1_31,Но иногда достаточно пальца.,But sometimes a finger is enough.,
+pistol_dream_1_32,Повторяй за мной.,Repeat after me.,
+pistol_dream_1_33,Чё именно?,What exactly?,
+pistol_dream_1_34,Не геройствуй. Я научу тебя точному удару!,Don't try to be a hero. I'll teach you how to strike with precision!,
+pistol_dream_2_1,Вот. Не промахнулся.,There you go. You didn't miss.,
+pistol_dream_2_2,"Я в тебе не сомневался, парень!","I never doubted you, man!",
+pistol_dream_2_3,Ты надежда всех дзинко.,You are the hope of all the Jinko.,
+pistol_dream_2_4,"Это всё? Я думал, будет… ну мощнее.","Is that it? I thought it would be… well, more intense.",
+pistol_dream_2_5,Еще будешь благодарен за такую точность!,You'll be grateful for that level of accuracy!,
+pistol_dream_2_6,Запомни. Империя держится на мелочах.,Remember this: An empire is built on the little things.,
+pistol_dream_2_7,А мелочи ломаются легко.,And small things break easily.,
+pistol_dream_2_8,Используй новый навык с толком.,Use your new skill wisely.,
+pistol_dream_2_9,И не стреляй куда попало.,And don't just shoot anywhere.,
+pistol_dream_2_10,Так делают только идиоты.,Only idiots do that.,
+pistol_dream_2_11,"Семейка у меня, конечно…","Well, what a family I have...",
+temple_stuff_1_1,Я слышу их… мёртвые говорят снова…,I can hear them… the dead are speaking again…,
+temple_stuff_1_2,Храм не должен пасть! Это наш дом!,The temple must not fall! This is our home!,
+temple_stuff_1_3,Они идут по коридорам…,They're walking down the hallways…,
+temple_stuff_1_4,Они уже внутри!,They're already inside!,
+temple_stuff_1_5,Кто-нибудь закройте ворота!,Someone close the gate!,
+temple_stuff_1_6,Не трогайте священные колокола!,Don't touch the sacred bells!,
+temple_stuff_1_7,Мы присоединимся к мертвым!,We will join the dead!,
+temple_stuff_1_8,Я пойду за своим богом!,I will follow my god!,
+temple_stuff_1_9,Нужно было бежать из этого места... теперь поздно.,I should have run away from this place... but now it's too late.,
+temple_stuff_1_10,"Он обещал, что воскресит мою жену, лжец.",He promised he would bring my wife back to life—what a liar.,
+temple_stuff_1_11,Мы должны сражаться до конца.,We must fight to the end.,
+temple_stuff_1_12,Дзинко! Имперская шавка!,Dzinko! You imperial mongrel!,
+temple_stuff_1_13,Что мы вам сделали? Это наше священное место!,What have we done to you? This is our sacred place!,
+temple_stuff_1_14,"Плевать, я не хочу тут сдохнуть!","Screw it, I don't want to die here!",
+temple_stuff_1_15,"Куда ты побежал, жалкий предатель!","Where are you running off to, you pathetic traitor!",
+temple_stuff_1_16,Он нам лгал!,He lied to us!,
+temple_stuff_1_17,Скоро я увижу семью...,I'll see my family soon...,
+temple_melee_1_1,Эти культисты - настоящие психи...,These cultists are total psychos...,
+temple_melee_1_2,Зато резать их проще простого!,But cutting them is a piece of cake!,
+temple_melee_1_3,"Ты, Рю, тоже [color=red]ебнутый[/color] на голову!","You, Ryu, are [color=red]crazy[/color] too!",
+temple_nigthmare_1_1,"Монах предсказал, что однажды я принесу гибель тысячам людей.",A monk predicted that one day I would bring about the deaths of thousands of people.,
+temple_nigthmare_1_2,"Они отвернулись от меня, хотя я был лишь ребенком.","They turned their backs on me, even though I was just a child.",
+temple_nigthmare_1_3,Я ушёл из своей деревни.,I left my village.,
+temple_nigthmare_1_4,"Думал, если исчезну — пророчество не сбудется.","I thought that if I disappeared, the prophecy wouldn't come true.",
+temple_nigthmare_1_5,Но его слова остались занозой.,But his words left a thorn in my side.,
+temple_nigthmare_1_6,Каждый день они звучали в моей голове.,"Every day, those thoughts echoed in my head.",
+temple_nigthmare_1_7,А потом я услышал голоса мёртвых.,And then I heard the voices of the dead.,
+temple_nigthmare_1_8,"И решил, что смогу всё исправить.",And I decided that I could fix everything.,
+temple_nigthmare_1_9,Я обрёл новую семью.,I've found a new family.,
+temple_nigthmare_1_10,Они приходили за надеждой. А я погубил их всех.,Они приходили за надеждой. А я погубил их всех.,
+temple_nigthmare_1_11,И себя.,И себя.,
+temple_nigthmare_1_12,Это не мои воспоминания.,These aren't my memories.,
