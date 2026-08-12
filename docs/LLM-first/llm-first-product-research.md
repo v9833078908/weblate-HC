@@ -20,7 +20,7 @@ XTM, memoQ) через exa.
 
 ### Карта LLM-возможностей
 
-```
+```text
 RoutedLLMTranslation (weblate_customization/machinery.py)
   name='OpenRouter', per-language routing JSON ({ja: model, *: fallback}),
   ContextVar -> resolve_model(), наследование настроек project -> global
@@ -73,11 +73,11 @@ EVENT_CHANGE. Дефолты: `mode=suggest`, `auto_source=others` (память
    подключён к игровым чекам.
 6. LLM виден в UI только как вкладка suggestions — опция, не дефолтный поток.
 
-### Существующие планы (docs/plans/)
+### Архивные планы (docs/plans/old/)
 
-- `llm-judge-external-pipeline.md` — внешний LLM-judge (back-translation +
-  семантическая проверка) через REST API, вердикты pass/flag/reject,
-  идемпотентный курсор. НЕ реализован.
+- `llm-judge-external-pipeline.md` — доархитектурный черновик внешнего
+  LLM-judge; не реализован и заменён архитектурой
+  `llm-first-product-architecture.md`, частью 4, и фазой 0 B2.
 - `2026-08-07-project-scoped-llm-context.md` — field-by-field наследование
   проектных настроек, developer note в промпте, команда glossary coverage.
   НЕ реализован.
@@ -290,15 +290,17 @@ IPE (Intelligent Post-Editing) — автоматический LLM-шаг до�
 
 Академическое обоснование: EMNLP 2025 cascaded deferral (см. Часть 3).
 
-### P4 — LLM-judge и петля качества (уже спланировано)
+### P4 — историческое предложение, заменено архитектурой
 
-- Реализовать `docs/LLM-first/plans/llm-judge-external-pipeline.md` как ночной
-  Celery-проход по auto-approved строкам — сэмплированный аудит того, что
-  человек не видел.
-- Реализовать `docs/LLM-first/plans/2026-08-07-project-scoped-llm-context.md`
-  (project-scoped persona / glossary coverage) — контекст per-игра; для
-  геймдева контекст-инъекция важнее выбора модели (консенсус
-  Crowdin/Gridly/Loxily).
+- Калибровка судьи выполняется по
+  `docs/LLM-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md`;
+  реализация судьи следует части 4
+  `llm-first-product-architecture.md`, а не архивному ночному
+  Celery-проходу.
+- `2026-08-07-project-scoped-llm-context.md` остаётся невыполненным
+  архивным планом: project-scoped persona / glossary coverage — контекст
+  per-игра; для геймдева контекст-инъекция важнее выбора модели
+  (консенсус Crowdin/Gridly/Loxily).
 
 ### Что сознательно НЕ делать
 

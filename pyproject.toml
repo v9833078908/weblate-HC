@@ -397,9 +397,11 @@ package_omit = [
 builtin = "clear,rare,informal,usage"
 count = true
 dictionary = "scripts/codespell.txt,-"
-# Vai is a language name, bloc is a French glossary rendering
-ignore-words-list = "assertIn,Vai,master,bloc"
-skip = '*.po,*.pot,*.json,*.tmx,*.tbx,*.csv,*/vendor/*,weblate/trans/specialchars.py,weblate/trans/tests/data/known_hosts,docs/changes/contributors/*.rst'
+# Vai is a language name; bloc is a French glossary rendering; mis- is an
+# English prefix; ons/te are French verb-ending and clitic literals in the
+# COL4 mutation generator; sanity-check is used across this codebase
+ignore-words-list = "assertIn,Vai,master,bloc,mis,ons,te,sanity-check"
+skip = '*.po,*.pot,*.json,*.jsonl,*.tmx,*.tbx,*.csv,*/vendor/*,weblate/trans/specialchars.py,weblate/trans/tests/data/known_hosts,docs/changes/contributors/*.rst,docs/misc/col4-judge-annotation.md'
 
 [tool.coverage.paths]
 source = [
@@ -801,6 +803,8 @@ Certifi = "Certifi"
 # Used in settings, but could be fixed
 COMMITER = "COMMITER"  # codespell:ignore
 hasttr = "hasattr"
+# English prefix, as in "mis-inflected"
+mis = "mis"
 # Open Document Format acronym
 ODF = "ODF"
 # Often misspelled Weblate variants
@@ -814,6 +818,10 @@ extend-exclude = [
   "**.po",
   "**.pot",
   "docs/changes/contributors",
+  "docs/misc/col4-b0-annotations-topup-20260812.jsonl",
+  "docs/misc/col4-b0-annotations.jsonl",
+  "docs/misc/col4-judge-annotation.md",
+  "docs/misc/col4-judge-golden.json",
   "docs/specs",
   "scripts/codespell.txt",
   "scripts/spdx-license-list",
