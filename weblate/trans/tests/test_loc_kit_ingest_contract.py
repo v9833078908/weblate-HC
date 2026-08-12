@@ -532,8 +532,11 @@ GLOSSARY_CSV = (
 
 
 # Language-only kit with no extra columns: deterministic inference must give
-# a preview. GLOSSARY_CSV above is intentionally NOT parsed deterministically
-# (domain/note_*) and keeps covering the LLM/manual path.
+# a preview. GLOSSARY_CSV above is intentionally NOT parsed deterministically:
+# `domain` and `note_ru`/`note_en` are in neither _NOTE_HEADERS nor
+# _IGNORABLE_HEADERS (loc_kit_ingest/infer.py), so it keeps covering the
+# LLM/manual path. Widening either set breaks that coverage - re-point these
+# tests at a new fixture instead of relaxing them.
 GLOSSARY_LANG_ONLY_CSV = "ru,en\nRussian,English\nГерой,Hero\nМеч,Sword\n"
 
 GLOSSARY_NOTE_CSV = (
