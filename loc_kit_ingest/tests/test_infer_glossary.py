@@ -15,6 +15,7 @@ from loc_kit_ingest.infer import (
     infer_glossary_profile,
 )
 from loc_kit_ingest.profile import parse_profile
+from loc_kit_ingest.reader import read_sheets
 
 # Standard language-only kit: header codes, a caption row with language
 # names, a section row (imported as an ordinary term), a blank row, a
@@ -502,3 +503,80 @@ def test_ignored_columns_absent_when_every_column_maps() -> None:
     rows = [["ru", "en"], ["Леон", "Leon"], ["Аки", "Aki"]]
     document, _notes = infer_glossary_profile("S", rows, component="s")
     assert "ignored_columns" not in document["components"][0]["grammar"]
+
+
+def _render_round_trip(document, rows, tmp_path):
+    from loc_kit_ingest.model import Severity
+    from loc_kit_ingest.parser import parse_component
+    from loc_kit_ingest.reader import validate_sheet_headers
+    from loc_kit_ingest.writer import render_component, validate_rendered_component
+
+    component = parse_profile(document).components[0]
+    diagnostics = list(validate_sheet_headers(component, rows))
+    result = parse_component(component, rows)
+    diagnostics.extend(result.diagnostics)
+    render_component(component, result, tmp_path)
+    diagnostics.extend(validate_rendered_component(component, result, tmp_path))
+    assert [d for d in diagnostics if d.severity is Severity.ERROR] == []
+    return component, result
+
+
+def _infer_csv(tmp_path, name: str, body: str):
+    path = tmp_path / name
+    path.write_text(body, encoding="utf-8-sig")
+    rows = read_sheets(path)[path.stem]
+    document, notes = infer_glossary_profile(path.stem, rows, component=path.stem)
+    return rows, document, notes
+
+
+@pytest.mark.parametrize(
+    ("name", "body", "targets", "ignored_columns", "blank_target"),
+    [
+        (
+            "Temple.csv",
+            "ru;en;notes\nЛеон;Leon;Имя собственное, мужской род.\nАки;Aki;Сестра Леона.\n",
+            ["en"],
+            None,
+            None,
+        ),
+        (
+            "Terms.csv",
+            "id,ru,en,ja,zh-TC,notes\n"
+            "char_leon,Леон,Leon,レオン,,главный герой\n"
+            "char_aki,Аки,Aki,,阿姬,\n"
+            "char_joe,Джо,Joe,,,паук\n",
+            ["en", "ja", "zh_Hant"],
+            [{"column": 1, "header": "id"}],
+            ("Джо", "zh_Hant"),
+        ),
+        (
+            "Terms-semicolon.csv",
+            "ru;en;ja;zh-TC;notes\nЛеон;Leon;レオン;;главный герой\nАки;Aki;;阿姬;\n",
+            ["en", "ja", "zh_Hant"],
+            None,
+            ("Аки", "ja"),
+        ),
+    ],
+)
+def test_real_kit_csv_shapes_survive_infer_and_render(
+    tmp_path, name, body, targets, ignored_columns, blank_target
+) -> None:
+    rows, document, notes = _infer_csv(tmp_path, name, body)
+    (component,) = document["components"]
+    assert component["source_lang"] == "ru"
+    assert component["initial_target_languages"] == targets
+    if ignored_columns is None:
+        assert "ignored_columns" not in component["grammar"]
+    else:
+        assert component["grammar"]["ignored_columns"] == ignored_columns
+    if blank_target is None:
+        assert "allow_empty_targets" not in component["grammar"]
+    else:
+        assert component["grammar"]["allow_empty_targets"] is True
+        assert any("untranslated" in note for note in notes)
+
+    _component, result = _render_round_trip(document, rows, tmp_path)
+    if blank_target is not None:
+        source, language = blank_target
+        blank = next(unit for unit in result.units if unit.values["ru"] == source)
+        assert blank.values[language] == ""
