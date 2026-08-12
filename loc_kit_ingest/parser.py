@@ -751,13 +751,14 @@ def _parse_record_map(
                     term_1based,
                     f"source term in language {source_lang!r} is empty",
                 )
-            for tlang in target_langs:
-                if _is_blank(term_values.get(tlang, "")):
-                    err(
-                        "tbx.missing_target_term",
-                        term_1based,
-                        f"target term in language {tlang!r} is empty",
-                    )
+            if not grammar.allow_empty_targets:
+                for tlang in target_langs:
+                    if _is_blank(term_values.get(tlang, "")):
+                        err(
+                            "tbx.missing_target_term",
+                            term_1based,
+                            f"target term in language {tlang!r} is empty",
+                        )
 
             # Notes, in declaration order.
             note_rows: list[int] = []

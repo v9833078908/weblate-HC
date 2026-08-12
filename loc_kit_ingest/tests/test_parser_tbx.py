@@ -578,3 +578,25 @@ def test_record_map_ignored_column_is_allowed_on_a_caption_row():
     component = parse_profile(profile).components[0]
     result = parse_component(component, rows)
     assert not any(d.code == "tbx.unmapped_cell" for d in result.diagnostics)
+
+
+def test_record_map_blank_target_is_an_error_by_default():
+    component = _flat_record_map()
+    rows = [["ru", "en"], ["Леон", ""]]
+    result = parse_component(component, rows)
+    assert any(d.code == "tbx.missing_target_term" for d in result.diagnostics)
+
+
+def test_record_map_blank_target_is_untranslated_when_allowed():
+    component = _flat_record_map(allow_empty_targets=True)
+    rows = [["ru", "en"], ["Леон", ""]]
+    result = parse_component(component, rows)
+    assert [d.code for d in result.diagnostics] == []
+    assert result.units[0].values == {"ru": "Леон", "en": ""}
+
+
+def test_record_map_blank_source_stays_an_error_when_targets_are_allowed():
+    component = _flat_record_map(allow_empty_targets=True)
+    rows = [["ru", "en"], ["", "Leon"]]
+    result = parse_component(component, rows)
+    assert any(d.code == "tbx.missing_term" for d in result.diagnostics)
