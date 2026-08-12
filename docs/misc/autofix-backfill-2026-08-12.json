@@ -1,0 +1,648 @@
+{
+ "autofix_registry": [
+  "line-separator-spacing",
+  "removed-final-stop",
+  "french-punctuation-spacing",
+  "end-whitespace",
+  "end-ellipsis",
+  "zero-width-space",
+  "control-chars",
+  "devanadari-danda",
+  "punctuation-spacing",
+  "safe-html"
+ ],
+ "autofix_list_setting": [
+  "weblate_customization.autofixes.LineSeparatorSpacing",
+  "weblate_customization.autofixes.RemoveAddedFinalStop",
+  "weblate_customization.autofixes.AddFrenchPunctuationSpacing",
+  "weblate.trans.autofixes.whitespace.SameBookendingWhitespace",
+  "weblate.trans.autofixes.chars.ReplaceTrailingDotsWithEllipsis",
+  "weblate.trans.autofixes.chars.RemoveZeroSpace",
+  "weblate.trans.autofixes.chars.RemoveControlChars",
+  "weblate.trans.autofixes.chars.DevanagariDanda",
+  "weblate.trans.autofixes.chars.PunctuationSpacing",
+  "weblate.trans.autofixes.html.BleachHTML"
+ ],
+ "shipped_terminal_fix_present": true,
+ "components": 9,
+ "units_total": 22750,
+ "live_failing_terminal_checks": {
+  "end_question": 38,
+  "end_exclamation": 93,
+  "end_stop": 1455,
+  "end_interrobang": 18,
+  "end_colon": 7
+ },
+ "units_scanned": 13559,
+ "units_skipped_empty": 10,
+ "backfill_shipped_units": 1388,
+ "backfill_shipped_by_fix": {
+  "french-punctuation-spacing": 19,
+  "removed-final-stop": 1366,
+  "zero-width-space": 7,
+  "end-ellipsis": 1
+ },
+ "backfill_proposed_units": 1458,
+ "backfill_proposed_by_fix": {
+  "removed-final-stop": 1436,
+  "french-punctuation-spacing": 19,
+  "zero-width-space": 7,
+  "end-ellipsis": 1
+ },
+ "terminal_rule_delta_units": 70,
+ "terminal_rule_delta_by_mark": {
+  "!": 37,
+  "?": 26,
+  ":": 7
+ },
+ "source_blind_predicate_by_mark": {
+  "!": 43,
+  "?": 42,
+  ":": 7
+ },
+ "per_component": {
+  "CoL4/LocalizeCommon": {
+   "proposed": 4,
+   "delta": 2,
+   "shipped": 2
+  },
+  "CoL4/data": {
+   "proposed": 1449,
+   "delta": 65,
+   "shipped": 1384
+  },
+  "Heart Abyss/temple": {
+   "proposed": 5,
+   "delta": 3,
+   "shipped": 2
+  }
+ },
+ "colon_units": [
+  {
+   "unit_id": 11049,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_213",
+   "source": "Дверь прилегает уже не так плотно, как раньше. Из образовавшейся щели начал просачиваться запах сырого мяса. Кто-то из курсантов вскрикнул",
+   "target": "Kapı artık eskisi kadar sıkı kapalı değildi. Aralıktan çiğ et kokusu sızmaya başlamıştı. Harbiyelilerden biri bağırdı:",
+   "proposed": "Kapı artık eskisi kadar sıkı kapalı değildi. Aralıktan çiğ et kokusu sızmaya başlamıştı. Harbiyelilerden biri bağırdı",
+   "marks": [
+    ":"
+   ]
+  },
+  {
+   "unit_id": 12012,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_422_RESULT_790",
+   "source": "Верхнеблокович Д.С. А должность слишком длинная. Да и не суть, а суть вот в чём",
+   "target": "Dragunov Sergei Verkhneblokovich.Adı çok uzun. Ama konu bu değil. Asıl konu şu:",
+   "proposed": "Dragunov Sergei Verkhneblokovich.Adı çok uzun. Ama konu bu değil. Asıl konu şu",
+   "marks": [
+    ":"
+   ]
+  },
+  {
+   "unit_id": 12628,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_540_RESULT_1021",
+   "source": "Вас переполняет гордость. Комиссар прицепил металлический значок и обратился к вам",
+   "target": "Gururlandın. Komiser sana metal bir rozet takıyor ve sana hitap ediyor:",
+   "proposed": "Gururlandın. Komiser sana metal bir rozet takıyor ve sana hitap ediyor",
+   "marks": [
+    ":"
+   ]
+  },
+  {
+   "unit_id": 12629,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_540_RESULT_1022",
+   "source": "Вас переполняет гордость. Петрович прицепил металлический значок к вашей форме",
+   "target": "Gururlandın. Petrovich sana metal bir rozet takıyor ve sana hitap ediyor:",
+   "proposed": "Gururlandın. Petrovich sana metal bir rozet takıyor ve sana hitap ediyor",
+   "marks": [
+    ":"
+   ]
+  },
+  {
+   "unit_id": 12875,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_596",
+   "source": "Осталась вторая схема, отвечающая за включение приборов",
+   "target": "Cihazların açılmasından sorumlu olan ikinci sigorta ise şu şekilde:",
+   "proposed": "Cihazların açılmasından sorumlu olan ikinci sigorta ise şu şekilde",
+   "marks": [
+    ":"
+   ]
+  },
+  {
+   "unit_id": 13739,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_774",
+   "source": "Вы бежите прочь от битвы в лагере Чистых. Несмотря на недавнюю победу над Старейшиной, вы не чувствуете себя победителем – предчувствие чего-то страшного гложет изнутри. Поспевая за Настей, вы спрашиваете",
+   "target": "Safların kampındaki savaştan kaçıyorsun. Bilge'ye alt etmene rağmen, kendini bir kazanan gibi hissetmiyorsun. Korkunç bir önsezi içini kemiriyor. Nastya'ya ayak uydurarak soruyorsun:",
+   "proposed": "Safların kampındaki savaştan kaçıyorsun. Bilge'ye alt etmene rağmen, kendini bir kazanan gibi hissetmiyorsun. Korkunç bir önsezi içini kemiriyor. Nastya'ya ayak uydurarak soruyorsun",
+   "marks": [
+    ":"
+   ]
+  },
+  {
+   "unit_id": 14245,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_93_RESULT_174",
+   "source": "Мальчуган шел за вами. Он хватает вас за рубашку и говорит",
+   "target": "Çocuk yanına geldi. Gömleğinden tuttu ve dedi ki:",
+   "proposed": "Çocuk yanına geldi. Gömleğinden tuttu ve dedi ki",
+   "marks": [
+    ":"
+   ]
+  }
+ ],
+ "delta_examples": [
+  {
+   "unit_id": 195,
+   "component": "CoL4/LocalizeCommon",
+   "language": "en_US",
+   "context": "SAVE_CONFIRM2",
+   "source": "Внимание! Игра сохранится перед текущим флагом",
+   "target": "Attention! The game will save before the current path! Progress will be overwritten!",
+   "proposed": "Attention! The game will save before the current path! Progress will be overwritten",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 277,
+   "component": "CoL4/LocalizeCommon",
+   "language": "tr",
+   "context": "SAVE_CONFIRM2",
+   "source": "Внимание! Игра сохранится перед текущим флагом",
+   "target": "Dikkat! Oyun mevcut bayraktan önce kaydedilecektir! İlerleme üzerine yazılacaktır!",
+   "proposed": "Dikkat! Oyun mevcut bayraktan önce kaydedilecektir! İlerleme üzerine yazılacaktır",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 7000,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_191",
+   "source": "Начинают бить барабаны. Включилась вентиляция. Вы готовы идти",
+   "target": "The drums begin to beat. The ventilation turns on. Are you ready to go?",
+   "proposed": "The drums begin to beat. The ventilation turns on. Are you ready to go",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 7111,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_213_ANSWER_684",
+   "source": "Спрятаться",
+   "target": "Hide!",
+   "proposed": "Hide",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 7674,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_337",
+   "source": "Молодой житель Гигахруща, давай будем честны. Меня зовут Игор, я послушник Чистых. Тебе наверняка знакомо это название и я бы хотел, чтобы ты рассказал мне, какую чушь Партия вбила в твою голове на наш счёт",
+   "target": "Young inhabitant of the Gigastructure, my name is Igor - I’m an apprentice of the Pure. I’m sure you’ve heard the name. Let’s be honest with each other, shall we? Tell me - what nonsense has the Party hammered into your head about us?",
+   "proposed": "Young inhabitant of the Gigastructure, my name is Igor - I’m an apprentice of the Pure. I’m sure you’ve heard the name. Let’s be honest with each other, shall we? Tell me - what nonsense has the Party hammered into your head about us",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 7871,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_38_ANSWER_541",
+   "source": "А что...",
+   "target": "What's going on?",
+   "proposed": "What's going on",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 8003,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_408_ANSWER_722",
+   "source": "Бежать вон",
+   "target": "Run away!",
+   "proposed": "Run away",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 8276,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_459_RESULT_867",
+   "source": "На вашем жетоне выдавлены как раз эти цифры. Откуда он знает!",
+   "target": "Those numbers are stamped on your badge. How does he know?",
+   "proposed": "Those numbers are stamped on your badge. How does he know",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 8418,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_486_ANSWER_871",
+   "source": "Есть",
+   "target": "Yes sir!",
+   "proposed": "Yes sir",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 8424,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_487_ANSWER_874",
+   "source": "Есть?",
+   "target": "Yes sir!",
+   "proposed": "Yes sir",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 8532,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_510_ANSWER_908",
+   "source": "Я вас не брошу",
+   "target": "I won't leave you!",
+   "proposed": "I won't leave you",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 8593,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_521_ANSWER_936",
+   "source": "Схватить её",
+   "target": "Grab her!",
+   "proposed": "Grab her",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 8670,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_537",
+   "source": "Быстро! Сажай её в экстрактор",
+   "target": "Quick! Put her in the extractor!",
+   "proposed": "Quick! Put her in the extractor",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 9023,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_612",
+   "source": "О Великая, прости нас за невежество. Мы не ждали тебя, хоть всем сердцем желали найти: мы глупцы, прости нас и даруй нам свою силу, чтобы мы справились с этим. Направь нас на путь, дай нам знания и яви прозрение. Мы обережём тебя от любых невзгод, только просим, будь с нами",
+   "target": "Oh, Great One, forgive us for our ignorance. We did not wait for you, though we desired with all our hearts to find you: we are fools, forgive us and grant us your strength so that we may cope with this. Guide us on the path, give us wisdom and revelation. We will protect you from all misfortune, we only beg, stay with us!",
+   "proposed": "Oh, Great One, forgive us for our ignorance. We did not wait for you, though we desired with all our hearts to find you: we are fools, forgive us and grant us your strength so that we may cope with this. Guide us on the path, give us wisdom and revelation. We will protect you from all misfortune, we only beg, stay with us",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 9344,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_675_ANSWER_1529",
+   "source": "Что-то не так? Тебе не понравилось свидание",
+   "target": "Is something wrong? Did you not enjoy the date?",
+   "proposed": "Is something wrong? Did you not enjoy the date",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 9395,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_685",
+   "source": "Ты, Послушник, ты должен был стать проводником истины, а не пристраститься к невежеству! Ты будешь уничтожен за то, что посмел нарушить священный Обряд чистоты",
+   "target": "You, Apprentice, were chosen to carry the truth, not to fall to ignorance! For your defiance of the sacred Rite of Purity, you shall be unmade!",
+   "proposed": "You, Apprentice, were chosen to carry the truth, not to fall to ignorance! For your defiance of the sacred Rite of Purity, you shall be unmade",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 9435,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_692",
+   "source": "Мне нужна помощь, меня преследуют",
+   "target": "I need help, they’re chasing me!",
+   "proposed": "I need help, they’re chasing me",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 9457,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_697_ANSWER_1275",
+   "source": "Я уверен, что это к добру",
+   "target": "I'm sure it's for the best!",
+   "proposed": "I'm sure it's for the best",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 9487,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_704_ANSWER_1244",
+   "source": "О чём это он...",
+   "target": "What's he talking about?",
+   "proposed": "What's he talking about",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 9666,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_739_ANSWER_1307",
+   "source": "Эй ты, руки прочь",
+   "target": "Hey, you, hands off!",
+   "proposed": "Hey, you, hands off",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 9954,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_811_ANSWER_1428",
+   "source": "Можно ли выпустить плесень",
+   "target": "Should we release the Sporechild?",
+   "proposed": "Should we release the Sporechild",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 9991,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_820_ANSWER_1448",
+   "source": "Слушаться",
+   "target": "Run!",
+   "proposed": "Run",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 10275,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "EVENT_887_ANSWER_1600",
+   "source": "Есть",
+   "target": "Yes sir!",
+   "proposed": "Yes sir",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 10559,
+   "component": "CoL4/data",
+   "language": "en_US",
+   "context": "TITLE_7_DESCRIPTION",
+   "source": "Вам знакомы такие ритуалы призыва о которых взрослые даже не слышали",
+   "target": "Are you familiar with rituals that adults have never even heard of?",
+   "proposed": "Are you familiar with rituals that adults have never even heard of",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 10941,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_191",
+   "source": "Начинают бить барабаны. Включилась вентиляция. Вы готовы идти",
+   "target": "Davullar çalmaya başlıyor. Havalandırma açılıyor. Hazır mısın?",
+   "proposed": "Davullar çalmaya başlıyor. Havalandırma açılıyor. Hazır mısın",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 11052,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_213_ANSWER_684",
+   "source": "Спрятаться",
+   "target": "Saklan!",
+   "proposed": "Saklan",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 11603,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_332_ANSWER_596",
+   "source": "Да, позволяю",
+   "target": "Evet!",
+   "proposed": "Evet",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 11615,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_337",
+   "source": "Молодой житель Гигахруща, давай будем честны. Меня зовут Игор, я послушник Чистых. Тебе наверняка знакомо это название и я бы хотел, чтобы ты рассказал мне, какую чушь Партия вбила в твою голове на наш счёт",
+   "target": "Gigastructure’nın genç sakini, benim adım Igor, Ben Safkanların çırağıyım. Eminim adımızı duymuşsundur. Hadi birbirimize dürüst olalım, ne dersin? Söyle bana, Parti’nin kafana bizimle ilgili ne saçmalıklar kazıdı?",
+   "proposed": "Gigastructure’nın genç sakini, benim adım Igor, Ben Safkanların çırağıyım. Eminim adımızı duymuşsundur. Hadi birbirimize dürüst olalım, ne dersin? Söyle bana, Parti’nin kafana bizimle ilgili ne saçmalıklar kazıdı",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 11659,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_349",
+   "source": "Ой, девочки, посмотрите, теперь вам будет, с кем поиграть! Садись милок, помоги старой вставить нитку в проушину, а то это кара Бетонного бога какая-то",
+   "target": "Ah kızlar, bakın, işte oynayacak biri buldunuz! Otur bakalım canım, yaşlı bir kadının iğneden iplik geçirmesine yardım et, olur mu? Bu, Beton Tanrı'nın bir tür cezası!",
+   "proposed": "Ah kızlar, bakın, işte oynayacak biri buldunuz! Otur bakalım canım, yaşlı bir kadının iğneden iplik geçirmesine yardım et, olur mu? Bu, Beton Tanrı'nın bir tür cezası",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 11756,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_368",
+   "source": "Так, где там этот Сидоров? Проверим как ты убираешь слизь",
+   "target": "Peki, Sidorov nerede? Bakalım balçığı nasıl temizleyecek?",
+   "proposed": "Peki, Sidorov nerede? Bakalım balçığı nasıl temizleyecek",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 11812,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_38_ANSWER_541",
+   "source": "А что...",
+   "target": "Neler oluyor?",
+   "proposed": "Neler oluyor",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 11922,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_402_ANSWER_715",
+   "source": "Радуйтесь, фанатики! Партия дала вам Огонь! Вы же его хотели...",
+   "target": "Sevinin bağnazlar! Siz istediniz, Parti size Ateş'i verdi!",
+   "proposed": "Sevinin bağnazlar! Siz istediniz, Parti size Ateş'i verdi",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 11927,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_403_RESULT_761",
+   "source": "У вас наворачиваются слёзы. Вы ненавидите то ли ликвидаторов то ли себя",
+   "target": "Gözlerin doluyor. Kimden daha çok nefret edeceğini bilmiyorsun, likidatörlerden mi yoksa kendinden mi?",
+   "proposed": "Gözlerin doluyor. Kimden daha çok nefret edeceğini bilmiyorsun, likidatörlerden mi yoksa kendinden mi",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 11933,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_405_ANSWER_719",
+   "source": "Эй! Я свой. Нам надо в Общину: там ликвидаторы идут",
+   "target": "Hey! Ben de sizdenim. Komünite'ye geri dönmeliyiz. Likidatörler geliyor!",
+   "proposed": "Hey! Ben de sizdenim. Komünite'ye geri dönmeliyiz. Likidatörler geliyor",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 12217,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_459_RESULT_867",
+   "source": "На вашем жетоне выдавлены как раз эти цифры. Откуда он знает!",
+   "target": "Bu sicil numaran rozetine basılmış. O bunu nereden biliyordu?",
+   "proposed": "Bu sicil numaran rozetine basılmış. O bunu nereden biliyordu",
+   "marks": [
+    "?"
+   ]
+  },
+  {
+   "unit_id": 12359,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_486_ANSWER_871",
+   "source": "Есть",
+   "target": "Emredersiniz efendim!",
+   "proposed": "Emredersiniz efendim",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 12365,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_487_ANSWER_874",
+   "source": "Есть?",
+   "target": "Emredersiniz efendim!",
+   "proposed": "Emredersiniz efendim",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 12473,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_510_ANSWER_908",
+   "source": "Я вас не брошу",
+   "target": "Seni burada bırakmayacağım!",
+   "proposed": "Seni burada bırakmayacağım",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 12534,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_521_ANSWER_936",
+   "source": "Схватить её",
+   "target": "Yakala!",
+   "proposed": "Yakala",
+   "marks": [
+    "!"
+   ]
+  },
+  {
+   "unit_id": 12795,
+   "component": "CoL4/data",
+   "language": "tr",
+   "context": "EVENT_578_RESULT_1112",
+   "source": "Конечно, какой хитрый. Сейчас в каждом отделе нужны генераторы. Ладно, можешь взять один в щитовой, но сперва надо запитать автоматическую дверь. Помоги мне с этим",
+   "target": "Elbette, ne kadar aptalım. Şu anda her departmanın jeneratöre ihtiyacı var. Tamam, kontrol odasından bir tane alabilirsin ama önce otomatik kapıyı çalıştırmam gerek. Bana bu konuda yardımcı olur musun?",
+   "proposed": "Elbette, ne kadar aptalım. Şu anda her departmanın jeneratöre ihtiyacı var. Tamam, kontrol odasından bir tane alabilirsin ama önce otomatik kapıyı çalıştırmam gerek. Bana bu konuda yardımcı olur musun",
+   "marks": [
+    "?"
+   ]
+  }
+ ]
+}
