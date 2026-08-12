@@ -533,14 +533,11 @@ def infer_glossary_profile(
     """
     Infer a schema v2 record-map TBX profile for one worksheet.
 
-    Every populated column must be a language column; the leftmost language
-    is the source, targets are languages filled on every term row. The
-    record-map parser treats any unmapped populated cell as an error, so an
-    extra column is a refusal, never a guess.
-
-    ``layout`` is ``"auto"`` (classify each block), ``"flat"`` (one term per
-    row) or ``"pairs"`` (a term followed by its description). The operator
-    overrides a wrong guess from the preview instead of writing a profile.
+    Targets have at least one term and meet ``min_fill`` across term rows.
+    Target gaps declare ``allow_empty_targets``. A technical ``id`` column is
+    declared in ``ignored_columns``; every other populated unmapped column is
+    refused. ``layout`` is ``"auto"`` (classify each block), ``"flat"`` (one
+    term per row) or ``"pairs"`` (a term followed by its description).
     Returns (document, notes).
     """
     if layout not in _LAYOUTS:
@@ -719,33 +716,38 @@ def infer_glossary_profile(
         rows_in_region = range(first, block[-1] + 1)
         term_rows.extend(rows_in_region[::step])
         description_rows.extend(rows_in_region[1::step] if step == 2 else [])
-
     target_langs: list[str] = []
+    allow_empty_targets = False
     for col in sorted(languages):
         if col == source_col:
             continue
         code = languages[col]
-        # Count every gap but keep only the head: the message shows ten.
-        missing_head: list[int] = []
-        missing_count = 0
-        for index in term_rows:
-            if _cell(rows[index], col).strip():
-                continue
-            missing_count += 1
-            if len(missing_head) < _MISSING_ROWS_SHOWN:
-                missing_head.append(index + 1)
-        if missing_count:
-            shown = ", ".join(str(row) for row in missing_head)
-            if missing_count > len(missing_head):
-                shown += f", +{missing_count - len(missing_head)} more"
-            notes.append(
-                f"language {code} is missing a term on row(s) {shown}; "
-                "recognised but not imported"
-            )
+        missing_rows = [
+            index + 1 for index in term_rows if not _cell(rows[index], col).strip()
+        ]
+        term_filled = len(term_rows) - len(missing_rows)
+        if not term_filled:
             continue
+        share = 100.0 * term_filled / len(term_rows)
+        if share < min_fill:
+            msg = (
+                f"column {col + 1} ({_cell(header_row, col)!r} -> {code}) is "
+                f"filled in {term_filled}/{len(term_rows)} term rows "
+                f"({share:.1f}%); too sparse to map deterministically"
+            )
+            raise InferenceError(msg)
         target_langs.append(code)
+        if missing_rows:
+            allow_empty_targets = True
+            shown = ", ".join(str(row) for row in missing_rows[:_MISSING_ROWS_SHOWN])
+            if len(missing_rows) > _MISSING_ROWS_SHOWN:
+                shown += f", +{len(missing_rows) - _MISSING_ROWS_SHOWN} more"
+            notes.append(
+                f"language {code} has no term on {len(missing_rows)} row(s) "
+                f"({shown}); imported untranslated"
+            )
     if not target_langs:
-        msg = f"sheet {sheet_name!r} has no fully filled target language column"
+        msg = f"sheet {sheet_name!r} has no target language with a term"
         raise InferenceError(msg)
 
     grammar: dict[str, Any] = {
@@ -759,6 +761,8 @@ def infer_glossary_profile(
             {"column": col + 1, "header": _cell(header_row, col)}
             for col in ignored_cols
         ]
+    if allow_empty_targets:
+        grammar["allow_empty_targets"] = True
     note_fields: list[dict[str, Any]] = []
     if paired:
         # A description cell is read by a note field, and a note field may

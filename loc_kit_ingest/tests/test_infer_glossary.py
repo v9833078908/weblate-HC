@@ -66,12 +66,12 @@ def test_standard_layout_infers_v2_record_map() -> None:
     ]
 
 
-def test_partially_filled_language_is_not_an_initial_target() -> None:
+def test_partially_filled_language_is_imported_as_a_target() -> None:
     document, notes = infer_glossary_profile("Terms", STANDARD, component="terms")
     (comp,) = document["components"]
-    # ja is empty on row 6 -> recognised but not imported.
-    assert comp["initial_target_languages"] == ["en"]
-    assert any("ja" in note and "6" in note for note in notes)
+    assert comp["initial_target_languages"] == ["en", "ja"]
+    assert comp["grammar"]["allow_empty_targets"] is True
+    assert any("ja" in note and "untranslated" in note for note in notes)
 
 
 def test_row_without_source_term_is_skipped_with_note() -> None:
@@ -105,14 +105,45 @@ def test_no_language_header_is_refused() -> None:
         infer_glossary_profile("S", [["key", "value"], ["a", "b"]], component="s")
 
 
-def test_no_fully_filled_target_is_refused() -> None:
-    rows = [
-        ["ru", "en"],
-        ["Герой", "Hero"],
-        ["Меч", ""],
-    ]
-    with pytest.raises(InferenceError, match="target"):
+def test_target_with_gaps_is_imported_instead_of_refused() -> None:
+    rows = [["ru", "en"], ["Леон", ""], ["Аки", "Aki"]]
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (comp,) = document["components"]
+    assert comp["initial_target_languages"] == ["en"]
+    assert comp["grammar"]["allow_empty_targets"] is True
+    assert any("en" in note and "untranslated" in note for note in notes)
+
+
+def test_complete_kit_does_not_declare_allow_empty_targets() -> None:
+    rows = [["ru", "en"], ["Леон", "Leon"], ["Аки", "Aki"]]
+    document, _notes = infer_glossary_profile("S", rows, component="s")
+    assert "allow_empty_targets" not in document["components"][0]["grammar"]
+
+
+def test_sheet_without_any_target_language_is_refused() -> None:
+    rows = [["ru", "en"], ["Леон", ""], ["Аки", ""]]
+    with pytest.raises(InferenceError, match="no target language"):
         infer_glossary_profile("S", rows, component="s")
+
+
+def test_sparse_language_column_is_still_refused() -> None:
+    rows = [["ru", "en"], *[[f"термин{i}", ""] for i in range(40)]]
+    rows[1][1] = "Leon"
+    with pytest.raises(InferenceError, match="too sparse"):
+        infer_glossary_profile("S", rows, component="s")
+
+
+def test_target_descriptions_do_not_bypass_term_min_fill() -> None:
+    rows = [["ru", "en", "ja"]]
+    for index in range(40):
+        rows.extend(
+            [
+                [f"термин{index}", f"term{index}", "訳" if index == 0 else ""],
+                [DESC_RU, DESC_EN, DESC_EN],
+            ]
+        )
+    with pytest.raises(InferenceError, match="too sparse"):
+        infer_glossary_profile("Terms", rows, component="terms")
 
 
 def test_document_survives_parse_profile() -> None:
@@ -266,7 +297,7 @@ def test_target_language_without_descriptions_is_still_a_target() -> None:
 def test_language_with_descriptions_but_missing_terms_is_refused() -> None:
     rows = [
         ["ru", "en", "ja"],
-        ["Леон", "Leon", "レオン"],
+        ["Леон", "Leon", ""],
         [DESC_RU, DESC_EN, DESC_EN],
         ["Аки", "Aki", ""],
         [DESC_RU, DESC_EN, DESC_EN],
