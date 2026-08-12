@@ -108,8 +108,11 @@ _RECORD_MAP_GRAMMAR_FIELDS = frozenset(
         "term_row_offset",
         "section_field",
         "notes",
+        "ignored_columns",
+        "allow_empty_targets",
     }
 )
+_IGNORED_COLUMN_FIELDS = frozenset({"column", "header"})
 _RECORD_REGION_FIELDS = frozenset(
     {
         "first_record_row",
@@ -186,6 +189,14 @@ class NoteField:
 
 
 @dataclass(frozen=True)
+class IgnoredColumn:
+    """A populated column the kit carries for its engine, never for content."""
+
+    column: int
+    header: str
+
+
+@dataclass(frozen=True)
 class RecordRegion:
     first_record_row: int
     last_record_row: int
@@ -201,6 +212,8 @@ class RecordMapGrammar:
     term_row_offset: int
     section_field: SectionField | None
     notes: tuple[NoteField, ...]
+    ignored_columns: tuple[IgnoredColumn, ...] = ()
+    allow_empty_targets: bool = False
 
 
 @dataclass(frozen=True)
@@ -517,6 +530,19 @@ def _parse_note_field(
     )
 
 
+def _parse_ignored_column(obj: dict[str, Any]) -> IgnoredColumn:
+    if not isinstance(obj, dict):
+        msg = "profile.invalid_value"
+        raise _err(msg, "an ignored column must be an object")
+    _check_unknown(obj, _IGNORED_COLUMN_FIELDS, label="ignored column")
+    column = _require_int(obj, "column", label="ignored column")
+    header = _require(obj, "header", label="ignored column")
+    if not isinstance(header, str):
+        msg = "profile.invalid_value"
+        raise _err(msg, "an ignored column header must be a string")
+    return IgnoredColumn(column=column - 1, header=header)
+
+
 def _parse_record_region(obj: dict[str, Any]) -> RecordRegion:
     _check_unknown(obj, _RECORD_REGION_FIELDS, label="record region")
     first_record = _require_int(obj, "first_record_row", label="record region")
@@ -628,6 +654,23 @@ def _parse_record_map_grammar(
         _parse_note_field(n, target_languages=target_languages) for n in notes_raw
     )
 
+    ignored_raw = obj.get("ignored_columns", [])
+    if not isinstance(ignored_raw, list):
+        msg = "profile.invalid_value"
+        raise _err(msg, "'ignored_columns' must be a list")
+    ignored_columns = tuple(_parse_ignored_column(item) for item in ignored_raw)
+    seen_ignored: set[int] = set()
+    for ignored in ignored_columns:
+        if ignored.column in seen_ignored:
+            msg = "profile.duplicate_column"
+            raise _err(msg, f"duplicate ignored column {ignored.column + 1}")
+        seen_ignored.add(ignored.column)
+
+    allow_empty_targets = obj.get("allow_empty_targets", False)
+    if not isinstance(allow_empty_targets, bool):
+        msg = "profile.invalid_value"
+        raise _err(msg, "'allow_empty_targets' must be a boolean")
+
     # record_stride bounds: every declared row_offset must be in [0, stride).
     strides = {r.record_stride for r in regions}
     for stride in strides:
@@ -696,6 +739,8 @@ def _parse_record_map_grammar(
         term_row_offset=term_row_offset,
         section_field=section_field,
         notes=notes,
+        ignored_columns=ignored_columns,
+        allow_empty_targets=allow_empty_targets,
     )
 
 
@@ -737,6 +782,24 @@ def _check_record_map_field_locations(
                 msg,
                 f"section_field column {grammar.section_field.column + 1} collides "
                 "with a language or note column",
+            )
+
+    if grammar.ignored_columns:
+        declared = {lang.column for lang in languages}
+        declared |= {note.column for note in grammar.notes}
+        if grammar.section_field is not None:
+            declared.add(grammar.section_field.column)
+        collision = sorted(
+            ignored.column
+            for ignored in grammar.ignored_columns
+            if ignored.column in declared
+        )
+        if collision:
+            msg = "profile.ignored_column_collision"
+            raise _err(
+                msg,
+                f"ignored columns {[col + 1 for col in collision]} collide with a "
+                "declared language, note, or section column",
             )
 
 

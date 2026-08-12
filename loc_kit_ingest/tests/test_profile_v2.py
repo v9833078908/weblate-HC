@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from loc_kit_ingest.profile import (
+    IgnoredColumn,
     NoteField,
     PairsGrammar,
     ProfileError,
@@ -449,3 +450,58 @@ def test_round_trips_through_json():
     document = _one_row_document()
     reparsed = parse_profile(json.loads(json.dumps(document)))
     assert reparsed == parse_profile(document)
+
+
+
+def test_ignored_columns_parse_to_zero_based_records():
+    document = _one_row_document()
+    document["components"][0]["grammar"]["ignored_columns"] = [
+        {"column": 6, "header": "id"},
+        {"column": 7, "header": "build"},
+    ]
+    grammar = parse_profile(document).components[0].grammar
+    assert grammar.ignored_columns == (
+        IgnoredColumn(column=5, header="id"),
+        IgnoredColumn(column=6, header="build"),
+    )
+
+
+def test_ignored_columns_default_to_empty():
+    grammar = parse_profile(_one_row_document()).components[0].grammar
+    assert grammar.ignored_columns == ()
+    assert grammar.allow_empty_targets is False
+
+
+@pytest.mark.parametrize(
+    ("column", "what"),
+    [(2, "language ru"), (4, "source note"), (1, "section field")],
+)
+def test_ignored_column_colliding_with_a_declared_field_is_rejected(column, what):
+    document = _one_row_document()
+    document["components"][0]["grammar"]["ignored_columns"] = [
+        {"column": column, "header": "x"}
+    ]
+    with pytest.raises(ProfileError, match="profile.ignored_column_collision"):
+        parse_profile(document)
+
+
+def test_ignored_column_needs_a_positive_integer_column():
+    document = _one_row_document()
+    document["components"][0]["grammar"]["ignored_columns"] = [
+        {"column": 0, "header": "id"}
+    ]
+    with pytest.raises(ProfileError, match="profile.invalid_index"):
+        parse_profile(document)
+
+
+def test_allow_empty_targets_parses_as_bool():
+    document = _one_row_document()
+    document["components"][0]["grammar"]["allow_empty_targets"] = True
+    assert parse_profile(document).components[0].grammar.allow_empty_targets is True
+
+
+def test_allow_empty_targets_rejects_a_non_bool():
+    document = _one_row_document()
+    document["components"][0]["grammar"]["allow_empty_targets"] = "yes"
+    with pytest.raises(ProfileError, match="profile.invalid_value"):
+        parse_profile(document)
