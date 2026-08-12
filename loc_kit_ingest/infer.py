@@ -24,6 +24,7 @@ from typing import Any
 
 from translate.lang import data as lang_data
 
+from loc_kit_ingest.langcode import language_code
 from loc_kit_ingest.profile import SCHEMA_VERSION, SCHEMA_VERSION_RECORD_MAP
 
 # Language columns filled below this share of content rows are stray spillover,
@@ -31,8 +32,6 @@ from loc_kit_ingest.profile import SCHEMA_VERSION, SCHEMA_VERSION_RECORD_MAP
 # paste-overs sit under 1%.
 DEFAULT_MIN_FILL = 5.0
 
-_PARENS_CODE = re.compile(r"\(\s*([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*)\s*\)\s*$")
-_BARE_CODE = re.compile(r"^\s*([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*)\s*$")
 _UNSAFE_COMPONENT = re.compile(r"[^A-Za-z0-9_-]+")
 
 # Markers some kits put in the key cell of a caption row.
@@ -99,32 +98,6 @@ class InferenceError(Exception):
     """Raised when a sheet's shape cannot be determined with confidence."""
 
 
-def _known_language(token: str) -> str | None:
-    """Return a Weblate-style code for ``token``, or None if it is no language."""
-    norm = token.strip().replace("-", "_")
-    if not norm:
-        return None
-    if norm in lang_data.languages:
-        return norm
-    if "_" in norm:
-        base, _, region = norm.partition("_")
-        canonical = f"{base.lower()}_{region.upper()}"
-        if canonical in lang_data.languages or base.lower() in lang_data.languages:
-            return canonical
-        return None
-    lowered = norm.lower()
-    return lowered if lowered in lang_data.languages else None
-
-
-def _language_code(header_cell: str) -> str | None:
-    """Extract a language code from a header cell, ``en`` or ``English(en)``."""
-    match = _PARENS_CODE.search(header_cell)
-    if match:
-        return _known_language(match.group(1))
-    match = _BARE_CODE.match(header_cell)
-    if match:
-        return _known_language(match.group(1))
-    return None
 
 
 def _cell(row: list[str], col: int) -> str:
@@ -154,7 +127,7 @@ def _find_header_row(rows: list[list[str]]) -> tuple[int, dict[int, str]]:
         found = {
             col: code
             for col in range(_KEY_COLUMN + 1, len(row))
-            if (code := _language_code(_cell(row, col))) is not None
+            if (code := language_code(_cell(row, col))) is not None
         }
         if found:
             return index, found
@@ -232,7 +205,7 @@ def infer_component(
         return [_cell(row, col) for row in data_rows]
 
     key_header = _cell(header_row, _KEY_COLUMN)
-    key_language_code = _language_code(key_header)
+    key_language_code = language_code(key_header)
     key_is_language = (
         key_language_code is not None
         and key_header.strip().casefold() not in _KEY_HEADER_DENYLIST
@@ -582,7 +555,7 @@ def infer_glossary_profile(
     # Column 0 is an ordinary column here; promote it when its header is a
     # language code (a keyless kit like ``ru,en,ja`` keeps terms in column 1).
     first_header = _cell(header_row, _KEY_COLUMN)
-    first_code = _language_code(first_header)
+    first_code = language_code(first_header)
     if (
         first_code is not None
         and first_header.strip().casefold() not in _KEY_HEADER_DENYLIST
