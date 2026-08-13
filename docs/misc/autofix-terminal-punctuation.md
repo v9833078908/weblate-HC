@@ -145,10 +145,8 @@ end-whitespace, end-ellipsis, zero-width-space, control-chars,
 devanadari-danda, punctuation-spacing, safe-html
 ```
 
-Dry-run на dev-компоненте `col4/data`:
-`2223 units to change (french-punctuation-spacing 47, removed-final-stop
-2173, zero-width-space 7)`. Ноль записей: `Change` до и после прогона —
-173057, `PendingUnitChange` — 0. Отличие от прод-чисел ожидаемо: dev
-несёт своё зеркало вывода автоперевода. Dry-run зафиксировал исходную версию
-правила с `:` во множестве знаков. После вердикта выше правило ограничено
-`.?!`; перед следующим развёртыванием нужен новый dry-run с этим регистром.
+Повторный dry-run на dev-компоненте `col4/data` после исключения `:`:
+`2210 units to change (french-punctuation-spacing 47, removed-final-stop
+2160, zero-width-space 7)`. Последняя строка: `Dry run: nothing written. Use
+--apply to write.` Отличие от прод-чисел ожидаемо: dev несёт своё зеркало
+вывода автоперевода.
