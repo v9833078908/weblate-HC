@@ -200,3 +200,55 @@ Read-only, на данных `b1f5438`; реестр прода совпадае
 снятой с машинного перевода. То есть все 33 `!`, все 19 французских пробелов,
 7 zero-width, 1 многоточие и все 49 юнитов, написанных человеком. Остаток —
 однотипное снятие точки с `fr`-автоперевода.
+
+## 8. Прод-прогон backfill (2026-08-13)
+
+Развёрнут `8fccfe8`. Dry-run `reapply_autofixes --all` совпал с замером:
+`CoL4/data` 1415, `CoL4/LocalizeCommon` 4, `Heart Abyss/temple` 2;
+`Strategy and Tactics 2/summer-update` 0, пять глоссариев пропущены.
+
+### Найдено прогоном: реакquire лока на чужом экземпляре компонента
+
+Первый `--apply` починил и закоммитил `LocalizeCommon` и `temple`, но на
+`CoL4/data` упал:
+
+```text
+col4/data/fr: skipping commit due to error: Cannot reacquire an unlocked lock
+```
+
+`Translation.update_units` обновляет лок репозитория каждые 1000 записей
+(`weblate/trans/models/translation.py:1453`), а лок живёт на экземпляре
+`Component`. `commit_pending_subset` брал `translation.component` из запроса —
+другой экземпляр, с незанятым локом. У `fr` было 1372 записи, то есть порог
+1000 переходился только здесь; `en_US` (22) и `tr` (21) прошли. Штатный
+`commit_pending` от этого защищён через `reuse_component_for_translation`, и
+теперь `commit_pending_subset` делает то же (`8fccfe8`, регрессионный тест
+`test_commit_holds_the_lock_the_translation_would_reacquire`).
+
+Правки при этом не потерялись: они остались 1415 pending-записями автора
+`weblate:autofix`, и после деплоя фикса тот же путь закоммитил их одним
+коммитом.
+
+### Побочная находка: `commit_pending` с областью не работает
+
+`weblate commit_pending col4/data --age 0` завершается без работы:
+`weblate/trans/management/commands/commit_pending.py:33` передаёт в задачу
+**id переводов**, а `find_committable_components`
+(`weblate/trans/models/pending.py:70`) фильтрует по **pk компонентов**.
+Периодическая задача (`pks=None`) не затронута. Не исправлено, вынесено
+отдельно.
+
+### Результат
+
+| Компонент | Юнитов | Коммит |
+|---|---:|---|
+| CoL4/data | 1415 | `e218961 autofix backfill` (3 файла, +1435 / -1460) |
+| CoL4/LocalizeCommon | 4 | `3f951af` |
+| Heart Abyss/temple | 2 | `8f6104d` |
+
+Проверено после прогона: повторный dry-run — `0 units to change` во всех
+компонентах; рабочее дерево `col4/data` чистое; `PendingUnitChange` вернулось
+к 114 записям чужого glossary-воркфлоу; починено **1421** юнитов, из них
+**49** сохранили `automatically_translated = False` и **1372** — `True`,
+то есть авторство не переписано; три `fr`-юнита по-прежнему заканчиваются на
+`?` (источник тоже) — правило их не тронуло.
