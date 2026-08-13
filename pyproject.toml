@@ -821,6 +821,7 @@ extend-exclude = [
   "**.pot",
   "docs/changes/contributors",
   "docs/misc/autofix-backfill-2026-08-12.json",
+  "docs/misc/autofix-backfill-review-2026-08-13.json",
   "docs/misc/col4-b0-annotations-topup-20260812.jsonl",
   "docs/misc/col4-b0-annotations.jsonl",
   "docs/misc/col4-judge-annotation.md",

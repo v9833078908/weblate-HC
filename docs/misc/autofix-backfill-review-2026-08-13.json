@@ -1,0 +1,1973 @@
+{
+  "fingerprint": [
+    "line-separator-spacing",
+    "removed-final-stop",
+    "french-punctuation-spacing",
+    "end-whitespace",
+    "end-ellipsis",
+    "zero-width-space",
+    "control-chars",
+    "devanadari-danda",
+    "punctuation-spacing",
+    "safe-html"
+  ],
+  "source_run": "reapply_autofixes --all --dump-json (read-only, prod b1f5438, 2026-08-13)",
+  "total_units_to_change": 1451,
+  "per_component": {
+    "CoL4/LocalizeCommon": 4,
+    "CoL4/data": 1442,
+    "Heart Abyss/temple": 5
+  },
+  "per_fix": {
+    "removed-final-stop": 1429,
+    "french-punctuation-spacing": 19,
+    "zero-width-space": 7,
+    "end-ellipsis": 1
+  },
+  "subset_rule": "every change except a plain full stop removed from an automatically translated string",
+  "records": [
+    {
+      "unit_id": 195,
+      "component": "CoL4/LocalizeCommon",
+      "language": "en_US",
+      "context": "SAVE_CONFIRM2",
+      "source": [
+        "Внимание! Игра сохранится перед текущим флагом"
+      ],
+      "target": [
+        "Attention! The game will save before the current path! Progress will be overwritten!"
+      ],
+      "proposed": [
+        "Attention! The game will save before the current path! Progress will be overwritten"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 277,
+      "component": "CoL4/LocalizeCommon",
+      "language": "tr",
+      "context": "SAVE_CONFIRM2",
+      "source": [
+        "Внимание! Игра сохранится перед текущим флагом"
+      ],
+      "target": [
+        "Dikkat! Oyun mevcut bayraktan önce kaydedilecektir! İlerleme üzerine yazılacaktır!"
+      ],
+      "proposed": [
+        "Dikkat! Oyun mevcut bayraktan önce kaydedilecektir! İlerleme üzerine yazılacaktır"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 356,
+      "component": "CoL4/LocalizeCommon",
+      "language": "fr",
+      "context": "DEMO_THANKS",
+      "source": [
+        "Спасибо что поиграли в демоверсию игры$Choice of Life: Samosbor"
+      ],
+      "target": [
+        "Merci d'avoir joué à la démo de$Choice of Life: Samosbor"
+      ],
+      "proposed": [
+        "Merci d'avoir joué à la démo de$Choice of Life : Samosbor"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 412,
+      "component": "CoL4/LocalizeCommon",
+      "language": "fr",
+      "context": "DATA_LOADING",
+      "source": [
+        "Идет скачивание данных$Пожалуйста, подождите$В зависимости от скорости интернета это может занять несколько минут"
+      ],
+      "target": [
+        "Téléchargement des données en cours.$Veuillez patienter.$Cela peut prendre plusieurs minutes, en fonction de votre connexion Internet."
+      ],
+      "proposed": [
+        "Téléchargement des données en cours.$Veuillez patienter.$Cela peut prendre plusieurs minutes, en fonction de votre connexion Internet"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 7000,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_191",
+      "source": [
+        "Начинают бить барабаны. Включилась вентиляция. Вы готовы идти"
+      ],
+      "target": [
+        "The drums begin to beat. The ventilation turns on. Are you ready to go?"
+      ],
+      "proposed": [
+        "The drums begin to beat. The ventilation turns on. Are you ready to go"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 7006,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_193",
+      "source": [
+        "Вас назначили помогать старикам. Вашу пионерскую группу ведут по длинному коридору Гигахруща к сегменту ячеек для ветеранов труда. Вокруг веет сыростью, свет тускнеет, а воздух становится холоднее"
+      ],
+      "target": [
+        "You’ve been selected to assist the elders. Your pioneer group is led down the long corridor of Gigastructure to the sector for labor veterans. The air carries a damp chill, and the light is fading."
+      ],
+      "proposed": [
+        "You’ve been selected to assist the elders. Your pioneer group is led down the long corridor of Gigastructure to the sector for labor veterans. The air carries a damp chill, and the light is fading"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 7111,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_213_ANSWER_684",
+      "source": [
+        "Спрятаться"
+      ],
+      "target": [
+        "Hide!"
+      ],
+      "proposed": [
+        "Hide"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 7225,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_234_RESULT_1602",
+      "source": [
+        "От неожиданности бомж закряхтел и вцепился желтыми ногтями вам в руку и на этом месте образовалась гнойная рана. Ветеран скрылся, а вы почувствовали себя плохо"
+      ],
+      "target": [
+        "Startled, the bum grunted and clutched your arm with his yellowed nails. A festering wound formed where he grabbed you. The veteran slipped away, and you began to feel unwell."
+      ],
+      "proposed": [
+        "Startled, the bum grunted and clutched your arm with his yellowed nails. A festering wound formed where he grabbed you. The veteran slipped away, and you began to feel unwell"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 7651,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_33_RESULT_57",
+      "source": [
+        "Бомж чуть с ума не сошёл от этой информации. Не раздумывая, он спрыгнул в проём между перилами и утонул в бесконечной тьме пролётов Гигахруща"
+      ],
+      "target": [
+        "The homeless man nearly loses his mind at the revelation. Without a second thought, he hurls himself into the gap between the railings and vanishes into the endless darkness of the Gigastructure."
+      ],
+      "proposed": [
+        "The homeless man nearly loses his mind at the revelation. Without a second thought, he hurls himself into the gap between the railings and vanishes into the endless darkness of the Gigastructure"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 7674,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_337",
+      "source": [
+        "Молодой житель Гигахруща, давай будем честны. Меня зовут Игор, я послушник Чистых. Тебе наверняка знакомо это название и я бы хотел, чтобы ты рассказал мне, какую чушь Партия вбила в твою голове на наш счёт"
+      ],
+      "target": [
+        "Young inhabitant of the Gigastructure, my name is Igor - I’m an apprentice of the Pure. I’m sure you’ve heard the name. Let’s be honest with each other, shall we? Tell me - what nonsense has the Party hammered into your head about us?"
+      ],
+      "proposed": [
+        "Young inhabitant of the Gigastructure, my name is Igor - I’m an apprentice of the Pure. I’m sure you’ve heard the name. Let’s be honest with each other, shall we? Tell me - what nonsense has the Party hammered into your head about us"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 7793,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_363_RESULT_678",
+      "source": [
+        "Вы испугались заходить в комнату, где стоит изделие. Может и к лучшему, ведь по ночам оттуда доносится странный скрежет"
+      ],
+      "target": [
+        "You were too afraid to enter the room where it was kept, and that was probably for the best. At night, a strange, scratchy noise emanated from behind the door."
+      ],
+      "proposed": [
+        "You were too afraid to enter the room where it was kept, and that was probably for the best. At night, a strange, scratchy noise emanated from behind the door"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 7839,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_373_RESULT_699",
+      "source": [
+        "Пока вы переодевались Макс странно на вас поглядывал. Надев костюм, вы ощутили невиданную силу и случайно разбили ящик, наполенный тюбиками зелёного концентрата. Довольные и сытые, вы вернулись на занятия"
+      ],
+      "target": [
+        "While you were changing, Max kept giving you strange looks. After putting on the suit, you felt an unprecedented strength and accidentally broke a box filled with tubes of green concentrate. Satisfied and full, you returned to class."
+      ],
+      "proposed": [
+        "While you were changing, Max kept giving you strange looks. After putting on the suit, you felt an unprecedented strength and accidentally broke a box filled with tubes of green concentrate. Satisfied and full, you returned to class"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 7871,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_38_ANSWER_541",
+      "source": [
+        "А что..."
+      ],
+      "target": [
+        "What's going on?"
+      ],
+      "proposed": [
+        "What's going on"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 7992,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_405_ANSWER_719",
+      "source": [
+        "Эй! Я свой. Нам надо в Общину: там ликвидаторы идут"
+      ],
+      "target": [
+        "Hey! I’m one of you. We must return to the Commune - the Liquidators are coming."
+      ],
+      "proposed": [
+        "Hey! I’m one of you. We must return to the Commune - the Liquidators are coming"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 8003,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_408_ANSWER_722",
+      "source": [
+        "Бежать вон"
+      ],
+      "target": [
+        "Run away!"
+      ],
+      "proposed": [
+        "Run away"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 8276,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_459_RESULT_867",
+      "source": [
+        "На вашем жетоне выдавлены как раз эти цифры. Откуда он знает!"
+      ],
+      "target": [
+        "Those numbers are stamped on your badge. How does he know?"
+      ],
+      "proposed": [
+        "Those numbers are stamped on your badge. How does he know"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 8418,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_486_ANSWER_871",
+      "source": [
+        "Есть"
+      ],
+      "target": [
+        "Yes sir!"
+      ],
+      "proposed": [
+        "Yes sir"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 8424,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_487_ANSWER_874",
+      "source": [
+        "Есть?"
+      ],
+      "target": [
+        "Yes sir!"
+      ],
+      "proposed": [
+        "Yes sir"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 8532,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_510_ANSWER_908",
+      "source": [
+        "Я вас не брошу"
+      ],
+      "target": [
+        "I won't leave you!"
+      ],
+      "proposed": [
+        "I won't leave you"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 8593,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_521_ANSWER_936",
+      "source": [
+        "Схватить её"
+      ],
+      "target": [
+        "Grab her!"
+      ],
+      "proposed": [
+        "Grab her"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 8670,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_537",
+      "source": [
+        "Быстро! Сажай её в экстрактор"
+      ],
+      "target": [
+        "Quick! Put her in the extractor!"
+      ],
+      "proposed": [
+        "Quick! Put her in the extractor"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 9023,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_612",
+      "source": [
+        "О Великая, прости нас за невежество. Мы не ждали тебя, хоть всем сердцем желали найти: мы глупцы, прости нас и даруй нам свою силу, чтобы мы справились с этим. Направь нас на путь, дай нам знания и яви прозрение. Мы обережём тебя от любых невзгод, только просим, будь с нами"
+      ],
+      "target": [
+        "Oh, Great One, forgive us for our ignorance. We did not wait for you, though we desired with all our hearts to find you: we are fools, forgive us and grant us your strength so that we may cope with this. Guide us on the path, give us wisdom and revelation. We will protect you from all misfortune, we only beg, stay with us!"
+      ],
+      "proposed": [
+        "Oh, Great One, forgive us for our ignorance. We did not wait for you, though we desired with all our hearts to find you: we are fools, forgive us and grant us your strength so that we may cope with this. Guide us on the path, give us wisdom and revelation. We will protect you from all misfortune, we only beg, stay with us"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 9344,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_675_ANSWER_1529",
+      "source": [
+        "Что-то не так? Тебе не понравилось свидание"
+      ],
+      "target": [
+        "Is something wrong? Did you not enjoy the date?"
+      ],
+      "proposed": [
+        "Is something wrong? Did you not enjoy the date"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 9391,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_684_RESULT_1291",
+      "source": [
+        "Тот издаёт булькающий звук и ударяет вас хитиновым отростком. Вас отбрасывает к нему за спину"
+      ],
+      "target": [
+        "It lets out a gurgling sound and strikes you with a chitinous spike. You’re thrown back behind it."
+      ],
+      "proposed": [
+        "It lets out a gurgling sound and strikes you with a chitinous spike. You’re thrown back behind it"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 9395,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_685",
+      "source": [
+        "Ты, Послушник, ты должен был стать проводником истины, а не пристраститься к невежеству! Ты будешь уничтожен за то, что посмел нарушить священный Обряд чистоты"
+      ],
+      "target": [
+        "You, Apprentice, were chosen to carry the truth, not to fall to ignorance! For your defiance of the sacred Rite of Purity, you shall be unmade!"
+      ],
+      "proposed": [
+        "You, Apprentice, were chosen to carry the truth, not to fall to ignorance! For your defiance of the sacred Rite of Purity, you shall be unmade"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 9435,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_692",
+      "source": [
+        "Мне нужна помощь, меня преследуют"
+      ],
+      "target": [
+        "I need help, they’re chasing me!"
+      ],
+      "proposed": [
+        "I need help, they’re chasing me"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 9457,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_697_ANSWER_1275",
+      "source": [
+        "Я уверен, что это к добру"
+      ],
+      "target": [
+        "I'm sure it's for the best!"
+      ],
+      "proposed": [
+        "I'm sure it's for the best"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 9487,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_704_ANSWER_1244",
+      "source": [
+        "О чём это он..."
+      ],
+      "target": [
+        "What's he talking about?"
+      ],
+      "proposed": [
+        "What's he talking about"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 9515,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_709_RESULT_1704",
+      "source": [
+        "Внезапно перемещение началось вновь и волной энергии вам рассекло руку, которую вы успели вытащить из машины. К счастью, под действием мази всё быстро зажило"
+      ],
+      "target": [
+        "Suddenly, the time travel began again, and a wave of energy sliced ​​open your arm, which you had managed to pull out of the machine. Luckily, the ointment healed it quickly."
+      ],
+      "proposed": [
+        "Suddenly, the time travel began again, and a wave of energy sliced open your arm, which you had managed to pull out of the machine. Luckily, the ointment healed it quickly"
+      ],
+      "fixes": [
+        "removed-final-stop",
+        "zero-width-space"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 9666,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_739_ANSWER_1307",
+      "source": [
+        "Эй ты, руки прочь"
+      ],
+      "target": [
+        "Hey, you, hands off!"
+      ],
+      "proposed": [
+        "Hey, you, hands off"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 9917,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_802",
+      "source": [
+        "Нужен сосуд. Если ты избавишь Настю от Плесенки, ты просто оставишь её гнить в пробирках, нейронные связи утратят сообщение и она погибнет – конец Гигахрущу. Если ты выпустишь её, то должен сразу заменить Субъект – подсунуть нового человека, чтобы плесень забрала его тело"
+      ],
+      "target": [
+        "You need a vessel. If you purge the Sporechild from Nastya, you’ll be leaving her to rot in test tubes. Her neural links will go dark and she will die - and the Gigastructure will suffer for it. If you free the Sporechild, you must replace the Subject immediately: find a new human for the Mold to inhabit."
+      ],
+      "proposed": [
+        "You need a vessel. If you purge the Sporechild from Nastya, you’ll be leaving her to rot in test tubes. Her neural links will go dark and she will die - and the Gigastructure will suffer for it. If you free the Sporechild, you must replace the Subject immediately: find a new human for the Mold to inhabit"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 9954,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_811_ANSWER_1428",
+      "source": [
+        "Можно ли выпустить плесень"
+      ],
+      "target": [
+        "Should we release the Sporechild?"
+      ],
+      "proposed": [
+        "Should we release the Sporechild"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 9991,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_820_ANSWER_1448",
+      "source": [
+        "Слушаться"
+      ],
+      "target": [
+        "Run!"
+      ],
+      "proposed": [
+        "Run"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 10275,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "EVENT_887_ANSWER_1600",
+      "source": [
+        "Есть"
+      ],
+      "target": [
+        "Yes sir!"
+      ],
+      "proposed": [
+        "Yes sir"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 10559,
+      "component": "CoL4/data",
+      "language": "en_US",
+      "context": "TITLE_7_DESCRIPTION",
+      "source": [
+        "Вам знакомы такие ритуалы призыва о которых взрослые даже не слышали"
+      ],
+      "target": [
+        "Are you familiar with rituals that adults have never even heard of?"
+      ],
+      "proposed": [
+        "Are you familiar with rituals that adults have never even heard of"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 10941,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_191",
+      "source": [
+        "Начинают бить барабаны. Включилась вентиляция. Вы готовы идти"
+      ],
+      "target": [
+        "Davullar çalmaya başlıyor. Havalandırma açılıyor. Hazır mısın?"
+      ],
+      "proposed": [
+        "Davullar çalmaya başlıyor. Havalandırma açılıyor. Hazır mısın"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 11052,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_213_ANSWER_684",
+      "source": [
+        "Спрятаться"
+      ],
+      "target": [
+        "Saklan!"
+      ],
+      "proposed": [
+        "Saklan"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 11407,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_288_ANSWER_513",
+      "source": [
+        "Кажется, я её знаю"
+      ],
+      "target": [
+        "Sanırım onu ​​tanıyorum"
+      ],
+      "proposed": [
+        "Sanırım onu tanıyorum"
+      ],
+      "fixes": [
+        "zero-width-space"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 11603,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_332_ANSWER_596",
+      "source": [
+        "Да, позволяю"
+      ],
+      "target": [
+        "Evet!"
+      ],
+      "proposed": [
+        "Evet"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 11615,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_337",
+      "source": [
+        "Молодой житель Гигахруща, давай будем честны. Меня зовут Игор, я послушник Чистых. Тебе наверняка знакомо это название и я бы хотел, чтобы ты рассказал мне, какую чушь Партия вбила в твою голове на наш счёт"
+      ],
+      "target": [
+        "Gigastructure’nın genç sakini, benim adım Igor, Ben Safkanların çırağıyım. Eminim adımızı duymuşsundur. Hadi birbirimize dürüst olalım, ne dersin? Söyle bana, Parti’nin kafana bizimle ilgili ne saçmalıklar kazıdı?"
+      ],
+      "proposed": [
+        "Gigastructure’nın genç sakini, benim adım Igor, Ben Safkanların çırağıyım. Eminim adımızı duymuşsundur. Hadi birbirimize dürüst olalım, ne dersin? Söyle bana, Parti’nin kafana bizimle ilgili ne saçmalıklar kazıdı"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 11659,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_349",
+      "source": [
+        "Ой, девочки, посмотрите, теперь вам будет, с кем поиграть! Садись милок, помоги старой вставить нитку в проушину, а то это кара Бетонного бога какая-то"
+      ],
+      "target": [
+        "Ah kızlar, bakın, işte oynayacak biri buldunuz! Otur bakalım canım, yaşlı bir kadının iğneden iplik geçirmesine yardım et, olur mu? Bu, Beton Tanrı'nın bir tür cezası!"
+      ],
+      "proposed": [
+        "Ah kızlar, bakın, işte oynayacak biri buldunuz! Otur bakalım canım, yaşlı bir kadının iğneden iplik geçirmesine yardım et, olur mu? Bu, Beton Tanrı'nın bir tür cezası"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 11756,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_368",
+      "source": [
+        "Так, где там этот Сидоров? Проверим как ты убираешь слизь"
+      ],
+      "target": [
+        "Peki, Sidorov nerede? Bakalım balçığı nasıl temizleyecek?"
+      ],
+      "proposed": [
+        "Peki, Sidorov nerede? Bakalım balçığı nasıl temizleyecek"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 11812,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_38_ANSWER_541",
+      "source": [
+        "А что..."
+      ],
+      "target": [
+        "Neler oluyor?"
+      ],
+      "proposed": [
+        "Neler oluyor"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 11852,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_39_ANSWER_62",
+      "source": [
+        "Соврать, что идёте на пикник с друзьями"
+      ],
+      "target": [
+        "Arkadaşlarınla ​​pikniğe gideceğin yalanını söyle"
+      ],
+      "proposed": [
+        "Arkadaşlarınla pikniğe gideceğin yalanını söyle"
+      ],
+      "fixes": [
+        "zero-width-space"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 11915,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_401",
+      "source": [
+        "Вы ведёте ликвидаторов, на пути встречая своих бывших соратников. Те проклинают вас, но их слова тонут в криках и языках огня, которыми в них плюётся дюжина огнемётов. В темноте раздаётся странный свист"
+      ],
+      "target": [
+        "Likidatörleri kampa doğru yönlendiriyorsun ve eski yoldaşlarınla ​​karşılaşıyorsun. Bir düzine alev makinesi onlara ateş püskürtürken küfürleri kükreme ve çığlıklar arasında kayboluyor. Karanlığın bir yerinde, tuhaf, kulakları sağır eden bir düdük çınlıyor"
+      ],
+      "proposed": [
+        "Likidatörleri kampa doğru yönlendiriyorsun ve eski yoldaşlarınla karşılaşıyorsun. Bir düzine alev makinesi onlara ateş püskürtürken küfürleri kükreme ve çığlıklar arasında kayboluyor. Karanlığın bir yerinde, tuhaf, kulakları sağır eden bir düdük çınlıyor"
+      ],
+      "fixes": [
+        "zero-width-space"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 11922,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_402_ANSWER_715",
+      "source": [
+        "Радуйтесь, фанатики! Партия дала вам Огонь! Вы же его хотели..."
+      ],
+      "target": [
+        "Sevinin bağnazlar! Siz istediniz, Parti size Ateş'i verdi!"
+      ],
+      "proposed": [
+        "Sevinin bağnazlar! Siz istediniz, Parti size Ateş'i verdi"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 11927,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_403_RESULT_761",
+      "source": [
+        "У вас наворачиваются слёзы. Вы ненавидите то ли ликвидаторов то ли себя"
+      ],
+      "target": [
+        "Gözlerin doluyor. Kimden daha çok nefret edeceğini bilmiyorsun, likidatörlerden mi yoksa kendinden mi?"
+      ],
+      "proposed": [
+        "Gözlerin doluyor. Kimden daha çok nefret edeceğini bilmiyorsun, likidatörlerden mi yoksa kendinden mi"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 11933,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_405_ANSWER_719",
+      "source": [
+        "Эй! Я свой. Нам надо в Общину: там ликвидаторы идут"
+      ],
+      "target": [
+        "Hey! Ben de sizdenim. Komünite'ye geri dönmeliyiz. Likidatörler geliyor!"
+      ],
+      "proposed": [
+        "Hey! Ben de sizdenim. Komünite'ye geri dönmeliyiz. Likidatörler geliyor"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 12217,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_459_RESULT_867",
+      "source": [
+        "На вашем жетоне выдавлены как раз эти цифры. Откуда он знает!"
+      ],
+      "target": [
+        "Bu sicil numaran rozetine basılmış. O bunu nereden biliyordu?"
+      ],
+      "proposed": [
+        "Bu sicil numaran rozetine basılmış. O bunu nereden biliyordu"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 12359,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_486_ANSWER_871",
+      "source": [
+        "Есть"
+      ],
+      "target": [
+        "Emredersiniz efendim!"
+      ],
+      "proposed": [
+        "Emredersiniz efendim"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 12365,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_487_ANSWER_874",
+      "source": [
+        "Есть?"
+      ],
+      "target": [
+        "Emredersiniz efendim!"
+      ],
+      "proposed": [
+        "Emredersiniz efendim"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 12448,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_504_RESULT_950",
+      "source": [
+        "Петя идёт неуверенно, а старик долго ждёт, будто рассматривает прибывшего"
+      ],
+      "target": [
+        "Petya kararsız bir şekilde yürürken, Bilge onu ​​dikkatle süzüyordu"
+      ],
+      "proposed": [
+        "Petya kararsız bir şekilde yürürken, Bilge onu dikkatle süzüyordu"
+      ],
+      "fixes": [
+        "zero-width-space"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 12473,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_510_ANSWER_908",
+      "source": [
+        "Я вас не брошу"
+      ],
+      "target": [
+        "Seni burada bırakmayacağım!"
+      ],
+      "proposed": [
+        "Seni burada bırakmayacağım"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 12534,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_521_ANSWER_936",
+      "source": [
+        "Схватить её"
+      ],
+      "target": [
+        "Yakala!"
+      ],
+      "proposed": [
+        "Yakala"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 12795,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_578_RESULT_1112",
+      "source": [
+        "Конечно, какой хитрый. Сейчас в каждом отделе нужны генераторы. Ладно, можешь взять один в щитовой, но сперва надо запитать автоматическую дверь. Помоги мне с этим"
+      ],
+      "target": [
+        "Elbette, ne kadar aptalım. Şu anda her departmanın jeneratöre ihtiyacı var. Tamam, kontrol odasından bir tane alabilirsin ama önce otomatik kapıyı çalıştırmam gerek. Bana bu konuda yardımcı olur musun?"
+      ],
+      "proposed": [
+        "Elbette, ne kadar aptalım. Şu anda her departmanın jeneratöre ihtiyacı var. Tamam, kontrol odasından bir tane alabilirsin ama önce otomatik kapıyı çalıştırmam gerek. Bana bu konuda yardımcı olur musun"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 12892,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_6",
+      "source": [
+        "Глаза, рот и уши обволакивает сырой, холодной субстанцией: плесень доходит до головы, а после охватывает и всё тело"
+      ],
+      "target": [
+        "Küf kafana ulaşır. Gözlerin, ağzın ve kulakların nemli soğuk bir maddeyle kaplanır. Sonra tüm vücudunu sarar."
+      ],
+      "proposed": [
+        "Küf kafana ulaşır. Gözlerin, ağzın ve kulakların nemli soğuk bir maddeyle kaplanır. Sonra tüm vücudunu sarar"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 12964,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_612",
+      "source": [
+        "О Великая, прости нас за невежество. Мы не ждали тебя, хоть всем сердцем желали найти: мы глупцы, прости нас и даруй нам свою силу, чтобы мы справились с этим. Направь нас на путь, дай нам знания и яви прозрение. Мы обережём тебя от любых невзгод, только просим, будь с нами"
+      ],
+      "target": [
+        "Ey Yüceler Yücesi, cehaletimizi bağışla. Seni beklemiyorduk, ama tüm kalbimizle seni bulmayı istiyorduk. Bizler aptalız, bizi bağışla ve bu durumla başa çıkabilmemiz için bize güç ver. Bizi yönlendir, bize bilgelik ve ilham ver. Seni her türlü beladan koruyacağız, yalvarıyoruz, bizimle kal!"
+      ],
+      "proposed": [
+        "Ey Yüceler Yücesi, cehaletimizi bağışla. Seni beklemiyorduk, ama tüm kalbimizle seni bulmayı istiyorduk. Bizler aptalız, bizi bağışla ve bu durumla başa çıkabilmemiz için bize güç ver. Bizi yönlendir, bize bilgelik ve ilham ver. Seni her türlü beladan koruyacağız, yalvarıyoruz, bizimle kal"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 13041,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_627_RESULT_1175",
+      "source": [
+        "Мне абсолютно неинтересны ваши гастрономические приключения"
+      ],
+      "target": [
+        "Senin mutfak maceralarınla ​​ilgilenmiyorum"
+      ],
+      "proposed": [
+        "Senin mutfak maceralarınla ilgilenmiyorum"
+      ],
+      "fixes": [
+        "zero-width-space"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 13152,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_649",
+      "source": [
+        "А ты не промах! Мне обещают повышения до начальника лаборатории. Ты явно заслужил награду, можешь пригласить меня на ужин"
+      ],
+      "target": [
+        "Hiç fena değilsin! Bana laboratuvar şefliği için terfi sözü verdiler. Kesinlikle bir ödülü hak ediyorsun, beni akşam yemeğine davet etmeye ne dersin?"
+      ],
+      "proposed": [
+        "Hiç fena değilsin! Bana laboratuvar şefliği için terfi sözü verdiler. Kesinlikle bir ödülü hak ediyorsun, beni akşam yemeğine davet etmeye ne dersin"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 13285,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_675_ANSWER_1529",
+      "source": [
+        "Что-то не так? Тебе не понравилось свидание"
+      ],
+      "target": [
+        "Bir sorun mu var? Birlikteliğimizden keyif almadın mı?"
+      ],
+      "proposed": [
+        "Bir sorun mu var? Birlikteliğimizden keyif almadın mı"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 13336,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_685",
+      "source": [
+        "Ты, Послушник, ты должен был стать проводником истины, а не пристраститься к невежеству! Ты будешь уничтожен за то, что посмел нарушить священный Обряд чистоты"
+      ],
+      "target": [
+        "Sen, çırak, gerçeği taşımak için seçildin, cehalete düşmek için değil! Kutsal Saflık Ayini'ne karşı çıktığın için varlığın silinecek!"
+      ],
+      "proposed": [
+        "Sen, çırak, gerçeği taşımak için seçildin, cehalete düşmek için değil! Kutsal Saflık Ayini'ne karşı çıktığın için varlığın silinecek"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 13376,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_692",
+      "source": [
+        "Мне нужна помощь, меня преследуют"
+      ],
+      "target": [
+        "Yardımına ihtiyacım var, benim peşimdeler!"
+      ],
+      "proposed": [
+        "Yardımına ihtiyacım var, benim peşimdeler"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 13428,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_704_ANSWER_1244",
+      "source": [
+        "О чём это он..."
+      ],
+      "target": [
+        "Ne diyor bu?"
+      ],
+      "proposed": [
+        "Ne diyor bu"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 13456,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_709_RESULT_1704",
+      "source": [
+        "Внезапно перемещение началось вновь и волной энергии вам рассекло руку, которую вы успели вытащить из машины. К счастью, под действием мази всё быстро зажило"
+      ],
+      "target": [
+        "Aniden zaman yolculuğu tekrar başladı ve bir enerji dalgası, makineden çıkarmayı başardığınız kolunuzu yaktı. Neyse ki merhem onu ​​hızla iyileştirdi"
+      ],
+      "proposed": [
+        "Aniden zaman yolculuğu tekrar başladı ve bir enerji dalgası, makineden çıkarmayı başardığınız kolunuzu yaktı. Neyse ki merhem onu hızla iyileştirdi"
+      ],
+      "fixes": [
+        "zero-width-space"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 13524,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_721_ANSWER_1274",
+      "source": [
+        "Меня два раза просить не нужно"
+      ],
+      "target": [
+        "Sorunun cevabı belli değil mi?"
+      ],
+      "proposed": [
+        "Sorunun cevabı belli değil mi"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 13607,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_739_ANSWER_1307",
+      "source": [
+        "Эй ты, руки прочь"
+      ],
+      "target": [
+        "Hey, ellerini çek!"
+      ],
+      "proposed": [
+        "Hey, ellerini çek"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 13895,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_811_ANSWER_1428",
+      "source": [
+        "Можно ли выпустить плесень"
+      ],
+      "target": [
+        "Küfdoğan'ı serbest mi bırakmalıyız?"
+      ],
+      "proposed": [
+        "Küfdoğan'ı serbest mi bırakmalıyız"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 13932,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_820_ANSWER_1448",
+      "source": [
+        "Слушаться"
+      ],
+      "target": [
+        "Koş!"
+      ],
+      "proposed": [
+        "Koş"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 14216,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_887_ANSWER_1600",
+      "source": [
+        "Есть"
+      ],
+      "target": [
+        "Emredersiniz!"
+      ],
+      "proposed": [
+        "Emredersiniz"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 14256,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "EVENT_95_RESULT_180",
+      "source": [
+        "Вы отстаиваете всю очередь и заходите в числе последних. Когда наконец приходит ваша очередь - вся еда уже холодная"
+      ],
+      "target": [
+        "Sırada bekliyorsun ve yemeğini alan son kişilerden biri oluyorsun. Sonunda sıra sana geldiğinde, tüm yiyecekler soğumuş oluyor."
+      ],
+      "proposed": [
+        "Sırada bekliyorsun ve yemeğini alan son kişilerden biri oluyorsun. Sonunda sıra sana geldiğinde, tüm yiyecekler soğumuş oluyor"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 14500,
+      "component": "CoL4/data",
+      "language": "tr",
+      "context": "TITLE_7_DESCRIPTION",
+      "source": [
+        "Вам знакомы такие ритуалы призыва о которых взрослые даже не слышали"
+      ],
+      "target": [
+        "Yetişkinlerin bile hiç duymadığı ritüelleri biliyor musunuz?"
+      ],
+      "proposed": [
+        "Yetişkinlerin bile hiç duymadığı ritüelleri biliyor musunuz"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 14546,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_106",
+      "source": [
+        "Попасть к директору накануне праздника ЧЗХ... Спасибо тебе за подарочек! Опозорил свой класс и меня"
+      ],
+      "target": [
+        "Aller voir le directeur à la veille de la fête du PTN... Merci pour ce cadeau! J'ai déshonoré ma classe et moi-même"
+      ],
+      "proposed": [
+        "Aller voir le directeur à la veille de la fête du PTN... Merci pour ce cadeau ! J'ai déshonoré ma classe et moi-même"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 15109,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_235",
+      "source": [
+        "А что? Извини, я не настроена на разговор"
+      ],
+      "target": [
+        "Quoi? Désolé, je ne suis pas d'humeur à parler."
+      ],
+      "proposed": [
+        "Quoi ? Désolé, je ne suis pas d'humeur à parler"
+      ],
+      "fixes": [
+        "removed-final-stop",
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 15255,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_266",
+      "source": [
+        "Да как ты смеешь?! Я ветеран труда! Мне тяжело! У меня спина больная!"
+      ],
+      "target": [
+        "Comment osez-vous?! Je suis un vétéran du travail! C'est lourd! Mon dos me fait mal!"
+      ],
+      "proposed": [
+        "Comment osez-vous ?! Je suis un vétéran du travail ! C'est lourd ! Mon dos me fait mal !"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 15411,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_300_ANSWER_540",
+      "source": [
+        "А что?"
+      ],
+      "target": [
+        "Quoi donc?"
+      ],
+      "proposed": [
+        "Quoi donc ?"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 15459,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_311_ANSWER_565",
+      "source": [
+        "А если я откажусь?"
+      ],
+      "target": [
+        "Et si je refuse?"
+      ],
+      "proposed": [
+        "Et si je refuse ?"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 15585,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_345_RESULT_1617",
+      "source": [
+        "Игор одобрительно кивнул. Вскоре вы выходите к большому костру, в свете которого видны квадратные колонны Гигахруща. Около колонн расселены люди. Каждый занят делом: кто-то шьёт, кто-то готовит, кто-то поддерживает костёр"
+      ],
+      "target": [
+        "Igor a fait un signe de tête approbateur. Bientôt, vous arrivez à un grand feu de camp, à la lumière duquel on distingue les colonnes carrées du Giga-détritus. Autour des colonnes, des gens sont répartis. Chacun est occupé: quelqu'un coud, quelqu'un prépare à manger, quelqu'un entretient le feu de camp"
+      ],
+      "proposed": [
+        "Igor a fait un signe de tête approbateur. Bientôt, vous arrivez à un grand feu de camp, à la lumière duquel on distingue les colonnes carrées du Giga-détritus. Autour des colonnes, des gens sont répartis. Chacun est occupé : quelqu'un coud, quelqu'un prépare à manger, quelqu'un entretient le feu de camp"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 15659,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_361_ANSWER_637",
+      "source": [
+        "А давайте"
+      ],
+      "target": [
+        "Et si on essayait ?"
+      ],
+      "proposed": [
+        "Et si on essayait"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 15776,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_384_ANSWER_682",
+      "source": [
+        "Ура!"
+      ],
+      "target": [
+        "Hourra!"
+      ],
+      "proposed": [
+        "Hourra !"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 15828,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_396_ANSWER_705",
+      "source": [
+        "Я знаю, где находится Община Чистых!"
+      ],
+      "target": [
+        "Je sais où se trouve la Commune des Purs!"
+      ],
+      "proposed": [
+        "Je sais où se trouve la Commune des Purs !"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 15887,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_409",
+      "source": [
+        "Помилуй нас Чистейший! А что же делать?!"
+      ],
+      "target": [
+        "Pardonnez-nous, Puré! Mais que faire ?!"
+      ],
+      "proposed": [
+        "Pardonnez-nous, Puré ! Mais que faire ? !"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 15959,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_423_RESULT_1592",
+      "source": [
+        "Да етить твою мать! Возьми уже эту аптечку и слушай дальше!"
+      ],
+      "target": [
+        "Bon sang! Prends cette trousse de premiers secours et continue d'écouter!"
+      ],
+      "proposed": [
+        "Bon sang ! Prends cette trousse de premiers secours et continue d'écouter !"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 15971,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_425_ANSWER_752",
+      "source": [
+        "Какая Партия, Макс? Я соскучился"
+      ],
+      "target": [
+        "Quel Parti, Max ? Tu m’as manqué !"
+      ],
+      "proposed": [
+        "Quel Parti, Max ? Tu m’as manqué"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 16146,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_457_RESULT_862",
+      "source": [
+        "Всё стихло, они оторвались...?"
+      ],
+      "target": [
+        "Tout s'est calmé, ils se sont détachés...?"
+      ],
+      "proposed": [
+        "Tout s'est calmé, ils se sont détachés... ?"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 16348,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_496_ANSWER_886",
+      "source": [
+        "Зачем мы её ищем..."
+      ],
+      "target": [
+        "Pourquoi la cherchons-nous ?"
+      ],
+      "proposed": [
+        "Pourquoi la cherchons-nous"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 16365,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_500",
+      "source": [
+        "Тогда Благословляю вас. Идите и несите нашу веру слепому народу Гигахруща!"
+      ],
+      "target": [
+        "Alors, je vous bénis. Allez porter notre foi au peuple aveugle de Gigahrush!"
+      ],
+      "proposed": [
+        "Alors, je vous bénis. Allez porter notre foi au peuple aveugle de Gigahrush !"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 16385,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_504",
+      "source": [
+        "Ну же, подойди ближе, давай"
+      ],
+      "target": [
+        "Allez, approche, viens !"
+      ],
+      "proposed": [
+        "Allez, approche, viens"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 16833,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_6",
+      "source": [
+        "Глаза, рот и уши обволакивает сырой, холодной субстанцией: плесень доходит до головы, а после охватывает и всё тело"
+      ],
+      "target": [
+        "Les yeux, la bouche et les oreilles sont enveloppés d'une substance humide et froide: la Moisissure atteint la tête, puis elle enveloppe tout le corps."
+      ],
+      "proposed": [
+        "Les yeux, la bouche et les oreilles sont enveloppés d'une substance humide et froide : la Moisissure atteint la tête, puis elle enveloppe tout le corps"
+      ],
+      "fixes": [
+        "removed-final-stop",
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 17097,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_649_RESULT_1217",
+      "source": [
+        "Что ж, как знаешь!"
+      ],
+      "target": [
+        "Eh bien, comme tu veux!"
+      ],
+      "proposed": [
+        "Eh bien, comme tu veux !"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 17203,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_671",
+      "source": [
+        "Хочу это! А ещё... Вот это"
+      ],
+      "target": [
+        "Je veux ça ! Et ça aussi… Ça !"
+      ],
+      "proposed": [
+        "Je veux ça ! Et ça aussi… Ça"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 17277,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_685",
+      "source": [
+        "Ты, Послушник, ты должен был стать проводником истины, а не пристраститься к невежеству! Ты будешь уничтожен за то, что посмел нарушить священный Обряд чистоты"
+      ],
+      "target": [
+        "Toi, Novice, tu aurais dû devenir un guide de la vérité, et non pas t'adonner à l'ignorance ! Tu seras détruit pour avoir osé violer le Sacré Rituel de pureté !"
+      ],
+      "proposed": [
+        "Toi, Novice, tu aurais dû devenir un guide de la vérité, et non pas t'adonner à l'ignorance ! Tu seras détruit pour avoir osé violer le Sacré Rituel de pureté"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 17369,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_704_ANSWER_1244",
+      "source": [
+        "О чём это он..."
+      ],
+      "target": [
+        "De quoi parle-t-il ?"
+      ],
+      "proposed": [
+        "De quoi parle-t-il"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 17443,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_717_RESULT_1344",
+      "source": [
+        "Конечно в мою, я уверена что в твоей ячейке холостяцкий бардак!"
+      ],
+      "target": [
+        "Bien sûr que c'est moi, je suis sûre que votre cellule est un véritable capharnaüm de célibataire!"
+      ],
+      "proposed": [
+        "Bien sûr que c'est moi, je suis sûre que votre cellule est un véritable capharnaüm de célibataire !"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 17542,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_738",
+      "source": [
+        "Нет? Что ж, ладно. Настраивайте оборудование, Юля пиши алгоритм. А я найду другой источник энергии"
+      ],
+      "target": [
+        "Non? Eh bien, d'accord. Configurez l'équipement, Yulia écrit l'algorithme. Et je trouverai une autre source d'énergie."
+      ],
+      "proposed": [
+        "Non ? Eh bien, d'accord. Configurez l'équipement, Yulia écrit l'algorithme. Et je trouverai une autre source d'énergie"
+      ],
+      "fixes": [
+        "removed-final-stop",
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 17685,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_775",
+      "source": [
+        "Побереги силы и задавай меньше вопросов! Мы уже близко, я помню эту местность 2017 квадрата – один из самых спокойных элементов Гигахруща. Был, по крайней мере, за пару циклов всё изменилось до неузнаваемости"
+      ],
+      "target": [
+        "Épargne tes forces et pose moins de questions! Nous sommes presque arrivés, je me souviens de cette zone du quadrant 2017 - l'un des éléments les plus calmes de la Gigastructure. Du moins, il l'était, car en quelques cycles, tout est devenu méconnaissable."
+      ],
+      "proposed": [
+        "Épargne tes forces et pose moins de questions ! Nous sommes presque arrivés, je me souviens de cette zone du quadrant 2017 - l'un des éléments les plus calmes de la Gigastructure. Du moins, il l'était, car en quelques cycles, tout est devenu méconnaissable"
+      ],
+      "fixes": [
+        "removed-final-stop",
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 18009,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_853_ANSWER_1515",
+      "source": [
+        "Играем"
+      ],
+      "target": [
+        "Jouons !"
+      ],
+      "proposed": [
+        "Jouons"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 18148,
+      "component": "CoL4/data",
+      "language": "fr",
+      "context": "EVENT_885",
+      "source": [
+        "Здравствуй! Давно я тебя не видел. А я ведь даже не поблагодарил тебя за своё спасение"
+      ],
+      "target": [
+        "Bonjour! Je ne t'ai pas vu depuis longtemps. Et je ne t'ai même pas remercié pour m'avoir sauvé"
+      ],
+      "proposed": [
+        "Bonjour ! Je ne t'ai pas vu depuis longtemps. Et je ne t'ai même pas remercié pour m'avoir sauvé"
+      ],
+      "fixes": [
+        "french-punctuation-spacing"
+      ],
+      "automatically_translated": true
+    },
+    {
+      "unit_id": 22580,
+      "component": "Heart Abyss/temple",
+      "language": "en",
+      "context": "intro_temple_1_3",
+      "source": [
+        "Да что ты говоришь!"
+      ],
+      "target": [
+        "Are you kidding me?"
+      ],
+      "proposed": [
+        "Are you kidding me"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 22664,
+      "component": "Heart Abyss/temple",
+      "language": "en",
+      "context": "templerun_1_11",
+      "source": [
+        "[shake]У меня от тебя мурашки по чешуе![/shake]"
+      ],
+      "target": [
+        "You give me goosebumps all over my scales!"
+      ],
+      "proposed": [
+        "You give me goosebumps all over my scales"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 22841,
+      "component": "Heart Abyss/temple",
+      "language": "en",
+      "context": "final_tengu_1_12",
+      "source": [
+        "Все что я могу,"
+      ],
+      "target": [
+        "All I can do is spend these last few minutes with my flock."
+      ],
+      "proposed": [
+        "All I can do is spend these last few minutes with my flock"
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 23175,
+      "component": "Heart Abyss/temple",
+      "language": "en",
+      "context": "altar_3_18",
+      "source": [
+        "Аки?.. Ты?.."
+      ],
+      "target": [
+        "Aki...? You...?"
+      ],
+      "proposed": [
+        "Aki...? You..."
+      ],
+      "fixes": [
+        "removed-final-stop"
+      ],
+      "automatically_translated": false
+    },
+    {
+      "unit_id": 23233,
+      "component": "Heart Abyss/temple",
+      "language": "en",
+      "context": "pistol_dream_2_11",
+      "source": [
+        "Семейка у меня, конечно…"
+      ],
+      "target": [
+        "Well, what a family I have..."
+      ],
+      "proposed": [
+        "Well, what a family I have…"
+      ],
+      "fixes": [
+        "end-ellipsis"
+      ],
+      "automatically_translated": false
+    }
+  ]
+}
