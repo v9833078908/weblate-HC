@@ -11,18 +11,27 @@
     "punctuation-spacing",
     "safe-html"
   ],
-  "source_run": "reapply_autofixes --all --dump-json (read-only, prod b1f5438, 2026-08-13)",
-  "total_units_to_change": 1451,
+  "source_run": "reapply_autofixes --all --dump-json equivalent, read-only against prod, tightened rule, 2026-08-13",
+  "total_units_to_change": 1421,
   "per_component": {
     "CoL4/LocalizeCommon": 4,
-    "CoL4/data": 1442,
-    "Heart Abyss/temple": 5
+    "CoL4/data": 1415,
+    "Heart Abyss/temple": 2
   },
   "per_fix": {
-    "removed-final-stop": 1429,
+    "removed-final-stop": 1399,
     "french-punctuation-spacing": 19,
     "zero-width-space": 7,
     "end-ellipsis": 1
+  },
+  "removed_marks": {
+    "!": 33,
+    ".": 1363,
+    "m": 2,
+    "e": 1,
+    "r": 1,
+    "u": 1,
+    "i": 1
   },
   "subset_rule": "every change except a plain full stop removed from an automatically translated string",
   "records": [
@@ -96,25 +105,6 @@
       ],
       "proposed": [
         "Téléchargement des données en cours.$Veuillez patienter.$Cela peut prendre plusieurs minutes, en fonction de votre connexion Internet"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 7000,
-      "component": "CoL4/data",
-      "language": "en_US",
-      "context": "EVENT_191",
-      "source": [
-        "Начинают бить барабаны. Включилась вентиляция. Вы готовы идти"
-      ],
-      "target": [
-        "The drums begin to beat. The ventilation turns on. Are you ready to go?"
-      ],
-      "proposed": [
-        "The drums begin to beat. The ventilation turns on. Are you ready to go"
       ],
       "fixes": [
         "removed-final-stop"
@@ -198,25 +188,6 @@
       "automatically_translated": false
     },
     {
-      "unit_id": 7674,
-      "component": "CoL4/data",
-      "language": "en_US",
-      "context": "EVENT_337",
-      "source": [
-        "Молодой житель Гигахруща, давай будем честны. Меня зовут Игор, я послушник Чистых. Тебе наверняка знакомо это название и я бы хотел, чтобы ты рассказал мне, какую чушь Партия вбила в твою голове на наш счёт"
-      ],
-      "target": [
-        "Young inhabitant of the Gigastructure, my name is Igor - I’m an apprentice of the Pure. I’m sure you’ve heard the name. Let’s be honest with each other, shall we? Tell me - what nonsense has the Party hammered into your head about us?"
-      ],
-      "proposed": [
-        "Young inhabitant of the Gigastructure, my name is Igor - I’m an apprentice of the Pure. I’m sure you’ve heard the name. Let’s be honest with each other, shall we? Tell me - what nonsense has the Party hammered into your head about us"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 7793,
       "component": "CoL4/data",
       "language": "en_US",
@@ -248,25 +219,6 @@
       ],
       "proposed": [
         "While you were changing, Max kept giving you strange looks. After putting on the suit, you felt an unprecedented strength and accidentally broke a box filled with tubes of green concentrate. Satisfied and full, you returned to class"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 7871,
-      "component": "CoL4/data",
-      "language": "en_US",
-      "context": "EVENT_38_ANSWER_541",
-      "source": [
-        "А что..."
-      ],
-      "target": [
-        "What's going on?"
-      ],
-      "proposed": [
-        "What's going on"
       ],
       "fixes": [
         "removed-final-stop"
@@ -312,50 +264,12 @@
       "automatically_translated": false
     },
     {
-      "unit_id": 8276,
-      "component": "CoL4/data",
-      "language": "en_US",
-      "context": "EVENT_459_RESULT_867",
-      "source": [
-        "На вашем жетоне выдавлены как раз эти цифры. Откуда он знает!"
-      ],
-      "target": [
-        "Those numbers are stamped on your badge. How does he know?"
-      ],
-      "proposed": [
-        "Those numbers are stamped on your badge. How does he know"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 8418,
       "component": "CoL4/data",
       "language": "en_US",
       "context": "EVENT_486_ANSWER_871",
       "source": [
         "Есть"
-      ],
-      "target": [
-        "Yes sir!"
-      ],
-      "proposed": [
-        "Yes sir"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 8424,
-      "component": "CoL4/data",
-      "language": "en_US",
-      "context": "EVENT_487_ANSWER_874",
-      "source": [
-        "Есть?"
       ],
       "target": [
         "Yes sir!"
@@ -445,25 +359,6 @@
       "automatically_translated": false
     },
     {
-      "unit_id": 9344,
-      "component": "CoL4/data",
-      "language": "en_US",
-      "context": "EVENT_675_ANSWER_1529",
-      "source": [
-        "Что-то не так? Тебе не понравилось свидание"
-      ],
-      "target": [
-        "Is something wrong? Did you not enjoy the date?"
-      ],
-      "proposed": [
-        "Is something wrong? Did you not enjoy the date"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 9391,
       "component": "CoL4/data",
       "language": "en_US",
@@ -540,25 +435,6 @@
       "automatically_translated": false
     },
     {
-      "unit_id": 9487,
-      "component": "CoL4/data",
-      "language": "en_US",
-      "context": "EVENT_704_ANSWER_1244",
-      "source": [
-        "О чём это он..."
-      ],
-      "target": [
-        "What's he talking about?"
-      ],
-      "proposed": [
-        "What's he talking about"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 9515,
       "component": "CoL4/data",
       "language": "en_US",
@@ -617,25 +493,6 @@
       "automatically_translated": false
     },
     {
-      "unit_id": 9954,
-      "component": "CoL4/data",
-      "language": "en_US",
-      "context": "EVENT_811_ANSWER_1428",
-      "source": [
-        "Можно ли выпустить плесень"
-      ],
-      "target": [
-        "Should we release the Sporechild?"
-      ],
-      "proposed": [
-        "Should we release the Sporechild"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 9991,
       "component": "CoL4/data",
       "language": "en_US",
@@ -667,44 +524,6 @@
       ],
       "proposed": [
         "Yes sir"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 10559,
-      "component": "CoL4/data",
-      "language": "en_US",
-      "context": "TITLE_7_DESCRIPTION",
-      "source": [
-        "Вам знакомы такие ритуалы призыва о которых взрослые даже не слышали"
-      ],
-      "target": [
-        "Are you familiar with rituals that adults have never even heard of?"
-      ],
-      "proposed": [
-        "Are you familiar with rituals that adults have never even heard of"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 10941,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_191",
-      "source": [
-        "Начинают бить барабаны. Включилась вентиляция. Вы готовы идти"
-      ],
-      "target": [
-        "Davullar çalmaya başlıyor. Havalandırma açılıyor. Hazır mısın?"
-      ],
-      "proposed": [
-        "Davullar çalmaya başlıyor. Havalandırma açılıyor. Hazır mısın"
       ],
       "fixes": [
         "removed-final-stop"
@@ -769,25 +588,6 @@
       "automatically_translated": false
     },
     {
-      "unit_id": 11615,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_337",
-      "source": [
-        "Молодой житель Гигахруща, давай будем честны. Меня зовут Игор, я послушник Чистых. Тебе наверняка знакомо это название и я бы хотел, чтобы ты рассказал мне, какую чушь Партия вбила в твою голове на наш счёт"
-      ],
-      "target": [
-        "Gigastructure’nın genç sakini, benim adım Igor, Ben Safkanların çırağıyım. Eminim adımızı duymuşsundur. Hadi birbirimize dürüst olalım, ne dersin? Söyle bana, Parti’nin kafana bizimle ilgili ne saçmalıklar kazıdı?"
-      ],
-      "proposed": [
-        "Gigastructure’nın genç sakini, benim adım Igor, Ben Safkanların çırağıyım. Eminim adımızı duymuşsundur. Hadi birbirimize dürüst olalım, ne dersin? Söyle bana, Parti’nin kafana bizimle ilgili ne saçmalıklar kazıdı"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 11659,
       "component": "CoL4/data",
       "language": "tr",
@@ -800,44 +600,6 @@
       ],
       "proposed": [
         "Ah kızlar, bakın, işte oynayacak biri buldunuz! Otur bakalım canım, yaşlı bir kadının iğneden iplik geçirmesine yardım et, olur mu? Bu, Beton Tanrı'nın bir tür cezası"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 11756,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_368",
-      "source": [
-        "Так, где там этот Сидоров? Проверим как ты убираешь слизь"
-      ],
-      "target": [
-        "Peki, Sidorov nerede? Bakalım balçığı nasıl temizleyecek?"
-      ],
-      "proposed": [
-        "Peki, Sidorov nerede? Bakalım balçığı nasıl temizleyecek"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 11812,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_38_ANSWER_541",
-      "source": [
-        "А что..."
-      ],
-      "target": [
-        "Neler oluyor?"
-      ],
-      "proposed": [
-        "Neler oluyor"
       ],
       "fixes": [
         "removed-final-stop"
@@ -883,44 +645,6 @@
       "automatically_translated": false
     },
     {
-      "unit_id": 11922,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_402_ANSWER_715",
-      "source": [
-        "Радуйтесь, фанатики! Партия дала вам Огонь! Вы же его хотели..."
-      ],
-      "target": [
-        "Sevinin bağnazlar! Siz istediniz, Parti size Ateş'i verdi!"
-      ],
-      "proposed": [
-        "Sevinin bağnazlar! Siz istediniz, Parti size Ateş'i verdi"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 11927,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_403_RESULT_761",
-      "source": [
-        "У вас наворачиваются слёзы. Вы ненавидите то ли ликвидаторов то ли себя"
-      ],
-      "target": [
-        "Gözlerin doluyor. Kimden daha çok nefret edeceğini bilmiyorsun, likidatörlerden mi yoksa kendinden mi?"
-      ],
-      "proposed": [
-        "Gözlerin doluyor. Kimden daha çok nefret edeceğini bilmiyorsun, likidatörlerden mi yoksa kendinden mi"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 11933,
       "component": "CoL4/data",
       "language": "tr",
@@ -940,50 +664,12 @@
       "automatically_translated": false
     },
     {
-      "unit_id": 12217,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_459_RESULT_867",
-      "source": [
-        "На вашем жетоне выдавлены как раз эти цифры. Откуда он знает!"
-      ],
-      "target": [
-        "Bu sicil numaran rozetine basılmış. O bunu nereden biliyordu?"
-      ],
-      "proposed": [
-        "Bu sicil numaran rozetine basılmış. O bunu nereden biliyordu"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 12359,
       "component": "CoL4/data",
       "language": "tr",
       "context": "EVENT_486_ANSWER_871",
       "source": [
         "Есть"
-      ],
-      "target": [
-        "Emredersiniz efendim!"
-      ],
-      "proposed": [
-        "Emredersiniz efendim"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 12365,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_487_ANSWER_874",
-      "source": [
-        "Есть?"
       ],
       "target": [
         "Emredersiniz efendim!"
@@ -1054,25 +740,6 @@
       "automatically_translated": false
     },
     {
-      "unit_id": 12795,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_578_RESULT_1112",
-      "source": [
-        "Конечно, какой хитрый. Сейчас в каждом отделе нужны генераторы. Ладно, можешь взять один в щитовой, но сперва надо запитать автоматическую дверь. Помоги мне с этим"
-      ],
-      "target": [
-        "Elbette, ne kadar aptalım. Şu anda her departmanın jeneratöre ihtiyacı var. Tamam, kontrol odasından bir tane alabilirsin ama önce otomatik kapıyı çalıştırmam gerek. Bana bu konuda yardımcı olur musun?"
-      ],
-      "proposed": [
-        "Elbette, ne kadar aptalım. Şu anda her departmanın jeneratöre ihtiyacı var. Tamam, kontrol odasından bir tane alabilirsin ama önce otomatik kapıyı çalıştırmam gerek. Bana bu konuda yardımcı olur musun"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 12892,
       "component": "CoL4/data",
       "language": "tr",
@@ -1130,44 +797,6 @@
       "automatically_translated": false
     },
     {
-      "unit_id": 13152,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_649",
-      "source": [
-        "А ты не промах! Мне обещают повышения до начальника лаборатории. Ты явно заслужил награду, можешь пригласить меня на ужин"
-      ],
-      "target": [
-        "Hiç fena değilsin! Bana laboratuvar şefliği için terfi sözü verdiler. Kesinlikle bir ödülü hak ediyorsun, beni akşam yemeğine davet etmeye ne dersin?"
-      ],
-      "proposed": [
-        "Hiç fena değilsin! Bana laboratuvar şefliği için terfi sözü verdiler. Kesinlikle bir ödülü hak ediyorsun, beni akşam yemeğine davet etmeye ne dersin"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 13285,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_675_ANSWER_1529",
-      "source": [
-        "Что-то не так? Тебе не понравилось свидание"
-      ],
-      "target": [
-        "Bir sorun mu var? Birlikteliğimizden keyif almadın mı?"
-      ],
-      "proposed": [
-        "Bir sorun mu var? Birlikteliğimizden keyif almadın mı"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 13336,
       "component": "CoL4/data",
       "language": "tr",
@@ -1206,25 +835,6 @@
       "automatically_translated": false
     },
     {
-      "unit_id": 13428,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_704_ANSWER_1244",
-      "source": [
-        "О чём это он..."
-      ],
-      "target": [
-        "Ne diyor bu?"
-      ],
-      "proposed": [
-        "Ne diyor bu"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 13456,
       "component": "CoL4/data",
       "language": "tr",
@@ -1244,25 +854,6 @@
       "automatically_translated": false
     },
     {
-      "unit_id": 13524,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_721_ANSWER_1274",
-      "source": [
-        "Меня два раза просить не нужно"
-      ],
-      "target": [
-        "Sorunun cevabı belli değil mi?"
-      ],
-      "proposed": [
-        "Sorunun cevabı belli değil mi"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 13607,
       "component": "CoL4/data",
       "language": "tr",
@@ -1275,25 +866,6 @@
       ],
       "proposed": [
         "Hey, ellerini çek"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 13895,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "EVENT_811_ANSWER_1428",
-      "source": [
-        "Можно ли выпустить плесень"
-      ],
-      "target": [
-        "Küfdoğan'ı serbest mi bırakmalıyız?"
-      ],
-      "proposed": [
-        "Küfdoğan'ı serbest mi bırakmalıyız"
       ],
       "fixes": [
         "removed-final-stop"
@@ -1351,25 +923,6 @@
       ],
       "proposed": [
         "Sırada bekliyorsun ve yemeğini alan son kişilerden biri oluyorsun. Sonunda sıra sana geldiğinde, tüm yiyecekler soğumuş oluyor"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 14500,
-      "component": "CoL4/data",
-      "language": "tr",
-      "context": "TITLE_7_DESCRIPTION",
-      "source": [
-        "Вам знакомы такие ритуалы призыва о которых взрослые даже не слышали"
-      ],
-      "target": [
-        "Yetişkinlerin bile hiç duymadığı ritüelleri biliyor musunuz?"
-      ],
-      "proposed": [
-        "Yetişkinlerin bile hiç duymadığı ritüelleri biliyor musunuz"
       ],
       "fixes": [
         "removed-final-stop"
@@ -1492,25 +1045,6 @@
       "automatically_translated": true
     },
     {
-      "unit_id": 15659,
-      "component": "CoL4/data",
-      "language": "fr",
-      "context": "EVENT_361_ANSWER_637",
-      "source": [
-        "А давайте"
-      ],
-      "target": [
-        "Et si on essayait ?"
-      ],
-      "proposed": [
-        "Et si on essayait"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": true
-    },
-    {
       "unit_id": 15776,
       "component": "CoL4/data",
       "language": "fr",
@@ -1621,25 +1155,6 @@
       ],
       "fixes": [
         "french-punctuation-spacing"
-      ],
-      "automatically_translated": true
-    },
-    {
-      "unit_id": 16348,
-      "component": "CoL4/data",
-      "language": "fr",
-      "context": "EVENT_496_ANSWER_886",
-      "source": [
-        "Зачем мы её ищем..."
-      ],
-      "target": [
-        "Pourquoi la cherchons-nous ?"
-      ],
-      "proposed": [
-        "Pourquoi la cherchons-nous"
-      ],
-      "fixes": [
-        "removed-final-stop"
       ],
       "automatically_translated": true
     },
@@ -1759,25 +1274,6 @@
       "automatically_translated": true
     },
     {
-      "unit_id": 17369,
-      "component": "CoL4/data",
-      "language": "fr",
-      "context": "EVENT_704_ANSWER_1244",
-      "source": [
-        "О чём это он..."
-      ],
-      "target": [
-        "De quoi parle-t-il ?"
-      ],
-      "proposed": [
-        "De quoi parle-t-il"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": true
-    },
-    {
       "unit_id": 17443,
       "component": "CoL4/data",
       "language": "fr",
@@ -1875,44 +1371,6 @@
       "automatically_translated": true
     },
     {
-      "unit_id": 22580,
-      "component": "Heart Abyss/temple",
-      "language": "en",
-      "context": "intro_temple_1_3",
-      "source": [
-        "Да что ты говоришь!"
-      ],
-      "target": [
-        "Are you kidding me?"
-      ],
-      "proposed": [
-        "Are you kidding me"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 22664,
-      "component": "Heart Abyss/temple",
-      "language": "en",
-      "context": "templerun_1_11",
-      "source": [
-        "[shake]У меня от тебя мурашки по чешуе![/shake]"
-      ],
-      "target": [
-        "You give me goosebumps all over my scales!"
-      ],
-      "proposed": [
-        "You give me goosebumps all over my scales"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
       "unit_id": 22841,
       "component": "Heart Abyss/temple",
       "language": "en",
@@ -1925,25 +1383,6 @@
       ],
       "proposed": [
         "All I can do is spend these last few minutes with my flock"
-      ],
-      "fixes": [
-        "removed-final-stop"
-      ],
-      "automatically_translated": false
-    },
-    {
-      "unit_id": 23175,
-      "component": "Heart Abyss/temple",
-      "language": "en",
-      "context": "altar_3_18",
-      "source": [
-        "Аки?.. Ты?.."
-      ],
-      "target": [
-        "Aki...? You...?"
-      ],
-      "proposed": [
-        "Aki...? You..."
       ],
       "fixes": [
         "removed-final-stop"

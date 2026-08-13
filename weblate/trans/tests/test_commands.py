@@ -864,8 +864,11 @@ class ReapplyAutofixesTest(ViewTestCase):
     def setUp(self) -> None:
         super().setUp()
         self.unit = self.get_unit(self.SOURCE)
+        # A stray zero-width space is the fixture defect: it is repaired in
+        # every language and does not depend on the terminal rule, which needs
+        # a source without terminal punctuation the fixture cannot offer.
         Unit.objects.filter(pk=self.unit.pk).update(
-            target="Merci\u202f!", state=STATE_TRANSLATED
+            target="Merci\u200b", state=STATE_TRANSLATED
         )
 
     def run_command(self, *args: str) -> str:
@@ -887,11 +890,11 @@ class ReapplyAutofixesTest(ViewTestCase):
         pending = PendingUnitChange.objects.count()
         result = self.run_command()
         self.assertIn("1 unit to change", result)
-        self.assertIn("removed-final-stop", result)
+        self.assertIn("zero-width-space", result)
         self.assertIn("Merci", result)
         self.assertIn("--apply", result)
         self.unit.refresh_from_db()
-        self.assertEqual(self.unit.target, "Merci\u202f!")
+        self.assertEqual(self.unit.target, "Merci\u200b")
         self.assertEqual(Change.objects.count(), changes)
         self.assertEqual(PendingUnitChange.objects.count(), pending)
 
@@ -948,9 +951,9 @@ class ReapplyAutofixesTest(ViewTestCase):
                 "language": "cs",
                 "context": self.unit.context,
                 "source": [self.SOURCE],
-                "target": ["Merci\u202f!"],
+                "target": ["Merci\u200b"],
                 "proposed": ["Merci"],
-                "fixes": ["removed-final-stop"],
+                "fixes": ["zero-width-space"],
             },
         )
         self.assertIn(str(path), result)
@@ -979,12 +982,12 @@ class ReapplyAutofixesTest(ViewTestCase):
         Unit.objects.filter(pk=self.unit.pk).update(state=STATE_READONLY)
         self.run_command("--apply")
         self.unit.refresh_from_db()
-        self.assertEqual(self.unit.target, "Merci\u202f!")
+        self.assertEqual(self.unit.target, "Merci\u200b")
 
     def test_source_translation_is_skipped(self) -> None:
         source_unit = self.component.source_translation.unit_set.get(source=self.SOURCE)
         Unit.objects.filter(pk=source_unit.pk).update(
-            target="Merci\u202f!", state=STATE_TRANSLATED
+            target="Merci\u200b", state=STATE_TRANSLATED
         )
         changes = source_unit.change_set.count()
         pending = PendingUnitChange.objects.filter(unit=source_unit).count()
@@ -995,7 +998,7 @@ class ReapplyAutofixesTest(ViewTestCase):
         self.run_command("--apply")
         source_unit.refresh_from_db()
         self.assertEqual(source_unit.source, self.SOURCE)
-        self.assertEqual(source_unit.target, "Merci\u202f!")
+        self.assertEqual(source_unit.target, "Merci\u200b")
         self.assertEqual(source_unit.change_set.count(), changes)
         self.assertEqual(
             PendingUnitChange.objects.filter(unit=source_unit).count(), pending
@@ -1011,7 +1014,7 @@ class ReapplyAutofixesTest(ViewTestCase):
         index = 0
         for translation in self.component.translation_set.all():
             for unit in translation.unit_set.all():
-                Unit.objects.filter(pk=unit.pk).update(target=f"Merci {index}\u202f!")
+                Unit.objects.filter(pk=unit.pk).update(target=f"Merci {index}\u200b")
                 index += 1
         result = self.run_command()
         self.assertIn("more", result)
@@ -1063,7 +1066,7 @@ class ReapplyAutofixesTest(ViewTestCase):
 
         with patch.object(Unit, "translate", autospec=True, side_effect=spy):
             self.run_command("--apply")
-        self.assertEqual(captured, [["Merci\u202f!"]])
+        self.assertEqual(captured, [["Merci\u200b"]])
         self.unit.refresh_from_db()
         self.assertEqual(self.unit.target, "Merci")
 
@@ -1083,12 +1086,12 @@ class ReapplyAutofixesTest(ViewTestCase):
         other = second.translation_set.get(language_code="cs").unit_set.get(
             source=self.SOURCE
         )
-        Unit.objects.filter(pk=other.pk).update(target="Merci\u202f!")
+        Unit.objects.filter(pk=other.pk).update(target="Merci\u200b")
         self.component.allow_translation_propagation = True
         self.component.save()
         self.run_command("--apply")
         other.refresh_from_db()
-        self.assertEqual(other.target, "Merci\u202f!")
+        self.assertEqual(other.target, "Merci\u200b")
 
     def test_apply_commits_all_translations_once(self) -> None:
         linked = self.create_link_existing(
@@ -1098,7 +1101,7 @@ class ReapplyAutofixesTest(ViewTestCase):
             source=self.SOURCE
         )
         Unit.objects.filter(pk=other.pk).update(
-            target="Merci\u202f!", state=STATE_TRANSLATED
+            target="Merci\u200b", state=STATE_TRANSLATED
         )
         revision = self.component.repository.last_revision
         output = StringIO()

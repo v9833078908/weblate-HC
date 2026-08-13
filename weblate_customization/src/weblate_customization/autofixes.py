@@ -36,15 +36,18 @@ HUGGING_SEPARATOR = re.compile(rf"{SEPARATOR_SPACE}*\${SEPARATOR_SPACE}*")
 SPACING_CHARACTERS = re.compile(r"[ \u00a0\u202f\u2009]")
 TRAILING_SPACING = re.compile(r"[ \u00a0\u202f\u2009]+$")
 
-# ASCII only. Colons are intentionally excluded: the production measurement
-# found direct-speech markers that look indistinguishable from added punctuation.
-TERMINAL_MARKS = ".!?"
-# Closing quotes stripped from the SOURCE before comparing, so a source mark
-# hiding behind one is still seen (prod unit 180448, `с криком "Еретик!"`).
-# The target is never unwrapped - see the class docstring for the measurement
-# that rejected it.
+# ASCII only, and no `?` or `:`. Both were measured on prod and rejected: a
+# question mark is grammatical load the Russian source drops by corpus
+# convention (26 units on 2026-08-13, `Можно ли выпустить плесень` ->
+# `Peut-on libérer la moisissure ?`), and a colon marks direct speech
+# (7 Turkish units). Removing either breaks a correct translation.
+TERMINAL_MARKS = ".!"
+# Stripped from the SOURCE before comparing, so a source mark hiding behind a
+# closing quote (prod unit 180448, `с криком "Еретик!"`) or a rich-text tag
+# (`[shake]...![/shake]`) is still seen. The target is never unwrapped - see
+# the class docstring for the measurement that rejected it.
 CLOSING_QUOTES = '»"”'
-TRAILING_QUOTES = re.compile(rf"[{re.escape(CLOSING_QUOTES)}]+$")
+SOURCE_TAIL = re.compile(rf"(\[[^\[\]]*\]|<[^<>]*>|[{re.escape(CLOSING_QUOTES)}])+$")
 # One instance each: checks are stateless, and the registry keeps singletons too.
 TERMINAL_CHECKS: tuple[TargetCheck, ...] = (
     EndStopCheck(),
@@ -127,11 +130,13 @@ class RemoveAddedFinalStop(AutoFix):
         if not stripped:
             # The mark is the whole translation; blanking it is not a repair.
             return target, False
-        source_body = TRAILING_QUOTES.sub("", source)
-        before = self._failing(source_body, target, unit)
-        if not before:
+        source_body = SOURCE_TAIL.sub("", source)
+        if not self._failing(source_body, target, unit):
             return target, False
-        if not self._failing(source_body, stripped, unit) < before:
+        if self._failing(source_body, stripped, unit):
+            # Removal has to settle every terminal check, not merely trade one
+            # mismatch for another: a source ending in a different mark keeps
+            # failing afterwards, and deleting only loses information.
             return target, False
         return stripped, True
 

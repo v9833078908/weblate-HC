@@ -79,14 +79,14 @@ class RemoveAddedFinalStopTest(SimpleTestCase):
             (["Les pionniers rient."], False),
         )
 
-    def test_removes_a_stop_the_source_does_not_end_with(self) -> None:
-        # The source ends with an exclamation mark, so the full stop is still
-        # one the source does not have and goes. Restoring the exclamation is
-        # not something a fix can invent, so it stays a check.
+    def test_keeps_a_stop_when_the_source_ends_with_another_mark(self) -> None:
+        # The source ends with an exclamation mark. Dropping the full stop
+        # cannot restore it, so the string keeps failing a terminal check and
+        # only loses information: the mismatch stays a check, not a repair.
         unit = make_unit(source="Les pionniers rient !", code="fr")
         self.assertEqual(
             self.fix.fix_target(["Les pionniers rient."], unit),
-            (["Les pionniers rient"], True),
+            (["Les pionniers rient."], False),
         )
 
     def test_repeated_dots_are_left_alone(self) -> None:
@@ -133,11 +133,30 @@ class RemoveAddedFinalStopTest(SimpleTestCase):
         target = "Le vieil homme fait une pause et reprend\u00a0:"
         self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
 
-    def test_removes_added_question_with_plain_space(self) -> None:
+    def test_keeps_a_question_the_source_omits(self) -> None:
+        # Prod dump 2026-08-13: 26 units of this exact shape. The Russian
+        # source omits the terminal mark by corpus convention, but the target
+        # sentence IS a question, and dropping the mark breaks it.
         unit = make_unit(source="Можно ли выпустить плесень", code="fr")
+        target = "Peut-on libérer la moisissure ?"
+        self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
+
+    def test_keeps_a_mark_the_source_wraps_in_markup(self) -> None:
+        # Prod unit in Heart Abyss/temple: the source does carry the mark, but
+        # a Unity rich-text tag hides it from a plain end-of-string comparison.
+        unit = make_unit(
+            source="[shake]У меня от тебя мурашки по чешуе![/shake]", code="en"
+        )
+        target = "You give me goosebumps all over my scales!"
+        self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
+
+    def test_keeps_a_mark_when_the_source_ends_with_another_one(self) -> None:
+        # Source "Есть?" with target "Yes sir!": removing the exclamation does
+        # not restore the question mark, so the string still fails a terminal
+        # check afterwards. That is a mismatch to report, not one to repair.
+        unit = make_unit(source="Так это правда?", code="en")
         self.assertEqual(
-            self.fix.fix_target(["Peut-on libérer la moisissure ?"], unit),
-            (["Peut-on libérer la moisissure"], True),
+            self.fix.fix_target(["That is true!"], unit), (["That is true!"], False)
         )
 
     def test_keeps_a_terminal_inside_a_closing_quote(self) -> None:
