@@ -1033,11 +1033,35 @@ class ReapplyAutofixesTest(ViewTestCase):
         other.refresh_from_db()
         self.assertEqual(other.target, "Merci\u202f!")
 
-    def test_apply_commits_the_repository_once(self) -> None:
-        with patch.object(Component, "commit_pending", return_value=True) as commit:
-            self.run_command("--apply")
-        self.assertEqual(commit.call_count, 1)
-        self.assertEqual(commit.call_args.kwargs["skip_push"], True)
+    def test_apply_commits_all_translations_once(self) -> None:
+        linked = self.create_link_existing(
+            name="Test 2", slug="test-2", filemask="po/*.po"
+        )
+        other = linked.translation_set.get(language_code="cs").unit_set.get(
+            source=self.SOURCE
+        )
+        Unit.objects.filter(pk=other.pk).update(
+            target="Merci\u202f!", state=STATE_TRANSLATED
+        )
+        revision = self.component.repository.last_revision
+        output = StringIO()
+
+        call_command(
+            "reapply_autofixes",
+            "test/test",
+            "test/test-2",
+            "--apply",
+            stdout=output,
+        )
+
+        self.component.repository.clean_revision_cache()
+        current = self.component.repository.last_revision
+        self.assertEqual(
+            self.component.repository.log_revisions(f"{revision}..{current}"),
+            [current],
+        )
+        other.refresh_from_db()
+        self.assertEqual(other.target, "Merci")
 
     def test_foreign_pending_changes_block_the_commit(self) -> None:
         self.edit_unit("Hello, world!\n", "Ahoj svete!\n")
@@ -1047,3 +1071,86 @@ class ReapplyAutofixesTest(ViewTestCase):
         ):
             self.run_command("--apply")
         commit.assert_not_called()
+
+    def test_foreign_pending_change_on_repaired_unit_blocks_the_commit(self) -> None:
+        original_repair = Command.repair
+        other_user = create_another_user("-foreign")
+        own_pending_ids: list[int] = []
+
+        def create_foreign_pending(command, unit_id, user):
+            result = original_repair(command, unit_id, user)
+            own_pending_ids.append(
+                PendingUnitChange.objects.filter(unit_id=unit_id, author=user)
+                .latest("pk")
+                .pk
+            )
+            PendingUnitChange.store_unit_change(
+                self.unit,
+                author=other_user,
+                target="Merci du traducteur",
+                state=STATE_TRANSLATED,
+            )
+            return result
+
+        with (
+            patch.object(
+                Command, "repair", autospec=True, side_effect=create_foreign_pending
+            ),
+            patch.object(Component, "commit_files", return_value=True) as commit,
+            self.assertRaises(CommandError),
+        ):
+            self.run_command("--apply")
+
+        commit.assert_not_called()
+        self.assertTrue(
+            PendingUnitChange.objects.filter(pk=own_pending_ids[0]).exists()
+        )
+        self.assertTrue(
+            PendingUnitChange.objects.filter(unit=self.unit, author=other_user).exists()
+        )
+
+    def test_vcs_commit_failure_keeps_own_pending_changes(self) -> None:
+        with (
+            patch.object(Component, "commit_files", return_value=False) as commit,
+            self.assertRaises(CommandError),
+        ):
+            self.run_command("--apply")
+
+        commit.assert_called_once()
+        self.assertTrue(PendingUnitChange.objects.filter(unit=self.unit).exists())
+
+    def test_late_foreign_pending_change_stays_pending(self) -> None:
+        original_foreign_pending = Command.foreign_pending
+        other_user = create_another_user("-late")
+        late_pending_ids: list[int] = []
+        own_pending_ids: list[int] = []
+        calls = 0
+
+        def create_late_pending(root, pending_change_ids):
+            nonlocal calls
+            result = original_foreign_pending(root, pending_change_ids)
+            calls += 1
+            if calls == 2:
+                own_pending_ids.extend(pending_change_ids)
+                pending_change = PendingUnitChange.store_unit_change(
+                    self.unit,
+                    author=other_user,
+                    target="Merci du traducteur",
+                    state=STATE_TRANSLATED,
+                )
+                assert pending_change.pk is not None
+                late_pending_ids.append(pending_change.pk)
+            return result
+
+        result = StringIO()
+        with patch.object(Command, "foreign_pending", side_effect=create_late_pending):
+            call_command("reapply_autofixes", "test/test", "--apply", stdout=result)
+
+        self.assertEqual(calls, 2)
+        self.assertIn("1 written", result.getvalue())
+        self.assertFalse(
+            PendingUnitChange.objects.filter(pk=own_pending_ids[0]).exists()
+        )
+        self.assertTrue(
+            PendingUnitChange.objects.filter(pk=late_pending_ids[0]).exists()
+        )

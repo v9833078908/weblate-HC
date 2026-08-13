@@ -1061,10 +1061,12 @@ By default the command reports what would change without writing anything.
 .. weblate-admin-option:: --apply
 
     Writes the repairs. Each unit is locked and re-evaluated inside the lock,
-    so a concurrent edit is never overwritten. The command commits once per
-    repository root without pushing, and refuses to commit when the repository
-    carries pending changes from other work: the repairs stay pending for the
-    regular scheduler, and the run exits with an error.
+    so a concurrent edit is never overwritten. The command checks for pending
+    changes from other work before and after it repairs a repository, and only
+    commits the pending changes it created, once per repository root and
+    without pushing. If other pending changes are found at either check, the
+    repairs stay pending for the regular scheduler and the run exits with an
+    error.
 
 You can either define which project or component to update (for example
 ``weblate/application``), or use ``--all`` to update all existing components.

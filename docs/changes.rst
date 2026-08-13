@@ -22,8 +22,8 @@ Weblate 2026.8.1
 * The engine line separator ``$`` is now enforced where it is used tightly in the source: whitespace around a separator is removed automatically, and a separator lost or added by a translation is reported by the ``game-line-break`` check.
 * :ref:`Automatic translation <auto-translation>` now sends two batches of a large language model service at a time instead of one, fetches the glossary terms of a whole batch at once, and stores every batch as soon as it arrives, so a crash no longer discards the whole run.
 * A large language model machine translation request now carries ten strings instead of twenty, which answers no slower and no longer wastes replies on truncation or on the model's content filter.
-* The autofix for final punctuation the source does not have now also removes an added exclamation mark, question mark, or colon (not only a full stop), unwraps closing quotes from the source so a quoted source mark is seen, and never touches a mark whose removal would leave a different failing check behind.
-* Added the :wladmin:`reapply_autofixes` management command, which replays the active automatic fixes over stored translations; it reports what would change by default and only writes with ``--apply``, refusing to commit a repository that carries pending changes from other work.
+* The autofix for final punctuation the source does not have now also removes an added exclamation mark or question mark (not only a full stop), unwraps closing quotes from the source so a quoted source mark is seen, and never touches a mark whose removal would leave a different failing check behind.
+* Added the :wladmin:`reapply_autofixes` management command, which replays the active automatic fixes over stored translations; it reports what would change by default and only writes with ``--apply``, committing only its own pending changes and refusing to start or finish a repository that already has pending changes from other work.
 
 .. rubric:: Bug fixes
 

@@ -138,7 +138,7 @@ class Command(WeblateComponentCommand):
             scope="weblate", name="autofix", verbose="Autofix backfill"
         )
 
-    def repair(self, unit_id: int, user: User) -> list[str] | None:
+    def repair(self, unit_id: int, user: User) -> tuple[list[str], int] | None:
         """
         Repair one unit, or report that it no longer needs one.
 
@@ -167,16 +167,20 @@ class Command(WeblateComponentCommand):
                 propagate=False,
                 select_for_update=False,
             )
-            return applied
+            pending_change = unit.pending_unit_change
+            if pending_change is None or pending_change.pk is None:
+                msg = "Autofix repair did not create a pending change."
+                raise RuntimeError(msg)
+            return applied, pending_change.pk
 
     @staticmethod
-    def foreign_pending(root: Component, written: list[int]) -> bool:
+    def foreign_pending(root: Component, pending_change_ids: set[int]) -> bool:
         """Any pending change in this repository family that is not ours."""
         return (
             PendingUnitChange.objects.for_component(
                 root, apply_filters=False, include_linked=True
             )
-            .exclude(unit_id__in=written)
+            .exclude(pk__in=pending_change_ids)
             .exists()
         )
 
@@ -187,30 +191,42 @@ class Command(WeblateComponentCommand):
         candidates: dict[int, list[int]],
     ) -> bool:
         user = self.get_user()
-        with root.repository.lock:
-            if self.foreign_pending(root, []):
+        with root.repository.lock, transaction.atomic():
+            if self.foreign_pending(root, set()):
                 self.stderr.write(
                     f"{root}: foreign pending changes, refusing to touch this repository"
                 )
                 return False
-            written: list[int] = []
+            pending_change_ids: set[int] = set()
             stale = 0
             for component in group:
                 for unit_id in candidates[component.pk]:
-                    if self.repair(unit_id, user) is None:
+                    repaired = self.repair(unit_id, user)
+                    if repaired is None:
                         stale += 1
                         continue
-                    written.append(unit_id)
-            self.stdout.write(f"{root}: {len(written)} written, {stale} stale")
-            if not written:
+                    _applied, pending_change_id = repaired
+                    pending_change_ids.add(pending_change_id)
+            if not pending_change_ids:
+                self.stdout.write(f"{root}: 0 written, {stale} stale")
                 return True
-            if self.foreign_pending(root, written):
+            if self.foreign_pending(root, pending_change_ids):
                 self.stderr.write(
                     f"{root}: foreign pending changes appeared during the run; "
                     "repairs stay pending and are not committed"
                 )
                 return False
-            root.commit_pending("autofix backfill", user, skip_push=True)
+            if not root.commit_pending_subset(
+                "autofix backfill",
+                user,
+                pending_change_ids,
+                skip_push=True,
+            ):
+                self.stderr.write(
+                    f"{root}: failed to commit autofix repairs; repairs stay pending"
+                )
+                return False
+        self.stdout.write(f"{root}: {len(pending_change_ids)} written, {stale} stale")
         return True
 
     def handle(self, *args, **options) -> None:

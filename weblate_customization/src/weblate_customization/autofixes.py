@@ -82,8 +82,8 @@ class RemoveAddedFinalStop(AutoFix):
     Drop terminal punctuation the source does not have.
 
     An LLM adds one to roughly a third of the strings of a game corpus, where
-    captions and button labels are unpunctuated on purpose. The four end checks
-    decide, so every language branch they implement - the short-source
+    captions and button labels are unpunctuated on purpose. The terminal check
+    set decides, so every language branch it implements - the short-source
     shortcut, the ellipsis rule, interrobangs, CJK, Armenian, Devanagari,
     Santali, Burmese - is honoured without being restated here.
 

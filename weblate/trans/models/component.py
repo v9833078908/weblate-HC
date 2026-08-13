@@ -66,6 +66,7 @@ from weblate.trans.defines import (
     REPO_LENGTH,
 )
 from weblate.trans.exceptions import (
+    FailedCommitError,
     FileParseError,
     InvalidTemplateError,
     is_expected_parse_error,
@@ -3808,6 +3809,100 @@ class Component(  # ruff: ignore[too-many-public-methods]
             if not skip_push:
                 self.push_if_needed()
 
+        return True
+
+    @transaction.atomic
+    def commit_pending_subset(
+        self,
+        reason: str,
+        user: User | None,
+        pending_change_ids: set[int],
+        *,
+        skip_push: bool = False,
+    ) -> bool:
+        """Commit exactly the supplied pending changes in one repository commit."""
+        # ruff: ignore[import-outside-top-level]
+        from weblate.auth.models import User
+
+        if user is None:
+            user = User.objects.get_or_create_bot(
+                scope="weblate", name="commit", verbose="Background commit"
+            )
+
+        pending_changes = list(
+            PendingUnitChange.objects.for_component(
+                self, apply_filters=False, include_linked=True
+            )
+            .filter(pk__in=pending_change_ids)
+            .select_related("author", "unit__translation__component")
+            .order_by("timestamp")
+            .select_for_update()
+        )
+        if len(pending_changes) != len(pending_change_ids):
+            self.log_error("refusing to commit pending changes outside this repository")
+            return False
+
+        changes_by_translation: dict[int, list[PendingUnitChange]] = defaultdict(list)
+        translations: dict[int, Translation] = {}
+        for pending_change in pending_changes:
+            translation = pending_change.unit.translation
+            changes_by_translation[translation.pk].append(pending_change)
+            translations[translation.pk] = translation
+
+        filenames: list[str] = []
+        components: dict[int, Component] = {}
+        for translation_id, changes in changes_by_translation.items():
+            translation = translations[translation_id]
+            components[translation.component_id] = translation.component
+            if not translation.filename:
+                translation.log_error("skipping commit due to missing filename")
+                return False
+            try:
+                store = translation.store
+                store.ensure_index()
+                changes_status = translation.update_units(
+                    changes, store, user.get_author_name()
+                )
+            except (FailedCommitError, FileParseError, ValueError) as error:
+                translation.log_error("skipping commit due to error: %s", error)
+                return False
+            if not all(changes_status.get(change.pk) for change in changes):
+                return False
+            filenames.extend(translation.filenames)
+            filenames.extend(translation.addon_commit_files)
+
+        if not filenames:
+            return False
+        if not self.commit_files(
+            message=reason,
+            author=user.get_author_name(),
+            timestamp=max(change.timestamp for change in pending_changes),
+            files=list(dict.fromkeys(filenames)),
+            signals=False,
+            skip_push=skip_push,
+            store_hash=False,
+        ):
+            return False
+
+        PendingUnitChange.objects.filter(pk__in=pending_change_ids).delete()
+        for translation_id, changes in changes_by_translation.items():
+            translation = translations[translation_id]
+            translation.clear_committed_disk_states(
+                {change.unit_id for change in changes}
+            )
+            translation.invalidate_cache()
+            translation.drop_store_cache()
+            translation.store_hash()
+            translation.addon_commit_files = []
+            translation.log_info(
+                "committed %s as %s", translation.filenames, user.get_author_name()
+            )
+            translation.change_set.create(
+                action=ActionEvents.COMMIT, user=user, author=user
+            )
+        for component in components.values():
+            component.send_post_commit_signal()
+            component.update_import_alerts(delete=False)
         return True
 
     def commit_files(
