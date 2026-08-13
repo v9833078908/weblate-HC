@@ -27,6 +27,7 @@ never shares a base with a dev one.
 
 from __future__ import annotations
 
+import argparse
 import json
 import operator
 import random
@@ -524,6 +525,17 @@ def build_mutations(clean: list[dict], clean_splits: dict[int, str]) -> list[dic
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--autofix-fingerprint",
+        required=True,
+        help=(
+            "Ordered, comma-separated identifiers of the active AUTOFIX_LIST, "
+            "copied from the `Active autofixes:` line of reapply_autofixes. "
+            "The judge may only be run against instances with this exact set."
+        ),
+    )
+    args = parser.parse_args()
     lines = DUMP.read_text(encoding="utf-8").splitlines()
     glossary = json.loads(lines[0])["glossary"]
     units = [json.loads(line) for line in lines[1:]]
@@ -622,7 +634,7 @@ def main() -> None:
 
     payload = {
         "dataset": "col4/data/fr - dev mirror of the prod run of 2026-08-11 (task ff7843b4)",
-        "normalization": "fix_target + RemoveAddedFinalStop + terminal-!?: + AddFrenchPunctuationSpacing",
+        "normalization": f"autofix fingerprint: {args.autofix_fingerprint}",
         "built_by": "docs/misc/col4-judge-goldenset-build.py",
         "seeds": {
             "terminology": TERM_SEED,

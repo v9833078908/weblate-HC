@@ -1,6 +1,6 @@
 {
   "dataset": "col4/data/fr - dev mirror of the prod run of 2026-08-11 (task ff7843b4)",
-  "normalization": "fix_target + RemoveAddedFinalStop + terminal-!?: + AddFrenchPunctuationSpacing",
+  "normalization": "autofix fingerprint: line-separator-spacing,removed-final-stop,french-punctuation-spacing,end-whitespace,end-ellipsis,zero-width-space,control-chars,devanadari-danda,punctuation-spacing,safe-html",
   "built_by": "docs/misc/col4-judge-goldenset-build.py",
   "seeds": {
     "terminology": 20260812,

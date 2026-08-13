@@ -44,12 +44,13 @@ from weblate.utils.state import STATE_READONLY, STATE_TRANSLATED
 
 # The test settings use the default AUTOFIX_LIST, which has none of the custom
 # fixes; the command fails closed without its required fix, so every test of it
-# runs against the default list extended exactly like WEBLATE_ADD_AUTOFIX does.
+# runs against the default list extended exactly like WEBLATE_ADD_AUTOFIX does -
+# additions at the head, as modify_env_list() inserts them.
 AUTOFIX_LIST_WITH_CUSTOM = [
-    *trans_defaults.DEFAULT_AUTOFIX_LIST,
     "weblate_customization.autofixes.LineSeparatorSpacing",
     "weblate_customization.autofixes.RemoveAddedFinalStop",
     "weblate_customization.autofixes.AddFrenchPunctuationSpacing",
+    *trans_defaults.DEFAULT_AUTOFIX_LIST,
 ]
 
 TEST_PO = get_test_file("cs.po")
