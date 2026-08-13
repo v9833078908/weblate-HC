@@ -933,6 +933,24 @@ class ReapplyAutofixesTest(ViewTestCase):
             ).exists()
         )
 
+    def test_commit_holds_the_lock_the_translation_would_reacquire(self) -> None:
+        # update_units refreshes component.repository.lock every 1000 changes
+        # (translation.py:1453). The lock lives on the Component instance, so a
+        # translation carrying its own instance reacquires a lock nobody holds
+        # and the commit dies with "Cannot reacquire an unlocked lock" - which
+        # is what happened on prod with 1372 pending changes in one language.
+        locked: list[bool] = []
+        original = Translation.update_units
+
+        def spy(translation, *args, **kwargs):
+            locked.append(translation.component.repository.lock.is_locked)
+            return original(translation, *args, **kwargs)
+
+        with patch.object(Translation, "update_units", autospec=True, side_effect=spy):
+            self.run_command("--apply")
+
+        self.assertEqual(locked, [True])
+
     def test_dump_json_writes_every_change_without_writing_to_the_database(
         self,
     ) -> None:

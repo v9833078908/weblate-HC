@@ -3845,7 +3845,12 @@ class Component(  # ruff: ignore[too-many-public-methods]
         changes_by_translation: dict[int, list[PendingUnitChange]] = defaultdict(list)
         translations: dict[int, Translation] = {}
         for pending_change in pending_changes:
-            translation = pending_change.unit.translation
+            # update_units refreshes the repository lock every 1000 changes, and
+            # the lock lives on the Component instance. Reuse the locked one, as
+            # commit_pending does, or that refresh finds an unlocked lock.
+            translation = self.reuse_component_for_translation(
+                pending_change.unit.translation
+            )
             changes_by_translation[translation.pk].append(pending_change)
             translations[translation.pk] = translation
 
