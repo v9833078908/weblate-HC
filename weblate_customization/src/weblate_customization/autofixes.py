@@ -14,6 +14,9 @@ from django.utils.translation import gettext_lazy
 from weblate.checks.chars import (
     FRENCH_PUNCTUATION_MISSING_RE_NBSP,
     FRENCH_PUNCTUATION_MISSING_RE_NNBSP,
+    EndColonCheck,
+    EndExclamationCheck,
+    EndQuestionCheck,
     EndStopCheck,
     PunctuationSpacingCheck,
 )
@@ -26,10 +29,28 @@ from weblate_customization.checks import (
 )
 
 if TYPE_CHECKING:
+    from weblate.checks.base import TargetCheck
     from weblate.trans.models import Unit
 
 HUGGING_SEPARATOR = re.compile(rf"{SEPARATOR_SPACE}*\${SEPARATOR_SPACE}*")
 SPACING_CHARACTERS = re.compile(r"[ \u00a0\u202f\u2009]")
+TRAILING_SPACING = re.compile(r"[ \u00a0\u202f\u2009]+$")
+
+# ASCII only, as measured: docs/misc/autofix-terminal-punctuation.md.
+TERMINAL_MARKS = ".!?:"
+# Closing quotes stripped from the SOURCE before comparing, so a source mark
+# hiding behind one is still seen (prod unit 180448, `с криком "Еретик!"`).
+# The target is never unwrapped - see the class docstring for the measurement
+# that rejected it.
+CLOSING_QUOTES = '»"”'
+TRAILING_QUOTES = re.compile(rf"[{re.escape(CLOSING_QUOTES)}]+$")
+# One instance each: checks are stateless, and the registry keeps singletons too.
+TERMINAL_CHECKS: tuple[TargetCheck, ...] = (
+    EndStopCheck(),
+    EndColonCheck(),
+    EndQuestionCheck(),
+    EndExclamationCheck(),
+)
 
 
 class LineSeparatorSpacing(AutoFix):
@@ -57,35 +78,59 @@ class LineSeparatorSpacing(AutoFix):
 
 class RemoveAddedFinalStop(AutoFix):
     """
-    Drop a final stop the source does not have.
+    Drop terminal punctuation the source does not have.
 
     An LLM adds one to roughly a third of the strings of a game corpus, where
-    captions and button labels are unpunctuated on purpose. The check itself
-    decides, so every language branch it implements - the short-source
-    shortcut, the ellipsis rule, CJK, Armenian, Devanagari, Santali, Burmese -
-    is honoured without being restated here. The opposite direction, a stop
+    captions and button labels are unpunctuated on purpose. The four end checks
+    decide, so every language branch they implement - the short-source
+    shortcut, the ellipsis rule, interrobangs, CJK, Armenian, Devanagari,
+    Santali, Burmese - is honoured without being restated here.
+
+    Two rules keep this narrow. The removal has to shrink the set of failing
+    terminal checks strictly: a removal that settles nothing, or that trades
+    one mismatch for another, is not a repair. And only the SOURCE is
+    unwrapped from closing quotes, never the target. Unwrapping the source is
+    what keeps a source mark hidden behind a quote (``с криком "Еретик!"``)
+    from reading as punctuation the model invented. Unwrapping the target was
+    measured on prod and rejected: it reached 17 more units and degraded 13 of
+    them, all ``en_US`` strings placing the full stop inside the quotes per US
+    convention (``the inscription "armory."``). The opposite direction, a mark
     lost in translation, is not repairable and stays a check.
     """
 
     fix_id = "removed-final-stop"
-    name = gettext_lazy("Added final stop")
+    name = gettext_lazy("Added final punctuation")
 
     @staticmethod
     def get_related_checks():
-        return [EndStopCheck()]
+        return list(TERMINAL_CHECKS)
+
+    @staticmethod
+    def _failing(source: str, target: str, unit: Unit) -> frozenset[str]:
+        return frozenset(
+            check.check_id
+            for check in TERMINAL_CHECKS
+            if not check.should_skip(unit) and check.check_single(source, target, unit)
+        )
 
     def fix_single_target(
         self, target: str, source: str, unit: Unit
     ) -> tuple[str, bool]:
-        if not target.endswith(".") or target.endswith(".."):
+        if not target or target[-1] not in TERMINAL_MARKS:
             return target, False
-        check = EndStopCheck()
-        if check.should_skip(unit) or not check.check_single(source, target, unit):
+        if len(target) > 1 and target[-2] == target[-1]:
+            # Dropping one dot of an unfinished ellipsis, or one of a doubled
+            # mark, would only make it odder.
             return target, False
-        stripped = target[:-1]
-        if check.check_single(source, stripped, unit):
-            # Removing the stop does not settle the disagreement, so the
-            # mismatch is about something else.
+        stripped = TRAILING_SPACING.sub("", target[:-1])
+        if not stripped:
+            # The mark is the whole translation; blanking it is not a repair.
+            return target, False
+        source_body = TRAILING_QUOTES.sub("", source)
+        before = self._failing(source_body, target, unit)
+        if not before:
+            return target, False
+        if not self._failing(source_body, stripped, unit) < before:
             return target, False
         return stripped, True
 

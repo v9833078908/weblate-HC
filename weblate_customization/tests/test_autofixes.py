@@ -118,6 +118,103 @@ class RemoveAddedFinalStopTest(SimpleTestCase):
             (["Les pionniers rient."], False),
         )
 
+    def test_removes_added_exclamation_with_narrow_space(self) -> None:
+        # Prod shape (unit 178826): the model added the mark and
+        # AddFrenchPunctuationSpacing already put U+202F in front of it.
+        unit = make_unit(source="А давайте", code="fr")
+        self.assertEqual(
+            self.fix.fix_target(["Allons-y\u202f!"], unit), (["Allons-y"], True)
+        )
+
+    def test_removes_added_colon_with_nbsp(self) -> None:
+        # Prod shape (unit 179518).
+        unit = make_unit(source="Старик сделал небольшую паузу и продолжил", code="fr")
+        self.assertEqual(
+            self.fix.fix_target(["Le vieil homme fait une pause et reprend\u00a0:"], unit),
+            (["Le vieil homme fait une pause et reprend"], True),
+        )
+
+    def test_removes_added_question_with_plain_space(self) -> None:
+        unit = make_unit(source="Можно ли выпустить плесень", code="fr")
+        self.assertEqual(
+            self.fix.fix_target(["Peut-on libérer la moisissure ?"], unit),
+            (["Peut-on libérer la moisissure"], True),
+        )
+
+    def test_keeps_a_terminal_inside_a_closing_quote(self) -> None:
+        # Measured on prod: reaching behind the quote repaired 17 units and
+        # broke 13 of them. `…the inscription "armory."` is correct en_US
+        # typography, and the rule must not touch it.
+        unit = make_unit(source="Впереди двери с надписью \u00abоружейная\u00bb", code="en")
+        target = 'Ahead are large double doors with the inscription "armory."'
+        self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
+
+    def test_keeps_a_terminal_inside_a_closing_guillemet(self) -> None:
+        unit = make_unit(source="Скорее, депеша", code="fr")
+        target = "\u00abVite, la d\u00e9p\u00eache\u202f!\u00bb"
+        self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
+
+    def test_keeps_terminal_when_the_quoted_source_has_it(self) -> None:
+        # Prod shape (unit 180448): the source mark hides behind a quote, so
+        # the target mark is correct even though end_exclamation fails. This is
+        # the one direction that IS unwrapped - the source side.
+        unit = make_unit(source='Старейшина бежит на вас с криком "Еретик!"', code="fr")
+        target = "L'Ancien se précipite sur toi en criant Hérétique\u202f!"
+        self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
+
+    def test_keeps_a_mark_wrapped_in_markup(self) -> None:
+        unit = make_unit(source="Скорее", code="fr")
+        self.assertEqual(
+            self.fix.fix_target(["<b>Vite\u202f!</b>"], unit),
+            (["<b>Vite\u202f!</b>"], False),
+        )
+
+    def test_keeps_full_width_marks(self) -> None:
+        unit = make_unit(source="Скорее", code="ja")
+        self.assertEqual(self.fix.fix_target(["急いで！"], unit), (["急いで！"], False))
+
+    def test_keeps_repeated_marks(self) -> None:
+        unit = make_unit(source="Les pionniers rient", code="fr")
+        self.assertEqual(
+            self.fix.fix_target(["Les pionniers rient!!"], unit),
+            (["Les pionniers rient!!"], False),
+        )
+
+    def test_keeps_interrobang(self) -> None:
+        unit = make_unit(source="Ты серьёзно", code="fr")
+        self.assertEqual(
+            self.fix.fix_target(["Tu es sérieux ?!"], unit), (["Tu es sérieux ?!"], False)
+        )
+
+    def test_refuses_to_empty_the_target(self) -> None:
+        unit = make_unit(source="Осторожно, ликвидаторы", code="fr")
+        self.assertEqual(self.fix.fix_target(["!"], unit), (["!"], False))
+
+    def test_keeps_a_double_terminal_it_cannot_settle(self) -> None:
+        # Dropping the dot would expose a question mark the source lacks:
+        # the failing-check set changes instead of shrinking.
+        unit = make_unit(source="Les pionniers rient", code="fr")
+        self.assertEqual(
+            self.fix.fix_target(["Vraiment?."], unit), (["Vraiment?."], False)
+        )
+
+    def test_mark_specific_ignore_flag_disables_the_fix(self) -> None:
+        unit = make_unit(
+            source="А давайте", code="fr", flags="ignore-end-exclamation"
+        )
+        self.assertEqual(
+            self.fix.fix_target(["Allons-y\u202f!"], unit), (["Allons-y\u202f!"], False)
+        )
+
+    def test_fixes_every_plural_form(self) -> None:
+        unit = make_unit(
+            source=["Attends", "Attendez"], target=["", ""], code="fr"
+        )
+        self.assertEqual(
+            self.fix.fix_target(["Attends\u202f!", "Attendez\u202f!"], unit),
+            (["Attends", "Attendez"], True),
+        )
+
 
 class AddFrenchPunctuationSpacingTest(SimpleTestCase):
     fix = AddFrenchPunctuationSpacing()
@@ -151,3 +248,24 @@ class AddFrenchPunctuationSpacingTest(SimpleTestCase):
         self.assertEqual(
             self.fix.fix_target(["Vraiment?"], unit), (["Vraiment?"], False)
         )
+
+
+class TerminalAndFrenchSpacingOrderTest(SimpleTestCase):
+    """Terminal removal runs before French spacing and survives a second pass."""
+
+    fixes = (RemoveAddedFinalStop(), AddFrenchPunctuationSpacing())
+
+    def run_fixes(self, target: list[str], unit) -> list[str]:
+        for fix in self.fixes:
+            target, _changed = fix.fix_target(target, unit)
+        return target
+
+    def test_no_dangling_space_survives_the_pair(self) -> None:
+        unit = make_unit(source="А давайте", code="fr")
+        first = self.run_fixes(["Allons-y!"], unit)
+        self.assertEqual(first, ["Allons-y"])
+
+    def test_second_pass_changes_nothing(self) -> None:
+        unit = make_unit(source="А давайте", code="fr")
+        first = self.run_fixes(["Allons-y\u202f!"], unit)
+        self.assertEqual(self.run_fixes(first, unit), first)
