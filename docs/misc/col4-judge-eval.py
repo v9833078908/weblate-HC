@@ -65,7 +65,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from itertools import starmap
-from math import sqrt
+from math import comb, sqrt
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +76,7 @@ API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 SEVERITY_RANK = {"minor": 1, "major": 2, "critical": 3}
 VERDICT_BY_SEVERITY = {0: "pass", 1: "pass", 2: "flag", 3: "reject"}
+VERDICT_ORDER = {"pass": 0, "flag": 1, "reject": 2}
 CATEGORIES = (
     "terminology",
     "mistranslation",
@@ -921,6 +922,111 @@ def metrics(
     return result
 
 
+def dump_verdicts(
+    records: list[Record], verdicts: dict[str, Verdict]
+) -> list[dict[str, Any]]:
+    """
+    Emit one row per record so a later question needs no second run.
+
+    The first version of this script stored aggregates only, which made the
+    agreement between two judges unanswerable without paying twice.
+    """
+    rows = []
+    for record in records:
+        verdict = verdicts.get(record.record_id)
+        if verdict is None:
+            continue
+        rows.append(
+            {
+                "record_id": record.record_id,
+                "stratum": record.stratum,
+                "label": record.label,
+                "severity": record.severity,
+                "predicted": "unparsed" if verdict.unparsed else verdict.verdict,
+                "error_count": len(verdict.errors),
+            }
+        )
+    return rows
+
+
+def mcnemar(b: int, c: int) -> dict[str, Any]:
+    """
+    Exact two-sided McNemar over the discordant pairs.
+
+    Only the records where the two judges disagree carry information about
+    which one is better; the rest cancel.
+    """
+    total = b + c
+    if not total:
+        return {"b": b, "c": c, "discordant": 0, "p_value": None}
+    tail = sum(comb(total, i) for i in range(min(b, c) + 1))
+    p_value = min(1.0, 2 * tail / (2**total))
+    return {"b": b, "c": c, "discordant": total, "p_value": round(p_value, 5)}
+
+
+def pairwise_analysis(
+    records: list[Record],
+    by_model: dict[str, dict[str, Verdict]],
+    prevalence: float,
+    bootstrap_draws: int,
+    seed: int,
+) -> dict[str, Any]:
+    """Union of two judges, plus a test of whether they really differ."""
+    out: dict[str, Any] = {}
+    names = list(by_model)
+    for index, first in enumerate(names):
+        for second in names[index + 1 :]:
+            left, right = by_model[first], by_model[second]
+            union: dict[str, Verdict] = {}
+            agree_flag = only_left = only_right = 0
+            b = c = 0
+            for record in records:
+                one, two = left.get(record.record_id), right.get(record.record_id)
+                if one is None or two is None or one.unparsed or two.unparsed:
+                    continue
+                # Union verdict: the stricter of the two.
+                worst = max((one.verdict, two.verdict), key=VERDICT_ORDER.__getitem__)
+                union[record.record_id] = Verdict(worst, one.errors + two.errors, "")
+                if one.needs_human and two.needs_human:
+                    agree_flag += 1
+                elif one.needs_human:
+                    only_left += 1
+                elif two.needs_human:
+                    only_right += 1
+                left_right = one.needs_human == record.truth_needs_human
+                right_right = two.needs_human == record.truth_needs_human
+                if left_right and not right_right:
+                    b += 1
+                elif right_right and not left_right:
+                    c += 1
+            summary = metrics(
+                records, union, None, None, [], prevalence, bootstrap_draws, seed
+            )
+            out[f"{first} + {second}"] = {
+                "_what": "Both judges on every record, verdict is the stricter of the two. Recall cannot fall below either judge; specificity cannot rise above either.",
+                "union": {
+                    "tpr": summary["boundary_h_needs_human"]["tpr"],
+                    "tnr": summary["boundary_h_needs_human"]["tnr"],
+                    "reject_tpr": summary["boundary_r_has_critical"]["tpr"],
+                    "false_critical_on_clean": summary["false_critical_on_clean"],
+                    "auto_pass": summary["auto_pass"]["rate"],
+                    "projected_miss": summary["auto_pass"][
+                        "projected_miss_rate_at_production_prevalence"
+                    ],
+                },
+                "flag_overlap": {
+                    "both": agree_flag,
+                    f"only {first}": only_left,
+                    f"only {second}": only_right,
+                },
+                "mcnemar": {
+                    "_what": f"b = records {first} got right and {second} got wrong at boundary H; c is the reverse.",
+                    **mcnemar(b, c),
+                },
+            }
+    return out
+
+
 def run_probe(
     models: list[str], records: list[Record], api_key: str, timeout: int
 ) -> dict[str, Any]:
@@ -1015,6 +1121,7 @@ def main() -> None:
         result = {**header, "probe": run_probe(models, records, api_key, args.timeout)}
     elif args.arm == "single":
         arms = {}
+        by_model: dict[str, dict[str, Verdict]] = {}
         for model in models:
             verdicts, usage = judge(
                 model,
@@ -1035,7 +1142,12 @@ def main() -> None:
                 args.bootstrap,
                 args.seed,
             )
-            arms[model] = {"usage": usage.as_dict(), "metrics": summary}
+            arms[model] = {
+                "usage": usage.as_dict(),
+                "metrics": summary,
+                "verdicts": dump_verdicts(records, verdicts),
+            }
+            by_model[model] = verdicts
             print(
                 f"SINGLE {model:34s} "
                 f"H-tpr={summary['boundary_h_needs_human']['tpr']['point']} "
@@ -1045,6 +1157,18 @@ def main() -> None:
                 f"unparsed={summary['unparsed']} cost=${usage.cost_usd:.3f}"
             )
         result = {**header, "arms": arms}
+        if len(models) > 1:
+            result["pairwise"] = pairwise_analysis(
+                records, by_model, args.prevalence, args.bootstrap, args.seed
+            )
+            for key, value in result["pairwise"].items():
+                union = value["union"]
+                print(
+                    f"PAIR {key} union-H-tpr={union['tpr']['point']} "
+                    f"union-H-tnr={union['tnr']['point']} "
+                    f"mcnemar b={value['mcnemar']['b']} c={value['mcnemar']['c']} "
+                    f"p={value['mcnemar']['p_value']}"
+                )
     else:
         if len(models) != 2:
             parser.error("cascade and mirror need exactly two models")
