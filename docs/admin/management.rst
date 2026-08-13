@@ -1068,6 +1068,18 @@ By default the command reports what would change without writing anything.
     repairs stay pending for the regular scheduler and the run exits with an
     error.
 
+    A repair keeps the string state and the record of whether the translation
+    came from a machine, so it does not turn a hand-written translation into
+    an automatically translated one.
+
+.. weblate-admin-option:: --dump-json PATH
+
+    Writes every candidate change to :file:`PATH` as JSON: the unit, its
+    component and language, the source, the stored translation, the proposed
+    one, and the fixes that produced it. The records come from the same scan
+    that ``--apply`` repairs, so the reviewed text is the text that would be
+    stored.
+
 You can either define which project or component to update (for example
 ``weblate/application``), or use ``--all`` to update all existing components.
 

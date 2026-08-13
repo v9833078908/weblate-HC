@@ -22,7 +22,9 @@ and writes only with an explicit ``--apply``.
 
 from __future__ import annotations
 
+import json
 from collections import Counter, defaultdict
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from django.core.management.base import CommandError
@@ -59,6 +61,9 @@ def render(text: str) -> str:
 class Command(WeblateComponentCommand):
     help = "re-applies the active autofixes to stored translations"
 
+    # Collected review records when --dump-json is given, otherwise None.
+    dump: list[dict[str, object]] | None = None
+
     def add_arguments(self, parser: CommandParser) -> None:
         super().add_arguments(parser)
         parser.add_argument(
@@ -66,6 +71,16 @@ class Command(WeblateComponentCommand):
             action="store_true",
             default=False,
             help="write the repairs and commit them; without it nothing is written",
+        )
+        parser.add_argument(
+            "--dump-json",
+            metavar="PATH",
+            default=None,
+            help=(
+                "write every candidate change as JSON for review; the records "
+                "come from the same scan --apply repairs, so what is reviewed "
+                "is what would be stored"
+            ),
         )
 
     def check_registry(self) -> None:
@@ -109,6 +124,19 @@ class Command(WeblateComponentCommand):
                 continue
             changed.append(unit.pk)
             counters.update(applied)
+            if self.dump is not None:
+                self.dump.append(
+                    {
+                        "unit_id": unit.pk,
+                        "component": str(component),
+                        "language": unit.translation.language.code,
+                        "context": unit.context,
+                        "source": unit.get_source_plurals(),
+                        "target": original,
+                        "proposed": candidate,
+                        "fixes": applied,
+                    }
+                )
             if len(examples) < DIFF_EXAMPLES:
                 examples.append(
                     f"  {render(' | '.join(original))} -> {render(' | '.join(candidate))}"
@@ -145,7 +173,10 @@ class Command(WeblateComponentCommand):
         The whole decision is retaken inside the row lock: the scan ran
         without one, and a translator or an import may have changed the unit
         since. ``translate`` receives the freshly read target, applies the
-        autofixes itself (unit.py:2404) and records the fixups.
+        autofixes itself (unit.py:2404) and records the fixups. It also derives
+        ``automatically_translated`` from the change action (unit.py:2427), so
+        the original value is restored afterwards: a punctuation repair says
+        nothing about who wrote the translation.
         """
         with transaction.atomic():
             unit = Unit.objects.select_for_update().prefetch().get(pk=unit_id)
@@ -155,6 +186,7 @@ class Command(WeblateComponentCommand):
                 or unit.translation.is_source
             ):
                 return None
+            was_automatic = unit.automatically_translated
             original = unit.get_target_plurals()
             candidate, applied = apply_autofixes(list(original), unit)
             if candidate == original:
@@ -171,6 +203,13 @@ class Command(WeblateComponentCommand):
             if pending_change is None or pending_change.pk is None:
                 msg = "Autofix repair did not create a pending change."
                 raise RuntimeError(msg)
+            if unit.automatically_translated != was_automatic:
+                unit.automatically_translated = was_automatic
+                Unit.objects.filter(pk=unit.pk).update(
+                    automatically_translated=was_automatic
+                )
+                pending_change.automatically_translated = was_automatic
+                pending_change.save(update_fields=["automatically_translated"])
             return applied, pending_change.pk
 
     @staticmethod
@@ -231,6 +270,7 @@ class Command(WeblateComponentCommand):
 
     def handle(self, *args, **options) -> None:
         self.check_registry()
+        self.dump = [] if options["dump_json"] else None
         components = self.get_components(**options).order_by("pk")
         groups: dict[int, list[Component]] = defaultdict(list)
         for component in components:
@@ -245,6 +285,13 @@ class Command(WeblateComponentCommand):
                 changed, counters, examples = self.scan(component)
                 candidates[component.pk] = changed
                 self.report(component, changed, counters, examples)
+
+        if self.dump is not None:
+            path = Path(options["dump_json"])
+            path.write_text(
+                json.dumps(self.dump, ensure_ascii=False, indent=1), encoding="utf-8"
+            )
+            self.stdout.write(f"Wrote {len(self.dump)} changes to {path}")
 
         if not options["apply"]:
             self.stdout.write("Dry run: nothing written. Use --apply to write.")

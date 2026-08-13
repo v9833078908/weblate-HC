@@ -4,8 +4,11 @@
 
 """Test for management commands."""
 
+import json
 import sys
+import tempfile
 from io import StringIO
+from pathlib import Path
 from typing import cast
 from unittest import SkipTest
 from unittest.mock import Mock, patch
@@ -898,6 +901,60 @@ class ReapplyAutofixesTest(ViewTestCase):
         self.assertEqual(self.unit.target, "Merci")
         self.assertEqual(self.unit.state, STATE_TRANSLATED)
         self.assertTrue(self.unit.change_set.filter(action=ActionEvents.AUTO).exists())
+
+    def test_repair_keeps_a_human_translation_human(self) -> None:
+        # translate(change_action=AUTO) sets automatically_translated (unit.py:2427).
+        # A punctuation repair must not relabel a translation somebody wrote by
+        # hand as machine output, in the unit or in its pending change.
+        self.run_command("--apply")
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "Merci")
+        self.assertFalse(self.unit.automatically_translated)
+        self.assertFalse(
+            PendingUnitChange.objects.filter(
+                unit=self.unit, automatically_translated=True
+            ).exists()
+        )
+
+    def test_repair_keeps_a_machine_translation_machine(self) -> None:
+        # The opposite direction: resetting the flag would erase the record that
+        # the string came from a machine.
+        Unit.objects.filter(pk=self.unit.pk).update(automatically_translated=True)
+        self.run_command("--apply")
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "Merci")
+        self.assertTrue(self.unit.automatically_translated)
+        self.assertFalse(
+            PendingUnitChange.objects.filter(
+                unit=self.unit, automatically_translated=False
+            ).exists()
+        )
+
+    def test_dump_json_writes_every_change_without_writing_to_the_database(
+        self,
+    ) -> None:
+        # The review dump has to come from the command itself, not from a
+        # separate script: only then is the reviewed before/after exactly what
+        # --apply would store.
+        path = Path(tempfile.mkdtemp()) / "dump.json"
+        result = self.run_command("--dump-json", str(path))
+        records = json.loads(path.read_text())
+        self.assertEqual(len(records), 1)
+        self.assertEqual(
+            records[0],
+            {
+                "unit_id": self.unit.pk,
+                "component": str(self.component),
+                "language": "cs",
+                "context": self.unit.context,
+                "source": [self.SOURCE],
+                "target": ["Merci\u202f!"],
+                "proposed": ["Merci"],
+                "fixes": ["removed-final-stop"],
+            },
+        )
+        self.assertIn(str(path), result)
+        self.assertEqual(PendingUnitChange.objects.count(), 0)
 
     def test_second_apply_changes_nothing(self) -> None:
         self.run_command("--apply")
