@@ -36,8 +36,9 @@ HUGGING_SEPARATOR = re.compile(rf"{SEPARATOR_SPACE}*\${SEPARATOR_SPACE}*")
 SPACING_CHARACTERS = re.compile(r"[ \u00a0\u202f\u2009]")
 TRAILING_SPACING = re.compile(r"[ \u00a0\u202f\u2009]+$")
 
-# ASCII only, as measured: docs/misc/autofix-terminal-punctuation.md.
-TERMINAL_MARKS = ".!?:"
+# ASCII only. Colons are intentionally excluded: the production measurement
+# found direct-speech markers that look indistinguishable from added punctuation.
+TERMINAL_MARKS = ".!?"
 # Closing quotes stripped from the SOURCE before comparing, so a source mark
 # hiding behind one is still seen (prod unit 180448, `с криком "Еретик!"`).
 # The target is never unwrapped - see the class docstring for the measurement

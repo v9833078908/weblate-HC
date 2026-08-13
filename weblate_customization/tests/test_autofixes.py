@@ -126,15 +126,12 @@ class RemoveAddedFinalStopTest(SimpleTestCase):
             self.fix.fix_target(["Allons-y\u202f!"], unit), (["Allons-y"], True)
         )
 
-    def test_removes_added_colon_with_nbsp(self) -> None:
-        # Prod shape (unit 179518).
+    def test_keeps_added_colon_with_nbsp(self) -> None:
+        # A colon can be a direct-speech marker. It was deliberately excluded
+        # after the production measurement found seven unsafe Turkish cases.
         unit = make_unit(source="Старик сделал небольшую паузу и продолжил", code="fr")
-        self.assertEqual(
-            self.fix.fix_target(
-                ["Le vieil homme fait une pause et reprend\u00a0:"], unit
-            ),
-            (["Le vieil homme fait une pause et reprend"], True),
-        )
+        target = "Le vieil homme fait une pause et reprend\u00a0:"
+        self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
 
     def test_removes_added_question_with_plain_space(self) -> None:
         unit = make_unit(source="Можно ли выпустить плесень", code="fr")

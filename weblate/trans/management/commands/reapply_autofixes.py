@@ -86,9 +86,9 @@ class Command(WeblateComponentCommand):
         translations = [
             translation
             for translation in component.translation_set.all()
-            # translate() skips autofixes for templates, so a template unit
-            # would be marked as automatically translated without a repair.
-            if not translation.is_template
+            # translate() skips autofixes for templates, and source units
+            # define the canonical source text rather than translations.
+            if not translation.is_template and not translation.is_source
         ]
         return (
             Unit.objects.filter(translation__in=translations)
@@ -149,7 +149,11 @@ class Command(WeblateComponentCommand):
         """
         with transaction.atomic():
             unit = Unit.objects.select_for_update().prefetch().get(pk=unit_id)
-            if unit.state == STATE_READONLY or unit.translation.is_template:
+            if (
+                unit.state == STATE_READONLY
+                or unit.translation.is_template
+                or unit.translation.is_source
+            ):
                 return None
             original = unit.get_target_plurals()
             candidate, applied = apply_autofixes(list(original), unit)

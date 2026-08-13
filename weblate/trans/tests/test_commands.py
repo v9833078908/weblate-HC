@@ -924,6 +924,26 @@ class ReapplyAutofixesTest(ViewTestCase):
         self.unit.refresh_from_db()
         self.assertEqual(self.unit.target, "Merci\u202f!")
 
+    def test_source_translation_is_skipped(self) -> None:
+        source_unit = self.component.source_translation.unit_set.get(source=self.SOURCE)
+        Unit.objects.filter(pk=source_unit.pk).update(
+            target="Merci\u202f!", state=STATE_TRANSLATED
+        )
+        changes = source_unit.change_set.count()
+        pending = PendingUnitChange.objects.filter(unit=source_unit).count()
+
+        result = self.run_command()
+
+        self.assertIn("1 unit to change", result)
+        self.run_command("--apply")
+        source_unit.refresh_from_db()
+        self.assertEqual(source_unit.source, self.SOURCE)
+        self.assertEqual(source_unit.target, "Merci\u202f!")
+        self.assertEqual(source_unit.change_set.count(), changes)
+        self.assertEqual(
+            PendingUnitChange.objects.filter(unit=source_unit).count(), pending
+        )
+
     def test_glossary_component_is_skipped(self) -> None:
         self.component.create_glossary()
         glossary = Component.objects.get(project=self.project, is_glossary=True)
