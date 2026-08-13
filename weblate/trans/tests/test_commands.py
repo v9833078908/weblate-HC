@@ -24,7 +24,9 @@ from weblate.trans.file_format_params import (
     BaseFileFormatParam,
     register_file_format_param,
 )
-from weblate.trans.models import Change, Component, Translation
+from weblate.trans import defaults as trans_defaults
+from weblate.trans.models import Change, Component, Unit
+from weblate.trans.models.pending import PendingUnitChange
 from weblate.trans.tests.test_models import RepoTestCase
 from weblate.trans.tests.test_views import (
     ComponentTestCase,
@@ -38,6 +40,17 @@ from weblate.trans.tests.utils import (
     require_github,
 )
 from weblate.vcs.mercurial import HgRepository
+from weblate.utils.state import STATE_READONLY, STATE_TRANSLATED
+
+# The test settings use the default AUTOFIX_LIST, which has none of the custom
+# fixes; the command fails closed without its required fix, so every test of it
+# runs against the default list extended exactly like WEBLATE_ADD_AUTOFIX does.
+AUTOFIX_LIST_WITH_CUSTOM = [
+    *trans_defaults.DEFAULT_AUTOFIX_LIST,
+    "weblate_customization.autofixes.LineSeparatorSpacing",
+    "weblate_customization.autofixes.RemoveAddedFinalStop",
+    "weblate_customization.autofixes.AddFrenchPunctuationSpacing",
+]
 
 TEST_PO = get_test_file("cs.po")
 TEST_COMPONENTS = get_test_file("components.json")
@@ -829,3 +842,93 @@ class DocumentationCommandTest(TestCase):
         self.assertIn(
             "Translation files were forcibly synchronized with the repository.", result
         )
+
+
+@override_settings(AUTOFIX_LIST=AUTOFIX_LIST_WITH_CUSTOM)
+class ReapplyAutofixesCommandTest(ComponentTestCase, WeblateComponentCommandMixin):
+    """Selection, validation and --all come from WeblateComponentCommand."""
+
+    command_name = "reapply_autofixes"
+    expected_string = "Active autofixes:"
+
+
+@override_settings(AUTOFIX_LIST=AUTOFIX_LIST_WITH_CUSTOM)
+class ReapplyAutofixesTest(ViewTestCase):
+    SOURCE = "Thank you for using Weblate."
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.unit = self.get_unit(self.SOURCE)
+        Unit.objects.filter(pk=self.unit.pk).update(
+            target="Merci\u202f!", state=STATE_TRANSLATED
+        )
+
+    def run_command(self, *args: str) -> str:
+        output = StringIO()
+        call_command("reapply_autofixes", "test/test", *args, stdout=output)
+        return output.getvalue()
+
+    def run_command_for(self, component: Component) -> str:
+        output = StringIO()
+        call_command(
+            "reapply_autofixes",
+            "/".join(component.get_url_path()),
+            stdout=output,
+        )
+        return output.getvalue()
+
+    def test_dry_run_reports_without_writing(self) -> None:
+        changes = Change.objects.count()
+        pending = PendingUnitChange.objects.count()
+        result = self.run_command()
+        self.assertIn("1 unit to change", result)
+        self.assertIn("removed-final-stop", result)
+        self.assertIn("Merci", result)
+        self.assertIn("--apply", result)
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "Merci\u202f!")
+        self.assertEqual(Change.objects.count(), changes)
+        self.assertEqual(PendingUnitChange.objects.count(), pending)
+
+    def test_clean_unit_is_never_written(self) -> None:
+        other = self.get_unit("Hello, world!\n")
+        Unit.objects.filter(pk=other.pk).update(
+            target="Ahoj svete!\n", automatically_translated=False
+        )
+        before = other.change_set.count()
+        self.run_command("--apply")
+        other.refresh_from_db()
+        self.assertEqual(other.target, "Ahoj svete!\n")
+        self.assertFalse(other.automatically_translated)
+        self.assertEqual(other.change_set.count(), before)
+
+    def test_readonly_unit_is_skipped(self) -> None:
+        Unit.objects.filter(pk=self.unit.pk).update(state=STATE_READONLY)
+        self.run_command("--apply")
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "Merci\u202f!")
+
+    def test_glossary_component_is_skipped(self) -> None:
+        self.component.create_glossary()
+        glossary = Component.objects.get(project=self.project, is_glossary=True)
+        result = self.run_command_for(glossary)
+        self.assertIn("skipped (glossary)", result)
+
+    def test_diff_examples_are_capped(self) -> None:
+        index = 0
+        for translation in self.component.translation_set.all():
+            for unit in translation.unit_set.all():
+                Unit.objects.filter(pk=unit.pk).update(
+                    target=f"Merci {index}\u202f!"
+                )
+                index += 1
+        result = self.run_command()
+        self.assertIn("more", result)
+        self.assertLessEqual(
+            len([line for line in result.splitlines() if " -> " in line]), 5
+        )
+
+    @override_settings(AUTOFIX_LIST=["weblate.trans.autofixes.chars.RemoveZeroSpace"])
+    def test_missing_required_autofix_fails_closed(self) -> None:
+        with self.assertRaises(CommandError):
+            self.run_command()
