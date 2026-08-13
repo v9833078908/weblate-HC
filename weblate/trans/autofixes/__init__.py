@@ -19,6 +19,8 @@ from .base import AutoFix
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from django_stubs_ext import StrOrPromise
+
     from weblate.trans.models.unit import Unit
 
 
@@ -35,14 +37,32 @@ class AutofixLoader(ClassLoader[AutoFix]):
 AUTOFIXES = AutofixLoader()
 
 
-def fix_target(target: list[str], unit: Unit) -> tuple[list[str], list[str]]:
-    """Apply each autofix to the target translation."""
-    if target == []:
-        return target, []
-    fixups = []
+def _run_autofixes(target: list[str], unit: Unit) -> tuple[list[str], list[AutoFix]]:
+    """Apply each autofix in order, collecting the ones that changed the target."""
+    applied: list[AutoFix] = []
     for fix in AUTOFIXES.values():
         target, fixed = fix.fix_target(target, unit)
         if fixed:
-            fixups.append(fix.name)
+            applied.append(fix)
+    return target, applied
 
-    return target, fixups
+
+def fix_target(target: list[str], unit: Unit) -> tuple[list[str], list[StrOrPromise]]:
+    """Apply each autofix to the target translation."""
+    if target == []:
+        return target, []
+    target, applied = _run_autofixes(target, unit)
+    return target, [fix.name for fix in applied]
+
+
+def apply_autofixes(target: list[str], unit: Unit) -> tuple[list[str], list[str]]:
+    """Apply each autofix, reporting stable identifiers instead of labels."""
+    if target == []:
+        return target, []
+    target, applied = _run_autofixes(target, unit)
+    return target, [fix.get_identifier() for fix in applied]
+
+
+def autofix_fingerprint() -> tuple[str, ...]:
+    """Return the ordered identifiers of the active autofixes."""
+    return tuple(AUTOFIXES.keys())

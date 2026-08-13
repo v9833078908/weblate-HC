@@ -4,9 +4,14 @@
 
 """Tests for automatic fixups."""
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 
-from weblate.trans.autofixes import fix_target
+from weblate.trans.autofixes import (
+    AUTOFIXES,
+    apply_autofixes,
+    autofix_fingerprint,
+    fix_target,
+)
 from weblate.trans.autofixes.chars import (
     DevanagariDanda,
     PunctuationSpacing,
@@ -309,3 +314,22 @@ class AutoFixTest(TestCase):
                 True,
             ),
         )
+
+
+class AutofixHelpersTest(SimpleTestCase):
+    def test_apply_autofixes_matches_fix_target(self) -> None:
+        unit = make_unit(source="Foo...")
+        self.assertEqual(
+            apply_autofixes(["Bar..."], unit)[0], fix_target(["Bar..."], unit)[0]
+        )
+
+    def test_apply_autofixes_reports_identifiers(self) -> None:
+        unit = make_unit(source="Foo…")
+        self.assertEqual(apply_autofixes(["Bar..."], unit)[1], ["end-ellipsis"])
+
+    def test_empty_target_is_left_alone(self) -> None:
+        unit = make_unit(source="Foo")
+        self.assertEqual(apply_autofixes([], unit), ([], []))
+
+    def test_fingerprint_is_ordered(self) -> None:
+        self.assertEqual(autofix_fingerprint(), tuple(AUTOFIXES.keys()))
