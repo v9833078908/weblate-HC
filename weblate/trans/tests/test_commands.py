@@ -890,6 +890,22 @@ class ReapplyAutofixesTest(ViewTestCase):
         self.assertEqual(Change.objects.count(), changes)
         self.assertEqual(PendingUnitChange.objects.count(), pending)
 
+    def test_apply_repairs_and_keeps_state(self) -> None:
+        self.run_command("--apply")
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "Merci")
+        self.assertEqual(self.unit.state, STATE_TRANSLATED)
+        self.assertTrue(
+            self.unit.change_set.filter(action=ActionEvents.AUTO).exists()
+        )
+
+    def test_second_apply_changes_nothing(self) -> None:
+        self.run_command("--apply")
+        changes = Change.objects.count()
+        result = self.run_command("--apply")
+        self.assertIn("0 units to change", result)
+        self.assertEqual(Change.objects.count(), changes)
+
     def test_clean_unit_is_never_written(self) -> None:
         other = self.get_unit("Hello, world!\n")
         Unit.objects.filter(pk=other.pk).update(
@@ -932,3 +948,71 @@ class ReapplyAutofixesTest(ViewTestCase):
     def test_missing_required_autofix_fails_closed(self) -> None:
         with self.assertRaises(CommandError):
             self.run_command()
+
+    def test_concurrent_edit_is_not_overwritten(self) -> None:
+        # The edit has to land between the scan and the row lock. Hooking
+        # Unit.translate would be too late: by then repair() has already read
+        # the row under select_for_update and recomputed, so even a correct
+        # implementation writes the scanned value and the test fails on good
+        # code. Command.get_user() runs once, after the scan and before
+        # apply_group takes any lock, which is exactly the window.
+        from weblate.trans.management.commands.reapply_autofixes import Command
+
+        original_get_user = Command.get_user
+
+        def edit_first(command):
+            Unit.objects.filter(pk=self.unit.pk).update(target="Merci beaucoup")
+            return original_get_user(command)
+
+        changes = Change.objects.count()
+        with patch.object(Command, "get_user", autospec=True, side_effect=edit_first):
+            self.run_command("--apply")
+        self.unit.refresh_from_db()
+        # Not merely "not Merci": the translator's text must survive intact,
+        # and a repair that found nothing to fix must leave no trace behind.
+        self.assertEqual(self.unit.target, "Merci beaucoup")
+        self.assertFalse(self.unit.automatically_translated)
+        self.assertEqual(Change.objects.count(), changes)
+
+    def test_translate_receives_the_unfixed_target_and_fixes_it(self) -> None:
+        # repair() hands translate() the UNFIXED target on purpose: translate()
+        # runs fix_target internally (unit.py:2406) and that call is what
+        # records unit.fixups. Both halves are pinned here because each can
+        # break alone: pre-fixing in the command would lose the fixups, and a
+        # translate() that stopped applying autofixes would turn every repair
+        # into a no-op write with a Change attached.
+        captured: list[list[str]] = []
+        original_translate = Unit.translate
+
+        def spy(unit, user, new_target, *args, **kwargs):
+            captured.append(list(new_target))
+            return original_translate(unit, user, new_target, *args, **kwargs)
+
+        with patch.object(Unit, "translate", autospec=True, side_effect=spy):
+            self.run_command("--apply")
+        self.assertEqual(captured, [["Merci\u202f!"]])
+        self.unit.refresh_from_db()
+        self.assertEqual(self.unit.target, "Merci")
+
+    def test_apply_does_not_propagate_to_another_component(self) -> None:
+        second = Component.objects.create(
+            name="Test 2",
+            slug="test-2",
+            project=self.project,
+            repo=self.git_repo_path,
+            vcs="git",
+            filemask="po/*.po",
+            template="",
+            file_format="po",
+            new_base="",
+            allow_translation_propagation=True,
+        )
+        other = second.translation_set.get(language_code="cs").unit_set.get(
+            source=self.SOURCE
+        )
+        Unit.objects.filter(pk=other.pk).update(target="Merci\u202f!")
+        self.component.allow_translation_propagation = True
+        self.component.save()
+        self.run_command("--apply")
+        other.refresh_from_db()
+        self.assertEqual(other.target, "Merci\u202f!")

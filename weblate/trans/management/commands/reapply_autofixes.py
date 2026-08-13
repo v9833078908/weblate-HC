@@ -25,7 +25,10 @@ from collections import Counter, defaultdict
 from typing import TYPE_CHECKING
 
 from django.core.management.base import CommandError
+from django.db import transaction
 
+from weblate.auth.models import User
+from weblate.trans.actions import ActionEvents
 from weblate.trans.autofixes import apply_autofixes, autofix_fingerprint
 from weblate.trans.models import Unit
 from weblate.utils.management.base import WeblateComponentCommand
@@ -130,6 +133,38 @@ class Command(WeblateComponentCommand):
         if len(changed) > len(examples):
             self.stdout.write(f"  … +{len(changed) - len(examples)} more")
 
+    def get_user(self) -> User:
+        return User.objects.get_or_create_bot(
+            scope="weblate", name="autofix", verbose="Autofix backfill"
+        )
+
+    def repair(self, unit_id: int, user: User) -> list[str] | None:
+        """
+        Repair one unit, or report that it no longer needs one.
+
+        The whole decision is retaken inside the row lock: the scan ran
+        without one, and a translator or an import may have changed the unit
+        since. ``translate`` receives the freshly read target, applies the
+        autofixes itself (unit.py:2404) and records the fixups.
+        """
+        with transaction.atomic():
+            unit = Unit.objects.select_for_update().prefetch().get(pk=unit_id)
+            if unit.state == STATE_READONLY or unit.translation.is_template:
+                return None
+            original = unit.get_target_plurals()
+            candidate, applied = apply_autofixes(list(original), unit)
+            if candidate == original:
+                return None
+            unit.translate(
+                user,
+                original,
+                unit.state,
+                change_action=ActionEvents.AUTO,
+                propagate=False,
+                select_for_update=False,
+            )
+            return applied
+
     def handle(self, *args, **options) -> None:
         self.check_registry()
         components = self.get_components(**options).order_by("pk")
@@ -149,3 +184,16 @@ class Command(WeblateComponentCommand):
 
         if not options["apply"]:
             self.stdout.write("Dry run: nothing written. Use --apply to write.")
+            return
+
+        user = self.get_user()
+        for group in groups.values():
+            written: list[int] = []
+            stale = 0
+            for component in group:
+                for unit_id in candidates[component.pk]:
+                    if self.repair(unit_id, user) is None:
+                        stale += 1
+                        continue
+                    written.append(unit_id)
+            self.stdout.write(f"{len(written)} written, {stale} stale")
