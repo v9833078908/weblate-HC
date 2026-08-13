@@ -1,5 +1,5 @@
 {
-  "_comment": "docs/misc/col4-eval-harness.py against production, same 150-string sample (fingerprint 4db4b89dfd4b). 'baseline' is commit 5c68a26: no ensure_ascii, no temperature, no reply schema, bisect-only retry, matched glossary. 'after' are three consecutive runs of commit 9247c2c.",
+  "_comment": "docs/misc/col4-eval-harness.py against production, same 150-string sample (fingerprint 4db4b89dfd4b). 'baseline' is commit 5c68a26: no ensure_ascii, no temperature, no reply schema, bisect-only retry, matched glossary. The first three 'after' entries are consecutive runs of commit 9247c2c against production. The fourth is the A2 snapshot of 2026-08-13 and is the odd one out: it ran against the dev-docker mirror, its fingerprint does not match, and it carries no no-regression verdict - read its own _status before comparing it to anything.",
   "baseline": {
     "_captured": "2026-08-11T11:10Z",
     "_commit": "5c68a26",
@@ -111,6 +111,69 @@
       "requests": 10,
       "requests_logged": 20,
       "seconds": 47.9
+    },
+    {
+      "_captured": "2026-08-13T16:36Z",
+      "_commit": "de58138",
+      "_environment": "dev-docker mirror",
+      "_status": "stopped: fingerprint mismatch, no no-regression verdict drawn",
+      "_comment": "Task A2 of plans/2026-08-12-phase0-implementation.md: fresh snapshot of the current code inside dev-docker-weblate-1, batch and concurrency left at the service defaults. The task told the runner to stop rather than force the comparison if the sample fingerprint did not match the historical 4db4b89dfd4b. It did not match, so the five no-regression criteria are deliberately left unanswered. The numbers stay here because they are the measurement that was asked for, but they describe a different sample in a different environment than the three entries above, which all ran against production.",
+      "_invocation": "EVAL_GLOSSARY=glossary; everything else default. The production glossary slug 'glossariy' does not exist in the mirror, where the component is 'glossary'.",
+      "fingerprint": "00fbe7a86b65",
+      "fingerprint_expected": "4db4b89dfd4b",
+      "fingerprint_source_only": "4dcb05628599",
+      "why_it_cannot_match": "fingerprint() hashes unit.id together with unit.source (col4-eval-harness.py:110). Unit ids are database-local, and every historical fingerprint in this file, in col4-model-eval.json and in col4-batch-size-eval.json was computed against production. The mirror holds the same 3941 units with contiguous ids 177675-181615 and the same selection step of 26, so the sampling logic is identical, but sample identity is not expressible across two databases with this hash. No production unit id is recorded in any document in this repository, so the mismatch cannot be settled offline.",
+      "second_divergence": "Even on a matching fingerprint these numbers would not read as a no-regression signal. The mirror glossary carries 153 entries (31 terms plus 122 forms) against 22 canonical terms in production, a known and documented difference (plans/2026-08-11-phase0-schema-and-judge-calibration.md:167-168). It moves glossary occurrences on this sample from 16 to 68 and inflates every prompt accordingly, so tokens and cost are not comparable by construction.",
+      "batch_size": 10,
+      "cached_tokens": 15811,
+      "checks": {
+        "double_space": 1,
+        "end_newline": 1,
+        "end_stop": 13,
+        "multiple_capital": 3,
+        "newline-count": 3,
+        "punctuation_spacing": 2,
+        "reused": 3
+      },
+      "completion_tokens": 92872,
+      "concurrency": 2,
+      "cost_usd": 0.281322,
+      "coverage_pct": 100.0,
+      "cyrillic_leaked": 0,
+      "final_punctuation_added": 13,
+      "finish_reasons": {
+        "length": 1,
+        "stop": 16
+      },
+      "glossary_adherence_pct": 100.0,
+      "glossary_applied": 68,
+      "glossary_missed_terms": {},
+      "glossary_occurrences": 68,
+      "length_ratio_avg": 1.418,
+      "length_ratio_over_130pct": 67,
+      "model": "configured",
+      "prompt_tokens": 178038,
+      "rate_limited_after": false,
+      "rate_limited_before": false,
+      "rejects": {
+        "json_error": 2
+      },
+      "rejects_total": 2,
+      "requests": 17,
+      "translated": 150,
+      "_measured_note": "Transcribed from the run's own printed fields; 'seconds' and 'requests_logged' were lost to output truncation and are left out rather than guessed.",
+      "closest_production_arm": {
+        "_comment": "col4-model-eval.json, google/gemini-2.5-flash at batch 10 / concurrency 2 - the only production arm with the same request shape as the mirror default.",
+        "completion_tokens": 8603,
+        "cost_usd": 0.034814,
+        "length_ratio_avg": 1.274,
+        "prompt_tokens": 67828,
+        "requests": 15
+      },
+      "what_would_make_A2_answerable": [
+        "Make sample identity portable: hash (unit.context, unit.source) instead of (unit.id, unit.source). context is the PO msgctxt and is stable across databases. This renumbers every recorded fingerprint once, which is why a measurement task did not do it on its own authority.",
+        "Or drop the cross-environment ambition and run the gate dev-against-dev: the same mirror at the historical commit and at HEAD, back to back. That is a controlled A/B; the present design is not."
+      ]
     }
   ],
   "autofix_check": {

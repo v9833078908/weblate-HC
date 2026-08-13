@@ -1,0 +1,325 @@
+{
+  "_arm": "mirror",
+  "_batch": 10,
+  "_captured": "2026-08-13T17:46Z",
+  "_concurrency": 4,
+  "_few_shot_held_out": [
+    "clean-177707",
+    "mut-177734-cyrillic-fragment",
+    "mut-177829-obscenity-injected"
+  ],
+  "_labels": {
+    "defect": 232,
+    "pass": 251
+  },
+  "_models": [
+    "deepseek/deepseek-v4-pro",
+    "anthropic/claude-sonnet-5"
+  ],
+  "_records": 483,
+  "_splits": [
+    "dev",
+    "train"
+  ],
+  "_strata": {
+    "clean": 251,
+    "mutation": 114,
+    "terminology": 118
+  },
+  "metrics": {
+    "auto_pass": {
+      "_observed_caveat": "The golden set is enriched with constructed defects, so the observed rates describe the set, not production. The projection below is the transferable number.",
+      "observed_critical_miss_rate": {
+        "high": 1.2,
+        "k": 0,
+        "low": 0.0,
+        "n": 304,
+        "point": 0.0
+      },
+      "observed_miss_rate": {
+        "high": 22.1,
+        "k": 53,
+        "low": 13.6,
+        "n": 304,
+        "point": 17.4
+      },
+      "projected_miss_rate_at_production_prevalence": {
+        "assumed_prevalence_pct": 18.2,
+        "draws": 2000,
+        "high": 5.94,
+        "low": 3.75,
+        "point": 4.84
+      },
+      "rate": {
+        "high": 67.1,
+        "k": 304,
+        "low": 58.5,
+        "n": 483,
+        "point": 62.9
+      }
+    },
+    "boundary_h_needs_human": {
+      "_what": "flag or reject against pass. The confidence router, and the product boundary.",
+      "tnr": {
+        "high": 100.0,
+        "k": 251,
+        "low": 98.5,
+        "n": 251,
+        "point": 100.0
+      },
+      "tpr": {
+        "high": 82.1,
+        "k": 179,
+        "low": 71.3,
+        "n": 232,
+        "point": 77.2
+      }
+    },
+    "boundary_r_has_critical": {
+      "_what": "reject against flag or pass. The release gate.",
+      "tnr_on_clean": {
+        "high": 100.0,
+        "k": 251,
+        "low": 98.5,
+        "n": 251,
+        "point": 100.0
+      },
+      "tpr": {
+        "high": 100.0,
+        "k": 61,
+        "low": 94.1,
+        "n": 61,
+        "point": 100.0
+      }
+    },
+    "by_annotator": {
+      "fable-anthropic-frontier-2026-08-12": {
+        "n": 92,
+        "tnr_h": {
+          "high": 100.0,
+          "k": 92,
+          "low": 96.0,
+          "n": 92,
+          "point": 100.0
+        },
+        "tpr_h": {
+          "high": null,
+          "k": 0,
+          "low": null,
+          "n": 0,
+          "point": null
+        }
+      },
+      "generator:20260812001": {
+        "n": 22,
+        "tnr_h": {
+          "high": null,
+          "k": 0,
+          "low": null,
+          "n": 0,
+          "point": null
+        },
+        "tpr_h": {
+          "high": 76.7,
+          "k": 13,
+          "low": 38.7,
+          "n": 22,
+          "point": 59.1
+        }
+      },
+      "generator:20260812002": {
+        "n": 92,
+        "tnr_h": {
+          "high": null,
+          "k": 0,
+          "low": null,
+          "n": 0,
+          "point": null
+        },
+        "tpr_h": {
+          "high": 85.5,
+          "k": 72,
+          "low": 68.8,
+          "n": 92,
+          "point": 78.3
+        }
+      },
+      "openai-codex-gpt-5.6-terra-2026-08-12": {
+        "n": 159,
+        "tnr_h": {
+          "high": 100.0,
+          "k": 159,
+          "low": 97.6,
+          "n": 159,
+          "point": 100.0
+        },
+        "tpr_h": {
+          "high": null,
+          "k": 0,
+          "low": null,
+          "n": 0,
+          "point": null
+        }
+      },
+      "probe:visibility-adherence": {
+        "n": 118,
+        "tnr_h": {
+          "high": null,
+          "k": 0,
+          "low": null,
+          "n": 0,
+          "point": null
+        },
+        "tpr_h": {
+          "high": 85.9,
+          "k": 94,
+          "low": 71.5,
+          "n": 118,
+          "point": 79.7
+        }
+      }
+    },
+    "by_stratum": {
+      "clean": {
+        "n": 251,
+        "needs_human_recall": null,
+        "pass_rate_on_clean": {
+          "high": 100.0,
+          "k": 251,
+          "low": 98.5,
+          "n": 251,
+          "point": 100.0
+        }
+      },
+      "mutation": {
+        "n": 114,
+        "needs_human_recall": {
+          "high": 81.7,
+          "k": 85,
+          "low": 65.9,
+          "n": 114,
+          "point": 74.6
+        },
+        "pass_rate_on_clean": null
+      },
+      "terminology": {
+        "n": 118,
+        "needs_human_recall": {
+          "high": 85.9,
+          "k": 94,
+          "low": 71.5,
+          "n": 118,
+          "point": 79.7
+        },
+        "pass_rate_on_clean": null
+      }
+    },
+    "confusion_matrix": {
+      "clean->pass": 251,
+      "critical->reject": 61,
+      "major->flag": 102,
+      "major->pass": 53,
+      "major->reject": 16
+    },
+    "false_critical_on_clean": {
+      "_what": "A clean string rejected by the judge never reaches the game, so this is a delivery defect, not noise.",
+      "high": 1.5,
+      "k": 0,
+      "low": -0.0,
+      "n": 251,
+      "point": 0.0
+    },
+    "false_flag_on_clean": {
+      "high": 1.5,
+      "k": 0,
+      "low": -0.0,
+      "n": 251,
+      "point": 0.0
+    },
+    "needs_human_recall_on_terminology": {
+      "high": 85.9,
+      "k": 94,
+      "low": 71.5,
+      "n": 118,
+      "point": 79.7
+    },
+    "records": 483,
+    "reject_recall_on_critical_mutations": {
+      "high": 100.0,
+      "k": 61,
+      "low": 94.1,
+      "n": 61,
+      "point": 100.0
+    },
+    "scored": 483,
+    "tier_a": {
+      "_what": "Tier A is the completeness filter. What it passes is never looked at again, so recall at boundary H decides whether the cascade holds together at all.",
+      "escalated": 184,
+      "escalation_rate_pct": 38.1,
+      "recall_at_h": {
+        "high": 83.3,
+        "k": 182,
+        "low": 72.7,
+        "n": 232,
+        "point": 78.4
+      },
+      "specificity_at_h": {
+        "high": 99.8,
+        "k": 249,
+        "low": 97.1,
+        "n": 251,
+        "point": 99.2
+      }
+    },
+    "tier_b": {
+      "_what": "Tier B is precision over the subset tier A escalated.",
+      "overturned": 5,
+      "overturned_correctly": 2,
+      "overturned_wrongly": 3,
+      "precision_on_escalated": {
+        "high": 100.0,
+        "k": 179,
+        "low": 97.9,
+        "n": 179,
+        "point": 100.0
+      },
+      "upheld": 179
+    },
+    "unparsed": 0,
+    "verdict_derived_from_errors_disagreed_with_model_verdict": 7
+  },
+  "tier_a_model": "anthropic/claude-sonnet-5",
+  "tier_b_model": "deepseek/deepseek-v4-pro",
+  "usage": {
+    "cost_per_1000_records": 1.5177,
+    "tier_a": {
+      "completion_tokens": 39733,
+      "cost_per_1000_records": 1.3755,
+      "cost_usd": 0.66436,
+      "prompt_tokens": 133515,
+      "records": 483,
+      "requests": 49,
+      "retries": 0,
+      "seconds": 142.0,
+      "transport_error_samples": [],
+      "transport_errors": {},
+      "unparsed": 0
+    },
+    "tier_b": {
+      "completion_tokens": 61647,
+      "cost_per_1000_records": 0.3734,
+      "cost_usd": 0.068704,
+      "prompt_tokens": 37261,
+      "records": 184,
+      "requests": 20,
+      "retries": 1,
+      "seconds": 404.9,
+      "transport_error_samples": [],
+      "transport_errors": {
+        "unparsed_reply": 1
+      },
+      "unparsed": 0
+    },
+    "total_cost_usd": 0.733064
+  }
+}
