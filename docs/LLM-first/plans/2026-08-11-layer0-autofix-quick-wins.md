@@ -258,7 +258,7 @@ pytest, PostgreSQL, git-бэкенд Weblate.
         # the target mark is correct even though end_exclamation fails. This is
         # the one direction that IS unwrapped - the source side.
         unit = make_unit(source='Старейшина бежит на вас с криком "Еретик!"', code="fr")
-        target = "L'Ancien se précipite sur toi en criant Hérétique\u202f!"
+        target = "L'Ancien se précipite sur toi en criant Hérétique\u202f!"  # codespell:ignore
         self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
 
     def test_keeps_a_mark_wrapped_in_markup(self) -> None:
