@@ -34,9 +34,9 @@ end-whitespace, end-ellipsis, zero-width-space, control-chars,
 devanadari-danda, punctuation-spacing, safe-html
 ```
 
-Для сравнения: в dev-контейнере активен только `line-separator-spacing`.
-Совпадение реестров прода и стенда не гарантировано и должно проверяться
-перед каждым прогоном.
+Стенд пересобран 2026-08-13 с полным `WEBLATE_ADD_AUTOFIX` из
+`dev-docker/docker-compose.yml`, поэтому dev-реестр теперь совпадает с
+продом; перед каждым прогоном совпадение всё равно проверяется командой.
 
 ## 1. Объём backfill (основание для команды)
 
@@ -139,3 +139,22 @@ devanadari-danda, punctuation-spacing, safe-html
 из участников не вычитывает.
 
 Решение остаётся за владельцем: цифры и все строки приведены выше.
+
+## 6. Dev smoke (2026-08-13)
+
+Стенд пересобран (`WEBLATE_PORT=3001 ./rundev.sh`), активный реестр
+dev-инстанса:
+
+```
+line-separator-spacing, removed-final-stop, french-punctuation-spacing,
+end-whitespace, end-ellipsis, zero-width-space, control-chars,
+devanadari-danda, punctuation-spacing, safe-html
+```
+
+Dry-run на dev-компоненте `col4/data`:
+`2223 units to change (french-punctuation-spacing 47, removed-final-stop
+2173, zero-width-space 7)`. Ноль записей: `Change` до и после прогона —
+173057, `PendingUnitChange` — 0. Отличие от прод-чисел ожидаемо: dev
+несёт своё зеркало вывода автоперевода. Правило отгружено с `:` во
+множестве знаков (дефолт плана); вердикт владельца по двоеточию из
+раздела 5 остаётся открытым.
