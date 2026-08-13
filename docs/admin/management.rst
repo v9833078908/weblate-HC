@@ -1046,6 +1046,29 @@ You can either define which project or component to update (for example
     Weblate pushes changes automatically if :ref:`component-push_on_commit` in
     :ref:`component` is turned on, which is the default.
 
+reapply_autofixes
+-----------------
+
+.. weblate-admin:: reapply_autofixes <project|project/component>
+
+Re-applies the active automatic fixes to translations that were stored before
+a fix existed: automatic fixes run only when a string is saved, so an older
+translation keeps its defect forever. The command skips glossary components,
+template translations, and read-only strings.
+
+By default the command reports what would change without writing anything.
+
+.. weblate-admin-option:: --apply
+
+    Writes the repairs. Each unit is locked and re-evaluated inside the lock,
+    so a concurrent edit is never overwritten. The command commits once per
+    repository root without pushing, and refuses to commit when the repository
+    carries pending changes from other work: the repairs stay pending for the
+    regular scheduler, and the run exits with an error.
+
+You can either define which project or component to update (for example
+``weblate/application``), or use ``--all`` to update all existing components.
+
 unlock_translation
 ------------------
 

@@ -130,7 +130,9 @@ class RemoveAddedFinalStopTest(SimpleTestCase):
         # Prod shape (unit 179518).
         unit = make_unit(source="Старик сделал небольшую паузу и продолжил", code="fr")
         self.assertEqual(
-            self.fix.fix_target(["Le vieil homme fait une pause et reprend\u00a0:"], unit),
+            self.fix.fix_target(
+                ["Le vieil homme fait une pause et reprend\u00a0:"], unit
+            ),
             (["Le vieil homme fait une pause et reprend"], True),
         )
 
@@ -145,7 +147,9 @@ class RemoveAddedFinalStopTest(SimpleTestCase):
         # Measured on prod: reaching behind the quote repaired 17 units and
         # broke 13 of them. `…the inscription "armory."` is correct en_US
         # typography, and the rule must not touch it.
-        unit = make_unit(source="Впереди двери с надписью \u00abоружейная\u00bb", code="en")
+        unit = make_unit(
+            source="Впереди двери с надписью \u00abоружейная\u00bb", code="en"
+        )
         target = 'Ahead are large double doors with the inscription "armory."'
         self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
 
@@ -159,7 +163,7 @@ class RemoveAddedFinalStopTest(SimpleTestCase):
         # the target mark is correct even though end_exclamation fails. This is
         # the one direction that IS unwrapped - the source side.
         unit = make_unit(source='Старейшина бежит на вас с криком "Еретик!"', code="fr")
-        target = "L'Ancien se précipite sur toi en criant Hérétique\u202f!"
+        target = "L'Ancien se précipite sur toi en criant Hérétique\u202f!"  # codespell:ignore
         self.assertEqual(self.fix.fix_target([target], unit), ([target], False))
 
     def test_keeps_a_mark_wrapped_in_markup(self) -> None:
@@ -183,7 +187,8 @@ class RemoveAddedFinalStopTest(SimpleTestCase):
     def test_keeps_interrobang(self) -> None:
         unit = make_unit(source="Ты серьёзно", code="fr")
         self.assertEqual(
-            self.fix.fix_target(["Tu es sérieux ?!"], unit), (["Tu es sérieux ?!"], False)
+            self.fix.fix_target(["Tu es sérieux ?!"], unit),
+            (["Tu es sérieux ?!"], False),
         )
 
     def test_refuses_to_empty_the_target(self) -> None:
@@ -199,17 +204,13 @@ class RemoveAddedFinalStopTest(SimpleTestCase):
         )
 
     def test_mark_specific_ignore_flag_disables_the_fix(self) -> None:
-        unit = make_unit(
-            source="А давайте", code="fr", flags="ignore-end-exclamation"
-        )
+        unit = make_unit(source="А давайте", code="fr", flags="ignore-end-exclamation")
         self.assertEqual(
             self.fix.fix_target(["Allons-y\u202f!"], unit), (["Allons-y\u202f!"], False)
         )
 
     def test_fixes_every_plural_form(self) -> None:
-        unit = make_unit(
-            source=["Attends", "Attendez"], target=["", ""], code="fr"
-        )
+        unit = make_unit(source=["Attends", "Attendez"], target=["", ""], code="fr")
         self.assertEqual(
             self.fix.fix_target(["Attends\u202f!", "Attendez\u202f!"], unit),
             (["Attends", "Attendez"], True),

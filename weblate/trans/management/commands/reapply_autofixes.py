@@ -2,7 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Re-apply the active autofixes to translations that were stored earlier.
+"""
+Re-apply the active autofixes to translations that were stored earlier.
 
 Autofixes only run on write (``Unit.translate`` -> ``fix_target``), so a unit
 translated before a fix existed keeps its defect forever. This command replays
@@ -81,7 +82,7 @@ class Command(WeblateComponentCommand):
 
     @staticmethod
     def candidate_units(component: Component):
-        """Stored units the autofixes are allowed to touch."""
+        """Select the stored units the autofixes are allowed to touch."""
         translations = [
             translation
             for translation in component.translation_set.all()

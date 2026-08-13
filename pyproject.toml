@@ -702,6 +702,8 @@ max-complexity = 16  # TODO: should be lower
 "weblate/trans/autofixes/__init__.py" = ["RUF067"]
 "weblate/trans/models/__init__.py" = ["RUF067"]
 "weblate/utils/generate_secret_key.py" = ["T201"]
+# Deliberate Russian prod strings (quote examples) in comments and docstrings
+"weblate_customization/src/weblate_customization/autofixes.py" = ["RUF002", "RUF003"]
 
 [tool.ruff.lint.pylint]
 # TODO: all these should be lower (or use defaults)

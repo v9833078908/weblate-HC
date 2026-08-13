@@ -18,14 +18,15 @@ from django.test.utils import override_settings
 
 from weblate.accounts.models import Profile
 from weblate.runner import main
+from weblate.trans import defaults as trans_defaults
 from weblate.trans.actions import ActionEvents
 from weblate.trans.file_format_params import (
     FILE_FORMATS_PARAMS,
     BaseFileFormatParam,
     register_file_format_param,
 )
-from weblate.trans import defaults as trans_defaults
-from weblate.trans.models import Change, Component, Unit
+from weblate.trans.management.commands.reapply_autofixes import Command
+from weblate.trans.models import Change, Component, Translation, Unit
 from weblate.trans.models.pending import PendingUnitChange
 from weblate.trans.tests.test_models import RepoTestCase
 from weblate.trans.tests.test_views import (
@@ -39,8 +40,8 @@ from weblate.trans.tests.utils import (
     get_test_file,
     require_github,
 )
-from weblate.vcs.mercurial import HgRepository
 from weblate.utils.state import STATE_READONLY, STATE_TRANSLATED
+from weblate.vcs.mercurial import HgRepository
 
 # The test settings use the default AUTOFIX_LIST, which has none of the custom
 # fixes; the command fails closed without its required fix, so every test of it
@@ -896,9 +897,7 @@ class ReapplyAutofixesTest(ViewTestCase):
         self.unit.refresh_from_db()
         self.assertEqual(self.unit.target, "Merci")
         self.assertEqual(self.unit.state, STATE_TRANSLATED)
-        self.assertTrue(
-            self.unit.change_set.filter(action=ActionEvents.AUTO).exists()
-        )
+        self.assertTrue(self.unit.change_set.filter(action=ActionEvents.AUTO).exists())
 
     def test_second_apply_changes_nothing(self) -> None:
         self.run_command("--apply")
@@ -935,9 +934,7 @@ class ReapplyAutofixesTest(ViewTestCase):
         index = 0
         for translation in self.component.translation_set.all():
             for unit in translation.unit_set.all():
-                Unit.objects.filter(pk=unit.pk).update(
-                    target=f"Merci {index}\u202f!"
-                )
+                Unit.objects.filter(pk=unit.pk).update(target=f"Merci {index}\u202f!")
                 index += 1
         result = self.run_command()
         self.assertIn("more", result)
@@ -957,8 +954,6 @@ class ReapplyAutofixesTest(ViewTestCase):
         # implementation writes the scanned value and the test fails on good
         # code. Command.get_user() runs once, after the scan and before
         # apply_group takes any lock, which is exactly the window.
-        from weblate.trans.management.commands.reapply_autofixes import Command
-
         original_get_user = Command.get_user
 
         def edit_first(command):
@@ -1026,7 +1021,9 @@ class ReapplyAutofixesTest(ViewTestCase):
 
     def test_foreign_pending_changes_block_the_commit(self) -> None:
         self.edit_unit("Hello, world!\n", "Ahoj svete!\n")
-        with patch.object(Component, "commit_pending") as commit:
-            with self.assertRaises(CommandError):
-                self.run_command("--apply")
+        with (
+            patch.object(Component, "commit_pending") as commit,
+            self.assertRaises(CommandError),
+        ):
+            self.run_command("--apply")
         commit.assert_not_called()
