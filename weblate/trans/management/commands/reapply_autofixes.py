@@ -30,14 +30,13 @@ from django.db import transaction
 from weblate.auth.models import User
 from weblate.trans.actions import ActionEvents
 from weblate.trans.autofixes import apply_autofixes, autofix_fingerprint
-from weblate.trans.models import Unit
+from weblate.trans.models import Component, Unit
+from weblate.trans.models.pending import PendingUnitChange
 from weblate.utils.management.base import WeblateComponentCommand
 from weblate.utils.state import STATE_READONLY
 
 if TYPE_CHECKING:
     from django.core.management.base import CommandParser
-
-    from weblate.trans.models import Component
 
 # Without it the run is a false green: it would report zero changes because the
 # fix is not registered, not because the corpus is clean.
@@ -165,6 +164,50 @@ class Command(WeblateComponentCommand):
             )
             return applied
 
+    @staticmethod
+    def foreign_pending(root: Component, written: list[int]) -> bool:
+        """Any pending change in this repository family that is not ours."""
+        return (
+            PendingUnitChange.objects.for_component(
+                root, apply_filters=False, include_linked=True
+            )
+            .exclude(unit_id__in=written)
+            .exists()
+        )
+
+    def apply_group(
+        self,
+        root: Component,
+        group: list[Component],
+        candidates: dict[int, list[int]],
+    ) -> bool:
+        user = self.get_user()
+        with root.repository.lock:
+            if self.foreign_pending(root, []):
+                self.stderr.write(
+                    f"{root}: foreign pending changes, refusing to touch this repository"
+                )
+                return False
+            written: list[int] = []
+            stale = 0
+            for component in group:
+                for unit_id in candidates[component.pk]:
+                    if self.repair(unit_id, user) is None:
+                        stale += 1
+                        continue
+                    written.append(unit_id)
+            self.stdout.write(f"{root}: {len(written)} written, {stale} stale")
+            if not written:
+                return True
+            if self.foreign_pending(root, written):
+                self.stderr.write(
+                    f"{root}: foreign pending changes appeared during the run; "
+                    "repairs stay pending and are not committed"
+                )
+                return False
+            root.commit_pending("autofix backfill", user, skip_push=True)
+        return True
+
     def handle(self, *args, **options) -> None:
         self.check_registry()
         components = self.get_components(**options).order_by("pk")
@@ -186,14 +229,16 @@ class Command(WeblateComponentCommand):
             self.stdout.write("Dry run: nothing written. Use --apply to write.")
             return
 
-        user = self.get_user()
-        for group in groups.values():
-            written: list[int] = []
-            stale = 0
-            for component in group:
-                for unit_id in candidates[component.pk]:
-                    if self.repair(unit_id, user) is None:
-                        stale += 1
-                        continue
-                    written.append(unit_id)
-            self.stdout.write(f"{len(written)} written, {stale} stale")
+        results: list[tuple[Component, bool]] = []
+        for root_id, group in groups.items():
+            root = next((c for c in group if c.pk == root_id), None)
+            if root is None:
+                root = Component.objects.get(pk=root_id)
+            results.append((root, self.apply_group(root, group, candidates)))
+
+        failures = [root for root, ok in results if not ok]
+        if failures:
+            msg = "Some repositories were not committed: " + ", ".join(
+                str(root) for root in failures
+            )
+            raise CommandError(msg)

@@ -1016,3 +1016,16 @@ class ReapplyAutofixesTest(ViewTestCase):
         self.run_command("--apply")
         other.refresh_from_db()
         self.assertEqual(other.target, "Merci\u202f!")
+
+    def test_apply_commits_the_repository_once(self) -> None:
+        with patch.object(Component, "commit_pending", return_value=True) as commit:
+            self.run_command("--apply")
+        self.assertEqual(commit.call_count, 1)
+        self.assertEqual(commit.call_args.kwargs["skip_push"], True)
+
+    def test_foreign_pending_changes_block_the_commit(self) -> None:
+        self.edit_unit("Hello, world!\n", "Ahoj svete!\n")
+        with patch.object(Component, "commit_pending") as commit:
+            with self.assertRaises(CommandError):
+                self.run_command("--apply")
+        commit.assert_not_called()
