@@ -7,8 +7,11 @@ from __future__ import annotations
 from random import choice
 from typing import TYPE_CHECKING
 
-from weblate.checks.glossary import GlossaryCheck, ProhibitedInitialCharacterCheck
+from django.test import SimpleTestCase
+
+from weblate.checks.glossary import GlossaryCheck, ProhibitedInitialCharacterCheck, evaluate_glossary_terms
 from weblate.checks.models import Check
+from weblate.trans.tests.factories import make_language, make_unit
 from weblate.trans.tests.test_views import ComponentTestCase
 from weblate.utils.csv import PROHIBITED_INITIAL_CHARS
 from weblate.utils.state import STATE_TRANSLATED

@@ -281,9 +281,12 @@ GLOSSARY_RULE = """\
 
 Each segment may carry `glossary`: terms of this project with their approved \
 Chinese rendering. They are reference material, not text to translate. A term \
-whose approved rendering is absent from the target is a `major` terminology \
-error; a target that follows the glossary is correct by definition, even if \
-another wording would read better."""
+rendered against its approved form is a `major` terminology error.
+
+Glossary conformance is necessary but never sufficient. A segment whose terms \
+all match the glossary can still be mistranslated, ungrammatical, or a pile of \
+correct words in an order no player can parse. Judge the sentence first, the \
+terms second."""
 
 FAMILY_RULE = """\
 
