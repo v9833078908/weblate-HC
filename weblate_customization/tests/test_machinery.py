@@ -330,6 +330,19 @@ class RoutedDownloadTest(TestCase):
         self.assertEqual(http_mock.calls, [])
 
     @http_mock.activate
+    def test_usage_recorded_through_inherited_seam(self) -> None:
+        from weblate.trans.models.llm_usage import LLMUsageLog
+
+        mock_chat()  # usage 9/2/11, no cost
+        self.machine().download_multiple_translations("en", "ja", [("Hello", None)])
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.model, DEEPSEEK)
+        self.assertEqual(log.prompt_tokens, 9)
+        self.assertEqual(log.completion_tokens, 2)
+        self.assertIsNone(log.cost_usd)
+        self.assertEqual(log.project_slug, "")
+
+    @http_mock.activate
     def test_route_context_is_reset_after_success(self) -> None:
         mock_chat()
         machine = self.machine()
