@@ -283,8 +283,12 @@ Reachability preconditions:
   proposal finding only when analysis is enabled, credentials are configured,
   and an explicit glossary intent plus selected worksheet precede the request.
   A draft finding is in model only across the owner-and-session-bound draft
-  lifecycle, with project-level component-creation permission rechecked on
-  every draft endpoint. *(documented)* (source:
+  lifecycle. A creation draft rechecks project-level component-creation
+  permission on every endpoint, including confirmation. An update draft
+  bound to an existing glossary component instead rechecks
+  ``upload.perform`` on that component, and the component-creation endpoint
+  explicitly refuses an update draft, so the weaker permission can never
+  reach component creation. *(documented)* (source:
   :ref:`uploading-glossary-tables`, :doc:`/admin/config`)
 
 Environment assumptions
@@ -737,9 +741,12 @@ Security properties Weblate provides
    * - A loc-kit glossary proposal response, whether from OpenRouter or an
        uploaded correction, is untrusted input: it is validated locally against
        the selected sheet and can never execute code or create a component
-       directly. A draft is owner-and-session bound, every draft endpoint
-       rechecks project-level component-creation permission, and only a
-       successful local render-and-parse-back gate reaches component creation.
+       directly. A creation draft rechecks project-level component-creation
+       permission on every endpoint; an update draft bound to an existing
+       glossary instead rechecks ``upload.perform`` on that glossary, and
+       component creation is unreachable from an update draft. Only a
+       successful local render-and-parse-back gate reaches component
+       creation.
        *(documented)* (source: :ref:`uploading-glossary-tables`,
        :doc:`/admin/config`)
      - Analysis is enabled and configured, or a manual profile is supplied.

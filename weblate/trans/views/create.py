@@ -1517,7 +1517,16 @@ class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
 
     @cached_property
     def draft(self) -> LocKitImportDraft:
-        return self.get_draft(self.kwargs["token"])
+        draft = self.get_draft(self.kwargs["token"])
+        # get_draft() deliberately relaxes its gate for update drafts to
+        # upload.perform on the existing glossary, skipping the wizard's
+        # creatable-projects check entirely (see the docstring above). This
+        # view creates a brand-new component, so an update draft must never
+        # reach it: that would let upload.perform on one glossary create an
+        # unrelated component the actor cannot otherwise create.
+        if draft.target_component_id is not None:
+            raise Http404
+        return draft
 
     def locked_values(self) -> dict:
         draft = self.draft

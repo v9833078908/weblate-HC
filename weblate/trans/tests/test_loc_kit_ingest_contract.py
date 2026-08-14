@@ -1561,6 +1561,33 @@ class LocKitGlossaryUpdateGateTest(ViewTestCase):
         )
         self.assertEqual(response.status_code, 200)
 
+    def test_confirm_rejects_an_update_draft(self) -> None:
+        """
+        Confirm creates a brand-new component using the creatable-projects
+        permission. An update draft is only gated by upload.perform on the
+        existing glossary and must never reach this endpoint - that would
+        let upload.perform on one glossary create an unrelated component.
+        """
+        draft = self._draft()
+        # Reach the state the view actually gates on, so a passing test
+        # proves the new guard fires rather than the pre-existing
+        # PREVIEW_READY check that would 404 an untouched draft anyway.
+        draft.state = LocKitImportDraft.State.PREVIEW_READY
+        draft.preview_json = json.dumps({"source_language": "en"})
+        draft.save(update_fields=["state", "preview_json"])
+        self._restrict_to_upload()
+        before = Component.objects.count()
+
+        response = self.client.get(
+            reverse("loc-kit-glossary-confirm", kwargs={"token": draft.token})
+        )
+        self.assertEqual(response.status_code, 404)
+        response = self.client.post(
+            reverse("loc-kit-glossary-confirm", kwargs={"token": draft.token}), {}
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Component.objects.count(), before)
+
 
 class LocKitGlossaryUpdateStartTest(ViewTestCase):
     """An operator stages an append table from an existing glossary."""
