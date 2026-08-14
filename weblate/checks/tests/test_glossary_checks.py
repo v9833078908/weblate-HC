@@ -109,11 +109,33 @@ class GlossaryCheckTest(ComponentTestCase):
         )
 
     def test_description(self) -> None:
+        """A plain term the comparison cannot confirm is phrased as a question."""
         self.test_bad()
         check = Check(unit=self.unit)
         self.assertEqual(
             self.check.get_description(check),
-            "Following terms are not translated according to glossary: hello",
+            "Check the following terms; keep the translation if it already uses "
+            "a grammatical form of the term: hello",
+        )
+
+    def test_description_separates_hard_from_advisory(self) -> None:
+        """Задача 4: a demanded rewrite is not phrased like an uncertain match."""
+        # A forbidden term present in the target demands a rewrite.
+        self.add_glossary("ahoj")
+        self.glossary.unit_set.all().update(extra_flags="forbidden")
+        # A plain term that is not found stays a question: cs has no Snowball
+        # algorithm, so the comparison cannot confirm an inflected form.
+        with self.captureOnCommitCallbacks(execute=True):
+            self.glossary.add_unit(None, "w", "world", "svět", author=self.user)
+        self.project.invalidate_glossary_cache()
+        self.unit.glossary_terms = None
+
+        check = Check(unit=self.unit)
+        self.assertEqual(
+            self.check.get_description(check),
+            "Following terms are not translated according to glossary: hello"
+            " Check the following terms; keep the translation if it already uses "
+            "a grammatical form of the term: world",
         )
 
     def test_morphology_lifts_inflected_german_target(self) -> None:
@@ -337,6 +359,22 @@ class GlossaryMorphologyEvaluatorTest(SimpleTestCase):
         )
         self.assertEqual(hard, set())
         self.assertEqual(advisory, {"Dukungan"})
+
+    def test_acronym_target_is_not_lifted_by_morphology(self) -> None:
+        """An abbreviation must not be accepted through a stem of itself."""
+        unit = self.build(
+            target_code="ru",
+            term_source="институт",
+            term_target="НИИ",
+            source_text="Институт закрыт.",
+            target_text="ни один не работает",
+        )
+        # "ни" shares the Russian stem of "НИИ" but is a particle, not the term.
+        hard, advisory = evaluate_glossary_terms(
+            unit, "Институт закрыт.", "ни один не работает"
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, {"институт"})
 
     def test_negative_id_batas_terakhir_not_lifted(self) -> None:
         unit = self.build(

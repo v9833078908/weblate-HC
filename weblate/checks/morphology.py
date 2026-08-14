@@ -89,6 +89,20 @@ def iter_word_spans(text: str) -> Iterator[tuple[str, int, int]]:
         yield match.group(), match.start(), match.end()
 
 
+def is_acronym(term: str) -> bool:
+    """
+    Return whether the term is a short all-caps abbreviation.
+
+    An abbreviation does not inflect the way a word does, and stemming one is
+    actively harmful: Russian Snowball turns ``НИИ`` into ``ни``, which is a
+    very common particle, so the term would match unrelated text. The rule
+    matches the one the measurements in
+    ``docs/specs/2026-08-11-glossary-enforcement-analysis.md`` were taken with -
+    the probes there compared acronyms case-sensitively for the same reason.
+    """
+    return term.isupper() and len(term) <= 5
+
+
 def contains_inflected(term: str, text: str, language_code: str) -> bool:
     """
     Return whether the term occurs in the text as a whole-word sequence of stems.
@@ -100,7 +114,13 @@ def contains_inflected(term: str, text: str, language_code: str) -> bool:
 
 
 def count_inflected(term: str, text: str, language_code: str) -> int:
-    """Count occurrences of the term's stem sequence as whole-word runs."""
+    """
+    Count occurrences of the term's stem sequence as whole-word runs.
+
+    An acronym never counts as inflected: see :func:`is_acronym`.
+    """
+    if is_acronym(term):
+        return 0
     needle = get_text_stems(term, language_code)
     if not needle:
         return 0

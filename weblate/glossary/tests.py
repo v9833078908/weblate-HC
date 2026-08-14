@@ -1307,6 +1307,18 @@ class GlossaryStemMatcherTest(ViewTestCase):
             with self.subTest(probe_source=probe_source):
                 self.assertEqual(self.matched_sources(probe_source), set())
 
+    def test_stem_fallback_excludes_acronyms_without_any_flag(self) -> None:
+        """
+        An abbreviation must not be stem-matched even with no flag set.
+
+        Measured on production: Russian Snowball turns ``НИИ`` into ``ни``, a
+        very common particle, which produced 34 false matches on col4 before
+        the guard. The exact matcher still finds the abbreviation itself.
+        """
+        self.add_ru_term("НИИ")
+        self.assertEqual(self.matched_sources("ни тут нет и ни там"), set())
+        self.assertEqual(self.matched_sources("НИИ работает"), {"НИИ"})
+
     def test_stem_fallback_excludes_not_applicable_terms(self) -> None:
         self.add_ru_term("ликвидатор", flags="not-applicable")
         self.assertEqual(self.matched_sources("ликвидаторов было много"), set())

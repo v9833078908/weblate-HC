@@ -27,6 +27,7 @@ from weblate.checks.morphology import (
     get_algorithm,
     get_snowball_version,
     get_stemmer,
+    is_acronym,
     stem_word,
 )
 from weblate.trans.models.unit import Unit
@@ -227,7 +228,9 @@ def get_glossary_stem_automaton(
                 if modes & {"exact", "not-applicable", "read-only", "forbidden"}:
                     continue
                 source = cleanup_glossary_term(unit.source)
-                if not source:
+                if not source or is_acronym(source):
+                    # An abbreviation is exact-only: stemming it matches
+                    # unrelated text, see weblate/checks/morphology.py
                     continue
                 stems = [
                     stem_word(algorithm, word.lower())

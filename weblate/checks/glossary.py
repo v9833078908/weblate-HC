@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from django.utils.html import escape, format_html
+from django.utils.html import escape, format_html, format_html_join
 from django.utils.translation import gettext, gettext_lazy
 
 from weblate.checks.base import TargetCheck
@@ -119,29 +119,59 @@ class GlossaryCheck(TargetCheck):
         sources = unit.get_source_plurals()
         targets = unit.get_target_plurals()
         source = sources[0]
-        results = set()
+        hard: set[str] = set()
+        advisory: set[str] = set()
         # Check singular
-        result = self.check_single(source, targets[0], unit)
-        if result:
-            results.update(result)
+        singular_hard, singular_advisory = evaluate_glossary_terms(
+            unit, source, targets[0]
+        )
+        hard |= singular_hard
+        advisory |= singular_advisory
         # Do we have more to check?
         if len(sources) > 1:
             source = sources[1]
         # Check plurals against plural from source
         for target in targets[1:]:
-            result = self.check_single(source, target, unit)
-            if result:
-                results.update(result)
+            plural_hard, plural_advisory = evaluate_glossary_terms(unit, source, target)
+            hard |= plural_hard
+            advisory |= plural_advisory
 
-        if not results:
+        # A term demanding a rewrite for one plural form is not also a maybe
+        advisory -= hard
+        if not hard and not advisory:
             return super().get_description(check_obj)
 
-        return format_html(
-            escape(
-                gettext("Following terms are not translated according to glossary: {}")
-            ),
-            format_html_join_comma("{}", ((term,) for term in sorted(results))),
-        )
+        # The check is a single UI projection of the evaluation, but a term the
+        # morphological comparison could not confirm must not be phrased as a
+        # certain failure: the translation may legitimately carry a form the
+        # comparison does not cover.
+        messages = []
+        if hard:
+            messages.append(
+                format_html(
+                    escape(
+                        gettext(
+                            "Following terms are not translated according to glossary: {}"
+                        )
+                    ),
+                    format_html_join_comma("{}", ((term,) for term in sorted(hard))),
+                )
+            )
+        if advisory:
+            messages.append(
+                format_html(
+                    escape(
+                        gettext(
+                            "Check the following terms; keep the translation if it "
+                            "already uses a grammatical form of the term: {}"
+                        )
+                    ),
+                    format_html_join_comma(
+                        "{}", ((term,) for term in sorted(advisory))
+                    ),
+                )
+            )
+        return format_html_join(" ", "{}", ((message,) for message in messages))
 
 
 class ProhibitedInitialCharacterCheck(TargetCheck):
