@@ -841,7 +841,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
 
     @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
     def test_operator_switches_the_layout_from_the_preview(self) -> None:
-        """Неверно угаданная раскладка чинится кнопкой, а не JSON-профилем."""
+        """Неверно угаданная раскладка чинится кнопкой, а не JSON-профилем."""  # ruff: ignore[ambiguous-unicode-character-docstring]
         self._start(upload=self._csv("Terms.csv", GLOSSARY_PAIRS_CSV), slug=self.slug)
         draft = self._draft()
 
@@ -1425,7 +1425,6 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertEqual(blank.state, STATE_EMPTY)
 
 
-
 class LocKitUpdateDraftModelTest(ViewTestCase):
     """A glossary-update draft is bound to one existing glossary component."""
 
@@ -1505,9 +1504,7 @@ class LocKitGlossaryUpdateGateTest(ViewTestCase):
             Permission.objects.get(codename="glossary.edit"),
             Permission.objects.get(codename="unit.edit"),
         )
-        group = Group.objects.create(
-            name=role.name, language_selection=SELECTION_ALL
-        )
+        group = Group.objects.create(name=role.name, language_selection=SELECTION_ALL)
         group.roles.add(role)
         group.projects.add(self.project)
         self.user.groups.add(group)
@@ -1563,10 +1560,11 @@ class LocKitGlossaryUpdateGateTest(ViewTestCase):
 
     def test_confirm_rejects_an_update_draft(self) -> None:
         """
-        Confirm creates a brand-new component using the creatable-projects
-        permission. An update draft is only gated by upload.perform on the
-        existing glossary and must never reach this endpoint - that would
-        let upload.perform on one glossary create an unrelated component.
+        Confirm requires the creatable-projects permission.
+
+        An update draft is only gated by upload.perform on the existing
+        glossary and must never reach this endpoint - that would let
+        upload.perform on one glossary create an unrelated component.
         """
         draft = self._draft()
         # Reach the state the view actually gates on, so a passing test
@@ -1651,16 +1649,15 @@ class LocKitGlossaryUpdateStartTest(ViewTestCase):
         depth = 0
         for tag in re.finditer(r"</?form\b", page.content.decode()):
             depth += -1 if tag.group().startswith("</") else 1
-            self.assertLessEqual(
-                depth, 1, "a form is nested inside another form"
-            )
+            self.assertLessEqual(depth, 1, "a form is nested inside another form")
 
 
 # --------------------------------------------------------------------------- #
 # Append-only application service
 # --------------------------------------------------------------------------- #
 
-from loc_kit_ingest.parser import _context_key  # ruff: ignore[module-import-not-at-top-of-file]
+# ruff: ignore[module-import-not-at-top-of-file, import-private-name]
+from loc_kit_ingest.parser import _context_key
 
 
 def _append_preview(
@@ -1677,9 +1674,7 @@ def _append_preview(
     """
     codes = [
         code
-        for code in dict.fromkeys(
-            value for term in terms for value in term["values"]
-        )
+        for code in dict.fromkeys(value for term in terms for value in term["values"])
         if code != source_language
     ]
     has_source_notes = any(term.get("notes", {}).get("source") for term in terms)
@@ -1769,8 +1764,10 @@ def _append_preview(
         row.extend(term["values"].get(code, "") for code in [source_language, *codes])
         if has_source_notes:
             row.append(term.get("notes", {}).get("source", ""))
-        for code in noted_targets:
-            row.append(term.get("notes", {}).get("target", {}).get(code, ""))
+        row.extend(
+            term.get("notes", {}).get("target", {}).get(code, "")
+            for code in noted_targets
+        )
         rows.append(row)
     return loc_kit.validate_glossary_profile(
         profile_document=document,
@@ -1801,9 +1798,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
         request.user = self.user
         return request
 
-    def _seed(
-        self, section, en, cs="", *, explanation="Old meaning.", state=None
-    ):
+    def _seed(self, section, en, cs="", *, explanation="Old meaning.", state=None):
         """Create one glossary term the way the stock UI would."""
         context = _context_key(section, en)
         # Adding through the source translation creates the source unit and
@@ -1828,9 +1823,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             source_language="en",
         )
 
-        result = loc_kit.append_glossary_terms(
-            self._request(), self.glossary, preview
-        )
+        result = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
 
         seeded.refresh_from_db()
         self.assertEqual(seeded.target, "")
@@ -1851,9 +1844,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             source_language="en",
         )
 
-        result = loc_kit.append_glossary_terms(
-            self._request(), self.glossary, preview
-        )
+        result = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
 
         translated.refresh_from_db()
         approved.refresh_from_db()
@@ -1863,9 +1854,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
         self.assertEqual(result.languages["cs"].existing, 2)
 
     def test_new_term_creates_every_nonempty_target(self) -> None:
-        pl = self.glossary.add_new_language(
-            Language.objects.get(code="pl"), None
-        )
+        pl = self.glossary.add_new_language(Language.objects.get(code="pl"), None)
         preview = _append_preview(
             {
                 "values": {"en": "Shield", "cs": "Stit", "pl": "Tarcza"},
@@ -1874,9 +1863,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             source_language="en",
         )
 
-        result = loc_kit.append_glossary_terms(
-            self._request(), self.glossary, preview
-        )
+        result = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
 
         self.assertEqual(result.added_terms, 1)
         cs_unit = self.cs.unit_set.get(source="Shield")
@@ -1899,9 +1886,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             source_language="en",
         )
 
-        result = loc_kit.append_glossary_terms(
-            self._request(), self.glossary, preview
-        )
+        result = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
 
         self.assertEqual(result.added_terms, 1)
         self.assertTrue(self.cs.unit_set.filter(source="Bow").exists())
@@ -1914,16 +1899,12 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
 
     def test_absent_column_does_not_block_other_languages(self) -> None:
         """A glossary language with no column is absent, not an error."""
-        pl = self.glossary.add_new_language(
-            Language.objects.get(code="pl"), None
-        )
+        pl = self.glossary.add_new_language(Language.objects.get(code="pl"), None)
         preview = _append_preview(
             {"values": {"en": "Potion", "cs": "Lektvar"}}, source_language="en"
         )
 
-        result = loc_kit.append_glossary_terms(
-            self._request(), self.glossary, preview
-        )
+        result = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
 
         self.assertEqual(result.added_terms, 1)
         self.assertEqual(result.languages["cs"].added, 1)
@@ -1937,9 +1918,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             {"values": {"en": "Mage", "ja": "Mahou"}}, source_language="en"
         )
 
-        result = loc_kit.append_glossary_terms(
-            self._request(), self.glossary, preview
-        )
+        result = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
 
         ja = self.glossary.translation_set.get(language__code="ja")
         self.assertEqual(ja.unit_set.get(source="Mage").target, "Mahou")
@@ -1948,8 +1927,9 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
 
     def test_restricted_user_gets_unavailable_language_only(self) -> None:
         """
-        Without translation.add the Japanese column is unavailable; the
-        Czech translation the user may still write to is added.
+        Without translation.add the Japanese column is unavailable.
+
+        The Czech translation the user may still write to is added anyway.
         """
         self.user.is_superuser = False
         self.user.save()
@@ -1961,9 +1941,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             Permission.objects.get(codename="glossary.add"),
             Permission.objects.get(codename="unit.edit"),
         )
-        group = Group.objects.create(
-            name=role.name, language_selection=SELECTION_ALL
-        )
+        group = Group.objects.create(name=role.name, language_selection=SELECTION_ALL)
         group.roles.add(role)
         group.projects.add(self.project)
         self.user.groups.add(group)
@@ -1975,9 +1953,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             {"values": {"en": "Forest", "cs": "Les", "ja": "Mori"}},
             source_language="en",
         )
-        result = loc_kit.append_glossary_terms(
-            self._request(), self.glossary, preview
-        )
+        result = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
 
         self.assertEqual(result.languages["cs"].added, 1)
         self.assertEqual(result.languages["ja"].unavailable_count, 1)
@@ -1993,9 +1969,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             {"values": {"en": "Staff", "cs": "Hul"}}, source_language="en"
         )
 
-        result = loc_kit.append_glossary_terms(
-            self._request(), self.glossary, preview
-        )
+        result = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
 
         self.assertEqual(result.added_terms, 1)
         source_unit = self.glossary.source_translation.unit_set.get(source="Staff")
@@ -2015,9 +1989,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             source_language="en",
         )
 
-        result = loc_kit.append_glossary_terms(
-            self._request(), self.glossary, preview
-        )
+        result = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
 
         seeded.refresh_from_db()
         self.assertEqual(seeded.explanation, "")
@@ -2036,9 +2008,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
         self.assertEqual(ctx.exception.conflicts[0][0], "Hero")
         self.assertFalse(
-            self.cs.unit_set.filter(source="Hero")
-            .exclude(target="Hrdina")
-            .exists()
+            self.cs.unit_set.filter(source="Hero").exclude(target="Hrdina").exists()
         )
 
         # ... and two incoming rows may not introduce the same source either.
@@ -2060,9 +2030,7 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             source_language="en",
         )
 
-        result = loc_kit.append_glossary_terms(
-            self._request(), self.glossary, preview
-        )
+        result = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
 
         cs, pl, de = (
             result.languages["cs"],
@@ -2109,25 +2077,21 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             {"values": {"en": "Key", "cs": "Klic"}}, source_language="en"
         )
 
-        with patch.object(
-            Component,
-            "locked_for_update",
-            side_effect=WeblateLockTimeoutError("locked", lock=None),
+        with (
+            patch.object(
+                Component,
+                "locked_for_update",
+                side_effect=WeblateLockTimeoutError("locked", lock=None),
+            ),
+            self.assertRaises(WeblateLockTimeoutError),
         ):
-            with self.assertRaises(WeblateLockTimeoutError):
-                loc_kit.append_glossary_terms(
-                    self._request(), self.glossary, preview
-                )
+            loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
         self.assertFalse(self.cs.unit_set.filter(source="Key").exists())
 
-        first = loc_kit.append_glossary_terms(
-            self._request(), self.glossary, preview
-        )
+        first = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
         self.assertEqual(first.added_terms, 1)
         # Replaying the same table adds nothing a second time.
-        second = loc_kit.append_glossary_terms(
-            self._request(), self.glossary, preview
-        )
+        second = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
         self.assertEqual(second.added_terms, 0)
         self.assertEqual(second.languages["cs"].existing, 1)
         self.assertEqual(self.cs.unit_set.filter(source="Key").count(), 1)
@@ -2242,7 +2206,7 @@ class LocKitGlossaryUpdateApplyTest(ViewTestCase):
         )
         draft = self._stage("en,cs\nEnglish,Czech\nShield,Stit\n")
 
-        response = self._apply(draft)
+        self._apply(draft)
 
         unit = self.cs.unit_set.get(context=context, source="Shield")
         self.assertEqual(unit.target, "")
@@ -2290,9 +2254,7 @@ class LocKitGlossaryUpdateApplyTest(ViewTestCase):
             Permission.objects.get(codename="glossary.add"),
             Permission.objects.get(codename="unit.edit"),
         )
-        group = Group.objects.create(
-            name=role.name, language_selection=SELECTION_ALL
-        )
+        group = Group.objects.create(name=role.name, language_selection=SELECTION_ALL)
         group.roles.add(role)
         group.projects.add(self.project)
         self.user.groups.add(group)
@@ -2321,9 +2283,7 @@ class LocKitGlossaryUpdateApplyTest(ViewTestCase):
         self.assertFalse(
             self.cs.unit_set.filter(source="Hero").exclude(target="").exists()
         )
-        self.assertTrue(
-            LocKitImportDraft.objects.filter(token=draft.token).exists()
-        )
+        self.assertTrue(LocKitImportDraft.objects.filter(token=draft.token).exists())
 
     def test_apply_stores_notes_on_new_term(self) -> None:
         draft = self._stage(
@@ -2346,9 +2306,7 @@ class LocKitGlossaryUpdateApplyTest(ViewTestCase):
             response = self._apply(draft)
 
         self.assertContains(response, "retry")
-        self.assertTrue(
-            LocKitImportDraft.objects.filter(token=draft.token).exists()
-        )
+        self.assertTrue(LocKitImportDraft.objects.filter(token=draft.token).exists())
         self.assertFalse(self.cs.unit_set.filter(source="Key").exists())
 
     def test_update_preview_promises_descriptions_carry_over(self) -> None:
@@ -2362,9 +2320,7 @@ class LocKitGlossaryUpdateApplyTest(ViewTestCase):
 
         self.assertContains(response, "Add new terms")
         self.assertContains(response, "will not change")
-        self.assertContains(
-            response, "Descriptions from this table will be added"
-        )
+        self.assertContains(response, "Descriptions from this table will be added")
         self.assertNotContains(response, "Create glossary component")
 
 

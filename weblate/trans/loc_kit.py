@@ -33,7 +33,6 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from loc_kit_ingest.model import Diagnostic, GlossaryTerm
-
     from weblate.auth.models import AuthenticatedHttpRequest
     from weblate.trans.models import Component, Translation
 
@@ -892,9 +891,7 @@ def _classify_incoming_terms(
         if key in existing_keys:
             continue
         if source in existing_sources or source in incoming_sources:
-            collisions.append(
-                (source, existing_contexts.get(source, ""), term.context)
-            )
+            collisions.append((source, existing_contexts.get(source, ""), term.context))
             continue
         incoming_sources.add(source)
         new_terms.append(term)
@@ -913,8 +910,7 @@ def _resolve_missing_language(
     user = request.user
     if not user.has_perm("translation.add", component.project):
         return _(
-            "Adding a language requires the “Add language for translation” "
-            "permission."
+            "Adding a language requires the “Add language for translation” permission."
         )
     if not user.has_perm("glossary.add", component.project):
         return _(
@@ -933,6 +929,28 @@ def _resolve_missing_language(
     )
 
 
+def _raise_collision(collisions: Sequence[tuple[str, str, str]]) -> None:
+    """Abort an apply because a source collides with an existing context."""
+    raise GlossaryAppendCollisionError(
+        _(
+            "Some source terms already exist under a different section. "
+            "Resolve the conflict before appending."
+        ),
+        conflicts=collisions,
+    )
+
+
+def _raise_missing_target_unit(source: str) -> None:
+    """Abort content application because add_unit unexpectedly returned None."""
+    msg = f"Could not add glossary term {source!r}"
+    raise ValueError(msg)
+
+
+# Two-phase locked apply (resolve languages, then write content) with
+# per-language partial success and content-failure compensation is
+# irreducibly this shaped; splitting it for these metrics would move state
+# across function boundaries without making the transaction easier to read.
+# ruff: ignore[complex-structure, too-many-statements, too-many-locals]
 def append_glossary_terms(
     request: AuthenticatedHttpRequest, component: Component, preview: GlossaryPreview
 ) -> GlossaryAppendResult:
@@ -966,13 +984,7 @@ def append_glossary_terms(
         )
         new_terms, collisions = _classify_incoming_terms(preview, existing_keys)
         if collisions:
-            raise GlossaryAppendCollisionError(
-                _(
-                    "Some source terms already exist under a different section. "
-                    "Resolve the conflict before appending."
-                ),
-                conflicts=collisions,
-            )
+            _raise_collision(collisions)
 
         translations_by_code = {
             translation.language.code: translation
@@ -989,11 +1001,7 @@ def append_glossary_terms(
         # New terms decide which languages matter at all: a column whose
         # cells are blank for every new term never creates a translation.
         new_term_data: dict[str, int] = {
-            code: sum(
-                1
-                for term in new_terms
-                if term.values.get(code, "").strip()
-            )
+            code: sum(1 for term in new_terms if term.values.get(code, "").strip())
             for code in target_codes
         }
 
@@ -1008,9 +1016,7 @@ def append_glossary_terms(
                     )
             elif new_term_data[code]:
                 try:
-                    outcome = _resolve_missing_language(
-                        request, locked_component, code
-                    )
+                    outcome = _resolve_missing_language(request, locked_component, code)
                 except WeblateLockTimeoutError:
                     # A lock timeout is retryable for the whole operation;
                     # it must reach the view without consuming the draft.
@@ -1031,25 +1037,24 @@ def append_glossary_terms(
                     continue
                 if isinstance(outcome, str):
                     unavailable_reasons[code] = outcome
+                # The file and its VCS commit exist now; re-check the
+                # write permission defensively before any content.
+                elif user.has_perm("unit.add", outcome):
+                    resolved_codes.add(code)
+                    created_by_this_apply.append(outcome)
                 else:
-                    # The file and its VCS commit exist now; re-check the
-                    # write permission defensively before any content.
-                    if user.has_perm("unit.add", outcome):
-                        resolved_codes.add(code)
-                        created_by_this_apply.append(outcome)
-                    else:
-                        unavailable_reasons[code] = _(
-                            "You do not have permission to add strings to this language."
+                    unavailable_reasons[code] = _(
+                        "You do not have permission to add strings to this language."
+                    )
+                    try:
+                        outcome.remove(user)
+                    except Exception:
+                        report_error(
+                            "Could not remove a glossary language created "
+                            "for an append that lost its permission",
+                            level="error",
+                            project=component.project,
                         )
-                        try:
-                            outcome.remove(user)
-                        except Exception:
-                            report_error(
-                                "Could not remove a glossary language created "
-                                "for an append that lost its permission",
-                                level="error",
-                                project=component.project,
-                            )
 
     counters = {
         code: {"added": 0, "existing": 0, "blank": 0, "unavailable": 0}
@@ -1058,6 +1063,7 @@ def append_glossary_terms(
     added_source_terms = 0
     content_failed = False
 
+    # ruff: ignore[too-many-statements-in-try-clause]
     try:
         # Second lock round: a concurrent change between the phases must not
         # produce duplicates, so the identity set is rebuilt from the fresh
@@ -1070,13 +1076,7 @@ def append_glossary_terms(
             )
             new_terms, collisions = _classify_incoming_terms(preview, existing_keys)
             if collisions:
-                raise GlossaryAppendCollisionError(
-                    _(
-                        "Some source terms already exist under a different "
-                        "section. Resolve the conflict before appending."
-                    ),
-                    conflicts=collisions,
-                )
+                _raise_collision(collisions)
             # Fresh translation objects: the preflight instances belong to
             # the previous lock round and must never write content.
             fresh_translations = {
@@ -1091,6 +1091,7 @@ def append_glossary_terms(
                 for code in resolved_codes
                 if code in fresh_translations
             }
+            # ruff: ignore[too-many-statements-in-try-clause]
             try:
                 with transaction.atomic():
                     for term in new_terms:
@@ -1120,8 +1121,7 @@ def append_glossary_terms(
                                 skip_existing=not first_addition,
                             )
                             if target_unit is None:
-                                msg = f"Could not add glossary term {source!r}"
-                                raise ValueError(msg)
+                                _raise_missing_target_unit(source)
                             counters[code]["added"] += 1
                             first_addition = False
                             if source_unit is None:

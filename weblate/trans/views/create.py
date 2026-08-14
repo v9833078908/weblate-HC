@@ -70,6 +70,7 @@ from weblate.trans.tasks import import_project_backup, perform_update
 from weblate.utils import messages
 from weblate.utils.celery import store_task_metadata
 from weblate.utils.licenses import LICENSE_URLS, detect_license
+from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.ratelimit import check_rate_limit, session_ratelimit_post
 from weblate.utils.views import (
     KIT_TABLE_SUFFIXES,
@@ -88,7 +89,6 @@ from weblate.vcs.github import (
 from weblate.vcs.models import VCS_REGISTRY
 from weblate.vcs.permissions import github_app_installation_workspaces
 from weblate.workspaces.models import Workspace
-from weblate.utils.lock import WeblateLockTimeoutError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -724,7 +724,6 @@ class CreateFromZip(CreateComponent):
         except Exception:
             draft.delete_storage()
             raise
-
 
 
 def _insert_draft_and_map(request: AuthenticatedHttpRequest, draft, sheets):
@@ -1380,7 +1379,9 @@ class LocKitGlossaryPreviewView(LocKitDraftMixin, TemplateView):
                 component_name=component.slug,
             )
         except GlossaryProfileError as error:
-            messages.error(request, f"{error.message} {' '.join(error.details)}".strip())
+            messages.error(
+                request, f"{error.message} {' '.join(error.details)}".strip()
+            )
             return redirect("loc-kit-glossary-preview", token=draft.token)
         if preview.source_language != component.source_language.code:
             messages.error(

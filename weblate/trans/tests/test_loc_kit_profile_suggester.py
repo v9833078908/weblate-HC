@@ -763,22 +763,24 @@ class LocKitGlossaryFullTermsTest(SimpleTestCase):
     @staticmethod
     def _rows(term_count: int) -> list[list[str]]:
         rows = [["domain", "ru", "en", "note_ru", "note_en"]]
-        for index in range(term_count):
-            rows.append(
-                [
-                    "Domain",
-                    f"Термин-{index}",
-                    f"Term-{index}",
-                    f"Note {index} ru",
-                    f"Note {index} en",
-                ]
-            )
+        rows.extend(
+            [
+                "Domain",
+                f"Термин-{index}",
+                f"Term-{index}",
+                f"Note {index} ru",
+                f"Note {index} en",
+            ]
+            for index in range(term_count)
+        )
         return rows
 
     def test_full_terms_survive_the_preview_cap(self) -> None:
         """
-        preview.terms stays bounded for the UI; the apply path reads
-        preview.all_terms so a wide table loses nothing past the cap.
+        preview.terms stays bounded for the UI.
+
+        The apply path reads preview.all_terms so a wide table loses
+        nothing past the cap.
         """
         term_count = loc_kit.PREVIEW_TERM_LIMIT + 1
         preview = _validate(
