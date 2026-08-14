@@ -3895,6 +3895,139 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
         fetch_terms.assert_called_once_with(units, include_variants=False)
 
+    def test_batch_glossary_full_payload_independent_of_matcher(self) -> None:
+        """Задача 2: below the limit the whole glossary is sent, matcher unused."""
+        machine = self.get_machine()
+        unit = make_unit(code="fr", source="Nothing relevant here.")
+        full_term = make_unit(
+            code="fr", source="Unrelated term", target="Terme sans rapport"
+        )
+        with (
+            patch.object(machine, "_get_full_glossary", return_value=[full_term]),
+            patch("weblate.machinery.llm.fetch_glossary_terms") as fetch_terms,
+            patch("weblate.machinery.llm.get_glossary_terms") as get_terms,
+        ):
+            # ruff: ignore[private-member-access]
+            entries = machine._get_batch_glossary([cast("Unit", unit)])
+        fetch_terms.assert_not_called()
+        get_terms.assert_not_called()
+        self.assertEqual(
+            entries,
+            [{"source": "Unrelated term", "target": "Terme sans rapport"}],
+        )
+
+    def test_batch_glossary_fallback_uses_matched_terms(self) -> None:
+        """Задача 2: above the limit, the batch glossary follows the matcher."""
+        machine = self.get_machine()
+        unit = make_unit(code="ru", source="ликвидаторов было много")
+        inflected_term = make_unit(code="ru", source="ликвидатор", target="ликвидатор")
+        unit.glossary_terms = [inflected_term]
+        with patch.object(machine, "_get_full_glossary", return_value=None):
+            # ruff: ignore[private-member-access]
+            entries = machine._get_batch_glossary([cast("Unit", unit)])
+        self.assertEqual(entries, [{"source": "ликвидатор", "target": "ликвидатор"}])
+
+    def test_glossary_entry_includes_exact_and_forbidden_flags(self) -> None:
+        """Задача 4: the payload explicitly lists exact and forbidden."""
+        machine = self.get_machine()
+        exact_term = make_unit(code="fr", source="Ship", target="Vaisseau")
+        exact_term.extra_flags = "exact"
+        forbidden_term = make_unit(code="fr", source="Bad", target="Mauvais")
+        forbidden_term.extra_flags = "forbidden"
+
+        # ruff: ignore[private-member-access]
+        entry_exact = machine._get_glossary_entry(cast("Unit", exact_term))
+        # ruff: ignore[private-member-access]
+        entry_forbidden = machine._get_glossary_entry(cast("Unit", forbidden_term))
+
+        self.assertEqual(entry_exact["flags"], ["exact"])
+        self.assertEqual(entry_forbidden["flags"], ["forbidden"])
+
+    def test_glossary_entry_excludes_not_applicable(self) -> None:
+        """Задача 1/4: not-applicable pairs never reach the prompt."""
+        machine = self.get_machine()
+        term = make_unit(code="fr", source="Ship", target="Vaisseau")
+        term.extra_flags = "not-applicable"
+        # ruff: ignore[private-member-access]
+        self.assertIsNone(machine._get_glossary_entry(cast("Unit", term)))
+
+    def test_glossary_cache_key_changes_with_exact_flag(self) -> None:
+        """Задача 4: flag changes on a glossary term bust the LLM cache key."""
+        machine = self.get_machine()
+        unit = make_unit(code="fr", source="Ship arrived.")
+        term = make_unit(code="fr", source="Ship", target="Vaisseau")
+
+        unit.glossary_terms = [term]
+        plain_key = machine.get_llm_glossary_cache_part(cast("Unit", unit))
+
+        term.extra_flags = "exact"
+        term.all_flags = term.get_all_flags()
+        unit.glossary_terms = [term]
+        exact_key = machine.get_llm_glossary_cache_part(cast("Unit", unit))
+
+        self.assertNotEqual(plain_key, exact_key)
+
+    def test_failing_checks_reports_glossary_advisory_separately(self) -> None:
+        """Задача 4: a soft glossary mismatch never becomes a mandatory rewrite."""
+        machine = self.get_machine()
+
+        class NamedCheck:
+            dismissed = False
+
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+            def get_name(self) -> str:
+                return self.name
+
+            def get_description(self) -> str:
+                return f"{self.name} description"
+
+        unit = make_unit(code="cs", source="Hello, world!", target="Nazdar svete!")
+        term = make_unit(code="cs", source="hello", target="ahoj")
+        unit.glossary_terms = [term]
+        unit.__dict__["all_checks"] = [NamedCheck("check_glossary")]
+        typed_unit = cast("Unit", unit)
+
+        # ruff: ignore[private-member-access]
+        failing, advisories = machine._get_failing_checks_context(
+            typed_unit, "Hello, world!"
+        )
+
+        self.assertEqual(failing, [])
+        self.assertEqual(advisories, ["hello"])
+
+    def test_failing_checks_keeps_hard_glossary_failure(self) -> None:
+        """Задача 4: an exact/forbidden/read-only miss stays a failing check."""
+        machine = self.get_machine()
+
+        class NamedCheck:
+            dismissed = False
+
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+            def get_name(self) -> str:
+                return self.name
+
+            def get_description(self) -> str:
+                return f"{self.name} description"
+
+        unit = make_unit(code="cs", source="Hello, world!", target="Nazdar svete!")
+        term = make_unit(code="cs", source="hello", target="ahoj")
+        term.extra_flags = "exact"
+        unit.glossary_terms = [term]
+        unit.__dict__["all_checks"] = [NamedCheck("check_glossary")]
+        typed_unit = cast("Unit", unit)
+
+        # ruff: ignore[private-member-access]
+        failing, advisories = machine._get_failing_checks_context(
+            typed_unit, "Hello, world!"
+        )
+
+        self.assertEqual([item["check_id"] for item in failing], ["check_glossary"])
+        self.assertEqual(advisories, [])
+
     def test_batch_size(self) -> None:
         # Measured, see docs/misc/col4-batch-size-eval.json: the generic 20 wasted
         # replies on truncation and the content filter, and answered no faster.

@@ -5,13 +5,21 @@
 r"""
 Measure both glossary blind spots on a real localization kit.
 
-Reimplements the two rules that decide whether a glossary term is enforced:
+Runs offline against an exported kit, without a live Weblate/Django instance,
+so it stays usable on a kit before it is even imported. That is also why the
+source-side exact matcher and the target-side exact test below are re-derived
+from the same rules as the product rather than imported:
 
 * the source-side matcher of ``weblate/glossary/models.py:220-222``, which needs
   the exact lowercased form with a non-word character or an edge on both sides;
 * the target-side test of ``weblate/checks/glossary.py:53-59``, which needs
   ``term.target`` verbatim in the translation, with ``\\b`` boundaries unless the
-  language is in ``NO_SPACE_LANGUAGES``.
+  language is in ``NO_SPACE_LANGUAGES`` (weblate/lang/data.py:12).
+
+The stem comparison, however, is imported directly from
+``weblate.checks.morphology`` (Django-free): it is the one rule this probe
+exists to validate, so it must never drift from what ``GlossaryCheck`` and the
+source-side matcher actually run. See docs/misc/glossary_matcher_fingerprint.
 
 Usage: python glossary-blindspot-probe.py <kit directory>
 """
@@ -24,7 +32,15 @@ from collections import Counter
 from pathlib import Path
 
 import openpyxl
-import snowballstemmer
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from weblate.checks.morphology import (
+    MORPHOLOGY_LANGUAGES,
+    contains_inflected,
+    get_algorithm,
+    get_snowball_version,
+)
 
 # weblate/lang/data.py:12
 NO_SPACE_LANGUAGES = {"zh", "ja", "th", "km", "lo", "my", "ko"}
@@ -80,44 +96,16 @@ def contains(term: str, text: str, *, boundary: bool) -> bool:
     return re.search(pattern, text, re.IGNORECASE) is not None
 
 
-# Snowball covers every inflecting language of these kits; the rest either skip
-# word boundaries entirely or do not inflect.
-STEMMER_LANGUAGES = {
-    "de": "german",
-    "es": "spanish",
-    "fa": "persian",
-    "fr": "french",
-    "hi": "hindi",
-    "id": "indonesian",
-    "it": "italian",
-    "pl": "polish",
-    "pt": "portuguese",
-    "ru": "russian",
-    "tr": "turkish",
-}
-WORD_RE = re.compile(r"\w+", re.UNICODE)
-
-
-def stems(text: str, stemmer) -> list[str]:
-    return [stemmer.stemWord(word.lower()) for word in WORD_RE.findall(text)]
-
-
-def contains_stemmed(term: str, text: str, stemmer) -> bool:
-    """Test containment up to inflection, as a contiguous run of stems."""
-    needle, haystack = stems(term, stemmer), stems(text, stemmer)
-    if not needle:
-        return False
-    return any(
-        haystack[i : i + len(needle)] == needle
-        for i in range(len(haystack) - len(needle) + 1)
-    )
-
-
 def main() -> int:
     kit = Path(sys.argv[1])
     glossaries = sorted(kit.glob("*glossary-*.xlsx"))
     languages = [path.stem.split("glossary-")[1] for path in glossaries]
     source_lang = "en"
+
+    print(
+        f"snowball {get_snowball_version()}, allowlist "
+        f"{sorted(MORPHOLOGY_LANGUAGES)} (weblate.checks.morphology)"
+    )
 
     terms_en = [
         source
@@ -152,7 +140,8 @@ def main() -> int:
         print(f"    {lost:5} invisible / {got:5} seen   {term!r}")
 
     # Target side: what the check reports today, and what it would report if the
-    # containment test tolerated inflection.
+    # containment test tolerated inflection (weblate.checks.morphology allowlist
+    # only - a language absent from it, e.g. Indonesian, keeps its exact miss).
     print()
     print("  lang    strings  fires(exact)  fires(stemmed)  removed  copy-through")
     for lang in sorted(languages):
@@ -169,8 +158,7 @@ def main() -> int:
         strings = load(kit / f"space-arena-game-strings-{lang}.xlsx")
         boundary = lang.split("_")[0] not in NO_SPACE_LANGUAGES
         copy_through = sum(1 for s, t in glossary.items() if s.strip() == t.strip())
-        algorithm = STEMMER_LANGUAGES.get(lang.split("_")[0])
-        stemmer = snowballstemmer.stemmer(algorithm) if algorithm else None
+        algorithm = get_algorithm(lang)
 
         fires = stemmed_fires = 0
         for source, target in strings:
@@ -181,7 +169,7 @@ def main() -> int:
                 if contains(expected, target, boundary=boundary):
                     continue
                 fires += 1
-                if stemmer is not None and contains_stemmed(expected, target, stemmer):
+                if algorithm is not None and contains_inflected(expected, target, lang):
                     continue
                 stemmed_fires += 1
         removed = fires - stemmed_fires

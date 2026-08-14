@@ -122,6 +122,8 @@ PLAIN_FLAGS["read-only"] = gettext_lazy("Read-only")
 PLAIN_FLAGS["strict-same"] = gettext_lazy("Strict unchanged check")
 PLAIN_FLAGS["strict-format"] = gettext_lazy("Strict format string checks")
 PLAIN_FLAGS["forbidden"] = gettext_lazy("Forbidden translation")
+PLAIN_FLAGS["exact"] = gettext_lazy("Exact glossary match")
+PLAIN_FLAGS["not-applicable"] = gettext_lazy("Glossary term not applicable here")
 PLAIN_FLAGS["terminology"] = gettext_lazy("Terminology")
 PLAIN_FLAGS["ignore-all-checks"] = gettext_lazy("Ignore all checks")
 PLAIN_FLAGS["case-insensitive"] = gettext_lazy("Use case insensitive placeholders")
@@ -166,6 +168,9 @@ IGNORE_CHECK_FLAGS = {check.ignore_string for check in CHECKS.values()} | set(
 )
 
 FLAG_ALIASES = {"markdown-text": "md-text"}
+
+# Glossary modes stored on the target unit so they apply to one language only
+GLOSSARY_LANGUAGE_SCOPED_FLAGS: frozenset[str] = frozenset({"exact", "not-applicable"})
 
 
 def get_auto_flag_names(name: str) -> tuple[str, ...]:
@@ -478,6 +483,8 @@ _FLAG_CATEGORIES: dict[str, StrOrPromise] = {
     "url": FLAG_CATEGORY_FORMAT,
     "read-only": FLAG_CATEGORY_BEHAVIOR,
     "forbidden": FLAG_CATEGORY_BEHAVIOR,
+    "exact": FLAG_CATEGORY_BEHAVIOR,
+    "not-applicable": FLAG_CATEGORY_BEHAVIOR,
     "terminology": FLAG_CATEGORY_BEHAVIOR,
     "case-insensitive": FLAG_CATEGORY_BEHAVIOR,
     "strict-same": FLAG_CATEGORY_BEHAVIOR,

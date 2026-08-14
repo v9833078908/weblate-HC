@@ -4,9 +4,13 @@
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import re
+from bisect import bisect_left
 from collections import OrderedDict, defaultdict
 from copy import copy
+from functools import lru_cache
 from itertools import chain
 from threading import Lock
 from typing import TYPE_CHECKING, cast
@@ -16,6 +20,15 @@ from django.core.cache import cache
 from django.db.models import Prefetch, Q, Value
 from django.db.models.functions import MD5, Lower
 
+from weblate.checks.morphology import (
+    MORPHOLOGY_LANGUAGES,
+    SOURCE_STEM_LANGUAGES,
+    WORD_RE,
+    get_algorithm,
+    get_snowball_version,
+    get_stemmer,
+    stem_word,
+)
 from weblate.trans.models.unit import Unit
 from weblate.utils.csv import PROHIBITED_INITIAL_CHARS
 from weblate.utils.state import STATE_TRANSLATED
@@ -38,6 +51,17 @@ GLOSSARY_AUTOMATON_CACHE: OrderedDict[tuple[int, int], ahocorasick_rs.AhoCorasic
     OrderedDict()
 )
 GLOSSARY_AUTOMATON_CACHE_LOCK = Lock()
+GLOSSARY_STEM_CACHE_SIZE = 32
+GLOSSARY_STEM_CACHE: OrderedDict[
+    tuple[int, str, str, int],
+    tuple[ahocorasick_rs.AhoCorasick | None, tuple[tuple[str, ...], ...]],
+] = OrderedDict()
+GLOSSARY_STEM_CACHE_LOCK = Lock()
+STEM_SEPARATOR = "\x00"
+# Mode names read from the target unit's own flags and from its source unit.
+# Kept as module constants so the memoized parse below has a hashable key.
+TARGET_SCOPED_MODES = frozenset({"exact", "not-applicable", "read-only", "forbidden"})
+SOURCE_SCOPED_MODES = frozenset({"read-only", "forbidden"})
 
 
 def cleanup_glossary_term(text: str) -> str:
@@ -70,6 +94,18 @@ def clear_glossary_automaton_cache(project_id: int | None = None) -> None:
             for cache_key in list(GLOSSARY_AUTOMATON_CACHE):
                 if cache_key[0] == project_id:
                     del GLOSSARY_AUTOMATON_CACHE[cache_key]
+    clear_glossary_stem_cache(project_id)
+
+
+def clear_glossary_stem_cache(project_id: int | None = None) -> None:
+    """Clear process-local glossary stem indexes."""
+    with GLOSSARY_STEM_CACHE_LOCK:
+        if project_id is None:
+            GLOSSARY_STEM_CACHE.clear()
+        else:
+            for cache_key in list(GLOSSARY_STEM_CACHE):
+                if cache_key[0] == project_id:
+                    del GLOSSARY_STEM_CACHE[cache_key]
 
 
 def get_glossary_automaton(project: Project) -> ahocorasick_rs.AhoCorasick:
@@ -106,6 +142,166 @@ def get_glossary_automaton(project: Project) -> ahocorasick_rs.AhoCorasick:
             while len(GLOSSARY_AUTOMATON_CACHE) > GLOSSARY_AUTOMATON_CACHE_SIZE:
                 GLOSSARY_AUTOMATON_CACHE.popitem(last=False)
         return result
+
+
+@lru_cache(maxsize=4096)
+def _glossary_modes_from_flags(
+    flags_text: str, scoped: frozenset[str]
+) -> frozenset[str]:
+    """
+    Parse one flags string into the subset of glossary modes it sets.
+
+    Memoized on the raw flag text: the stem index build and every matcher
+    call ask this for each glossary unit, and a term base holds far fewer
+    distinct flag strings than units.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.checks.flags import Flags
+
+    if not flags_text:
+        return frozenset()
+    flags = None
+    with contextlib.suppress(Exception):
+        flags = Flags(flags_text)
+    if flags is None:
+        return frozenset()
+    return frozenset(flag for flag in scoped if flag in flags)
+
+
+def get_glossary_term_modes(unit: Unit) -> set[str]:
+    """
+    Return effective glossary modes for a target glossary unit.
+
+    ``forbidden`` and ``read-only`` may be set on the source unit and apply
+    to every language, while ``exact`` and ``not-applicable`` are per-language
+    and are read from the target unit's own flags only.
+    """
+    modes = set(
+        _glossary_modes_from_flags(
+            getattr(unit, "extra_flags", "") or "", TARGET_SCOPED_MODES
+        )
+    )
+    modes |= _glossary_modes_from_flags(
+        getattr(getattr(unit, "source_unit", None), "extra_flags", "") or "",
+        SOURCE_SCOPED_MODES,
+    )
+    return modes
+
+
+def get_glossary_stem_automaton(
+    project: Project, source_language, language
+) -> tuple[ahocorasick_rs.AhoCorasick | None, tuple[tuple[str, ...], ...]]:
+    """
+    Return the stem index for one source/target language pair.
+
+    The index maps a Snowball stem sequence of a term to the canonical term
+    sources. Terms that are exact-only (``exact``, ``read-only``,
+    ``forbidden``) or ``not-applicable`` for the target language are excluded.
+    Source stemming is enabled only for languages in ``SOURCE_STEM_LANGUAGES``.
+    The cache key embeds the glossary automaton cache version because the
+    modes live on target units and invalidate together with the glossary.
+    """
+    if source_language.base_code not in SOURCE_STEM_LANGUAGES:
+        return (None, ())
+    cache_key = (
+        project.pk,
+        source_language.code,
+        language.code,
+        project.glossary_automaton_cache_version,
+    )
+    with GLOSSARY_STEM_CACHE_LOCK:
+        if cache_key in GLOSSARY_STEM_CACHE:
+            GLOSSARY_STEM_CACHE.move_to_end(cache_key)
+            return GLOSSARY_STEM_CACHE[cache_key]
+
+    with start_span(op="glossary.stems", name=project.slug):
+        stemmer = get_stemmer(source_language.code)
+        patterns: dict[str, set[str]] = {}
+        if stemmer is not None:
+            algorithm = stemmer[0]
+            units = prepare_glossary_units(project, source_language, language).filter(
+                state__gte=STATE_TRANSLATED
+            )
+            for unit in units:
+                modes = get_glossary_term_modes(unit)
+                if modes & {"exact", "not-applicable", "read-only", "forbidden"}:
+                    continue
+                source = cleanup_glossary_term(unit.source)
+                if not source:
+                    continue
+                stems = [
+                    stem_word(algorithm, word.lower())
+                    for word in WORD_RE.findall(source)
+                ]
+                if not stems or any(not stem for stem in stems):
+                    continue
+                pattern = STEM_SEPARATOR + STEM_SEPARATOR.join(stems) + STEM_SEPARATOR
+                patterns.setdefault(pattern, set()).add(source.lower())
+
+        if patterns:
+            automaton: ahocorasick_rs.AhoCorasick | None = ahocorasick_rs.AhoCorasick(
+                list(patterns),
+                implementation=ahocorasick_rs.Implementation.ContiguousNFA,
+                store_patterns=True,
+            )
+            term_sources = tuple(
+                tuple(sorted(patterns[pattern])) for pattern in patterns
+            )
+        else:
+            automaton = None
+            term_sources = ()
+
+    result = (automaton, term_sources)
+    with GLOSSARY_STEM_CACHE_LOCK:
+        GLOSSARY_STEM_CACHE[cache_key] = result
+        GLOSSARY_STEM_CACHE.move_to_end(cache_key)
+        while len(GLOSSARY_STEM_CACHE) > GLOSSARY_STEM_CACHE_SIZE:
+            GLOSSARY_STEM_CACHE.popitem(last=False)
+    return result
+
+
+def match_glossary_stems(
+    source: str,
+    source_language,
+    automaton: ahocorasick_rs.AhoCorasick,
+    term_sources: tuple[tuple[str, ...], ...],
+) -> dict[str, list[tuple[int, int]]]:
+    """
+    Match glossary terms against the source by stem sequences.
+
+    Returns canonical term sources with the character spans of the matched
+    words. Only whole words can match, never substrings.
+    """
+    stemmer = get_stemmer(source_language.code)
+    if stemmer is None:
+        return {}
+    word_spans = [match.span() for match in WORD_RE.finditer(source)]
+    if not word_spans:
+        return {}
+    algorithm = stemmer[0]
+    joined_parts = [STEM_SEPARATOR]
+    sep_offsets = [0]
+    offset = 1
+    for start, end in word_spans:
+        stem = stem_word(algorithm, source[start:end].lower())
+        offset += len(stem)
+        joined_parts.extend((stem, STEM_SEPARATOR))
+        sep_offsets.append(offset)
+        offset += 1
+    joined = "".join(joined_parts)
+
+    result: dict[str, set[tuple[int, int]]] = defaultdict(set)
+    for termno, start, end in automaton.find_matches_as_indexes(
+        joined, overlapping=True
+    ):
+        first_word = bisect_left(sep_offsets, start)
+        last_word = bisect_left(sep_offsets, end - 1) - 1
+        if not 0 <= first_word <= last_word < len(word_spans):
+            continue
+        span = (word_spans[first_word][0], word_spans[last_word][1])
+        for term in term_sources[termno]:
+            result[term].add(span)
+    return {term: sorted(spans) for term, spans in result.items()}
 
 
 def get_glossary_units(project, source_language, target_language):
@@ -224,6 +420,20 @@ def fetch_glossary_terms(  # ruff: ignore[complex-structure]
                         terms.add(term)
                         positions[i][term].append((start, end))
 
+            # Stem fallback: recover inflected forms the exact matcher drops
+            stem_automaton, stem_term_sources = get_glossary_stem_automaton(
+                project, source_language, language
+            )
+            if stem_automaton is not None:
+                for i, source in enumerate(sources):
+                    for term, spans in match_glossary_stems(
+                        source, source_language, stem_automaton, stem_term_sources
+                    ).items():
+                        if term in positions[i]:
+                            continue
+                        terms.add(term)
+                        positions[i][term].extend(spans)
+
             # Skip processing when there are no matches
             if not terms:
                 continue
@@ -237,11 +447,18 @@ def fetch_glossary_terms(  # ruff: ignore[complex-structure]
             if current_unit_ids:
                 base_units = base_units.exclude(pk__in=current_unit_ids)
 
-            glossary_units = list(
-                base_units.filter(
+            glossary_units = [
+                unit
+                for unit in base_units.filter(
                     Q(source__lower__md5__in=[MD5(Value(term)) for term in terms]),
                 )
-            )
+                # not-applicable pairs are excluded from matching for this
+                # target language. Filtered in Python rather than SQL because
+                # extra_flags is free-form text: a LIKE would also match a
+                # longer flag name containing this one, and cannot use an
+                # index. The parse itself is memoized.
+                if "not-applicable" not in get_glossary_term_modes(unit)
+            ]
 
             # Add variants manually. This could be done by adding filtering on
             # variant__unit__source in the above query, but this slows down the query
@@ -382,3 +599,53 @@ def get_glossary_tsv(translation) -> str:
     cache.set(cache_key, result, 24 * 3600)
 
     return result
+
+
+def glossary_matcher_fingerprint(
+    project: Project, source_language, language
+) -> dict[str, object]:
+    """
+    Capture the matcher configuration a probe or golden-set run depends on.
+
+    Historical measurements are comparable only when every field here
+    matches: a change to the Snowball version, either language's algorithm,
+    an allowlist, ``LLM_FULL_GLOSSARY_LIMIT``, or the glossary content
+    itself can change which terms reach the prompt or fire the check.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.machinery.llm import LLM_FULL_GLOSSARY_LIMIT
+
+    units = list(prepare_glossary_units(project, source_language, language, full=True))
+    exact_only_count = 0
+    not_applicable_count = 0
+    for unit in units:
+        modes = get_glossary_term_modes(unit)
+        if modes & {"exact", "read-only", "forbidden"}:
+            exact_only_count += 1
+        if "not-applicable" in modes:
+            not_applicable_count += 1
+    glossary_digest = hashlib.sha256(
+        "\n".join(
+            "\x1f".join(
+                (
+                    unit.source,
+                    unit.target,
+                    unit.extra_flags,
+                    getattr(unit.source_unit, "extra_flags", ""),
+                )
+            )
+            for unit in sorted(units, key=lambda unit: (unit.source, unit.context))
+        ).encode()
+    ).hexdigest()
+    return {
+        "snowball_version": get_snowball_version(),
+        "source_algorithm": get_algorithm(source_language.code),
+        "target_algorithm": get_algorithm(language.code),
+        "source_stem_allowlist": sorted(SOURCE_STEM_LANGUAGES),
+        "target_morphology_allowlist": sorted(MORPHOLOGY_LANGUAGES),
+        "llm_full_glossary_limit": LLM_FULL_GLOSSARY_LIMIT,
+        "exact_only_term_count": exact_only_count,
+        "not_applicable_term_count": not_applicable_count,
+        "glossary_term_count": len(units),
+        "glossary_hash": glossary_digest,
+    }

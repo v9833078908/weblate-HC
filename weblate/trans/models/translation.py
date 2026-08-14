@@ -25,7 +25,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext, ngettext
 from translate.storage.fluent import FluentContentError
 
-from weblate.checks.flags import Flags
+from weblate.checks.flags import GLOSSARY_LANGUAGE_SCOPED_FLAGS, Flags
 from weblate.formats.auto import try_load
 from weblate.formats.base import TranslationFormat, UnitNotFoundError
 from weblate.formats.helpers import CONTROLCHARS, NamedBytesIO
@@ -2466,13 +2466,34 @@ class Translation(
         if isinstance(source, list):
             source = join_plural(source)
 
-        parsed_flags = Flags(extra_flags)
-
         user = request.user if request else author
         if user is None:
             msg = "Can not add unit without an author!"
             raise ValueError(msg)
         component = self.component
+        parsed_flags = Flags(extra_flags)
+        # Language-scoped glossary modes (exact, not-applicable) belong on the
+        # target unit so they apply to one language only. They mean nothing
+        # outside a glossary, so there the flags are left exactly where the
+        # caller put them.
+        scoped_flags = (
+            Flags(
+                flag
+                for flag in parsed_flags.items()
+                if isinstance(flag, str) and flag in GLOSSARY_LANGUAGE_SCOPED_FLAGS
+            )
+            if component.is_glossary
+            else Flags()
+        )
+        scoped_extra_flags = scoped_flags.format()
+        if scoped_extra_flags:
+            source_flags = Flags(parsed_flags)
+            source_flags.remove(flag for flag in scoped_flags if isinstance(flag, str))
+            source_extra_flags = source_flags.format()
+        else:
+            # Nothing to split out, keep the caller's string untouched
+            source_extra_flags = extra_flags
+
         add_terminology = False
         if (
             is_plural(source)
@@ -2533,11 +2554,13 @@ class Translation(
                 kwargs["explanation"] = explanation
             if is_source:
                 current_target = source
-                kwargs["extra_flags"] = extra_flags
+                kwargs["extra_flags"] = source_extra_flags
             elif add_terminology and translation != self:
                 current_target = ""
             else:
                 current_target = target
+                if scoped_extra_flags:
+                    kwargs["extra_flags"] = scoped_extra_flags
             if current_target is None:
                 current_target = ""
             # Wipe target for untranslatable strings
@@ -2560,7 +2583,7 @@ class Translation(
                     pass
                 else:
                     flags = Flags(unit.extra_flags)
-                    flags.merge(extra_flags)
+                    flags.merge(source_extra_flags)
                     new_flags = flags.format()
                     if not skip_existing and (
                         unit.extra_flags != new_flags or unit.explanation != explanation
