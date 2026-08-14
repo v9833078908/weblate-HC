@@ -30,8 +30,8 @@ Schema), pytest + `weblate.utils.tests.http_mock`.
 ### Входит
 
 Строка «План 1» таблицы `2026-08-13-judge-native-ui-design.md:497`:
-модель и миграция, классы судейских чеков, клиент судьи, лестница
-эскалации в Celery, режим `judge` в `AutoForm` с чекбоксом перезаписи,
+модель и миграция, классы судейских чеков, клиент судьи, коллегия двух
+судей и починка в Celery, режим `judge` в `AutoForm` с чекбоксом перезаписи,
 fail-safe `state 10`, гейт по severity, карточка на юните, обратный
 перевод в форме, протухание вердикта, исключение судейских чеков из
 карточки «Things to check».
@@ -41,7 +41,7 @@ fail-safe `state 10`, гейт по severity, карточка на юните, 
 | Отложено в | Что именно |
 |---|---|
 | План 2 | `judge_field` в `search.py`, регистрация в `FILTERS`, судейские ключи в выпадашке формы, `calculate_judge()`, карточка «Оценка ИИ» на обзоре языка, баннер релизной готовности |
-| План 3 | кнопки решений с обязательной причиной, работа с `resolution`, вкладка «Оценка ИИ» с историей лестницы, парсер судейских спанов в `Formatter`, отдельный класс бейджа |
+| План 3 | кнопки решений с обязательной причиной, работа с `resolution`, вкладка «Оценка ИИ» с историей кругов суда, парсер судейских спанов в `Formatter`, отдельный класс бейджа |
 | Вне первого тира | откат по `run_id`, аварийный выключатель на проекте, пер-языковые тиры, категория настроек `JUDGE` с наследованием |
 
 ### Два осознанных разрыва, унаследованных из дизайна
@@ -56,61 +56,52 @@ fail-safe `state 10`, гейт по severity, карточка на юните, 
    `critical` держится состоянием `10`; «принять вопреки судье» делается
    штатной сменой состояния при праве `unit.review`.
 
-### Блокирующее расхождение: план описывает отвергнутый каскад
+### Почему не лестница: конструкция, отвергнутая замером
 
-Заметка добавлена 2026-08-14, после прогона коллегии на живом компоненте
-(`docs/LLM-first/2026-08-14-st2-zh-judge-run.md`). **Задачу 6 нельзя
-реализовывать в текущем виде.**
+Первая редакция этого плана описывала в задаче 6 каскад: судья A на всех
+строках, судья B только на его flag/reject — и с правом вернуть `PASS`
+поверх флага A. План переписан на коллегию 2026-08-14, после прогона на
+живом компоненте (`docs/LLM-first/2026-08-14-st2-zh-judge-run.md`).
+Раздел оставлен, потому что в коде каскад отличается от коллегии одним
+`if`, и вернуть его можно случайно.
 
-Псевдокод лестницы (`Задача 6, Step 3`) даёт ступени B право вернуть
-`PASS` поверх флага ступени A:
+Отвергнутая конструкция:
 
 ```text
 verdict_b = judge(unit, tier=2, attempt=0)
 if verdict_b is PASS or UNPARSED: return verdict_b   # ← B снимает флаг A
 ```
 
-Это ровно та конструкция, которую замер B2' отверг напрямую:
-«Ступень B в дизайновом виде — с правом снимать флаг — не добавлять ни
-при каком выборе моделей» (`2026-08-13-phase0-measurements.md`,
-рекомендация 4). Измеренная причина: специфичность ступени A 97.6-99.2%,
-снимать почти нечего, и переголосования снимают настоящие дефекты —
-**46 ошибочных снятий из 48** в худшей паре. Сквозной recall такой схемы
+Замер B2' запретил её прямо: «Ступень B в дизайновом виде — с правом
+снимать флаг — не добавлять ни при каком выборе моделей»
+(`2026-08-13-phase0-measurements.md`, рекомендация 4). Причина
+измеренная, а не эстетическая: специфичность первой ступени 97.6-99.2%,
+снимать почти нечего, и переголосования снимали настоящие дефекты —
+**46 ошибочных снятий из 48** в худшей паре. Сквозной recall каскада
 равен `recall(A) x recall(B | эскалированные)` и по построению не может
 превысить recall одной ступени A.
 
-Дизайн после замера переписан на **коллегию**: оба судьи независимо судят
-**каждую** строку, вердикт — максимум severity, понижать друг друга они
-не вправе (`2026-08-13-judge-native-ui-design.md`, раздел «Коллегия из
-двух судей»). План написан до этой правки и её не отражает.
+Коллегия даёт обратную арифметику, `1 - (1 - recall_1)(1 - recall_2)`, и
+уронить recall не может: оба места судят **каждую** строку независимо,
+вердикт круга — строгий из двух.
 
-Что обязано измениться до начала работ по задаче 6:
+Как это разложено по задачам:
 
-1. **Псевдокод.** Оба вызова безусловны, вердикт — максимум severity:
+| Место | Что стоит в плане |
+|---|---|
+| Поле модели | `seat`, не `tier` — место в коллегии, не старшинство (задача 1) |
+| Порядок строгости | `SEVERITY_RANK` рядом с гейтом по severity (задача 2) |
+| Чтение вердикта | `latest_round` + `collegium_verdict`; проецируется круг целиком, а не последняя записанная строка (задача 4) |
+| Настройки | `JUDGE_MODEL_SEAT_1` / `JUDGE_MODEL_SEAT_2` (задача 5) |
+| Оркестрация | оба вызова безусловны, между ними нет ни одного `if` (задача 6) |
+| Регрессия | `test_no_seat_may_lower_the_other` плюс мутация в задаче 6, Step 5 |
+| Счётчик в форме | два вызова на строку, а не полтора (задача 9) |
 
-   ```text
-   run_id = uuid4()
-   v1 = judge(unit, seat=1, attempt=0)
-   v2 = judge(unit, seat=2, attempt=0)
-   verdict = max_severity(v1, v2)        # unparsed не понижает и не повышает
-   if verdict is PASS: return verdict
-   for attempt in 1..JUDGE_MAX_REPAIR_ATTEMPTS: ...
-   ```
-
-2. **Поле модели.** `tier` (задача 1, Step 3) переименовать в `seat` —
-   дизайн явно называет его «место в коллегии, не старшинство». Сделать
-   это до миграции `0099`, иначе понадобится вторая.
-3. **Тесты задачи 6.** Сценарии вида «A флагует, B пропускает» сейчас
-   ожидают `PASS`; после правки они обязаны ожидать флаг. Добавить тест
-   «ни один судья не понижает вердикт другого» — он ловит регрессию
-   прямо в точке, где она уже один раз произошла.
-4. **Счётчик строк (задача 9).** Каскад звал вторую модель примерно на
-   45% строк; коллегия зовёт её на 100%. Оценка стоимости в форме обязана
-   считать два вызова на строку, иначе она врёт в меньшую сторону.
-5. **Модели.** Замер выбрал `deepseek/deepseek-v4-pro` и
-   `qwen/qwen3-235b-a22b-2507`. Второй судья стоит около 5% бюджета
-   первого, поэтому переход от каскада к коллегии почти не меняет
-   суммарную цену прогона.
+Модели выбраны замером: `deepseek/deepseek-v4-pro` и
+`qwen/qwen3-235b-a22b-2507`. На прогоне 2026-08-14 второе место стоило
+около 10% от первого ($0.006 против $0.062 на 124 строках), поэтому
+переход от каскада к коллегии почти не меняет деньги — но удваивает
+число запросов, и упирается прогон именно в них.
 
 ### Контракт `description` для промпта починки
 
@@ -152,8 +143,8 @@ if verdict_b is PASS or UNPARSED: return verdict_b   # ← B снимает фл
 
 Случай «починка вернула тот же текст» **уже закрыт**: `repair_target`
 возвращает `None`, когда результат совпадает с текущим текстом
-(задача 6, Step 3), лестница на этом останавливается, и это
-зафиксировано тестом `test_repair_that_changes_nothing_stops_the_ladder`.
+(задача 6, Step 3), петля на этом останавливается, и это
+зафиксировано тестом `test_repair_that_changes_nothing_stops_the_loop`.
 Холостая попытка с неизменившимся `target_hash` не сгорает и повторного
 суда не вызывает. Отдельного механизма не нужно.
 
@@ -359,7 +350,8 @@ class JudgeVerdict(models.Model):
     """One judge opinion about one version of one unit.
 
     Verdicts are never overwritten: they accumulate per
-    ``(unit, run_id, attempt)`` so the escalation ladder stays auditable.
+    ``(unit, run_id, attempt, seat)`` so the collegium and its repair
+    loop stay auditable.
     """
 
     # Stored and API-facing values: deliberately not localized.
@@ -391,7 +383,8 @@ class JudgeVerdict(models.Model):
     errors = models.JSONField(default=list, blank=True)
     back_translation = models.TextField(blank=True)
     judge_model = models.CharField(max_length=200)
-    tier = models.SmallIntegerField()
+    # Place in the collegium, not seniority: seat 2 may not lower seat 1.
+    seat = models.SmallIntegerField()
     attempt = models.SmallIntegerField(default=0)
     target_hash = models.CharField(max_length=64)
     context_hash = models.CharField(max_length=64)
@@ -417,9 +410,17 @@ class JudgeVerdict(models.Model):
             models.Index(fields=["unit", "-timestamp"], name="judge_unit_recent_idx"),
             models.Index(fields=["run_id"], name="judge_run_idx"),
         ]
+        constraints = [
+            # One vote per seat per round: the projection reduces a round
+            # to its strictest seat and must not see a seat twice.
+            models.UniqueConstraint(
+                fields=["unit", "run_id", "attempt", "seat"],
+                name="judge_one_vote_per_seat",
+            ),
+        ]
 
     def __str__(self) -> str:
-        return f"{self.unit_id}: {self.verdict} (tier {self.tier})"
+        return f"{self.unit_id}: {self.verdict} (seat {self.seat})"
 
     def is_stale(self, target: Sequence[str]) -> bool:
         """Whether the judged text differs from the text stored now."""
@@ -583,6 +584,14 @@ _SEVERITY_VERDICT = {
 def verdict_for_severity(max_severity: str) -> str:
     """Derive the verdict from the worst error the judge reported."""
     return _SEVERITY_VERDICT[max_severity]
+
+
+# Order of strictness, so a round can be reduced to its strictest seat
+# without a seat ever lowering another. Derived from the declared scale:
+# Severity is ordered by definition, _SEVERITY_VERDICT is not.
+SEVERITY_RANK = {
+    name: rank for rank, name in enumerate(JudgeVerdict.Severity.values)
+}
 
 
 def state_for_verdict(verdict: str, *, enable_review: bool) -> int | None:
@@ -783,8 +792,15 @@ Create `weblate/trans/tests/test_judge_projection.py`:
 
 from __future__ import annotations
 
+import uuid
+
 from weblate.checks.models import Check
-from weblate.trans.judge_projection import project_verdict, describe_latest_verdict
+from weblate.trans.judge_projection import (
+    collegium_verdict,
+    describe_latest_verdict,
+    latest_round,
+    project_verdict,
+)
 from weblate.trans.models.judge import JudgeVerdict, compute_target_hash
 from weblate.trans.tests.test_views import ViewTestCase
 
@@ -794,7 +810,7 @@ class JudgeProjectionTest(ViewTestCase):
         kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
         kwargs.setdefault("context_hash", "ctx")
         kwargs.setdefault("judge_model", "vendor/model-a")
-        kwargs.setdefault("tier", 1)
+        kwargs.setdefault("seat", 1)
         return JudgeVerdict.objects.create(unit=unit, verdict=verdict, **kwargs)
 
     def check_names(self, unit) -> set[str]:
@@ -814,7 +830,44 @@ class JudgeProjectionTest(ViewTestCase):
         project_verdict(unit)
         self.assertEqual(self.check_names(unit) & {"judge-flag", "judge-reject"}, set())
 
-    def test_new_verdict_replaces_the_previous_projection(self) -> None:
+    def test_the_strict_seat_of_a_round_is_projected(self) -> None:
+        # Seat 2 passing must not clear seat 1's rejection: that is the
+        # cascade B2' rejected, arriving through the projection instead.
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        self.make_verdict(
+            unit,
+            JudgeVerdict.Verdict.REJECT,
+            seat=1,
+            run_id=run_id,
+            max_severity="critical",
+        )
+        self.make_verdict(unit, JudgeVerdict.Verdict.PASS, seat=2, run_id=run_id)
+        project_verdict(unit)
+        self.assertEqual(
+            self.check_names(unit) & {"judge-flag", "judge-reject"}, {"judge-reject"}
+        )
+        self.assertEqual(collegium_verdict(latest_round(unit)).seat, 1)
+
+    def test_a_parsed_seat_outvotes_an_unparsed_one(self) -> None:
+        # A transport failure is not an opinion and must not mute the
+        # seat that did answer.
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        self.make_verdict(unit, JudgeVerdict.Verdict.UNPARSED, seat=1, run_id=run_id)
+        self.make_verdict(
+            unit,
+            JudgeVerdict.Verdict.REJECT,
+            seat=2,
+            run_id=run_id,
+            max_severity="critical",
+        )
+        project_verdict(unit)
+        self.assertEqual(
+            self.check_names(unit) & {"judge-flag", "judge-reject"}, {"judge-reject"}
+        )
+
+    def test_a_newer_round_replaces_the_previous_projection(self) -> None:
         unit = self.get_unit()
         self.make_verdict(unit, JudgeVerdict.Verdict.REJECT, max_severity="critical")
         project_verdict(unit)
@@ -864,11 +917,54 @@ class JudgeProjectionTest(ViewTestCase):
                     "span_end": 4,
                     "category": "terminology",
                     "severity": "critical",
+                    "description": "the Gates are called DOORS here",
                 }
             ],
         )
         description = describe_latest_verdict(unit)
         self.assertIn("terminology", description)
+        self.assertIn("the Gates are called DOORS here", description)
+
+    def test_description_merges_both_seats(self) -> None:
+        # The repair has to satisfy the whole collegium, not the seat
+        # that happened to be strictest.
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        self.make_verdict(
+            unit,
+            JudgeVerdict.Verdict.REJECT,
+            seat=1,
+            run_id=run_id,
+            max_severity="critical",
+            errors=[
+                {
+                    "span_start": 0,
+                    "span_end": 4,
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "the Gates are called DOORS here",
+                }
+            ],
+        )
+        self.make_verdict(
+            unit,
+            JudgeVerdict.Verdict.FLAG,
+            seat=2,
+            run_id=run_id,
+            max_severity="major",
+            errors=[
+                {
+                    "span_start": 5,
+                    "span_end": 9,
+                    "category": "fluency",
+                    "severity": "major",
+                    "description": "the second clause has no verb",
+                }
+            ],
+        )
+        description = describe_latest_verdict(unit)
+        self.assertIn("the Gates are called DOORS here", description)
+        self.assertIn("the second clause has no verb", description)
 ```
 
 Проверь фактическое имя метода получения плюралов у `Unit`
@@ -901,9 +997,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from weblate.checks.models import Check
-from weblate.trans.models.judge import JudgeVerdict, compute_target_hash
+from weblate.trans.models.judge import SEVERITY_RANK, JudgeVerdict
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from weblate.trans.models.unit import Unit
 
 JUDGE_CHECKS = frozenset({"judge-flag", "judge-reject"})
@@ -914,19 +1012,46 @@ _VERDICT_CHECK = {
 }
 
 
-def latest_verdict(unit: Unit) -> JudgeVerdict | None:
-    """Most recent verdict for a unit, stale or not."""
-    return unit.judge_verdicts.order_by("-timestamp", "-pk").first()
+def latest_round(unit: Unit) -> list[JudgeVerdict]:
+    """Every seat's opinion about the newest judged version, stale or not."""
+    newest = unit.judge_verdicts.order_by("-timestamp", "-pk").first()
+    if newest is None:
+        return []
+    return list(
+        unit.judge_verdicts.filter(
+            run_id=newest.run_id, attempt=newest.attempt
+        ).order_by("seat")
+    )
+
+
+def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
+    """The strictest opinion of a round.
+
+    No seat may lower another. The cascade where a second model could
+    clear the first one's flag was rejected by measurement B2': 46 of 48
+    overturns deleted a real defect. A transport failure is not an
+    opinion, so an ``unparsed`` row neither raises nor lowers the round;
+    only when every seat failed does the round read as ``unparsed``.
+    """
+    if not rows:
+        return None
+    parsed = [row for row in rows if row.verdict != JudgeVerdict.Verdict.UNPARSED]
+    if not parsed:
+        return rows[0]
+    return max(parsed, key=lambda row: (SEVERITY_RANK[row.max_severity], -row.seat))
+
+
+def active_round(unit: Unit) -> list[JudgeVerdict]:
+    """The newest round, or nothing when it describes older text."""
+    rows = latest_round(unit)
+    if not rows or rows[0].is_stale(unit.get_target_plurals()):
+        return []
+    return rows
 
 
 def active_verdict(unit: Unit) -> JudgeVerdict | None:
-    """Most recent verdict that still describes the stored text."""
-    verdict = latest_verdict(unit)
-    if verdict is None:
-        return None
-    if verdict.is_stale(unit.get_target_plurals()):
-        return None
-    return verdict
+    """The collegium verdict that still describes the stored text."""
+    return collegium_verdict(active_round(unit))
 
 
 def project_verdict(unit: Unit) -> None:
@@ -950,21 +1075,25 @@ def project_verdict(unit: Unit) -> None:
 
 
 def describe_latest_verdict(unit: Unit) -> str:
-    """Human-readable evidence for the active verdict, or an empty string.
+    """Human-readable evidence for the active round, or an empty string.
 
     Rendered into the check description, which
     ``weblate/machinery/llm.py:516`` feeds to the translator as
-    ``failing_checks`` during the repair stage.
+    ``failing_checks`` during the repair stage. Both seats are merged:
+    the repair has to satisfy everything the collegium found, not only
+    the seat that happened to be strictest.
     """
-    verdict = active_verdict(unit)
-    if verdict is None or not verdict.errors:
-        return ""
-    parts = []
-    for error in verdict.errors:
-        category = error.get("category", "unspecified")
-        severity = error.get("severity", "unspecified")
-        parts.append(f"{severity}/{category}")
-    return "; ".join(parts)
+    lines: list[str] = []
+    for row in active_round(unit):
+        for error in row.errors:
+            line = "{}/{}: {}".format(
+                error.get("severity", "unspecified"),
+                error.get("category", "unspecified"),
+                error.get("description", ""),
+            )
+            if line not in lines:
+                lines.append(line)
+    return "\n".join(lines)
 ```
 
 Проверь имя метода инвалидации кэша чеков у `Unit`
@@ -974,12 +1103,12 @@ def describe_latest_verdict(unit: Unit) -> str:
 
 Run: `./rundev.sh test weblate/trans/tests/test_judge_projection.py`
 
-Expected: PASS (7 тестов)
+Expected: PASS (10 тестов)
 
 ### Step 5: Убедиться, что тест на протухание ловит баг
 
-Временно убрать проверку `is_stale` из `active_verdict` (вернуть
-`latest_verdict(unit)` напрямую), прогнать снова.
+Временно убрать проверку `is_stale` из `active_round` (вернуть
+`latest_round(unit)` напрямую), прогнать снова.
 
 Expected: FAIL на `test_stale_verdict_is_not_projected`. Вернуть код.
 
@@ -1077,6 +1206,10 @@ class JudgeClientTest(SimpleTestCase):
                             "span_end": 32,
                             "category": "terminology",
                             "severity": "critical",
+                            "description": (
+                                "«ВРАТА» is rendered as «DOORS»; the glossary "
+                                "calls this location the Gates"
+                            ),
                         }
                     ],
                     "back_translation": "The door is blocked by the DOORS",
@@ -1086,7 +1219,33 @@ class JudgeClientTest(SimpleTestCase):
         result = request_verdict(REQUEST, model="vendor/model-a")
         self.assertEqual(result.max_severity, "critical")
         self.assertEqual(len(result.errors), 1)
+        self.assertIn("Gates", result.errors[0]["description"])
         self.assertIn("DOORS", result.back_translation)
+
+    @http_mock.activate
+    def test_an_error_without_a_description_raises(self) -> None:
+        # A bare span in the target language is not evidence: the producer
+        # does not read it and the repair prompt cannot act on it.
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                {
+                    "max_severity": "major",
+                    "errors": [
+                        {
+                            "span_start": 0,
+                            "span_end": 2,
+                            "category": "fluency",
+                            "severity": "major",
+                        }
+                    ],
+                    "back_translation": "whatever",
+                }
+            ),
+        )
+        with self.assertRaises(JudgeError):
+            request_verdict(REQUEST, model="vendor/model-a")
 
     @http_mock.activate
     def test_sends_a_strict_schema_and_requires_providers_to_honour_it(self) -> None:
@@ -1163,8 +1322,8 @@ Expected: FAIL — `ModuleNotFoundError: weblate.trans.judge`
 ```python
 DEFAULT_JUDGE_ENABLED = False
 DEFAULT_JUDGE_OPENROUTER_KEY = ""
-DEFAULT_JUDGE_MODEL_TIER_A = ""
-DEFAULT_JUDGE_MODEL_TIER_B = ""
+DEFAULT_JUDGE_MODEL_SEAT_1 = ""
+DEFAULT_JUDGE_MODEL_SEAT_2 = ""
 DEFAULT_JUDGE_MAX_REPAIR_ATTEMPTS = 1
 ```
 
@@ -1174,8 +1333,8 @@ DEFAULT_JUDGE_MAX_REPAIR_ATTEMPTS = 1
     # LLM judge (off by default; site-wide, like LOC_KIT_PROFILE_*)
     JUDGE_ENABLED = defaults.DEFAULT_JUDGE_ENABLED
     JUDGE_OPENROUTER_KEY = defaults.DEFAULT_JUDGE_OPENROUTER_KEY
-    JUDGE_MODEL_TIER_A = defaults.DEFAULT_JUDGE_MODEL_TIER_A
-    JUDGE_MODEL_TIER_B = defaults.DEFAULT_JUDGE_MODEL_TIER_B
+    JUDGE_MODEL_SEAT_1 = defaults.DEFAULT_JUDGE_MODEL_SEAT_1
+    JUDGE_MODEL_SEAT_2 = defaults.DEFAULT_JUDGE_MODEL_SEAT_2
     JUDGE_MAX_REPAIR_ATTEMPTS = defaults.DEFAULT_JUDGE_MAX_REPAIR_ATTEMPTS
 ```
 
@@ -1269,7 +1428,13 @@ def _response_schema() -> dict:
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
-                    "required": ["span_start", "span_end", "category", "severity"],
+                    "required": [
+                        "span_start",
+                        "span_end",
+                        "category",
+                        "severity",
+                        "description",
+                    ],
                     "properties": {
                         "span_start": {"type": "integer", "minimum": 0},
                         "span_end": {"type": "integer", "minimum": 0},
@@ -1278,6 +1443,12 @@ def _response_schema() -> dict:
                             "type": "string",
                             "enum": [s for s in SEVERITIES if s != "none"],
                         },
+                        # Read by the producer and fed to the repair prompt
+                        # as a failing check. A span in the target language
+                        # tells neither of them anything. Non-emptiness is
+                        # checked in code: length keywords are outside the
+                        # strict structured-output subset.
+                        "description": {"type": "string"},
                     },
                 },
             },
@@ -1303,14 +1474,23 @@ def _response_schema() -> dict:
    follow_redirects=False)` в `try`, любое исключение → `JudgeError`.
 5. `status_code >= 400` → `JudgeError` с кодом, без тела ответа.
 6. Разбор: `choices[0].message.content` → `json.loads` → валидация
-   `max_severity in SEVERITIES` и формы `errors`. Любое несоответствие —
-   `JudgeError`. **Никогда не подставлять дефолтный вердикт.**
+   `max_severity in SEVERITIES` и формы `errors`, включая непустой
+   `description` у каждой ошибки. Любое несоответствие — `JudgeError`.
+   **Никогда не подставлять дефолтный вердикт.**
+
+Что обязан содержать `description`, задаётся промптом, а не схемой:
+**обратный перевод спорного фрагмента плюс объяснение, что с ним не
+так**, на языке продюсера. Ни спан на целевом языке, ни повтор
+категории не годятся — раздел «Контракт `description` для промпта
+починки» в начале плана показывает, во что это обходится: и продюсер, и
+переводчик получают улику вида `[critical] mistranslation: 拒绝`, по
+которой нельзя ни принять решение, ни починить строку.
 
 ### Step 5: Прогнать тесты
 
 Run: `./rundev.sh test weblate/trans/tests/test_judge_client.py`
 
-Expected: PASS (8 тестов)
+Expected: PASS (9 тестов)
 
 ### Step 6: Коммит
 
@@ -1324,20 +1504,27 @@ git commit -m "feat(judge): add the site-wide OpenRouter judge client"
 
 ---
 
-## Задача 6. Лестница эскалации
+## Задача 6. Коллегия и петля починки
 
-Чистая оркестрация поверх клиента: без Django-форм, без Celery. Судья A
-на всём, судья B только на его flag/reject, починка после подтверждения,
-затем очередь человека.
+Чистая оркестрация поверх клиента: без Django-форм, без Celery. Оба
+места коллегии судят **каждую** строку независимо, вердикт круга —
+строгий из двух, понижать друг друга места не вправе. Дальше петля
+починки до исчерпания попыток, затем очередь человека.
+
+Раздел «Почему не лестница» в начале плана объясняет причину: право
+второй ступени снимать флаг первой замер B2' отверг напрямую —
+46 ошибочных снятий из 48 в худшей паре. Тест
+`test_no_seat_may_lower_the_other` стоит ровно в той точке, где эта
+ошибка уже один раз произошла.
 
 **Files:**
 
-- Create: `weblate/trans/judge_ladder.py`
-- Test: `weblate/trans/tests/test_judge_ladder.py`
+- Create: `weblate/trans/judge_loop.py`
+- Test: `weblate/trans/tests/test_judge_loop.py`
 
 ### Step 1: Написать падающий тест
 
-Create `weblate/trans/tests/test_judge_ladder.py`. Клиент подменяется
+Create `weblate/trans/tests/test_judge_loop.py`. Клиент подменяется
 целиком — сеть в этих тестах не участвует.
 
 ```python
@@ -1352,14 +1539,22 @@ from unittest import mock
 from django.test import override_settings
 
 from weblate.trans.judge import JudgeError, JudgeResult
-from weblate.trans.judge_ladder import run_ladder
+from weblate.trans.judge_loop import run_judge_loop
 from weblate.trans.models.judge import JudgeVerdict
 from weblate.trans.tests.test_views import ViewTestCase
 
 PASS = JudgeResult(max_severity="none", errors=[], back_translation="ok")
 MAJOR = JudgeResult(
     max_severity="major",
-    errors=[{"span_start": 0, "span_end": 1, "category": "style", "severity": "major"}],
+    errors=[
+        {
+            "span_start": 0,
+            "span_end": 1,
+            "category": "style",
+            "severity": "major",
+            "description": "register is too formal for a barracks line",
+        }
+    ],
     back_translation="meh",
 )
 CRITICAL = JudgeResult(
@@ -1370,6 +1565,7 @@ CRITICAL = JudgeResult(
             "span_end": 1,
             "category": "terminology",
             "severity": "critical",
+            "description": "«MAX» left in Latin script; the glossary wants 最大",
         }
     ],
     back_translation="wrong",
@@ -1379,85 +1575,112 @@ CRITICAL = JudgeResult(
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_OPENROUTER_KEY="sk-test",
-    JUDGE_MODEL_TIER_A="vendor-a/model",
-    JUDGE_MODEL_TIER_B="vendor-b/model",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_MAX_REPAIR_ATTEMPTS=1,
 )
-class JudgeLadderTest(ViewTestCase):
+class JudgeLoopTest(ViewTestCase):
     def run_with(self, results, repair=None):
         with (
             mock.patch(
-                "weblate.trans.judge_ladder.request_verdict", side_effect=results
+                "weblate.trans.judge_loop.request_verdict", side_effect=results
             ) as client,
             mock.patch(
-                "weblate.trans.judge_ladder.repair_target",
-                return_value=repair,
+                "weblate.trans.judge_loop.repair_target", return_value=repair
             ),
         ):
             unit = self.get_unit()
-            verdict = run_ladder(unit, user=self.user)
+            verdict = run_judge_loop(unit, user=self.user)
         return unit, verdict, client
 
-    def test_pass_on_tier_a_never_calls_tier_b(self) -> None:
-        _, verdict, client = self.run_with([PASS])
+    def test_both_seats_judge_every_string(self) -> None:
+        unit, verdict, client = self.run_with([PASS, PASS])
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
-        self.assertEqual(client.call_count, 1)
-        self.assertEqual(verdict.tier, 1)
-
-    def test_tier_b_clears_a_false_alarm(self) -> None:
-        unit, verdict, client = self.run_with([MAJOR, PASS])
-        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
-        self.assertEqual(verdict.tier, 2)
         self.assertEqual(client.call_count, 2)
-        # Both opinions are kept: the ladder must stay auditable.
         self.assertEqual(unit.judge_verdicts.count(), 2)
 
-    def test_tier_b_uses_a_different_model(self) -> None:
-        _, _, client = self.run_with([MAJOR, PASS])
+    def test_no_seat_may_lower_the_other(self) -> None:
+        # The construction B2' rejected. Measured cost of the opposite:
+        # 46 of 48 overturns deleted a real defect.
+        _, verdict, _ = self.run_with([MAJOR, PASS])
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+        self.assertEqual(verdict.max_severity, "major")
+
+    def test_the_same_holds_when_the_strict_seat_votes_second(self) -> None:
+        _, verdict, _ = self.run_with([PASS, MAJOR])
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+
+    def test_verdict_takes_the_higher_severity(self) -> None:
+        _, verdict, _ = self.run_with([MAJOR, CRITICAL], repair=None)
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+        self.assertEqual(verdict.max_severity, "critical")
+
+    def test_seats_use_different_models(self) -> None:
+        _, _, client = self.run_with([PASS, PASS])
         models_used = [call.kwargs["model"] for call in client.call_args_list]
         self.assertEqual(models_used, ["vendor-a/model", "vendor-b/model"])
 
-    def test_confirmed_defect_triggers_one_repair(self) -> None:
+    def test_unparsed_neither_raises_nor_lowers_the_other_seat(self) -> None:
+        _, verdict, _ = self.run_with([CRITICAL, JudgeError("boom")], repair=None)
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+
+    def test_a_clean_seat_next_to_an_unparsed_one_still_passes(self) -> None:
+        _, verdict, _ = self.run_with([PASS, JudgeError("boom")])
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
+
+    def test_unparsed_from_both_seats_is_unparsed(self) -> None:
+        _, verdict, _ = self.run_with([JudgeError("boom"), JudgeError("boom")])
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.UNPARSED)
+        self.assertEqual(verdict.max_severity, "none")
+
+    def test_confirmed_defect_triggers_one_repair_judged_by_both_seats(self) -> None:
         _, verdict, client = self.run_with(
-            [CRITICAL, CRITICAL, PASS], repair=["fixed text"]
+            [CRITICAL, CRITICAL, PASS, PASS], repair=["fixed text"]
         )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
         self.assertEqual(verdict.attempt, 1)
+        self.assertEqual(client.call_count, 4)
 
-    def test_exhausted_ladder_returns_the_last_negative_verdict(self) -> None:
+    def test_exhausted_loop_returns_the_last_negative_verdict(self) -> None:
         _, verdict, _ = self.run_with(
-            [CRITICAL, CRITICAL, CRITICAL], repair=["still wrong"]
+            [CRITICAL, CRITICAL, CRITICAL, CRITICAL], repair=["still wrong"]
         )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
         self.assertEqual(verdict.attempt, 1)
 
-    def test_repair_that_changes_nothing_stops_the_ladder(self) -> None:
+    def test_repair_that_changes_nothing_stops_the_loop(self) -> None:
         # No point re-judging identical text; that is a wasted call.
         _, verdict, client = self.run_with([CRITICAL, CRITICAL], repair=None)
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
         self.assertEqual(client.call_count, 2)
 
-    def test_transport_failure_is_recorded_as_unparsed_not_as_a_flag(self) -> None:
-        _, verdict, _ = self.run_with([JudgeError("boom")])
-        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.UNPARSED)
-        self.assertEqual(verdict.max_severity, "none")
-
     def test_every_verdict_of_one_run_shares_the_run_id(self) -> None:
-        unit, _, _ = self.run_with([MAJOR, PASS])
+        unit, _, _ = self.run_with(
+            [CRITICAL, CRITICAL, PASS, PASS], repair=["fixed text"]
+        )
         self.assertEqual(
             len(set(unit.judge_verdicts.values_list("run_id", flat=True))), 1
+        )
+
+    def test_each_seat_votes_exactly_once_per_round(self) -> None:
+        unit, _, _ = self.run_with(
+            [CRITICAL, CRITICAL, PASS, PASS], repair=["fixed text"]
+        )
+        self.assertEqual(
+            set(unit.judge_verdicts.values_list("attempt", "seat")),
+            {(0, 1), (0, 2), (1, 1), (1, 2)},
         )
 ```
 
 ### Step 2: Прогнать и убедиться, что падает
 
-Run: `./rundev.sh test weblate/trans/tests/test_judge_ladder.py`
+Run: `./rundev.sh test weblate/trans/tests/test_judge_loop.py`
 
-Expected: FAIL — `ModuleNotFoundError: weblate.trans.judge_ladder`
+Expected: FAIL — `ModuleNotFoundError: weblate.trans.judge_loop`
 
-### Step 3: Реализовать лестницу
+### Step 3: Реализовать коллегию и петлю
 
-Create `weblate/trans/judge_ladder.py` с двумя публичными функциями.
+Create `weblate/trans/judge_loop.py` с двумя публичными функциями.
 
 `repair_target(unit, user) -> list[str] | None`:
 
@@ -1471,24 +1694,34 @@ Create `weblate/trans/judge_ladder.py` с двумя публичными фун
 
 Улики судьи в промпт подставлять **не надо**: они уже там. Судейские
 `Check`-строки записаны проекцией, а `weblate/machinery/llm.py:493-528`
-кладёт их в `failing_checks` вместе с `get_description()`.
+кладёт их в `failing_checks` вместе с `get_description()`. Отсюда
+жёсткий порядок внутри круга: `project_verdict(unit)` обязан отработать
+**до** `repair_target`, иначе переводчик получит улики прошлой попытки.
 
-`run_ladder(unit, *, user) -> JudgeVerdict`:
+`run_judge_loop(unit, *, user) -> JudgeVerdict`:
 
 ```text
 run_id = uuid4()
-verdict = judge(unit, tier=1, attempt=0)          # судья A
-if verdict is PASS or UNPARSED: return verdict
-verdict_b = judge(unit, tier=2, attempt=0)        # судья B, другое семейство
-if verdict_b is PASS or UNPARSED: return verdict_b
-for attempt in 1..JUDGE_MAX_REPAIR_ATTEMPTS:
-    new_target = repair_target(unit, user)
-    if new_target is None: break
-    write new_target to the unit          # состояние ставит вызывающий код
-    verdict = judge(unit, tier=1, attempt=attempt)
+for attempt in 0..JUDGE_MAX_REPAIR_ATTEMPTS:
+    rows = [judge(unit, seat=1, attempt=attempt, run_id=run_id),
+            judge(unit, seat=2, attempt=attempt, run_id=run_id)]
+    project_verdict(unit)                 # один раз на круг, не на место
+    verdict = collegium_verdict(rows)
     if verdict is PASS or UNPARSED: return verdict
-return verdict                                     # лестница исчерпана
+    if attempt == JUDGE_MAX_REPAIR_ATTEMPTS: return verdict
+    new_target = repair_target(unit, user)
+    if new_target is None: return verdict          # чинить нечем
+    write new_target to the unit          # состояние ставит вызывающий код
+return verdict
 ```
+
+Оба вызова безусловны. Ни один `if` между ними не появляется: как только
+второе место начинает зависеть от вердикта первого, схема превращается в
+отвергнутый каскад.
+
+Модель места берётся из `JUDGE_MODEL_SEAT_1` / `JUDGE_MODEL_SEAT_2`.
+Замер выбрал `deepseek/deepseek-v4-pro` и `qwen/qwen3-235b-a22b-2507` —
+разные семейства, и это часть калибровки, а не деталь развёртывания.
 
 Внутренний `judge(...)`:
 
@@ -1500,32 +1733,47 @@ return verdict                                     # лестница исчер
 - `JudgeError` → пишет `JudgeVerdict` с `verdict="unparsed"`,
   `max_severity="none"`, пустыми `errors`;
 - иначе `verdict_for_severity(result.max_severity)`;
-- всегда пишет `target_hash`, `context_hash`, `run_id`, `tier`, `attempt`,
-  `judge_model`;
-- после записи зовёт `project_verdict(unit)`, чтобы улики стали видны
-  следующей починке.
+- всегда пишет `target_hash`, `context_hash`, `run_id`, `seat`,
+  `attempt`, `judge_model`.
+
+Проекцию `judge(...)` не зовёт: круг проецируется целиком после обоих
+мест, иначе строка успеет постоять под вердиктом одного места.
+
+`collegium_verdict(rows)` живёт в `judge_projection.py` (задача 4) —
+её же читают карточка юнита и сама проекция.
 
 ### Step 4: Прогнать тесты
 
-Run: `./rundev.sh test weblate/trans/tests/test_judge_ladder.py`
+Run: `./rundev.sh test weblate/trans/tests/test_judge_loop.py`
 
-Expected: PASS (8 тестов)
+Expected: PASS (13 тестов)
 
-### Step 5: Проверить, что тест про второе семейство ловит баг
+### Step 5: Проверить, что тесты ловят баг
 
-Временно передать `JUDGE_MODEL_TIER_A` на обеих ступенях. Прогнать.
+Две мутации подряд, каждая возвращается после прогона.
 
-Expected: FAIL на `test_tier_b_uses_a_different_model`. Вернуть код.
+1. Дать месту 2 право снимать флаг: после первого вызова добавить
+   `if rows[1].verdict == PASS: return rows[1]`.
 
-Каскад без смены семейства — это 3x-агрегация, которую дизайн
-(`:75-77`) заменил именно потому, что она сбивает дисперсию, но не
-смещение.
+   Expected: FAIL на `test_no_seat_may_lower_the_other` и
+   `test_the_same_holds_when_the_strict_seat_votes_second`.
+
+   Это и есть отвергнутая замером конструкция. Тест существует затем,
+   чтобы она не вернулась случайно.
+
+2. Передать `JUDGE_MODEL_SEAT_1` на обоих местах.
+
+   Expected: FAIL на `test_seats_use_different_models`.
+
+   Коллегия из одного семейства — это 3x-агрегация, которую дизайн
+   (`:132-138`) заменил именно потому, что она сбивает дисперсию, но не
+   смещение.
 
 ### Step 6: Коммит
 
 ```bash
-git add weblate/trans/judge_ladder.py weblate/trans/tests/test_judge_ladder.py
-git commit -m "feat(judge): implement the two-family escalation ladder"
+git add weblate/trans/judge_loop.py weblate/trans/tests/test_judge_loop.py
+git commit -m "feat(judge): judge every string with a two-family collegium"
 ```
 
 ---
@@ -1665,18 +1913,18 @@ from weblate.utils.state import STATE_APPROVED, STATE_FUZZY, STATE_TRANSLATED
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_OPENROUTER_KEY="sk-test",
-    JUDGE_MODEL_TIER_A="vendor-a/model",
-    JUDGE_MODEL_TIER_B="vendor-b/model",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
 )
 class JudgeAutoTranslateTest(ViewTestCase):
     def perform(self, verdict_kind, *, q="", overwrite=False):
-        def fake_ladder(unit, **kwargs):
+        def fake_loop(unit, **kwargs):
             return JudgeVerdict.objects.create(
                 unit=unit,
                 verdict=verdict_kind,
                 max_severity="none",
                 judge_model="vendor-a/model",
-                tier=1,
+                seat=1,
                 target_hash="h",
                 context_hash="c",
             )
@@ -1689,7 +1937,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             overwrite_existing=overwrite,
         )
         with mock.patch(
-            "weblate.trans.autotranslate.run_ladder", side_effect=fake_ladder
+            "weblate.trans.autotranslate.run_judge_loop", side_effect=fake_loop
         ):
             auto.process_judge()
         return auto
@@ -1764,7 +2012,7 @@ for pos, unit in enumerate(units):
         if target: write it with state = self.fresh_translation_state
     if not unit.target:
         continue                       # нечего судить
-    verdict = run_ladder(unit, user=self.user)
+    verdict = run_judge_loop(unit, user=self.user)
     state = state_for_verdict(verdict.verdict,
                               enable_review=self.translation.enable_review)
     if state is not None:
@@ -1865,6 +2113,14 @@ Expected: FAIL
 нет — рендерить серверный счётчик при загрузке страницы и отдельно
 подписать, что число отражает фильтр на момент открытия. Точность здесь
 менее важна, чем порядок величины перед тратой денег.
+
+Рядом со счётчиком показать, что коллегия делает **два вызова на
+строку**: оба места судят каждую строку, второе не по эскалации.
+Прогон 2026-08-14 на 124 строках zh_Hans парой
+`deepseek-v4-pro` + `qwen3-235b` стоил $0.068, то есть $0.00055 за
+строку. Второе место добавляет к деньгам около 10% (`$0.006` против
+`$0.062`), но удваивает число запросов — и упирается прогон именно в
+них: те же 124 строки заняли 13 минут.
 
 ### Step 5: Прогнать тесты
 
@@ -2030,14 +2286,19 @@ Expected: FAIL
 
 ### Step 3: Реализовать
 
-1. Во вью юнита положить в контекст `judge_verdict` — `latest_verdict(unit)`,
-   и флаг `judge_verdict_stale`.
+1. Во вью юнита положить в контекст `judge_round` — `latest_round(unit)`,
+   `judge_verdict` — `collegium_verdict(judge_round)`, и флаг
+   `judge_verdict_stale`. Карточка показывает вердикт коллегии, но
+   перечисляет мнения обоих мест: согласие двух семейств — сильный
+   сигнал, расхождение — слабый, и скрывать его дизайн запрещает
+   (`:295-296`).
 2. `weblate/templates/snippets/judge-verdict.html` — карточка по образцу
    существующей `card` из `translate.html:594-598`, с `id="id_judge_card"`.
    Содержимое по таблице дизайна (`:188-195`):
    - `pass` / `minor` — свёрнута, «Принято · модель · когда»;
    - `flag` / `reject` — развёрнута, список ошибок с категорией и
-     severity, обе ступени, плашка «не уйдёт в сборку» для `reject`;
+     severity, оба места коллегии и явная отметка, если они разошлись;
+     плашка «не уйдёт в сборку» для `reject`;
    - протух — серая, «relates to a previous version», кнопка «пересудить»
      появится в плане 3, здесь только текст;
    - `unparsed` — серая, «ответ судьи не разобран», **не** как вердикт.
@@ -2183,7 +2444,7 @@ Expected: pass. Если `typos` или `rumdl` ругаются на чужие
 Run:
 
 ```bash
-uv run pylint weblate/trans/judge.py weblate/trans/judge_ladder.py \
+uv run pylint weblate/trans/judge.py weblate/trans/judge_loop.py \
   weblate/trans/judge_projection.py weblate/trans/models/judge.py
 uv run mypy --show-column-numbers weblate scripts/*.py ./*.py | ./scripts/filter-mypy.sh
 ```
@@ -2200,7 +2461,7 @@ Expected: без новых ошибок относительно базовой
 
 ```bash
 WEBLATE_JUDGE_ENABLED=1 WEBLATE_JUDGE_OPENROUTER_KEY=... \
-WEBLATE_JUDGE_MODEL_TIER_A=... WEBLATE_JUDGE_MODEL_TIER_B=... \
+WEBLATE_JUDGE_MODEL_SEAT_1=... WEBLATE_JUDGE_MODEL_SEAT_2=... \
 WEBLATE_PORT=3001 ./rundev.sh
 ```
 
@@ -2213,9 +2474,11 @@ WEBLATE_PORT=3001 ./rundev.sh
    - поиск `check:judge-reject` их находит;
    - на странице git-статуса они посчитаны как пропущенные политикой;
    - судейских строк нет в карточке «Things to check».
-4. Записать наблюдение (сколько строк, сколько ушло на ступень B, сколько
-   починок) в `docs/misc/` отдельным файлом — это первый реальный замер
-   каскада вне золотого набора.
+4. Записать наблюдение (сколько строк, на скольких места коллегии
+   разошлись, сколько починок) в `docs/misc/` отдельным файлом. Прогон
+   на живом компоненте уже есть — `docs/LLM-first/2026-08-14-st2-zh-judge-run.md`,
+   124 строки zh_Hans, согласие судей 72.6%, — но он сделан внешним
+   скриптом мимо продукта; этот будет первым через сам режим.
 
 ### Step 7: Коммит и пуш
 
@@ -2240,14 +2503,16 @@ git commit -m "docs(judge): document the judge translation mode"
 - [ ] `unparsed` нигде не выглядит как `flag` или `reject`.
 - [ ] Протухший вердикт не проецируется в `Check` и не показывает свой
       обратный перевод.
-- [ ] Ступень B ходит в другую модель, чем ступень A.
+- [ ] Места коллегии ходят в разные семейства моделей.
+- [ ] Ни одно место не понижает вердикт другого: `flag` + `pass` даёт
+      `flag`, и это зафиксировано тестом.
 - [ ] Улики судьи доезжают до промпта починки без отдельного механизма.
 - [ ] Судейские чеки не рендерятся в «Things to check», но находятся
       через `check:judge-*`.
 - [ ] Свежепереведённая, но несудившаяся строка остаётся в `10`.
 - [ ] Существующий перевод без чекбокса перезаписи не переписывается.
-- [ ] Три теста, помеченные шагами «убедиться, что тест ловит баг»,
-      действительно падают при откате соответствующей правки.
+- [ ] Каждая мутация из шагов «убедиться, что тест ловит баг» (задачи 4,
+      6, 8, 10) действительно роняет свой тест.
 
 ## Что этот план сознательно не закрывает
 
