@@ -52,14 +52,15 @@ def _sources_project_slug(sources: list[tuple[str, Unit | None]]) -> str:
         if unit is None:
             continue
         try:
-            return unit.translation.component.project.slug
+            slug = unit.translation.component.project.slug
+            return slug if isinstance(slug, str) else ""
         except AttributeError:
             return ""
+    return ""
 
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-
     from django_stubs_ext import StrOrPromise
 
     from weblate.checks.base import Highlight, HighlightKind

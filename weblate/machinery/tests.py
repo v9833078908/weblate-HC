@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from functools import partial
 from io import StringIO
 from pathlib import Path
+from decimal import Decimal
 from typing import TYPE_CHECKING, ClassVar, NoReturn, cast
 from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 from urllib.parse import parse_qs, urlparse
@@ -24,6 +25,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import DatabaseError
 from django.test import SimpleTestCase, TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -3868,6 +3870,137 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assert_async_translate(
             self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN
         )
+
+    def mock_chat_usage(self, usage: dict | None) -> None:
+        """Register chat and models routes returning the given usage."""
+        http_mock.register(
+            "GET",
+            re.compile(r"/models$"),
+            json={
+                "object": "list",
+                "data": [
+                    {
+                        "id": self.TRACE_MODEL,
+                        "object": "model",
+                        "created": 1686935002,
+                        "owned_by": "test",
+                    }
+                ],
+            },
+        )
+
+        def chat_callback(request):
+            return httpx2.Response(
+                200,
+                headers={},
+                json={
+                    "id": "chatcmpl-123",
+                    "object": "chat.completion",
+                    "created": 1677652288,
+                    "model": self.TRACE_MODEL,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": '["Ahoj světe"]',
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    **({"usage": usage} if usage is not None else {}),
+                },
+            )
+
+        http_mock.register_callback(
+            "POST", re.compile(r"chat/completions"), chat_callback
+        )
+
+    def mock_response_priced(self) -> None:
+        self.mock_chat_usage(
+            {
+                "prompt_tokens": 9,
+                "completion_tokens": 12,
+                "total_tokens": 21,
+                "cost": 0.00001234,
+                "prompt_tokens_details": {
+                    "cached_tokens": 4,
+                    "cache_write_tokens": 0,
+                },
+                "completion_tokens_details": {"reasoning_tokens": 0},
+            }
+        )
+
+    def mock_response_unpriced(self) -> None:
+        self.mock_chat_usage(
+            {"prompt_tokens": 9, "completion_tokens": 12, "total_tokens": 21}
+        )
+
+    @http_mock.activate
+    def test_usage_recorded(self) -> None:
+        from weblate.trans.models.llm_usage import LLMUsageLog
+
+        LLMUsageLog.objects.all().delete()
+        self.mock_response_priced()
+        self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.model, self.TRACE_MODEL)
+        self.assertEqual(log.prompt_tokens, 9)
+        self.assertEqual(log.completion_tokens, 12)
+        self.assertEqual(log.total_tokens, 21)
+        self.assertEqual(log.cost_usd, Decimal("0.00001234"))
+        self.assertEqual(log.response_id, "chatcmpl-123")
+        self.assertEqual(log.cached_tokens, 4)
+        self.assertEqual(log.project_slug, "mock")
+
+    @http_mock.activate
+    def test_usage_recorded_async(self) -> None:
+        from weblate.trans.models.llm_usage import LLMUsageLog
+
+        LLMUsageLog.objects.all().delete()
+        self.mock_response_priced()
+        self.assert_async_translate(
+            self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN
+        )
+        self.assertEqual(LLMUsageLog.objects.count(), 1)
+
+    @http_mock.activate
+    def test_usage_cost_zero_is_unpriced(self) -> None:
+        from weblate.trans.models.llm_usage import LLMUsageLog
+
+        LLMUsageLog.objects.all().delete()
+        self.mock_response_unpriced()  # usage without cost
+        self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.prompt_tokens, 9)
+        self.assertIsNone(log.cost_usd)
+
+    @http_mock.activate
+    def test_usage_missing_means_no_record(self) -> None:
+        from weblate.trans.models.llm_usage import LLMUsageLog
+
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_usage(None)
+        self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
+        self.assertEqual(LLMUsageLog.objects.count(), 0)
+
+
+    @http_mock.activate
+    def test_usage_record_failure_does_not_break_translation(self) -> None:
+        from weblate.trans.models.llm_usage import LLMUsageLog
+
+        LLMUsageLog.objects.all().delete()
+        self.mock_response_priced()
+        with patch.object(
+            LLMUsageLog._default_manager,  # ruff: ignore[private-member-access]
+            "create",
+            side_effect=DatabaseError("boom"),
+        ):
+            translation = self.assert_translate(
+                self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN
+            )
+        self.assertTrue(translation)
+        self.assertEqual(LLMUsageLog.objects.count(), 0)
 
     @http_mock.activate
     def test_batch_fetches_glossary_terms_once(self) -> None:

@@ -4,9 +4,11 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from decimal import Decimal
+from typing import Any, ClassVar
 from urllib.parse import quote, urljoin
 
+from asgiref.sync import sync_to_async
 from django.core.cache import cache
 
 from weblate.logger import LOGGER
@@ -17,7 +19,7 @@ from .base import (
     MachineTranslationError,
 )
 from .forms import AzureOpenAIMachineryForm, MistralMachineryForm, OpenAIMachineryForm
-from .llm import BaseLLMTranslation
+from .llm import BaseLLMTranslation, llm_batch_project
 
 
 class BaseOpenAITranslation(BaseLLMTranslation):
@@ -94,7 +96,9 @@ class BaseOpenAITranslation(BaseLLMTranslation):
                 model, prompt, content, previous_content, previous_response
             ),
         )
-        return self.parse_chat_response(response.json())
+        payload = response.json()
+        self.record_llm_usage(payload, model)
+        return self.parse_chat_response(payload)
 
     async def afetch_llm_translations(
         self, prompt: str, content: str, previous_content: str, previous_response: str
@@ -107,7 +111,56 @@ class BaseOpenAITranslation(BaseLLMTranslation):
                 model, prompt, content, previous_content, previous_response
             ),
         )
-        return self.parse_chat_response(response.json())
+        payload = response.json()
+        await sync_to_async(self.record_llm_usage, thread_sensitive=True)(
+            payload, model
+        )
+        return self.parse_chat_response(payload)
+
+    def record_llm_usage(self, payload: dict[str, Any], model: str) -> None:
+        """
+        Persist the token usage and cost OpenRouter billed for this request.
+
+        Never raises: a broken accounting write must not break a translation,
+        and the exception is logged so a broken table is visible in the log.
+        """
+        try:
+            if not isinstance(payload, dict):
+                return
+            usage = payload.get("usage")
+            if not isinstance(usage, dict):
+                return
+            prompt_tokens = usage.get("prompt_tokens") or 0
+            completion_tokens = usage.get("completion_tokens") or 0
+            total_tokens = usage.get("total_tokens") or (
+                prompt_tokens + completion_tokens
+            )
+            if not prompt_tokens and not completion_tokens:
+                return
+            cost = usage.get("cost")
+            prompt_details = usage.get("prompt_tokens_details") or {}
+            completion_details = usage.get("completion_tokens_details") or {}
+            project = self.settings.get("_project")
+            if project is not None:
+                project_slug = project.slug
+            else:
+                project_slug = llm_batch_project.get()
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.models.llm_usage import LLMUsageLog
+
+            LLMUsageLog.objects.create(
+                model=model,
+                project_slug=project_slug,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                cost_usd=Decimal(str(cost)) if cost else None,
+                response_id=str(payload.get("id") or ""),
+                cached_tokens=prompt_details.get("cached_tokens") or 0,
+                reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
+            )
+        except Exception:
+            LOGGER.exception("Failed to record LLM usage")
 
     def get_chat_payload(
         self,
