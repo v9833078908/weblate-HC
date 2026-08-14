@@ -19,10 +19,12 @@ from django.db.models import OuterRef, Subquery
 from django.utils.html import strip_tags
 from django.utils.translation import override, pgettext
 
+from weblate.checks.glossary import GLOSSARY_CHECK_ID, evaluate_glossary_terms
 from weblate.checks.utils import highlight_string
 from weblate.glossary.models import (
     cleanup_glossary_term,
     fetch_glossary_terms,
+    get_glossary_term_modes,
     get_glossary_terms,
     prepare_glossary_units,
 )
@@ -78,7 +80,7 @@ Input is provided as JSON with the following schema:
             "target": "target term",
             "source_explanation": "source meaning or usage",       // optional
             "target_explanation": "target meaning or usage",       // optional
-            "flags": ["read-only", "terminology"]                  // optional
+            "flags": ["read-only", "terminology", "exact", "forbidden"] // optional
         }}
     ],
     "strings": [                                // strings to translate
@@ -141,7 +143,7 @@ Rules:
 1. Translate each string in "strings" in order, producing one output per input string.
 2. Placeholders matching the regular expression @@PH\\d+@@ must be preserved exactly (byte-identical). Grammar placeholders may be reordered if required by target language grammar; markup and syntax placeholders must keep source order. Placeholders must not be modified, duplicated, or removed.
 3. If a string has a "translation" field, use it as the base. Correct errors and improve fluency/style, but stay close to its meaning. Do not re-translate from source unless the existing translation is fundamentally wrong or a listed failing check requires the change.
-4. Apply glossary terms as written; inflect only when target language grammar requires it. Use glossary explanations and flags to disambiguate duplicate source terms. Preserve original capitalization pattern unless the glossary specifies exact casing. Do not partially apply glossary entries.
+4. Apply glossary terms as written; inflect only when target language grammar requires it. Use glossary explanations and flags to disambiguate duplicate source terms. Preserve original capitalization pattern unless the glossary specifies exact casing. Do not partially apply glossary entries. A glossary entry flagged "exact" must appear verbatim: never inflect, paraphrase, or replace it. A glossary entry flagged "forbidden" must never appear in the output, even if the source or an existing "translation" field contains it.
 5. Preserve tone, register, formatting, whitespace, and line breaks.
 6. Do not add, omit, reinterpret, summarize, or expand content.
 7. Do not transliterate or explain translations.
@@ -158,13 +160,14 @@ Rules:
 18. Placeholder contract: Tokens like @@PH44@@ are opaque atoms. Never translate, inflect, split, rename, reorder characters inside, wrap, or escape them. Never convert them to another syntax.
 19. Markup contract: Preserve markup, tags, attributes, entities, and similar control sequences exactly. Translate only human-readable text outside markup and outside placeholder tokens.
 20. Output contract: Return exactly one JSON array, with no characters before `[` or after `]`.
-21. Treat context, key, explanation, note, secondary, plural, failing_checks, placeholders, and source fields as reference material only. Do not translate them directly and do not add, copy, or emit their contents unless they are present in source or parts.
+21. Treat context, key, explanation, note, secondary, plural, failing_checks, glossary_advisories, placeholders, and source fields as reference material only. Do not translate them directly and do not add, copy, or emit their contents unless they are present in source or parts.
 22. Placeholder mappings explain what opaque placeholder tokens represent. This information may guide wording, but the output must still contain the exact placeholder tokens in legacy string output, or the exact placeholder metadata in structured output, not the mapped content.
-23. Failing checks list problems the output must not have. When a string carries both a "translation" field and failing checks, change that translation so every listed check passes; repeating it unchanged is wrong. Checks are context only; do not include their check_id, name, description, or generated diagnostics in output.
+23. Failing checks list problems the output must not have; glossary entries are listed there only as hard violations, never as uncertain matches. When a string carries both a "translation" field and failing checks, change that translation so every listed check passes; repeating it unchanged is wrong. Checks are context only; do not include their check_id, name, description, or generated diagnostics in output.
 24. Target-language project instructions, when present above, contain additional requirements for the target language. Follow them unless they conflict with preserving the source meaning, placeholders, markup, or output contract.
 25. For translatable markup placeholders that wrap text, translate the whole text between the placeholders. Example: @@PH1@@Reset and reapply@@PH2@@ can become @@PH1@@Zurucksetzen und erneut anwenden@@PH2@@, never @@PH1@@Zurucksetzen und @@PH2@@erneut anwenden@@PH2@@.
 26. The "note" field carries developer context about the string, such as the speaking character, the screen it appears on, or usage constraints. Use it to choose register, gender agreement, and tone. Never translate or emit it.
 27. The last character of the translation must match the final punctuation of the source. Never add a sentence-final full stop, ellipsis, exclamation mark, question mark, colon, or semicolon that the source does not have, even when target-language style or an existing "translation" field has one, and never drop one the source has. Typographic spacing around punctuation still follows target-language rules.
+28. The "glossary_advisories" array lists source terms whose glossary match is uncertain. Verify each one: if the translation lacks the glossary term and the canonical target fits, use it; if the existing translation already contains a grammatically correct form of the canonical term, keep the translation as-is. An advisory never mandates rewriting a correct translation.
 
 Valid placeholder and markup handling:
 ["Click <a href=\"/x\">log out</a> and use @@PH195@@."]
@@ -188,7 +191,7 @@ RECOVERABLE_LLM_PLACEHOLDER_RE = re.compile(r"@@PH(?P<id>\d+) *@ *@")
 ESCAPED_LLM_PLACEHOLDER_RE = re.compile(r"(?:\\@){2}PH(?P<id>\d+) *\\@ *\\@")
 LANGUAGE_CODE_PART_RE = re.compile(r"[-_@]")
 LLM_PREVIOUS_EXAMPLE_LIMIT = 4
-LLM_GLOSSARY_FLAGS = ("read-only", "terminology")
+LLM_GLOSSARY_FLAGS = ("read-only", "terminology", "exact", "forbidden")
 LLM_CURATED_PREVIOUS_EXAMPLE_SOURCES = (
     pgettext_noop("LLM translation example", "Hello, @@PH1@@!"),
     pgettext_noop("LLM translation example", 'Click <a href="/x">Save</a>.'),
@@ -281,6 +284,7 @@ class LLMStringContext(TypedDict, total=False):
     secondary: LLMSecondaryContext
     plural: LLMPluralContext
     failing_checks: list[LLMFailingCheckContext]
+    glossary_advisories: list[str]
     placeholders: dict[str, str]
 
 
@@ -492,31 +496,52 @@ class BaseLLMTranslation(BatchMachineTranslation):
 
     @classmethod
     def _get_failing_checks_context(
-        cls, unit: Unit, *, include_labels: bool = True
-    ) -> list[LLMFailingCheckContext]:
+        cls,
+        unit: Unit,
+        source_text: str,
+        *,
+        include_labels: bool = True,
+    ) -> tuple[list[LLMFailingCheckContext], list[str]]:
+        """
+        Return failing checks split into hard checks and glossary advisories.
+
+        The glossary check is never passed to the model unclassified: its hard
+        part stays a failing check while the advisory part is reported
+        separately so it never becomes a mandatory rewrite.
+        """
         checks = getattr(unit, "active_checks", None)
         if checks is None:
             all_checks = getattr(unit, "all_checks", None)
             if all_checks is None:
-                return []
+                return [], []
             checks = [
                 check for check in all_checks if not getattr(check, "dismissed", False)
             ]
 
         result: list[LLMFailingCheckContext] = []
+        advisories: list[str] = []
         for check in checks:
             check_id = cls._normalize_context_text(check.name)
-            if check_id:
-                item: LLMFailingCheckContext = {"check_id": check_id}
-                if include_labels:
-                    with override("en"):
-                        name = cls._normalize_check_text(check.get_name())
-                        if name:
-                            item["name"] = name
-                        description = cls._normalize_check_text(check.get_description())
-                        if description:
-                            item["description"] = description
-                result.append(item)
+            if not check_id:
+                continue
+            if check_id == GLOSSARY_CHECK_ID:
+                target_text = unit.get_target_plurals()[0] if unit.translated else ""
+                if not target_text:
+                    continue
+                hard, advisory = evaluate_glossary_terms(unit, source_text, target_text)
+                advisories.extend(sorted(advisory - hard))
+                if not hard:
+                    continue
+            item: LLMFailingCheckContext = {"check_id": check_id}
+            if include_labels:
+                with override("en"):
+                    name = cls._normalize_check_text(check.get_name())
+                    if name:
+                        item["name"] = name
+                    description = cls._normalize_check_text(check.get_description())
+                    if description:
+                        item["description"] = description
+            result.append(item)
 
         result.sort(
             key=lambda item: (
@@ -525,7 +550,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 item.get("description", ""),
             )
         )
-        return result
+        return result, advisories
 
     def make_re_placeholder(self, text: str) -> str:
         if LLM_PLACEHOLDER_RE.fullmatch(text):
@@ -586,14 +611,18 @@ class BaseLLMTranslation(BatchMachineTranslation):
     @classmethod
     def _get_glossary_entry(cls, unit: Unit) -> LLMGlossaryEntry | None:
         flags = unit.all_flags
-        if "forbidden" in flags:
+        modes = get_glossary_term_modes(unit)
+        # Pairs marked not applicable for this target language never reach
+        # the prompt
+        if "not-applicable" in modes:
             return None
 
-        if not unit.translated and "read-only" not in flags:
+        forbidden = "forbidden" in modes
+        if not forbidden and not unit.translated and "read-only" not in modes:
             return None
 
         source = cleanup_glossary_term(unit.source)
-        target = source if "read-only" in flags else cleanup_glossary_term(unit.target)
+        target = source if "read-only" in modes else cleanup_glossary_term(unit.target)
         if not source or not target:
             return None
 
@@ -1018,10 +1047,13 @@ class BaseLLMTranslation(BatchMachineTranslation):
         ):
             result["plural"] = plural
 
-        if failing_checks := self._get_failing_checks_context(
-            unit, include_labels=include_check_labels
-        ):
+        failing_checks, glossary_advisories = self._get_failing_checks_context(
+            unit, source_text, include_labels=include_check_labels
+        )
+        if failing_checks:
             result["failing_checks"] = failing_checks
+        if glossary_advisories:
+            result["glossary_advisories"] = glossary_advisories
 
         if placeholders := self._get_placeholder_context(
             source_text, unit, source_occurrence

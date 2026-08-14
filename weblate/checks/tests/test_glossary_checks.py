@@ -7,8 +7,15 @@ from __future__ import annotations
 from random import choice
 from typing import TYPE_CHECKING
 
-from weblate.checks.glossary import GlossaryCheck, ProhibitedInitialCharacterCheck
+from django.test import SimpleTestCase
+
+from weblate.checks.glossary import (
+    GlossaryCheck,
+    ProhibitedInitialCharacterCheck,
+    evaluate_glossary_terms,
+)
 from weblate.checks.models import Check
+from weblate.trans.tests.factories import make_language, make_unit
 from weblate.trans.tests.test_views import ComponentTestCase
 from weblate.utils.csv import PROHIBITED_INITIAL_CHARS
 from weblate.utils.state import STATE_TRANSLATED
@@ -109,6 +116,56 @@ class GlossaryCheckTest(ComponentTestCase):
             "Following terms are not translated according to glossary: hello",
         )
 
+    def test_morphology_lifts_inflected_german_target(self) -> None:
+        """Задача 3: a stem-matching German inflection lifts the check."""
+        de_translation = self.component.translation_set.get(language_code="de")
+        de_glossary = self.project.glossaries[0].translation_set.get(language_code="de")
+        with self.captureOnCommitCallbacks(execute=True):
+            de_glossary.add_unit(None, "", "Bauplan", "Bauplan", author=self.user)
+        unit = de_translation.add_unit(
+            None,
+            context="",
+            source="The Bauplan is ready.",
+            target="Die Bauplänen sind fertig.",
+            author=self.user,
+            state=STATE_TRANSLATED,
+        )
+        unit.extra_flags = "check-glossary"
+        # reset all_flags to reset cached_property
+        unit.all_flags = unit.get_all_flags()
+        unit.glossary_terms = None
+        self.assertFalse(
+            self.check.check_target(
+                ["The Bauplan is ready."], ["Die Bauplänen sind fertig."], unit
+            )
+        )
+
+    def test_morphology_exact_flag_blocks_lift(self) -> None:
+        """Задача 3: exact/forbidden/read-only terms never go through Snowball."""
+        de_translation = self.component.translation_set.get(language_code="de")
+        de_glossary = self.project.glossaries[0].translation_set.get(language_code="de")
+        with self.captureOnCommitCallbacks(execute=True):
+            de_glossary.add_unit(
+                None, "", "Bauplan", "Bauplan", author=self.user, extra_flags="exact"
+            )
+        unit = de_translation.add_unit(
+            None,
+            context="",
+            source="The Bauplan is ready.",
+            target="Die Bauplänen sind fertig.",
+            author=self.user,
+            state=STATE_TRANSLATED,
+        )
+        unit.extra_flags = "check-glossary"
+        # reset all_flags to reset cached_property
+        unit.all_flags = unit.get_all_flags()
+        unit.glossary_terms = None
+        self.assertTrue(
+            self.check.check_target(
+                ["The Bauplan is ready."], ["Die Bauplänen sind fertig."], unit
+            )
+        )
+
 
 class ProhibitedInitialCharacterCheckTest(ComponentTestCase):
     check = ProhibitedInitialCharacterCheck()
@@ -165,3 +222,206 @@ class ProhibitedInitialCharacterCheckTest(ComponentTestCase):
             None, context="", source=term, target=term, author=self.user
         )
         self.assertEqual(Check.objects.filter(name=self.check.check_id).count(), 0)
+
+
+class GlossaryMorphologyEvaluatorTest(SimpleTestCase):
+    """
+    Задача 3: target-side morphological lift, evaluate_glossary_terms.
+
+    Pure unit tests independent of DB fixture languages, covering the
+    allowlisted (ru/de/tr) and non-allowlisted (id) acceptance cases from
+    docs/plans/2026-08-11-glossary-morphological-enforcement.md.
+    """
+
+    def build(
+        self,
+        *,
+        target_code: str,
+        term_source: str,
+        term_target: str,
+        source_text: str,
+        target_text: str,
+        term_flags: str = "",
+        source_language_code: str = "en",
+    ) -> Unit:
+        unit = make_unit(code=target_code, source=source_text, target=target_text)
+        unit.translation.component.source_language = make_language(source_language_code)
+        term = make_unit(code=target_code, source=term_source, target=term_target)
+        term.extra_flags = term_flags
+        unit.glossary_terms = [term]
+        return unit
+
+    def test_positive_ru_korabl(self) -> None:
+        unit = self.build(
+            target_code="ru",
+            term_source="Корабль",
+            term_target="Корабль",
+            source_text="Нужен Корабль здесь.",
+            target_text="корабля больше нет",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit, "Нужен Корабль здесь.", "корабля больше нет"
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, set())
+
+    def test_positive_ru_dvigatel(self) -> None:
+        unit = self.build(
+            target_code="ru",
+            term_source="Двигатель",
+            term_target="Двигатель",
+            source_text="Новый Двигатель установлен.",
+            target_text="ремонт двигателя завершён",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit, "Новый Двигатель установлен.", "ремонт двигателя завершён"
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, set())
+
+    def test_positive_de_bauplan(self) -> None:
+        unit = self.build(
+            target_code="de",
+            term_source="Bauplan",
+            term_target="Bauplan",
+            source_text="The Bauplan is ready.",
+            target_text="Die Bauplänen sind fertig.",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit, "The Bauplan is ready.", "Die Bauplänen sind fertig."
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, set())
+
+    def test_positive_de_galaktischer_traeger(self) -> None:
+        unit = self.build(
+            target_code="de",
+            term_source="Galaktischer Träger",
+            term_target="Galaktischer Träger",
+            source_text="The Galaktischer Träger arrived.",
+            target_text="Der Galaktischen Trägers wurde gesichtet.",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit,
+            "The Galaktischer Träger arrived.",
+            "Der Galaktischen Trägers wurde gesichtet.",
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, set())
+
+    def test_positive_tr_case_ending(self) -> None:
+        unit = self.build(
+            target_code="tr",
+            term_source="Modül",
+            term_target="Modül",
+            source_text="The Modül is ready.",
+            target_text="Yeni modülüne bakın.",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit, "The Modül is ready.", "Yeni modülüne bakın."
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, set())
+
+    def test_negative_id_dukungan_not_lifted(self) -> None:
+        """Indonesian is not allowlisted: a stem collision must still fire."""
+        unit = self.build(
+            target_code="id",
+            term_source="Dukungan",
+            term_target="Dukungan",
+            source_text="Dukungan diperlukan.",
+            target_text="seorang pendukung datang",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit, "Dukungan diperlukan.", "seorang pendukung datang"
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, {"Dukungan"})
+
+    def test_negative_id_batas_terakhir_not_lifted(self) -> None:
+        unit = self.build(
+            target_code="id",
+            term_source="Batas terakhir",
+            term_target="Batas terakhir",
+            source_text="Batas terakhir sudah dekat.",
+            target_text="Perbatasan Terakhir sudah dekat.",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit,
+            "Batas terakhir sudah dekat.",
+            "Perbatasan Terakhir sudah dekat.",
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, {"Batas terakhir"})
+
+    def test_exact_flag_never_lifts(self) -> None:
+        unit = self.build(
+            target_code="ru",
+            term_source="Корабль",
+            term_target="Корабль",
+            term_flags="exact",
+            source_text="Нужен Корабль здесь.",
+            target_text="корабля больше нет",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit, "Нужен Корабль здесь.", "корабля больше нет"
+        )
+        self.assertEqual(hard, {"Корабль"})
+        self.assertEqual(advisory, set())
+
+    def test_read_only_never_lifts(self) -> None:
+        unit = self.build(
+            target_code="ru",
+            term_source="Корабль",
+            term_target="Крейсер",
+            term_flags="read-only",
+            source_text="Нужен Корабль здесь.",
+            target_text="корабля больше нет",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit, "Нужен Корабль здесь.", "корабля больше нет"
+        )
+        self.assertEqual(hard, {"Корабль"})
+        self.assertEqual(advisory, set())
+
+    def test_forbidden_fires_only_on_exact_form(self) -> None:
+        unit = self.build(
+            target_code="ru",
+            term_source="Корабль",
+            term_target="Корабль",
+            term_flags="forbidden",
+            source_text="Нужен Корабль здесь.",
+            target_text="корабля больше нет",
+        )
+        # An inflected form of a forbidden term does not trigger it.
+        hard, advisory = evaluate_glossary_terms(
+            unit, "Нужен Корабль здесь.", "корабля больше нет"
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, set())
+        # The exact forbidden form does.
+        hard, advisory = evaluate_glossary_terms(
+            unit, "Нужен Корабль здесь.", "старый Корабль тут"
+        )
+        self.assertEqual(hard, {"Корабль"})
+
+    def test_occurrence_count_blocks_partial_lift(self) -> None:
+        """A source with the term twice needs the target to match it twice."""
+        unit = self.build(
+            target_code="de",
+            term_source="Bauplan",
+            term_target="Bauplan",
+            source_text="Bauplan und Bauplan.",
+            target_text="Bauplänen sind da.",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit, "Bauplan und Bauplan.", "Bauplänen sind da."
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, {"Bauplan"})
+
+        hard, advisory = evaluate_glossary_terms(
+            unit, "Bauplan und Bauplan.", "Zweimal Bauplänen und Bauplänen."
+        )
+        self.assertEqual(hard, set())
+        self.assertEqual(advisory, set())

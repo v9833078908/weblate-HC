@@ -7,22 +7,24 @@ Measure Russian stem recovery on the COL4 source side, and its cost.
 
 The source-side matcher only accepts a term when a non-letter or a string edge
 sits on both sides of the exact form, so every Russian case ending hides the
-term. This measures what a stem-level comparison would recover on COL4 and
-prints the recovered word forms per term so each one can be judged by eye: a
-recovered form is either the same term inflected, or a different word the
-stemmer wrongly conflated.
+term. This runs the product stem index and matcher
+(weblate.glossary.models.get_glossary_stem_automaton /
+match_glossary_stems - the same functions fetch_glossary_terms falls back to)
+to measure what it recovers on COL4, and prints the recovered word forms per
+term so each one can be judged by eye: a recovered form is either the same
+term inflected, or a different word the stemmer wrongly conflated.
 """
 
 from __future__ import annotations
 
-import re
 from collections import Counter, defaultdict
 
-import snowballstemmer
-
+from weblate.glossary.models import (
+    get_glossary_stem_automaton,
+    glossary_matcher_fingerprint,
+    match_glossary_stems,
+)
 from weblate.trans.models import Project, Translation
-
-WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 
 project = Project.objects.get(slug="col4")
 glossary_component = project.component_set.get(slug="glossariy")
@@ -32,8 +34,7 @@ pairs: dict[str, str] = {}
 for unit in fr_glossary.unit_set.all():
     if unit.source and unit.target:
         pairs[unit.source] = unit.target
-
-ru_stemmer = snowballstemmer.stemmer("russian")
+pairs_by_lower = {source.lower(): source for source in pairs}
 
 
 def is_acronym(term: str) -> bool:
@@ -41,6 +42,7 @@ def is_acronym(term: str) -> bool:
 
 
 def exact_hit(term: str, text: str) -> bool:
+    """Use the same word-boundary rule as weblate/glossary/models.py:220-222."""
     haystack = text if is_acronym(term) else text.lower()
     needle = term if is_acronym(term) else term.lower()
     start = haystack.find(needle)
@@ -54,11 +56,6 @@ def exact_hit(term: str, text: str) -> bool:
     return False
 
 
-term_stems = {
-    term: [ru_stemmer.stemWord(word.lower()) for word in WORD_RE.findall(term)]
-    for term in pairs
-}
-
 units = []
 for slug in ("data", "localizecommon"):
     translation = Translation.objects.get(
@@ -66,32 +63,52 @@ for slug in ("data", "localizecommon"):
     )
     units.extend(translation.unit_set.filter(state__gte=20).exclude(target=""))
 
+source_language = translation.component.source_language
+target_language = translation.language
+
+print(
+    "FINGERPRINT",
+    glossary_matcher_fingerprint(project, source_language, target_language),
+)
+
+stem_automaton, term_sources = get_glossary_stem_automaton(
+    project, source_language, target_language
+)
+if stem_automaton is None:
+    print("No stem index built: source language not in SOURCE_STEM_LANGUAGES,")
+    print("or every glossary term is exact/read-only/forbidden/not-applicable.")
+
 recovered = Counter()
 recovered_forms: dict[str, Counter] = defaultdict(Counter)
 exact_strings = Counter()
 
 for unit in units:
     source = unit.get_source_plurals()[0]
-    words = WORD_RE.findall(source)
-    stemmed = [ru_stemmer.stemWord(word.lower()) for word in words]
-    for term, needle in term_stems.items():
+    for term in pairs:
         if exact_hit(term, source):
             exact_strings[term] += 1
+
+    if stem_automaton is None:
+        continue
+    matches = match_glossary_stems(
+        source, source_language, stem_automaton, term_sources
+    )
+    for term_lower, spans in matches.items():
+        term = pairs_by_lower.get(term_lower, term_lower)
+        if exact_hit(term, source):
+            # Already visible to the exact matcher for this string; the stem
+            # index does not get credit for a hit it did not need to make.
             continue
-        if not needle or len(needle) > len(stemmed):
-            continue
-        for i in range(len(stemmed) - len(needle) + 1):
-            if stemmed[i : i + len(needle)] == needle:
-                recovered[term] += 1
-                recovered_forms[term][" ".join(words[i : i + len(needle)])] += 1
-                break
+        recovered[term] += 1
+        for start, end in spans:
+            recovered_forms[term][source[start:end]] += 1
 
 print("TERM | STRINGS_EXACT | STRINGS_RECOVERED_BY_STEM | RECOVERED_FORMS")
 for term in sorted(pairs, key=lambda t: -recovered[t]):
     if not recovered[term] and not exact_strings[term]:
         continue
     forms = ", ".join(
-        f"{form}×{count}" for form, count in recovered_forms[term].most_common(8)
+        f"{form!r}:{count}" for form, count in recovered_forms[term].most_common(5)
     )
     print(f"{term} | {exact_strings[term]} | {recovered[term]} | {forms}")
 

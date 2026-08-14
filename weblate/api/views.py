@@ -134,6 +134,7 @@ from weblate.api.serializers import (
 from weblate.auth.models import Group, Role, TeamMembership, User
 from weblate.auth.results import PermissionResult
 from weblate.auth.utils import validate_team_assignable_user
+from weblate.checks.flags import GLOSSARY_LANGUAGE_SCOPED_FLAGS, Flags
 from weblate.configuration.models import Setting, SettingCategory
 from weblate.formats.models import EXPORTERS
 from weblate.lang.forms import validate_language_code
@@ -3735,6 +3736,12 @@ def suggestion_vote_response(request: Request, suggestion_pk: int) -> Response:
     )
 
 
+def _flags_are_language_scoped(extra_flags: str) -> bool:
+    """Check that all given flags are per-language glossary modes."""
+    flags = Flags(extra_flags)
+    return bool(flags) and all(flag in GLOSSARY_LANGUAGE_SCOPED_FLAGS for flag in flags)
+
+
 @extend_schema_view(
     list=extend_schema(description="Return a list of translation units."),
     retrieve=extend_schema(description="Return information about translation unit."),
@@ -3791,8 +3798,24 @@ class UnitViewSet(viewsets.ReadOnlyModelViewSet, UpdateModelMixin, DestroyModelM
         new_target = data.get("target", [])
         new_state = data.get("state", None)
 
+        # Glossary target units accept per-language flags such as exact or
+        # not-applicable without touching any other source-only field.
+        language_scoped_flags_only = (
+            "extra_flags" in data
+            and "explanation" not in data
+            and "labels" not in data
+            and translation.component.is_glossary
+            and not unit.is_source
+            and _flags_are_language_scoped(data["extra_flags"])
+        )
+
         # Sanity and permission checks
-        if do_source and (
+        if do_source and language_scoped_flags_only:
+            if not user.has_perm("meta:unit.flag", translation):
+                self.permission_denied(
+                    request, "You do not have permission to set flags"
+                )
+        elif do_source and (
             not unit.is_source or not user.has_perm("source.edit", translation)
         ):
             self.permission_denied(

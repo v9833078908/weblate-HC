@@ -877,6 +877,10 @@ class Unit(models.Model, LoggerMixin):
                 or self.all_flags.has_value("variant")
             ):
                 self.update_variants()
+            if component.is_glossary:
+                # Per-language term modes live on target units; the stem
+                # index and matcher caches must follow the flag change
+                component.invalidate_glossary_cache()
 
         # Update terminology
         if sync_terminology:
@@ -2705,6 +2709,36 @@ class Unit(models.Model, LoggerMixin):
                         gettext("Mark as terminology"),
                     )
                 )
+            if not self.is_source:
+                unit_flags = self.get_unit_flags()
+                if "exact" in unit_flags:
+                    result.append(
+                        (
+                            "removeflag",
+                            "exact",
+                            gettext("Unmark as exact glossary match"),
+                        )
+                    )
+                else:
+                    result.append(
+                        ("addflag", "exact", gettext("Mark as exact glossary match"))
+                    )
+                if "not-applicable" in unit_flags:
+                    result.append(
+                        (
+                            "removeflag",
+                            "not-applicable",
+                            gettext("Unmark as not applicable"),
+                        )
+                    )
+                else:
+                    result.append(
+                        (
+                            "addflag",
+                            "not-applicable",
+                            gettext("Mark as not applicable"),
+                        )
+                    )
         return result
 
     def invalidate_related_cache(self) -> None:

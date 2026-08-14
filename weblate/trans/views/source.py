@@ -47,6 +47,9 @@ def edit_context(request: AuthenticatedHttpRequest, pk):
         ):
             unit = unit.source_unit
             flags = Flags(unit.extra_flags)
+        elif flag in {"exact", "not-applicable"} and unit.is_source:
+            msg = "Per-language glossary flag on source unit!"
+            raise Http404(msg)
         if do_add:
             flags.merge(flag)
         else:

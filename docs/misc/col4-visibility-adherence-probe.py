@@ -14,21 +14,22 @@ into two buckets:
   rule dropped them and the term never reached the prompt.
 
 Then it measures how often the canonical French rendering shows up in the
-translation, comparing at stem level so a legitimate French inflection still
+translation, comparing at stem level (weblate.checks.morphology, the same
+comparison ``GlossaryCheck`` runs) so a legitimate French inflection still
 counts as adherence. The gap between the two buckets is the cost of the
-source-side blind spot.
+source-side blind spot this probe measures - the visible/missed split itself
+stays local since it classifies *why* the exact word-boundary rule in
+weblate/glossary/models.py rejected an occurrence, which is not something the
+matcher's pass/fail result exposes.
 """
 
 from __future__ import annotations
 
-import re
 from collections import Counter, defaultdict
 
-import snowballstemmer
-
+from weblate.checks.morphology import contains_inflected
+from weblate.glossary.models import glossary_matcher_fingerprint
 from weblate.trans.models import Project, Translation
-
-WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 
 project = Project.objects.get(slug="col4")
 glossary_component = project.component_set.get(slug="glossariy")
@@ -38,23 +39,6 @@ pairs: dict[str, str] = {}
 for unit in fr_glossary.unit_set.all():
     if unit.source and unit.target:
         pairs[unit.source] = unit.target
-
-fr_stemmer = snowballstemmer.stemmer("french")
-
-
-def stems(text: str) -> list[str]:
-    return [fr_stemmer.stemWord(word.lower()) for word in WORD_RE.findall(text)]
-
-
-def contains_inflected(term: str, text: str) -> bool:
-    needle = stems(term)
-    haystack = stems(text)
-    if not needle or len(needle) > len(haystack):
-        return False
-    return any(
-        haystack[i : i + len(needle)] == needle
-        for i in range(len(haystack) - len(needle) + 1)
-    )
 
 
 def is_acronym(term: str) -> bool:
@@ -92,6 +76,13 @@ for slug in ("data", "localizecommon"):
     )
     units.extend(translation.unit_set.filter(state__gte=20).exclude(target=""))
 
+print(
+    "FINGERPRINT",
+    glossary_matcher_fingerprint(
+        project, translation.component.source_language, translation.language
+    ),
+)
+
 strings = Counter()
 followed = Counter()
 misses: dict[tuple[str, str], list[tuple[str, str]]] = defaultdict(list)
@@ -104,9 +95,9 @@ for unit in units:
         if bucket is None:
             continue
         strings[term, bucket] += 1
-        if contains_inflected(rendering, target):
+        if contains_inflected(rendering, target, "fr"):
             followed[term, bucket] += 1
-        elif len(misses[term, bucket]) < 2:
+        else:
             misses[term, bucket].append((source, target))
 
 
@@ -114,9 +105,8 @@ def rate(term: str, bucket: str) -> str:
     total = strings[term, bucket]
     if not total:
         return "-"
-    return (
-        f"{followed[term, bucket]}/{total} = {followed[term, bucket] * 100 // total}%"
-    )
+    ok = followed[term, bucket]
+    return f"{ok}/{total} = {ok * 100 // total}%"
 
 
 print("TERM | VISIBLE_ADHERENCE | MISSED_ADHERENCE")
@@ -128,7 +118,6 @@ for term in sorted(pairs, key=lambda t: -(strings[t, "missed"])):
 for bucket in ("visible", "missed"):
     total = sum(v for (_, b), v in strings.items() if b == bucket)
     ok = sum(v for (_, b), v in followed.items() if b == bucket)
-    print()
     print(f"TOTAL {bucket}: {ok}/{total} = {ok * 100 // total if total else 0}%")
 
 print()
@@ -136,8 +125,8 @@ print("=== SAMPLES: term visible to the matcher, rendering still absent")
 for (term, bucket), samples in misses.items():
     if bucket != "visible":
         continue
-    for source, target in samples[:1]:
-        print(f"{term!r} -> {pairs[term]!r}")
+    print(f"{term!r} -> {pairs[term]!r}")
+    for source, target in samples[:3]:
         print(f"    SRC {source[:130]}")
         print(f"    TGT {target[:130]}")
 
@@ -146,7 +135,7 @@ print("=== SAMPLES: term dropped by the matcher, rendering absent")
 for (term, bucket), samples in misses.items():
     if bucket != "missed":
         continue
-    for source, target in samples[:1]:
-        print(f"{term!r} -> {pairs[term]!r}")
+    print(f"{term!r} -> {pairs[term]!r}")
+    for source, target in samples[:3]:
         print(f"    SRC {source[:130]}")
         print(f"    TGT {target[:130]}")

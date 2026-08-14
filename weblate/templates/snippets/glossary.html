@@ -14,7 +14,17 @@
         {% format_unit_target unit value=item.target simple=True %}
       </td>
     {% else %}
-      <td class="source">{{ item.source }}</td>
+      <td class="source">
+        {{ item.source }}
+        {% if "exact" in item.all_flags %}
+          <span class="badge bg-info"
+                title="{% translate "This term must match exactly, without inflection." %}">{% translate "Exact" %}</span>
+        {% endif %}
+        {% if "not-applicable" in item.all_flags %}
+          <span class="badge bg-secondary"
+                title="{% translate "This term is not applicable for this language." %}">{% translate "Not applicable" %}</span>
+        {% endif %}
+      </td>
       <td class="target">
         {% if "forbidden" in item.all_flags %}
           <span class="red forbidden-term">{% icon "cancel.svg" %}</span>

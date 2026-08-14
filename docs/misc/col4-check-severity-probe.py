@@ -17,21 +17,22 @@ what it reports into two piles:
 Separately counts source-side occurrences the matcher drops because a Russian
 inflection puts a letter where the word-boundary rule wants a non-letter. Those
 terms never reach the prompt at all for that string.
+
+Prints ``glossary_matcher_fingerprint`` first: compare results across runs only
+when it matches (docs/plans/2026-08-11-glossary-morphological-enforcement.md,
+Задача 5).
 """
 
 from __future__ import annotations
 
-import re
 from collections import Counter, defaultdict
 
-import snowballstemmer
-
 from weblate.checks.glossary import GlossaryCheck
-from weblate.glossary.models import fetch_glossary_terms
+from weblate.checks.morphology import contains_inflected
+from weblate.glossary.models import fetch_glossary_terms, glossary_matcher_fingerprint
 from weblate.trans.models import Project, Translation
 
 CHUNK = 200
-WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 
 project = Project.objects.get(slug="col4")
 glossary_component = project.component_set.get(slug="glossariy")
@@ -41,25 +42,6 @@ pairs: dict[str, str] = {}
 for unit in fr_glossary.unit_set.all():
     if unit.source and unit.target:
         pairs[unit.source] = unit.target
-
-ru_stemmer = snowballstemmer.stemmer("russian")
-fr_stemmer = snowballstemmer.stemmer("french")
-
-
-def stems(text: str, stemmer) -> list[str]:
-    return [stemmer.stemWord(word.lower()) for word in WORD_RE.findall(text)]
-
-
-def contains_inflected(term: str, text: str, stemmer) -> bool:
-    """Match the term as a contiguous run of stems inside the text."""
-    needle = stems(term, stemmer)
-    haystack = stems(text, stemmer)
-    if not needle or len(needle) > len(haystack):
-        return False
-    return any(
-        haystack[i : i + len(needle)] == needle
-        for i in range(len(haystack) - len(needle) + 1)
-    )
 
 
 def is_acronym(term: str) -> bool:
@@ -73,7 +55,10 @@ def source_occurrences(term: str, text: str) -> tuple[int, int, int]:
     ``inflected`` means the term starts at a word boundary but a letter follows
     it, which is what a Russian case ending looks like. ``noise`` means a letter
     precedes the term, so the hit sits inside an unrelated or compound word and
-    the boundary rule is right to drop it.
+    the boundary rule is right to drop it. This is a probe-only classification
+    of *why* the product matcher's boundary rule rejects a hit; the boundary
+    rule itself is the one in weblate/glossary/models.py, not reimplemented
+    here.
     """
     accepted = inflected = noise = 0
     haystack = text if is_acronym(term) else text.lower()
@@ -100,6 +85,13 @@ for slug in ("data", "localizecommon"):
         component__project=project, component__slug=slug, language__code="fr"
     )
     all_units.extend(translation.unit_set.filter(state__gte=20).exclude(target=""))
+
+print(
+    "FINGERPRINT",
+    glossary_matcher_fingerprint(
+        project, translation.component.source_language, translation.language
+    ),
+)
 
 reported = Counter()
 rescued = Counter()
@@ -136,7 +128,7 @@ for start in range(0, len(all_units), CHUNK):
         for term in result:
             reported[term] += 1
             rendering = pairs.get(term, "")
-            if rendering and contains_inflected(rendering, target, fr_stemmer):
+            if rendering and contains_inflected(rendering, target, "fr"):
                 rescued[term] += 1
                 if len(rescued_samples[term]) < 3:
                     rescued_samples[term].append((source, target))

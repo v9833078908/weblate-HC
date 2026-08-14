@@ -4178,6 +4178,21 @@ class GlossaryAddMixin(NewUnitBaseForm):
         ),
         required=False,
     )
+    exact = forms.BooleanField(
+        label=gettext_lazy("Exact glossary match"),
+        help_text=gettext_lazy(
+            "Mark terms that must match exactly, without inflection, "
+            "such as names or abbreviations."
+        ),
+        required=False,
+    )
+    not_applicable = forms.BooleanField(
+        label=gettext_lazy("Glossary term not applicable here"),
+        help_text=gettext_lazy(
+            "Mark terms that cannot be applied to every context of this language."
+        ),
+        required=False,
+    )
 
     def can_edit_terminology(self) -> bool:
         return bool(
@@ -4198,6 +4213,10 @@ class GlossaryAddMixin(NewUnitBaseForm):
             result.append("forbidden")
         if self.cleaned_data.get("read_only"):
             result.append("read-only")
+        if self.cleaned_data.get("exact"):
+            result.append("exact")
+        if self.cleaned_data.get("not_applicable"):
+            result.append("not-applicable")
         return ", ".join(result)
 
     def clean(self) -> None:

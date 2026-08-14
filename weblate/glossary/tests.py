@@ -20,7 +20,12 @@ from django.db import transaction
 from django.urls import reverse
 from lxml import etree
 
-from weblate.glossary.models import get_glossary_terms, get_glossary_tsv
+from weblate.glossary.models import (
+    fetch_glossary_terms,
+    get_glossary_terms,
+    get_glossary_tsv,
+    glossary_matcher_fingerprint,
+)
 from weblate.glossary.tasks import (
     cleanup_stale_glossaries,
     get_stale_glossary_translations,
@@ -33,7 +38,7 @@ from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.tests.utils import get_test_file
 from weblate.utils.hash import calculate_hash
 from weblate.utils.lock import WeblateLockTimeoutError
-from weblate.utils.state import STATE_READONLY, STATE_TRANSLATED
+from weblate.utils.state import STATE_EMPTY, STATE_READONLY, STATE_TRANSLATED
 from weblate.utils.xml import PARSER
 
 if TYPE_CHECKING:
@@ -1072,6 +1077,67 @@ class GlossaryTest(ViewTestCase):
     def test_source_string_removal_commit(self) -> None:
         self.removal_test(self.glossary_component.source_translation, commit=True)
 
+    def test_exact_and_not_applicable_are_per_language(self) -> None:
+        """Задача 1: exact/not-applicable land on the target unit, not shared."""
+        with self.captureOnCommitCallbacks(execute=True):
+            self.glossary.add_unit(
+                None,
+                "",
+                "hello",
+                "ahoj",
+                author=self.user,
+                extra_flags="exact,terminology",
+            )
+        de_glossary = self.glossary_component.translation_set.get(language_code="de")
+        de_unit = de_glossary.unit_set.get(source="hello")
+        with self.captureOnCommitCallbacks(execute=True):
+            de_unit.translate(self.user, "hallo", STATE_TRANSLATED)
+        de_unit.update_extra_flags("not-applicable", self.user)
+
+        cs_unit = self.glossary.unit_set.get(source="hello")
+        de_unit = de_glossary.unit_set.get(source="hello")
+
+        self.assertEqual(cs_unit.extra_flags, "exact")
+        self.assertEqual(de_unit.extra_flags, "not-applicable")
+        # Only one glossary entry exists: the modes did not fork the term.
+        self.assertEqual(
+            self.glossary_component.source_translation.unit_set.filter(
+                source="hello"
+            ).count(),
+            1,
+        )
+
+    def test_edit_context_sets_per_language_flag_on_target_unit(self) -> None:
+        self.user.is_superuser = True
+        self.user.save()
+        self.add_term("hello", "ahoj")
+        unit = self.glossary.unit_set.get(source="hello")
+
+        response = self.client.post(
+            reverse("edit_context", kwargs={"pk": unit.pk}), {"addflag": "exact"}
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+        unit = self.glossary.unit_set.get(source="hello")
+        self.assertIn("exact", unit.get_unit_flags())
+        source_unit = self.glossary_component.source_translation.unit_set.get(
+            source="hello"
+        )
+        self.assertNotIn("exact", source_unit.get_unit_flags())
+
+    def test_edit_context_rejects_per_language_flag_on_source_unit(self) -> None:
+        self.user.is_superuser = True
+        self.user.save()
+        self.add_term("hello", "ahoj")
+        source_unit = self.glossary_component.source_translation.unit_set.get(
+            source="hello"
+        )
+
+        response = self.client.post(
+            reverse("edit_context", kwargs={"pk": source_unit.pk}),
+            {"addflag": "not-applicable"},
+        )
+        self.assertEqual(response.status_code, 404)
+
 
 class GlossaryCoverageCommandTest(ViewTestCase):
     """The coverage report names what matched, what did not, and writes nothing."""
@@ -1129,3 +1195,167 @@ class GlossaryCoverageCommandTest(ViewTestCase):
         self.run_command()
 
         self.assertEqual(Unit.objects.count(), before)
+
+
+class GlossaryStemMatcherTest(ViewTestCase):
+    """
+    Задача 2: source-side stem matcher, fetch_glossary_terms.
+
+    Uses a dedicated Russian-source project (the default ViewTestCase
+    component/glossary are English-source) so the matcher can recover
+    inflected Russian source forms per
+    docs/plans/2026-08-11-glossary-morphological-enforcement.md.
+    """
+
+    CREATE_GLOSSARIES: bool = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.ru_project = self.create_project(name="Ru Source", slug="ru-source")
+        self.ru_component = self.create_po(
+            project=self.ru_project,
+            source_language=Language.objects.get(code="ru"),
+        )
+        self.ru_glossary_component = self.ru_project.glossaries[0]
+        self.ru_glossary = self.ru_glossary_component.translation_set.get(
+            language_code="cs"
+        )
+        self.ru_translation = self.ru_component.translation_set.get(language_code="cs")
+
+    def add_ru_term(self, source: str, flags: str = "") -> None:
+        id_hash = calculate_hash(source, "")
+        source_unit = self.ru_glossary_component.source_translation.unit_set.create(
+            source=source,
+            target=source,
+            context="",
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+        )
+        self.ru_glossary.unit_set.create(
+            source=source,
+            target=source,
+            context="",
+            source_unit=source_unit,
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+            extra_flags=flags,
+        )
+        self.ru_glossary.invalidate_cache()
+
+    def matched_sources(self, probe_source: str) -> set[str]:
+        unit = Unit(
+            translation=self.ru_translation,
+            id_hash=1,
+            source=probe_source,
+            target="",
+            context="",
+            position=1,
+            state=STATE_EMPTY,
+        )
+        fetch_glossary_terms([unit])
+        return {term.source for term in unit.glossary_terms}
+
+    def test_stem_fallback_recovers_inflected_forms(self) -> None:
+        for term in ("Гигахрущ", "ликвидатор", "ячейка", "блок", "община"):
+            self.add_ru_term(term)
+        cases = {
+            "Гигахруща": "Гигахрущ",
+            "ликвидаторов": "ликвидатор",
+            "ячейку": "ячейка",
+            "блока": "блок",
+            "Общину": "община",
+        }
+        for inflected, canonical in cases.items():
+            with self.subTest(inflected=inflected):
+                self.assertIn(
+                    canonical, self.matched_sources(f"Текст про {inflected} тут.")
+                )
+
+    def test_stem_fallback_excludes_exact_flagged_terms(self) -> None:
+        self.add_ru_term("НИИ", flags="exact")
+        self.add_ru_term("Партия", flags="exact")
+        self.add_ru_term("Чистые", flags="exact")
+        for probe_source in ("ни тут нет", "парту купили", "чистить полы"):
+            with self.subTest(probe_source=probe_source):
+                self.assertEqual(self.matched_sources(probe_source), set())
+
+    def test_stem_fallback_excludes_not_applicable_terms(self) -> None:
+        self.add_ru_term("ликвидатор", flags="not-applicable")
+        self.assertEqual(self.matched_sources("ликвидаторов было много"), set())
+
+    def test_stem_fallback_never_matches_substrings(self) -> None:
+        self.add_ru_term("концентрат")
+        self.add_ru_term("блок")
+        self.assertEqual(self.matched_sources("пищеконцентрат прибыл"), set())
+        self.assertEqual(self.matched_sources("началась блокировка"), set())
+
+    def test_matcher_fingerprint_changes_with_glossary_and_modes(self) -> None:
+        """Задача 5: the fingerprint tracks Snowball, allowlists and content."""
+        source_language = self.ru_component.source_language
+        target_language = self.ru_translation.language
+
+        baseline = glossary_matcher_fingerprint(
+            self.ru_project, source_language, target_language
+        )
+        self.assertEqual(baseline["source_algorithm"], "russian")
+        self.assertIsNone(baseline["target_algorithm"])
+        self.assertIn("ru", baseline["source_stem_allowlist"])
+        self.assertEqual(baseline["glossary_term_count"], 0)
+        self.assertEqual(baseline["exact_only_term_count"], 0)
+        self.assertEqual(baseline["not_applicable_term_count"], 0)
+
+        self.add_ru_term("ликвидатор")
+        after_add = glossary_matcher_fingerprint(
+            self.ru_project, source_language, target_language
+        )
+        self.assertEqual(after_add["glossary_term_count"], 1)
+        self.assertNotEqual(after_add["glossary_hash"], baseline["glossary_hash"])
+
+        self.add_ru_term("НИИ", flags="exact")
+        after_exact = glossary_matcher_fingerprint(
+            self.ru_project, source_language, target_language
+        )
+        self.assertEqual(after_exact["exact_only_term_count"], 1)
+        self.assertNotEqual(after_exact["glossary_hash"], after_add["glossary_hash"])
+
+    def test_stem_fallback_disabled_for_non_stem_source_language(self) -> None:
+        """English source is not in SOURCE_STEM_LANGUAGES: no stem recovery."""
+        en_project = self.create_project(name="En Source", slug="en-source")
+        en_component = self.create_po(project=en_project)
+        en_glossary_component = en_project.glossaries[0]
+        en_glossary = en_glossary_component.translation_set.get(language_code="cs")
+        en_translation = en_component.translation_set.get(language_code="cs")
+
+        id_hash = calculate_hash("ship", "")
+        source_unit = en_glossary_component.source_translation.unit_set.create(
+            source="ship",
+            target="ship",
+            context="",
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+        )
+        en_glossary.unit_set.create(
+            source="ship",
+            target="ship",
+            context="",
+            source_unit=source_unit,
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+        )
+        en_glossary.invalidate_cache()
+
+        unit = Unit(
+            translation=en_translation,
+            id_hash=1,
+            source="ships arrived",
+            target="",
+            context="",
+            position=1,
+            state=STATE_EMPTY,
+        )
+        fetch_glossary_terms([unit])
+        self.assertEqual({term.source for term in unit.glossary_terms}, set())

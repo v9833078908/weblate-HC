@@ -96,6 +96,7 @@ from weblate.trans.util import join_plural
 from weblate.trans.validators import SUGGESTION_REJECTION_REASON_LENGTH
 from weblate.utils.celery import get_task_metadata_key
 from weblate.utils.data import data_dir
+from weblate.utils.hash import calculate_hash
 from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.state import (
     STATE_APPROVED,
@@ -12131,6 +12132,53 @@ class UnitAPITest(APIBaseTest):
         unit = Unit.objects.get(pk=unit.id)
         self.assertEqual(unit.all_flags.format(), "c-format, ignore-same")
         self.assertEqual(unit.all_checks_names, set())
+
+    def test_glossary_language_scoped_flags(self) -> None:
+        """Задача 1: exact/not-applicable are per-language, on the target unit."""
+        glossary_component = self.project.glossaries[0]
+        id_hash = calculate_hash("hello", "")
+        source_unit = glossary_component.source_translation.unit_set.create(
+            source="hello",
+            target="hello",
+            context="",
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+        )
+        cs_glossary = glossary_component.translation_set.get(language_code="cs")
+        target_unit = cs_glossary.unit_set.create(
+            source="hello",
+            target="ahoj",
+            context="",
+            source_unit=source_unit,
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+        )
+
+        # A per-language glossary mode is accepted on the target unit.
+        self.do_request(
+            "api:unit-detail",
+            kwargs={"pk": target_unit.pk},
+            method="patch",
+            code=200,
+            superuser=True,
+            request={"extra_flags": "exact"},
+        )
+        target_unit = Unit.objects.get(pk=target_unit.pk)
+        self.assertEqual(target_unit.extra_flags, "exact")
+        # The source unit, and thus the glossary entry itself, stays untouched.
+        self.assertEqual(Unit.objects.get(pk=source_unit.pk).extra_flags, "")
+
+        # A non-language-scoped flag is still rejected on a target unit.
+        self.do_request(
+            "api:unit-detail",
+            kwargs={"pk": target_unit.pk},
+            method="patch",
+            code=403,
+            superuser=True,
+            request={"extra_flags": "read-only"},
+        )
 
     def test_unit_labels(self) -> None:
         other_project = Project.objects.create(

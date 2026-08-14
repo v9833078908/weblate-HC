@@ -1,7 +1,16 @@
 # План: морфологическое сравнение для глоссарного гейта
 
-Статус: **согласован для реализации 2026-08-13**. Обоснование и все числа -
-`docs/specs/2026-08-11-glossary-enforcement-analysis.md`.
+Статус: задачи 1-4 реализованы и покрыты тестами 2026-08-14 (ветка
+`plan/glossary-morphological-enforcement`). Задача 5 реализована частично:
+`glossary_matcher_fingerprint` добавлен в `weblate/glossary/models.py`, все
+четыре probe-скрипта в `docs/misc/` переведены на продуктовые функции
+(`weblate.checks.morphology`, `weblate.glossary.models`,
+`weblate.checks.glossary`) и печатают fingerprint. Сам замер на реальной
+русскоязычной matcher-fallback когорте с ручной разметкой stem-only вхождений
+и решение по задаче 6 (go/no-go, ребейзлайн судьи) не выполнены - это требует
+доступа к продовым/dev-container данным и ручной разметки, вне рамок этой
+сессии. `GlossaryCheck` остаётся `default_disabled` до задачи 6. Обоснование и
+все числа - `docs/specs/2026-08-11-glossary-enforcement-analysis.md`.
 
 Цель: когда LLM собирает глоссарий матчером, доводить до неё термины в
 склонённой форме источника и отдельно сделать глоссарный чек пригодным как
@@ -34,6 +43,7 @@
   план, а не калибровка судьи
   (`docs/LLM-first/2026-08-13-judge-native-ui-design.md`, риск «Граница
   ответственности судьи по глоссарию»).
+
 ## Задача 1. Режим и область применения пер-термин и пер-язык
 
 Файлы: `weblate/checks/flags.py`, `weblate/trans/forms.py`,

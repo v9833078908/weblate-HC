@@ -20,10 +20,90 @@ from weblate.utils.html import format_html_join_comma
 if TYPE_CHECKING:
     from weblate.trans.models import Unit
 
+GLOSSARY_CHECK_ID = "check_glossary"
+
+
+def evaluate_glossary_terms(
+    unit: Unit, source: str, target: str
+) -> tuple[set[str], set[str]]:
+    """
+    Evaluate glossary terms for one source/target pair.
+
+    Returns a ``(hard_failures, advisories)`` tuple of term sources. Hard
+    failures demand a rewrite (forbidden term present, or an exact/read-only
+    term missing its exact form). Advisories only ask the translator or the
+    model to verify the term: a plain inflectable term without an exact or
+    morphological match.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.checks.morphology import SOURCE_STEM_LANGUAGES, count_inflected
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.glossary.models import get_glossary_term_modes, get_glossary_terms
+
+    language = unit.translation.language
+    source_language = unit.translation.component.source_language
+    boundary = r"\b" if language.uses_whitespace() else ""
+    source_boundary = r"\b" if source_language.uses_whitespace() else ""
+    hard: set[str] = set()
+    advisory: set[str] = set()
+    matched: set[str] = set()
+
+    for term in get_glossary_terms(unit, include_variants=False):
+        term_source = term.source
+        modes = get_glossary_term_modes(term)
+        # Not applicable pairs are excluded for this target language
+        if "not-applicable" in modes or term_source in matched:
+            continue
+        expected = term_source if "read-only" in modes else term.target
+        exact_only = bool(modes & {"read-only", "exact", "forbidden"})
+
+        if "forbidden" in modes:
+            if re.search(
+                rf"{boundary}{re.escape(expected)}{boundary}", target, re.IGNORECASE
+            ):
+                hard.add(term_source)
+            matched.add(term_source)
+            continue
+
+        if re.search(
+            rf"{boundary}{re.escape(expected)}{boundary}", target, re.IGNORECASE
+        ):
+            matched.add(term_source)
+            advisory.discard(term_source)
+            continue
+        if exact_only:
+            # Exact, read-only and forbidden terms never go through Snowball
+            hard.add(term_source)
+            continue
+
+        # Morphology can only lift a failure, never create one. Compare by
+        # occurrence counts, not by presence anywhere in the string: a source
+        # with the term twice and a single matching target form must not pass.
+        source_count = len(
+            re.findall(
+                rf"{source_boundary}{re.escape(term_source)}{source_boundary}",
+                source,
+                re.IGNORECASE,
+            )
+        )
+        if source_language.base_code in SOURCE_STEM_LANGUAGES:
+            source_count = max(
+                source_count,
+                count_inflected(term_source, source, source_language.code),
+            )
+        if count_inflected(expected, target, language.code) >= max(source_count, 1):
+            matched.add(term_source)
+            advisory.discard(term_source)
+        else:
+            advisory.add(term_source)
+
+    return hard, advisory
+
 
 class GlossaryCheck(TargetCheck):
     default_disabled = True
-    check_id = "check_glossary"
+    check_id = GLOSSARY_CHECK_ID
     name = gettext_lazy("Does not follow glossary")
     description = gettext_lazy(
         "The translation does not follow terms defined in a glossary."
@@ -31,34 +111,8 @@ class GlossaryCheck(TargetCheck):
     version_added = "4.5"
 
     def check_single(self, source: str, target: str, unit: Unit):
-        # ruff: ignore[import-outside-top-level]
-        from weblate.glossary.models import get_glossary_terms
-
-        forbidden = set()
-        mismatched = set()
-        matched = set()
-        boundary = r"\b" if unit.translation.language.uses_whitespace() else ""
-        for term in get_glossary_terms(unit, include_variants=False):
-            term_source = term.source
-            flags = term.all_flags
-            expected = term_source if "read-only" in flags else term.target
-            if "forbidden" in flags:
-                if re.search(
-                    rf"{boundary}{re.escape(expected)}{boundary}", target, re.IGNORECASE
-                ):
-                    forbidden.add(term_source)
-            else:
-                if term_source in matched:
-                    continue
-                if re.search(
-                    rf"{boundary}{re.escape(expected)}{boundary}", target, re.IGNORECASE
-                ):
-                    mismatched.discard(term_source)
-                    matched.add(term_source)
-                else:
-                    mismatched.add(term_source)
-
-        return forbidden | mismatched
+        hard, advisory = evaluate_glossary_terms(unit, source, target)
+        return hard | advisory
 
     def get_description(self, check_obj):
         unit = check_obj.unit
