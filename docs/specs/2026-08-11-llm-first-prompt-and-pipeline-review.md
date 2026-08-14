@@ -371,7 +371,7 @@ $0.05, время около минуты. Это надо сделать **до
 Универсален для всех проектов: слоты `{persona}`, `{style}`, `{language_instructions}`
 сохранены и остаются единственным местом проектной и языковой специфики.
 
-```
+```text
 You are a professional translation engine for structured localization tasks.
 
 {persona}

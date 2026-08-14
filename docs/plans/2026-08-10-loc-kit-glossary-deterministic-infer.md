@@ -11,6 +11,7 @@
 **Дизайн:** `docs/plans/2026-08-10-loc-kit-glossary-deterministic-infer-design.md`
 
 **Критично для исполнителя:**
+
 - Контейнерные тесты гонять `./rundev.sh test <path> -n0` (без `-n0` xdist в контейнере флакует; при массовых setup-ошибках сначала `docker stats --no-stream` — обычная причина не код, а memory pressure от чужих контейнеров).
 - После каждой правки `loc_kit_ingest/*.py` копировать в контейнер: `cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/` — контейнер импортирует пакет из `/app/data/python`, а не из репо.
 - Фикстура `GLOSSARY_CSV` (колонки `domain,ru,en,note_ru,note_en`) **намеренно** не разбирается детерминированно (не-языковые колонки → `InferenceError`): она продолжает покрывать LLM/ручной путь. Не «чинить» её.
@@ -18,9 +19,10 @@
 
 ---
 
-### Task 1: standalone-тесты `infer_glossary_profile` (провал)
+## Task 1: standalone-тесты `infer_glossary_profile` (провал)
 
 **Files:**
+
 - Create: `loc_kit_ingest/tests/test_infer_glossary.py`
 
 Обрати внимание: `rows` — это `list[list[str]]` уже прочитанного листа (как из `reader.read_sheets`), 0-based внутри, 1-based в JSON-документе.
@@ -145,6 +147,7 @@ Expected: `ImportError: cannot import name 'infer_glossary_profile'`
 ### Task 2: реализация `infer_glossary_profile`
 
 **Files:**
+
 - Modify: `loc_kit_ingest/infer.py` (добавить в конец файла; импорт `SCHEMA_VERSION_RECORD_MAP` — к существующему импорту `SCHEMA_VERSION`)
 
 **Step 1: импорт**
@@ -359,6 +362,7 @@ git commit -m "feat(loc-kit): deterministic glossary profile inference"
 ### Task 3: contract-тест детерминированного пути в визарде (провал)
 
 **Files:**
+
 - Modify: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
 
 **Step 1: фикстура и тесты** — рядом с `GLOSSARY_CSV` (~строка 529) добавить:
@@ -420,6 +424,7 @@ Expected: FAIL — `draft.state == UPLOADED`, превью пустое (дет�
 ### Task 4: включить детерминированный путь в `_analyze_draft_sheet`
 
 **Files:**
+
 - Modify: `weblate/trans/views/create.py` — `_analyze_draft_sheet` (~строка 1097) и `_store_validated_profile` (~строка 1140)
 
 **Step 1: `_store_validated_profile` принимает предупреждения инференса**
@@ -484,6 +489,7 @@ git commit -m "feat(loc-kit): try deterministic glossary inference before the an
 ### Task 5: auto-skip выбора листа для одностраничных файлов
 
 **Files:**
+
 - Modify: `weblate/trans/views/create.py` — `_start_glossary_draft` (~строка 673, конец метода)
 
 **Step 1: реализация**
@@ -531,6 +537,7 @@ def _infer_draft_profile(draft: LocKitImportDraft, rows: list) -> str | None:
 
 Run: `./rundev.sh test weblate/trans/tests/test_loc_kit_ingest_contract.py::LocKitGlossaryUploadUITest -n0`
 Expected: PASS все, включая оба теста Task 3. Проверить особо:
+
 - `test_glossary_upload_creates_a_draft_and_asks_for_a_sheet` — GLOSSARY_CSV одностраничный, но детерминированно НЕ разбирается → redirect остаётся на sheet-select; ассерт `draft.state == UPLOADED` смени́тся на `SHEET_SELECTED` (auto-skip зафиксировал лист) — обновить тест.
 - `test_multiple_worksheets_require_an_explicit_choice` — без изменений.
 
@@ -546,6 +553,7 @@ git commit -m "feat(loc-kit): skip sheet selection for single-sheet glossary upl
 ### Task 6: документация
 
 **Files:**
+
 - Modify: `docs/changes.rst` — верхняя (нерелизнутая) секция
 - Modify: `docs/specs/loc-kit-ingest.md` — раздел про glossary-workflow
 - Modify: `AGENTS.md` — абзац про `loc_kit_ingest` («optional OpenRouter profile proposal» → «deterministic inference first, optional OpenRouter fallback»)
@@ -576,6 +584,7 @@ uv run prek run --files weblate/trans/views/create.py loc_kit_ingest/infer.py lo
 
 **Step 2: живой smoke в браузере** (dev-инстанс на :3001, admin/admin).
 КЛИКАМИ по реальным контролам (`tab.click`), не `form.submit()` — прошлый баг с вложенными формами пережил smoke именно из-за этого:
+
 1. Создать компонент → «Upload translation files» → выбрать `/Users/eli/Downloads/Heart Abyss_Localization - Terms.csv`, галочка «Use as glossary», проект Heart Abyss → Continue.
 2. Ожидание: экран выбора листа НЕ показывается; сразу превью: source **ru**, targets **en, ja** (остальные колонки пусты — в предупреждениях), терминов ~26, секционные строки («Персонажи» и т.п.) видны как термины.
 3. «Create glossary component» → компонент создан, в нём en/ja переводы терминов.

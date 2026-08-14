@@ -56,6 +56,7 @@
 ### Task 1: emit a flat source-note column with linear detection
 
 **Files:**
+
 - Modify: `loc_kit_ingest/infer.py:41-53, 462-570, 677-715`
 - Test: `loc_kit_ingest/tests/test_infer_glossary.py`
 
@@ -284,6 +285,7 @@ git commit -m "feat(loc-kit): infer a flat glossary note column"
 ### Task 2: support the note column in explicit pairs layout
 
 **Files:**
+
 - Modify: `loc_kit_ingest/infer.py:630-715`
 - Test: `loc_kit_ingest/tests/test_infer_glossary.py`
 
@@ -414,6 +416,7 @@ git commit -m "feat(loc-kit): support note columns in pairs glossaries"
 ### Task 3: pin the complete Weblate wizard and LLM-context contract
 
 **Files:**
+
 - Modify: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
 
 **Step 1: add the CSV fixture** near `GLOSSARY_LANG_ONLY_CSV`:
@@ -499,6 +502,7 @@ git commit -m "test(loc-kit): cover note columns through the glossary wizard"
 ### Task 4: document the supported table shape
 
 **Files:**
+
 - Modify: `docs/admin/projects.rst:117-140`
 - Modify: `docs/specs/loc-kit-ingest.md:100-125, 271-278`
 - Modify: `docs/changes.rst` under Weblate 2026.8.1 / Improvements

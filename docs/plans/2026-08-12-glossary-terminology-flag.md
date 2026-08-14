@@ -25,7 +25,7 @@ component's source units exist and then hands over to the ordinary `sync_termino
 
 Production logs, 2026-08-12:
 
-```
+```text
 11:13:12 heart-abyss/glossary/fr: processing tbx/fr.tbx, new file, 0 strings
 11:13:24 heart-abyss/glossary/fr: fetching translations for 0 units from OpenRouter, 10 per request
 11:13:24 heart-abyss/glossary/fr: completed automatic translation
@@ -33,7 +33,7 @@ Production logs, 2026-08-12:
 
 Production database:
 
-```
+```text
  code | filename   | units        flags | count
  en   | tbx/en.tbx |    57              |   114
  fr   | tbx/fr.tbx |     0
@@ -53,6 +53,7 @@ Every command below is issued from the repository root on the host.
 ### Task A1: Capture the before state
 
 **Files:**
+
 - Create: `docs/misc/glossary-terminology-fix.py`
 
 **Step 1: Record the current numbers**
@@ -73,7 +74,7 @@ GROUP BY 1 ORDER BY 1;"'
 
 Expected, unchanged from the investigation:
 
-```
+```text
  en | 57
  fr |  0
  ru | 57
@@ -166,7 +167,7 @@ payload=$(base64 < docs/misc/glossary-terminology-fix.py | tr -d '\n')
 
 Expected output:
 
-```
+```text
 TERMINOLOGY_FLAGGED 57
 SYNC_SCHEDULED
 ```
@@ -187,7 +188,7 @@ Expected: a `sync_terminology` task received, then `heart-abyss/glossary/fr` com
 Rerun the SQL from Task A1 Step 1.
 Expected:
 
-```
+```text
  en | 57
  fr | 57
  ru | 57
@@ -203,7 +204,7 @@ Tell the user to rerun automatic translation on `heart-abyss/glossary/fr` in the
 settings as before. Do not start it: it spends OpenRouter budget, and the run is the user's call. What
 should now appear in the log instead of `0 units`:
 
-```
+```text
 heart-abyss/glossary/fr: fetching translations for 57 units from OpenRouter
 ```
 
@@ -216,6 +217,7 @@ Runs on the host, ordinary development, no production access. TDD.
 ### Task B1: Failing test for the imported glossary
 
 **Files:**
+
 - Modify: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
 
 **Step 1: Write the failing test**
@@ -259,6 +261,7 @@ git commit -m "test(loc-kit): require terminology flags on imported glossaries"
 ### Task B2: The task that sets the flag
 
 **Files:**
+
 - Modify: `weblate/glossary/tasks.py`
 
 **Step 1: Add the task**
@@ -325,6 +328,7 @@ git commit -m "feat(glossary): add task flagging imported terms as terminology"
 ### Task B3: Schedule it from the wizard
 
 **Files:**
+
 - Modify: `weblate/trans/views/create.py:1448-1492` (`LocKitGlossaryConfirmView.form_valid`)
 
 **Step 1: Schedule the task after the component exists**
@@ -367,6 +371,7 @@ git commit -m "fix(loc-kit): flag imported glossary terms as terminology"
 ### Task B4: Second test - the terms reach a new language
 
 **Files:**
+
 - Modify: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
 
 **Step 1: Write the test**
@@ -409,6 +414,7 @@ git commit -m "test(loc-kit): glossary terms reach a newly added language"
 ### Task B5: Documentation and changelog
 
 **Files:**
+
 - Modify: `docs/changes.rst`
 - Modify: `docs/specs/loc-kit-ingest.md`
 

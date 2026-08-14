@@ -48,9 +48,7 @@ data_units = list(data.unit_set.all())
 print("DATA_UNITS", len(data_units))
 print("DATA_WITH_NOTE", len([u for u in data_units if u.note.strip()]))
 print("DATA_WITH_CONTEXT", len([u for u in data_units if u.context.strip()]))
-src_data = data.component.translation_set.get(
-    language=data.component.source_language
-)
+src_data = data.component.translation_set.get(language=data.component.source_language)
 print(
     "DATA_SOURCE_WITH_EXPLANATION",
     len([u for u in src_data.unit_set.all() if u.explanation.strip()]),

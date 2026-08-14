@@ -52,6 +52,7 @@
 ### Task 1: привязать update-черновик к целевому glossary-компоненту
 
 **Files:**
+
 - Modify: `weblate/trans/models/loc_kit.py`
 - Create: `weblate/trans/migrations/0099_loc_kit_draft_target_component.py`
 - Test: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
@@ -138,6 +139,7 @@ git commit -m "feat(loc-kit): bind update drafts to a glossary"
 ### Task 2: проверять доступ к update-черновику по праву загрузки
 
 **Files:**
+
 - Modify: `weblate/trans/views/create.py`
 - Test: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
 
@@ -193,6 +195,7 @@ git commit -m "feat(loc-kit): gate glossary update drafts on upload access"
 ### Task 3: дать оператору вход из существующего глоссария
 
 **Files:**
+
 - Modify: `weblate/trans/forms.py`
 - Modify: `weblate/trans/views/create.py`
 - Modify: `weblate/urls.py`
@@ -280,6 +283,7 @@ git commit -m "feat(loc-kit): stage glossary append tables"
 ### Task 4: сохранить все валидированные термины для применения, не расширяя UI-preview
 
 **Files:**
+
 - Modify: `weblate/trans/loc_kit.py`
 - Test: `weblate/trans/tests/test_loc_kit_profile_suggester.py`
 
@@ -329,6 +333,7 @@ git commit -m "refactor(loc-kit): retain validated terms for glossary append"
 ### Task 5: реализовать append-only application service с частичными языками и notes
 
 **Files:**
+
 - Modify: `weblate/trans/loc_kit.py`
 - Test: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
 
@@ -505,6 +510,7 @@ git commit -m "feat(loc-kit): append glossary terms without overwriting existing
 ### Task 6: применить append service из preview view и показать честный результат
 
 **Files:**
+
 - Modify: `weblate/trans/views/create.py`
 - Modify: `weblate/templates/trans/loc_kit_glossary_preview.html`
 - Test: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
@@ -571,6 +577,7 @@ git commit -m "feat(loc-kit): apply append-only glossary updates"
 ### Task 7: проверить terminology sync и языковые границы end-to-end
 
 **Files:**
+
 - Modify: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
 - Modify: `weblate/glossary/tests.py` only if existing helpers need a narrow regression test
 
@@ -615,6 +622,7 @@ Do not stage `weblate/glossary/tests.py` if it was not changed.
 ### Task 8: обновить документацию и acceptance criteria
 
 **Files:**
+
 - Modify: `docs/changes.rst`
 - Modify: `docs/specs/loc-kit-ingest.md`
 - Modify: `AGENTS.md`

@@ -234,6 +234,7 @@
 ### Pattern A: Verdict > Evidence > Explanation Hierarchy (Stella Ops AI UX)
 
 Three-panel structure with clear authority labeling [verified: https://stella-ops.org/docs/modules/web/ai-ux-patterns/]:
+
 - **Verdict Panel** (authoritative outcome): the pass/flag/reject decision.
 - **Evidence Panel** (factual backing): reachability, runtime data, VEX statements.
 - **AI Assist Panel** (explanations): AI-generated rationale, clearly labeled as inference.
@@ -245,6 +246,7 @@ Visual rules: default 3-line AI summary (what changed, why it matters, recommend
 ### Pattern B: Make AI Outputs Legible - Show What It Saw, Ignored, Confidence, Correction Path (ByteLabs)
 
 Core principles [verified: https://www.bytelabs.space/blog/ux-patterns-for-ai-explainability-and-trust]:
+
 - Show what the AI saw (source, context, glossary terms considered).
 - Show what it ignored (terms it didn't apply, rules it skipped).
 - Show confidence explicitly (calibrated, not raw probability).
@@ -255,6 +257,7 @@ Core principles [verified: https://www.bytelabs.space/blog/ux-patterns-for-ai-ex
 ### Pattern C: Confidence-Based Three-Threshold Routing (Content Moderation Systems)
 
 From production moderation pipelines [verified: https://letsbuildsolutions.com/blog/system-design/designing-a-content-moderation-system-automated-filtering-ml-classification-and-human-review-queues-at-scale/ and https://looprails.dev/article-hitl-content-moderation.html]:
+
 - **Auto-approve** (high confidence, low impact): handle automatically, log only.
 - **Human review** (uncertain): route to queue with full context.
 - **Auto-reject/archive** (high confidence, high impact or clearly wrong): flag but allow appeal.
@@ -278,6 +281,7 @@ Each review item carries explicit fields [verified: https://eskilab.com/human-re
 ### Pattern E: Override Requires Reason + Symmetric Friction (EU AI Act Art.14)
 
 From regulatory-driven oversight design [verified: https://www.sota.io/blog/eu-ai-act-art14-human-oversight-ux-api-design-patterns-developer-guide-2026]:
+
 - Override (disagreeing with AI) is a PRIMARY action, not hidden behind menus.
 - Override requires a stated reason (audit trail).
 - Symmetric friction: overriding should be as easy/hard as approving, preventing both rubber-stamping and reflexive rejection.
@@ -287,6 +291,7 @@ From regulatory-driven oversight design [verified: https://www.sota.io/blog/eu-a
 ### Pattern F: Word-Level Explanation Highlights (TRuST-M / LIME)
 
 From ACM study on LLM moderation explanations [verified: https://dl.acm.org/doi/10.1145/3779211.3793172]:
+
 - LIME-style word-level highlights (showing which words drove the verdict) were preferred by 58% of reviewers for intuitive comprehension.
 - Attention visualizations were least helpful (unclear token emphasis).
 - Positive correlation between explanation clarity, user trust, and decision confidence.
@@ -295,6 +300,7 @@ From ACM study on LLM moderation explanations [verified: https://dl.acm.org/doi/
 ### Pattern G: Back-Translation with Similarity Percentage (SPF.io)
 
 From SPF.io Document Translation Portal [verified: https://www.spf.io/2024/04/05/accelerate-document-translation-with-alternative-translations/]:
+
 - **Back Translation tab** shows the reverse translation alongside a **similarity percentage** comparing back-translation to original source.
 - Explicitly designed for "reviewers who are not fluent in the target language to verify if a translation retains a similar meaning to the source sentence" [verified: same].
 - Low similarity = visual signal to investigate; high similarity = confidence the meaning survived.
@@ -303,6 +309,7 @@ From SPF.io Document Translation Portal [verified: https://www.spf.io/2024/04/05
 ### Pattern H: Appeals as a Real Escalation Tier (LoopRails)
 
 From HITL content moderation design [verified: https://looprails.dev/article-hitl-content-moderation.html]:
+
 - Appeals must provide genuine authority and time to reconsider, not just re-confirmation.
 - Show context, not just a verdict: content, surrounding thread, category, model confidence, exact signals that triggered flags.
 - Avoid "automation bias": present evidence and reasons to DISAGREE, not just a remove/keep binary.
@@ -315,6 +322,7 @@ From HITL content moderation design [verified: https://looprails.dev/article-hit
 Weblate's existing UI surfaces: **unit list** (Zen/table rows with failing-checks badges, labels, state icons), **unit editor** (source/target text, per-unit checks panel, comments, suggestions, history), **project/component dashboard** (progress stats, checks overview), **search filter** (`q=` query syntax with check/state filters).
 
 ### Pattern 1: Score Badge in Unit List Row
+
 **Source:** Phrase QPS (segment-level 0-100 next to translation), Transifex TQI (inline score next to AI translation), Smartling LQE (label in Translation column).
 
 **Weblate mapping:** Add a judge-verdict badge to each unit row in the Zen/table view, positioned next to the target text (where failing-checks badges already live). Use a compact format: a colored pill with verdict label (PASS / FLAG / REJECT) or a numeric score band. Color-code: green (pass), amber (flag), red (reject). This parallels Weblate's existing check-failure red badges but represents the LLM judge's semantic verdict rather than deterministic format checks.
@@ -322,9 +330,11 @@ Weblate's existing UI surfaces: **unit list** (Zen/table rows with failing-check
 **Why it fits:** Weblate already renders per-unit status badges (failing checks, state). A judge badge is the same visual pattern with different semantics. Producers scanning the list get immediate triage signal without reading the target language.
 
 ### Pattern 2: Verdict Detail Panel in Unit Editor (Click-to-Expand)
+
 **Source:** Transifex TQI Insights tab + Breakdown modal (Ctrl+T), Lokalise lens-icon click-to-expand, Phrase QA pane > AI checks tab.
 
 **Weblate mapping:** Add a "Judge verdict" section to the unit editor's checks/information sidebar (where "Other checks," "Comments," "Suggestions" tabs already are). Click the verdict badge to expand. Contents:
+
 - **Verdict** (pass/flag/reject) with confidence.
 - **Evidence:** back-translation with similarity % (Pattern G), placeholder/markup diff, glossary term matches.
 - **Explanation:** structured issue list (MQM-style: category + severity), or a 3-line AI summary (Pattern A).
@@ -333,6 +343,7 @@ Weblate's existing UI surfaces: **unit list** (Zen/table rows with failing-check
 **Why it fits:** Weblate's editor already has a tabbed sidebar for checks/comments/suggestions. The judge verdict is a natural additional tab or a promoted section within the existing checks area. The reviewer never needs to read the target text - the evidence (back-translation, diffs) is in the source language.
 
 ### Pattern 3: Separate AI-Verdict Checks from Deterministic Checks
+
 **Source:** Phrase explicitly separates "AI checks" tab from "QA checks" tab in the QA pane.
 
 **Weblate mapping:** Do NOT mix judge verdicts into the existing `Checks` framework (which produces deterministic pass/fail badges via `weblate.checks`). Keep the judge verdict as a distinct visual layer - different badge color/shape, different sidebar section. Rationale: deterministic checks (placeholder count, XML validity) are binary facts; judge verdicts are probabilistic assessments. Mixing them erodes trust in both.
@@ -340,9 +351,11 @@ Weblate's existing UI surfaces: **unit list** (Zen/table rows with failing-check
 **Why it fits:** Weblate's check system is already cleanly separated (each check is a registered class with a unique ID). Adding judge verdicts as "pseudo-checks" would be technically easy but semantically wrong. A separate presentation layer preserves the fact/inference distinction (Pattern B).
 
 ### Pattern 4: Filter by Verdict in Search (`q=` extension)
+
 **Source:** Transifex filter by TQI range (More menu), Smartling LQE filter (High/Medium/Low), Lokalise below-threshold routing to review tasks.
 
 **Weblate mapping:** Extend the `q=` search syntax with judge-verdict filters, e.g.:
+
 - `q=judge:reject` - show only rejected units.
 - `q=judge:flag` - show only flagged units.
 - `q=judge_score:<80` - show units below a score threshold.
@@ -353,9 +366,11 @@ These integrate with existing filters like `check:placeholders`, `state:needs-ed
 **Why it fits:** Weblate's search is already filter-based with `check:`, `state:`, `label:` prefixes. Judge verdicts are a natural additional filter dimension. Producers can build a review queue by filtering `judge:reject OR judge:flag` and working through it.
 
 ### Pattern 5: Back-Translation Evidence Block in Editor
+
 **Source:** SPF.io Back Translation tab with similarity %, Crowdin Backtranslation app.
 
 **Weblate mapping:** In the unit editor, below the source/target text pair, add an optional "Back-translation" block:
+
 - Shows the target text back-translated into the source language.
 - Shows a similarity percentage between back-translation and original source.
 - Color-code: high similarity (green), medium (amber), low (red).
@@ -364,9 +379,11 @@ These integrate with existing filters like `check:placeholders`, `state:needs-ed
 **Why it fits:** This is THE pattern for non-fluent reviewers. Weblate's editor already shows source and target side-by-side; the back-translation is a third line in the source language. The similarity % gives a calibrated confidence signal without requiring the reviewer to judge the target text.
 
 ### Pattern 6: Auto-Approve with Visible State Transition + Audit Comment
+
 **Source:** Transifex Auto-Review (threshold -> auto-marked reviewed + TM entry), Phrase QPS lock (lock icon with tooltip), XTM Intelligent Workflow (auto-close with conditions).
 
 **Weblate mapping:** When the judge verdict is PASS with high confidence:
+
 - Auto-transition the unit to state 30 (approved) or 20 (waiting-for-review) depending on config.
 - Leave an auto-generated comment (using Weblate's existing comment system) recording: verdict, score, back-translation similarity, timestamp, judge model. This creates the audit trail.
 - Visually, the unit shows the normal approved-state indicator PLUS the judge badge (so it's clear WHY it was auto-approved).
@@ -374,9 +391,11 @@ These integrate with existing filters like `check:placeholders`, `state:needs-ed
 **Why it fits:** Weblate already has review states (10/20/30) and a comment system. Auto-approval is a state transition + a comment. The comment provides the "source_evidence" and "reviewer_decision" audit fields (Pattern D). Producers can later filter `state:approved AND has:judge_comment` to see what the judge approved.
 
 ### Pattern 7: Escalation Path via "Needs Editing" + Comment
+
 **Source:** LoopRails appeals as escalation tier, EskiLab reviewer actions (approve/edit/reject/escalate/request info), EU AI Act override-with-reason.
 
 **Weblate mapping:** When the judge verdict is FLAG or REJECT:
+
 - Auto-set the unit to state 10 (needs-editing) so it surfaces in review queues.
 - Auto-add a comment with the judge's issue breakdown (the "reason").
 - The producer's action: read the back-translation evidence, then either approve (override), edit, or leave for a linguist. Approving an override requires no special friction (Weblate is a single-user studio), but the comment records the disagreement for audit.
@@ -384,9 +403,11 @@ These integrate with existing filters like `check:placeholders`, `state:needs-ed
 **Why it fits:** Weblate's "needs-editing" state already exists for exactly this purpose. The judge becomes an automated commenter that sets needs-editing. Producers filter `state:needs-editing` to find the judge's flagged queue.
 
 ### Pattern 8: Project/Component Dashboard Verdict Summary
+
 **Source:** Phrase Quality Profile Insights tab (locked-words %, total volume, AIU consumed), Smartling LQA Dashboard (MQM score trends, locale/project/job breakdowns), XTM job-average TQI.
 
 **Weblate mapping:** Add a "Judge verdicts" widget to the project/component dashboard showing:
+
 - Distribution: X% pass, Y% flag, Z% reject (donut chart).
 - Flagged/rejected unit count with a link to the filtered unit list (`q=judge:flag OR judge:reject`).
 - Average back-translation similarity score per language.
@@ -395,6 +416,7 @@ These integrate with existing filters like `check:placeholders`, `state:needs-ed
 **Why it fits:** Weblate dashboards already show progress stats and check-failure counts. A verdict-distribution widget is the same data shape (count by category). It gives producers a single-screen answer to "is this language's translation quality under control?"
 
 ### Pattern 9: Variant Suggestions (Alternative Translations)
+
 **Source:** Transifex Variants tab (apply alternate LLM translation directly), SPF.io Alternatives tab, Smartling AI Post-Editing Agent.
 
 **Weblate mapping:** When the judge verdict is FLAG/REJECT, show 1-2 alternative translations (re-generated by the LLM with the judge's feedback) in the editor sidebar, as "suggestions" using Weblate's existing suggestion mechanism. The producer can accept a suggestion with one click.
@@ -402,6 +424,7 @@ These integrate with existing filters like `check:placeholders`, `state:needs-ed
 **Why it fits:** Weblate already has a suggestions system (users propose alternative translations, others vote/accept). Judge-generated variants are machine-produced suggestions using the same accept/reject UI.
 
 ### Pattern 10: White-Box Pipeline Log (Debug View)
+
 **Source:** Crowdin AI Pipeline Logs (input/output per step), Stella Ops Evidence Panel.
 
 **Weblate mapping:** For power users debugging why the judge flagged a unit, provide a "Judge reasoning" expandable section showing the full prompt/response chain: the judge's input (source, target, glossary, back-translation), its step-by-step reasoning, and the final verdict. This is the "AI Pipeline Logs" equivalent - it lets a producer or developer understand WHERE the judgment went wrong without re-running anything.
@@ -430,44 +453,47 @@ These integrate with existing filters like `check:placeholders`, `state:needs-ed
 ## Sources
 
 ### Vendor Documentation (Primary)
-- Phrase QPS Overview: https://support.phrase.com/hc/en-us/articles/5709672289180-Phrase-QPS-Overview
-- Phrase Pre-translation (QPS thresholds, lock): https://support.phrase.com/hc/en-us/articles/5709717749788-Pre-translation-TMS
-- Phrase CAT Pane (QPS display): https://support.phrase.com/hc/en-us/articles/5709683926812-CAT-Pane-TMS
-- Phrase Quality Profiles (AI checks, lock, Insights): https://support.phrase.com/hc/en-us/articles/25865045974300-Quality-Profiles
-- Lokalise Scoring Translation Quality: https://docs.lokalise.com/en/articles/11631905-scoring-translation-quality
-- Lokalise AI LQA: https://docs.lokalise.com/en/articles/7945761-ai-lqa
-- Crowdin AI Pipeline: https://store.crowdin.com/ai-pipeline
-- Crowdin Copilot: https://store.crowdin.com/crowdin-copilot
-- Crowdin Copilot blog: https://crowdin.com/blog/meet-crowdin-copilot
-- Crowdin Pre-Translation: https://support.crowdin.com/pre-translation/
-- Crowdin QA Check Settings: https://support.crowdin.com/project-settings/qa-checks/
-- Crowdin Backtranslation: https://store.crowdin.com/backtranslation
-- Transifex TQI: https://help.transifex.com/en/articles/9465000-translation-quality-index-tqi
-- Transifex TQI Breakdown announcement: https://community.transifex.com/t/new-feature-tqi-breakdown-for-deeper-insights/4278
-- Transifex TQI Insights in Editor: https://community.transifex.com/t/new-tqi-insights-now-available-directly-in-the-editor/5245
-- Transifex Auto-Review: https://community.transifex.com/t/now-live-supercharge-your-localization-with-auto-review-based-on-tqi/4762
-- Transifex Editor Filters: https://help.transifex.com/en/articles/14287841-transifex-editor-filters-reference
-- XTM TQI settings: https://help.xtm.ai/en/xtm-cloud/26.2/en/global-ai-translate---tqi-settings.html
-- XTM Intelligent Workflow: https://help.xtm.ai/en/xtm-cloud/26.2/en/global-intelligent-workflow-settings.html
-- XTM TQI product page: https://xtm.ai/ai-translation/tqi
-- Smartling LQE Agent: https://help.smartling.com/hc/en-us/articles/25058582212507-Language-Quality-Estimation-Agent-for-Machine-Translation
-- Smartling LQA Dashboard: https://help.smartling.com/hc/en-us/articles/19513205210651-Assess-Translation-Quality-with-the-LQA-Dashboard
-- Smartling LQA Agent: https://www.smartling.com/software/lqaagent
-- Smartling LQA Suite: https://www.smartling.com/software/lqa-suite/
-- Smartling Strings View Filters: https://help.smartling.com/hc/en-us/articles/9352527251355-Strings-View-Search-Filters-Project
-- Smartling back-translation blog: https://www.smartling.com/blog/what-is-back-translation-and-why-is-it-important
+
+- Phrase QPS Overview: <https://support.phrase.com/hc/en-us/articles/5709672289180-Phrase-QPS-Overview>
+- Phrase Pre-translation (QPS thresholds, lock): <https://support.phrase.com/hc/en-us/articles/5709717749788-Pre-translation-TMS>
+- Phrase CAT Pane (QPS display): <https://support.phrase.com/hc/en-us/articles/5709683926812-CAT-Pane-TMS>
+- Phrase Quality Profiles (AI checks, lock, Insights): <https://support.phrase.com/hc/en-us/articles/25865045974300-Quality-Profiles>
+- Lokalise Scoring Translation Quality: <https://docs.lokalise.com/en/articles/11631905-scoring-translation-quality>
+- Lokalise AI LQA: <https://docs.lokalise.com/en/articles/7945761-ai-lqa>
+- Crowdin AI Pipeline: <https://store.crowdin.com/ai-pipeline>
+- Crowdin Copilot: <https://store.crowdin.com/crowdin-copilot>
+- Crowdin Copilot blog: <https://crowdin.com/blog/meet-crowdin-copilot>
+- Crowdin Pre-Translation: <https://support.crowdin.com/pre-translation/>
+- Crowdin QA Check Settings: <https://support.crowdin.com/project-settings/qa-checks/>
+- Crowdin Backtranslation: <https://store.crowdin.com/backtranslation>
+- Transifex TQI: <https://help.transifex.com/en/articles/9465000-translation-quality-index-tqi>
+- Transifex TQI Breakdown announcement: <https://community.transifex.com/t/new-feature-tqi-breakdown-for-deeper-insights/4278>
+- Transifex TQI Insights in Editor: <https://community.transifex.com/t/new-tqi-insights-now-available-directly-in-the-editor/5245>
+- Transifex Auto-Review: <https://community.transifex.com/t/now-live-supercharge-your-localization-with-auto-review-based-on-tqi/4762>
+- Transifex Editor Filters: <https://help.transifex.com/en/articles/14287841-transifex-editor-filters-reference>
+- XTM TQI settings: <https://help.xtm.ai/en/xtm-cloud/26.2/en/global-ai-translate---tqi-settings.html>
+- XTM Intelligent Workflow: <https://help.xtm.ai/en/xtm-cloud/26.2/en/global-intelligent-workflow-settings.html>
+- XTM TQI product page: <https://xtm.ai/ai-translation/tqi>
+- Smartling LQE Agent: <https://help.smartling.com/hc/en-us/articles/25058582212507-Language-Quality-Estimation-Agent-for-Machine-Translation>
+- Smartling LQA Dashboard: <https://help.smartling.com/hc/en-us/articles/19513205210651-Assess-Translation-Quality-with-the-LQA-Dashboard>
+- Smartling LQA Agent: <https://www.smartling.com/software/lqaagent>
+- Smartling LQA Suite: <https://www.smartling.com/software/lqa-suite/>
+- Smartling Strings View Filters: <https://help.smartling.com/hc/en-us/articles/9352527251355-Strings-View-Search-Filters-Project>
+- Smartling back-translation blog: <https://www.smartling.com/blog/what-is-back-translation-and-why-is-it-important>
 
 ### Cross-Domain (Calibrated Trust / HITL)
-- Stella Ops AI UX Patterns (Verdict/Evidence/AI Assist panels): https://stella-ops.org/docs/modules/web/ai-ux-patterns/
-- ByteLabs UX Patterns for AI Explainability and Trust: https://www.bytelabs.space/blog/ux-patterns-for-ai-explainability-and-trust
-- TRuST-M (ACM WSDM 2025, LIME explanations preferred): https://dl.acm.org/doi/10.1145/3779211.3793172
-- LoopRails HITL Content Moderation: https://looprails.dev/article-hitl-content-moderation.html
-- Let's Build Content Moderation System Design: https://letsbuildsolutions.com/blog/system-design/designing-a-content-moderation-system-automated-filtering-ml-classification-and-human-review-queues-at-scale/
-- EU AI Act Art.14 Human Oversight UX/API Patterns: https://www.sota.io/blog/eu-ai-act-art14-human-oversight-ux-api-design-patterns-developer-guide-2026
-- EskiLab Human Review Queue Design: https://eskilab.com/human-review-queue-design-ai-operations/
-- Mavik Labs HITL Review Queues 2026: https://www.maviklabs.com/blog/human-in-the-loop-review-queue-2026/
-- ICO UK Guidance on Explaining AI Decisions: https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/artificial-intelligence/explaining-decisions-made-with-artificial-intelligence/part-1-the-basics-of-explaining-ai/what-goes-into-an-explanation/
+
+- Stella Ops AI UX Patterns (Verdict/Evidence/AI Assist panels): <https://stella-ops.org/docs/modules/web/ai-ux-patterns/>
+- ByteLabs UX Patterns for AI Explainability and Trust: <https://www.bytelabs.space/blog/ux-patterns-for-ai-explainability-and-trust>
+- TRuST-M (ACM WSDM 2025, LIME explanations preferred): <https://dl.acm.org/doi/10.1145/3779211.3793172>
+- LoopRails HITL Content Moderation: <https://looprails.dev/article-hitl-content-moderation.html>
+- Let's Build Content Moderation System Design: <https://letsbuildsolutions.com/blog/system-design/designing-a-content-moderation-system-automated-filtering-ml-classification-and-human-review-queues-at-scale/>
+- EU AI Act Art.14 Human Oversight UX/API Patterns: <https://www.sota.io/blog/eu-ai-act-art14-human-oversight-ux-api-design-patterns-developer-guide-2026>
+- EskiLab Human Review Queue Design: <https://eskilab.com/human-review-queue-design-ai-operations/>
+- Mavik Labs HITL Review Queues 2026: <https://www.maviklabs.com/blog/human-in-the-loop-review-queue-2026/>
+- ICO UK Guidance on Explaining AI Decisions: <https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/artificial-intelligence/explaining-decisions-made-with-artificial-intelligence/part-1-the-basics-of-explaining-ai/what-goes-into-an-explanation/>
 
 ### Back-Translation Specific
-- SPF.io Alternative + Back Translations (similarity %): https://www.spf.io/2024/04/05/accelerate-document-translation-with-alternative-translations/
-- Crowdin Backtranslation app: https://store.crowdin.com/backtranslation
+
+- SPF.io Alternative + Back Translations (similarity %): <https://www.spf.io/2024/04/05/accelerate-document-translation-with-alternative-translations/>
+- Crowdin Backtranslation app: <https://store.crowdin.com/backtranslation>

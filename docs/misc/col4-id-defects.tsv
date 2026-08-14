@@ -1,0 +1,24 @@
+# col4/data/id - glossary adherence defects + cyrillic leak
+# Source: prod l10n.herocraft.com, weblate shell audit 2026-08-14
+# Glossary: all-glossary ru->id, 95 terms. Matcher: stem fallback ON (fingerprint src_alg=russian, allowlist=[ru])
+#
+# === REAL ADHERENCE DEFECTS (11) ===
+# unit_id	term_ru	expected_id	source	target
+87419	Ликвидатор	Likuidator	Бездомный оказался вором, которого долго не могли поймать. За мёртвого вора награды не будет, а за срыв плаката и попытку поиска запрещённого элемента – штраф. В корпус ликвидаторов поступить будет труднее	Tunawisma itu ternyata seorang pencuri yang sudah lama tidak bisa ditangkap. Tidak akan ada hadiah untuk pencuri yang mati, tetapi akan ada denda untuk merobek poster dan mencoba mencari elemen terlarang. Akan lebih sulit untuk masuk ke Korps Likuidasi
+87530	Ликвидатор	Likuidator	Если хочешь попасть в корпус ликвидаторов - придётся	Jika kamu ingin masuk Korps Likuidasi – kamu harus
+87609	Ликвидатор	Likuidator	Впереди по коридору появилась дверь кабинета. На табличке написано "Старший состав ликвидаторов"	Di depan, di koridor, muncul pintu kantor. Di plakat tertulis "Staf senior Korps Likuidasi"
+87962	Устав	Piagam	Вы ждёте бездомного достаточно долго. Устав следить за округой, вы прислоняетесь к двери, и та захлопывается	Kamu menunggu tunawisma itu cukup lama. Lelah mengawasi sekitar, kamu bersandar di pintu, dan pintu itu tertutup
+88084	Чистые	Yang Murni	Вы погружаетесь в Чистую тьму	Anda tenggelam dalam kegelapan Murni
+88167	Истина	Kebenaran	Истинную Веру надо поддерживать, как Костёр, поэтому мужчины ходят на поиски еды и топлива, а это опасно. Даже перемещаться между Общин – опасно, но ты поймёшь сам	Iman yang Benar harus dijaga seperti Api Unggun, jadi para pria pergi mencari makanan dan bahan bakar, dan itu berbahaya. Bahkan bergerak antar Komunitas—berbahaya, tetapi Anda akan mengerti sendiri
+88444	Чистые	Yang Murni	Помилуй нас Чистейший! А что же делать?!	Kasihanilah kami, Yang Paling Murni! Lalu apa yang harus dilakukan?!
+88616	Пищконцентрат	Konsentrat Makanan	Житель ячейки пустил вас без лишних вопросов. Оказалось, что детектор реагирует на плесень в ванной комнате. Испугавшись проблем с партией, житель задобрил вас красным пищконцентратом	Penghuni sel membiarkan Anda masuk tanpa pertanyaan lebih lanjut. Ternyata detektor bereaksi terhadap jamur di kamar mandi. Karena takut masalah dengan Partai, penghuni itu menyuap Anda dengan Konsentrat Merah
+89277	Чистые	Yang Murni	Ты нашла нас! Молодые Послушники, новые Чистые души, поклонитесь, наши молитвы вознаграждены! Перед вами – спасение Гигахруща. Плесенка!	Kau menemukan kami! Novis muda, jiwa-jiwa Murni yang baru, bersujudlah, doa-doa kami telah dikabulkan! Di hadapanmu adalah keselamatan GIGAKHRUSHCH. Anak Jamur!
+90281	Смена	Shift	Спёртый ядовитый воздух разряжается, но на смену приходит другая проблема: на вас уставился научный персонал. Кто-то из них занимался уборкой, а кто-то настройкой оборудования	Udara beracun yang pengap menghilang, tetapi masalah lain muncul: staf ilmiah menatap Anda. Beberapa dari mereka sedang membersihkan, dan beberapa sedang mengatur peralatan
+87139	ЧЗХ	WTF	Ждать праздника ЧЗХ	Menunggu Perayaan Panji Rumah Tangga
+#
+# === CYRILLIC LEAK (4) - all are the product name "ёЛ-К4" -> "ёL-K4" ===
+# unit_id	source	target	cyrillic_fragment
+88228	Скоро наступит ваш любимый праздник - "Новый Цикл!" В честь этого отец приволок домой изделие ёЛ-К4. Родители говорят что она "живая" и даже пахнет...	Tak lama lagi akan tiba hari libur favorit Anda – "Siklus Baru!" Untuk merayakannya, ayah membawa pulang produk ёL-K4. Orang tua mengatakan bahwa itu "hidup" dan bahkan berbau...	ё
+88231	Вы выбрали самые красивые фантики от пищконцентрата и игрушки ликвидаторов... А ёЛ-К4 даже помогает надеть их на себя	Anda memilih bungkus konsentrat makanan yang paling indah dan mainan likuidator... Dan ёL-K4 bahkan membantu Anda memakainya	ё
+88238	Через несколько смен праздник уже отгремел и блок вернулся к обычной жизни. Родители ушли на завод и поручили вам убрать изделие ёЛ-К4 из их комнаты	Beberapa shift kemudian, perayaan telah berakhir dan blok kembali ke kehidupan normal. Orang tua pergi ke pabrik dan menugaskanmu untuk memindahkan produk ёL-K4 dari kamar mereka	ё
+88242	Родители забыли про поручение и мёртвое тело ёЛ-К4 простояло в ячейке ещё полцикла. Отец никак не мог найти времени отнести этот труп к мусорному тоннелю	Orang tua lupa tentang tugas itu dan tubuh ёL-K4 yang mati tetap berada di sel selama setengah siklus lagi. Ayah tidak bisa menemukan waktu untuk membawa mayat ini ke terowongan sampah	ё

@@ -86,16 +86,12 @@ collisions = {
 print("TARGET_COLLISIONS", len(collisions))
 
 separator_lost = [
-    unit
-    for unit in translated
-    if unit.source.count("$") != unit.target.count("$")
+    unit for unit in translated if unit.source.count("$") != unit.target.count("$")
 ]
 print("SEPARATOR_COUNT_MISMATCH", len(separator_lost))
 
 growth = [
-    len(unit.target) / len(unit.source)
-    for unit in translated
-    if unit.source.strip()
+    len(unit.target) / len(unit.source) for unit in translated if unit.source.strip()
 ]
 if growth:
     print("LENGTH_RATIO_AVG", round(sum(growth) / len(growth), 3))

@@ -18,8 +18,12 @@ translation = Translation.objects.get(
 
 PROBES = {
     "Гигахрущ": re.compile(r"\bGiga\w*", re.IGNORECASE),
-    "ликвидатор": re.compile(r"\b\w*liquidat\w*|\bélimina\w*|\bnettoyeur\w*", re.IGNORECASE),
-    "Самосбор": re.compile(r"\bSamosbor\w*|\bAuto-?assembl\w*|\bRassembl\w*", re.IGNORECASE),
+    "ликвидатор": re.compile(
+        r"\b\w*liquidat\w*|\bélimina\w*|\bnettoyeur\w*", re.IGNORECASE
+    ),
+    "Самосбор": re.compile(
+        r"\bSamosbor\w*|\bAuto-?assembl\w*|\bRassembl\w*", re.IGNORECASE
+    ),
 }
 
 units = [

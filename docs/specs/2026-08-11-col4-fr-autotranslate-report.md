@@ -171,7 +171,7 @@
 Глоссарий залит за **3.5 часа до появления кода** и за 4.5 часа до деплоя. Фикс работает
 только на импорте и задним числом explanation не добавляет. Фактическое состояние данных:
 
-```
+```text
 GLOSSARY_SOURCE_UNITS 22
 GLOSSARY_UNITS_WITH_EXPLANATION 0
 GLOSSARY_FR_WITH_EXPLANATION 0

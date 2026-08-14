@@ -354,6 +354,142 @@ API, репозиторий подключён по пути (`file`), пуш - 
 Статистика перевода обновляется отложенно: сразу после импорта счётчики могут
 отставать на минуту. Считать по ним расхождение раньше - ложная тревога.
 
+## Часть 6. Другие форматы лок-китов у команд HeroCraft
+
+Контракт выше написан на примере Pirate Ships. У заказчика каждая команда
+хранит строки по-своему; раздел фиксирует, какой формат как подключается.
+Классификация по реальным файлам команд 2026-08-14.
+
+| Команда | Родной формат | Путь подключения |
+|---|---|---|
+| Space Arena | плоский JSON на язык, `loc/*.json` | нативно, формат `json`, уже работает |
+| Pirate Ships | сводный table-JSON, все языки в одном файле | конвертер `scripts/convert-localization-json.py` → per-language JSON, стенд прогнан (часть 5) |
+| Need for Greed | xlsx-таблицы (5 компонентов) | нативно, формат `xlsx`, уже работает |
+| Команда с TSV | TSV UTF-16LE, колонки `Key\|English\|Russian\|…` | перегнать в UTF-8 CSV (`iconv`), формат `csv`: `Key` → context, `English` → source |
+| Команда с Unity Localization | String Tables (`com.unity.localization`) | editor-скрипт экспорта в CSV (см. 6.3) |
+
+### 6.1 Канонический вид: один язык - один файл
+
+Weblate архитектурно исходит из «один язык - один файл»: сводные таблицы
+«колонка на язык» в одном файле не поддерживаются и не планируются
+(<https://github.com/WeblateOrg/weblate/issues/11039>, открыт, не
+запланирован). Встроенный формат CSV тоже этого не умеет: его словарь
+колонок содержит ровно один `target`, а параметр `csv-multi` означает
+альтернативные варианты перевода строки, а не несколько языков
+(<https://docs.weblate.org/en/latest/formats/csv.html>). Поэтому любой
+«широкий» формат заказчика на границе репозитория разрезается на файлы по
+языкам; опорный промежуточный формат - плоский монолингвальный JSON (он же
+родной для Space Arena и Pirate Ships).
+
+Обратное правило: исходная широкая таблица остаётся источником истины у
+разработчика, а конвертер обязан иметь round-trip тест (split → join =
+исходный файл). Потерянный при round-trip перевод - главный способ тихо
+испортить данные на этой схеме.
+
+### 6.2 TSV UTF-16
+
+Штатный CSV-парсер Weblate не имеет варианта кодировки UTF-16 в
+`csv_encoding`, поэтому UTF-16LE с BOM сначала перекодируется в UTF-8:
+
+```sh
+iconv -f UTF-16LE -t UTF-8 localization.txt > localization.csv
+```
+
+Дальше компонент создаётся с форматом CSV, колонка `Key` мапится в context,
+`English` - в source. Конкретный файл команды проверен 2026-08-14: 974
+строки, 10 языков, парсится после перекодировки. В данных уже найдены
+дефекты (в `gdpr_title` испанская колонка содержит текст политики
+конфиденциальности из `gdpr_body`) - ещё один аргумент за включение
+проверок сразу при подключении.
+
+### 6.3 Unity Localization (String Tables)
+
+Файлы `*.asset` вида `Russian (ru).asset` - это **метаданные локали** пакета
+`com.unity.localization` (код языка, имя, порядок сортировки), а не строки:
+проверено по образцу команды, там нет ни одного перевода. Сами строки живут
+в String Table Collections. Готового моста Unity Localization ↔ Weblate не
+существует ни в апстриме, ни в open-source
+(<https://github.com/WeblateOrg/weblate/issues/3081> - про XLIFF-экспорт;
+все публичные интеграции - через проприетарные плагины Crowdin/Phrase/Tolgee
+или самописные скрипты).
+
+Рабочий путь - штатный экспорт пакета в CSV
+(<https://docs.unity3d.com/Packages/com.unity.localization@1.5/manual/CSV.html>):
+editor-скрипт `UnityEditor.Localization.Plugins.CSV.Csv` выгружает таблицу
+«ключ + колонка на локаль», дальше файл входит в общий контур как TSV/CSV из
+6.2. Два требования к экспорту:
+
+- **Include Id = true**: без колонки `Id` переименование ключа в Unity
+  превращается в «старый ключ удалён, новый добавлен» - переводы молча
+  теряются;
+- Smart String-плейсхолдеры (`{playerName}`) ходят как обычный текст -
+  их сохранность контролируется нашей проверкой `game-markup`, отдельной
+  настройки не требует.
+
+XLIFF-экспорт пакета работает, но у него задокументированы проблемы с
+XML-эскейпингом (#3081); CSV предпочтительнее. Заявление команды «нам
+подойдут JSON» пакетом напрямую не поддерживается - нативного
+JSON-экспорта String Tables нет; если команда уже генерирует JSON своим
+плагином, его вывод подключается как Space Arena, без CSV-шага.
+
+### 6.4 Схема для портфеля команд
+
+```text
+команда (JSON per lang)  ── напрямую ──────────────┐
+команда (TSV/CSV)        ── iconv/профиль ─────────┤
+команда (table-JSON)     ── конвертер split ───────┼──> loc-репозиторий игры
+команда (Unity StringTb) ── editor CSV export ─────┤    (маска + base file)
+                                                    │
+        Weblate: проект = игра, компонент = формат ◀┘
+                    │ commit / push
+                    ▼
+        CI игры: join/сборка в родной формат движка
+```
+
+Правила топологии (собрано из документированных примитивов Weblate,
+end-to-end предписания в документации нет):
+
+1. **Проект = игра, компонент = формат/таблица.** Проект приватный, доступ
+   переводчиков - через per-project teams
+   (<https://docs.weblate.org/en/latest/admin/access.html>). Так проще ACL и
+   работает propagation одинаковых строк внутри проекта.
+2. **Loc-only репозиторий на игру.** Weblate никогда не видит исходники
+   игры: либо отдельный маленький репозиторий со строками (шаблон из FAQ -
+   submodule), либо узкая ветка `localization`, как у Pirate Ships - полный
+   клон master оказался невозможен технически (см. 5.5).
+3. **Конвертер - единственный путь записи в loc-репозиторий** для
+   неродных форматов. Перед прогоном конвертера компонент блокируется
+   (`wlc lock` → push → pull → конвертер → unlock), иначе Weblate и скрипт
+   пишут в одни файлы параллельно
+   (<https://docs.weblate.org/en/latest/admin/continuous.html#avoiding-merge-conflicts>).
+4. **Не squash-мержить** ветки локализации - Weblate опирается на историю
+   коммитов.
+5. **Одно соглашение об именовании ключей на игру**: propagation одинаковых
+   переводов между компонентами для монолингвальных форматов работает
+   только при совпадающих ключах
+   (<https://docs.weblate.org/en/latest/admin/continuous.html#translation-propagation>).
+6. Вебхук на push из репозитория игры настраивается по
+   <https://docs.weblate.org/en/latest/admin/continuous.html#matching-webhook-targets>;
+   с версии 2026.9 URL вебхука сравнивается с URL компонента строго -
+   лишний слеш или другое имя хоста молча отключает обновление.
+
+### 6.5 Валидация на границе
+
+Официального предписания по предварительному линту файлов заказчика нет -
+это практика, принятая у нас:
+
+- конвертер/loc-kit ingest парсит строго: `//`-комментарии и сырые
+  control-символы в JSON (оба встречаются в живом файле Pirate Ships,
+  3 735 ключей) должны **падать на границе**, а не доезжать до релиза;
+- кодировка задаётся явно в профиле команды (UTF-16LE → UTF-8), паритет
+  ключей между языками проверяется конвертером;
+- алерты Weblate (ошибки парсинга, дубли, неоднозначные коды языков,
+  <https://docs.weblate.org/en/latest/devel/alerts.html>) - страховка
+  после импорта, а не замена граничной проверке;
+- пользовательские проверки `game-markup` / `game-line-break`
+  (`weblate_customization`) включать с первого дня - именно они ловят
+  потерянные `<color>`-теги и `$`-разделители движка.
+
 ## Следующие шаги
 
 ### Согласовано с разработчиком
@@ -401,3 +537,21 @@ API, репозиторий подключён по пути (`file`), пуш - 
 - <https://docs.weblate.org/en/latest/vcs.html>,
   <https://docs.weblate.org/en/latest/admin/code-hosting.html>,
   <https://docs.weblate.org/en/latest/admin/continuous.html>.
+
+Исследование для части 6 (2026-08-14):
+
+- «один язык - один файл» как архитектурное допущение:
+  <https://github.com/WeblateOrg/weblate/issues/11039>,
+  <https://github.com/WeblateOrg/weblate/issues/10848>;
+- поддержка нестандартных форматов:
+  <https://docs.weblate.org/en/latest/formats.html#supporting-other-formats>,
+  <https://docs.weblate.org/en/latest/faq.html>;
+- CSV в Weblate и translate-toolkit:
+  <https://docs.weblate.org/en/latest/formats/csv.html>,
+  <https://docs.translatehouse.org/projects/translate-toolkit/en/latest/formats/csv.html>;
+- Unity Localization CSV/XLIFF:
+  <https://docs.unity3d.com/Packages/com.unity.localization@1.5/manual/CSV.html>,
+  <https://docs.unity3d.com/Packages/com.unity.localization@1.2/manual/XLIFF.html>,
+  XLIFF-эскейпинг: <https://github.com/WeblateOrg/weblate/issues/3081>;
+- доступы и команды: <https://docs.weblate.org/en/latest/admin/access.html>;
+- алерты: <https://docs.weblate.org/en/latest/devel/alerts.html>.

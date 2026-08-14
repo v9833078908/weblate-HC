@@ -2,7 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Split COL4 glossary defects into model non-compliance and matcher misses.
+"""
+Split COL4 glossary defects into model non-compliance and matcher misses.
 
 A term counts as present in the source only on a word-boundary match, with
 acronyms matched case-sensitively, so short terms such as "НИИ" no longer match
@@ -43,7 +44,7 @@ def source_pattern(term: str) -> re.Pattern[str]:
 
 
 def target_pattern(rendering: str) -> re.Pattern[str]:
-    head = rendering.split()[0]
+    head = rendering.split(maxsplit=1)[0]
     stem = head[:-1] if len(head) > 5 else head
     return re.compile(rf"(?<![^\W\d_]){re.escape(stem)}", re.IGNORECASE)
 

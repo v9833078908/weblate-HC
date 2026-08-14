@@ -83,6 +83,7 @@ The paper's conclusion: "prompt-based approaches are outperformed by the encoder
 `[inference]` Note: these results used sub-13B open models (Llama-2, Gemma, OpenChat). Frontier closed models (GPT-4.1, Claude) were not tested here and would likely score higher, but the tokenization problem affects all autoregressive LLMs. The GEMBA-MQM V2 results at WMT25 used GPT-4.1-mini across diverse languages including some lower-resource pairs and ranked first - suggesting frontier models partially compensate, but the study did not isolate very-low-resource pairs like Thai/Vietnamese.
 
 **Practical implication for this project:** For th, vi, hi, fa, and to a lesser extent id, the judge should:
+
 - Use a frontier model (GPT-4.1-class), not a small open model.
 - Prefer MQM-span-annotation prompting (forces structured reasoning) over raw DA scoring.
 - Run CometKiwi as a complementary signal (it is a fine-tuned multilingual encoder, less affected by LLM tokenization artifacts).
@@ -106,13 +107,14 @@ The paper's conclusion: "prompt-based approaches are outperformed by the encoder
 
 The standard MQM scoring framework uses severity multipliers: Neutral=0, Minor=1, Major=5, Critical=25 `[verified: https://themqm.org/introduction-to-tqe/concrete-example-with-formulas/]` `[verified: https://www.themqm.org/mqm-pillars/the-mqm-scoring-models/]`. The penalty formula:
 
-```
+```text
 ETPT = ((Minor_count x 1) + (Major_count x 5) + (Critical_count x 25)) x Error_Type_Weight
 ```
 
 A single Critical error typically yields automatic fail. GEMBA V2 adopts this exact weighting (25/5/1) for LLM-produced annotations `[verified: https://aclanthology.org/2025.wmt-1.67/]`. Freitag et al. (2021) established that segment-level MQM scores correlate with human acceptability thresholds, and the WMT metrics tasks have validated these weights against human MQM annotations across many language pairs.
 
 **For a pass/flag/reject verdict from MQM output, a defensible mapping is:**
+
 - **Pass:** no Critical, no Major errors (or penalty total below a tunable threshold).
 - **Flag:** at least one Major error, no Critical (needs-editing / waiting-for-review).
 - **Reject:** at least one Critical error (e.g., wrong meaning, untranslated content, placeholder corruption).
@@ -222,7 +224,7 @@ Back-translation is useful as a **trust/display artifact** (showing stakeholders
 
 The FutureAGI engineering guide (2026) documents a 4-tier cascade that multiple production systems converge on `[verified: https://futureagi.com/blog/evaluating-llm-translation-quality-2026/]`:
 
-```
+```text
 Tier 0: Deterministic checks (length, placeholder integrity, glossary match, NER preservation)
          -> cost: microseconds; catches ~40-60% of defects in game localization
 Tier 1: Reference-free QE (CometKiwi / MetricX-QE)
@@ -234,6 +236,7 @@ Tier 3: Frontier adjudication (stronger model or human)
 ```
 
 Key design choices:
+
 - **Memoization/caching:** "keyed by source/target and glossary hashes to reuse verdicts" - identical source+target+glossary state never re-judges `[verified: https://futureagi.com/blog/evaluating-llm-translation-quality-2026/]`.
 - **Sampling:** "Start with 100-200 examples per direction; stratify by source length, register, and domain. Beyond 300-500 per direction, sampling is preferred over expanding full data due to judge cost."
 
@@ -297,28 +300,33 @@ Slator's industry survey (2024) reports the primary cost levers: "combine batchi
 ### 7.2 Recommended Architecture: Tiered Cascade with MQM-Span Verdict
 
 **Tier 0 - Deterministic (free, runs on every unit):**
+
 - Placeholder/markup integrity check (existing Weblate check framework).
 - Glossary exact-match detection (deterministic regex/stem match against the 22-300 term glossary).
 - Length ratio, number preservation, untranslated-content detection.
 - Verdict: if any Critical-deterministic check fails (placeholder corruption, missing content), auto-reject without LLM. This eliminates ~40-60% of units from LLM cost.
 
 **Tier 1 - LLM Fallback for Glossary Morphology (cheap, only for Tier-0 glossary misses):**
+
 - When a glossary term is NOT found by exact/stem match, call an LLM to confirm whether a morphologically inflected form of the term is present and correct.
 - Binary pass/fail. This is the IFMTBench pattern `[verified: https://arxiv.org/html/2605.28218v1]`.
 - Use a different model family than the translator to avoid self-preference `[verified: https://arxiv.org/html/2410.21819v1]`.
 
 **Tier 2 - MQM-Span Judge (the primary quality verdict):**
+
 - Prompt: MQM-span-annotation with JSON-first structured output, severity-weighted (Critical=25/Major=5/Minor=1), using the EAPrompt two-step pattern (enumerate errors first, derive verdict second) `[verified: https://aclanthology.org/2024.findings-acl.520/]`.
 - Verdict mapping: Critical error -> Reject (auto-fail). Major error -> Flag (needs-editing). No errors or only Minor -> Pass.
 - Include the glossary in the prompt context so the judge evaluates terminology as an explicit MQM dimension (as M-MAD does with its Terminology dimension) `[verified: https://aclanthology.org/2025.acl-long.351/]`.
 - Single run per unit by default (cost). For flagged/rejected units, optionally re-run 3x and aggregate (GEMBA V2 pattern) to reduce false rejects before surfacing to stakeholders `[verified: https://aclanthology.org/2025.wmt-1.67/]`.
 
 **Tier 3 - Back-Translation as Display Artifact (not a scoring signal):**
+
 - Generate a back-translation into ru/en for every unit.
 - Display it to stakeholders in the Weblate UI (comment or custom field) alongside the MQM verdict, labeled "approximate reconstruction."
 - Do NOT derive any score from it. It exists purely so non-speakers can sanity-check meaning.
 
 **Tier 4 - CometKiwi as Complementary Drift Signal:**
+
 - Run CometKiwi (reference-free QE) on every unit as a cheap second opinion.
 - Escalate to Tier 2 re-judgment (or a stronger frontier model) when CometKiwi and the MQM judge disagree (QE flags but judge passes, or vice versa). This is the cascade-disagreement escalation from the FutureAGI pattern `[verified: https://futureagi.com/blog/evaluating-llm-translation-quality-2026/]`.
 - For low-resource languages (th, vi, hi, fa), CometKiwi is the more reliable signal than the LLM judge (per the LoResLM evidence), so weight the escalation toward QE there.
@@ -357,6 +365,7 @@ Back-translation should be retained as a Tier 3 display artifact (it is genuinel
 ### 7.6 Cost Estimate for 22-300 Term Glossary Scale
 
 Assuming ~5000 translatable units per game project:
+
 - Tier 0 (deterministic): ~free, catches ~40-60% -> ~2000-3000 units proceed to LLM.
 - Tier 1 (glossary fallback): only for glossary-miss units, likely <10% -> ~500 LLM calls.
 - Tier 2 (MQM judge): ~2000-3000 API calls (or sample 10% = ~500 calls if budget-constrained).
@@ -370,82 +379,89 @@ At frontier-model pricing (~$0.005-0.015/segment for structured MQM output), ful
 ## Sources Index
 
 ### Judge Architectures
-- GEMBA-MQM (Kocmi & Federmann, WMT 2023): https://aclanthology.org/2023.wmt-1.64/
-- AutoMQM / "The Devil Is in the Errors" (Fernandes et al., WMT 2023): https://aclanthology.org/2023.wmt-1.100/
-- EAPrompt (Findings ACL 2024): https://aclanthology.org/2024.findings-acl.520/
-- GEMBA-MQM V2 (WMT 2025): https://aclanthology.org/2025.wmt-1.67/
-- MQM-APE (COLING 2025): https://aclanthology.org/2025.coling-main.374/
-- M-MAD (ACL 2025): https://aclanthology.org/2025.acl-long.351/
-- HIMATE (Findings EMNLP 2025): https://aclanthology.org/2025.findings-emnlp.593.pdf
-- TASER (WMT 2025): https://aclanthology.org/2025.wmt-1.76.pdf
-- Rubric-MQM (ACL Industry 2025): https://aclanthology.org/2025.acl-industry.12/
-- "What do LLMs Need for MT Evaluation?" (EMNLP 2024): https://aclanthology.org/2024.emnlp-main.214/
-- WMT25 Shared Task Findings: https://aclanthology.org/2025.wmt-1.24/
-- WMT24 QE Shared Task Findings: https://aclanthology.org/2024.wmt-1.3/
-- LoResLM 2025 (low-resource LLM QE): https://aclanthology.org/2025.loreslm-1.33.pdf
-- Reference-less LLM QE for Indian languages: https://arxiv.org/html/2404.02512v1
-- How Good is Zero-Shot MT Eval for Low-Resource Indian Languages (ACL Short 2024): https://aclanthology.org/2024.acl-short.58/
-- CompactQE (2025): https://arxiv.org/html/2605.15763v1
-- Large Reasoning Models as MT Evaluators (NeurIPS 2025): https://arxiv.org/html/2510.20780v1
+
+- GEMBA-MQM (Kocmi & Federmann, WMT 2023): <https://aclanthology.org/2023.wmt-1.64/>
+- AutoMQM / "The Devil Is in the Errors" (Fernandes et al., WMT 2023): <https://aclanthology.org/2023.wmt-1.100/>
+- EAPrompt (Findings ACL 2024): <https://aclanthology.org/2024.findings-acl.520/>
+- GEMBA-MQM V2 (WMT 2025): <https://aclanthology.org/2025.wmt-1.67/>
+- MQM-APE (COLING 2025): <https://aclanthology.org/2025.coling-main.374/>
+- M-MAD (ACL 2025): <https://aclanthology.org/2025.acl-long.351/>
+- HIMATE (Findings EMNLP 2025): <https://aclanthology.org/2025.findings-emnlp.593.pdf>
+- TASER (WMT 2025): <https://aclanthology.org/2025.wmt-1.76.pdf>
+- Rubric-MQM (ACL Industry 2025): <https://aclanthology.org/2025.acl-industry.12/>
+- "What do LLMs Need for MT Evaluation?" (EMNLP 2024): <https://aclanthology.org/2024.emnlp-main.214/>
+- WMT25 Shared Task Findings: <https://aclanthology.org/2025.wmt-1.24/>
+- WMT24 QE Shared Task Findings: <https://aclanthology.org/2024.wmt-1.3/>
+- LoResLM 2025 (low-resource LLM QE): <https://aclanthology.org/2025.loreslm-1.33.pdf>
+- Reference-less LLM QE for Indian languages: <https://arxiv.org/html/2404.02512v1>
+- How Good is Zero-Shot MT Eval for Low-Resource Indian Languages (ACL Short 2024): <https://aclanthology.org/2024.acl-short.58/>
+- CompactQE (2025): <https://arxiv.org/html/2605.15763v1>
+- Large Reasoning Models as MT Evaluators (NeurIPS 2025): <https://arxiv.org/html/2510.20780v1>
 
 ### Back-Translation / Round-Trip
-- QE via Backtranslation (WMT 2022): https://aclanthology.org/2022.wmt-1.54/
-- Rethinking RTT for MT Evaluation (Findings ACL 2023): https://aclanthology.org/2023.findings-acl.22/
-- Revisiting RTT for QE (EAMT 2020): https://aclanthology.org/2020.eamt-1.11.pdf
-- RTT efficacy survey: https://translationjournal.net/journal/51reverse.htm
-- RTT: What Is It Good For? (ACL 2005): https://aclanthology.org/U05-1019.pdf
-- Backtranslation Score (ACL 2009): https://aclanthology.org/P09-2034.pdf
-- On Evaluation of MT Trained with Back-Translation (ACL 2020): https://aclanthology.org/2020.acl-main.253/
+
+- QE via Backtranslation (WMT 2022): <https://aclanthology.org/2022.wmt-1.54/>
+- Rethinking RTT for MT Evaluation (Findings ACL 2023): <https://aclanthology.org/2023.findings-acl.22/>
+- Revisiting RTT for QE (EAMT 2020): <https://aclanthology.org/2020.eamt-1.11.pdf>
+- RTT efficacy survey: <https://translationjournal.net/journal/51reverse.htm>
+- RTT: What Is It Good For? (ACL 2005): <https://aclanthology.org/U05-1019.pdf>
+- Backtranslation Score (ACL 2009): <https://aclanthology.org/P09-2034.pdf>
+- On Evaluation of MT Trained with Back-Translation (ACL 2020): <https://aclanthology.org/2020.acl-main.253/>
 
 ### Reference-Free QE
-- CometKiwi (WMT 2022): https://aclanthology.org/2022.wmt-1.60/
-- Scaling CometKiwi (WMT 2023): https://aclanthology.org/2023.wmt-1.73/
-- CometKiwi-DA model card: https://huggingface.co/Unbabel/wmt22-cometkiwi-da
-- MetricX-24 (WMT 2024): https://aclanthology.org/2024.wmt-1.35.pdf
-- Reference-less QE for resource-scarce scenarios (MDPI 2025): https://www.mdpi.com/2078-2489/16/10/916
+
+- CometKiwi (WMT 2022): <https://aclanthology.org/2022.wmt-1.60/>
+- Scaling CometKiwi (WMT 2023): <https://aclanthology.org/2023.wmt-1.73/>
+- CometKiwi-DA model card: <https://huggingface.co/Unbabel/wmt22-cometkiwi-da>
+- MetricX-24 (WMT 2024): <https://aclanthology.org/2024.wmt-1.35.pdf>
+- Reference-less QE for resource-scarce scenarios (MDPI 2025): <https://www.mdpi.com/2078-2489/16/10/916>
 
 ### Verdict Design / Calibration / Bias
-- MQM scoring models: https://www.themqm.org/mqm-pillars/the-mqm-scoring-models/
-- MQM concrete example with formulas: https://themqm.org/introduction-to-tqe/concrete-example-with-formulas/
-- MQM scoring models and SQC (arXiv 2024): https://arxiv.org/html/2405.16969v5
-- "LLMs are not Fair Evaluators" / FairEval (ACL 2024): https://aclanthology.org/2024.acl-long.511.pdf
-- OffsetBias / EvalBiasBench (Findings EMNLP 2024): https://aclanthology.org/2024.findings-emnlp.57/
-- Length bias in LLM preference eval (arXiv 2024): https://arxiv.org/html/2407.01085
-- Self-Preference Bias in LLM-as-a-Judge (arXiv 2024): https://arxiv.org/html/2410.21819v1
-- LLM Evaluators Recognize Their Own Generations (NeurIPS 2024): https://proceedings.neurips.cc/paper_files/paper/2024/file/7f1f0218e45f5414c79c0679633e47bc-Paper-Conference.pdf
-- Deconstructing Self-Bias in LLM Translation Benchmarks (arXiv 2025): https://arxiv.org/html/2509.26600v1
-- LLMs for Literary Translation Eval (arXiv 2024): https://arxiv.org/html/2410.18697
-- PORTIA / Split and Merge (EMNLP 2024): https://aclanthology.org/2024.emnlp-main.621.pdf
-- Position Bias in LLM Judges (arXiv 2024): https://arxiv.org/html/2406.07791
-- Systematic Evaluation of LLM-as-a-Judge (arXiv 2024): https://arxiv.org/html/2408.13006v2
-- Mitigating Bias of LLM Evaluation (CCL 2024): https://aclanthology.org/2024.ccl-1.101/
+
+- MQM scoring models: <https://www.themqm.org/mqm-pillars/the-mqm-scoring-models/>
+- MQM concrete example with formulas: <https://themqm.org/introduction-to-tqe/concrete-example-with-formulas/>
+- MQM scoring models and SQC (arXiv 2024): <https://arxiv.org/html/2405.16969v5>
+- "LLMs are not Fair Evaluators" / FairEval (ACL 2024): <https://aclanthology.org/2024.acl-long.511.pdf>
+- OffsetBias / EvalBiasBench (Findings EMNLP 2024): <https://aclanthology.org/2024.findings-emnlp.57/>
+- Length bias in LLM preference eval (arXiv 2024): <https://arxiv.org/html/2407.01085>
+- Self-Preference Bias in LLM-as-a-Judge (arXiv 2024): <https://arxiv.org/html/2410.21819v1>
+- LLM Evaluators Recognize Their Own Generations (NeurIPS 2024): <https://proceedings.neurips.cc/paper_files/paper/2024/file/7f1f0218e45f5414c79c0679633e47bc-Paper-Conference.pdf>
+- Deconstructing Self-Bias in LLM Translation Benchmarks (arXiv 2025): <https://arxiv.org/html/2509.26600v1>
+- LLMs for Literary Translation Eval (arXiv 2024): <https://arxiv.org/html/2410.18697>
+- PORTIA / Split and Merge (EMNLP 2024): <https://aclanthology.org/2024.emnlp-main.621.pdf>
+- Position Bias in LLM Judges (arXiv 2024): <https://arxiv.org/html/2406.07791>
+- Systematic Evaluation of LLM-as-a-Judge (arXiv 2024): <https://arxiv.org/html/2408.13006v2>
+- Mitigating Bias of LLM Evaluation (CCL 2024): <https://aclanthology.org/2024.ccl-1.101/>
 
 ### Terminology Validation
-- IFMTBench (arXiv 2025): https://arxiv.org/html/2605.28218v1
-- CoTERM (LREC 2026): https://lrec.elra.info/lrec2026-main-682
-- Automated Terminology Consistency Metric (WMT 2022): https://aclanthology.org/2022.wmt-1.41.pdf
-- Morphology-Aware Source Term Masking (Findings EACL 2024): https://aclanthology.org/2024.findings-eacl.117.pdf
-- Target Lemma Annotations (EACL 2021): https://aclanthology.org/2021.eacl-main.271.pdf
-- Coming to Terms with Glossary Enforcement (EAMT 2023): https://aclanthology.org/2023.eamt-1.34.pdf
-- Glossary enforcement in MT (arXiv 2021): https://ar5iv.labs.arxiv.org/html/2106.11891
-- Hybrid Fallback Term Injection in Low-Resource (LoResMT 2026): https://aclanthology.org/2026.loresmt-1.6/
-- AI Translation with Glossary Support (Lokalise): https://lokalise.com/blog/ai-translation-glossary/
+
+- IFMTBench (arXiv 2025): <https://arxiv.org/html/2605.28218v1>
+- CoTERM (LREC 2026): <https://lrec.elra.info/lrec2026-main-682>
+- Automated Terminology Consistency Metric (WMT 2022): <https://aclanthology.org/2022.wmt-1.41.pdf>
+- Morphology-Aware Source Term Masking (Findings EACL 2024): <https://aclanthology.org/2024.findings-eacl.117.pdf>
+- Target Lemma Annotations (EACL 2021): <https://aclanthology.org/2021.eacl-main.271.pdf>
+- Coming to Terms with Glossary Enforcement (EAMT 2023): <https://aclanthology.org/2023.eamt-1.34.pdf>
+- Glossary enforcement in MT (arXiv 2021): <https://ar5iv.labs.arxiv.org/html/2106.11891>
+- Hybrid Fallback Term Injection in Low-Resource (LoResMT 2026): <https://aclanthology.org/2026.loresmt-1.6/>
+- AI Translation with Glossary Support (Lokalise): <https://lokalise.com/blog/ai-translation-glossary/>
 
 ### Cost / Latency / Cascade
-- Evaluating LLM Translation Quality (FutureAGI, 2026): https://futureagi.com/blog/evaluating-llm-translation-quality-2026/
-- Translate Smart, not Hard (arXiv 2025): https://arxiv.org/html/2502.12701
-- RouteLMT (arXiv 2025): https://arxiv.org/html/2604.22520v1
-- TQLite (arXiv 2025): https://arxiv.org/html/2608.02975
-- Tuning LLM Judge Design Decisions (AutoML 2025): https://proceedings.mlr.press/v267/salinas25a.html
-- Cost/Quality Balance in AI Translation Eval (Slator): https://slator.com/how-to-balance-cost-quality-in-ai-translation-evaluation/
-- Is Escalation Worth It? LLM Cascades (arXiv 2025): https://arxiv.org/html/2605.06350
+
+- Evaluating LLM Translation Quality (FutureAGI, 2026): <https://futureagi.com/blog/evaluating-llm-translation-quality-2026/>
+- Translate Smart, not Hard (arXiv 2025): <https://arxiv.org/html/2502.12701>
+- RouteLMT (arXiv 2025): <https://arxiv.org/html/2604.22520v1>
+- TQLite (arXiv 2025): <https://arxiv.org/html/2608.02975>
+- Tuning LLM Judge Design Decisions (AutoML 2025): <https://proceedings.mlr.press/v267/salinas25a.html>
+- Cost/Quality Balance in AI Translation Eval (Slator): <https://slator.com/how-to-balance-cost-quality-in-ai-translation-evaluation/>
+- Is Escalation Worth It? LLM Cascades (arXiv 2025): <https://arxiv.org/html/2605.06350>
 
 ### Game Localization
-- AI-Driven Game Localization Case Study (Springer 2025): https://link.springer.com/chapter/10.1007/978-981-95-4798-2_8
-- Loxily AI LQA Scoring Framework: https://loxily.com/en/blog/ai-lqa-scoring-framework
-- Game Localization QA Checklist (Loxily): https://loxily.com/en/blog/game-localization-qa-checklist
-- Godot-AI-Localizer: https://github.com/reprodev/Godot-AI-Localizer
-- L10n-Audit-Toolkit: https://wael-daaboul.github.io/L10n-Audit-Toolkit/
-- VistatecVerifier: https://www.vistatec.com/services/vistatecverifier/
-- Gridly AI Translation Guide: https://www.gridly.com/blog/ai-translation-game-localization/
-- Gridly AI-Assisted Game LQA: https://www.gridly.com/blog/ai-assisted-game-lqa-transformation-localization-quality-assurance/
+
+- AI-Driven Game Localization Case Study (Springer 2025): <https://link.springer.com/chapter/10.1007/978-981-95-4798-2_8>
+- Loxily AI LQA Scoring Framework: <https://loxily.com/en/blog/ai-lqa-scoring-framework>
+- Game Localization QA Checklist (Loxily): <https://loxily.com/en/blog/game-localization-qa-checklist>
+- Godot-AI-Localizer: <https://github.com/reprodev/Godot-AI-Localizer>
+- L10n-Audit-Toolkit: <https://wael-daaboul.github.io/L10n-Audit-Toolkit/>
+- VistatecVerifier: <https://www.vistatec.com/services/vistatecverifier/>
+- Gridly AI Translation Guide: <https://www.gridly.com/blog/ai-translation-game-localization/>
+- Gridly AI-Assisted Game LQA: <https://www.gridly.com/blog/ai-assisted-game-lqa-transformation-localization-quality-assurance/>

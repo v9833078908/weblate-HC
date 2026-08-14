@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""
+r"""
 Size the autofix backfill and the proposed terminal rule on a whole instance.
 
 Read-only: every autofix and check used here is pure, nothing is saved. Run it
@@ -118,7 +118,9 @@ def candidate_units():
         .exclude(translation__component__is_glossary=True)
         # A source translation is not a translation; repairing it would rewrite
         # the corpus the checks compare against.
-        .exclude(translation__language_id=F("translation__component__source_language_id"))
+        .exclude(
+            translation__language_id=F("translation__component__source_language_id")
+        )
         .select_related(
             "translation",
             "translation__language",

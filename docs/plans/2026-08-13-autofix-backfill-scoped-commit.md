@@ -20,6 +20,7 @@ PendingUnitChange/Translation/Component модели, Git backend, pytest.
 ## Задача 1. Зафиксировать безопасный scope и решение по `:`
 
 **Файлы:**
+
 - Modify: `weblate_customization/tests/test_autofixes.py`
 - Modify: `weblate_customization/src/weblate_customization/autofixes.py`
 - Test: `weblate/trans/tests/test_commands.py`
@@ -66,6 +67,7 @@ git commit -m "fix(autofixes): keep colons and source translations unchanged"
 ## Задача 2. Выделить scoped pending commit без VCS-коммита
 
 **Файлы:**
+
 - Modify: `weblate/trans/models/translation.py`
 - Modify: `weblate/trans/models/component.py`
 - Test: `weblate/trans/tests/test_commands.py`
@@ -138,6 +140,7 @@ git commit -m "fix(trans): commit scoped autofix pending changes once"
 ## Задача 3. Применить exact pending snapshot под row locks
 
 **Файлы:**
+
 - Modify: `weblate/trans/management/commands/reapply_autofixes.py`
 - Test: `weblate/trans/tests/test_commands.py`
 
@@ -190,6 +193,7 @@ git commit -m "fix(trans): isolate autofix backfill pending changes"
 ## Задача 4. Синхронизировать contract и провести верификацию
 
 **Файлы:**
+
 - Modify: `docs/admin/management.rst`
 - Modify: `docs/changes.rst`
 - Modify: `docs/misc/autofix-terminal-punctuation.md`

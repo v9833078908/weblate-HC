@@ -118,6 +118,7 @@ Sniffer не просто не чинит `;` — он падает и на за
 **Связность.** `reader` не должен зависеть от `infer` (сегодня зависимости нет, и `infer` — слой выше). Поэтому распознавание кода и header выносится в новый модуль `loc_kit_ingest/langcode.py`, который импортируют оба. Вариант «детектить в pipeline» отвергнут: у `read_sheets` три вызывающих (`weblate/trans/views/create.py:673`, `:1054`, CLI `pipeline`), детект уехал бы в три места.
 
 **Files:**
+
 - Create: `loc_kit_ingest/langcode.py`
 - Modify: `loc_kit_ingest/infer.py:21-35,146-165` (shared matcher вместо локальной логики), `loc_kit_ingest/reader.py:22` (константа), `:29-43` (`read_sheets`), новая `_detect_delimiter`
 - Test: `loc_kit_ingest/tests/test_reader.py`
@@ -266,6 +267,7 @@ _DELIMITER_SCAN_ROWS = 20
 ```
 
 Новая функция рядом с `_read_csv`:
+
 ```python
 
 def _detect_delimiter(path: Path) -> str:
@@ -325,6 +327,7 @@ for name in ['heart_abyss_glossary_temple.csv', 'heart_abyss_glossary.csv', 'hea
     print(name, rows[0][:4], len(rows))
 "
 ```
+
 Expected: у всех трёх первая строка разобрана на колонки (`['ru', 'en', 'notes'…]` / `['id', 'ru', 'en'…]`), а не одной ячейкой.
 
 **Step 7: commit**
@@ -342,6 +345,7 @@ git commit -m "feat(loc-kit): pick the CSV delimiter that makes the header recog
 ### Task 2: закрытая таблица алиасов вендорных кодов
 
 **Files:**
+
 - Modify: `loc_kit_ingest/langcode.py` (`_LANGUAGE_ALIASES`, `known_language`)
 - Test: `loc_kit_ingest/tests/test_infer_glossary.py`
 
@@ -415,6 +419,7 @@ git commit -m "feat(loc-kit): alias vendor Chinese codes to canonical Weblate co
 Оба поля аддитивны и опциональны: профиль без них парсится ровно как сегодня (`ignored_columns=()`, `allow_empty_targets=False`), версия схемы не меняется.
 
 **Files:**
+
 - Modify: `loc_kit_ingest/profile.py:103-112` (`_RECORD_MAP_GRAMMAR_FIELDS`), `:188-203` (dataclasses), `:591-699` (`_parse_record_map_grammar`), `:702-740` (`_check_record_map_field_locations`)
 - Test: `loc_kit_ingest/tests/test_profile_v2.py`
 
@@ -662,6 +667,7 @@ git commit -m "feat(loc-kit): declare ignored columns and empty targets in v2 gr
 Без этого профиль, переиспользованный на другом экспорте, молча пропустит уже другую колонку — ровно та потеря данных, которую запрещает спека.
 
 **Files:**
+
 - Modify: `loc_kit_ingest/reader.py:141-156` (record-map-ветка `validate_sheet_headers`)
 - Test: `loc_kit_ingest/tests/test_reader.py`
 
@@ -753,6 +759,7 @@ git commit -m "feat(loc-kit): validate ignored column headers against the sheet"
 ### Task 5: record-map чтит `ignored_columns`
 
 **Files:**
+
 - Modify: `loc_kit_ingest/parser.py:623-625` (локальные множества), `:693` (`allowed` caption-строки), `:788-800` (проверка непокрытых ячеек)
 - Test: `loc_kit_ingest/tests/test_parser_tbx.py`
 
@@ -889,6 +896,7 @@ git commit -m "feat(loc-kit): record-map parser consumes declared ignored column
 v1 `_parse_pairs` (`parser.py:490-502`) **не трогается**: ручные v1-профили остаются строгими.
 
 **Files:**
+
 - Modify: `loc_kit_ingest/parser.py:749-755` (только record-map)
 - Test: `loc_kit_ingest/tests/test_parser_tbx.py`
 
@@ -964,6 +972,7 @@ git commit -m "feat(loc-kit): allow blank record-map targets behind an explicit 
 ### Task 7: техническая колонка (`id`) объявляется игнорируемой; остальное по-прежнему отказ
 
 **Files:**
+
 - Modify: `loc_kit_ingest/infer.py:643-662` (блок unmapped), `:770-775` (эмит grammar), новая константа рядом с `_NOTE_HEADERS` (`:50-76`)
 - Test: `loc_kit_ingest/tests/test_infer_glossary.py`
 
@@ -1075,6 +1084,7 @@ git commit -m "feat(loc-kit): declare a technical id column as ignored, refuse t
 Числовой guard и порог `min_fill` **сохраняются и применяются к term-строкам target-языка**: убирается только требование «target заполнен в каждой строке-записи». Колонка, содержащая только descriptions и ни одного target-term, по-прежнему отказ: иначе импорт создаст пустой TBX-язык и замаскирует неверную раскладку.
 
 **Files:**
+
 - Modify: `loc_kit_ingest/infer.py:742-768` (сбор целей), `:770-775` (эмит `allow_empty_targets`), `:777-811` (paired-ветка)
 - Test: `loc_kit_ingest/tests/test_infer_glossary.py`
 
@@ -1232,6 +1242,7 @@ git commit -m "feat(loc-kit): import partially translated glossary target langua
 ### Task 9: сквозной standalone-прогон трёх реальных форм
 
 **Files:**
+
 - Test: `loc_kit_ingest/tests/test_infer_glossary.py` (без БД)
 
 **Step 1: написать тесты**
@@ -1341,6 +1352,7 @@ for name in [
     print(name, comp['source_lang'], comp['initial_target_languages'], len(notes))
 "
 ```
+
 Expected: все три разбираются; у второго и третьего среди целей `zh_Hant`, у второго `ignored_columns` содержит `id`.
 
 **Step 4: commit**
@@ -1355,6 +1367,7 @@ git commit -m "test(loc-kit): real kit shapes infer and survive TBX round-trip"
 ### Task 10: контрактная матрица в Weblate (upload → превью → живой компонент)
 
 **Files:**
+
 - Modify: `weblate/trans/tests/test_loc_kit_ingest_contract.py` (фикстуры рядом с `:526-559`, тесты в `LocKitGlossaryUploadUITest`)
 
 **Step 1: подготовить host-side Django runner**
@@ -1489,6 +1502,7 @@ def test_id_partial_kit_creates_a_component_with_untranslated_terms(self) -> Non
 uv run pytest weblate/trans/tests/test_loc_kit_ingest_contract.py \
   -k "semicolon or id_partial" -n0
 ```
+
 Expected: PASS. При массовых setup-ошибках сначала `docker stats --no-stream` — обычная причина не код, а нехватка памяти из-за чужих контейнеров.
 
 **Step 4: commit**
@@ -1505,6 +1519,7 @@ git commit -m "test(loc-kit): contract matrix for semicolon, id column and parti
 Ручной и LLM-путь держатся на том, что `GLOSSARY_CSV` (`domain,ru,en,note_ru,note_en`) детерминированно **не** разбирается. Ни `domain`, ни `note_ru`/`note_en` не входят в `_NOTE_HEADERS` (`infer.py:50-76`) и не входят в `_IGNORABLE_HEADERS`, поэтому отказ сохраняется — но это надо доказать прогоном, а не рассуждением.
 
 **Files:**
+
 - Modify: `weblate/trans/tests/test_loc_kit_ingest_contract.py:533-536` (комментарий у фикстуры)
 
 **Step 1: прогнать зависящие тесты**
@@ -1514,7 +1529,9 @@ git commit -m "test(loc-kit): contract matrix for semicolon, id column and parti
 ```bash
 uv run pytest weblate/trans/tests/test_loc_kit_ingest_contract.py -n0
 ```
+
 Expected: PASS, в том числе:
+
 - `test_glossary_upload_creates_a_draft_and_asks_for_a_sheet` (`:689-702`, ждёт `SHEET_SELECTED`),
 - `test_disabled_analyzer_offers_manual_profile_upload` (`:875-886`),
 - `test_sheet_selection_is_not_rate_limited_without_analysis` (`:917-948`),
@@ -1548,6 +1565,7 @@ git commit -m "test(loc-kit): pin the manual-profile fixture to the refusal cont
 ### Task 12: changelog, спецификация, threat model
 
 **Files:**
+
 - Modify: `docs/changes.rst` (верхняя нерелизная секция), `docs/specs/loc-kit-ingest.md`, `docs/security/threat-model.rst`
 
 **Step 1: changelog**
@@ -1607,6 +1625,7 @@ uv run prek run --files \
 uv run pylint loc_kit_ingest/
 uv run mypy --show-column-numbers weblate scripts/*.py ./*.py | ./scripts/filter-mypy.sh
 ```
+
 Expected: без новых ошибок. Удалять только имена, осиротевшие этой серией
 изменений, и отдельным `refactor(loc-kit): …` commit.
 

@@ -3,7 +3,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""S&T2 summer-update zh_Hans: run the collegium on every unit and compare to current state.
+"""
+S&T2 summer-update zh_Hans: run the collegium on every unit and compare to current state.
 
 Reuses the judge infrastructure from col4-judge-eval.py.
 
@@ -39,8 +40,14 @@ SEVERITY_RANK = {"minor": 1, "major": 2, "critical": 3}
 VERDICT_BY_SEVERITY = {0: "pass", 1: "pass", 2: "flag", 3: "reject"}
 
 CATEGORIES = (
-    "terminology", "mistranslation", "omission", "addition",
-    "fluency", "punctuation", "markup", "register",
+    "terminology",
+    "mistranslation",
+    "omission",
+    "addition",
+    "fluency",
+    "punctuation",
+    "markup",
+    "register",
 )
 
 SYSTEM_PROMPT = """\
@@ -267,9 +274,7 @@ def render_segment(index: int, record: Record) -> dict[str, Any]:
     if record.checks:
         segment["checks"] = record.checks
     if record.glossary:
-        segment["glossary"] = [
-            {"source": s, "target": t} for s, t in record.glossary
-        ]
+        segment["glossary"] = [{"source": s, "target": t} for s, t in record.glossary]
     if record.family:
         segment["family"] = [
             {"key": k, "source_ru": s, "target_zh": t} for k, s, t in record.family
@@ -331,7 +336,10 @@ def build_payload(model: str, batch: list[Record]) -> dict[str, Any]:
 
 
 def judge_batch(
-    model: str, batch: list[Record], api_key: str, timeout: int,
+    model: str,
+    batch: list[Record],
+    api_key: str,
+    timeout: int,
 ) -> tuple[list[Verdict], Usage]:
     usage = Usage(records=len(batch))
     payload = build_payload(model, batch)
@@ -372,19 +380,20 @@ def judge_batch(
         if attempt == 0:
             usage.retries += 1
             continue
-        else:
-            usage.unparsed += len(batch)
-            return [UNPARSED] * len(batch), usage
+        usage.unparsed += len(batch)
+        return [UNPARSED] * len(batch), usage
 
     return [UNPARSED] * len(batch), usage
 
 
 def judge(
-    model: str, records: list[Record], api_key: str, batch_size: int, timeout: int,
+    model: str,
+    records: list[Record],
+    api_key: str,
+    batch_size: int,
+    timeout: int,
 ) -> tuple[dict[str, Verdict], Usage]:
-    batches = [
-        records[i : i + batch_size] for i in range(0, len(records), batch_size)
-    ]
+    batches = [records[i : i + batch_size] for i in range(0, len(records), batch_size)]
     results: dict[str, Verdict] = {}
     total = Usage()
 
@@ -393,14 +402,15 @@ def judge(
         total.merge(batch_usage)
         for record, verdict in zip(batch, batch_verdicts):
             results[record.record_id] = verdict
-        print(f"  batch {i+1}/{len(batches)} done  ", end="\r", file=sys.stderr)
+        print(f"  batch {i + 1}/{len(batches)} done  ", end="\r", file=sys.stderr)
 
-    print("", file=sys.stderr)
+    print(file=sys.stderr)
     return results, total
 
 
 def max_severity_union(
-    v1: dict[str, Verdict], v2: dict[str, Verdict],
+    v1: dict[str, Verdict],
+    v2: dict[str, Verdict],
 ) -> dict[str, Verdict]:
     result: dict[str, Verdict] = {}
     for rid in v1:
@@ -493,11 +503,11 @@ def merge_and_report(
     union = max_severity_union(v1, v2)
     cu = Counter(v.verdict for v in union.values())
 
-    print(f"\n--- Individual verdicts ---")
+    print("\n--- Individual verdicts ---")
     print(f"  {label1}: {dict(c1)}")
     print(f"  {label2}: {dict(c2)}")
 
-    print(f"\n--- Collegium (max severity) ---")
+    print("\n--- Collegium (max severity) ---")
     print(f"  verdicts: {dict(cu)}")
 
     sev_counter: Counter[str] = Counter()
@@ -509,18 +519,16 @@ def merge_and_report(
     print(f"  errors by severity: {dict(sev_counter)}")
     print(f"  errors by category: {dict(cat_counter)}")
 
-    agree = sum(
-        1 for rid in v1 if v1[rid].verdict == v2.get(rid, UNPARSED).verdict
+    agree = sum(1 for rid in v1 if v1[rid].verdict == v2.get(rid, UNPARSED).verdict)
+    print(
+        f"\n  judge agreement: {agree}/{len(records)} "
+        f"({100 * agree / len(records):.1f}%)"
     )
-    print(f"\n  judge agreement: {agree}/{len(records)} "
-          f"({100 * agree / len(records):.1f}%)")
     only_j1 = sum(
-        1 for rid in v1
-        if v1[rid].needs_human and not v2.get(rid, UNPARSED).needs_human
+        1 for rid in v1 if v1[rid].needs_human and not v2.get(rid, UNPARSED).needs_human
     )
     only_j2 = sum(
-        1 for rid in v2
-        if v2[rid].needs_human and not v1.get(rid, UNPARSED).needs_human
+        1 for rid in v2 if v2[rid].needs_human and not v1.get(rid, UNPARSED).needs_human
     )
     print(f"  only {label1} flags: {only_j1}")
     print(f"  only {label2} flags: {only_j2}")
@@ -528,28 +536,32 @@ def merge_and_report(
     flagged = sum(1 for v in union.values() if v.needs_human)
     rejected = sum(1 for v in union.values() if v.is_reject)
     critical_errors = sum(
-        1 for v in union.values()
-        for e in v.errors if e.get("severity") == "critical"
+        1 for v in union.values() for e in v.errors if e.get("severity") == "critical"
     )
 
-    print(f"\n--- Comparison: judges vs current state ---")
+    print("\n--- Comparison: judges vs current state ---")
     print(f"  Current state: all {len(records)} units at state=20 (translated)")
-    print(f"  Current failing checks: 0")
-    print(f"  Judges would flag: {flagged}/{len(records)} "
-          f"({100 * flagged / len(records):.1f}%)")
-    print(f"  Judges would reject: {rejected}/{len(records)} "
-          f"({100 * rejected / len(records):.1f}%)")
+    print("  Current failing checks: 0")
+    print(
+        f"  Judges would flag: {flagged}/{len(records)} "
+        f"({100 * flagged / len(records):.1f}%)"
+    )
+    print(
+        f"  Judges would reject: {rejected}/{len(records)} "
+        f"({100 * rejected / len(records):.1f}%)"
+    )
     print(f"  Critical errors found: {critical_errors}")
-    print(f"  Auto-pass rate (judged): "
-          f"{100 * (len(records) - flagged) / len(records):.1f}%")
+    print(
+        f"  Auto-pass rate (judged): "
+        f"{100 * (len(records) - flagged) / len(records):.1f}%"
+    )
 
-    print(f"\n--- Non-pass units ---")
+    print("\n--- Non-pass units ---")
     for record in records:
         v = union.get(record.record_id, UNPARSED)
         if not v.needs_human:
             continue
-        print(f"\n  [{record.record_id}] verdict={v.verdict} "
-              f"ctx={record.context}")
+        print(f"\n  [{record.record_id}] verdict={v.verdict} ctx={record.context}")
         print(f"    src: {record.source[:120]}")
         print(f"    tgt: {record.target[:120]}")
         for err in v.errors:
@@ -557,6 +569,7 @@ def merge_and_report(
             cat = err.get("category", "?")
             span = err.get("span", "")[:80]
             print(f"    [{sev}] {cat}: {span}")
+
 
 GLOSSARY_URL = (
     "https://l10n.herocraft.com/api/translations/"
@@ -589,7 +602,8 @@ def load_glossary(cache: str) -> list[tuple[str, str]]:
 
 
 def attach_glossary(records: list[Record], terms: list[tuple[str, str]]) -> None:
-    """Mirror of weblate.glossary.models.get_glossary_terms: match on the source.
+    """
+    Mirror of weblate.glossary.models.get_glossary_terms: match on the source.
 
     Whether the target honours the term is the judge's business, not ours;
     the segment carries every term the source mentions.
@@ -608,7 +622,8 @@ def attach_glossary(records: list[Record], terms: list[tuple[str, str]]) -> None
 
 
 def attach_family(records: list[Record], limit: int) -> None:
-    """Neighbours whose key shares a prefix, so drift across a family is visible.
+    """
+    Neighbours whose key shares a prefix, so drift across a family is visible.
 
     Ranking is by shared leading key tokens first, then by a shared trailing
     token: ``ID_USER_LOST_ARMED_PROVINCE_NAME`` must reach
@@ -629,8 +644,11 @@ def attach_family(records: list[Record], limit: int) -> None:
         mine = tokens[record.record_id]
         ranked = sorted(
             (
-                (-score(mine, tokens[other.record_id]),
-                 abs(other.position - record.position), other)
+                (
+                    -score(mine, tokens[other.record_id]),
+                    abs(other.position - record.position),
+                    other,
+                )
                 for other in records
                 if other.record_id != record.record_id
                 and score(mine, tokens[other.record_id]) >= 4
@@ -660,29 +678,40 @@ def main() -> None:
         help="Save per-unit verdicts as JSON",
     )
     parser.add_argument(
-        "--merge", nargs=2, metavar=("FILE1", "FILE2"),
+        "--merge",
+        nargs=2,
+        metavar=("FILE1", "FILE2"),
         help="Merge two saved verdict JSON files and print the union",
     )
     parser.add_argument("--model1", default="deepseek/deepseek-v4-pro")
     parser.add_argument("--model2", default="qwen/qwen3-235b-a22b-2507")
     parser.add_argument(
-        "--glossary", action="store_true",
+        "--glossary",
+        action="store_true",
         help="Attach project glossary terms matching each source",
     )
     parser.add_argument(
-        "--glossary-cache", default="/tmp/st2_glossary.json",
+        "--glossary-cache",
+        default="/tmp/st2_glossary.json",
         help="Where the fetched glossary is cached",
     )
     parser.add_argument(
-        "--siblings", type=int, default=0, metavar="N",
+        "--siblings",
+        type=int,
+        default=0,
+        metavar="N",
         help="Attach up to N key-family neighbours as reference context",
     )
     args = parser.parse_args()
 
     if args.merge:
         records = load_units(args.input)
-        v1 = verdicts_from_dict(json.loads(open(args.merge[0], encoding="utf-8").read()))
-        v2 = verdicts_from_dict(json.loads(open(args.merge[1], encoding="utf-8").read()))
+        v1 = verdicts_from_dict(
+            json.loads(open(args.merge[0], encoding="utf-8").read())
+        )
+        v2 = verdicts_from_dict(
+            json.loads(open(args.merge[1], encoding="utf-8").read())
+        )
         merge_and_report(records, v1, v2, args.merge[0], args.merge[1])
         return
 
@@ -699,9 +728,11 @@ def main() -> None:
 
     print(f"Loaded {len(records)} units")
     print(f"  states: {dict(Counter(r.state for r in records))}")
-    print(f"  source len: min={min(len(r.source) for r in records)} "
-          f"max={max(len(r.source) for r in records)} "
-          f"avg={sum(len(r.source) for r in records) // len(records)}")
+    print(
+        f"  source len: min={min(len(r.source) for r in records)} "
+        f"max={max(len(r.source) for r in records)} "
+        f"avg={sum(len(r.source) for r in records) // len(records)}"
+    )
 
     if args.dry_run:
         print("Dry run complete. No LLM calls made.")
@@ -723,8 +754,10 @@ def main() -> None:
         c = Counter(x.verdict for x in v.values())
         print(f"  verdicts: {dict(c)}")
         print(f"  unparsed: {u.unparsed}")
-        print(f"  cost: ${u.cost_usd:.4f}  time: {elapsed:.1f}s  "
-              f"prompt: {u.prompt_tokens}  completion: {u.completion_tokens}")
+        print(
+            f"  cost: ${u.cost_usd:.4f}  time: {elapsed:.1f}s  "
+            f"prompt: {u.prompt_tokens}  completion: {u.completion_tokens}"
+        )
 
         if args.save_to:
             with open(args.save_to, "w", encoding="utf-8") as f:
@@ -752,7 +785,7 @@ def main() -> None:
     merge_and_report(records, v1, v2, args.model1, args.model2)
 
     total_cost = u1.cost_usd + u2.cost_usd
-    print(f"\n--- Cost ---")
+    print("\n--- Cost ---")
     print(f"  Judge 1: ${u1.cost_usd:.4f}")
     print(f"  Judge 2: ${u2.cost_usd:.4f}")
     print(f"  Total: ${total_cost:.4f}")

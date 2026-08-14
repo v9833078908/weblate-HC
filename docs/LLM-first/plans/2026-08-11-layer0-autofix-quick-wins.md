@@ -138,7 +138,7 @@ pytest, PostgreSQL, git-бэкенд Weblate.
 
 ## Граф задач
 
-```
+```text
 Задача 1  решение по ":" (замер готов, нужен вердикт владельца)
     |
 Задача 2  автофикс терминала  ──────────────┐
@@ -207,6 +207,7 @@ pytest, PostgreSQL, git-бэкенд Weblate.
 ## Задача 2. Автофикс терминала `!`, `?`, `:` (D1, D16, D11)
 
 **Files:**
+
 - Modify: `weblate_customization/src/weblate_customization/autofixes.py:14-32,58-90`
 - Test: `weblate_customization/tests/test_autofixes.py:65-119`
 
@@ -490,6 +491,7 @@ git commit -m "feat(autofixes): remove added terminal punctuation, not only the 
 реестра.
 
 **Files:**
+
 - Modify: `weblate/trans/autofixes/__init__.py:38-48`
 - Test: `weblate/trans/tests/test_autofix.py`
 
@@ -583,6 +585,7 @@ git commit -m "feat(autofixes): expose stable identifiers and an ordered registr
 ## Задача 4. Команда: селекция, исключения, dry-run (D5, D6, D8, D9, D10, D13)
 
 **Files:**
+
 - Create: `weblate/trans/management/commands/reapply_autofixes.py`
 - Test: `weblate/trans/tests/test_commands.py`
 
@@ -884,6 +887,7 @@ git commit -m "feat(trans): add reapply_autofixes dry-run reporting"
 ## Задача 5. `--apply`: запись под блокировкой (D2, D3, D12, D14)
 
 **Files:**
+
 - Modify: `weblate/trans/management/commands/reapply_autofixes.py`
 - Test: `weblate/trans/tests/test_commands.py`
 
@@ -1090,6 +1094,7 @@ git commit -m "feat(trans): write autofix repairs under a row lock"
 на dev ничего не говорит о поведении на проде.
 
 **Files:**
+
 - Modify: `weblate/trans/management/commands/reapply_autofixes.py`
 - Test: `weblate/trans/tests/test_commands.py`
 
@@ -1194,6 +1199,7 @@ Golden set собран прототипом (`fixups: ["terminal-extension-!?:"
 калибровка судьи может оценивать не ту популяцию, что прод.
 
 **Files:**
+
 - Modify: `docs/misc/col4-judge-goldenset-build.py`
 - Modify: `docs/LLM-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md`
 

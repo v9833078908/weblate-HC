@@ -16,10 +16,10 @@ OUT=${OUT:-docs/misc/col4-fr-monitor.log}
 OR_KEY=${OR_KEY:-$(./deploy/vps.sh ssh "docker exec hcgameloc-weblate-1 weblate shell -c \"
 from weblate.configuration.models import Setting
 print(Setting.objects.get(category=2, name='openrouter').value['key'])
-\"" 2>/dev/null | tail -1)}
+\"" 2> /dev/null | tail -1)}
 
 remote_probe() {
-    cat <<'PROBE'
+    cat << 'PROBE'
 echo "SAMPLE $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "REQ_3M $(docker logs hcgameloc-weblate-1 --since 3m 2>&1 | grep -c 'chat/completions')"
 echo "JSONERR_3M $(docker logs hcgameloc-weblate-1 --since 3m 2>&1 | grep -c 'WARNING/ForkPoolWorker.*Could not parse assistant reply as JSON')"
@@ -41,7 +41,7 @@ PROBE
 while true; do
     probe=$(remote_probe | sed "s/__TASK_ID__/$TASK_ID/")
     {
-        ./deploy/vps.sh ssh "$probe" 2>/dev/null | grep -E '^(SAMPLE|REQ_3M|JSONERR_3M|MISMATCH_3M|HTTPERR_3M|FAILED_3M|STATE|TRANSLATED|SUGGESTIONS)'
+        ./deploy/vps.sh ssh "$probe" 2> /dev/null | grep -E '^(SAMPLE|REQ_3M|JSONERR_3M|MISMATCH_3M|HTTPERR_3M|FAILED_3M|STATE|TRANSLATED|SUGGESTIONS)'
         echo "COST_USD_DAILY $(curl -s https://openrouter.ai/api/v1/key -H "Authorization: Bearer $OR_KEY" | jq -r .data.usage_daily)"
         echo "---"
     } >> "$OUT"

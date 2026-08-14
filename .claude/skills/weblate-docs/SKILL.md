@@ -33,7 +33,7 @@ Any question touching these: read local files, not upstream.
 
 ## Step 1 - local first
 
-```
+```text
 grep -rn "<term>" docs/ --include=*.rst
 ```
 
@@ -60,7 +60,7 @@ grep -i "glossary" /tmp/weblate-llms.txt
 Then read the page. Pages are large (`admin/machine.md` is 72 KB) - read in
 ranges and widen only if needed:
 
-```
+```text
 read https://docs.weblate.org/en/latest/admin/machine.md:1-200
 ```
 
@@ -88,7 +88,7 @@ Hot paths, already verified:
 `weblate/utils/version.py` (`VERSION`). Mismatch -> the answer may describe a
 different release; pin the version explicitly:
 
-```
+```text
 https://docs.weblate.org/en/weblate-5.9/admin/machine.md
 ```
 
