@@ -31,7 +31,7 @@ from weblate.utils.requests import fetch_validated_url
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from loc_kit_ingest.model import Diagnostic
+    from loc_kit_ingest.model import Diagnostic, GlossaryTerm
 
 
 # Fixed OpenRouter chat-completions endpoint. Not configurable, never derived
@@ -615,6 +615,11 @@ class GlossaryPreview:
     note_count: int
     warnings: tuple[str, ...]
     terms: tuple[GlossaryTermPreview, ...]
+    # The full validated set, uncapped. Never serialized into
+    # draft.preview_json and never rendered by the UI: the preview table
+    # is a bounded sanity sample, while an append apply must not lose rows
+    # past PREVIEW_TERM_LIMIT.
+    all_terms: tuple[GlossaryTerm, ...]
     profile_json: str
     files: dict[str, bytes]
 
@@ -810,6 +815,7 @@ def validate_glossary_profile(
             if d.severity is not Severity.ERROR
         ),
         terms=terms,
+        all_terms=tuple(glossary_terms),
         profile_json=_canonical_profile_json(document),
         files=files,
     )
