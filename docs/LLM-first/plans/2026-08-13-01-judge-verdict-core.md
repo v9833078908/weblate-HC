@@ -1631,7 +1631,9 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
         self.assertEqual(verdict.max_severity, "critical")
 
-    def test_seats_use_different_models(self) -> None:
+    def test_each_seat_uses_its_configured_model(self) -> None:
+        # Contract: seat N calls SEAT_N. Whether the two differ is a
+        # deployment choice, not an invariant.
         _, _, client = self.run_with([PASS, PASS])
         models_used = [call.kwargs["model"] for call in client.call_args_list]
         self.assertEqual(models_used, ["vendor-a/model", "vendor-b/model"])
@@ -1736,8 +1738,11 @@ return verdict
 отвергнутый каскад.
 
 Модель места берётся из `JUDGE_MODEL_SEAT_1` / `JUDGE_MODEL_SEAT_2`.
-Замер выбрал `deepseek/deepseek-v4-pro` и `qwen/qwen3-235b-a22b-2507` —
-разные семейства, и это часть калибровки, а не деталь развёртывания.
+Замер 2026-08-13 выбрал `deepseek/deepseek-v4-pro` и
+`qwen/qwen3-235b-a22b-2507`. Замер 2026-08-14 на живом компоненте это
+переоткрыл: второе семейство не дало ни одной уникальной находки при
+двенадцатикратной цене. Модели на местах — настройка, финальный выбор
+за замером на n=5 (`plans/2026-08-14-judge-severity-recalibration.md`).
 
 Внутренний `judge(...)`:
 
@@ -1777,19 +1782,26 @@ Expected: PASS (13 тестов)
    Это и есть отвергнутая замером конструкция. Тест существует затем,
    чтобы она не вернулась случайно.
 
-2. Передать `JUDGE_MODEL_SEAT_1` на обоих местах.
+2. Передать одну и ту же модель на оба места.
 
-   Expected: FAIL на `test_seats_use_different_models`.
+   Expected: PASS. Одинаковые модели на местах — **допустимая
+   конфигурация**, а не ошибка, и теста, который её запрещает, быть не
+   должно.
 
-   Коллегия из одного семейства — это 3x-агрегация, которую дизайн
-   (`:132-138`) заменил именно потому, что она сбивает дисперсию, но не
-   смещение.
+   Первая редакция плана требовала здесь `test_seats_use_different_models`
+   со ссылкой на дизайн (`:132-138`). Замер 2026-08-14
+   (`docs/LLM-first/2026-08-14-st2-zh-judge-run.md`) снял основание:
+   `deepseek` за два прогона не нашёл ничего сверх двух прогонов `qwen`
+   при двенадцатикратной цене, а собственный шум каждой модели —
+   11-16% юнитов. Что ставить на места, решает замер на n=5
+   (`plans/2026-08-14-judge-severity-recalibration.md`), а код обязан
+   выполнить любую валидную конфигурацию.
 
 ### Step 6: Коммит
 
 ```bash
 git add weblate/trans/judge_loop.py weblate/trans/tests/test_judge_loop.py
-git commit -m "feat(judge): judge every string with a two-family collegium"
+git commit -m "feat(judge): judge every string with a two-seat collegium"
 ```
 
 ---
@@ -2519,7 +2531,8 @@ git commit -m "docs(judge): document the judge translation mode"
 - [ ] `unparsed` нигде не выглядит как `flag` или `reject`.
 - [ ] Протухший вердикт не проецируется в `Check` и не показывает свой
       обратный перевод.
-- [ ] Места коллегии ходят в разные семейства моделей.
+- [ ] Каждое место берёт свою настроенную модель; одинаковые модели на
+      местах — валидная конфигурация, а не ошибка.
 - [ ] Ни одно место не понижает вердикт другого: `flag` + `pass` даёт
       `flag`, и это зафиксировано тестом.
 - [ ] Улики судьи доезжают до промпта починки без отдельного механизма.
