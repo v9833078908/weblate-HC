@@ -31,6 +31,7 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError
 from django.test import SimpleTestCase
@@ -40,7 +41,8 @@ from django.utils import timezone
 from openpyxl import Workbook
 from translate.storage.pypo import pofile
 
-from weblate.auth.models import User
+from weblate.auth.data import SELECTION_ALL
+from weblate.auth.models import Group, Permission, Role, User
 from weblate.formats.models import FILE_FORMATS
 from weblate.lang.models import Language
 from weblate.machinery.llm import BaseLLMTranslation
@@ -1452,3 +1454,106 @@ class LocKitUpdateDraftModelTest(ViewTestCase):
         )
         glossary.delete()
         self.assertFalse(LocKitImportDraft.objects.exists())
+
+
+class LocKitGlossaryUpdateGateTest(ViewTestCase):
+    """Update drafts are gated on the target glossary, not on creation."""
+
+    CREATE_GLOSSARIES: bool = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.glossary = self.project.glossaries[0]
+        # A component-level upload.perform resolves through its child
+        # translations, and a freshly created glossary has none. Seed one
+        # target language so the restricted-role tests see a real glossary.
+        self.user.is_superuser = True
+        self.user.save()
+        self.glossary.add_new_language(Language.objects.get(code="cs"), None)
+        self.user.is_superuser = False
+        self.user.save()
+        self.user.clear_permissions_cache()
+
+    def _draft(self, component=None) -> LocKitImportDraft:
+        component = component or self.glossary
+        session = self.client.session
+        if not session.session_key:
+            session.create()
+        draft = LocKitImportDraft(
+            owner=self.user,
+            session_key=session.session_key,
+            project=self.project,
+            slug=component.slug,
+            name=component.name,
+            source_filename="Terms.csv",
+            target_component=component,
+        )
+        draft.uploaded.save("Terms.csv", ContentFile(b"ru,en\n"), save=False)
+        draft.save()
+        return draft
+
+    def _restrict_to_upload(self) -> None:
+        """Keep upload.perform, drop translation.add/glossary.add/unit.add."""
+        self.user.groups.clear()
+        role = Role.objects.create(name=f"Update gate {uuid.uuid4().hex[:6]}")
+        role.permissions.add(
+            Permission.objects.get(codename="glossary.upload"),
+            # check_upload rewrites glossary unit.edit to glossary.edit
+            Permission.objects.get(codename="glossary.edit"),
+            Permission.objects.get(codename="unit.edit"),
+        )
+        group = Group.objects.create(
+            name=role.name, language_selection=SELECTION_ALL
+        )
+        group.roles.add(role)
+        group.projects.add(self.project)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+    def test_update_draft_requires_upload_permission(self) -> None:
+        draft = self._draft()
+        self.user.groups.clear()
+        self.user.clear_permissions_cache()
+        for name in ("loc-kit-sheet-select", "loc-kit-glossary-preview"):
+            response = self.client.get(reverse(name, kwargs={"token": draft.token}))
+            self.assertEqual(response.status_code, 404, name)
+
+    def test_locked_glossary_hides_its_update_draft(self) -> None:
+        draft = self._draft()
+        self.user.is_superuser = True
+        self.user.save()
+        self.glossary.locked = True
+        self.glossary.save()
+        response = self.client.get(
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_draft_pointing_at_a_regular_component_is_rejected(self) -> None:
+        draft = self._draft(component=self.component)
+        self.user.is_superuser = True
+        self.user.save()
+        response = self.client.get(
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_upload_permission_alone_opens_the_preview(self) -> None:
+        """
+        translation.add is only needed when a language must be created.
+
+        A user without glossary.add/unit.add still opens the preview; the
+        apply path refuses those languages per language instead of giving a
+        permission bypass (covered by the UpdateApply tests).
+        """
+        draft = self._draft()
+        self._restrict_to_upload()
+        self.assertTrue(self.user.has_perm("upload.perform", self.glossary))
+        self.assertFalse(self.user.has_perm("translation.add", self.project))
+        self.assertFalse(
+            self.user.has_perm("unit.add", self.glossary.source_translation)
+        )
+        response = self.client.get(
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
+        )
+        self.assertEqual(response.status_code, 200)

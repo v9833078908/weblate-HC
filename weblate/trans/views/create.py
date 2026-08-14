@@ -1040,6 +1040,20 @@ class LocKitDraftMixin(View):
         )
         if draft is None:
             raise Http404
+        # An update draft is bound to an existing glossary component and
+        # is gated by upload access on that component, not by the
+        # component-creation wizard. translation.add is deliberately not
+        # required here: without it an operator can still add data to the
+        # languages that already exist.
+        if draft.target_component_id is not None:
+            component = draft.target_component
+            if (
+                not component.is_glossary
+                or component.locked
+                or not self.request.user.has_perm("upload.perform", component)
+            ):
+                raise Http404
+            return draft
         # Exactly the wizard's gate, billing included. A permission revoked
         # (or billing lapsed) mid-flight makes the draft unavailable.
         if (
