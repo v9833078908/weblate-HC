@@ -23,7 +23,7 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.functional import cached_property
 from django.utils.http import urlencode
-from django.utils.translation import gettext
+from django.utils.translation import gettext, ngettext
 from django.views.generic.base import TemplateView, View
 from django.views.generic.edit import CreateView
 
@@ -52,9 +52,12 @@ from weblate.trans.inherited_settings import (
     get_inherit_field_name,
 )
 from weblate.trans.loc_kit import (
+    GlossaryAppendCollisionError,
+    GlossaryAppendResult,
     GlossaryProfileError,
     ProfileProposalError,
     SampleTooLargeError,
+    append_glossary_terms,
     build_glossary_structure_sample,
     cap_preview_warnings,
     profile_document_from_envelope,
@@ -85,6 +88,7 @@ from weblate.vcs.github import (
 from weblate.vcs.models import VCS_REGISTRY
 from weblate.vcs.permissions import github_app_installation_workspaces
 from weblate.workspaces.models import Workspace
+from weblate.utils.lock import WeblateLockTimeoutError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -1345,12 +1349,126 @@ class LocKitGlossaryPreviewView(LocKitDraftMixin, TemplateView):
                 messages.error(request, error)
             return redirect("loc-kit-glossary-preview", token=draft.token)
 
+        if action == "apply":
+            return self._apply_update(request, draft)
+
         if action == "confirm":
             if draft.state != LocKitImportDraft.State.PREVIEW_READY:
                 raise Http404
             return redirect("loc-kit-glossary-confirm", token=draft.token)
 
         raise Http404
+
+    def _apply_update(
+        self, request: AuthenticatedHttpRequest, draft: LocKitImportDraft
+    ):
+        """Append brand-new terms to the draft's existing glossary."""
+        component = draft.target_component
+        if component is None or draft.state != LocKitImportDraft.State.PREVIEW_READY:
+            raise Http404
+        sheets = self.read_draft_sheets(draft)
+        if draft.sheet not in sheets:
+            raise Http404
+        # The stored profile is re-validated against the same worksheet,
+        # exactly like the creation confirm: the preview JSON is display
+        # data, never the application input.
+        try:
+            preview = validate_glossary_profile(
+                profile_document=json.loads(draft.profile_json),
+                rows=sheets[draft.sheet],
+                sheet_name=draft.sheet,
+                component_name=component.slug,
+            )
+        except GlossaryProfileError as error:
+            messages.error(request, f"{error.message} {' '.join(error.details)}".strip())
+            return redirect("loc-kit-glossary-preview", token=draft.token)
+        if preview.source_language != component.source_language.code:
+            messages.error(
+                request,
+                gettext(
+                    "The table's source language does not match the glossary's "
+                    "source language."
+                ),
+            )
+            return redirect("loc-kit-glossary-preview", token=draft.token)
+        try:
+            result = append_glossary_terms(request, component, preview)
+        except GlossaryAppendCollisionError as error:
+            messages.error(request, str(error))
+            for source, existing_context, incoming_context in error.conflicts:
+                messages.error(
+                    request,
+                    gettext(
+                        "“%(source)s” is already a glossary term under "
+                        "“%(existing)s”, but the table places it under "
+                        "“%(incoming)s”."
+                    )
+                    % {
+                        "source": source,
+                        "existing": existing_context,
+                        "incoming": incoming_context,
+                    },
+                )
+            return redirect("loc-kit-glossary-preview", token=draft.token)
+        except WeblateLockTimeoutError:
+            messages.error(
+                request,
+                gettext(
+                    "The glossary is busy right now; nothing was changed. "
+                    "Please retry in a moment."
+                ),
+            )
+            return redirect("loc-kit-glossary-preview", token=draft.token)
+        if self._report_append_outcome(request, result):
+            draft.delete_storage()
+            draft.delete()
+            return redirect(component)
+        # Nothing applicable: the outcome is shown as information and the
+        # draft stays so the operator can review the table.
+        return redirect("loc-kit-glossary-preview", token=draft.token)
+
+    @staticmethod
+    def _report_append_outcome(
+        request: AuthenticatedHttpRequest, result: GlossaryAppendResult
+    ) -> bool:
+        """Message the per-language outcome; True when terms were added."""
+        if result.added_terms:
+            messages.success(
+                request,
+                ngettext(
+                    "%d new glossary term added.",
+                    "%d new glossary terms added.",
+                    result.added_terms,
+                )
+                % result.added_terms,
+            )
+        else:
+            messages.info(
+                request,
+                gettext(
+                    "No new glossary terms were added; the draft is kept so "
+                    "you can review the table."
+                ),
+            )
+        for code, language in result.languages.items():
+            parts = [
+                ngettext("%d added", "%d added", language.added) % language.added
+                if language.added
+                else "",
+                ngettext("%d existing", "%d existing", language.existing)
+                % language.existing
+                if language.existing
+                else "",
+                ngettext("%d blank", "%d blank", language.blank) % language.blank
+                if language.blank
+                else "",
+                gettext("no column in the table") if language.absent else "",
+                language.unavailable,
+            ]
+            detail = ", ".join(part for part in parts if part)
+            if detail:
+                messages.info(request, f"{code}: {detail}")
+        return bool(result.added_terms)
 
 
 # Fields the conversion decides. The operator may not change them at the final

@@ -2152,3 +2152,189 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
         self.assertTrue(
             self.glossary.translation_set.filter(language__code="ja").exists()
         )
+
+
+# --------------------------------------------------------------------------- #
+# Applying an append table from the preview view
+# --------------------------------------------------------------------------- #
+
+
+class LocKitGlossaryUpdateApplyTest(ViewTestCase):
+    """The preview view applies the append service to an existing glossary."""
+
+    CREATE_GLOSSARIES: bool = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        self.glossary = self.project.glossaries[0]
+        self.cs = self.glossary.translation_set.get(language__code="cs")
+
+    def _stage(self, csv_body: str) -> LocKitImportDraft:
+        response = self.client.post(
+            reverse(
+                "loc-kit-glossary-update",
+                kwargs={"path": self.glossary.get_url_path()},
+            ),
+            {
+                "table": SimpleUploadedFile(
+                    "Terms.csv", csv_body.encode(), content_type="text/csv"
+                )
+            },
+        )
+        draft = LocKitImportDraft.objects.get()
+        self.assertRedirects(
+            response,
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token}),
+        )
+        return draft
+
+    def _apply(self, draft, follow=True):
+        return self.client.post(
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token}),
+            {"action": "apply"},
+            follow=follow,
+        )
+
+    def test_apply_imports_new_term_and_consumes_draft(self) -> None:
+        draft = self._stage("en,cs\nEnglish,Czech\nShield,Stit\n")
+
+        response = self._apply(draft)
+
+        self.assertContains(response, "1 added")
+        self.assertContains(response, "cs")
+        self.assertEqual(self.cs.unit_set.get(source="Shield").target, "Stit")
+        self.assertFalse(LocKitImportDraft.objects.exists())
+
+    def test_apply_keeps_existing_empty_target_blank(self) -> None:
+        context = _context_key("", "Shield")
+        self.glossary.source_translation.add_unit(
+            None, context, "Shield", author=self.user
+        )
+        draft = self._stage("en,cs\nEnglish,Czech\nShield,Stit\n")
+
+        response = self._apply(draft)
+
+        unit = self.cs.unit_set.get(context=context, source="Shield")
+        self.assertEqual(unit.target, "")
+
+    def test_apply_reports_blank_targets_as_success(self) -> None:
+        # A fully blank column never reaches the service: inference drops
+        # it. A partially filled one does, and its blank cells are skipped.
+        draft = self._stage(
+            "en,cs,pl\nEnglish,Czech,Polish\nBow,Luk,\nSword,Mec,Miecz\n"
+        )
+
+        response = self._apply(draft)
+
+        self.assertContains(response, "2 new glossary terms added.")
+        self.assertContains(response, "1 blank")
+        self.assertEqual(self.cs.unit_set.get(source="Bow").target, "Luk")
+        pl = self.glossary.translation_set.get(language__code="pl")
+        self.assertEqual(pl.unit_set.get(source="Sword").target, "Miecz")
+        # Terminology sync mirrors the new source term into pl with an
+        # empty target; the blank cell itself wrote nothing.
+        self.assertEqual(pl.unit_set.get(source="Bow").target, "")
+        self.assertFalse(LocKitImportDraft.objects.exists())
+
+    def test_apply_creates_missing_language_and_reports_it(self) -> None:
+        draft = self._stage("en,ja\nEnglish,Japanese\nMage,Mahou\n")
+
+        response = self._apply(draft)
+
+        self.assertContains(response, "ja")
+        self.assertContains(response, "1 added")
+        ja = self.glossary.translation_set.get(language__code="ja")
+        self.assertEqual(ja.unit_set.get(source="Mage").target, "Mahou")
+
+    def test_apply_without_translation_add_keeps_english_and_flags_japanese(
+        self,
+    ) -> None:
+        draft = self._stage("en,cs,ja\nEnglish,Czech,Japanese\nForest,Les,Mori\n")
+        self.user.is_superuser = False
+        self.user.save()
+        self.user.groups.clear()
+        role = Role.objects.create(name=f"Apply {uuid.uuid4().hex[:6]}")
+        role.permissions.add(
+            Permission.objects.get(codename="glossary.upload"),
+            Permission.objects.get(codename="glossary.edit"),
+            Permission.objects.get(codename="glossary.add"),
+            Permission.objects.get(codename="unit.edit"),
+        )
+        group = Group.objects.create(
+            name=role.name, language_selection=SELECTION_ALL
+        )
+        group.roles.add(role)
+        group.projects.add(self.project)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+        response = self._apply(draft)
+
+        self.assertContains(response, "1 added")
+        self.assertContains(response, "Add language for translation")
+        self.assertEqual(self.cs.unit_set.get(source="Forest").target, "Les")
+        self.assertFalse(
+            self.glossary.translation_set.filter(language__code="ja").exists()
+        )
+        self.assertFalse(LocKitImportDraft.objects.exists())
+
+    def test_collision_returns_to_preview_and_keeps_draft(self) -> None:
+        self.glossary.source_translation.add_unit(
+            None, _context_key("Characters", "Hero"), "Hero", author=self.user
+        )
+        draft = self._stage("en,cs\nEnglish,Czech\nHero,Sampion\n")
+
+        response = self._apply(draft)
+
+        self.assertContains(response, "different section")
+        # The seeded source unit keeps its empty cs pair; the incoming
+        # value must never land in it.
+        self.assertFalse(
+            self.cs.unit_set.filter(source="Hero").exclude(target="").exists()
+        )
+        self.assertTrue(
+            LocKitImportDraft.objects.filter(token=draft.token).exists()
+        )
+
+    def test_apply_stores_notes_on_new_term(self) -> None:
+        draft = self._stage(
+            "en,cs,note\nEnglish,Czech,Note\nStaff,Hul,A wooden staff.\n"
+        )
+
+        self._apply(draft)
+
+        source_unit = self.glossary.source_translation.unit_set.get(source="Staff")
+        self.assertEqual(source_unit.explanation, "A wooden staff.")
+
+    def test_apply_lock_timeout_keeps_draft_and_says_retry(self) -> None:
+        draft = self._stage("en,cs\nEnglish,Czech\nKey,Klic\n")
+
+        with patch.object(
+            Component,
+            "locked_for_update",
+            side_effect=WeblateLockTimeoutError("locked", lock=None),
+        ):
+            response = self._apply(draft)
+
+        self.assertContains(response, "retry")
+        self.assertTrue(
+            LocKitImportDraft.objects.filter(token=draft.token).exists()
+        )
+        self.assertFalse(self.cs.unit_set.filter(source="Key").exists())
+
+    def test_update_preview_promises_descriptions_carry_over(self) -> None:
+        draft = self._stage(
+            "en,cs,note\nEnglish,Czech,Note\nStaff,Hul,A wooden staff.\n"
+        )
+
+        response = self.client.get(
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
+        )
+
+        self.assertContains(response, "Add new terms")
+        self.assertContains(response, "will not change")
+        self.assertContains(
+            response, "Descriptions from this table will be added"
+        )
+        self.assertNotContains(response, "Create glossary component")
