@@ -2466,24 +2466,34 @@ class Translation(
         if isinstance(source, list):
             source = join_plural(source)
 
-        parsed_flags = Flags(extra_flags)
-        # Language-scoped glossary modes (exact, not-applicable) live on the
-        # target unit so they apply to one language only
-        scoped_flags = Flags(
-            flag
-            for flag in parsed_flags.items()
-            if isinstance(flag, str) and flag in GLOSSARY_LANGUAGE_SCOPED_FLAGS
-        )
-        source_flags = Flags(parsed_flags)
-        source_flags.remove(flag for flag in scoped_flags if isinstance(flag, str))
-        source_extra_flags = source_flags.format()
-        scoped_extra_flags = scoped_flags.format()
-
         user = request.user if request else author
         if user is None:
             msg = "Can not add unit without an author!"
             raise ValueError(msg)
         component = self.component
+        parsed_flags = Flags(extra_flags)
+        # Language-scoped glossary modes (exact, not-applicable) belong on the
+        # target unit so they apply to one language only. They mean nothing
+        # outside a glossary, so there the flags are left exactly where the
+        # caller put them.
+        scoped_flags = (
+            Flags(
+                flag
+                for flag in parsed_flags.items()
+                if isinstance(flag, str) and flag in GLOSSARY_LANGUAGE_SCOPED_FLAGS
+            )
+            if component.is_glossary
+            else Flags()
+        )
+        scoped_extra_flags = scoped_flags.format()
+        if scoped_extra_flags:
+            source_flags = Flags(parsed_flags)
+            source_flags.remove(flag for flag in scoped_flags if isinstance(flag, str))
+            source_extra_flags = source_flags.format()
+        else:
+            # Nothing to split out, keep the caller's string untouched
+            source_extra_flags = extra_flags
+
         add_terminology = False
         if (
             is_plural(source)

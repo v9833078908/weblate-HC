@@ -10,6 +10,7 @@ import re
 from bisect import bisect_left
 from collections import OrderedDict, defaultdict
 from copy import copy
+from functools import lru_cache
 from itertools import chain
 from threading import Lock
 from typing import TYPE_CHECKING, cast
@@ -57,6 +58,10 @@ GLOSSARY_STEM_CACHE: OrderedDict[
 ] = OrderedDict()
 GLOSSARY_STEM_CACHE_LOCK = Lock()
 STEM_SEPARATOR = "\x00"
+# Mode names read from the target unit's own flags and from its source unit.
+# Kept as module constants so the memoized parse below has a hashable key.
+TARGET_SCOPED_MODES = frozenset({"exact", "not-applicable", "read-only", "forbidden"})
+SOURCE_SCOPED_MODES = frozenset({"read-only", "forbidden"})
 
 
 def cleanup_glossary_term(text: str) -> str:
@@ -139,6 +144,30 @@ def get_glossary_automaton(project: Project) -> ahocorasick_rs.AhoCorasick:
         return result
 
 
+@lru_cache(maxsize=4096)
+def _glossary_modes_from_flags(
+    flags_text: str, scoped: frozenset[str]
+) -> frozenset[str]:
+    """
+    Parse one flags string into the subset of glossary modes it sets.
+
+    Memoized on the raw flag text: the stem index build and every matcher
+    call ask this for each glossary unit, and a term base holds far fewer
+    distinct flag strings than units.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.checks.flags import Flags
+
+    if not flags_text:
+        return frozenset()
+    flags = None
+    with contextlib.suppress(Exception):
+        flags = Flags(flags_text)
+    if flags is None:
+        return frozenset()
+    return frozenset(flag for flag in scoped if flag in flags)
+
+
 def get_glossary_term_modes(unit: Unit) -> set[str]:
     """
     Return effective glossary modes for a target glossary unit.
@@ -147,28 +176,15 @@ def get_glossary_term_modes(unit: Unit) -> set[str]:
     to every language, while ``exact`` and ``not-applicable`` are per-language
     and are read from the target unit's own flags only.
     """
-    # ruff: ignore[import-outside-top-level]
-    from weblate.checks.flags import Flags
-
-    modes: set[str] = set()
-    flag_sources = (
-        (
-            getattr(unit, "extra_flags", ""),
-            {"exact", "not-applicable", "read-only", "forbidden"},
-        ),
-        (
-            getattr(getattr(unit, "source_unit", None), "extra_flags", ""),
-            {"read-only", "forbidden"},
-        ),
+    modes = set(
+        _glossary_modes_from_flags(
+            getattr(unit, "extra_flags", "") or "", TARGET_SCOPED_MODES
+        )
     )
-    for flags_text, scoped in flag_sources:
-        if not flags_text:
-            continue
-        flags = None
-        with contextlib.suppress(Exception):
-            flags = Flags(flags_text)
-        if flags is not None:
-            modes |= {flag for flag in scoped if flag in flags}
+    modes |= _glossary_modes_from_flags(
+        getattr(getattr(unit, "source_unit", None), "extra_flags", "") or "",
+        SOURCE_SCOPED_MODES,
+    )
     return modes
 
 
@@ -437,7 +453,10 @@ def fetch_glossary_terms(  # ruff: ignore[complex-structure]
                     Q(source__lower__md5__in=[MD5(Value(term)) for term in terms]),
                 )
                 # not-applicable pairs are excluded from matching for this
-                # target language
+                # target language. Filtered in Python rather than SQL because
+                # extra_flags is free-form text: a LIKE would also match a
+                # longer flag name containing this one, and cannot use an
+                # index. The parse itself is memoized.
                 if "not-applicable" not in get_glossary_term_modes(unit)
             ]
 

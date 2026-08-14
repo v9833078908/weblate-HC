@@ -610,7 +610,6 @@ class BaseLLMTranslation(BatchMachineTranslation):
 
     @classmethod
     def _get_glossary_entry(cls, unit: Unit) -> LLMGlossaryEntry | None:
-        flags = unit.all_flags
         modes = get_glossary_term_modes(unit)
         # Pairs marked not applicable for this target language never reach
         # the prompt
@@ -642,7 +641,16 @@ class BaseLLMTranslation(BatchMachineTranslation):
         ):
             entry["target_explanation"] = target_explanation
 
-        glossary_flags = [flag for flag in LLM_GLOSSARY_FLAGS if flag in flags]
+        # Inclusion above is decided by `modes`, so the advertised flags are
+        # derived from it too rather than from a second, wider source. Only
+        # `terminology` is outside it: it is a source-side bookkeeping flag,
+        # not a glossary mode.
+        effective_flags = set(modes)
+        if "terminology" in unit.all_flags:
+            effective_flags.add("terminology")
+        glossary_flags = [
+            flag for flag in LLM_GLOSSARY_FLAGS if flag in effective_flags
+        ]
         if glossary_flags:
             entry["flags"] = glossary_flags
 

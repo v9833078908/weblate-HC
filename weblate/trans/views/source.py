@@ -14,7 +14,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext
 from django.views.decorators.http import require_POST
 
-from weblate.checks.flags import Flags
+from weblate.checks.flags import GLOSSARY_LANGUAGE_SCOPED_FLAGS, Flags
 from weblate.trans.forms import ContextForm, MatrixLanguageForm
 from weblate.trans.models import Component, Unit
 from weblate.trans.util import redirect_next, render
@@ -47,9 +47,18 @@ def edit_context(request: AuthenticatedHttpRequest, pk):
         ):
             unit = unit.source_unit
             flags = Flags(unit.extra_flags)
-        elif flag in {"exact", "not-applicable"} and unit.is_source:
-            msg = "Per-language glossary flag on source unit!"
-            raise Http404(msg)
+        elif flag in GLOSSARY_LANGUAGE_SCOPED_FLAGS and unit.is_source:
+            # A per-language mode has no meaning on the source string, which is
+            # shared by every language. This is a bad request, not a missing
+            # page, so the translator is told why nothing changed.
+            messages.error(
+                request,
+                gettext(
+                    "Glossary flags for a single language can only be set on a "
+                    "translation, not on the source string."
+                ),
+            )
+            return redirect_next(request.POST.get("next"), unit.get_absolute_url())
         if do_add:
             flags.merge(flag)
         else:

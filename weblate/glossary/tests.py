@@ -1135,8 +1135,34 @@ class GlossaryTest(ViewTestCase):
         response = self.client.post(
             reverse("edit_context", kwargs={"pk": source_unit.pk}),
             {"addflag": "not-applicable"},
+            follow=True,
         )
-        self.assertEqual(response.status_code, 404)
+        # A bad request, not a missing page: the translator is redirected back
+        # with an explanation and the flag is not stored.
+        self.assertRedirects(response, source_unit.get_absolute_url())
+        self.assertContains(response, "can only be set on a translation")
+        source_unit.refresh_from_db()
+        self.assertNotIn("not-applicable", source_unit.get_unit_flags())
+
+    def test_per_language_flags_are_left_alone_outside_a_glossary(self) -> None:
+        """A glossary mode carries no meaning on a regular component."""
+        translation = self.component.translation_set.get(language_code="cs")
+        with self.captureOnCommitCallbacks(execute=True):
+            translation.add_unit(
+                None,
+                "regular-context",
+                "regular source",
+                "regular target",
+                author=self.user,
+                extra_flags="exact",
+            )
+        source_unit = self.component.source_translation.unit_set.get(
+            context="regular-context"
+        )
+        target_unit = translation.unit_set.get(context="regular-context")
+        # No relocation to the target unit happens outside a glossary.
+        self.assertEqual(source_unit.extra_flags, "exact")
+        self.assertEqual(target_unit.extra_flags, "")
 
 
 class GlossaryCoverageCommandTest(ViewTestCase):
@@ -1319,6 +1345,41 @@ class GlossaryStemMatcherTest(ViewTestCase):
         )
         self.assertEqual(after_exact["exact_only_term_count"], 1)
         self.assertNotEqual(after_exact["glossary_hash"], after_add["glossary_hash"])
+
+    def test_matcher_fingerprint_contract(self) -> None:
+        """
+        Задача 5: the probes in docs/misc read these keys by name.
+
+        Probe scripts are not exercised by CI, so the key set and the value
+        types are pinned here: renaming a field must fail this test rather
+        than a measurement run months later.
+        """
+        fingerprint = glossary_matcher_fingerprint(
+            self.ru_project,
+            self.ru_component.source_language,
+            self.ru_translation.language,
+        )
+        self.assertEqual(
+            set(fingerprint),
+            {
+                "snowball_version",
+                "source_algorithm",
+                "target_algorithm",
+                "source_stem_allowlist",
+                "target_morphology_allowlist",
+                "llm_full_glossary_limit",
+                "exact_only_term_count",
+                "not_applicable_term_count",
+                "glossary_term_count",
+                "glossary_hash",
+            },
+        )
+        self.assertIsInstance(fingerprint["snowball_version"], str)
+        self.assertIsInstance(fingerprint["source_stem_allowlist"], list)
+        self.assertIsInstance(fingerprint["target_morphology_allowlist"], list)
+        self.assertIsInstance(fingerprint["llm_full_glossary_limit"], int)
+        # A sha256 hex digest, so a probe can compare runs by string equality
+        self.assertRegex(str(fingerprint["glossary_hash"]), r"\A[0-9a-f]{64}\Z")
 
     def test_stem_fallback_disabled_for_non_stem_source_language(self) -> None:
         """English source is not in SOURCE_STEM_LANGUAGES: no stem recovery."""
