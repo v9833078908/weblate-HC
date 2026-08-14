@@ -10,6 +10,7 @@ import json
 import re
 import string
 from collections import Counter, defaultdict
+from contextvars import ContextVar
 from itertools import chain
 from operator import itemgetter
 from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, TypeGuard
@@ -39,6 +40,22 @@ from weblate.utils.errors import add_breadcrumb
 from weblate.utils.hash import calculate_hash, hash_to_checksum
 from weblate.utils.state import STATE_APPROVED, STATE_READONLY, STATE_TRANSLATED
 from weblate.utils.translation import pgettext_noop
+
+#: Project slug of the batch currently fetching, for usage accounting at the
+#: HTTP seam, which does not receive the batch units.
+llm_batch_project: ContextVar[str] = ContextVar("llm_batch_project", default="")
+
+
+def _sources_project_slug(sources: list[tuple[str, Unit | None]]) -> str:
+    """Project slug of a batch, from the first unit that carries one."""
+    for _text, unit in sources:
+        if unit is None:
+            continue
+        try:
+            return unit.translation.component.project.slug
+        except AttributeError:
+            return ""
+
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -2727,9 +2744,13 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 source_occurrences,
             )
         )
-        translations_string = self.fetch_llm_translations(
-            prompt, content, previous_content, previous_response
-        )
+        project_token = llm_batch_project.set(_sources_project_slug(sources))
+        try:
+            translations_string = self.fetch_llm_translations(
+                prompt, content, previous_content, previous_response
+            )
+        finally:
+            llm_batch_project.reset(project_token)
         return self._parse_llm_translations(
             translations_string, sources, source_occurrences
         )
@@ -2837,9 +2858,13 @@ class BaseLLMTranslation(BatchMachineTranslation):
             sources,
             source_occurrences,
         )
-        translations_string = await self.afetch_llm_translations(
-            prompt, content, previous_content, previous_response
-        )
+        project_token = llm_batch_project.set(_sources_project_slug(sources))
+        try:
+            translations_string = await self.afetch_llm_translations(
+                prompt, content, previous_content, previous_response
+            )
+        finally:
+            llm_batch_project.reset(project_token)
         return await sync_to_async(self._parse_llm_translations)(
             translations_string, sources, source_occurrences
         )
