@@ -17,6 +17,7 @@ Weblate 2026.8.1
 * Glossaries imported from a loc-kit table now mark their terms as terminology, so the terms appear in every glossary language.
 * Glossary table import now trims leading and trailing whitespace from a term description instead of refusing the table, and reports the trim as a warning; whitespace around a term itself remains an error.
 * Glossary table import now detects the CSV delimiter, recognises vendor Chinese codes such as ``zh-TC``, skips a declared technical identifier column, and imports partially translated languages as untranslated terms, see :ref:`uploading-glossary-tables`.
+* An existing glossary can now receive an append-only batch of new terms from a loc-kit table: existing terms, their targets, and their descriptions are never changed, and a non-empty column for a language the glossary does not yet have creates that language, see :ref:`uploading-glossary-tables`.
 * Added :envvar:`WEBLATE_DEFAULT_LANGUAGE` to choose the interface language used for visitors whose browser language is not available.
 * The sign-in page no longer states that names and usernames are visible publicly, and the :guilabel:`Full name` field no longer promises that the name is used in version-control commits when the site defaults to a private commit name.
 * The engine line separator ``$`` is now enforced where it is used tightly in the source: whitespace around a separator is removed automatically, and a separator lost or added by a translation is reported by the ``game-line-break`` check.
