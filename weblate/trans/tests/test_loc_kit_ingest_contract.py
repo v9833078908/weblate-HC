@@ -1418,3 +1418,37 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         blank = translation.unit_set.get(source="Джо")
         self.assertEqual(blank.target, "")
         self.assertEqual(blank.state, STATE_EMPTY)
+
+
+
+class LocKitUpdateDraftModelTest(ViewTestCase):
+    """A glossary-update draft is bound to one existing glossary component."""
+
+    CREATE_GLOSSARIES: bool = True
+
+    def test_draft_binds_to_existing_glossary(self) -> None:
+        glossary = self.project.glossaries[0]
+        draft = LocKitImportDraft.objects.create(
+            owner=self.user,
+            session_key="x" * 10,
+            project=self.project,
+            slug=glossary.slug,
+            name=glossary.name,
+            source_filename="Terms.csv",
+            target_component=glossary,
+        )
+        self.assertEqual(draft.target_component, glossary)
+
+    def test_deleting_target_glossary_deletes_its_draft(self) -> None:
+        glossary = self.project.glossaries[0]
+        LocKitImportDraft.objects.create(
+            owner=self.user,
+            session_key="x" * 10,
+            project=self.project,
+            slug=glossary.slug,
+            name=glossary.name,
+            source_filename="Terms.csv",
+            target_component=glossary,
+        )
+        glossary.delete()
+        self.assertFalse(LocKitImportDraft.objects.exists())
