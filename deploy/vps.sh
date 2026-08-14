@@ -272,7 +272,16 @@ else
     echo "image revision: \$revision"
     stale=0
 fi
-login=\$(curl -s -o /dev/null -m 20 -w '%{http_code}' "http://127.0.0.1:\${WEBLATE_LOCAL_PORT:-8081}/accounts/login/" || echo 000)
+# Docker reports the container healthy as soon as its own probe passes, which
+# can happen while granian workers are still importing Django, so a single
+# request here races the app and reports a false DEPLOY-FAILED. Retry until it
+# serves, and keep the last code so a genuine failure still fails.
+login=000
+for _ in \$(seq 1 24); do
+    login=\$(curl -s -o /dev/null -m 20 -w '%{http_code}' "http://127.0.0.1:\${WEBLATE_LOCAL_PORT:-8081}/accounts/login/" || echo 000)
+    [ "\$login" = 200 ] && break
+    sleep 5
+done
 echo "login page: \$login"
 if [ "\$health" = healthy ] && [ "\$login" = 200 ] && [ "\$stale" = 0 ]; then
     echo DEPLOY-OK
