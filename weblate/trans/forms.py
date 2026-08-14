@@ -3060,6 +3060,29 @@ class LocKitProfileCorrectionForm(forms.Form):
         return document
 
 
+class LocKitGlossaryUpdateForm(forms.Form):
+    """Stage a loc-kit table to append new terms to one glossary."""
+
+    table = forms.FileField(
+        label=gettext_lazy("Loc-kit table (CSV, TSV, XLSX)"),
+        help_text=gettext_lazy(
+            "The table is mapped locally and previewed before anything is "
+            "added to the glossary. Existing terms are never changed."
+        ),
+        validators=[
+            validate_component_zip_upload_size,
+            FileExtensionValidator(allowed_extensions=["csv", "tsv", "xlsx"]),
+        ],
+        widget=forms.FileInput(attrs={"accept": ".csv,.tsv,.xlsx"}),
+    )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # See LocKitSheetSelectForm: the template owns the form element.
+        self.helper = FormHelper(self)
+        self.helper.form_tag = False
+
+
 class ComponentDocCreateForm(ComponentProjectForm):
     docfile = forms.FileField(
         label=gettext_lazy("Document to translate"),

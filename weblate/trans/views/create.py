@@ -39,6 +39,7 @@ from weblate.trans.forms import (
     ComponentScratchCreateForm,
     ComponentSelectForm,
     ComponentZipCreateForm,
+    LocKitGlossaryUpdateForm,
     LocKitProfileCorrectionForm,
     LocKitSheetSelectForm,
     ProjectCreateForm,
@@ -71,6 +72,7 @@ from weblate.utils.views import (
     KIT_TABLE_SUFFIXES,
     create_component_from_doc,
     create_component_from_kit,
+    parse_path,
 )
 from weblate.vcs.base import RepositoryError
 from weblate.vcs.git import LocalRepository
@@ -714,31 +716,33 @@ class CreateFromZip(CreateComponent):
         # mid-parse would roll the row back and leave the file behind.
         draft.uploaded.save(filename, ContentFile(payload), save=False)
         try:
-            return self._insert_draft_and_map(draft, sheets)
+            return _insert_draft_and_map(self.request, draft, sheets)
         except Exception:
             draft.delete_storage()
             raise
 
-    def _insert_draft_and_map(self, draft, sheets):
-        """Insert the draft row and, for a single sheet, map it locally."""
-        draft.save()
-        if len(sheets) > 1:
-            # Several worksheets: the operator has to choose one, and that
-            # POST runs the full analysis path.
-            return redirect("loc-kit-sheet-select", token=draft.token)
-        # A CSV/TSV always has exactly one sheet; the selection screen is
-        # noise. Only the deterministic step may run here: this POST is
-        # atomic, a provider call inside it would hold a transaction open
-        # for the whole network timeout.
-        sheet_name, rows = next(iter(sheets.items()))
-        draft.sheet = sheet_name
-        draft.state = LocKitImportDraft.State.SHEET_SELECTED
-        draft.save(update_fields=["sheet", "state"])
-        infer_error = _infer_draft_profile(draft, rows)
-        if infer_error is None:
-            return redirect("loc-kit-glossary-preview", token=draft.token)
-        messages.info(self.request, infer_error)
+
+
+def _insert_draft_and_map(request: AuthenticatedHttpRequest, draft, sheets):
+    """Insert the draft row and, for a single sheet, map it locally."""
+    draft.save()
+    if len(sheets) > 1:
+        # Several worksheets: the operator has to choose one, and that
+        # POST runs the full analysis path.
         return redirect("loc-kit-sheet-select", token=draft.token)
+    # A CSV/TSV always has exactly one sheet; the selection screen is
+    # noise. Only the deterministic step may run here: this POST is
+    # atomic, a provider call inside it would hold a transaction open
+    # for the whole network timeout.
+    sheet_name, rows = next(iter(sheets.items()))
+    draft.sheet = sheet_name
+    draft.state = LocKitImportDraft.State.SHEET_SELECTED
+    draft.save(update_fields=["sheet", "state"])
+    infer_error = _infer_draft_profile(draft, rows)
+    if infer_error is None:
+        return redirect("loc-kit-glossary-preview", token=draft.token)
+    messages.info(request, infer_error)
+    return redirect("loc-kit-sheet-select", token=draft.token)
 
 
 class CreateFromDoc(CreateComponent):
@@ -1509,3 +1513,81 @@ class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
         draft.delete()
         transaction.on_commit(lambda: flag_glossary_terminology.delay(self.object.pk))
         return response
+
+
+@method_decorator(login_required, name="dispatch")
+class LocKitGlossaryUpdateStartView(TemplateView):
+    """
+    Stage a loc-kit table that appends new terms to one existing glossary.
+
+    Nothing about the glossary changes until the preview is applied: the
+    upload stays in a temporary draft exactly like the creation flow, and
+    the same deterministic mapping runs for a single-sheet table.
+    """
+
+    template_name = "trans/loc_kit_glossary_update.html"
+
+    def get_component(self) -> Component:
+        component = parse_path(self.request, self.kwargs["path"], (Component,))
+        if (
+            not component.is_glossary
+            or component.locked
+            or not self.request.user.has_perm("upload.perform", component)
+        ):
+            raise Http404
+        return component
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["object"] = self.get_component()
+        context["form"] = kwargs.get("form") or LocKitGlossaryUpdateForm()
+        return context
+
+    @transaction.atomic
+    def post(self, request: AuthenticatedHttpRequest, **kwargs):
+        component = self.get_component()
+        form = LocKitGlossaryUpdateForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form))
+        uploaded = form.cleaned_data["table"]
+        # ruff: ignore[import-outside-top-level]
+        from loc_kit_ingest.reader import ReaderError, read_sheets
+
+        filename = os.path.basename(getattr(uploaded, "name", "") or "")
+        uploaded.seek(0)
+        payload = uploaded.read()
+
+        # Read locally first: an unreadable file must fail here, before a
+        # draft exists and long before anything could touch the glossary.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            local = Path(tmpdir) / filename
+            local.write_bytes(payload)
+            try:
+                sheets = read_sheets(local)
+            except ReaderError as error:
+                form.add_error("table", gettext("Could not read the table: %s") % error)
+                return self.render_to_response(self.get_context_data(form=form))
+        if not sheets:
+            form.add_error("table", gettext("The table holds no worksheets."))
+            return self.render_to_response(self.get_context_data(form=form))
+
+        if not request.session.session_key:
+            request.session.create()
+
+        draft = LocKitImportDraft(
+            owner=request.user,
+            session_key=request.session.session_key or "",
+            project=component.project,
+            slug=component.slug,
+            name=component.name,
+            source_filename=filename,
+            target_component=component,
+        )
+        # Storage is not transactional; undo the write if the row or the
+        # deterministic mapping fails (see CreateFromZip._start_glossary_draft).
+        draft.uploaded.save(filename, ContentFile(payload), save=False)
+        try:
+            return _insert_draft_and_map(request, draft, sheets)
+        except Exception:
+            draft.delete_storage()
+            raise

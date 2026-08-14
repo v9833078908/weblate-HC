@@ -1557,3 +1557,70 @@ class LocKitGlossaryUpdateGateTest(ViewTestCase):
             reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
         )
         self.assertEqual(response.status_code, 200)
+
+
+class LocKitGlossaryUpdateStartTest(ViewTestCase):
+    """An operator stages an append table from an existing glossary."""
+
+    CREATE_GLOSSARIES: bool = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.glossary = self.project.glossaries[0]
+        self.user.is_superuser = True
+        self.user.save()
+
+    def _url(self):
+        return reverse(
+            "loc-kit-glossary-update", kwargs={"path": self.glossary.get_url_path()}
+        )
+
+    def _table(self, body: str = GLOSSARY_LANG_ONLY_CSV):
+        return SimpleUploadedFile("Terms.csv", body.encode(), content_type="text/csv")
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_update_upload_stages_a_bound_draft(self) -> None:
+        response = self.client.post(self._url(), {"table": self._table()})
+
+        draft = LocKitImportDraft.objects.get()
+        self.assertEqual(draft.target_component, self.glossary)
+        self.assertEqual(draft.project, self.project)
+        # Single sheet: auto-skip mapped it straight to a preview.
+        self.assertEqual(draft.state, LocKitImportDraft.State.PREVIEW_READY)
+        self.assertRedirects(
+            response,
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token}),
+        )
+        # The component is not touched by staging.
+        self.glossary.refresh_from_db()
+        self.assertEqual(self.glossary.source_translation.unit_set.count(), 0)
+
+    def test_update_start_requires_upload_permission(self) -> None:
+        # Superusers bypass every permission; the gate is only observable
+        # on an ordinary account.
+        self.user.is_superuser = False
+        self.user.save()
+        self.user.groups.clear()
+        self.user.clear_permissions_cache()
+
+        response = self.client.get(self._url())
+        self.assertEqual(response.status_code, 404)
+        response = self.client.post(self._url(), {"table": self._table()})
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(LocKitImportDraft.objects.exists())
+
+    def test_update_stage_template_never_nests_a_form(self) -> None:
+        """
+        Same contract as the creation stages, for the update page.
+
+        The template owns the single <form>; crispy must not emit one of
+        its own. The rendered source stays balanced either way, so only
+        walking tag depth exposes a nested form that browsers reject.
+        """
+        page = self.client.get(self._url())
+        depth = 0
+        for tag in re.finditer(r"</?form\b", page.content.decode()):
+            depth += -1 if tag.group().startswith("</") else 1
+            self.assertLessEqual(
+                depth, 1, "a form is nested inside another form"
+            )

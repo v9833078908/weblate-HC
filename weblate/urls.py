@@ -363,6 +363,11 @@ real_patterns = [
         name="loc-kit-glossary-confirm",
     ),
     path(
+        "loc-kit/glossary/update/<object_path:path>/",
+        weblate.trans.views.create.LocKitGlossaryUpdateStartView.as_view(),
+        name="loc-kit-glossary-update",
+    ),
+    path(
         "create/component/doc/",
         weblate.trans.views.create.CreateFromDoc.as_view(),
         name="create-component-doc",
