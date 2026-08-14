@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.request
@@ -123,6 +124,8 @@ class Record:
     source: str
     target: str
     checks: list[str] = field(default_factory=list)
+    glossary: list[tuple[str, str]] = field(default_factory=list)
+    family: list[tuple[str, str, str]] = field(default_factory=list)
     state: int = 0
     position: int = 0
 
@@ -263,7 +266,42 @@ def render_segment(index: int, record: Record) -> dict[str, Any]:
     }
     if record.checks:
         segment["checks"] = record.checks
+    if record.glossary:
+        segment["glossary"] = [
+            {"source": s, "target": t} for s, t in record.glossary
+        ]
+    if record.family:
+        segment["family"] = [
+            {"key": k, "source_ru": s, "target_zh": t} for k, s, t in record.family
+        ]
     return segment
+
+
+GLOSSARY_RULE = """\
+
+Each segment may carry `glossary`: terms of this project with their approved \
+Chinese rendering. They are reference material, not text to translate. A term \
+whose approved rendering is absent from the target is a `major` terminology \
+error; a target that follows the glossary is correct by definition, even if \
+another wording would read better."""
+
+FAMILY_RULE = """\
+
+Each segment may carry `family`: neighbouring strings whose key shares a prefix \
+with this one, already translated. They are reference material, not text to \
+translate. Use them to judge consistency: the same source notion rendered one \
+way here and another way in the family is an error even when this segment reads \
+well on its own."""
+
+
+def system_prompt(*, glossary: bool, family: bool) -> str:
+    """Baseline prompt stays byte-identical when no extra context is supplied."""
+    prompt = SYSTEM_PROMPT
+    if glossary:
+        prompt += GLOSSARY_RULE
+    if family:
+        prompt += FAMILY_RULE
+    return prompt
 
 
 def build_payload(model: str, batch: list[Record]) -> dict[str, Any]:
@@ -271,7 +309,13 @@ def build_payload(model: str, batch: list[Record]) -> dict[str, Any]:
     return {
         "model": model,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "system",
+                "content": system_prompt(
+                    glossary=any(r.glossary for r in batch),
+                    family=any(r.family for r in batch),
+                ),
+            },
             {
                 "role": "user",
                 "content": json.dumps({"segments": segments}, ensure_ascii=False),
@@ -511,6 +555,90 @@ def merge_and_report(
             span = err.get("span", "")[:80]
             print(f"    [{sev}] {cat}: {span}")
 
+GLOSSARY_URL = (
+    "https://l10n.herocraft.com/api/translations/"
+    "strategy-and-tactics-2/summer-glossary/zh_Hans/units/?page_size=200"
+)
+
+
+def load_glossary(cache: str) -> list[tuple[str, str]]:
+    """Project glossary, cached on disk so arms share one fetch."""
+    if os.path.exists(cache):
+        with open(cache, encoding="utf-8") as f:
+            return [tuple(pair) for pair in json.load(f)]
+    token = os.environ.get("WEBLATE_API_TOKEN", "")
+    if not token:
+        print("Set WEBLATE_API_TOKEN to fetch the glossary", file=sys.stderr)
+        sys.exit(1)
+    request = urllib.request.Request(
+        GLOSSARY_URL, headers={"Authorization": f"Token {token}"}
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        payload = json.loads(response.read().decode())
+    terms = [
+        (unit["source"][0], unit["target"][0])
+        for unit in payload["results"]
+        if unit.get("target") and unit["target"][0].strip()
+    ]
+    with open(cache, "w", encoding="utf-8") as f:
+        json.dump(terms, f, ensure_ascii=False)
+    return terms
+
+
+def attach_glossary(records: list[Record], terms: list[tuple[str, str]]) -> None:
+    """Mirror of weblate.glossary.models.get_glossary_terms: match on the source.
+
+    Whether the target honours the term is the judge's business, not ours;
+    the segment carries every term the source mentions.
+    """
+    for record in records:
+        source = record.source.lower()
+        record.glossary = [
+            (term_source, term_target)
+            for term_source, term_target in terms
+            if re.search(
+                rf"(?<![\w\u0400-\u04ff]){re.escape(term_source.lower())}"
+                rf"(?![\w\u0400-\u04ff])",
+                source,
+            )
+        ]
+
+
+def attach_family(records: list[Record], limit: int) -> None:
+    """Neighbours whose key shares a prefix, so drift across a family is visible.
+
+    Ranking is by shared leading key tokens first, then by a shared trailing
+    token: ``ID_USER_LOST_ARMED_PROVINCE_NAME`` must reach
+    ``..._DESC`` and the ``FAILED_CAPTURED`` sibling, not an unrelated
+    ``ID_USER_*`` string.
+    """
+    tokens = {r.record_id: r.context.strip().split("_") for r in records}
+
+    def score(a: list[str], b: list[str]) -> int:
+        shared = 0
+        for left, right in zip(a, b):
+            if left != right:
+                break
+            shared += 1
+        return shared * 2 + (1 if a[-1] == b[-1] else 0)
+
+    for record in records:
+        mine = tokens[record.record_id]
+        ranked = sorted(
+            (
+                (-score(mine, tokens[other.record_id]),
+                 abs(other.position - record.position), other)
+                for other in records
+                if other.record_id != record.record_id
+                and score(mine, tokens[other.record_id]) >= 4
+            ),
+            key=lambda item: (item[0], item[1]),
+        )
+        record.family = [
+            (other.context.strip(), other.source, other.target)
+            for _, _, other in ranked[:limit]
+        ]
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -534,6 +662,18 @@ def main() -> None:
     )
     parser.add_argument("--model1", default="deepseek/deepseek-v4-pro")
     parser.add_argument("--model2", default="qwen/qwen3-235b-a22b-2507")
+    parser.add_argument(
+        "--glossary", action="store_true",
+        help="Attach project glossary terms matching each source",
+    )
+    parser.add_argument(
+        "--glossary-cache", default="/tmp/st2_glossary.json",
+        help="Where the fetched glossary is cached",
+    )
+    parser.add_argument(
+        "--siblings", type=int, default=0, metavar="N",
+        help="Attach up to N key-family neighbours as reference context",
+    )
     args = parser.parse_args()
 
     if args.merge:
@@ -544,6 +684,16 @@ def main() -> None:
         return
 
     records = load_units(args.input)
+    if args.glossary:
+        terms = load_glossary(args.glossary_cache)
+        attach_glossary(records, terms)
+        matched = sum(1 for r in records if r.glossary)
+        print(f"  glossary: {len(terms)} terms, attached to {matched} units")
+    if args.siblings:
+        attach_family(records, args.siblings)
+        matched = sum(1 for r in records if r.family)
+        print(f"  family context: attached to {matched} units")
+
     print(f"Loaded {len(records)} units")
     print(f"  states: {dict(Counter(r.state for r in records))}")
     print(f"  source len: min={min(len(r.source) for r in records)} "

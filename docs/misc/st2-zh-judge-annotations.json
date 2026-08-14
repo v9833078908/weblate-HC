@@ -1,0 +1,408 @@
+{
+  "run": "S&T2 summer-update zh_Hans, 124 units, 2026-08-14",
+  "annotator": "manual review of every collegium flag against source, target and sibling units",
+  "judges": {
+    "seat_1": "deepseek/deepseek-v4-pro",
+    "seat_2": "qwen/qwen3-235b-a22b-2507"
+  },
+  "flags": {
+    "24130": {
+      "context": "ID_AGITATION_CAMPAIGN_PURCHASE_QUESTION",
+      "collegium": "reject",
+      "deepseek": "reject",
+      "qwen": "reject",
+      "label": "REAL",
+      "reason": "«за {PARAM1}» — длительность (сиблинг 24131: «в течение следующих {PARAM1} ходов»), отрендерено как 支付 «заплатите». В 24253, где параметр действительно цена, стоит верное 花费."
+    },
+    "24137": {
+      "context": "ID_ADDITIONAL_REINFORCEMENTS_SLOTS_AVAILABLE_AT_USER_LEVEL",
+      "collegium": "flag",
+      "deepseek": "flag",
+      "qwen": "pass",
+      "label": "WEAK",
+      "reason": "«доступ к дополнительным подкреплениям» → 增援槽位: добавлено «槽位» (слоты). Вероятно верно по факту UI; добавление, не ошибка."
+    },
+    "24140": {
+      "context": "ID_MINEFIELD_NOTIFICATION_HEADER",
+      "collegium": "reject",
+      "deepseek": "pass",
+      "qwen": "reject",
+      "label": "REAL",
+      "reason": "«попался в ловушку» (минное поле) → 中计 «попался на уловку». Ловушка физическая, а не хитрость. Реально, но не critical."
+    },
+    "24144": {
+      "context": "ID_DIVISION_EXP_MAX",
+      "collegium": "reject",
+      "deepseek": "reject",
+      "qwen": "pass",
+      "label": "REAL",
+      "reason": "«МАКС» → MAX: латиница в китайском UI, ожидается 满级. Реально; critical завышен."
+    },
+    "24149": {
+      "context": "ID_DIVISION_EXP_PATH_HEADER",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "«Боевой путь» → 征战历程 — идиоматично и верно."
+    },
+    "24157": {
+      "context": "ID_CARAVAN_REACHED_HOME_DESC",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "«с товарами на сумму {1}» → 带回价值{1}的货物 — верно."
+    },
+    "24158": {
+      "context": "ID_CARAVAN_REACHED_HOME_PROTECTION",
+      "collegium": "flag",
+      "deepseek": "flag",
+      "qwen": "pass",
+      "label": "WEAK",
+      "reason": "«Боевые корабли конвоя» → 商队的战舰: коллокация странная, но следует из выбора 商队; строка точна."
+    },
+    "24160": {
+      "context": "ID_CARAVAN_ON_PATH_TO_HOME_ROBBERY_FAILED_DESC",
+      "collegium": "flag",
+      "deepseek": "flag",
+      "qwen": "pass",
+      "label": "REAL",
+      "reason": "«Шел {0} ход» → 第{0}天 «день». В пошаговой стратегии смена единицы; 24219 использует верное 回合."
+    },
+    "24161": {
+      "context": "ID_CARAVAN_ON_PATH_TO_HOME_ROBBERY_SUCCESS_DESC",
+      "collegium": "flag",
+      "deepseek": "flag",
+      "qwen": "pass",
+      "label": "REAL",
+      "reason": "То же, что 24160."
+    },
+    "24168": {
+      "context": "ID_USER_SHIP_LANDING_KILLED_DESC_ NEW",
+      "collegium": "flag",
+      "deepseek": "flag",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "«Морские десантники» → 海军陆战队 — стандартный эквивалент."
+    },
+    "24169": {
+      "context": "ID_USER_SHIP_LANDING_ARRIVED_DESC_NEW",
+      "collegium": "flag",
+      "deepseek": "flag",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "То же, что 24168."
+    },
+    "24171": {
+      "context": "ID_ENEMY_SHIP_LANDING_ARRIVED_DESC_NEW",
+      "collegium": "reject",
+      "deepseek": "reject",
+      "qwen": "pass",
+      "label": "FP",
+      "reason": "Строка переведена верно; deepseek поставил critical на span длиной во всё предложение без формулировки претензии."
+    },
+    "24173": {
+      "context": "ID_ENEMY_BLOW_CASUALITIES_DESC_NEW",
+      "collegium": "reject",
+      "deepseek": "pass",
+      "qwen": "reject",
+      "label": "WEAK",
+      "reason": "«Получено урона» → 受到伤害 верно; расхождение с 承受伤害 в 24194 — синонимия, не ошибка."
+    },
+    "24179": {
+      "context": "ID_USER_CAPTURED_ARMED_PROVINCE_DESC",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "WEAK",
+      "reason": "«удачного штурма» → 成功突袭 «внезапный налёт», тогда как сиблинги-заголовки используют 进攻. Дрейф термина, minor."
+    },
+    "24180": {
+      "context": "ID_USER_LOST_ARMED_PROVINCE_DESC",
+      "collegium": "reject",
+      "deepseek": "pass",
+      "qwen": "reject",
+      "label": "REAL",
+      "reason": "«Результаты провальной обороны укреплений» → 省份{0}防御工事失败防御结果: набор существительных без связей."
+    },
+    "24181": {
+      "context": "ID_USER_FAILED_CAPTURED_ARMED_PROVINCE_DESC",
+      "collegium": "reject",
+      "deepseek": "pass",
+      "qwen": "reject",
+      "label": "REAL",
+      "reason": "То же: 防御工事失败进攻结果."
+    },
+    "24182": {
+      "context": "ID_AI_FAILED_CAPTURED_ARMED_PROVINCE_DESC",
+      "collegium": "reject",
+      "deepseek": "pass",
+      "qwen": "reject",
+      "label": "REAL",
+      "reason": "То же: 防御工事成功防御结果."
+    },
+    "24187": {
+      "context": "ID_USER_FAILED_CAPTURED_ARMED_PROVINCE_NAME",
+      "collegium": "flag",
+      "deepseek": "flag",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "防御工事进攻失败 для «Провальный штурм укреплений» — приемлемый заголовок; сиблинги согласованы."
+    },
+    "24188": {
+      "context": "ID_AI_FAILED_CAPTURED_ARMED_PROVINCE_NAME",
+      "collegium": "flag",
+      "deepseek": "flag",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "То же, что 24187."
+    },
+    "24189": {
+      "context": "ID_USER_CAPTURED_ARMED_PROVINCE_NAME",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "То же, что 24187."
+    },
+    "24194": {
+      "context": "ID_DETAILED_BATTLE_LOG",
+      "collegium": "flag",
+      "deepseek": "flag",
+      "qwen": "pass",
+      "label": "REAL",
+      "reason": "«Нанесено урона по небронированным» → 非装甲单位造成伤害 без 对: читается «небронированные наносят урон», агент перевёрнут относительно парной строки 承受伤害."
+    },
+    "24197": {
+      "context": "ID_NOT_RETREAT_ABILITY_CASTLE_USED",
+      "collegium": "flag",
+      "deepseek": "flag",
+      "qwen": "pass",
+      "label": "FP",
+      "reason": "«не отступают» → 绝不撤退 — усиление, не ошибка."
+    },
+    "24203": {
+      "context": "ID_USER_SURVIVORS_STRENGTH",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "«Влияние выживших» → 幸存者影响力 — верно по источнику. Ключ говорит STRENGTH, но расхождение в русском, а не в переводе."
+    },
+    "24204": {
+      "context": "ID_ENEMY_SURVIVORS_STRENGTH",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "То же, что 24203."
+    },
+    "24208": {
+      "context": "ID_AI_PLAYER_HEGEMON_STATUS_NOTIFICATION_DESC",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "Источник сам шаблонно искажён («{1} статус {2}»); перевод ему верен."
+    },
+    "24218": {
+      "context": "ID_DIVISION_EXP_LVL_UP_NAME",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "«Новый уровень войск!» → 部队新等级！ — верно."
+    },
+    "24219": {
+      "context": "ID_DIVISION_EXP_LVL_UP_DESC",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "Строка переведена верно, роли плейсхолдеров правильные; это эталон для 24221."
+    },
+    "24220": {
+      "context": "ID_DIVISION_WITH_EXP_LVL_DIED_NAME",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "«Потери среди лучших!» → 精锐部队的损失！ — верно."
+    },
+    "24221": {
+      "context": "ID_DIVISION_WITH_EXP_LVL_DIED_DESC",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "REAL",
+      "reason": "RU «дивизия {0} уровня {1}» ({0}=имя, {1}=уровень) → ZH «{0}级别的{1}师» ({0}=уровень, {1}=имя). Роли перевёрнуты; сиблинг 24219 подтверждает верный порядок."
+    },
+    "24230": {
+      "context": "ID_NOT_ENOUGH_DIPLOMACY_POINTS_FOR_CREATE_TRADE_RELATIONS",
+      "collegium": "flag",
+      "deepseek": "flag",
+      "qwen": "pass",
+      "label": "WEAK",
+      "reason": "«через ходов: {N}» → «回合数：{N}» — теряется «через», остаётся «число ходов». Реально, minor."
+    },
+    "24233": {
+      "context": "ID_DECLAIN_TRADE_RELATIONS",
+      "collegium": "reject",
+      "deepseek": "pass",
+      "qwen": "reject",
+      "label": "FP",
+      "reason": "«Отказаться» → 拒绝 — верный перевод кнопки, помечен critical."
+    },
+    "24237": {
+      "context": "ID_CARAVAN_LAUNCH_OFFER_HEADER",
+      "collegium": "reject",
+      "deepseek": "flag",
+      "qwen": "reject",
+      "label": "WEAK",
+      "reason": "Разметка адаптирована верно; спор только о 商队 против «конвоя» — и это доминирующая форма (11 юнитов)."
+    },
+    "24239": {
+      "context": "ID_CARAVAN_LAUNCH_OFFER_OPTION_DECLAIN",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "«Не отправлять» → 不派遣 — верно."
+    },
+    "24243": {
+      "context": "DIVISION_NAME_17",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "«Мины» → 地雷 — верно."
+    },
+    "24244": {
+      "context": "ID_MINEFIELD_DESCRIPTION",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "REAL",
+      "reason": "«наземной технике и пехоте» → 地面单位和步兵: «техника» расширена до «наземных юнитов», отчего «и пехоте» становится избыточным. Minor (находка deepseek); флаг qwen на 地雷 — ложный."
+    },
+    "24246": {
+      "context": "ID_TROOPS_DIVISION_EXP_WIDGET_STEP_0",
+      "collegium": "reject",
+      "deepseek": "pass",
+      "qwen": "reject",
+      "label": "FP",
+      "reason": "«Накопленный опыт и опыта, необходимый…» → 累计经验与升级所需经验 — верно, перевод ещё и починил опечатку источника."
+    },
+    "24247": {
+      "context": "ID_TROOPS_DIVISION_EXP_WIDGET_STEP_1",
+      "collegium": "flag",
+      "deepseek": "pass",
+      "qwen": "flag",
+      "label": "FP",
+      "reason": "«Посмотрите боевой путь дивизии» → 查看师的征战历程 — верно."
+    },
+    "24250": {
+      "context": "ID_MINES_STEP_3",
+      "collegium": "reject",
+      "deepseek": "pass",
+      "qwen": "reject",
+      "label": "WEAK",
+      "reason": "«считаются уничтоженными» → 被视为已清除 «расчищены». Оттенок, minor; critical завышен."
+    },
+    "24252": {
+      "context": "ID_MINES_STEP_5",
+      "collegium": "reject",
+      "deepseek": "pass",
+      "qwen": "reject",
+      "label": "FP",
+      "reason": "«больше 12 минных полей» → 超过12个雷区 — верно."
+    }
+  },
+  "ground_truth": {
+    "24130": {
+      "context": "ID_AGITATION_CAMPAIGN_PURCHASE_QUESTION",
+      "severity": "critical",
+      "detectability": "intra",
+      "outcome": "caught-reject"
+    },
+    "24160": {
+      "context": "ID_CARAVAN_ON_PATH_TO_HOME_ROBBERY_FAILED_DESC",
+      "severity": "major",
+      "detectability": "intra",
+      "outcome": "caught-flag"
+    },
+    "24161": {
+      "context": "ID_CARAVAN_ON_PATH_TO_HOME_ROBBERY_SUCCESS_DESC",
+      "severity": "major",
+      "detectability": "intra",
+      "outcome": "caught-flag"
+    },
+    "24180": {
+      "context": "ID_USER_LOST_ARMED_PROVINCE_DESC",
+      "severity": "critical",
+      "detectability": "intra",
+      "outcome": "caught-reject"
+    },
+    "24181": {
+      "context": "ID_USER_FAILED_CAPTURED_ARMED_PROVINCE_DESC",
+      "severity": "critical",
+      "detectability": "intra",
+      "outcome": "caught-reject"
+    },
+    "24182": {
+      "context": "ID_AI_FAILED_CAPTURED_ARMED_PROVINCE_DESC",
+      "severity": "critical",
+      "detectability": "intra",
+      "outcome": "caught-reject"
+    },
+    "24183": {
+      "context": "ID_USER_WIN_NAVY_BATTLE_CASUALITIES_DESC",
+      "severity": "major",
+      "detectability": "intra",
+      "outcome": "MISSED"
+    },
+    "24184": {
+      "context": "ID_USER_LOSE_NAVY_BATTLE_CASUALITIES_DESC",
+      "severity": "major",
+      "detectability": "intra",
+      "outcome": "MISSED"
+    },
+    "24190": {
+      "context": "ID_USER_LOST_ARMED_PROVINCE_NAME",
+      "severity": "major",
+      "detectability": "intra",
+      "outcome": "MISSED"
+    },
+    "24194": {
+      "context": "ID_DETAILED_BATTLE_LOG",
+      "severity": "major",
+      "detectability": "intra",
+      "outcome": "caught-flag"
+    },
+    "24200": {
+      "context": "ID_ENEMY_SURVIVORS",
+      "severity": "major",
+      "detectability": "cross",
+      "outcome": "MISSED"
+    },
+    "24221": {
+      "context": "ID_DIVISION_WITH_EXP_LVL_DIED_DESC",
+      "severity": "critical",
+      "detectability": "intra",
+      "outcome": "caught-flag-UNDERGRADED"
+    },
+    "24240": {
+      "context": "ID_CARAVAN_LAUNCH_OFFER_OPTION_ACCEPT_FAST",
+      "severity": "major",
+      "detectability": "cross",
+      "outcome": "MISSED"
+    },
+    "24241": {
+      "context": "ID_CARAVAN_BOOST_FOR_GOLD_FAILED",
+      "severity": "major",
+      "detectability": "cross",
+      "outcome": "MISSED"
+    }
+  }
+}
