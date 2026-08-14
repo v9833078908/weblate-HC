@@ -32,11 +32,11 @@ class Command(BaseCommand):
     help = "reports LLM token usage and cost grouped by model and project"
 
     def add_arguments(self, parser: CommandParser) -> None:
-        parser.add_argument("--days", type=int, default=None, help="only the last N days")
-        parser.add_argument("--model", default=None, help="only this model")
         parser.add_argument(
-            "--project", default=None, help="only this project slug"
+            "--days", type=int, default=None, help="only the last N days"
         )
+        parser.add_argument("--model", default=None, help="only this model")
+        parser.add_argument("--project", default=None, help="only this project slug")
         parser.add_argument("--format", choices=["table", "csv"], default="table")
 
     def handle(self, *args, **options) -> None:

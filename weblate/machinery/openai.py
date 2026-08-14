@@ -125,42 +125,40 @@ class BaseOpenAITranslation(BaseLLMTranslation):
         and the exception is logged so a broken table is visible in the log.
         """
         try:
-            if not isinstance(payload, dict):
-                return
-            usage = payload.get("usage")
-            if not isinstance(usage, dict):
-                return
-            prompt_tokens = usage.get("prompt_tokens") or 0
-            completion_tokens = usage.get("completion_tokens") or 0
-            total_tokens = usage.get("total_tokens") or (
-                prompt_tokens + completion_tokens
-            )
-            if not prompt_tokens and not completion_tokens:
-                return
-            cost = usage.get("cost")
-            prompt_details = usage.get("prompt_tokens_details") or {}
-            completion_details = usage.get("completion_tokens_details") or {}
-            project = self.settings.get("_project")
-            if project is not None:
-                project_slug = project.slug
-            else:
-                project_slug = llm_batch_project.get()
-            # ruff: ignore[import-outside-top-level]
-            from weblate.trans.models.llm_usage import LLMUsageLog
-
-            LLMUsageLog.objects.create(
-                model=model,
-                project_slug=project_slug,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=total_tokens,
-                cost_usd=Decimal(str(cost)) if cost else None,
-                response_id=str(payload.get("id") or ""),
-                cached_tokens=prompt_details.get("cached_tokens") or 0,
-                reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
-            )
+            self._write_llm_usage(payload, model)
         except Exception:
             LOGGER.exception("Failed to record LLM usage")
+
+    def _write_llm_usage(self, payload: dict[str, Any], model: str) -> None:
+        if not isinstance(payload, dict):
+            return
+        usage = payload.get("usage")
+        if not isinstance(usage, dict):
+            return
+        prompt_tokens = usage.get("prompt_tokens") or 0
+        completion_tokens = usage.get("completion_tokens") or 0
+        total_tokens = usage.get("total_tokens") or (prompt_tokens + completion_tokens)
+        if not prompt_tokens and not completion_tokens:
+            return
+        cost = usage.get("cost")
+        prompt_details = usage.get("prompt_tokens_details") or {}
+        completion_details = usage.get("completion_tokens_details") or {}
+        project = self.settings.get("_project")
+        project_slug = project.slug if project is not None else llm_batch_project.get()
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.llm_usage import LLMUsageLog
+
+        LLMUsageLog.objects.create(
+            model=model,
+            project_slug=project_slug if isinstance(project_slug, str) else "",
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            cost_usd=Decimal(str(cost)) if cost else None,
+            response_id=str(payload.get("id") or ""),
+            cached_tokens=prompt_details.get("cached_tokens") or 0,
+            reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
+        )
 
     def get_chat_payload(
         self,

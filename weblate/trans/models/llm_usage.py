@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from django.db import models
 
 
@@ -33,7 +35,7 @@ class LLMUsageLog(models.Model):
     reasoning_tokens = models.IntegerField(default=0)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering: ClassVar[list[str]] = ["-created_at"]
 
     def __str__(self) -> str:
         return f"{self.model} {self.total_tokens} tokens ${self.cost_usd}"

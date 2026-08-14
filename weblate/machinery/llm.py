@@ -61,6 +61,7 @@ def _sources_project_slug(sources: list[tuple[str, Unit | None]]) -> str:
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
     from django_stubs_ext import StrOrPromise
 
     from weblate.checks.base import Highlight, HighlightKind

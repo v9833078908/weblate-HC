@@ -9,10 +9,10 @@ import os
 import re
 from copy import copy
 from datetime import UTC, datetime
+from decimal import Decimal
 from functools import partial
 from io import StringIO
 from pathlib import Path
-from decimal import Decimal
 from typing import TYPE_CHECKING, ClassVar, NoReturn, cast
 from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 from urllib.parse import parse_qs, urlparse
@@ -101,6 +101,7 @@ from weblate.machinery.yandexv2 import YandexV2Translation
 from weblate.machinery.youdao import YoudaoTranslation
 from weblate.memory.machine import WeblateMemory
 from weblate.trans.models import Category, Component, Project, Unit
+from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.tests.factories import make_language, make_unit
 from weblate.trans.tests.test_views import (
     FixtureComponentTestCase,
@@ -3938,8 +3939,6 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
     @http_mock.activate
     def test_usage_recorded(self) -> None:
-        from weblate.trans.models.llm_usage import LLMUsageLog
-
         LLMUsageLog.objects.all().delete()
         self.mock_response_priced()
         self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
@@ -3955,8 +3954,6 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
     @http_mock.activate
     def test_usage_recorded_async(self) -> None:
-        from weblate.trans.models.llm_usage import LLMUsageLog
-
         LLMUsageLog.objects.all().delete()
         self.mock_response_priced()
         self.assert_async_translate(
@@ -3966,8 +3963,6 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
     @http_mock.activate
     def test_usage_cost_zero_is_unpriced(self) -> None:
-        from weblate.trans.models.llm_usage import LLMUsageLog
-
         LLMUsageLog.objects.all().delete()
         self.mock_response_unpriced()  # usage without cost
         self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
@@ -3977,18 +3972,13 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
     @http_mock.activate
     def test_usage_missing_means_no_record(self) -> None:
-        from weblate.trans.models.llm_usage import LLMUsageLog
-
         LLMUsageLog.objects.all().delete()
         self.mock_chat_usage(None)
         self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
         self.assertEqual(LLMUsageLog.objects.count(), 0)
 
-
     @http_mock.activate
     def test_usage_record_failure_does_not_break_translation(self) -> None:
-        from weblate.trans.models.llm_usage import LLMUsageLog
-
         LLMUsageLog.objects.all().delete()
         self.mock_response_priced()
         with patch.object(

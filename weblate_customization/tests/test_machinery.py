@@ -18,6 +18,7 @@ from weblate_customization.machinery import (
 
 from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.openai import OpenAITranslation
+from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.tests import http_mock
 
 if TYPE_CHECKING:
@@ -331,8 +332,6 @@ class RoutedDownloadTest(TestCase):
 
     @http_mock.activate
     def test_usage_recorded_through_inherited_seam(self) -> None:
-        from weblate.trans.models.llm_usage import LLMUsageLog
-
         mock_chat()  # usage 9/2/11, no cost
         self.machine().download_multiple_translations("en", "ja", [("Hello", None)])
         log = LLMUsageLog.objects.get()
