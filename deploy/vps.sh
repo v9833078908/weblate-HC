@@ -37,6 +37,7 @@ cd "$(dirname "$0")"
 CONTAINER=hc-vpn-gw
 IMAGE=hc-vpn-gw
 SOCKS_PORT=${SOCKS_PORT:-11080}
+TUN_MTU=${TUN_MTU:-1100}
 SECRETS_DIR="${TMPDIR:-/tmp}/hc-vpn-gw-secrets"
 REPO_DIR=/srv/hcgameloc
 WEBLATE_CONTAINER=hcgameloc-weblate-1
@@ -63,7 +64,10 @@ gateway_running() {
 
 gateway_up() {
     if gateway_running; then
-        echo "Gateway already running (SOCKS5 on 127.0.0.1:$SOCKS_PORT)."
+        # Re-apply in case the container was restarted by Docker: the MTU set
+        # below is runtime state and does not survive a restart.
+        docker exec "$CONTAINER" ip link set dev tun0 mtu "$TUN_MTU"
+        echo "Gateway already running (SOCKS5 on 127.0.0.1:$SOCKS_PORT, tun0 MTU $TUN_MTU)."
         return 0
     fi
 
@@ -89,7 +93,13 @@ gateway_up() {
 
     for _ in $(seq 1 45); do
         if docker logs "$CONTAINER" 2>&1 | grep -q "SOCKS5 listening"; then
-            echo "Gateway up: SOCKS5 on 127.0.0.1:$SOCKS_PORT"
+            # The office VPN server hands out tun0 with MTU 1500 while the real
+            # path is smaller, and it neither fragments nor returns ICMP. Packets
+            # above ~1100 bytes leaving the tunnel are dropped silently, which
+            # breaks SSH: the key exchange has to send a ~1.2 KB packet and stalls
+            # forever at SSH2_MSG_KEX_ECDH_REPLY while small requests keep working.
+            docker exec "$CONTAINER" ip link set dev tun0 mtu "$TUN_MTU"
+            echo "Gateway up: SOCKS5 on 127.0.0.1:$SOCKS_PORT (tun0 MTU $TUN_MTU)"
             return 0
         fi
         if ! gateway_running; then
