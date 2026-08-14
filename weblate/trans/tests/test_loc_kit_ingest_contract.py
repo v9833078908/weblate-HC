@@ -44,6 +44,7 @@ from translate.storage.pypo import pofile
 from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Permission, Role, User
 from weblate.formats.models import FILE_FORMATS
+from weblate.glossary.tasks import sync_terminology
 from weblate.lang.models import Language
 from weblate.machinery.llm import BaseLLMTranslation
 from weblate.trans import loc_kit
@@ -2338,3 +2339,83 @@ class LocKitGlossaryUpdateApplyTest(ViewTestCase):
             response, "Descriptions from this table will be added"
         )
         self.assertNotContains(response, "Create glossary component")
+
+
+class LocKitGlossaryAppendTerminologySyncTest(ViewTestCase):
+    """Appended terms stay usable in later components through terminology sync."""
+
+    CREATE_GLOSSARIES: bool = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        self.factory = RequestFactory()
+        self.glossary = self.project.glossaries[0]
+        self.cs = self.glossary.translation_set.get(language__code="cs")
+
+    def _request(self):
+        request = self.factory.post("/")
+        request.user = self.user
+        return request
+
+    def test_sync_mirrors_new_term_without_touching_targets(self) -> None:
+        # An existing translated term must survive the sync untouched.
+        context = _context_key("Characters", "Hero")
+        self.glossary.source_translation.add_unit(
+            None, context, "Hero", author=self.user
+        )
+        hero = self.cs.unit_set.get(context=context, source="Hero")
+        hero.target = "Hrdina"
+        hero.state = STATE_TRANSLATED
+        hero.save(update_fields=["target", "state"], same_content=True)
+
+        # The new term lands in English and Polish only.
+        preview = _append_preview(
+            {"values": {"en": "Blade", "pl": "Ostrze"}}, source_language="en"
+        )
+        loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
+
+        source_unit = self.glossary.source_translation.unit_set.get(source="Blade")
+        self.assertIn("terminology", source_unit.extra_flags)
+
+        # A later ordinary component gains a language the glossary lacks;
+        # the sync must create the glossary language and mirror the term.
+        # (The stock test component ships with new_lang="contact", which
+        # blocks add_new_language on purpose; opt this component in.)
+        self.component.new_base = "po/hello.pot"
+        self.component.new_lang = "add"
+        self.component.save(update_fields=["new_base", "new_lang"])
+        self.component.add_new_language(Language.objects.get(code="fr"), None)
+
+        sync_terminology(self.glossary.pk, self.glossary)
+
+        # Structural pairs appear in every glossary language, empty ...
+        self.assertEqual(self.cs.unit_set.get(source="Blade").target, "")
+        de = self.glossary.translation_set.get(language__code="de")
+        self.assertTrue(de.unit_set.filter(source="Blade").exists())
+        fr = self.glossary.translation_set.get(language__code="fr")
+        self.assertEqual(fr.unit_set.get(source="Blade").target, "")
+        pl = self.glossary.translation_set.get(language__code="pl")
+        self.assertEqual(pl.unit_set.get(source="Blade").target, "Ostrze")
+        # ... and the existing translated target is unchanged.
+        hero.refresh_from_db()
+        self.assertEqual(hero.target, "Hrdina")
+
+    def test_japanese_target_and_explanations_survive_sync(self) -> None:
+        preview = _append_preview(
+            {
+                "values": {"en": "Mage", "ja": "Mahou"},
+                "notes": {"source": "Casts spells.", "target": {"ja": "Spellcaster."}},
+            },
+            source_language="en",
+        )
+        loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
+
+        sync_terminology(self.glossary.pk, self.glossary)
+
+        ja = self.glossary.translation_set.get(language__code="ja")
+        ja_unit = ja.unit_set.get(source="Mage")
+        self.assertEqual(ja_unit.target, "Mahou")
+        self.assertEqual(ja_unit.explanation, "Spellcaster.")
+        self.assertEqual(ja_unit.source_unit.explanation, "Casts spells.")
