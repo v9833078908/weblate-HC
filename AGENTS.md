@@ -238,6 +238,28 @@ Repository-specific parts:
   gated by `LOC_KIT_PROFILE_ANALYSIS_ENABLED` (all off by default); it does
   **not** reuse `RoutedLLMTranslation` or its machine-translation
   configuration, and users cannot supply an endpoint, key, or model.
+  `append_glossary_terms(request, component, preview) -> GlossaryAppendResult`
+  is the append-only counterpart: it applies a validated preview to an
+  *existing* glossary component and never overwrites anything already
+  there. Identity is `(context, source)`; a match is the old term, and its
+  target, explanations, and flags stay untouched no matter what the table
+  carries for it. A blank target cell or an absent language column is a
+  per-language partial-success skip (`blank`/`absent` on
+  `GlossaryLanguageAppendResult`), not an apply-wide failure; apply is
+  blocked entirely only on a source-language mismatch or a same-source/
+  different-context conflict (`GlossaryAppendCollisionError`). A missing
+  target language is created automatically when a new term needs it and
+  the actor holds `translation.add`/`glossary.add`, otherwise that
+  language is `unavailable` while the rest of the table still applies. New
+  terms keep their source/target explanations
+  (`Unit.update_explanation`) and are flagged `terminology`, so background
+  `sync_terminology` later mirrors them into languages added afterwards.
+  `LocKitImportDraft.target_component` distinguishes an update draft,
+  bound to one existing glossary and gated by `upload.perform` on it
+  rather than the wizard's project-creation permission;
+  `LocKitGlossaryConfirmView` explicitly refuses a draft with
+  `target_component` set, so that weaker permission can never reach
+  component creation.
 
 Local modifications to `dev-docker/docker-compose.yml`: Postgres published on
 `5434` (5433 is taken by another project) and `WEBLATE_VCS_ALLOW_SCHEMES` extended

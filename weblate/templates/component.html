@@ -92,6 +92,12 @@
           <li>
             <a class="dropdown-item" data-bs-target="#upload" data-bs-toggle="tab" href="#">{% translate "Upload translation" %}</a>
           </li>
+          {% if object.is_glossary %}
+            <li>
+              <a class="dropdown-item"
+                 href="{% url 'loc-kit-glossary-update' path=object.get_url_path %}">{% translate "Add new glossary terms from a loc-kit table" %}</a>
+            </li>
+          {% endif %}
         {% endif %}
       </ul>
     </li>

@@ -4,6 +4,7 @@
 
 {% block breadcrumbs %}
   <li><a href="{% url 'create-component-zip' %}">{% translate "Create component" %}</a></li>
+  {% if draft.target_component %}<li><a href="{% url 'show' path=draft.target_component.get_url_path %}">{{ draft.target_component }}</a></li>{% endif %}
   <li><a href="#">{% translate "Glossary preview" %}</a></li>
 {% endblock breadcrumbs %}
 
@@ -144,16 +145,37 @@
 
       <hr />
 
-      <form action="{% url 'loc-kit-glossary-preview' token=draft.token %}"
-            method="post"
-            class="form-inline">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="confirm" />
-        <input type="submit"
-               value="{% translate "Create glossary component" %}"
-               class="btn btn-primary"
-               {% if not preview %}disabled{% endif %} />
-      </form>
+      {% if draft.target_component %}
+        <p class="help-block">
+          {% translate "Only brand-new terms are added. Existing terms and their notes will not change, and blank target cells are skipped instead of clearing anything." %}
+        </p>
+        {% if preview.note_count %}
+          <div class="alert alert-success" role="alert">
+            {% translate "Descriptions from this table will be added to new glossary terms. Existing terms and descriptions are not changed." %}
+          </div>
+        {% endif %}
+        <form action="{% url 'loc-kit-glossary-preview' token=draft.token %}"
+              method="post"
+              class="form-inline">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="apply" />
+          <input type="submit"
+                 value="{% translate "Add new terms" %}"
+                 class="btn btn-primary"
+                 {% if not preview %}disabled{% endif %} />
+        </form>
+      {% else %}
+        <form action="{% url 'loc-kit-glossary-preview' token=draft.token %}"
+              method="post"
+              class="form-inline">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="confirm" />
+          <input type="submit"
+                 value="{% translate "Create glossary component" %}"
+                 class="btn btn-primary"
+                 {% if not preview %}disabled{% endif %} />
+        </form>
+      {% endif %}
 
       <form action="{% url 'loc-kit-glossary-preview' token=draft.token %}"
             method="post"

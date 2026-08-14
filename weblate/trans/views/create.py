@@ -23,7 +23,7 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.functional import cached_property
 from django.utils.http import urlencode
-from django.utils.translation import gettext
+from django.utils.translation import gettext, ngettext
 from django.views.generic.base import TemplateView, View
 from django.views.generic.edit import CreateView
 
@@ -39,6 +39,7 @@ from weblate.trans.forms import (
     ComponentScratchCreateForm,
     ComponentSelectForm,
     ComponentZipCreateForm,
+    LocKitGlossaryUpdateForm,
     LocKitProfileCorrectionForm,
     LocKitSheetSelectForm,
     ProjectCreateForm,
@@ -51,9 +52,12 @@ from weblate.trans.inherited_settings import (
     get_inherit_field_name,
 )
 from weblate.trans.loc_kit import (
+    GlossaryAppendCollisionError,
+    GlossaryAppendResult,
     GlossaryProfileError,
     ProfileProposalError,
     SampleTooLargeError,
+    append_glossary_terms,
     build_glossary_structure_sample,
     cap_preview_warnings,
     profile_document_from_envelope,
@@ -66,11 +70,13 @@ from weblate.trans.tasks import import_project_backup, perform_update
 from weblate.utils import messages
 from weblate.utils.celery import store_task_metadata
 from weblate.utils.licenses import LICENSE_URLS, detect_license
+from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.ratelimit import check_rate_limit, session_ratelimit_post
 from weblate.utils.views import (
     KIT_TABLE_SUFFIXES,
     create_component_from_doc,
     create_component_from_kit,
+    parse_path,
 )
 from weblate.vcs.base import RepositoryError
 from weblate.vcs.git import LocalRepository
@@ -714,31 +720,32 @@ class CreateFromZip(CreateComponent):
         # mid-parse would roll the row back and leave the file behind.
         draft.uploaded.save(filename, ContentFile(payload), save=False)
         try:
-            return self._insert_draft_and_map(draft, sheets)
+            return _insert_draft_and_map(self.request, draft, sheets)
         except Exception:
             draft.delete_storage()
             raise
 
-    def _insert_draft_and_map(self, draft, sheets):
-        """Insert the draft row and, for a single sheet, map it locally."""
-        draft.save()
-        if len(sheets) > 1:
-            # Several worksheets: the operator has to choose one, and that
-            # POST runs the full analysis path.
-            return redirect("loc-kit-sheet-select", token=draft.token)
-        # A CSV/TSV always has exactly one sheet; the selection screen is
-        # noise. Only the deterministic step may run here: this POST is
-        # atomic, a provider call inside it would hold a transaction open
-        # for the whole network timeout.
-        sheet_name, rows = next(iter(sheets.items()))
-        draft.sheet = sheet_name
-        draft.state = LocKitImportDraft.State.SHEET_SELECTED
-        draft.save(update_fields=["sheet", "state"])
-        infer_error = _infer_draft_profile(draft, rows)
-        if infer_error is None:
-            return redirect("loc-kit-glossary-preview", token=draft.token)
-        messages.info(self.request, infer_error)
+
+def _insert_draft_and_map(request: AuthenticatedHttpRequest, draft, sheets):
+    """Insert the draft row and, for a single sheet, map it locally."""
+    draft.save()
+    if len(sheets) > 1:
+        # Several worksheets: the operator has to choose one, and that
+        # POST runs the full analysis path.
         return redirect("loc-kit-sheet-select", token=draft.token)
+    # A CSV/TSV always has exactly one sheet; the selection screen is
+    # noise. Only the deterministic step may run here: this POST is
+    # atomic, a provider call inside it would hold a transaction open
+    # for the whole network timeout.
+    sheet_name, rows = next(iter(sheets.items()))
+    draft.sheet = sheet_name
+    draft.state = LocKitImportDraft.State.SHEET_SELECTED
+    draft.save(update_fields=["sheet", "state"])
+    infer_error = _infer_draft_profile(draft, rows)
+    if infer_error is None:
+        return redirect("loc-kit-glossary-preview", token=draft.token)
+    messages.info(request, infer_error)
+    return redirect("loc-kit-sheet-select", token=draft.token)
 
 
 class CreateFromDoc(CreateComponent):
@@ -1040,6 +1047,20 @@ class LocKitDraftMixin(View):
         )
         if draft is None:
             raise Http404
+        # An update draft is bound to an existing glossary component and
+        # is gated by upload access on that component, not by the
+        # component-creation wizard. translation.add is deliberately not
+        # required here: without it an operator can still add data to the
+        # languages that already exist.
+        if draft.target_component_id is not None:
+            component = draft.target_component
+            if (
+                not component.is_glossary
+                or component.locked
+                or not self.request.user.has_perm("upload.perform", component)
+            ):
+                raise Http404
+            return draft
         # Exactly the wizard's gate, billing included. A permission revoked
         # (or billing lapsed) mid-flight makes the draft unavailable.
         if (
@@ -1327,12 +1348,128 @@ class LocKitGlossaryPreviewView(LocKitDraftMixin, TemplateView):
                 messages.error(request, error)
             return redirect("loc-kit-glossary-preview", token=draft.token)
 
+        if action == "apply":
+            return self._apply_update(request, draft)
+
         if action == "confirm":
             if draft.state != LocKitImportDraft.State.PREVIEW_READY:
                 raise Http404
             return redirect("loc-kit-glossary-confirm", token=draft.token)
 
         raise Http404
+
+    def _apply_update(
+        self, request: AuthenticatedHttpRequest, draft: LocKitImportDraft
+    ):
+        """Append brand-new terms to the draft's existing glossary."""
+        component = draft.target_component
+        if component is None or draft.state != LocKitImportDraft.State.PREVIEW_READY:
+            raise Http404
+        sheets = self.read_draft_sheets(draft)
+        if draft.sheet not in sheets:
+            raise Http404
+        # The stored profile is re-validated against the same worksheet,
+        # exactly like the creation confirm: the preview JSON is display
+        # data, never the application input.
+        try:
+            preview = validate_glossary_profile(
+                profile_document=json.loads(draft.profile_json),
+                rows=sheets[draft.sheet],
+                sheet_name=draft.sheet,
+                component_name=component.slug,
+            )
+        except GlossaryProfileError as error:
+            messages.error(
+                request, f"{error.message} {' '.join(error.details)}".strip()
+            )
+            return redirect("loc-kit-glossary-preview", token=draft.token)
+        if preview.source_language != component.source_language.code:
+            messages.error(
+                request,
+                gettext(
+                    "The table's source language does not match the glossary's "
+                    "source language."
+                ),
+            )
+            return redirect("loc-kit-glossary-preview", token=draft.token)
+        try:
+            result = append_glossary_terms(request, component, preview)
+        except GlossaryAppendCollisionError as error:
+            messages.error(request, str(error))
+            for source, existing_context, incoming_context in error.conflicts:
+                messages.error(
+                    request,
+                    gettext(
+                        "“%(source)s” is already a glossary term under "
+                        "“%(existing)s”, but the table places it under "
+                        "“%(incoming)s”."
+                    )
+                    % {
+                        "source": source,
+                        "existing": existing_context,
+                        "incoming": incoming_context,
+                    },
+                )
+            return redirect("loc-kit-glossary-preview", token=draft.token)
+        except WeblateLockTimeoutError:
+            messages.error(
+                request,
+                gettext(
+                    "The glossary is busy right now; nothing was changed. "
+                    "Please retry in a moment."
+                ),
+            )
+            return redirect("loc-kit-glossary-preview", token=draft.token)
+        if self._report_append_outcome(request, result):
+            draft.delete_storage()
+            draft.delete()
+            return redirect(component)
+        # Nothing applicable: the outcome is shown as information and the
+        # draft stays so the operator can review the table.
+        return redirect("loc-kit-glossary-preview", token=draft.token)
+
+    @staticmethod
+    def _report_append_outcome(
+        request: AuthenticatedHttpRequest, result: GlossaryAppendResult
+    ) -> bool:
+        """Message the per-language outcome; True when terms were added."""
+        if result.added_terms:
+            messages.success(
+                request,
+                ngettext(
+                    "%d new glossary term added.",
+                    "%d new glossary terms added.",
+                    result.added_terms,
+                )
+                % result.added_terms,
+            )
+        else:
+            messages.info(
+                request,
+                gettext(
+                    "No new glossary terms were added; the draft is kept so "
+                    "you can review the table."
+                ),
+            )
+        for code, language in result.languages.items():
+            parts = [
+                ngettext("%d added", "%d added", language.added) % language.added
+                if language.added
+                else "",
+                ngettext("%d existing", "%d existing", language.existing)
+                % language.existing
+                if language.existing
+                else "",
+                ngettext("%d blank", "%d blank", language.blank) % language.blank
+                if language.blank
+                else "",
+                gettext("no column in the table") if language.absent else "",
+                language.unavailable,
+            ]
+            detail = ", ".join(part for part in parts if part)
+            if detail:
+                messages.info(request, f"{code}: {detail}")
+        return bool(result.added_terms)
 
 
 # Fields the conversion decides. The operator may not change them at the final
@@ -1381,7 +1518,16 @@ class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
 
     @cached_property
     def draft(self) -> LocKitImportDraft:
-        return self.get_draft(self.kwargs["token"])
+        draft = self.get_draft(self.kwargs["token"])
+        # get_draft() deliberately relaxes its gate for update drafts to
+        # upload.perform on the existing glossary, skipping the wizard's
+        # creatable-projects check entirely (see the docstring above). This
+        # view creates a brand-new component, so an update draft must never
+        # reach it: that would let upload.perform on one glossary create an
+        # unrelated component the actor cannot otherwise create.
+        if draft.target_component_id is not None:
+            raise Http404
+        return draft
 
     def locked_values(self) -> dict:
         draft = self.draft
@@ -1495,3 +1641,81 @@ class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
         draft.delete()
         transaction.on_commit(lambda: flag_glossary_terminology.delay(self.object.pk))
         return response
+
+
+@method_decorator(login_required, name="dispatch")
+class LocKitGlossaryUpdateStartView(TemplateView):
+    """
+    Stage a loc-kit table that appends new terms to one existing glossary.
+
+    Nothing about the glossary changes until the preview is applied: the
+    upload stays in a temporary draft exactly like the creation flow, and
+    the same deterministic mapping runs for a single-sheet table.
+    """
+
+    template_name = "trans/loc_kit_glossary_update.html"
+
+    def get_component(self) -> Component:
+        component = parse_path(self.request, self.kwargs["path"], (Component,))
+        if (
+            not component.is_glossary
+            or component.locked
+            or not self.request.user.has_perm("upload.perform", component)
+        ):
+            raise Http404
+        return component
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["object"] = self.get_component()
+        context["form"] = kwargs.get("form") or LocKitGlossaryUpdateForm()
+        return context
+
+    @transaction.atomic
+    def post(self, request: AuthenticatedHttpRequest, **kwargs):
+        component = self.get_component()
+        form = LocKitGlossaryUpdateForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form))
+        uploaded = form.cleaned_data["table"]
+        # ruff: ignore[import-outside-top-level]
+        from loc_kit_ingest.reader import ReaderError, read_sheets
+
+        filename = os.path.basename(getattr(uploaded, "name", "") or "")
+        uploaded.seek(0)
+        payload = uploaded.read()
+
+        # Read locally first: an unreadable file must fail here, before a
+        # draft exists and long before anything could touch the glossary.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            local = Path(tmpdir) / filename
+            local.write_bytes(payload)
+            try:
+                sheets = read_sheets(local)
+            except ReaderError as error:
+                form.add_error("table", gettext("Could not read the table: %s") % error)
+                return self.render_to_response(self.get_context_data(form=form))
+        if not sheets:
+            form.add_error("table", gettext("The table holds no worksheets."))
+            return self.render_to_response(self.get_context_data(form=form))
+
+        if not request.session.session_key:
+            request.session.create()
+
+        draft = LocKitImportDraft(
+            owner=request.user,
+            session_key=request.session.session_key or "",
+            project=component.project,
+            slug=component.slug,
+            name=component.name,
+            source_filename=filename,
+            target_component=component,
+        )
+        # Storage is not transactional; undo the write if the row or the
+        # deterministic mapping fails (see CreateFromZip._start_glossary_draft).
+        draft.uploaded.save(filename, ContentFile(payload), save=False)
+        try:
+            return _insert_draft_and_map(request, draft, sheets)
+        except Exception:
+            draft.delete_storage()
+            raise

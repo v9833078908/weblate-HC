@@ -60,6 +60,13 @@ class LocKitImportDraft(models.Model):
         blank=True,
         related_name="loc_kit_import_drafts",
     )
+    target_component = models.ForeignKey(
+        "trans.Component",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="loc_kit_update_drafts",
+    )
     slug = models.SlugField(max_length=COMPONENT_NAME_LENGTH)
     name = models.CharField(max_length=COMPONENT_NAME_LENGTH)
     source_filename = models.CharField(max_length=FILENAME_LENGTH)

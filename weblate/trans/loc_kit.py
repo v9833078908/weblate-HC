@@ -26,12 +26,15 @@ from django.conf import settings
 from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
 
+from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.requests import fetch_validated_url
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
-    from loc_kit_ingest.model import Diagnostic
+    from loc_kit_ingest.model import Diagnostic, GlossaryTerm
+    from weblate.auth.models import AuthenticatedHttpRequest
+    from weblate.trans.models import Component, Translation
 
 
 # Fixed OpenRouter chat-completions endpoint. Not configurable, never derived
@@ -615,6 +618,11 @@ class GlossaryPreview:
     note_count: int
     warnings: tuple[str, ...]
     terms: tuple[GlossaryTermPreview, ...]
+    # The full validated set, uncapped. Never serialized into
+    # draft.preview_json and never rendered by the UI: the preview table
+    # is a bounded sanity sample, while an append apply must not lose rows
+    # past PREVIEW_TERM_LIMIT.
+    all_terms: tuple[GlossaryTerm, ...]
     profile_json: str
     files: dict[str, bytes]
 
@@ -810,9 +818,369 @@ def validate_glossary_profile(
             if d.severity is not Severity.ERROR
         ),
         terms=terms,
+        all_terms=tuple(glossary_terms),
         profile_json=_canonical_profile_json(document),
         files=files,
     )
+
+
+# --------------------------------------------------------------------------- #
+# Append-only application of a validated preview to an existing glossary
+# --------------------------------------------------------------------------- #
+
+# How many conflicts a collision error carries into the UI. The operator
+# resolves them one by one; the whole table never lands in an exception.
+COLLISION_REPORT_LIMIT = 10
+
+
+@dataclass(frozen=True)
+class GlossaryLanguageAppendResult:
+    """Independent per-language counters for one append run."""
+
+    added: int = 0
+    existing: int = 0
+    blank: int = 0
+    absent: bool = False
+    unavailable: str = ""
+    unavailable_count: int = 0
+
+
+@dataclass(frozen=True)
+class GlossaryAppendResult:
+    languages: Mapping[str, GlossaryLanguageAppendResult]
+    added_terms: int
+
+
+class GlossaryAppendCollisionError(Exception):
+    """A source is already known under another glossary context."""
+
+    def __init__(
+        self, message: str, *, conflicts: Sequence[tuple[str, str, str]]
+    ) -> None:
+        super().__init__(message)
+        # (source, existing context, incoming context), capped for the UI.
+        self.conflicts = tuple(conflicts[:COLLISION_REPORT_LIMIT])
+
+
+def _term_source(term: GlossaryTerm, source_language: str) -> str:
+    return term.values.get(source_language, "")
+
+
+def _classify_incoming_terms(
+    preview: GlossaryPreview,
+    existing_keys: set[tuple[str, str]],
+):
+    """
+    Split the validated terms against the glossary's current identity set.
+
+    Identity is ``(context, source)``. A matching identity is the old term:
+    its targets, notes and flags must stay untouched. The same source under
+    a different context is a conflict, never a silent second entry.
+    """
+    existing_contexts: dict[str, str] = {}
+    for context, source in existing_keys:
+        existing_contexts.setdefault(source, context)
+    existing_sources = set(existing_contexts)
+
+    new_terms = []
+    incoming_sources: set[str] = set()
+    collisions = []
+    for term in preview.all_terms:
+        source = _term_source(term, preview.source_language)
+        key = (term.context, source)
+        if key in existing_keys:
+            continue
+        if source in existing_sources or source in incoming_sources:
+            collisions.append((source, existing_contexts.get(source, ""), term.context))
+            continue
+        incoming_sources.add(source)
+        new_terms.append(term)
+    return new_terms, collisions
+
+
+def _resolve_missing_language(
+    request: AuthenticatedHttpRequest, component: Component, code: str
+):
+    """
+    Create an absent target language, or explain why it stays unavailable.
+
+    The allowed language is picked exactly like the standard Weblate form:
+    ``translation.add_more`` lifts the project's addable-language filter.
+    """
+    user = request.user
+    if not user.has_perm("translation.add", component.project):
+        return _(
+            "Adding a language requires the “Add language for translation” permission."
+        )
+    if not user.has_perm("glossary.add", component.project):
+        return _(
+            "Adding glossary entries requires the “Add glossary entry” permission."
+        )
+    languages = component.get_all_available_languages()
+    if not user.has_perm("translation.add_more", component):
+        languages = languages.filter_for_add(component.project)
+    language = languages.filter(code=code).first()
+    if language is None:
+        return _("The language cannot be added in this project.")
+    if not component.can_add_new_language(user):
+        return str(component.new_lang_error_message)
+    return component.add_new_language(language, request) or str(
+        component.new_lang_error_message
+    )
+
+
+def _raise_collision(collisions: Sequence[tuple[str, str, str]]) -> None:
+    """Abort an apply because a source collides with an existing context."""
+    raise GlossaryAppendCollisionError(
+        _(
+            "Some source terms already exist under a different section. "
+            "Resolve the conflict before appending."
+        ),
+        conflicts=collisions,
+    )
+
+
+def _raise_missing_target_unit(source: str) -> None:
+    """Abort content application because add_unit unexpectedly returned None."""
+    msg = f"Could not add glossary term {source!r}"
+    raise ValueError(msg)
+
+
+# Two-phase locked apply (resolve languages, then write content) with
+# per-language partial success and content-failure compensation is
+# irreducibly this shaped; splitting it for these metrics would move state
+# across function boundaries without making the transaction easier to read.
+# ruff: ignore[complex-structure, too-many-statements, too-many-locals]
+def append_glossary_terms(
+    request: AuthenticatedHttpRequest, component: Component, preview: GlossaryPreview
+) -> GlossaryAppendResult:
+    """
+    Append brand-new terms from a validated preview to an existing glossary.
+
+    Existing terms are never changed: their targets, explanations and flags
+    stay untouched even when the table carries other values for them. Blank
+    cells, absent language columns and unavailable languages are partial
+    skips reported per language, not failures.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from django.db import transaction
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.checks.flags import Flags
+
+    # ruff: ignore[import-outside-top-level]
+    from weblate.utils.errors import report_error
+
+    user = request.user
+    target_codes = list(preview.target_languages)
+
+    # Preflight under the standard lock order: identity set, collisions and
+    # language resolution all run before any unit is written.
+    with component.locked_for_update() as locked_component:
+        existing_keys = set(
+            locked_component.source_translation.unit_set.values_list(
+                "context", "source"
+            )
+        )
+        new_terms, collisions = _classify_incoming_terms(preview, existing_keys)
+        if collisions:
+            _raise_collision(collisions)
+
+        translations_by_code = {
+            translation.language.code: translation
+            for translation in locked_component.translation_set.select_related(
+                "language"
+            )
+            if translation.language_id != locked_component.source_language_id
+        }
+
+        resolved_codes: set[str] = set()
+        unavailable_reasons: dict[str, str] = {}
+        created_by_this_apply: list[Translation] = []
+
+        # New terms decide which languages matter at all: a column whose
+        # cells are blank for every new term never creates a translation.
+        new_term_data: dict[str, int] = {
+            code: sum(1 for term in new_terms if term.values.get(code, "").strip())
+            for code in target_codes
+        }
+
+        for code in target_codes:
+            translation = translations_by_code.get(code)
+            if translation is not None:
+                if user.has_perm("unit.add", translation):
+                    resolved_codes.add(code)
+                else:
+                    unavailable_reasons[code] = _(
+                        "You do not have permission to add strings to this language."
+                    )
+            elif new_term_data[code]:
+                try:
+                    outcome = _resolve_missing_language(request, locked_component, code)
+                except WeblateLockTimeoutError:
+                    # A lock timeout is retryable for the whole operation;
+                    # it must reach the view without consuming the draft.
+                    raise
+                except Exception as error:
+                    # A VCS error on one language must not abort the whole
+                    # append; it stays unavailable and is reported while the
+                    # other languages continue.
+                    report_error(
+                        "Glossary append could not create a language",
+                        level="error",
+                        project=component.project,
+                        exception=error,
+                    )
+                    unavailable_reasons[code] = _(
+                        "The language file could not be created."
+                    )
+                    continue
+                if isinstance(outcome, str):
+                    unavailable_reasons[code] = outcome
+                # The file and its VCS commit exist now; re-check the
+                # write permission defensively before any content.
+                elif user.has_perm("unit.add", outcome):
+                    resolved_codes.add(code)
+                    created_by_this_apply.append(outcome)
+                else:
+                    unavailable_reasons[code] = _(
+                        "You do not have permission to add strings to this language."
+                    )
+                    try:
+                        outcome.remove(user)
+                    except Exception:
+                        report_error(
+                            "Could not remove a glossary language created "
+                            "for an append that lost its permission",
+                            level="error",
+                            project=component.project,
+                        )
+
+    counters = {
+        code: {"added": 0, "existing": 0, "blank": 0, "unavailable": 0}
+        for code in target_codes
+    }
+    added_source_terms = 0
+    content_failed = False
+
+    # ruff: ignore[too-many-statements-in-try-clause]
+    try:
+        # Second lock round: a concurrent change between the phases must not
+        # produce duplicates, so the identity set is rebuilt from the fresh
+        # component and every addition runs in one database transaction.
+        with component.locked_for_update() as fresh_component:
+            existing_keys = set(
+                fresh_component.source_translation.unit_set.values_list(
+                    "context", "source"
+                )
+            )
+            new_terms, collisions = _classify_incoming_terms(preview, existing_keys)
+            if collisions:
+                _raise_collision(collisions)
+            # Fresh translation objects: the preflight instances belong to
+            # the previous lock round and must never write content.
+            fresh_translations = {
+                translation.language.code: translation
+                for translation in fresh_component.translation_set.select_related(
+                    "language"
+                )
+                if translation.language_id != fresh_component.source_language_id
+            }
+            resolved = {
+                code: fresh_translations[code]
+                for code in resolved_codes
+                if code in fresh_translations
+            }
+            # ruff: ignore[too-many-statements-in-try-clause]
+            try:
+                with transaction.atomic():
+                    for term in new_terms:
+                        source = _term_source(term, preview.source_language)
+                        source_unit = None
+                        first_addition = True
+                        for code in target_codes:
+                            value = term.values.get(code, "").strip()
+                            if not value:
+                                counters[code]["blank"] += 1
+                                continue
+                            translation = resolved.get(code)
+                            if translation is None:
+                                counters[code]["unavailable"] += 1
+                                continue
+                            target_unit = translation.add_unit(
+                                request,
+                                term.context,
+                                source,
+                                value,
+                                explanation=term.target_explanations.get(code, ""),
+                                # The second language of one term must reuse
+                                # the source unit the first one created.
+                                # Without skip_existing, add_unit's merge
+                                # path would rewrite the source explanation
+                                # with this language's target explanation.
+                                skip_existing=not first_addition,
+                            )
+                            if target_unit is None:
+                                _raise_missing_target_unit(source)
+                            counters[code]["added"] += 1
+                            first_addition = False
+                            if source_unit is None:
+                                source_unit = target_unit.source_unit
+                        if source_unit is not None:
+                            source_unit.update_explanation(
+                                term.source_explanation, user
+                            )
+                            flags = Flags(source_unit.extra_flags)
+                            flags.merge("terminology")
+                            source_unit.update_extra_flags(flags.format(), user)
+                            added_source_terms += 1
+                    for term in preview.all_terms:
+                        source = _term_source(term, preview.source_language)
+                        if (term.context, source) in existing_keys:
+                            # The logical term is old: nothing is filled,
+                            # cleared or re-flagged in any language.
+                            for code in target_codes:
+                                counters[code]["existing"] += 1
+            except Exception:
+                content_failed = True
+                raise
+            if added_source_terms:
+                transaction.on_commit(fresh_component.schedule_sync_terminology)
+    except Exception:
+        if content_failed and created_by_this_apply:
+            # Compensate the language files this call created; they are
+            # empty because the content transaction rolled back.
+            for translation in created_by_this_apply:
+                try:
+                    translation.remove(user)
+                except Exception:
+                    report_error(
+                        "Could not compensate a glossary language created "
+                        "by a failed loc-kit append",
+                        level="error",
+                        project=component.project,
+                    )
+        raise
+
+    languages: dict[str, GlossaryLanguageAppendResult] = {
+        code: GlossaryLanguageAppendResult(
+            added=counters[code]["added"],
+            existing=counters[code]["existing"],
+            blank=counters[code]["blank"],
+            unavailable=unavailable_reasons.get(code, ""),
+            unavailable_count=counters[code]["unavailable"],
+        )
+        for code in target_codes
+    }
+    # Glossary languages the table knows nothing about: absent column, not
+    # a failure.
+    for translation in component.translation_set.select_related("language"):
+        if translation.language_id == component.source_language_id:
+            continue
+        code = translation.language.code
+        if code not in languages:
+            languages[code] = GlossaryLanguageAppendResult(absent=True)
+    return GlossaryAppendResult(languages=languages, added_terms=added_source_terms)
 
 
 __all__ = [
@@ -823,11 +1191,15 @@ __all__ = [
     "PREVIEW_TERM_LIMIT",
     "PREVIEW_WARNING_LIMIT",
     "SAMPLE_TOO_LARGE",
+    "GlossaryAppendCollisionError",
+    "GlossaryAppendResult",
+    "GlossaryLanguageAppendResult",
     "GlossaryPreview",
     "GlossaryProfileError",
     "GlossaryTermPreview",
     "ProfileProposalError",
     "SampleTooLargeError",
+    "append_glossary_terms",
     "build_glossary_structure_sample",
     "cap_preview_warnings",
     "load_profile_prompt",

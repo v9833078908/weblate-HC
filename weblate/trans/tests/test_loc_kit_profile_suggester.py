@@ -722,3 +722,78 @@ class LocKitGlossaryValidationTest(SimpleTestCase):
                 component_name="Draft-Glossary",
             )
         self.assertIn("parse-back", str(ctx.exception))
+
+
+class LocKitGlossaryFullTermsTest(SimpleTestCase):
+    """The append flow needs every validated term, not the preview sample."""
+
+    @staticmethod
+    def _document(term_count: int) -> dict:
+        return _record_map_document(
+            grammar={
+                "type": "record-map",
+                "skip_rows": [],
+                "regions": [
+                    {
+                        "first_record_row": 2,
+                        "last_record_row": 1 + term_count,
+                        "record_stride": 1,
+                    }
+                ],
+                "term_row_offset": 0,
+                "section_field": {"column": 1, "header": "domain", "row_offset": 0},
+                "notes": [
+                    {
+                        "scope": "source",
+                        "column": 4,
+                        "header": "note_ru",
+                        "row_offset": 0,
+                    },
+                    {
+                        "scope": "target",
+                        "language": "en",
+                        "column": 5,
+                        "header": "note_en",
+                        "row_offset": 0,
+                    },
+                ],
+            }
+        )
+
+    @staticmethod
+    def _rows(term_count: int) -> list[list[str]]:
+        rows = [["domain", "ru", "en", "note_ru", "note_en"]]
+        rows.extend(
+            [
+                "Domain",
+                f"Термин-{index}",
+                f"Term-{index}",
+                f"Note {index} ru",
+                f"Note {index} en",
+            ]
+            for index in range(term_count)
+        )
+        return rows
+
+    def test_full_terms_survive_the_preview_cap(self) -> None:
+        """
+        preview.terms stays bounded for the UI.
+
+        The apply path reads preview.all_terms so a wide table loses
+        nothing past the cap.
+        """
+        term_count = loc_kit.PREVIEW_TERM_LIMIT + 1
+        preview = _validate(
+            document=self._document(term_count), rows=self._rows(term_count)
+        )
+
+        self.assertEqual(len(preview.terms), loc_kit.PREVIEW_TERM_LIMIT)
+        self.assertEqual(len(preview.all_terms), term_count)
+        self.assertEqual(
+            [term.values["ru"] for term in preview.all_terms],
+            [f"Термин-{index}" for index in range(term_count)],
+        )
+        self.assertEqual(
+            [term.values["en"] for term in preview.all_terms],
+            [f"Term-{index}" for index in range(term_count)],
+        )
