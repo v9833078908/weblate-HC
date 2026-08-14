@@ -34,7 +34,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
 from django.test.utils import modify_settings, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -46,11 +46,13 @@ from weblate.auth.models import Group, Permission, Role, User
 from weblate.formats.models import FILE_FORMATS
 from weblate.lang.models import Language
 from weblate.machinery.llm import BaseLLMTranslation
+from weblate.trans import loc_kit
 from weblate.trans.loc_kit import PREVIEW_WARNING_LIMIT
-from weblate.trans.models import Category, Component, Project
+from weblate.trans.models import Category, Component, Project, Translation
 from weblate.trans.models.loc_kit import LOC_KIT_DRAFT_STORAGE, LocKitImportDraft
 from weblate.trans.tests.test_views import ViewTestCase
-from weblate.utils.state import STATE_EMPTY
+from weblate.utils.lock import WeblateLockTimeoutError
+from weblate.utils.state import STATE_APPROVED, STATE_EMPTY, STATE_TRANSLATED
 from weblate.utils.tests import http_mock
 from weblate.utils.views import create_component_from_kit
 from weblate.vcs.git import LocalRepository
@@ -1624,3 +1626,529 @@ class LocKitGlossaryUpdateStartTest(ViewTestCase):
             self.assertLessEqual(
                 depth, 1, "a form is nested inside another form"
             )
+
+
+# --------------------------------------------------------------------------- #
+# Append-only application service
+# --------------------------------------------------------------------------- #
+
+from loc_kit_ingest.parser import _context_key  # ruff: ignore[module-import-not-at-top-of-file]
+
+
+def _append_preview(
+    *terms: dict, source_language: str = "ru"
+) -> loc_kit.GlossaryPreview:
+    """
+    Build a validated preview straight from term rows, no UI round trip.
+
+    Each term is ``{"section": str, "values": {code: str}, "notes":
+    {"source": str, "target": {code: str}}}``. The section column drives
+    the same (section, term) context the writer derives, so previews can
+    match units seeded through add_unit. Note columns exist only when a
+    term carries notes, matching the record-map shape the flow accepts.
+    """
+    codes = [
+        code
+        for code in dict.fromkeys(
+            value for term in terms for value in term["values"]
+        )
+        if code != source_language
+    ]
+    has_source_notes = any(term.get("notes", {}).get("source") for term in terms)
+    noted_targets = [
+        code
+        for code in codes
+        if any(term.get("notes", {}).get("target", {}).get(code) for term in terms)
+    ]
+
+    # column 1 is the section field; languages follow.
+    header = ["domain", source_language, *codes]
+    note_fields = []
+    column = len(header) + 1
+    if has_source_notes:
+        header.append("note_ru")
+        note_fields.append(
+            {
+                "scope": "source",
+                "column": column,
+                "header": "note_ru",
+                "row_offset": 0,
+            }
+        )
+        column += 1
+    for code in noted_targets:
+        name = f"note_{code}"
+        header.append(name)
+        note_fields.append(
+            {
+                "scope": "target",
+                "language": code,
+                "column": column,
+                "header": name,
+                "row_offset": 0,
+            }
+        )
+        column += 1
+
+    languages = [
+        {
+            "code": source_language,
+            "xml_lang": source_language,
+            "column": 2,
+            "header": source_language,
+        },
+        *[
+            {"code": code, "xml_lang": code, "column": i + 3, "header": code}
+            for i, code in enumerate(codes)
+        ],
+    ]
+    document = {
+        "schema_version": 2,
+        "components": [
+            {
+                "sheet": "Terms",
+                "component": "glossary",
+                "kind": "tbx",
+                "source_lang": source_language,
+                "header_row": 1,
+                "languages": languages,
+                "grammar": {
+                    "type": "record-map",
+                    "skip_rows": [],
+                    "regions": [
+                        {
+                            "first_record_row": 2,
+                            "last_record_row": 1 + len(terms),
+                            "record_stride": 1,
+                        }
+                    ],
+                    "term_row_offset": 0,
+                    "allow_empty_targets": True,
+                    "notes": note_fields,
+                    "section_field": {
+                        "column": 1,
+                        "header": "domain",
+                        "row_offset": 0,
+                    },
+                },
+                "initial_target_languages": codes,
+            }
+        ],
+    }
+    rows = [header]
+    for term in terms:
+        row = [term.get("section", "Термины")]
+        row.extend(term["values"].get(code, "") for code in [source_language, *codes])
+        if has_source_notes:
+            row.append(term.get("notes", {}).get("source", ""))
+        for code in noted_targets:
+            row.append(term.get("notes", {}).get("target", {}).get(code, ""))
+        rows.append(row)
+    return loc_kit.validate_glossary_profile(
+        profile_document=document,
+        rows=rows,
+        sheet_name="Terms",
+        component_name="glossary",
+    )
+
+
+class LocKitGlossaryAppendServiceTest(ViewTestCase):
+    """append_glossary_terms only ever appends, never overwrites."""
+
+    CREATE_GLOSSARIES: bool = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        self.factory = RequestFactory()
+        self.glossary = self.project.glossaries[0]
+        # The stock setup already mirrors every project language (cs, de)
+        # into a fresh glossary; only languages outside the project can be
+        # added later.
+        self.cs = self.glossary.translation_set.get(language__code="cs")
+
+    def _request(self):
+        request = self.factory.post("/")
+        request.user = self.user
+        return request
+
+    def _seed(
+        self, section, en, cs="", *, explanation="Old meaning.", state=None
+    ):
+        """Create one glossary term the way the stock UI would."""
+        context = _context_key(section, en)
+        # Adding through the source translation creates the source unit and
+        # an empty target pair in every existing language.
+        self.glossary.source_translation.add_unit(
+            None, context, en, explanation=explanation, author=self.user
+        )
+        target_unit = self.cs.unit_set.get(context=context, source=en)
+        if cs:
+            target_unit.target = cs
+            target_unit.state = STATE_TRANSLATED
+            target_unit.save(update_fields=["target", "state"], same_content=True)
+        if state is not None:
+            target_unit.state = state
+            target_unit.save(update_fields=["state"], same_content=True)
+        return target_unit
+
+    def test_existing_empty_target_is_never_filled(self) -> None:
+        seeded = self._seed("Characters", "Hero")
+        preview = _append_preview(
+            {"section": "Characters", "values": {"en": "Hero", "cs": "Hrdina"}},
+            source_language="en",
+        )
+
+        result = loc_kit.append_glossary_terms(
+            self._request(), self.glossary, preview
+        )
+
+        seeded.refresh_from_db()
+        self.assertEqual(seeded.target, "")
+        # The explanation lives on the source unit; the target unit carries
+        # its own (empty) one, and neither is rewritten by the append.
+        self.assertEqual(seeded.explanation, "")
+        self.assertEqual(seeded.source_unit.explanation, "Old meaning.")
+        self.assertEqual(result.added_terms, 0)
+        self.assertEqual(result.languages["cs"].existing, 1)
+        self.assertEqual(result.languages["cs"].added, 0)
+
+    def test_translated_and_approved_terms_untouched(self) -> None:
+        translated = self._seed("One", "First", "Prvni")
+        approved = self._seed("Two", "Second", "Druhy", state=STATE_APPROVED)
+        preview = _append_preview(
+            {"section": "One", "values": {"en": "First", "cs": "Jedna"}},
+            {"section": "Two", "values": {"en": "Second", "cs": "Zwei"}},
+            source_language="en",
+        )
+
+        result = loc_kit.append_glossary_terms(
+            self._request(), self.glossary, preview
+        )
+
+        translated.refresh_from_db()
+        approved.refresh_from_db()
+        self.assertEqual(translated.target, "Prvni")
+        self.assertEqual(approved.target, "Druhy")
+        self.assertEqual(result.added_terms, 0)
+        self.assertEqual(result.languages["cs"].existing, 2)
+
+    def test_new_term_creates_every_nonempty_target(self) -> None:
+        pl = self.glossary.add_new_language(
+            Language.objects.get(code="pl"), None
+        )
+        preview = _append_preview(
+            {
+                "values": {"en": "Shield", "cs": "Stit", "pl": "Tarcza"},
+                "notes": {"source": "Defense.", "target": {"cs": "Obrana."}},
+            },
+            source_language="en",
+        )
+
+        result = loc_kit.append_glossary_terms(
+            self._request(), self.glossary, preview
+        )
+
+        self.assertEqual(result.added_terms, 1)
+        cs_unit = self.cs.unit_set.get(source="Shield")
+        pl_unit = pl.unit_set.get(source="Shield")
+        self.assertEqual(cs_unit.target, "Stit")
+        self.assertEqual(pl_unit.target, "Tarcza")
+        # Meanings: target explanation on the target unit, source
+        # explanation on its source unit.
+        self.assertEqual(cs_unit.explanation, "Obrana.")
+        source_unit = cs_unit.source_unit
+        self.assertEqual(source_unit.explanation, "Defense.")
+        self.assertIn("terminology", source_unit.extra_flags)
+        self.assertEqual(result.languages["cs"].added, 1)
+        self.assertEqual(result.languages["pl"].added, 1)
+
+    def test_blank_target_cell_is_skipped_not_created(self) -> None:
+        """Blank pl for a new term: Czech lands, Polish stays absent."""
+        preview = _append_preview(
+            {"values": {"en": "Bow", "cs": "Luk", "pl": ""}},
+            source_language="en",
+        )
+
+        result = loc_kit.append_glossary_terms(
+            self._request(), self.glossary, preview
+        )
+
+        self.assertEqual(result.added_terms, 1)
+        self.assertTrue(self.cs.unit_set.filter(source="Bow").exists())
+        self.assertFalse(
+            self.glossary.translation_set.filter(language__code="pl").exists()
+        )
+        self.assertEqual(result.languages["cs"].added, 1)
+        self.assertEqual(result.languages["pl"].blank, 1)
+        self.assertEqual(result.languages["pl"].added, 0)
+
+    def test_absent_column_does_not_block_other_languages(self) -> None:
+        """A glossary language with no column is absent, not an error."""
+        pl = self.glossary.add_new_language(
+            Language.objects.get(code="pl"), None
+        )
+        preview = _append_preview(
+            {"values": {"en": "Potion", "cs": "Lektvar"}}, source_language="en"
+        )
+
+        result = loc_kit.append_glossary_terms(
+            self._request(), self.glossary, preview
+        )
+
+        self.assertEqual(result.added_terms, 1)
+        self.assertEqual(result.languages["cs"].added, 1)
+        self.assertTrue(result.languages["pl"].absent)
+        # Terminology sync still mirrors the new source term into every
+        # glossary language, but the absent column never writes a target.
+        self.assertEqual(pl.unit_set.get(source="Potion").target, "")
+
+    def test_nonempty_column_creates_a_missing_language(self) -> None:
+        preview = _append_preview(
+            {"values": {"en": "Mage", "ja": "Mahou"}}, source_language="en"
+        )
+
+        result = loc_kit.append_glossary_terms(
+            self._request(), self.glossary, preview
+        )
+
+        ja = self.glossary.translation_set.get(language__code="ja")
+        self.assertEqual(ja.unit_set.get(source="Mage").target, "Mahou")
+        self.assertEqual(result.languages["ja"].added, 1)
+        self.assertEqual(result.added_terms, 1)
+
+    def test_restricted_user_gets_unavailable_language_only(self) -> None:
+        """
+        Without translation.add the Japanese column is unavailable; the
+        Czech translation the user may still write to is added.
+        """
+        self.user.is_superuser = False
+        self.user.save()
+        self.user.groups.clear()
+        role = Role.objects.create(name=f"Append {uuid.uuid4().hex[:6]}")
+        role.permissions.add(
+            Permission.objects.get(codename="glossary.upload"),
+            Permission.objects.get(codename="glossary.edit"),
+            Permission.objects.get(codename="glossary.add"),
+            Permission.objects.get(codename="unit.edit"),
+        )
+        group = Group.objects.create(
+            name=role.name, language_selection=SELECTION_ALL
+        )
+        group.roles.add(role)
+        group.projects.add(self.project)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+        self.assertFalse(self.user.has_perm("translation.add", self.project))
+        self.assertTrue(self.user.has_perm("unit.add", self.cs))
+
+        preview = _append_preview(
+            {"values": {"en": "Forest", "cs": "Les", "ja": "Mori"}},
+            source_language="en",
+        )
+        result = loc_kit.append_glossary_terms(
+            self._request(), self.glossary, preview
+        )
+
+        self.assertEqual(result.languages["cs"].added, 1)
+        self.assertEqual(result.languages["ja"].unavailable_count, 1)
+        self.assertNotEqual(result.languages["ja"].unavailable, "")
+        self.assertEqual(result.languages["ja"].added, 0)
+        self.assertFalse(
+            self.glossary.translation_set.filter(language__code="ja").exists()
+        )
+        self.assertEqual(result.added_terms, 1)
+
+    def test_missing_notes_do_not_block_new_terms(self) -> None:
+        preview = _append_preview(
+            {"values": {"en": "Staff", "cs": "Hul"}}, source_language="en"
+        )
+
+        result = loc_kit.append_glossary_terms(
+            self._request(), self.glossary, preview
+        )
+
+        self.assertEqual(result.added_terms, 1)
+        source_unit = self.glossary.source_translation.unit_set.get(source="Staff")
+        self.assertEqual(source_unit.explanation, "")
+
+    def test_incoming_notes_never_rewrite_existing_terms(self) -> None:
+        seeded = self._seed("Characters", "Hero", "Hrdina")
+        preview = _append_preview(
+            {
+                "section": "Characters",
+                "values": {"en": "Hero", "cs": "Hrdina"},
+                "notes": {
+                    "source": "A brand new description.",
+                    "target": {"cs": "Brand new note."},
+                },
+            },
+            source_language="en",
+        )
+
+        result = loc_kit.append_glossary_terms(
+            self._request(), self.glossary, preview
+        )
+
+        seeded.refresh_from_db()
+        self.assertEqual(seeded.explanation, "")
+        self.assertEqual(seeded.source_unit.explanation, "Old meaning.")
+        self.assertEqual(result.languages["cs"].existing, 1)
+        self.assertEqual(result.languages["cs"].added, 0)
+
+    def test_same_source_under_different_contexts_collides(self) -> None:
+        self._seed("Characters", "Hero", "Hrdina")
+        # The glossary already knows the source under another section ...
+        preview = _append_preview(
+            {"section": "Weapons", "values": {"en": "Hero", "cs": "Sampion"}},
+            source_language="en",
+        )
+        with self.assertRaises(loc_kit.GlossaryAppendCollisionError) as ctx:
+            loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
+        self.assertEqual(ctx.exception.conflicts[0][0], "Hero")
+        self.assertFalse(
+            self.cs.unit_set.filter(source="Hero")
+            .exclude(target="Hrdina")
+            .exists()
+        )
+
+        # ... and two incoming rows may not introduce the same source either.
+        preview = _append_preview(
+            {"section": "One", "values": {"en": "Sword", "cs": "Mec"}},
+            {"section": "Two", "values": {"en": "Sword", "cs": "Cepel"}},
+            source_language="en",
+        )
+        with self.assertRaises(loc_kit.GlossaryAppendCollisionError):
+            loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
+        self.assertFalse(self.cs.unit_set.filter(source="Sword").exists())
+
+    def test_counters_mix_added_blank_existing_and_absent(self) -> None:
+        self._seed("One", "Old", "Stary")
+        self.glossary.translation_set.get(language__code="de")
+        preview = _append_preview(
+            {"section": "Two", "values": {"en": "New", "cs": "Novy", "pl": ""}},
+            {"section": "One", "values": {"en": "Old", "cs": "Ancient"}},
+            source_language="en",
+        )
+
+        result = loc_kit.append_glossary_terms(
+            self._request(), self.glossary, preview
+        )
+
+        cs, pl, de = (
+            result.languages["cs"],
+            result.languages["pl"],
+            result.languages["de"],
+        )
+        self.assertEqual((cs.added, cs.existing, cs.blank), (1, 1, 0))
+        self.assertEqual((pl.added, pl.existing, pl.blank), (0, 1, 1))
+        self.assertTrue(de.absent)
+
+    def test_content_error_rolls_back_every_new_unit(self) -> None:
+        real_add_unit = Translation.add_unit
+        calls = []
+
+        def failing_add_unit(translation, *args, **kwargs):
+            calls.append(translation.language.code)
+            if len(calls) == 2:
+                msg = "simulated storage failure"
+                raise ValueError(msg)
+            return real_add_unit(translation, *args, **kwargs)
+
+        preview = _append_preview(
+            {"values": {"en": "First", "cs": "Prvni"}},
+            {"values": {"en": "Second", "cs": "Druhy"}},
+            source_language="en",
+        )
+        with (
+            patch.object(Translation, "add_unit", failing_add_unit),
+            self.assertRaises(ValueError),
+        ):
+            loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
+
+        self.assertFalse(
+            self.cs.unit_set.filter(source__in=["First", "Second"]).exists()
+        )
+        self.assertFalse(
+            self.glossary.source_translation.unit_set.filter(
+                source__in=["First", "Second"]
+            ).exists()
+        )
+
+    def test_lock_timeout_propagates_and_reapply_is_idempotent(self) -> None:
+        preview = _append_preview(
+            {"values": {"en": "Key", "cs": "Klic"}}, source_language="en"
+        )
+
+        with patch.object(
+            Component,
+            "locked_for_update",
+            side_effect=WeblateLockTimeoutError("locked", lock=None),
+        ):
+            with self.assertRaises(WeblateLockTimeoutError):
+                loc_kit.append_glossary_terms(
+                    self._request(), self.glossary, preview
+                )
+        self.assertFalse(self.cs.unit_set.filter(source="Key").exists())
+
+        first = loc_kit.append_glossary_terms(
+            self._request(), self.glossary, preview
+        )
+        self.assertEqual(first.added_terms, 1)
+        # Replaying the same table adds nothing a second time.
+        second = loc_kit.append_glossary_terms(
+            self._request(), self.glossary, preview
+        )
+        self.assertEqual(second.added_terms, 0)
+        self.assertEqual(second.languages["cs"].existing, 1)
+        self.assertEqual(self.cs.unit_set.filter(source="Key").count(), 1)
+
+    def test_failed_content_compensates_created_languages(self) -> None:
+        preview = _append_preview(
+            {"values": {"en": "Throne", "ja": "Za"}}, source_language="en"
+        )
+
+        def failing_add_unit(translation, *args, **kwargs):
+            msg = "simulated content failure"
+            raise ValueError(msg)
+
+        with (
+            patch.object(Translation, "add_unit", failing_add_unit),
+            self.assertRaises(ValueError),
+        ):
+            loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
+
+        self.assertFalse(
+            self.glossary.translation_set.filter(language__code="ja").exists()
+        )
+
+    def test_failed_compensation_is_reported_and_still_raises(self) -> None:
+        preview = _append_preview(
+            {"values": {"en": "Prison", "ja": "Vezeni"}}, source_language="en"
+        )
+
+        def failing_add_unit(translation, *args, **kwargs):
+            msg = "simulated content failure"
+            raise ValueError(msg)
+
+        with (
+            patch.object(Translation, "add_unit", failing_add_unit),
+            patch.object(Translation, "remove", side_effect=OSError("fs down")),
+            patch("weblate.utils.errors.report_error") as report,
+            self.assertRaises(ValueError),
+        ):
+            loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
+
+        self.assertTrue(
+            any(
+                call.args and "compensate" in str(call.args[0])
+                for call in report.call_args_list
+            ),
+            report.call_args_list,
+        )
+        # The language could not be removed either: it stays, visibly broken,
+        # for the operator instead of being hidden behind a success message.
+        self.assertTrue(
+            self.glossary.translation_set.filter(language__code="ja").exists()
+        )
