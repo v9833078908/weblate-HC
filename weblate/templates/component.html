@@ -88,6 +88,13 @@
              href="{% url 'download' path=object.get_url_path %}?format=zip:xlsx"
              title="{% translate "Download for offline translation." %}">{% blocktranslate %}Download translations as XLSX in a ZIP file{% endblocktranslate %}</a>
         </li>
+        {% if object.has_template %}
+          <li>
+            <a class="dropdown-item"
+               href="{% url 'download' path=object.get_url_path %}?format=zip:json"
+               title="{% translate "Download for offline translation." %}">{% blocktranslate %}Download translations as JSON in a ZIP file{% endblocktranslate %}</a>
+          </li>
+        {% endif %}
         {% if user_can_upload_translation %}
           <li>
             <a class="dropdown-item" data-bs-target="#upload" data-bs-toggle="tab" href="#">{% translate "Upload translation" %}</a>

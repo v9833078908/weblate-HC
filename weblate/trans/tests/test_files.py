@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import os
 import tempfile
 from io import BytesIO, StringIO
@@ -1534,6 +1535,28 @@ class DownloadMultiTest(ViewTestCase):
 
         self.assertIn(translation_rel, zip_names)
         self.assertNotIn(template_rel, zip_names)
+
+
+class DownloadMonoComponentTest(ViewTestCase):
+    def create_component(self):
+        return self.create_json_mono()
+
+    def test_component_json_zip(self) -> None:
+        response = self.client.get(
+            reverse("download", kwargs=self.kw_component), {"format": "zip:json"}
+        )
+        content = self.assert_zip(response, "test-test-cs.json")
+        payload = json.loads(content)
+        self.assertIn("hello", payload)
+
+    def test_bilingual_json_zip_is_all_skipped(self) -> None:
+        self.component = self.create_po(name="Bilingual", project=self.project)
+        response = self.client.get(
+            reverse("download", kwargs=self.kw_component), {"format": "zip:json"}
+        )
+        with ZipFile(BytesIO(response.content), "r") as zipfile:
+            self.assertTrue(zipfile.namelist())
+            self.assertTrue(all(n.endswith(".skipped") for n in zipfile.namelist()))
 
 
 EXPECTED_CSV = """location,source,target,id,fuzzy,context,translator_comments,developer_comments\r
