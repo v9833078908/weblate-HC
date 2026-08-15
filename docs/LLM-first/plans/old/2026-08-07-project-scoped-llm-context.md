@@ -1,5 +1,8 @@
 # Project-scoped LLM context - Implementation Plan
 
+> **Status: obsolete.** This historical plan is retained for context and must
+> not be counted as unfinished.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Let every project give its LLM suggestions its own voice and its own per-language rules without copying credentials, and let the model see the developer note attached to each string.
