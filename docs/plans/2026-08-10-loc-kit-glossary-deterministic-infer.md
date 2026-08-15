@@ -10,6 +10,10 @@
 
 **Дизайн:** `docs/plans/2026-08-10-loc-kit-glossary-deterministic-infer-design.md`
 
+**Status (2026-08-15): implemented and verified.** Deterministic glossary
+inference, single-sheet auto-skip, preview validation, and the OpenRouter
+fallback are implemented and covered by standalone and Weblate contract tests.
+
 **Критично для исполнителя:**
 
 - Контейнерные тесты гонять `./rundev.sh test <path> -n0` (без `-n0` xdist в контейнере флакует; при массовых setup-ошибках сначала `docker stats --no-stream` — обычная причина не код, а memory pressure от чужих контейнеров).

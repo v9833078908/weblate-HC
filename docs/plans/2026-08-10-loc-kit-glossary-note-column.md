@@ -10,6 +10,10 @@
 
 **Design:** `docs/plans/2026-08-10-loc-kit-glossary-note-column-design.md`.
 
+**Status (2026-08-15): implemented and verified.** Flat and pairs note-column
+inference, source explanations, preview behavior, and the LLM payload contract
+are covered by the standalone and Weblate tests.
+
 ## Scope locked by review
 
 - **UI only.** This changes the existing Weblate `Use as glossary` workflow. Do not add a CLI `--glossary` mode or change generic PO inference.
@@ -576,15 +580,15 @@ git commit -m "fix(loc-kit): close note-column verification defects"
 
 ## Implementation tasks from engineering review
 
-- [ ] **T1 (P1)** - `loc_kit_ingest/infer.py` - classify flat note columns, reject note text outside its term row, and emit a valid grammar field in the same red-green task.
+- [x] **T1 (P1)** - `loc_kit_ingest/infer.py` - classify flat note columns, reject note text outside its term row, and emit a valid grammar field in the same red-green task.
   - Verify: `cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py -q`
-- [ ] **T2 (P1)** - `loc_kit_ingest/infer.py` - apply the shared non-term-row guard to pairs and preserve the declaration order of descriptions and the note column.
+- [x] **T2 (P1)** - `loc_kit_ingest/infer.py` - apply the shared non-term-row guard to pairs and preserve the declaration order of descriptions and the note column.
   - Verify: automatic and explicit-pairs tests.
-- [ ] **T3 (P1)** - `weblate/trans/tests/test_loc_kit_ingest_contract.py` - assert the actual created French glossary unit exposes CSV text through the LLM glossary-entry contract.
+- [x] **T3 (P1)** - `weblate/trans/tests/test_loc_kit_ingest_contract.py` - assert the actual created French glossary unit exposes CSV text through the LLM glossary-entry contract.
   - Verify: exact `LocKitGlossaryUploadUITest` node.
-- [ ] **T4 (P2)** - `docs/admin/projects.rst`, `docs/specs/loc-kit-ingest.md`, and `docs/changes.rst` - document the user-facing note column and remove the stale claim that v2 `record-map` is never inferred locally.
+- [x] **T4 (P2)** - `docs/admin/projects.rst`, `docs/specs/loc-kit-ingest.md`, and `docs/changes.rst` - document the user-facing note column and remove the stale claim that v2 `record-map` is never inferred locally.
   - Verify: docs source review and configured lint.
-- [ ] **T5 (P2)** - `loc_kit_ingest/infer.py` - classify empty/populated note headers from the one-pass populated set.
+- [x] **T5 (P2)** - `loc_kit_ingest/infer.py` - classify empty/populated note headers from the one-pass populated set.
   - Verify: empty-plus-populated and duplicate-populated tests.
 
 ## Worktree parallelization

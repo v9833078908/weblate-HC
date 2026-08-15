@@ -47,6 +47,10 @@ pytest, PostgreSQL, git-бэкенд Weblate.
 | «покомпонентные коммиты» | протокол по корню репозитория + runbook подготовки | `commit_pending()` захватывает связанные компоненты; на живом инстансе pending есть почти всегда |
 | доставка = `cp` в `dev-docker/data/python` | fail-closed проверка активного реестра | в dev-контейнере активен только `line-separator-spacing`, на проде — все три |
 
+**Итог (2026-08-15): реализован и проверен.** Автофиксы, команда
+`reapply_autofixes`, row locks, scoped repository commit, fingerprint,
+production backfill и повторный dry-run завершены успешно.
+
 ## Замер (воспроизводимый)
 
 Полные цифры, метод и все спорные строки:

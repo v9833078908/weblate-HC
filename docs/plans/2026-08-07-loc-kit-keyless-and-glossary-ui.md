@@ -8,6 +8,10 @@
 
 **Tech stack:** Python 3.13, Django, Celery, pytest, translate-toolkit (`tbxfile`), `httpx2` through Weblate's outbound HTTP helpers, OpenRouter structured outputs, Bootstrap/jQuery templates, Docker development stack.
 
+**Status (2026-08-15): implemented and verified.** The profile v2 grammar,
+authenticated draft workflow, local validation, parse-back, and glossary
+component creation are implemented and covered by Weblate contract tests.
+
 ---
 
 ## Approved product decisions

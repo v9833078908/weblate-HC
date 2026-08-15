@@ -8,7 +8,10 @@
 
 **Tech Stack:** Django ORM, asgiref `sync_to_async` (async-путь), `contextvars.ContextVar` (прецедент: `weblate_customization/machinery.py`), http_mock в тестах.
 
-Статус: **на согласовании 2026-08-14**. Прошёл ревью; правки ревью влиты (project_slug, убран `service`, явная цепочка извлечения `usage`, `response_id` 255, счётчик unpriced в отчёте, тест наследования RoutedLLM, тест `usage` без поля `cost`).
+Статус: **реализован и проверен 2026-08-15**. Прошёл ревью; правки
+ревью влиты (project_slug, убран `service`, явная цепочка извлечения
+`usage`, `response_id` 255, счётчик unpriced в отчёте, тест наследования
+RoutedLLM, тест `usage` без поля `cost`).
 
 Обоснование «не Langfuse/LiteLLM/Helicone» - отчёт `agent://LLMCostResearch`: внешняя система пересчитала бы стоимость по своей прайс-таблице и *снизила* точность; источник истины - кредиты, которые списывает сам OpenRouter.
 

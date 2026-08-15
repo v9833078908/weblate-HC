@@ -1,5 +1,9 @@
 # План реализации scoped commit для backfill автофиксов
 
+**Статус (2026-08-15): реализован и проверен.** Exact pending scope,
+row locks и один commit на repository root реализованы в команде
+`reapply_autofixes` и покрыты тестами.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Цель:** сделать `reapply_autofixes --apply` безопасным относительно правок

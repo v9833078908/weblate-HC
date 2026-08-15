@@ -8,6 +8,9 @@
 
 **Tech Stack:** Django templates, Django test client, pytest.
 
+**Status (2026-08-15): implemented and verified.** Glossary-only statistics
+rendering and the regression coverage are implemented.
+
 ---
 
 ## Task 1: Add a glossary overview regression test

@@ -10,6 +10,10 @@
 
 **Tech Stack:** Django, `weblate/trans/views/create.py`, `weblate/trans/loc_kit.py`, `Translation.add_unit`, `Unit.update_explanation`, `Component.add_new_language`, `loc_kit_ingest`.
 
+**Status (2026-08-15): реализован и проверен.** Append-only application
+service, partial-language handling, collision protection, terminology sync,
+and the update UI are covered by contract and focused tests.
+
 **Dependency:** фаза 1 (`docs/plans/2026-08-10-loc-kit-glossary-deterministic-infer.md`) должна быть влита. План использует `_infer_draft_profile`, `_store_validated_profile`, auto-skip выбора листа и `validate_glossary_profile`.
 
 ## Product contract
