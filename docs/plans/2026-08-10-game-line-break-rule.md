@@ -632,18 +632,21 @@ and becomes stale for dev after Task 3.
 
 ## Task checklist
 
-- [ ] **T1 (P1)** - `weblate_customization/src/weblate_customization/checks.py` - shared separator vocabulary and `GameLineBreakCheck`, red-green in one task.
+- [x] **T1 (P1)** - `weblate_customization/src/weblate_customization/checks.py` - shared separator vocabulary and `GameLineBreakCheck`, red-green in one task.
   - Verify: `./rundev.sh test weblate_customization/tests/test_checks.py -n0 -q`
-- [ ] **T2 (P1)** - `weblate_customization/src/weblate_customization/autofixes.py` - `LineSeparatorSpacing`, including the real `DATA_LOADING` regression.
+- [x] **T2 (P1)** - `weblate_customization/src/weblate_customization/autofixes.py` - `LineSeparatorSpacing`, including the real `DATA_LOADING` regression.
   - Verify: `./rundev.sh test weblate_customization/tests/ -n0 -q`
-- [ ] **T3 (P1)** - `dev-docker/docker-compose.yml`, `deploy/environment.example` - register both, close the dev/prod gap.
+- [x] **T3 (P1)** - `dev-docker/docker-compose.yml`, `deploy/environment.example` - register both, close the dev/prod gap.
   - Verify: container settings dump lists both.
-- [ ] **T4 (P1)** - live dev instance - suggestion creation *and legacy acceptance* are repaired; corpus check count is sane.
+- [x] **T4 (P1)** - live dev instance - suggestion creation *and legacy acceptance* are repaired; corpus check count is sane.
   - Verify: `DATA_LOADING` is repaired in both flows and restored after the probe; `DEMO_THANKS` is reported.
-- [ ] **T5 (P1)** - prod `.env`, `./deploy/vps.sh deploy`, scoped `updatechecks`, preflight, and scoped accept.
-  - Verify: the preflight has exactly 82 expected rows and no no-op accepts; `translated = 82`, two strings clean, `DEMO_THANKS` reported.
-- [ ] **T6 (P2)** - `docs/changes.rst`, `docs/specs/producer-guide.md`, `AGENTS.md`.
-  - Verify: `uv run prek run --all-files`.
+- [~] **T5 (P1)** - prod `.env`, `./deploy/vps.sh deploy`, scoped `updatechecks`, preflight, and scoped accept.
+  - Production runtime rollout is confirmed read-only on 2026-08-15: `hcgameloc-weblate-1` is healthy at revision `02f8d2f`, and both custom checks and autofixes are loaded.
+  - Production data confirms `82` suggestion-creation records by `mt:openrouter` and `translated_units = 82`; however, `Suggestion.accept()` records are `0`, `79` suggestions were removed by cleanup, and `3` remain pending (`28`, `38`, `53`). The exact scoped acceptance operation from this task was not run.
+  - The French `DEMO_THANKS`, `DATA_LOADING`, and `BUG_TEXT` targets are clean; `DEMO_THANKS` was corrected by a user edit, not by the planned suggestion-acceptance batch. Persisted `game-line-break` failures remain for the expected real defects.
+- [~] **T6 (P2)** - `docs/changes.rst`, `docs/specs/producer-guide.md`, `AGENTS.md`.
+  - Documentation changes are present and the relevant formatting, Ruff, YAML, Sphinx, and codespell hooks pass.
+  - The full `prek` run is not green because of unrelated existing REUSE/typos errors in `docs/misc/col4-glossary-append-2026-08-14.csv` and `docs/misc/col4-id-defects.tsv`, plus the pre-existing `docs/changes.rst:12` bullet-stop failure.
 
 ## Parallelization
 
