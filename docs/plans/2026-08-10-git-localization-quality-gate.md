@@ -115,6 +115,26 @@ Move an advisory check to blocking only after one full production cycle shows no
 false positives and existing findings are zero. Do not create a permanent
 baseline that silently accepts new defects.
 
+Two constraints on this promotion path follow from the Cathedral comparison
+(`docs/LLM-first/2026-08-11-cathedral-localizer-analysis.md`) and from the
+verified glossary check semantics:
+
+- LLM judge results enter `validation-report.json` only through the closed,
+  typed advisory schema defined in Task 6. Cathedral lost 19.6 % of judge
+  verdicts to free-text parsing; more than half of its correction queue
+  (75 963 of 141 936 rows) were unparsed verdicts, not bad translations. An
+  unparseable judge response is an infrastructure error, never a silent
+  default verdict that routes work.
+- Never promote `check_glossary` wholesale to blocking or to Weblate
+  `enforced_checks`: the check fires on the union of its hard part
+  (`exact`/`read-only`/`forbidden`, deterministic) and its advisory
+  morphology part, so enforcing it would block on morphological
+  uncertainty. Verified on the dev instance in both term orders:
+  `docs/misc/glossary-or-probe.py`. The deterministic strengthening path is
+  per-term `exact` mode in the Weblate glossary. The offline gate never
+  reads the glossary at all: it lives in the Weblate database, not in the
+  game repository.
+
 ---
 
 ## Execution prerequisite: isolated worktrees
@@ -577,6 +597,11 @@ Cover:
 - one source rendered by multiple different targets emits advisory
   `corpus.inconsistent-translation`.
 
+For `corpus.inconsistent-translation`, take regression fixtures from the
+measured col4/fr drift corpus: 84 of 146 repeated-source groups render
+differently while the stock Weblate `inconsistent` check flags none of them
+(`docs/LLM-first/plans/2026-08-14-intra-component-consistency-check.md`).
+
 Use the measured defects as regression fixtures:
 
 ```python
@@ -609,9 +634,15 @@ alphabetic code points; do not classify punctuation or digits. Keep the
 allowlist as exact keys in version-controlled policy. Do not add regex-based
 allowlists or arbitrary executable policy. Encode the French spacing table as
 data with explicit tests matching Weblate's current punctuation-spacing
-behavior. Group all units in one component to find inconsistent repeated-source
-translations. Severity comes from policy; these advisory diagnostics must not
-change the process exit code until promoted.
+behavior. Group repeated-source units in one component to find inconsistent
+translations, and keep the grouping key and source normalization in a single
+helper inside this validation package: the planned Weblate-side repeat-drift
+check (`docs/LLM-first/plans/2026-08-14-intra-component-consistency-check.md`)
+must import that helper rather than re-derive the groups, the same way the
+custom autofixes import the separator regexes from the custom checks. Two
+implementations of the grouping are exactly the authoring/enforcement drift
+this plan forbids. Severity comes from policy; these advisory diagnostics
+must not change the process exit code until promoted.
 
 #### Step 4: Run the text tests
 
@@ -775,6 +806,14 @@ EXIT_CONFIGURATION = 2
 no token. JSON uses UTF-8, `ensure_ascii=False`, sorted keys, a final newline, and
 no timestamps. `validate-changes` invokes `git diff --name-status -z` with an
 argument vector, never a shell, and checks both the old and new name of renames.
+
+The report schema reserves a typed `advisories` array with a closed severity
+enum for probabilistic findings. A future LLM judge writes only into that
+slot, produces its verdict through structured output with a strict JSON
+schema (the contract `weblate_customization` machinery already uses for
+OpenRouter), and treats an unparseable model response as an infrastructure
+error, never as a default verdict or a finding. Cathedral's correction queue
+doubled because unparsed free-text verdicts were routed as findings.
 
 `runner.py` must apply the structural, syntax, text, corpus, and layout helpers
 to every declared component and language. It must not reimplement any check in
@@ -1285,8 +1324,13 @@ jobs:
         name: localization-${{ github.sha }}
         path: build/localization
         if-no-files-found: error
-        retention-days: 14
+        retention-days: 90
 ```
+
+Keep `retention-days` at 90, the GitHub maximum: the advisory-to-blocking
+promotion rule in "Blocking and advisory policy" needs the
+`validation-report.json` findings from one full production cycle, and a
+14-day window silently discards that evidence when a cycle runs longer.
 
 #### Step 2: Configure and test the Weblate-bot path gate
 
@@ -1489,7 +1533,11 @@ Populate and approve all six French glossary targets before enabling this Git
 workflow for new automatic translation. The glossary must retain source notes
 for `ГИГАХРУЩ`, `САМОСБОР`, `Ячейка`, `Ликвидатор`, `Партия`, and `Концентрат`.
 Keep terminology morphology advisory: French inflection and context require
-human judgment, but every PR reviewer must see the glossary warnings.
+human judgment, but every PR reviewer must see the glossary warnings. Where a
+term must appear verbatim in the target (proper names such as `ГИГАХРУЩ`),
+set per-term `exact` mode instead of enforcing the whole check; only the hard
+part of `check_glossary` is deterministic (see "Blocking and advisory
+policy").
 
 #### Step 7: Compare staging against production
 
