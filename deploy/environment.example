@@ -68,14 +68,23 @@ REDIS_HOST=cache
 REDIS_PORT=6379
 
 # --- Mail ---------------------------------------------------------------
+# Outgoing mail goes through Yandex 360 for herocraft.com: implicit SSL on
+# port 465 with an app password. The sender address must be the authenticated
+# mailbox itself (Yandex rejects any other `From`), so both fields below carry
+# the bare address - no display name in the value. The display name in the
+# letters comes from WEBLATE_SITE_TITLE at render time; putting it here would
+# double-wrap the `From` header and break it.
 # Required: Weblate refuses to start with an empty SMTP host.
-WEBLATE_EMAIL_HOST=smtp.office.lan
-WEBLATE_EMAIL_PORT=587
-WEBLATE_EMAIL_HOST_USER=
-WEBLATE_EMAIL_HOST_PASSWORD=
-WEBLATE_EMAIL_USE_TLS=1
-WEBLATE_SERVER_EMAIL=loc@herocraft.example
-WEBLATE_DEFAULT_FROM_EMAIL=loc@herocraft.example
+WEBLATE_EMAIL_HOST=smtp.yandex.ru
+WEBLATE_EMAIL_PORT=465
+WEBLATE_EMAIL_HOST_USER=webnotify@herocraft.com
+WEBLATE_EMAIL_HOST_PASSWORD=CHANGE-ME-APP-PASSWORD
+WEBLATE_EMAIL_USE_SSL=1
+WEBLATE_EMAIL_USE_TLS=0
+# WEBLATE_ADMIN_EMAIL (see Access above) is the error-report recipient;
+# it stays a real human mailbox and is unrelated to the sender.
+WEBLATE_SERVER_EMAIL=webnotify@herocraft.com
+WEBLATE_DEFAULT_FROM_EMAIL=webnotify@herocraft.com
 
 # --- Hero Craft customizations -----------------------------------------
 WEBLATE_ADD_MACHINERY=weblate_customization.machinery.RoutedLLMTranslation
