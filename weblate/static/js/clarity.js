@@ -27,5 +27,10 @@ if (clarityTracker.dataset.project !== undefined) {
   window.clarity("set", "project", clarityTracker.dataset.project);
 }
 if (clarityTracker.dataset.username !== undefined) {
-  window.clarity("identify", clarityTracker.dataset.username);
+  const username = clarityTracker.dataset.username;
+  // identify() always SHA-256 hashes its first argument; the fourth one is the
+  // display name. Without it Clarity shows a redacted hint such as "te******".
+  window.clarity("identify", username, null, null, username);
+  // Plain custom tag: stored verbatim and offered in the dashboard filters
+  window.clarity("set", "username", username);
 }
