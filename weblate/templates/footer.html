@@ -77,3 +77,14 @@
           data-language="{{ LANGUAGE_CODE }}"
           {% if project %}data-project="{{ project.name }}"{% endif %}></script>
 {% endif %}
+
+{% if clarity_project_id %}
+  <script src="{% static 'js/clarity.js' %}"
+          async
+          defer
+          id="clarity-tracker"
+          data-project-id="{{ clarity_project_id }}"
+          data-language="{{ LANGUAGE_CODE }}"
+          {% if project %}data-project="{{ project.name }}"{% endif %}
+          {% if user.is_authenticated %}data-username="{{ user.username }}"{% endif %}></script>
+{% endif %}

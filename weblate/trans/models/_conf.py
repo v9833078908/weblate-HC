@@ -63,6 +63,9 @@ class WeblateConf(AppConf):
     # Google Analytics
     GOOGLE_ANALYTICS_ID = defaults.DEFAULT_GOOGLE_ANALYTICS_ID
 
+    # Microsoft Clarity
+    CLARITY_PROJECT_ID = defaults.DEFAULT_CLARITY_PROJECT_ID
+
     # Link for support portal
     GET_HELP_URL = defaults.DEFAULT_GET_HELP_URL
 

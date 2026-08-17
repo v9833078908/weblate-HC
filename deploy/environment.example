@@ -53,6 +53,9 @@ WEBLATE_PRIVATE_COMMIT_NAME_OPT_IN=0
 # sends that hash off-site on every profile render. Off means local fallback
 # images.
 WEBLATE_ENABLE_AVATARS=0
+
+# Microsoft Clarity session recordings; empty value disables the integration
+WEBLATE_CLARITY_PROJECT_ID=
 WEBLATE_DEBUG=0
 WEBLATE_LOGLEVEL=INFO
 

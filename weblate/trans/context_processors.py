@@ -40,6 +40,7 @@ CONTEXT_SETTINGS = [
     "MATOMO_SITE_ID",
     "MATOMO_URL",
     "GOOGLE_ANALYTICS_ID",
+    "CLARITY_PROJECT_ID",
     "ENABLE_HOOKS",
     "REGISTRATION_OPEN",
     "CONTACT_FORM",
@@ -82,6 +83,9 @@ def get_preconnect_list() -> list[str | None]:
         result.append(urlparse(settings.MATOMO_URL).hostname)
     if settings.GOOGLE_ANALYTICS_ID:
         result.append("www.google-analytics.com")
+    if settings.CLARITY_PROJECT_ID:
+        result.append("www.clarity.ms")
+        result.append("scripts.clarity.ms")
     return result
 
 

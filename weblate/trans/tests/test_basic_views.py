@@ -90,6 +90,25 @@ class BasicViewTest(FixtureTestCase):
         self.assertIn("matomo.example.com", script_src)
         self.assertNotIn("'unsafe-inline'", script_src)
 
+    @override_settings(CLARITY_PROJECT_ID="abc12345")
+    def test_clarity(self) -> None:
+        response = self.client.get(self.project_url)
+        self.assertContains(response, static("js/clarity.js"))
+        self.assertContains(response, 'data-project-id="abc12345"')
+        self.assertContains(response, 'data-language="en"')
+        self.assertContains(response, f'data-project="{self.project.name}"')
+        self.assertContains(response, f'data-username="{self.user.username}"')
+        self.assertContains(response, 'href="https://www.clarity.ms"')
+        self.assertContains(response, 'href="https://scripts.clarity.ms"')
+        # The official snippet embeds this URL inline; this loader must not.
+        self.assertNotContains(response, "clarity.ms/tag")
+
+    def test_clarity_disabled(self) -> None:
+        response = self.client.get(self.project_url)
+        self.assertNotContains(response, static("js/clarity.js"))
+        self.assertNotContains(response, "clarity-tracker")
+        self.assertNotIn("clarity.ms", response["Content-Security-Policy"])
+
     def test_keys(self) -> None:
         ensure_ssh_key()
         response = self.client.get(reverse("keys"))

@@ -50,6 +50,7 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: weblate.settings_docker
       WEBLATE_SITE_DOMAIN: ${WEBLATE_HOST}
+      WEBLATE_CLARITY_PROJECT_ID: ${WEBLATE_CLARITY_PROJECT_ID:-}
       WEBLATE_EMAIL_HOST: maildev
       WEBLATE_EMAIL_PORT: 1025
       WEBLATE_EMAIL_USE_TLS: 0
