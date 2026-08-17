@@ -105,10 +105,16 @@ class GameNumberCheckTest(CheckTestCase):
         self.test_failure_3 = ("Deals 20% and 30%", "Infligge 30% e 10%", "")
 
     def test_a_number_the_target_adds_is_accepted(self) -> None:
-        # Japanese counts what Russian words: "каждый третий" -> "3回に1回".
+        # Japanese counts what Russian words: "каждый третий" -> "3回に1回", on
+        # top of a required "10" the source states and the target must keep -
+        # a source with zero numbers would let the check's own early-return
+        # guard hide a regression to symmetric comparison instead of proving
+        # containment actually accepts the added counter digits.
         self.assertFalse(
             self.check.check_single(
-                "Every third repair is faster", "3回に1回の修理は速くなります", None
+                "Every third repair heals 10 HP",
+                "3回に1回の修理は10回復します",
+                None,
             )
         )
 
