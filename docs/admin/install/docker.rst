@@ -1005,6 +1005,11 @@ Generic settings
 
     Configures ID for Google Analytics by changing :setting:`GOOGLE_ANALYTICS_ID`.
 
+.. envvar:: WEBLATE_CLARITY_PROJECT_ID
+
+   Configures ID for Microsoft Clarity by changing
+   :setting:`CLARITY_PROJECT_ID`.
+
 .. envvar:: WEBLATE_DEFAULT_PULL_MESSAGE
 
     Configures the default title and message for pull requests via API by changing

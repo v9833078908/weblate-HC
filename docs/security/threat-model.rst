@@ -933,6 +933,14 @@ class: its owner-and-session-bound temporary draft, bounded sample, per-session
 rate limit, and locally validated proposal response are documented above.
 *(maintainer)*
 
+Microsoft Clarity session recording (see :setting:`CLARITY_PROJECT_ID`) is the
+reviewed instance of a new outbound integration class: once a project ID is
+configured, page markup, URLs, and the signed-in username are sent to
+Microsoft. The integration is opt-in and disabled by default, the Content
+Security Policy is extended only when the setting is configured, and the
+provider never records the content of ``input``, ``select``, or ``textarea``
+fields. *(maintainer)*
+
 Triage dispositions
 -------------------
 

@@ -1203,6 +1203,19 @@ Additional settings not described here can be found at :ref:`settings-credential
    * :ref:`code-hosting-azure-devops-pull-requests`
    * `Azure DevOps: Personal access token <https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=Windows>`_
 
+.. setting:: CLARITY_PROJECT_ID
+
+CLARITY_PROJECT_ID
+------------------
+
+`Microsoft Clarity <https://clarity.microsoft.com/>`_ project ID to turn on
+session recordings and heatmaps.
+
+.. note::
+
+   Clarity always masks the content of input fields (``input``, ``select`` and
+   ``textarea``) in the recordings, this can not be changed from Weblate.
+
 .. setting:: GOOGLE_ANALYTICS_ID
 
 GOOGLE_ANALYTICS_ID
