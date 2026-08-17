@@ -10,6 +10,7 @@ from weblate_customization.checks import (
     CyrillicLeakCheck,
     GameLineBreakCheck,
     GameMarkupCheck,
+    GameNumberCheck,
 )
 
 from weblate.checks.tests.test_checks import CheckTestCase
@@ -78,3 +79,63 @@ class CyrillicLeakCheckTest(CheckTestCase):
 
     def test_an_empty_target_passes(self) -> None:
         self.assertFalse(self.check.check_single("Самосбор", "", None))
+
+
+class GameNumberCheckTest(CheckTestCase):
+    check = GameNumberCheck()
+
+    def setUp(self) -> None:
+        super().setUp()
+        # The decimal separator is a locale choice, not a different number.
+        self.test_good_matching = (
+            "Radius 0.5 m for 1.5 seconds",
+            "Rayon 0,5 m pendant 1,5 seconde",  # codespell:ignore
+            "",
+        )
+        # A rebalanced value that never reached the source, or a stale source:
+        # either way the two strings promise the player different things.
+        self.test_failure_1 = (
+            "Shield with 200 durability",
+            "Bouclier avec 1200 de durabilite",
+            "",
+        )
+        # A dropped clause takes its number with it.
+        self.test_failure_2 = ("Deals 200 damage over 3 s", "Infliger des degats", "")
+        # Two values, both wrong, and neither is absent - only the set differs.
+        self.test_failure_3 = ("Deals 20% and 30%", "Infligge 30% e 10%", "")
+
+    def test_a_number_the_target_adds_is_accepted(self) -> None:
+        # Japanese counts what Russian words: "каждый третий" -> "3回に1回".
+        self.assertFalse(
+            self.check.check_single(
+                "Every third repair is faster", "3回に1回の修理は速くなります", None
+            )
+        )
+
+    def test_a_full_date_is_not_a_quantity(self) -> None:
+        self.assertFalse(
+            self.check.check_single(
+                "Starts on 14.04.2025", "Beginnt am 14. April 2025", None
+            )
+        )
+
+    def test_a_placeholder_is_not_a_number(self) -> None:
+        self.assertFalse(self.check.check_single("Value {0}", "Wert {0}", None))
+
+    def test_a_lost_placeholder_is_not_this_checks_business(self) -> None:
+        # game-markup owns placeholder integrity; two checks reporting one
+        # defect would double every failing-check count.
+        self.assertFalse(self.check.check_single("Value {0}", "Wert", None))
+
+    def test_a_number_inside_markup_is_not_counted(self) -> None:
+        self.assertFalse(
+            self.check.check_single(
+                "<size=14>Text</size>", "<size=14>Texte</size>", None
+            )
+        )
+
+    def test_a_source_without_numbers_passes(self) -> None:
+        self.assertFalse(self.check.check_single("Plain text", "Texte 42", None))
+
+    def test_an_empty_target_passes(self) -> None:
+        self.assertFalse(self.check.check_single("Damage 200", "", None))

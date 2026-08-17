@@ -11,6 +11,8 @@ checks miss: <color=#RRGGBB>, <link>, <size=N>, <b>, {0}/{c}, %KEY%.
 
 from __future__ import annotations
 
+from collections import Counter
+
 import regex
 from django.utils.translation import gettext_lazy
 
@@ -23,6 +25,18 @@ TAG_PATTERN = regex.compile(
 )
 # Engine placeholders: {0}, {c}, {1}, {SEASON}, %PLAYER, %SHIP%
 PLACEHOLDER_PATTERN = regex.compile(r"\{[^{}]*\}|%[A-Z][A-Z0-9_]+%")
+
+# Tags and placeholders together: `_tokens` compares them, `_numbers` removes
+# them so that `<size=14>` and `{0}` are never read as quantities.
+MARKUP = regex.compile(rf"(?:{TAG_PATTERN.pattern})|(?:{PLACEHOLDER_PATTERN.pattern})")
+
+# A number in the source is a fact the player acts on: damage, radius, seconds.
+# Losing or altering it is a defect in every language. A number the target adds
+# is not: Japanese counts "3回に1回" where the source says "каждый третий", and a
+# full date is written per locale. So the rule is containment, not equality.
+NUMBER = regex.compile(r"\d+(?:[.,]\d+)?")
+# A full date is not a quantity, and its rendering belongs to the locale.
+FULL_DATE = regex.compile(r"\b\d{1,2}[.,]\d{1,2}[.,]\d{4}\b")
 
 # `$` is the engine's line separator, not a character. Whitespace beside one
 # renders as a stray indent; a lost one merges two lines.
@@ -70,12 +84,7 @@ def separator_is_tight(source: str) -> bool:
 
 def _tokens(text: str) -> list[str]:
     """Extract ordered markup tokens (tags with attrs + placeholders)."""
-    return [
-        match.group()
-        for match in regex.finditer(
-            rf"(?:{TAG_PATTERN.pattern})|(?:{PLACEHOLDER_PATTERN.pattern})", text
-        )
-    ]
+    return [match.group() for match in MARKUP.finditer(text)]
 
 
 class GameMarkupCheck(TargetCheck):
@@ -144,3 +153,27 @@ class CyrillicLeakCheck(TargetCheck):
 
     def check_single(self, source: str, target: str, unit) -> bool:
         return bool(target) and bool(CYRILLIC.search(target))
+
+
+def _numbers(text: str) -> Counter[str]:
+    """Quantities outside markup, with the decimal separator normalized."""
+    body = FULL_DATE.sub(" ", MARKUP.sub(" ", text))
+    return Counter(match.group().replace(",", ".") for match in NUMBER.finditer(body))
+
+
+class GameNumberCheck(TargetCheck):
+    """Every quantity the source states must survive into the translation."""
+
+    check_id = "game-number"
+    name = gettext_lazy("Game number")
+    description = gettext_lazy(
+        "A number from the source string is missing from the translation."
+    )
+    # Always on: a wrong damage or radius value is a defect, not a preference.
+    default_disabled = False
+
+    def check_single(self, source: str, target: str, unit) -> bool:
+        source_numbers = _numbers(source)
+        if not source_numbers or not target:
+            return False
+        return bool(source_numbers - _numbers(target))
