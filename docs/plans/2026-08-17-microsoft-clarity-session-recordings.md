@@ -63,6 +63,7 @@
 ### Task 1: Рендеринг хука Clarity
 
 **Files:**
+
 - Modify: `weblate/trans/tests/test_basic_views.py` (вставка после строки 91, перед `def test_keys` на 93)
 - Modify: `weblate/trans/defaults.py:34`
 - Modify: `weblate/trans/models/_conf.py:64`
@@ -226,7 +227,7 @@ Clarity рекомендует `<head>`, но здесь берётся конв
 
 `deploy/environment.example`, после `WEBLATE_ENABLE_AVATARS=0` (строка 55):
 
-```
+```text
 # Microsoft Clarity session recordings; empty value disables the integration
 WEBLATE_CLARITY_PROJECT_ID=
 ```
@@ -260,6 +261,7 @@ git commit -m "feat(trans): add optional Microsoft Clarity tracking hook"
 ### Task 2: CSP для Clarity
 
 **Files:**
+
 - Modify: `weblate/trans/tests/test_basic_views.py` (дополнить `test_clarity`)
 - Modify: `weblate/middleware.py:317,401`
 
@@ -353,6 +355,7 @@ git add -u && git commit -m "style: apply prek formatting to Clarity integration
 ### Task 4: Документация
 
 **Files:**
+
 - Modify: `docs/admin/config.rst` (перед строкой 1206)
 - Modify: `docs/admin/install/docker.rst` (рядом с `WEBLATE_GOOGLE_ANALYTICS_ID`, строка ~1004)
 - Modify: `docs/changes.rst` (секция `Weblate 2026.8.1`)
