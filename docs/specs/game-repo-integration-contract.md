@@ -23,7 +23,8 @@
 | Сеть до боевого репозитория | внутренний адрес `192.168.0.3:8080` открыт с сервера Weblate, разрешён в `WEBLATE_VCS_ALLOW_SCHEMES` и `WEBLATE_VCS_ALLOW_HOSTS` |
 | Доступ к репозиторию | получен: сервисная учётная запись `localization.service`, **право записи проверено пушем** 2026-08-14 |
 | Ветка `localization` | **создана** 2026-08-14 (orphan, минимальный smoke-файл `Localization_ru.json` + `en/es/fr/de`); к master не привязана, мерж - отдельным решением |
-| Боевой компонент | не создан; на дев-стенде поднят `pirate-ships/integration-smoke` с реальным URL репозитория и пушем |
+| Боевой компонент | `pirate-ships/localization-json` работает на проде как staging: `vcs=local` (без remote), 16 языков × 3735 строк, 0 падающих проверок, формат приведён к контракту 2026-08-17 - `file_format_params` = indent 1 / tabs, проект получил `Language aliases = kr:ko,pt:pt_BR`, файлы на диске названы игровыми кодами (`_kr`, `_pt`, `_jp`, `_cn`). Подключение к `Tempest_f2p` - отдельный шаг |
+| Передача файлов команде | без гита: ZIP из интерфейса (`Files → Download translation files as ZIP`, `/download/pirate-ships/localization-json/`) отдаёт файлы репозитория байт в байт; проверено через API-эквивалент `/api/components/pirate-ships/localization-json/file/` (200, 16 файлов, табы, игровые имена) |
 
 Пароль сервисной учётной записи в репозиторий не кладётся: он живёт в
 credential-store гита Weblate (`/app/data/home/.git-credentials`, в боевом
