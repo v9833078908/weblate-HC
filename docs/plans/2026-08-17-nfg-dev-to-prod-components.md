@@ -140,10 +140,41 @@ extra_flags)` по всем 303 терминам. После импорта - т
 - Ни одного pending-коммита и ни одного alert'а у восьми компонентов,
   страница логина отвечает 200, все восемь компонентов видны в UI проекта.
 
-Единственное расхождение по чекам - `reused` на проде срабатывает на три
-юнита больше (`ui/ru`: `terrain1Biome2Title`, `terrain2Title`; `loot/ru`:
-`winter.chest`). Это не артефакт импорта: `reused` считается по проекту, а в
+Расхождение по чекам после импорта - `reused` срабатывал на три юнита больше
+(`ui/ru`: `terrain1Biome2Title`, `terrain2Title`; `loot/ru`: `winter.chest`)
+плюс девять раз на самом `glossary/ru`. Это не артефакт импорта и не ошибка
+переводов: область `reused` - весь проект, но только компоненты с
+`allow_translation_propagation=True`
+(`weblate/trans/models/unit.py:412`, `weblate/checks/consistency.py:239`), а в
 прод-глоссарии два разных исходных термина делят один ru-перевод
 (`Chest of the Jarl` и `Jarl Chest` -> `Сундук Конунга`, `Meteorfall` и
-`Starfall` -> `Звездопад`, `Belomar` и `Whitelands` -> `Белоземье`). В деве
-глоссарий другой, поэтому там этих совпадений нет.
+`Starfall` -> `Звездопад`, `Belomar` и `Whitelands` -> `Белоземье`).
+
+## Выравнивание reused по словарю
+
+Причина расхождения - настройка, а не данные: у дев-глоссария
+`allow_translation_propagation=False`, у прод-глоссария было `True`. Так же
+создаёт глоссарии сам Weblate (`Component.create_glossary`,
+`weblate/trans/models/component.py:1828`), поэтому прод приведён к тому же
+значению:
+
+1. `PATCH /api/components/need-for-greed/glossary/`
+   `{"allow_translation_propagation": false}`. Термины не затронуты.
+2. Смена этого флага не планирует пересчёт чеков (в `Component.save` это
+   делают только `check_flags`, проект и категория,
+   `weblate/trans/models/component.py:1385`), поэтому по согласованию
+   выполнена разовая команда в прод-контейнере:
+   `docker compose exec -T weblate weblate shell` со скриптом
+   `schedule_update_checks(update_state=True)` по восьми компонентам проекта.
+   Без неё те же записи ушли бы сами в течение суток через
+   `daily_update_checks` (`weblate/trans/tasks.py:1170`).
+
+Результат: failing-checks по всем 28 парам компонент/язык совпадают с девом
+один в один (`ui/ru` 50, `loot/ru` 3), `glossary/ru` - 0 записей `reused`,
+множества юнитов с `reused` в `ui/ru` и `loot/ru` идентичны девовским. Юниты,
+их состояния и содержимое глоссария (`units_sha`, SHA-256 `tbx/ru.tbx`) не
+изменились; pending-коммитов нет, `check_flags` проекта пуст.
+
+Побочный эффект флага: правка термина в словаре больше не распространяется
+автоматически на игровые строки с тем же исходником и наоборот. Для глоссария
+это ожидаемое поведение и совпадает с девом.
