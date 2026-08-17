@@ -1,8 +1,10 @@
 # План: исходящая почта прода через webnotify@herocraft.com
 
-> **Статус:** одобрен 2026-08-17, выполняется в отдельной сессии. Все решения
-> приняты, вопросов к пользователю не осталось: см. «Принятые решения».
->
+> **Статус:** одобрен 2026-08-17, выполняется в отдельной сессии; прошёл
+> ревью 2026-08-17 (исправлены два блокера: display-name в `From` и капча
+> на сценарии сброса пароля). Все решения приняты, вопросов к пользователю
+> не осталось: см. «Принятые решения».
+
 > **Цель пользователя:** прод `l10n.herocraft.com` действительно отправляет
 > письма (инвайты, сброс пароля, подтверждение адреса, письма админам,
 > дайджесты) от `webnotify@herocraft.com`; существующие пользователи
@@ -17,10 +19,17 @@
    `smtp.yandex.ru:465` (implicit SSL). Пароль приложения получен от
    пользователя и **уже проверен** (только `AUTH`, без отправки) изнутри
    прод-контейнера: `AUTH OK` и на 465/SSL, и на 587/STARTTLS.
-2. **Отправитель:** `From: HCGameLoc <webnotify@herocraft.com>`, то есть
-   `WEBLATE_SERVER_EMAIL` и `WEBLATE_DEFAULT_FROM_EMAIL` меняются с
-   `i.efimov@herocraft.com`. Иначе Yandex отклонит письмо (`From` не
-   принадлежит аутентифицированному ящику). `WEBLATE_ADMIN_EMAIL=i.efimov@`
+2. **Отправитель:** голый адрес `webnotify@herocraft.com` в
+   `WEBLATE_SERVER_EMAIL` и `WEBLATE_DEFAULT_FROM_EMAIL` (меняются с
+   `i.efimov@herocraft.com`; иначе Yandex отклонит письмо — `From` не
+   принадлежит аутентифицированному ящику). Display-name в письмах
+   появляется автоматически из `SITE_TITLE` (`notifications.py:396-397`:
+   `formataddr((from_name, settings.DEFAULT_FROM_EMAIL))`, в проде
+   `SITE_TITLE=Hero Craft Localization`). **Не вкладывать display-name в
+   сам env**: тогда `formataddr` обернёт его второй раз и `From` станет
+   `Hero Craft Localization <HCGameLoc <webnotify@...>>` — RFC-битый
+   заголовок (воспроизведено на ревью плана), конверт при этом валиден,
+   SMTP примет, а фильтры получателя зарежут. `WEBLATE_ADMIN_EMAIL=i.efimov@`
    не меняется — это получатель.
 3. **Секрет** живёт только в `/srv/hcgameloc/deploy/.env` на сервере
    (не в git).
@@ -68,7 +77,8 @@
 ## Целевое состояние
 
 1. Weblate отправляет через `smtp.yandex.ru:465` (SSL), аккаунт
-   `webnotify@herocraft.com`, `From: HCGameLoc <webnotify@herocraft.com>`.
+   `webnotify@herocraft.com`; в письмах `From: Hero Craft Localization
+   <webnotify@herocraft.com>` (имя из `SITE_TITLE`, адрес голый в env).
 2. `weblate sendtestemail i.efimov@herocraft.com` доходит.
 3. Сброс пароля и подтверждение адреса реально уходят; ссылки остаются
    `http://l10n.herocraft.com/...` до отдельной задачи про `ENABLE_HTTPS`
@@ -115,8 +125,12 @@ WEBLATE_EMAIL_USE_TLS=0
 WEBLATE_EMAIL_HOST_USER=webnotify@herocraft.com
 WEBLATE_EMAIL_HOST_PASSWORD=<app password, уже получен>
 WEBLATE_SERVER_EMAIL=webnotify@herocraft.com
-WEBLATE_DEFAULT_FROM_EMAIL=HCGameLoc <webnotify@herocraft.com>
+WEBLATE_DEFAULT_FROM_EMAIL=webnotify@herocraft.com
 ```
+
+Оба адресных поля — голые, без display-name (см. «Принятые решения», п. 2:
+двойная обёртка `formataddr` в `notifications.py:397` делает RFC-битый
+`From`; имя подставится из `SITE_TITLE` автоматически).
 
 `WEBLATE_ADMIN_EMAIL=i.efimov@herocraft.com` не меняется: это получатель
 писем об ошибках, а не отправитель. Перед правкой — `cp .env .env.bak-2026-08-17`
@@ -153,37 +167,85 @@ cd /srv/hcgameloc/deploy && docker compose up -d weblate
    print('password set:', bool(settings.EMAIL_HOST_PASSWORD))"
    ```
 
-   Ожидаемое: `smtp.yandex.ru 465 webnotify@herocraft.com False True`,
-   `DEFAULT_FROM_EMAIL = HCGameLoc <webnotify@herocraft.com>`,
-   `password set: True`. Скрипт запускать через
-   `docker exec ... python -` со stdin: `/tmp` в контейнере — tmpfs, и
-   `docker cp` туда не виден процессу.
-2. `docker exec hcgameloc-weblate-1 weblate sendtestemail i.efimov@herocraft.com`
+   Ожидаемое: `EMAIL_HOST=smtp.yandex.ru`, `EMAIL_PORT=465`,
+   `EMAIL_HOST_USER=webnotify@herocraft.com`, `EMAIL_USE_TLS=False`,
+   `EMAIL_USE_SSL=True`, оба адресных поля — голый
+   `webnotify@herocraft.com`, `password set: True`.
+2. **`From` валиден на обоих путях отправки.** Через `weblate shell`:
+
+   ```python
+   # путь Notification (notifications.py:396-397) — двойная обёртка:
+   from django.conf import settings
+
+   # путь Notification (notifications.py:396-397) —双重 обёртка:
+   hdr = formataddr((settings.SITE_TITLE, settings.DEFAULT_FROM_EMAIL))
+   print("notification From:", hdr, "| addr:", parseaddr(hdr)[1])
+   # путь sendtestemail (Django) — сырая строка:
+   print("sendtest addr:", parseaddr(settings.DEFAULT_FROM_EMAIL)[1])
+   ```
+
+   Ожидаемое: первый — `Hero Craft Localization <webnotify@herocraft.com>`
+   c `addr = webnotify@herocraft.com`; второй — тот же addr. Если addr
+   не содержит `@` — env содержит display-name, конфигурация неверна
+   (возврат к «Принятым решениям», п. 2).
+3. `docker exec hcgameloc-weblate-1 weblate sendtestemail i.efimov@herocraft.com`
    — нулевой код возврата, без исключения.
-3. Пользователь подтверждает, что письмо пришло, и сообщает папку
+4. Пользователь подтверждает, что письмо пришло, и сообщает папку
    (Inbox / Спам) — единственная проверка доставки, недоступная изнутри.
 
 ### 4. Транзакционная почта на живом сценарии
 
 Сброс пароля для `i.efimov@herocraft.com` (проверочный получатель; на чужие
-адреса реальные письма не отправляем):
+адреса реальные письма не отправляем).
+
+**Капча.** `REGISTRATION_CAPTCHA=True` в проде (проверено; env не
+переопределяет, дефолт `weblate/accounts/defaults.py:16`). `ResetForm` →
+`EmailForm` → `CaptchaForm` (`forms.py:657,808`): поле `captcha` обязательно,
+вопрос лежит в сессии и рендерится в label как `What is X + Y?`
+(`forms.py:547-553`; генерация — `captcha.py:62-73`, числа 1-10, ответ
+неотрицательный). Altcha скрыта (`is_altcha_available()` = False при
+`ENABLE_HTTPS=False`, `forms.py:483-490`), отправлять её не нужно.
 
 ```sh
-cd /srv/hcgameloc/deploy
-docker compose logs -f --tail 0 weblate &     # смотреть очередь notify
-curl -s -o /dev/null -w '%{http_code}\n' \
-  -c /tmp/j -b /tmp/j -e http://127.0.0.1:8081/accounts/reset/ \
-  -H 'Host: l10n.herocraft.com' \
-  --data-urlencode "csrfmiddlewaretoken=<из GET /accounts/reset/>" \
+# на VPS, в одной cookie-сессии
+J=$(mktemp)
+# 1) страница с формой: csrf-токен + вопрос капчи из label
+curl -s -c "$J" -H 'Host: l10n.herocraft.com' http://127.0.0.1:8081/accounts/reset/ > /tmp/reset.html
+CSRF=$(grep -o 'name="csrfmiddlewaretoken" value="[^"]*"' /tmp/reset.html | head -1 | sed 's/.*value="//;s/"//')
+Q=$(grep -oE 'What is [0-9]+ [-+*] [0-9]+' /tmp/reset.html | head -1)
+ANS=$(python3 -c "print(eval('$Q'.replace('What is ','')))")
+# 2) POST с ответом
+curl -s -o /dev/null -w '%{http_code} -> %{redirect_url}\n' \
+  -b "$J" -c "$J" -H 'Host: l10n.herocraft.com' \
+  -e http://127.0.0.1:8081/accounts/reset/ \
+  --data-urlencode "csrfmiddlewaretoken=$CSRF" \
   --data-urlencode "email=i.efimov@herocraft.com" \
+  --data-urlencode "captcha=$ANS" \
   http://127.0.0.1:8081/accounts/reset/
 ```
 
-Ожидаемое: `302`, в логах задача `weblate.accounts.tasks.notify_*` (очередь
-`notify`) без исключения, письмо получено. Схема ссылки в письме будет
-`http://l10n.herocraft.com/...` — это ожидаемо (см. шаг 5), и публичный edge
-отвечает на неё `301` на `https`, так что переход в браузере приземляется
-на TLS.
+Ожидаемое:
+
+- `302` (или редирект на `email-sent`); `200` с текстом формы = капча/CSRF
+  не сошлись, письмо не ушло.
+- В логах — задача **`weblate.accounts.tasks.send_mails`** в очереди
+  `notify` (`pipeline.py:210` → `notifications.py:1473` → `tasks.py:238-248`;
+  маршрут `settings_docker.py:1442`), без исключения. Имени `notify_*` у
+  этой задачи нет — не искать его.
+- В БД — `AuditLog(activity="sent-email", email="i.efimov@herocraft.com")`
+  (`pipeline.py:202-207`): пишется ровно в момент отправки, это самое
+  надёжное доказательство. Проверка:
+
+  ```python
+  from weblate.accounts.models import AuditLog
+  print(AuditLog.objects.filter(activity="sent-email").order_by("-timestamp")[:3].values("timestamp", "email"))
+  ```
+
+- Лимит: `reset-request` блокируется при 10 запросах/сутки
+  (`AUTH_LOCK_ATTEMPTS`, `accounts/models.py:699-706`,
+  `trans/defaults.py:142`). Двумя попытками не исчерпывается.
+- Схема ссылки в письме — `http://l10n.herocraft.com/...`, это ожидаемо
+  (шаг 5); публичный edge отвечает на неё `301` на `https`.
 
 ### 5. ENABLE_HTTPS — отложено, замер выполнен
 
@@ -267,9 +329,11 @@ Secure-cookie. Технических препятствий два ожидал
 ## Риски
 
 1. **`From` не совпадает с SMTP-аккаунтом.** Yandex отклоняет письмо, если
-   отправитель не принадлежит аутентифицированному ящику. Поэтому
-   `SERVER_EMAIL`/`DEFAULT_FROM_EMAIL` меняются на `webnotify@`; оставить
-   `i.efimov@` там нельзя. Проявится как ошибка на шаге 3.2.
+   отправитель не принадлежит аутентифицированному ящику. Оба адресных поля
+   меняются на голый `webnotify@herocraft.com`; вариант с display-name в
+   env запрещён — на ревью воспроизведён RFC-битый `From` от двойной
+   обёртки `formataddr` (`notifications.py:397`). Проявится как отказ
+   SMTP или спам-фильтр на шаге 3.
 2. **Письма в спам.** DMARC `p=none`, SPF/DKIM Яндекса в порядке, но новый
    отправитель без истории. Смягчение: проверка на шаге 3.4 с указанием папки.
 3. **Пароль приложения в env.** Лежит в `.env` на сервере (не в git),
