@@ -84,8 +84,7 @@ def get_preconnect_list() -> list[str | None]:
     if settings.GOOGLE_ANALYTICS_ID:
         result.append("www.google-analytics.com")
     if settings.CLARITY_PROJECT_ID:
-        result.append("www.clarity.ms")
-        result.append("scripts.clarity.ms")
+        result.extend(("www.clarity.ms", "scripts.clarity.ms"))
     return result
 
 
