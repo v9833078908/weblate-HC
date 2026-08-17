@@ -1,3 +1,7 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Probe: verified semantics of evaluate_glossary_terms for ru -> zh_Hans.
 
 Run 2026-08-16 inside the dev container:
