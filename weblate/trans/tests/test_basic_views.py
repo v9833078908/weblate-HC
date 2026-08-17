@@ -102,6 +102,20 @@ class BasicViewTest(FixtureTestCase):
         self.assertContains(response, 'href="https://scripts.clarity.ms"')
         # The official snippet embeds this URL inline; this loader must not.
         self.assertNotContains(response, "clarity.ms/tag")
+        script_src = next(
+            directive
+            for directive in response["Content-Security-Policy"].split(";")
+            if directive.strip().startswith("script-src ")
+        )
+        self.assertIn("www.clarity.ms", script_src)
+        self.assertIn("scripts.clarity.ms", script_src)
+        self.assertNotIn("'unsafe-inline'", script_src)
+        connect_src = next(
+            directive
+            for directive in response["Content-Security-Policy"].split(";")
+            if directive.strip().startswith("connect-src ")
+        )
+        self.assertIn("*.clarity.ms", connect_src)
 
     def test_clarity_disabled(self) -> None:
         response = self.client.get(self.project_url)

@@ -315,6 +315,7 @@ class CSPBuilder:
         self.build_csp_sentry()
         self.build_csp_piwik()
         self.build_csp_google_analytics()
+        self.build_csp_clarity()
         self.build_csp_static_url()
         self.build_csp_cdn()
         self.build_csp_auth()
@@ -398,6 +399,15 @@ class CSPBuilder:
         if settings.GOOGLE_ANALYTICS_ID:
             self.directives["script-src"].add("www.google-analytics.com")
             self.directives["img-src"].add("www.google-analytics.com")
+
+    def build_csp_clarity(self) -> None:
+        # Microsoft Clarity
+        if settings.CLARITY_PROJECT_ID:
+            # The tag bootstrap loads the library from a separate host
+            self.directives["script-src"].add("www.clarity.ms")
+            self.directives["script-src"].add("scripts.clarity.ms")
+            # Uploads are load balanced across a.clarity.ms … z.clarity.ms
+            self.directives["connect-src"].add("*.clarity.ms")
 
     def build_csp_static_url(self) -> None:
         # External static URL
