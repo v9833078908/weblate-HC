@@ -10,14 +10,26 @@ import re
 
 from translate.lang import data as lang_data
 
-_PARENS_CODE = re.compile(r"\(\s*([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*)\s*\)\s*$")
-_BARE_CODE = re.compile(r"^\s*([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*)\s*$")
+_PARENS_CODE = re.compile(r"\(\s*([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{1,8})*)\s*\)\s*$")
+_BARE_CODE = re.compile(r"^\s*([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{1,8})*)\s*$")
 
+# Codes that game kits use for languages Translate Toolkit does not know under
+# that name (``ch``, ``cn``, ``jp`` and ``kr`` are absent from
+# ``translate.lang.data.languages``), so nothing is displaced by mapping them.
+# A code that is a language on its own keeps its meaning: ``pt`` stays
+# Portuguese, and a per-project decision such as "pt means pt-BR" belongs to
+# Weblate's project-level language aliases.
 _LANGUAGE_ALIASES = {
     "zh_tc": "zh_Hant",
     "zh_hant": "zh_Hant",
     "zh_sc": "zh_Hans",
     "zh_hans": "zh_Hans",
+    "ch": "zh_Hans",
+    "ch_s": "zh_Hans",
+    "ch_t": "zh_Hant",
+    "cn": "zh_Hans",
+    "jp": "ja",
+    "kr": "ko",
 }
 
 

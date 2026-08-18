@@ -77,13 +77,32 @@ def test_duplicate_key_blocks_the_component(temple_component, temple_rows):
 # ---------------------------------------------------------------------------
 
 
-def test_missing_source_is_error(temple_component, temple_rows):
+def test_missing_source_with_translations_is_warning_and_imports(
+    temple_component, temple_rows
+):
+    """A key the kit only translated keeps its translations and loses the source."""
     temple_rows[3][2] = ""  # blank the source cell
     result = parse_component(temple_component, temple_rows)
+    assert [
+        d.severity.name for d in result.diagnostics if d.code == "po.missing_source"
+    ] == ["WARNING"]
+    assert [d for d in result.diagnostics if d.severity.name == "ERROR"] == []
+    unit = result.units[0]
+    assert unit.key == "sample_key"
+    assert not unit.values["ru"]
+    assert unit.values["en"] == "<color=#E3BA59>Text &#13;{value:cond:1}</color>"
+
+
+def test_key_without_any_text_is_error(temple_component, temple_rows):
+    """A key with no text in any language would import as an empty unit."""
+    temple_rows[3][2] = ""
+    temple_rows[3][3] = ""
+    result = parse_component(temple_component, temple_rows)
     assert any(
-        item.code == "po.missing_source" and item.severity.name == "ERROR"
-        for item in result.diagnostics
+        d.code == "po.key_without_content" and d.severity.name == "ERROR"
+        for d in result.diagnostics
     )
+    assert result.units == ()
 
 
 def test_short_row_is_error(temple_component, temple_rows):
@@ -197,18 +216,7 @@ def test_no_double_report_wrong_script(temple_component):
 
 
 def test_source_empty_note_like_target_is_warning(temple_component):
-    """A note-like target while source is empty is a warning, not an error."""
-    # Actually per spec: source must exist for a keyed row.
-    # But if source is blank and target is a note, it's an error (missing source).
-    # The spec says "note-like target while source is empty" is a warning.
-    # This means: the row has content but source is empty -> still an error?
-    # Re-reading spec: "empty/missing source" is error.
-    # "note-like target while source is empty" is listed as a warning test case.
-    # Resolution: if source is empty but some other column has content,
-    # it's still an error for missing source. The warning is separate.
-    # Let's test a case where the row looks like a note (not a real entry).
-    # Actually the parser doesn't distinguish - empty source = error.
-    # This test verifies empty source is an error regardless.
+    """A row with no source but a target keeps the target and warns."""
     rows = [
         ["id", "Character", "ru", "en", "Id"],
         ["id-ignore", "label", "label", "label", "label"],
@@ -216,7 +224,10 @@ def test_source_empty_note_like_target_is_warning(temple_component):
         ["k1", "", "", "[note: TODO]", "42"],
     ]
     result = parse_component(temple_component, rows)
-    assert any(d.code == "po.missing_source" for d in result.diagnostics)
+    assert [
+        d.severity.name for d in result.diagnostics if d.code == "po.missing_source"
+    ] == ["WARNING"]
+    assert result.units[0].values["en"] == "[note: TODO]"
 
 
 def test_key_is_not_trimmed(temple_component):

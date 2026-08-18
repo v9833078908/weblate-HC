@@ -524,6 +524,80 @@ class LocKitUniversalUploadContractTest(ViewTestCase):
         source_unit = component.source_translation.unit_set.get(context="line_1")
         self.assertIn("Ann", source_unit.note)
 
+    def test_game_language_codes_become_weblate_translations(self) -> None:
+        # Game kits label Chinese, Japanese and Korean with their own codes;
+        # unrecognised they would silently become developer comments.
+        kit = (
+            "id,ru,en,ch-s,jp,kr\n"
+            "line_1,Привет,Hello,你好,こんにちは,안녕\n"
+            "line_2,Пока,Bye,再见,さようなら,잘 가\n"
+        )
+        fake, info = create_component_from_kit(
+            self._kit_data("codes"), self._upload("Space Kit - Codes.csv", kit)
+        )
+        self.assertEqual(info["languages"], ["ru", "en", "zh_Hans", "ja", "ko"])
+        repo = Path(fake.full_path)
+        self.assertEqual(
+            sorted(path.name for path in repo.glob("*.po")),
+            ["en.po", "ja.po", "ko.po", "ru.po", "zh_Hans.po"],
+        )
+        self.assertEqual(
+            Language.objects.filter(code__in=["zh_Hans", "ja", "ko"]).count(), 3
+        )
+        shutil.rmtree(fake.full_path, ignore_errors=True)
+
+    def test_key_without_any_text_blocks_intake(self) -> None:
+        broken = "id,ru,en\nline_1,Привет,Hello\nline_2,,\n"
+        with self.assertRaises(ValidationError) as ctx:
+            create_component_from_kit(
+                self._kit_data("empty-row"), self._upload("Empty.csv", broken)
+            )
+        self.assertIn("no text in any language", "".join(ctx.exception.messages))
+
+    def test_sourceless_key_becomes_a_unit_with_an_empty_source(self) -> None:
+        self.user.is_superuser = True
+        self.user.save()
+        kit = (
+            "id,ru,en,ja\n"
+            "line_1,Привет,Hello,こんにちは\n"
+            "line_2,,Beta only,ベータ限定\n"
+        )
+
+        with modify_settings(INSTALLED_APPS={"remove": "weblate.billing"}):
+            response = self.client.post(
+                reverse("create-component-zip"),
+                {
+                    "zipfile": self._upload("Space Kit - Beta.csv", kit),
+                    "name": "Beta",
+                    "slug": "beta",
+                    "project": self.project.pk,
+                    "source_language": self.component.source_language.pk,
+                },
+            )
+            self.assertContains(
+                response, "1 strings were imported without a source string"
+            )
+            self.assertContains(response, "po.missing_source")
+
+            form = response.context["form"]
+            params = {field: form[field].value() or "" for field in form.fields}
+            params.pop("inherit_new_lang", None)
+            params["new_lang"] = "none"
+            self.client.post(reverse("create-component-zip"), params, follow=True)
+
+        component = Component.objects.get(slug="beta")
+        self.assertEqual(component.source_translation.unit_set.count(), 2)
+
+        source_unit = component.source_translation.unit_set.get(context="line_2")
+        self.assertEqual(source_unit.source, "")
+        self.assertEqual(source_unit.target, "")
+
+        ja_unit = component.translation_set.get(language__code="ja").unit_set.get(
+            context="line_2"
+        )
+        self.assertEqual(ja_unit.source, "")
+        self.assertEqual(ja_unit.target, "ベータ限定")
+
 
 # --------------------------------------------------------------------------- #
 # Glossary intake UI: sheet selection, preview, correction, confirmation

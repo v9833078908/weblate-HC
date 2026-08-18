@@ -661,6 +661,15 @@ class CreateFromZip(CreateComponent):
                     "source": kit_info["source_lang"],
                 },
             )
+            if kit_info["sourceless"]:
+                messages.warning(
+                    self.request,
+                    gettext(
+                        "%d strings were imported without a source string; they "
+                        "show up as untranslated in the source language."
+                    )
+                    % kit_info["sourceless"],
+                )
             for note in kit_info["notes"]:
                 messages.info(self.request, note)
             warnings = kit_info["warnings"]

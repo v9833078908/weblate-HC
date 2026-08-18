@@ -73,6 +73,18 @@ key and a language column". Так кит без отдельной латинс
 качестве источника. Для подлинно неоднозначной первой колонки остаётся
 `--profile`.
 
+**Коды, которыми игры называют языки.** Заголовок распознаётся через
+`loc_kit_ingest/langcode.py`, где кроме реестра Translate Toolkit лежит карта
+алиасов для кодов, которых в реестре нет: `ch`, `ch-s`, `cn` → `zh_Hans`,
+`ch-t`, `zh-TC` → `zh_Hant`, `jp` → `ja`, `kr` → `ko`. Код, который сам по себе
+является языком, не переписывается: `pt` остаётся португальским, а решение
+«в этом проекте pt значит pt-BR» - это `language_aliases` проекта Weblate
+(`weblate/trans/models/project.py`), а не свойство кита.
+
+Заголовок, похожий на код языка, но не опознанный (`chn`), по-прежнему
+становится комментарием разработчика, и заметка это прямо говорит: иначе целый
+язык бесшумно превращается в комментарий к каждой строке.
+
 ```sh
 # профиль выводится сам
 uv run python -m loc_kit_ingest "/path/Temple.csv" --out /tmp/seed --zip
@@ -507,8 +519,29 @@ BCP-47 тег в `xml:lang`: например, `pt_PT` → `pt-PT`, `zh_Hans` �
 
 | Severity | Примеры |
 |---|---|
-| `error` | profile/schema/header/column/sheet mismatch, duplicate component/path/key/context, missing source, missing target term without `allow_empty_targets`, неизвестная строка, orphan term/description, unmapped cell (`tbx.unmapped_cell`), нечитабельный файл, ошибка записи/ZIP/contract validation |
-| `warning` | target equals source, подозрительный алфавит в языковой колонке, пустой target в PO, заметка вместо перевода, явно пропущенная пустая строка |
+| `error` | profile/schema/header/column/sheet mismatch, duplicate component/path/key/context, ключ без текста хоть на одном языке (`po.key_without_content`), missing source term в глоссарии, missing target term without `allow_empty_targets`, неизвестная строка, orphan term/description, unmapped cell (`tbx.unmapped_cell`), нечитабельный файл, ошибка записи/ZIP/contract validation |
+| `warning` | target equals source, подозрительный алфавит в языковой колонке, пустой target в PO, ключ без исходной строки (`po.missing_source`), заметка вместо перевода, явно пропущенная пустая строка |
+
+### Ключ без исходной строки
+
+Кит регулярно приносит ключ, переведённый только на неисходный язык: фича
+в разработке, текст пишут сразу на языке команды. Такой ключ импортируется:
+`po.missing_source` - warning, исходная строка остаётся пустой, переводы
+сохраняются. В Weblate это юнит с `source == ""`, который в переводе исходного
+языка виден как непереведённая строка - там его и дописывают.
+
+Ключ, у которого пусты и источник, и все целевые ячейки, - это `error`
+(`po.key_without_content`): пустая строка-ключ иначе завела бы пустой юнит в
+шаблон и во все языковые файлы, не породив ни одного другого диагностического
+сообщения (предупреждения о пустом target подавлены пустым источником).
+
+Отчёт и форма загрузки печатают число таких ключей отдельной строкой, потому
+что в ките с тысячами warning его иначе не видно.
+
+Следствие для проверок: у юнита с пустым источником нечего сравнивать, поэтому
+`game-markup` срабатывает на всех переведённых языках такого ключа, а
+автоперевод по нему давал бы мусор. И то и другое исчезает, когда источник
+дописан.
 
 Отчёт содержит число юнитов, typed skipped rows и все diagnostics с адресом
 `component:sheet!row`. При error он идёт в stderr, CLI возвращает nonzero и

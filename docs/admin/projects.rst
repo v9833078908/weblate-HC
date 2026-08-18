@@ -100,14 +100,35 @@ As a last step, you review the translation component info and fill in optional d
 
 .. image:: /screenshots/user-add-component.webp
 
+.. _loc-kit-tables:
+
+Translation tables from CSV, TSV, and XLSX
+++++++++++++++++++++++++++++++++++++++++
+
+The :guilabel:`Upload translations files` flow also accepts a single CSV, TSV,
+or XLSX spreadsheet as a loc-kit. It is converted into one monolingual PO file
+per populated language column, and the table's own header row decides the
+layout, so the component parameters arrive prefilled.
+
+Language columns are recognised by their header. Besides standard codes, the
+codes game kits use for Chinese, Japanese, and Korean are accepted: ``ch``,
+``ch-s``, and ``cn`` for Simplified Chinese, ``ch-t`` and ``zh-TC`` for
+Traditional Chinese, ``jp`` for Japanese, and ``kr`` for Korean. A code that is
+a language on its own keeps its meaning; use
+:ref:`project-language_aliases` when a project needs ``pt`` to mean
+Brazilian Portuguese. A column whose header only looks like a language code,
+such as ``chn``, becomes a developer comment, and the import report says so -
+rename the header to import the column as a translation.
+
+A key the table translated without filling the source column is imported with
+an empty source string, and the number of such keys is reported. In the source
+language they appear as untranslated strings, which is where the missing source
+text is filled in. A row with a key but no text in any language is refused.
+
 .. _uploading-glossary-tables:
 
 Glossary tables from CSV, TSV, and XLSX
-+++++++++++++++++++++++++++++++++++++++
-
-The :guilabel:`Upload translations files` flow also accepts a single CSV, TSV,
-or XLSX spreadsheet as a loc-kit. Without further action it is converted into
-monolingual PO files exactly as before.
+++++++++++++++++++++++++++++++++++++++
 
 A spreadsheet can instead become a bilingual TBX glossary component. This is
 the only path that may consult an external provider, and it starts only when

@@ -152,3 +152,32 @@ def test_denylisted_id_header_is_not_promoted_even_with_nonnumeric_data():
     assert codes == ["ru", "en"]
     assert document["key"] == {"column": 1, "header": "id"}
     assert not any("is both the PO key and a language column" in note for note in notes)
+
+
+def test_language_shaped_unknown_header_says_it_became_a_comment():
+    rows = [
+        ["key", "ru", "en", "chn"],
+        ["a", "Привет", "Hello", "你好"],
+        ["b", "Пока", "Bye", "再见"],
+    ]
+    document, notes = infer_component("Sheet1", rows, component="Test")
+
+    assert [lang["code"] for lang in document["languages"]] == ["ru", "en"]
+    assert [comment["header"] for comment in document["comments"]] == ["chn"]
+    assert any(
+        "looks like a language code but is not one" in note
+        and "developer comment" in note
+        for note in notes
+    )
+
+
+def test_prose_header_keeps_the_plain_developer_comment_note():
+    rows = [
+        ["key", "ru", "en", "Character limit"],
+        ["a", "Привет", "Hello", "20 chars"],
+        ["b", "Пока", "Bye", "12 chars"],
+    ]
+    _document, notes = infer_component("Sheet1", rows, component="Test")
+
+    assert any(note.endswith("-> developer comment") for note in notes)
+    assert not any("looks like a language code" in note for note in notes)

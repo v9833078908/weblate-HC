@@ -43,6 +43,11 @@ _KEY_COLUMN = 0
 # resolves to a real code (``id`` is also the Indonesian language code).
 _KEY_HEADER_DENYLIST = frozenset({"id"})
 
+# A header that reads like a language code but resolves to none: the column
+# still becomes a developer comment, and the note has to say so, or three
+# languages disappear into per-string comments without a word about it.
+_LANGUAGE_SHAPED_HEADER = re.compile(r"^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{1,4})?$")
+
 # A column of prose about the term, not a translation of it. Recognised by
 # header text alone: a length rule would accept "Character limit" and route it
 # into every LLM prompt, where a wrong guess is invisible.
@@ -320,7 +325,15 @@ def infer_component(
             notes.append(f"column {col + 1} ({name!r}) -> location reference")
         else:
             comments.append(entry)
-            notes.append(f"column {col + 1} ({name!r}) -> developer comment")
+            if _LANGUAGE_SHAPED_HEADER.match(header_text.strip()):
+                notes.append(
+                    f"column {col + 1} ({name!r}) looks like a language code but is "
+                    "not one; its text is imported as a developer comment, not as a "
+                    "translation. Rename the header to a Weblate language code if "
+                    "the column holds translations"
+                )
+            else:
+                notes.append(f"column {col + 1} ({name!r}) -> developer comment")
 
     ordered = sorted(languages)
     resolved_source = source_lang or languages[ordered[0]]

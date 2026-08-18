@@ -66,6 +66,9 @@ def _build_report(
             f"    source {comp.source_lang}, languages: "
             f"{', '.join(lang.code for lang in comp.languages)}"
         )
+    sourceless = sum(1 for d in diagnostics if d.code == "po.missing_source")
+    if sourceless:
+        lines.append(f"Keys imported without a source string: {sourceless}")
     if inference_notes:
         lines.append("Profile derived from the kit's own header row:")
         lines.extend(f"  * {note}" for note in inference_notes)
