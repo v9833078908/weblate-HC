@@ -25,18 +25,20 @@ import re
 import sys
 from pathlib import Path
 
-SOURCE = (
-    Path.home() / "Downloads" / "Spaceship Battles - Localization - Glossary (1).csv"
-)
+SOURCE = Path.home() / "Downloads" / "Spaceship Battles - Localization - Glossary.csv"
 TARGET = Path.home() / "Downloads" / "SpaceshipBattles-glossary.csv"
 
-# Kit header -> header written to the output file. ``ru`` comes first because
-# the leftmost language column becomes the glossary source language. Indonesian
-# is written as ``Indonesian(id)`` because a column headed exactly ``id`` is
-# treated as a technical identifier and dropped (loc_kit_ingest/infer.py).
+# Kit header -> header written to the output file. ``en`` comes first because
+# the leftmost language column becomes the glossary source language, and a
+# glossary is only visible to components with the same source language
+# (``get_glossary_units`` in weblate/glossary/models.py). The Space Arena kit
+# imports as an English-source component, so the glossary has to be keyed on
+# English. Indonesian is written as ``Indonesian(id)`` because a column headed
+# exactly ``id`` is treated as a technical identifier and dropped
+# (loc_kit_ingest/infer.py).
 COLUMNS: tuple[tuple[str, str], ...] = (
-    ("ru", "ru"),
     ("en", "en"),
+    ("ru", "ru"),
     ("de", "de"),
     ("fr", "fr"),
     ("es", "es"),
@@ -189,7 +191,7 @@ class Term:
 
     @property
     def source(self) -> str:
-        return self.values["ru"]
+        return self.values["en"]
 
     def key_text(self) -> str:
         if not self.keys:
@@ -203,7 +205,7 @@ class Term:
         parts = [
             f"{NOTE_LABELS.get(code, code)}={other.values[code]}"
             for _kit, code in COLUMNS
-            if code not in {"ru", "en"}
+            if code != "en"
             and other.values[code]
             and other.values[code] != self.values[code]
         ]
@@ -253,8 +255,13 @@ def read_terms(path: Path) -> tuple[list[Term], list[str]]:
         if description and "%" not in description and not any(values.values()):
             section = description
             continue
-        if not values["ru"]:
-            report.append(f"row {number}: no ru term; skipped")
+        if not values["en"]:
+            kept = ", ".join(
+                f"{NOTE_LABELS.get(code, code)}={value}"
+                for _kit, code in COLUMNS
+                if code != "en" and (value := values[code])
+            )
+            report.append(f"row {number}: no en term; skipped ({kept})")
             continue
         if not section:
             msg = f"row {number}: term before any section caption"

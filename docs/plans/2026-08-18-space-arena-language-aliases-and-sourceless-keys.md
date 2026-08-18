@@ -339,13 +339,40 @@ note (все notes показываются в UI без обрезки, в от
 |---|---|
 | `~/Downloads/SpaceArena_Internal_import.csv` | кит для загрузки: 3 заголовка переименованы в коды Weblate, 31 пустая ячейка `en` заполнена английским |
 | `~/Downloads/SpaceArena_Internal_added_en.csv` | те же 31 строка (`key`, `ru`, добавленный `en`) на ревью ГД |
-| `~/Downloads/SpaceArena_Glossary_import.csv` | плоский глоссарий: 313 терминов из 317 строк кита, 4 омонимичных смысла свёрнуты в заметку |
+| `~/Downloads/SpaceshipBattles-glossary.csv` | плоский глоссарий на **en-источнике**: 311 терминов из 317 строк кита, 6 строк свёрнуты в 4 омонима (`Support`, `Armor`, `Engine`, `Shield`). Загружать с галочкой :guilabel:`Use as glossary` |
+| `~/Downloads/space-arena-locales-weblate.zip` | JSON-поставка: 15 файлов с каноническими кодами Weblate (`en.json` - шаблон), 4861 ключ в каждом, порядок ключей совпадает с шаблоном |
 
-Оба файла проходят гейт формы и на **предыдущем** коде конвертера
+Оба CSV проходят гейт формы и на **предыдущем** коде конвертера
 (проверено на копии `git archive HEAD`), поэтому загрузка через интерфейс не
 ждёт деплоя. Полный офлайн-прогон импортного кита: `exit 0`, 4861 unit, 15
 PO-файлов, ноль ERROR, 8911 warning (намеренно пустые цели и «перевод равен
 источнику»). Глоссарий проходит публикационный гейт
 `weblate.trans.loc_kit.validate_glossary_profile`: schema v2 `record-map`,
-источник `ru`, 14 целевых языков, 313 терминов, 313 заметок, ноль warning,
-14 TBX-файлов с чистым parse-back.
+источник `en`, 14 целевых языков, 311 терминов, 311 заметок, ноль warning,
+14 TBX-файлов с чистым parse-back. Исходный язык глоссария именно `en`,
+потому что `get_glossary_units` фильтрует глоссарии по
+`component__source_language` (`weblate/glossary/models.py:310-316`), а кит
+импортируется английским источником: ru-глоссарий не подцепился бы ни к одной
+строке. Ru-вариант остался в `SpaceArena_Glossary_import.csv`.
+
+### JSON-поставка
+
+`space-arena-locales-weblate.zip` собран из `SpaceArena_Internal_import.csv`,
+а не из выгрузки игры: значение к значению они совпадают, но в CSV целы
+плейсхолдеры, которые их `Locales/*.json` местами уже потеряли (`fa`
+`%CLAN_SHOP_GIFT_MAIL_MESSAGE%` -> `{ارسال کننده}` вместо `{SENDER}`, `tr`
+`%CPB_RESET%` -> `0}` вместо `{0}`, `id` `%EXP_LEFT%` -> `{s}` вместо `{0}`),
+плюс `ru` `%RADIANTOMEGA%` = `12345`. Всего 6 расхождений на 15 языков,
+остальные ключи идентичны, и наш набор - надмножество их ключей.
+
+Имена файлов - канонические коды Weblate (`en ru de fr es pt_BR zh_Hans ja ko
+fa tr hi vi id th`, все `exact` в `weblate_language_data`), поэтому
+`language_aliases` для этого архива не нужны. Проверка: каждый файл разбирается
+`FILE_FORMATS["json"]` с `en.json` как шаблоном - 4861 unit, порядок ключей
+совпадает с шаблоном, `translated` равно числу непустых ячеек в CSV
+(`ru` 4624, `de` 4309, `ko` 4302, ... `vi` 4249), пустая ячейка = untranslated.
+Сквозная проверка UI-пути (одноразовый тест на урезанной копии архива, снят
+после прогона): `Файлы -> Upload translation files` даёт ровно один вариант
+раскладки (`JSON file`, `*.json`), компонент создаётся с `file_format: json`,
+`filemask: *.json`, `template: en.json`, source `en` и всеми 15 языками;
+`%TUTORIAL_NEW_NEA%` в `ru` приходит как `Nea` -> `Ниа`.
