@@ -814,6 +814,7 @@ def create_component_from_kit(data, uploaded):
         "languages": [lang.code for lang in component.languages],
         "units": len(result.units),
         "skipped": len(result.skipped_rows),
+        "sourceless": sum(1 for d in diagnostics if d.code == "po.missing_source"),
         "notes": list(notes),
         "warnings": [
             f"row {d.row} ({d.code}): {d.message}"

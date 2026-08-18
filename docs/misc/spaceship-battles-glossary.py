@@ -296,13 +296,15 @@ def write_glossary(terms: list[Term], path: Path) -> None:
 
 
 def main() -> None:
-    terms, report = read_terms(SOURCE)
+    source = Path(sys.argv[1]) if len(sys.argv) > 1 else SOURCE
+    target = Path(sys.argv[2]) if len(sys.argv) > 2 else TARGET
+    terms, report = read_terms(source)
     merged, merge_report = merge_homonyms(terms)
-    write_glossary(merged, TARGET)
+    write_glossary(merged, target)
     sections: dict[str, int] = {}
     for term in merged:
         sections[term.section] = sections.get(term.section, 0) + 1
-    print(f"{TARGET}: {len(merged)} terms from {len(terms)} kit rows")
+    print(f"{target}: {len(merged)} terms from {len(terms)} kit rows")
     for section, count in sections.items():
         print(f"  {count:4d}  {section}")
     for line in report + merge_report:

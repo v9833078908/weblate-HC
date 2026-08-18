@@ -202,19 +202,39 @@ def _parse_keyed(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
                 )
                 continue
 
-        # Missing source
+        # Missing source. A key whose source cell is empty still carries the
+        # translations the kit has for it, so it is imported and the source
+        # string is left empty; the source language shows it as untranslated.
+        # A key with no text at all would import as an empty unit into every
+        # file without any other diagnostic, so that stays an error.
         if _is_blank(source_val):
+            has_target = any(
+                not _is_blank(_cell(rows, row_idx, col))
+                for code, col in lang_columns.items()
+                if code != source_lang
+            )
+            if not has_target:
+                diagnostics.append(
+                    Diagnostic(
+                        Severity.ERROR,
+                        "po.key_without_content",
+                        component.component,
+                        component.sheet,
+                        row_1based,
+                        "row has a key but no text in any language",
+                    )
+                )
+                continue
             diagnostics.append(
                 Diagnostic(
-                    Severity.ERROR,
+                    Severity.WARNING,
                     "po.missing_source",
                     component.component,
                     component.sheet,
                     row_1based,
-                    "source cell is empty",
+                    "source cell is empty; key imported without a source string",
                 )
             )
-            continue
 
         # Duplicate key
         if key in seen_keys:
