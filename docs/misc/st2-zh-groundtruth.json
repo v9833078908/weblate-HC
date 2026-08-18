@@ -1,0 +1,511 @@
+{
+ "_run": "S&T2 summer-update zh_Hans, 124 units, sealed 2026-08-18",
+ "_truth_source": "human inventory: 14-defect anchor (st2-zh-judge-annotations.json) + corrected-export defect list (st2-zh-corrected-export-2026-08-14.md), severities assigned by player-consequence rubric",
+ "_annotator_note": "Non-family model annotators (claude-sonnet-5, gpt-5.4-mini) reproduced the judges' blind spots: they labelled 9/14 hand-confirmed defects below major. Used only as a completeness cross-check; they surfaced no defect outside the human inventory (3 outside-flags were single-annotator noise / the 省 short-form artifact / a source-typo fix). Ground truth is therefore the human inventory, not the model labels.",
+ "distribution": {
+  "critical": 7,
+  "major": 17,
+  "minor": 17,
+  "none": 83
+ },
+ "labels": {
+  "24130": {
+   "severity": "critical",
+   "provenance": "anchor",
+   "disputed": true
+  },
+  "24131": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24132": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24133": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24134": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24135": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24136": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24137": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24138": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24139": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24140": {
+   "severity": "major",
+   "provenance": "corrected-export+rubric"
+  },
+  "24141": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24142": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24143": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24144": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24145": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24146": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24147": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24148": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24149": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24150": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24151": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24152": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24153": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24154": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24155": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24156": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24157": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24158": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24159": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24160": {
+   "severity": "major",
+   "provenance": "anchor"
+  },
+  "24161": {
+   "severity": "major",
+   "provenance": "anchor"
+  },
+  "24162": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24163": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24164": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24165": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24166": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24167": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24168": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24169": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24170": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24171": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24172": {
+   "severity": "major",
+   "provenance": "corrected-export+rubric"
+  },
+  "24173": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24174": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24175": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24176": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24177": {
+   "severity": "major",
+   "provenance": "corrected-export+rubric"
+  },
+  "24178": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24179": {
+   "severity": "major",
+   "provenance": "corrected-export+rubric"
+  },
+  "24180": {
+   "severity": "critical",
+   "provenance": "anchor"
+  },
+  "24181": {
+   "severity": "critical",
+   "provenance": "anchor"
+  },
+  "24182": {
+   "severity": "critical",
+   "provenance": "anchor"
+  },
+  "24183": {
+   "severity": "major",
+   "provenance": "anchor"
+  },
+  "24184": {
+   "severity": "major",
+   "provenance": "anchor"
+  },
+  "24185": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24186": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24187": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24188": {
+   "severity": "major",
+   "provenance": "corrected-export+rubric"
+  },
+  "24189": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24190": {
+   "severity": "major",
+   "provenance": "anchor"
+  },
+  "24191": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24192": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24193": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24194": {
+   "severity": "major",
+   "provenance": "anchor",
+   "disputed": true
+  },
+  "24195": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24196": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24197": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24198": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24199": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24200": {
+   "severity": "major",
+   "provenance": "anchor"
+  },
+  "24201": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24202": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24203": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24204": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24205": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24206": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24207": {
+   "severity": "critical",
+   "provenance": "corrected-export+rubric"
+  },
+  "24208": {
+   "severity": "critical",
+   "provenance": "corrected-export+rubric"
+  },
+  "24209": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24210": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24211": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24212": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24213": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24214": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24215": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24216": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24217": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24218": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24219": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24220": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24221": {
+   "severity": "critical",
+   "provenance": "anchor"
+  },
+  "24222": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24223": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24224": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24225": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24226": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24227": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24228": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24229": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24230": {
+   "severity": "major",
+   "provenance": "corrected-export+rubric"
+  },
+  "24231": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24232": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24233": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24234": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24235": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24236": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24237": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24238": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24239": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24240": {
+   "severity": "major",
+   "provenance": "anchor"
+  },
+  "24241": {
+   "severity": "major",
+   "provenance": "anchor"
+  },
+  "24242": {
+   "severity": "minor",
+   "provenance": "corrected-export+rubric"
+  },
+  "24243": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24244": {
+   "severity": "major",
+   "provenance": "corrected-export+rubric"
+  },
+  "24245": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24246": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24247": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24248": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24249": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24250": {
+   "severity": "major",
+   "provenance": "corrected-export+rubric"
+  },
+  "24251": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24252": {
+   "severity": "none",
+   "provenance": "clean"
+  },
+  "24253": {
+   "severity": "none",
+   "provenance": "clean"
+  }
+ }
+}
