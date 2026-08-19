@@ -313,6 +313,8 @@ def parse_reply(payload: dict[str, Any], size: int) -> list[Verdict] | None:
             segments = body["parsed"].get("segments", [])
         elif "content" in body:
             content = body["content"]
+            if content is None:
+                return None
             segments = (
                 json.loads(content).get("segments", [])
                 if isinstance(content, str)
