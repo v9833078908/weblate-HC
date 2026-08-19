@@ -1194,11 +1194,11 @@ class AutoForm(forms.Form):
 
     mode = forms.ChoiceField(
         label=gettext_lazy("Automatic translation mode"),
-        initial="suggest",
+        initial="translate",
     )
     q = QueryField(
         required=True,
-        initial="state:<translated",
+        initial="state:empty",
         help_text=gettext_lazy(
             "Please note that translating all strings will "
             "discard all existing translations."
@@ -1323,7 +1323,7 @@ class AutoForm(forms.Form):
             self.fields["engines"].initial = ["weblate"]
 
         if "q" not in self.initial:
-            self.initial["q"] = "state:<translated"
+            self.initial["q"] = "state:empty"
 
         choices = [
             ("suggest", gettext("Add as suggestion")),
