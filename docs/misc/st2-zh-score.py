@@ -94,7 +94,7 @@ def main() -> None:
     print(f"truth: critical {len(true_crit)}  major+ {len(true_majorplus)}  none {len(true_none)}")
 
     out = Path(args.out_dir)
-    for arm in ("A", "B", "C"):
+    for arm in ("A", "B", "C", "D"):
         s1 = [load(out / f"arm{arm}-{args.seat1}-run{k}.json") for k in range(1, 6)]
         s2 = [load(out / f"arm{arm}-{args.seat2}-run{k}.json") for k in range(1, 6)]
         g1 = [r for r in s1 if r is not None]
