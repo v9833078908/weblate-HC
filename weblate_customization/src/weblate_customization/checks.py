@@ -11,6 +11,7 @@ checks miss: <color=#RRGGBB>, <link>, <size=N>, <b>, {0}/{c}, %KEY%.
 
 from __future__ import annotations
 
+import unicodedata
 from collections import Counter
 
 import regex
@@ -34,7 +35,7 @@ MARKUP = regex.compile(rf"(?:{TAG_PATTERN.pattern})|(?:{PLACEHOLDER_PATTERN.patt
 # Losing or altering it is a defect in every language. A number the target adds
 # is not: Japanese counts "3回に1回" where the source says "каждый третий", and a
 # full date is written per locale. So the rule is containment, not equality.
-NUMBER = regex.compile(r"\d+(?:[.,]\d+)?")
+NUMBER = regex.compile(r"\d+(?:[.,\u066b]\d+)?")
 # A full date is not a quantity, and its rendering belongs to the locale.
 FULL_DATE = regex.compile(r"\b\d{1,2}[./,]\d{1,2}[./,]\d{4}\b")
 
@@ -46,13 +47,13 @@ URL = regex.compile(r"https?://\S+")
 # translation.
 ORDINAL = regex.compile(r"\b\d+(?:st|nd|rd|th)\b", regex.IGNORECASE)
 # Digit grouping is a locale choice like the decimal separator: "1,900,000"
-# (English), "1 900 000" and "1.900.000" are one number. Comma and space never
-# mark a decimal, so a single group folds; a dot folds only in a run of groups,
-# because "1.900" on its own is a decimal.
-_GROUP = r"[ ,\u00a0\u2009\u202f]"
+# (English), "1 900 000", "1.900.000" and "30.000" are the same number. An
+# exactly three-digit group is what marks a separator as grouping rather than a
+# decimal, so "1.5" and "3.6" are left alone. The Arabic thousands mark (U+066C)
+# groups too, and native digits are folded to ASCII before this runs.
+_GROUP = r"[ ,.\u00a0\u2009\u202f\u066c]"
+_GROUP_RE = regex.compile(_GROUP)
 THOUSANDS = regex.compile(rf"(?<![\d.,])\d{{1,3}}(?:{_GROUP}\d{{3}})+(?!\d)")
-THOUSANDS_DOT = regex.compile(r"(?<![\d.,])\d{1,3}(?:\.\d{3}){2,}(?!\d)")
-_GROUP_CHARS = regex.compile(r"[ ,.\u00a0\u2009\u202f]")
 
 # `$` is the engine's line separator, not a character. Whitespace beside one
 # renders as a stray indent; a lost one merges two lines.
@@ -171,19 +172,29 @@ class CyrillicLeakCheck(TargetCheck):
         return bool(target) and bool(CYRILLIC.search(target))
 
 
+def _fold_digits(text: str) -> str:
+    """Fold any Unicode decimal digit (Arabic-Indic, Devanagari, ...) to ASCII."""
+    return "".join(
+        str(value) if (value := unicodedata.decimal(char, None)) is not None else char
+        for char in text
+    )
+
+
 def _collapse_grouping(text: str) -> str:
-    """Fold locale digit grouping so 1,900,000 == 1 900 000 == 1.900.000."""
-    text = THOUSANDS.sub(lambda match: _GROUP_CHARS.sub("", match.group()), text)
-    return THOUSANDS_DOT.sub(lambda match: match.group().replace(".", ""), text)
+    """Fold locale digit grouping so 1,900,000 == 1 900 000 == 1.900.000 == 30.000."""
+    return THOUSANDS.sub(lambda match: _GROUP_RE.sub("", match.group()), text)
 
 
 def _numbers(text: str) -> Counter[str]:
-    """Quantities outside markup, URLs, dates and ordinals, grouping folded."""
-    body = URL.sub(" ", text)
+    """Quantities outside markup, URLs, dates, ordinals; digits and grouping folded."""
+    body = _fold_digits(URL.sub(" ", text))
     body = FULL_DATE.sub(" ", MARKUP.sub(" ", body))
     body = ORDINAL.sub(" ", body)
     body = _collapse_grouping(body)
-    return Counter(match.group().replace(",", ".") for match in NUMBER.finditer(body))
+    return Counter(
+        match.group().replace(",", ".").replace("\u066b", ".")
+        for match in NUMBER.finditer(body)
+    )
 
 
 class GameNumberCheck(TargetCheck):

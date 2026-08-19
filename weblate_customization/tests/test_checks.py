@@ -194,3 +194,24 @@ class GameNumberCheckTest(CheckTestCase):
         self.assertTrue(
             self.check.check_single("Update 3.6 is out", "Встречайте!", None)
         )
+
+    def test_european_single_dot_group_is_thousands(self) -> None:
+        # "30.000" in German is 30000, not a decimal; it matches "30,000".
+        self.assertFalse(
+            self.check.check_single("30,000 for victory", "30.000 für den Sieg", None)
+        )
+
+    def test_native_digit_scripts_are_the_same_number(self) -> None:
+        # Arabic-Indic and Devanagari digits are the source number, restated.
+        self.assertFalse(
+            self.check.check_single("30,000 for victory", "۳۰٬۰۰۰ برای پیروزی", None)
+        )
+        self.assertFalse(
+            self.check.check_single("15,000 for victory", "१५,००० जीत के लिए", None)
+        )
+
+    def test_a_wrong_value_across_locales_still_fails(self) -> None:
+        # Folding scripts and grouping must not fold away a different amount.
+        self.assertTrue(
+            self.check.check_single("30,000 for victory", "20.000 für Sieg", None)
+        )
