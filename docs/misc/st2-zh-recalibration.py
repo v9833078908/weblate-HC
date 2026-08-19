@@ -382,7 +382,7 @@ def judge_batch(
 
 
 def judge(
-    model: str, records: list[Record], arm: str, api_key: str, batch_size: int, timeout: int
+    model: str, records: list[Record], arm: str, api_key: str, batch_size: int, timeout: int, sleep: float,
 ) -> tuple[dict[str, Verdict], Usage]:
     batches = [records[i : i + batch_size] for i in range(0, len(records), batch_size)]
     results: dict[str, Verdict] = {}
@@ -393,6 +393,8 @@ def judge(
         for record, verdict in zip(batch, verdicts):
             results[record.record_id] = verdict
         print(f"  batch {i + 1}/{len(batches)} done  ", end="\r", file=sys.stderr)
+        if sleep and i + 1 < len(batches):
+            time.sleep(sleep)
     print(file=sys.stderr)
     return results, total
 
@@ -459,6 +461,8 @@ def main() -> None:
     parser.add_argument("--checks-file", default=str(MISC / "st2-zh-glossary-checks.json"))
     parser.add_argument("--out-dir", default=str(MISC / "st2-zh-recal"))
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--start-run", type=int, default=1)
+    parser.add_argument("--sleep", type=float, default=0.0, help="seconds between batches")
     args = parser.parse_args()
 
     records = load_records(Path(args.input), Path(args.glossary_file), Path(args.checks_file))
@@ -489,10 +493,10 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     model_slug = args.model.split("/")[-1]
     grand = 0.0
-    for k in range(1, args.repeats + 1):
+    for k in range(args.start_run, args.repeats + 1):
         print(f"\n--- arm {args.arm}  {args.model}  run {k}/{args.repeats} ---")
         t0 = time.monotonic()
-        v, u = judge(args.model, records, args.arm, api_key, args.batch_size, args.timeout)
+        v, u = judge(args.model, records, args.arm, api_key, args.batch_size, args.timeout, args.sleep)
         counts = Counter(x.verdict for x in v.values())
         grand += u.cost_usd
         print(
