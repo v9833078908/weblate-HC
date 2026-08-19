@@ -14,6 +14,10 @@ run):
     A  baseline      current prompt + glossary          (reproduces armC-fixedrule)
     B  + description required English description per error (back-translation)
     C  + rubric       + player-consequence severity rubric
+    D  + render       C + rendered previews: sample values substituted into
+                      placeholders of both source and target (2026-08-19 addendum:
+                      tests whether judge-invisible render defects, 24207-class,
+                      become visible when the judged artifact is the rendered string)
 
 Each (arm, model) is run --repeats times; the median and spread are read by the
 scoring step, never a single run. Glossary and offline check_glossary results
@@ -40,9 +44,9 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import re
 from collections import Counter
 from dataclasses import dataclass, field
-from itertools import starmap
 from pathlib import Path
 from typing import Any
 
@@ -145,13 +149,49 @@ player understands.
 When unsure between two levels, ask only: would the player be misled about what \
 happened? Yes -> critical. Recoverable -> major. Cosmetic -> minor."""
 
+# Arm D: rendered previews. The 24207 class (placeholder roles read wrong once
+# the engine substitutes real values) is invisible in the raw string, so the
+# judge additionally receives a deterministic render with distinct sample values.
+RENDER_RULE = """\
+
+Segments may carry `rendered_source_ru` and `rendered_target_zh`: the same texts \
+with sample values substituted into the engine placeholders ({0}, {[PARAM0]}, \
+%KEY%). This is what a player actually sees. The samples are arbitrary distinct \
+numbers or tokens; a placeholder may in the real game hold a name or a category, \
+not only a number. Judge the rendered pair too: if the rendered target is \
+ungrammatical, puts a value in a slot where it reads as the wrong role, or \
+orders the substituted values so the player reads a different fact than the \
+rendered source states, that is an error of the segment even though the raw \
+placeholder string looks plausible."""
+
+# Distinct, order-revealing sample values: a swapped or misplaced slot changes
+# the rendered meaning visibly. Deterministic by placeholder index.
+SAMPLE_VALUES = ("3", "7", "15", "28", "42", "56", "64", "77")
+
+_PLACEHOLDER_RE = re.compile(r"\{\[PARAM(\d+)\]\}|\{(\d+)\}|%([A-Za-z_]+)%")
+
+
+def render_preview(text: str) -> str | None:
+    """Substitute sample values; None when the text has no placeholders."""
+
+    def sub(match: re.Match[str]) -> str:
+        param, plain, named = match.groups()
+        if named is not None:
+            return SAMPLE_VALUES[sum(named.encode()) % len(SAMPLE_VALUES)]
+        return SAMPLE_VALUES[int(param or plain) % len(SAMPLE_VALUES)]
+
+    rendered, count = _PLACEHOLDER_RE.subn(sub, text)
+    return rendered if count else None
+
 
 def system_prompt(arm: str) -> str:
     prompt = SYSTEM_PROMPT + GLOSSARY_RULE
-    if arm in ("B", "C"):
+    if arm in ("B", "C", "D"):
         prompt += DESCRIPTION_RULE
-    if arm == "C":
+    if arm in ("C", "D"):
         prompt += RUBRIC_RULE
+    if arm == "D":
+        prompt += RENDER_RULE
     return prompt
 
 
@@ -261,13 +301,19 @@ def priced(model: str, prompt_tokens: int, completion_tokens: int) -> float:
     return prompt_tokens * prompt_price + completion_tokens * completion_price
 
 
-def render_segment(index: int, record: Record) -> dict[str, Any]:
+def render_segment(index: int, record: Record, arm: str = "A") -> dict[str, Any]:
     segment: dict[str, Any] = {
         "id": index,
         "key": record.context,
         "source_ru": record.source,
         "target_zh": record.target,
     }
+    if arm == "D":
+        rendered_source = render_preview(record.source)
+        rendered_target = render_preview(record.target)
+        if rendered_source is not None or rendered_target is not None:
+            segment["rendered_source_ru"] = rendered_source or record.source
+            segment["rendered_target_zh"] = rendered_target or record.target
     if record.checks:
         segment["checks"] = record.checks
     if record.glossary:
@@ -276,7 +322,7 @@ def render_segment(index: int, record: Record) -> dict[str, Any]:
 
 
 def build_payload(model: str, batch: list[Record], arm: str) -> dict[str, Any]:
-    segments = list(starmap(render_segment, enumerate(batch)))
+    segments = [render_segment(i, record, arm) for i, record in enumerate(batch)]
     return {
         "model": model,
         "messages": [
@@ -288,7 +334,7 @@ def build_payload(model: str, batch: list[Record], arm: str) -> dict[str, Any]:
         ],
         "response_format": {
             "type": "json_schema",
-            "json_schema": reply_schema(arm in ("B", "C")),
+            "json_schema": reply_schema(arm in ("B", "C", "D")),
         },
         "provider": {"require_parameters": True},
         "usage": {"include": True},
@@ -453,7 +499,7 @@ def verdicts_to_dict(v: dict[str, Verdict]) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="zh severity recalibration, one arm")
-    parser.add_argument("--arm", choices=("A", "B", "C"), required=True)
+    parser.add_argument("--arm", choices=("A", "B", "C", "D"), required=True)
     parser.add_argument("--model", default="qwen/qwen3-235b-a22b-2507")
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=5)
