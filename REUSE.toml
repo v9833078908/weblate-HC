@@ -30,10 +30,12 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 path = [
   ".claude/skills/**.md",
   "docs/**.md",
+  "docs/misc/**.csv",
   "docs/misc/**.json",
   "docs/misc/**.jsonl",
   "docs/misc/**.log",
   "docs/misc/**.py",
+  "docs/misc/**.tsv",
   "hcgameloc.egg-info/**",
   "loc_kit_ingest/.gitignore",
   "loc_kit_ingest/pytest.ini",
