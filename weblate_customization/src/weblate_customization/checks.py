@@ -36,7 +36,23 @@ MARKUP = regex.compile(rf"(?:{TAG_PATTERN.pattern})|(?:{PLACEHOLDER_PATTERN.patt
 # full date is written per locale. So the rule is containment, not equality.
 NUMBER = regex.compile(r"\d+(?:[.,]\d+)?")
 # A full date is not a quantity, and its rendering belongs to the locale.
-FULL_DATE = regex.compile(r"\b\d{1,2}[.,]\d{1,2}[.,]\d{4}\b")
+FULL_DATE = regex.compile(r"\b\d{1,2}[./,]\d{1,2}[./,]\d{4}\b")
+
+# A URL is not a phrase the translator restates; digits in a share link or a
+# patch-notes address are not game quantities, so drop the whole token.
+URL = regex.compile(r"https?://\S+")
+# An English ordinal ("1st", "21st") is a label the target spells out
+# ("first purchase" -> "первую покупку"), so its digit need not reach the
+# translation.
+ORDINAL = regex.compile(r"\b\d+(?:st|nd|rd|th)\b", regex.IGNORECASE)
+# Digit grouping is a locale choice like the decimal separator: "1,900,000"
+# (English), "1 900 000" and "1.900.000" are one number. Comma and space never
+# mark a decimal, so a single group folds; a dot folds only in a run of groups,
+# because "1.900" on its own is a decimal.
+_GROUP = r"[ ,\u00a0\u2009\u202f]"
+THOUSANDS = regex.compile(rf"(?<![\d.,])\d{{1,3}}(?:{_GROUP}\d{{3}})+(?!\d)")
+THOUSANDS_DOT = regex.compile(r"(?<![\d.,])\d{1,3}(?:\.\d{3}){2,}(?!\d)")
+_GROUP_CHARS = regex.compile(r"[ ,.\u00a0\u2009\u202f]")
 
 # `$` is the engine's line separator, not a character. Whitespace beside one
 # renders as a stray indent; a lost one merges two lines.
@@ -155,9 +171,18 @@ class CyrillicLeakCheck(TargetCheck):
         return bool(target) and bool(CYRILLIC.search(target))
 
 
+def _collapse_grouping(text: str) -> str:
+    """Fold locale digit grouping so 1,900,000 == 1 900 000 == 1.900.000."""
+    text = THOUSANDS.sub(lambda match: _GROUP_CHARS.sub("", match.group()), text)
+    return THOUSANDS_DOT.sub(lambda match: match.group().replace(".", ""), text)
+
+
 def _numbers(text: str) -> Counter[str]:
-    """Quantities outside markup, with the decimal separator normalized."""
-    body = FULL_DATE.sub(" ", MARKUP.sub(" ", text))
+    """Quantities outside markup, URLs, dates and ordinals, grouping folded."""
+    body = URL.sub(" ", text)
+    body = FULL_DATE.sub(" ", MARKUP.sub(" ", body))
+    body = ORDINAL.sub(" ", body)
+    body = _collapse_grouping(body)
     return Counter(match.group().replace(",", ".") for match in NUMBER.finditer(body))
 
 

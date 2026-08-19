@@ -145,3 +145,52 @@ class GameNumberCheckTest(CheckTestCase):
 
     def test_an_empty_target_passes(self) -> None:
         self.assertFalse(self.check.check_single("Damage 200", "", None))
+
+    def test_thousands_grouping_is_a_locale_choice(self) -> None:
+        # English groups with commas, other locales with spaces or dots; the
+        # grouped value is one number, not a different one.
+        self.assertFalse(
+            self.check.check_single(
+                "Costs 1,900,000 credits", "Coûte 1 900 000 crédits", None
+            )
+        )
+
+    def test_dotted_thousands_match_spaced(self) -> None:
+        self.assertFalse(
+            self.check.check_single("Reward 1.900.000 ISK", "Award 1 900 000 ISK", None)
+        )
+
+    def test_a_grouped_value_with_a_wrong_amount_still_fails(self) -> None:
+        # Folding the grouping must not fold away a genuinely wrong amount.
+        self.assertTrue(
+            self.check.check_single("Costs 1,900,000 credits", "Coûte 1 000", None)
+        )
+
+    def test_a_slash_date_is_not_a_quantity(self) -> None:
+        self.assertFalse(
+            self.check.check_single("Limit from 01/12/2022", "Лимит с 01.12.2022", None)
+        )
+
+    def test_digits_in_a_url_are_not_quantities(self) -> None:
+        self.assertFalse(
+            self.check.check_single("Survey https://forms.gle/aB4cd5", "Опрос", None)
+        )
+
+    def test_an_english_ordinal_label_need_not_survive(self) -> None:
+        # "1st" is spelled out per language ("первую покупку"); its digit is a
+        # label, not a quantity the target must carry.
+        self.assertFalse(
+            self.check.check_single(
+                "SALE BONUS FOR 1ST BUY", "БОНУС ЗА ПЕРВУЮ ПОКУПКУ", None
+            )
+        )
+
+    def test_an_ordinal_does_not_hide_a_dropped_quantity(self) -> None:
+        # Removing the ordinal label must not silence a real number beside it.
+        self.assertTrue(self.check.check_single("1st prize is 500 gold", "Приз", None))
+
+    def test_a_dropped_bare_number_still_fails(self) -> None:
+        # A plain number the target omits is a real signal, grouping aside.
+        self.assertTrue(
+            self.check.check_single("Update 3.6 is out", "Встречайте!", None)
+        )
