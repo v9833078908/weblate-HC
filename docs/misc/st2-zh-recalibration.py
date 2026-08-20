@@ -60,6 +60,7 @@ import time
 import urllib.error
 import urllib.request
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from secrets import token_hex
@@ -316,6 +317,16 @@ ANALYSIS_RULE = """\
 Every segment starts with `analysis`: one or two sentences in English weighing \
 what the target does with the source. Write it before you list the errors."""
 
+# Arms H/I: the minimal change. Arm D's text byte for byte, with only the
+# hardcoded genre sentence replaced by the project's own description. This
+# is what ships if the E/F rewrite does not hold its gates: it fixes the
+# false major that an inherited setting produces, and changes nothing else.
+MINIMAL_ARMS = ("H", "I")
+_D_GENRE_SENTENCE = (
+    "The game is a turn-based strategy game set in World War II; the register "
+    "is formal military/political, and that is intended, not an error."
+)
+
 # Distinct, order-revealing sample values: a swapped or misplaced slot changes
 # the rendered meaning visibly. Deterministic by placeholder index.
 SAMPLE_VALUES = ("3", "7", "15", "28", "42", "56", "64", "77")
@@ -346,12 +357,18 @@ def system_prompt(arm: str) -> str:
             .replace("{project_context}", context)
         )
         return prompt + (ANALYSIS_RULE if arm == "F" else VERDICT_RULE)
-    prompt = SYSTEM_PROMPT + GLOSSARY_RULE
-    if arm in ("B", "C", "D"):
+    head = SYSTEM_PROMPT
+    if arm in MINIMAL_ARMS:
+        head = SYSTEM_PROMPT.replace(
+            _D_GENRE_SENTENCE,
+            ST2_CONTEXT if arm == "H" else NEUTRAL_CONTEXT,
+        )
+    prompt = head + GLOSSARY_RULE
+    if arm in ("B", "C", "D", *MINIMAL_ARMS):
         prompt += DESCRIPTION_RULE
-    if arm in ("C", "D"):
+    if arm in ("C", "D", *MINIMAL_ARMS):
         prompt += RUBRIC_RULE
-    if arm == "D":
+    if arm in ("D", *MINIMAL_ARMS):
         prompt += RENDER_RULE
     return prompt
 
@@ -488,7 +505,7 @@ def render_segment(index: int, record: Record, arm: str = "A") -> dict[str, Any]
         "source" if universal else "source_ru": record.source,
         "target" if universal else "target_zh": record.target,
     }
-    if arm == "D" or universal:
+    if arm == "D" or universal or arm in MINIMAL_ARMS:
         rendered_source = render_preview(record.source)
         rendered_target = render_preview(record.target)
         if rendered_source is not None or rendered_target is not None:
@@ -640,10 +657,33 @@ def judge(
     batch_size: int,
     timeout: int,
     sleep: float,
+    workers: int = 1,
 ) -> tuple[dict[str, Verdict], Usage]:
     batches = [records[i : i + batch_size] for i in range(0, len(records), batch_size)]
     results: dict[str, Verdict] = {}
     total = Usage()
+    if workers > 1:
+        # Batches are independent HTTP requests over frozen inputs, so
+        # running them concurrently changes wall time only, never a
+        # payload. Sleep is ignored: concurrency replaces pacing.
+        done = 0
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(judge_batch, model, batch, arm, api_key, timeout): batch
+                for batch in batches
+            }
+            for future in as_completed(futures):
+                batch = futures[future]
+                verdicts, usage = future.result()
+                total.merge(usage)
+                for record, verdict in zip(batch, verdicts):
+                    results[record.record_id] = verdict
+                done += 1
+                print(
+                    f"  batch {done}/{len(batches)} done  ", end="\r", file=sys.stderr
+                )
+        print(file=sys.stderr)
+        return results, total
     for i, batch in enumerate(batches):
         verdicts, usage = judge_batch(model, batch, arm, api_key, timeout)
         total.merge(usage)
@@ -711,7 +751,9 @@ def verdicts_to_dict(v: dict[str, Verdict]) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="zh severity recalibration, one arm")
     parser.add_argument(
-        "--arm", choices=("A", "B", "C", "D", *UNIVERSAL_ARMS), required=True
+        "--arm",
+        choices=("A", "B", "C", "D", *UNIVERSAL_ARMS, *MINIMAL_ARMS),
+        required=True,
     )
     parser.add_argument("--model", default="qwen/qwen3-235b-a22b-2507")
     parser.add_argument("--repeats", type=int, default=5)
@@ -729,6 +771,12 @@ def main() -> None:
     parser.add_argument("--start-run", type=int, default=1)
     parser.add_argument(
         "--sleep", type=float, default=0.0, help="seconds between batches"
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="concurrent batches per run; 1 keeps the original pacing",
     )
     args = parser.parse_args()
 
@@ -773,6 +821,7 @@ def main() -> None:
             args.batch_size,
             args.timeout,
             args.sleep,
+            args.workers,
         )
         counts = Counter(x.verdict for x in v.values())
         grand += u.cost_usd
