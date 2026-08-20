@@ -69,18 +69,26 @@ run ($1.69/1000 strings) is roughly five times the phase-0 rate
 
 ## Findings
 
-1. **A judge-only run reports "0 strings" before launch.** `judge_row_count`
-   (`weblate/trans/views/basic.py:805`) counts `state:<translated`, which is the
-   set that gets pre-translated, not the set that gets judged. On a fully
+1. **The row counter does not count the filter it names.** The label promises
+   "The current filter matches N strings", but `judge_row_count`
+   (`weblate/trans/views/basic.py:805-812`) counts a hardcoded
+   `state:<translated` — neither the `q` the operator typed nor the form's own
+   default, `state:empty` (`weblate/trans/forms.py:1201`). On a fully
    translated component — the audit case, and the expected primary use — the
-   form promises 0 strings and then judges 10. The counter exists to price a run
-   before it spends money, so this under-reports exactly when it matters.
-   Not fixed here: choosing the query to count is a design decision, and the
-   `has:judge` filter it would naturally use is deferred to plan 2.
+   form promised 0 strings and then judged 10, and `judge_request_estimate`
+   under-priced the run by the same factor. The counter exists to show the
+   price before the money is spent, so it misleads exactly where it is needed.
 2. **The default `q` does not follow the mode.** It stays `state:empty`, so the
    audit case requires the operator to type a filter by hand; leaving the
    default would judge nothing on a translated component. The design's intended
-   default (`NOT has:judge`) depends on the same deferred filter.
+   default is `NOT has:judge`.
+
+   Findings 1 and 2 are one piece of work and both are now recorded in plan 2's
+   scope (`docs/LLM-first/2026-08-13-judge-native-ui-design.md`, "Планы первого
+   тира" and "Известные временные разрывы"; deferral table in
+   `docs/LLM-first/plans/2026-08-13-01-judge-verdict-core.md`). They share one
+   dependency — the `has:judge` filter that plan 2 introduces — so fixing the
+   counter before that filter exists would be work thrown away.
 3. **Judge spend was unattributed.** All four usage rows carried a blank
    `project_slug`, so `llm_usage_report --project` could not see them. Fixed in
    this branch (`fix(judge): bill judge requests to the project that ran them`).
