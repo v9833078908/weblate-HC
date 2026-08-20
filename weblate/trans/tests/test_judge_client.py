@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import json
+from typing import Any
+from unittest import mock
 
 from django.test import SimpleTestCase, TestCase, override_settings
 
@@ -34,6 +36,13 @@ REQ = JudgeRequest(
 def _reply(segments: list[dict]) -> dict:
     content = json.dumps({"segments": segments})
     return {"choices": [{"message": {"content": content}}]}
+
+
+def _request_segments(body: dict) -> list[dict]:
+    content = body["messages"][1]["content"]
+    payload = content.split(">\n", 1)[1]
+    payload = payload.rsplit("\n</", 1)[0]
+    return json.loads(payload)["segments"]
 
 
 class JudgeClientGateTest(SimpleTestCase):
@@ -199,7 +208,9 @@ class JudgeClientTest(SimpleTestCase):
         self.assertTrue(body["response_format"]["json_schema"]["strict"])
         self.assertTrue(body["provider"]["require_parameters"])
         self.assertEqual(body["model"], "vendor/model-a")
-        user_msg = json.loads(body["messages"][1]["content"])
+        user_msg = {
+            "segments": _request_segments(body),
+        }
         self.assertIn("segments", user_msg)
 
     @http_mock.activate
@@ -224,9 +235,10 @@ class JudgeClientTest(SimpleTestCase):
         )
         request_verdicts([req], model="vendor/model-a")
         body = json.loads(http_mock.calls[0].request.content)
-        segment = json.loads(body["messages"][1]["content"])["segments"][0]
+        segment = _request_segments(body)[0]
         self.assertIn("rendered_source", segment)
         self.assertIn("rendered_target", segment)
+        self.assertIn("untrusted_translation_data_", body["messages"][1]["content"])
 
     def test_render_preview_returns_none_without_placeholders(self) -> None:
         self.assertIsNone(render_preview("plain text"))
@@ -243,6 +255,48 @@ class JudgeClientTest(SimpleTestCase):
     @http_mock.activate
     def test_http_error_makes_the_batch_unparsed(self) -> None:
         http_mock.register("POST", CHAT_URL, status_code=500, json={})
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+        self.assertEqual(len(http_mock.calls), 1)
+
+    @mock.patch("weblate.trans.judge.time.sleep")
+    @http_mock.activate
+    def test_only_rate_limit_errors_are_retried(self, sleep) -> None:
+        http_mock.register("POST", CHAT_URL, status_code=429, json={})
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertFalse(result.unparsed)
+        self.assertEqual(len(http_mock.calls), 2)
+        sleep.assert_called_once()
+
+    @http_mock.activate
+    def test_malformed_required_fields_make_the_batch_unparsed(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {
+                        "id": 0,
+                        "verdict": "pass",
+                        "errors": [
+                            {
+                                "span": "x",
+                                "category": "fluency",
+                                "severity": "minor",
+                            }
+                        ],
+                        "back_translation": "",
+                    }
+                ]
+            ),
+        )
         [result] = request_verdicts([REQ], model="vendor/model-a")
         self.assertTrue(result.unparsed)
 
@@ -334,9 +388,15 @@ class JudgeUsageLogTest(TestCase):
         JUDGE_REQUEST_SLEEP=0.0,
     )
     @http_mock.activate
-    def test_usage_is_not_recorded_when_the_batch_fails_to_parse(self) -> None:
+    def test_usage_is_recorded_when_the_batch_fails_to_parse(self) -> None:
+        payload: dict[str, Any] = {"choices": [{"message": {"content": "not json"}}]}
+        payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
         http_mock.register(
-            "POST", CHAT_URL, json={"choices": [{"message": {"content": "not json"}}]}
+            "POST",
+            CHAT_URL,
+            json=payload,
         )
         request_verdicts([REQ], model="vendor/model-a")
-        self.assertEqual(LLMUsageLog.objects.count(), 0)
+        row = LLMUsageLog.objects.get(model="vendor/model-a")
+        self.assertEqual(row.prompt_tokens, 11)
+        self.assertEqual(row.completion_tokens, 7)

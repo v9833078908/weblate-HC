@@ -4,13 +4,18 @@
 
 from __future__ import annotations
 
+import uuid
 from unittest import mock
 
 from django.test import override_settings
 
 from weblate.trans.judge import JudgeResult
-from weblate.trans.judge_loop import run_judge_batch
-from weblate.trans.models.judge import JudgeVerdict
+from weblate.trans.judge_loop import build_request, run_judge_batch
+from weblate.trans.models.judge import (
+    JudgeVerdict,
+    compute_context_hash,
+    compute_target_hash,
+)
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.state import STATE_TRANSLATED
 
@@ -83,6 +88,12 @@ class JudgeLoopTest(ViewTestCase):
         _, verdict, _ = self.run_batch([MAJOR, CRITICAL], repair=None)
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
 
+    def test_flag_does_not_trigger_a_repair(self) -> None:
+        unit, verdict, client = self.run_batch([MAJOR, MAJOR], repair=["fixed"])
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+        self.assertEqual(client.call_count, 2)
+        self.assertNotEqual(unit.target, "fixed")
+
     def test_each_seat_uses_its_configured_model(self) -> None:
         _, _, client = self.run_batch([PASS, PASS])
         models = [c.kwargs["model"] for c in client.call_args_list]
@@ -107,6 +118,63 @@ class JudgeLoopTest(ViewTestCase):
         _, verdict, _ = self.run_batch([DEAD, DEAD])
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.UNPARSED)
 
+    def test_current_all_unparsed_round_does_not_repair_from_history(self) -> None:
+        unit = self.get_unit()
+        old_request = build_request(unit)
+        old_run = uuid.uuid4()
+        for seat, model in enumerate(("vendor-a/model", "vendor-b/model"), start=1):
+            JudgeVerdict.objects.create(
+                unit=unit,
+                max_severity="critical",
+                model_verdict="reject",
+                judge_model=model,
+                seat=seat,
+                run_id=old_run,
+                target_hash=compute_target_hash(old_request.target_plurals),
+                context_hash=compute_context_hash(
+                    source=old_request.source,
+                    note=old_request.note,
+                    glossary_terms=old_request.glossary_terms,
+                ),
+            )
+        client = mock.Mock(side_effect=[[DEAD], [DEAD]])
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop._cached_verdict", return_value=None),
+            mock.patch(
+                "weblate.trans.judge_loop.repair_target",
+                return_value=["must not be used"],
+            ) as repair,
+        ):
+            verdicts = run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
+        self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.UNPARSED)
+        repair.assert_not_called()
+
+    def test_matching_parsed_round_is_reused_without_network(self) -> None:
+        unit = self.get_unit()
+        request = build_request(unit)
+        run = uuid.uuid4()
+        for seat, model in enumerate(("vendor-a/model", "vendor-b/model"), start=1):
+            JudgeVerdict.objects.create(
+                unit=unit,
+                max_severity="none",
+                model_verdict="pass",
+                judge_model=model,
+                seat=seat,
+                run_id=run,
+                target_hash=compute_target_hash(request.target_plurals),
+                context_hash=compute_context_hash(
+                    source=request.source,
+                    note=request.note,
+                    glossary_terms=request.glossary_terms,
+                ),
+            )
+        client = mock.Mock()
+        with mock.patch("weblate.trans.judge_loop.request_verdicts", client):
+            verdicts = run_judge_batch([unit], writable_ids=set(), user=self.user)
+        self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.PASS)
+        client.assert_not_called()
+
     def test_confirmed_defect_triggers_one_repair_judged_by_both_seats(self) -> None:
         _unit, verdict, client = self.run_batch(
             [CRITICAL, CRITICAL, PASS, PASS], repair=["fixed text"]
@@ -124,6 +192,24 @@ class JudgeLoopTest(ViewTestCase):
     def test_repair_that_changes_nothing_stops_the_loop(self) -> None:
         _, _verdict, client = self.run_batch([CRITICAL, CRITICAL], repair=None)
         self.assertEqual(client.call_count, 2)
+
+    def test_repair_is_rolled_back_when_it_adds_a_deterministic_check(self) -> None:
+        unit = self.get_unit()
+        original = unit.target
+        client = mock.Mock(side_effect=[[CRITICAL], [CRITICAL]])
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.repair_target",
+                return_value=["new but invalid"],
+            ),
+            mock.patch(
+                "weblate.trans.judge_loop._deterministic_checks",
+                side_effect=[set(), {"game-markup"}],
+            ),
+        ):
+            run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
+        self.assertEqual(self.get_unit().target, original)
 
     def test_a_human_string_is_not_repaired_when_not_writable(self) -> None:
         # D3/A3: overwrite off => the unit is not in writable_ids => a

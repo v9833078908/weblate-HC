@@ -4,10 +4,18 @@
 
 from __future__ import annotations
 
+from django.test import override_settings
+
 from weblate.trans.forms import AutoForm
 from weblate.trans.tests.test_views import ViewTestCase
 
 
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
 class JudgeAutoFormTest(ViewTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -28,6 +36,18 @@ class JudgeAutoFormTest(ViewTestCase):
 
     def test_judge_mode_hidden_without_review_permission(self) -> None:
         self.user.is_superuser = False
+        self.user.save()
+        self.assertNotIn("judge", self.modes(self.user))
+
+    @override_settings(JUDGE_MODEL_SEAT_2="")
+    def test_judge_mode_hidden_when_one_seat_is_not_configured(self) -> None:
+        self.user.is_superuser = True
+        self.user.save()
+        self.assertNotIn("judge", self.modes(self.user))
+
+    @override_settings(JUDGE_ENABLED=False)
+    def test_judge_mode_hidden_when_judge_is_disabled(self) -> None:
+        self.user.is_superuser = True
         self.user.save()
         self.assertNotIn("judge", self.modes(self.user))
 

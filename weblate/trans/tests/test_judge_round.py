@@ -10,7 +10,10 @@ from weblate.trans.models.judge import (
     JudgeVerdict,
     active_round,
     active_verdict,
+    compute_context_hash,
     compute_target_hash,
+    current_round,
+    current_verdict,
     describe_latest_verdict,
     latest_round,
 )
@@ -70,6 +73,38 @@ class JudgeRoundTest(ViewTestCase):
         verdict = active_verdict(unit)
         assert verdict is not None
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+
+    def test_current_round_exposes_unparsed_without_historical_fallback(self) -> None:
+        unit = self.get_unit()
+        context_hash = compute_context_hash(
+            source=unit.source,
+            note=unit.source_unit.note,
+            glossary_terms=[],
+        )
+        old = uuid.uuid4()
+        self.make(
+            unit,
+            "critical",
+            seat=1,
+            run_id=old,
+            context_hash=context_hash,
+        )
+        new = uuid.uuid4()
+        self.make(
+            unit,
+            "none",
+            seat=1,
+            run_id=new,
+            unparsed=True,
+            context_hash=context_hash,
+        )
+        active = active_verdict(unit)
+        assert active is not None
+        self.assertEqual(active.verdict, JudgeVerdict.Verdict.REJECT)
+        current = current_verdict(unit)
+        assert current is not None
+        self.assertEqual(current.verdict, JudgeVerdict.Verdict.UNPARSED)
+        self.assertEqual(current_round(unit)[0].run_id, new)
 
     def test_a_verdict_for_other_text_is_not_active(self) -> None:
         unit = self.get_unit()

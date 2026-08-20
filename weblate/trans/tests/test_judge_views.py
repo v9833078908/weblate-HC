@@ -9,9 +9,23 @@ import uuid
 from django.test import override_settings
 from django.urls import reverse
 
-from weblate.trans.models.judge import JudgeVerdict, compute_target_hash
+from weblate.trans.judge_loop import build_request
+from weblate.trans.models.judge import (
+    JudgeVerdict,
+    compute_context_hash,
+    compute_target_hash,
+)
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.state import STATE_TRANSLATED
+
+
+def judge_context_hash(unit) -> str:
+    request = build_request(unit)
+    return compute_context_hash(
+        source=request.source,
+        note=request.note,
+        glossary_terms=request.glossary_terms,
+    )
 
 
 @override_settings(JUDGE_ENABLED=True, JUDGE_MAX_REPAIR_ATTEMPTS=1)
@@ -31,7 +45,7 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
             judge_model="vendor/model-a",
             seat=1,
             target_hash=compute_target_hash(unit.get_target_plurals()),
-            context_hash="c",
+            context_hash=judge_context_hash(unit),
         )
         unit.run_checks()
 
@@ -82,7 +96,7 @@ class JudgeCheckVisibilityTest(ViewTestCase):
             judge_model="vendor/model-a",
             seat=1,
             target_hash=compute_target_hash(unit.get_target_plurals()),
-            context_hash="c",
+            context_hash=judge_context_hash(unit),
         )
         unit.run_checks()
 
@@ -189,7 +203,7 @@ class JudgeVerdictCardTest(ViewTestCase):
             errors=errors1,
             judge_model="vendor/model-a",
             target_hash=compute_target_hash(unit.get_target_plurals()),
-            context_hash="c",
+            context_hash=judge_context_hash(unit),
         )
         JudgeVerdict.objects.create(
             unit=unit,
@@ -199,7 +213,7 @@ class JudgeVerdictCardTest(ViewTestCase):
             errors=errors2,
             judge_model="vendor/model-b",
             target_hash=compute_target_hash(unit.get_target_plurals()),
-            context_hash="c",
+            context_hash=judge_context_hash(unit),
         )
         unit.run_checks()
 
@@ -239,6 +253,17 @@ class JudgeVerdictCardTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "rejected")
+
+    def test_current_unparsed_round_is_marked_even_with_historical_verdict(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        context_hash = judge_context_hash(unit)
+        self.make_reject(unit, context_hash=context_hash)
+        self.make_unparsed(unit, context_hash=context_hash)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "latest judge answer was not parsed")
+        self.assertContains(response, "historical evidence")
 
     def test_no_verdict_means_no_card(self) -> None:
         response = self.client.get(self.get_unit().get_absolute_url())

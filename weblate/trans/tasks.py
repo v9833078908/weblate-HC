@@ -34,6 +34,7 @@ from weblate.trans.autotranslate import BatchAutoTranslate
 from weblate.trans.component_copy import copy_component_addons
 from weblate.trans.exceptions import FileParseError
 from weblate.trans.inherited_settings import apply_create_inheritance_defaults
+from weblate.trans.judge import JudgeError
 from weblate.trans.models import (
     Category,
     Change,
@@ -1041,6 +1042,19 @@ def auto_translate(
                 status=AddonActivityLogStatus.ERROR,
                 task_count=activity_log_task_count,
             )
+        except JudgeError as error:
+            result.update(
+                {
+                    "message": gettext("Automatic translation failed: %s") % error,
+                    "warnings": auto.get_warnings(),
+                }
+            )
+            return store_auto_translate_activity_log(
+                activity_log_id,
+                result,
+                status=AddonActivityLogStatus.ERROR,
+                task_count=activity_log_task_count,
+            )
         result.update({"message": message, "warnings": auto.get_warnings()})
         return store_auto_translate_activity_log(
             activity_log_id,
@@ -1067,6 +1081,7 @@ def auto_translate_component(
     user_id: int | None = None,
     activity_log_id: int | None = None,
     enforce_permissions: bool = True,
+    overwrite_existing: bool = False,
 ) -> dict[str, Any]:
     component_obj = Component.objects.get(pk=component_id)
     user = User.objects.get(pk=user_id) if user_id else None
@@ -1077,15 +1092,30 @@ def auto_translate_component(
         mode=mode,
         component_wide=True,
         enforce_permissions=enforce_permissions,
+        overwrite_existing=overwrite_existing,
     )
-    message = auto.perform(
-        auto_source=auto_source,
-        engines=engines,
-        threshold=threshold,
-        source_component_ids=(
-            [source_component_id] if source_component_id is not None else None
-        ),
-    )
+    try:
+        message = auto.perform(
+            auto_source=auto_source,
+            engines=engines,
+            threshold=threshold,
+            source_component_ids=(
+                [source_component_id] if source_component_id is not None else None
+            ),
+        )
+    except JudgeError as error:
+        message = gettext("Automatic translation failed: %s") % error
+        auto.add_warning(message)
+        result = {
+            "component": component_obj.id,
+            "message": message,
+            "warnings": auto.get_warnings(),
+        }
+        return store_auto_translate_activity_log(
+            activity_log_id,
+            result,
+            status=AddonActivityLogStatus.ERROR,
+        )
     component_obj.run_batched_checks()
     result = {
         "component": component_obj.id,

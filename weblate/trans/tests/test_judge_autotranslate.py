@@ -8,8 +8,13 @@ from unittest import mock
 
 from django.test import override_settings
 
-from weblate.trans.autotranslate import AutoTranslate
-from weblate.trans.models.judge import JudgeVerdict, compute_target_hash
+from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
+from weblate.trans.judge_loop import build_request
+from weblate.trans.models.judge import (
+    JudgeVerdict,
+    compute_context_hash,
+    compute_target_hash,
+)
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.state import FUZZY_STATES, STATE_FUZZY, STATE_TRANSLATED
 
@@ -27,6 +32,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         def fake_batch(units, *, writable_ids, user):
             out = {}
             for u in units:
+                request = build_request(u)
                 out[u.id] = JudgeVerdict.objects.create(
                     unit=u,
                     max_severity=severity,
@@ -34,8 +40,12 @@ class JudgeAutoTranslateTest(ViewTestCase):
                     unparsed=(verdict_kind == JudgeVerdict.Verdict.UNPARSED),
                     judge_model="vendor-a/model",
                     seat=1,
-                    target_hash=compute_target_hash(u.get_target_plurals()),
-                    context_hash="c",
+                    target_hash=compute_target_hash(request.target_plurals),
+                    context_hash=compute_context_hash(
+                        source=request.source,
+                        note=request.note,
+                        glossary_terms=request.glossary_terms,
+                    ),
                 )
             return out
 
@@ -98,3 +108,98 @@ class JudgeAutoTranslateTest(ViewTestCase):
             any("unjudged" in warning for warning in auto.warnings),
             auto.warnings,
         )
+
+    def test_batch_cap_is_shared_across_translations(self) -> None:
+        translations = list(
+            self.component.translation_set.exclude_source().order_by("pk")[:2]
+        )
+        if len(translations) < 2:
+            self.skipTest("fixture has only one target translation")
+        unit = translations[0].unit_set.first()
+        assert unit is not None
+        auto = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        with (
+            override_settings(JUDGE_MAX_UNITS_PER_RUN=1),
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+            ) as run,
+        ):
+            auto.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+        self.assertEqual(sum(len(call.args[0]) for call in run.call_args_list), 1)
+        self.assertTrue(
+            any("cap was reached" in warning for warning in auto.warnings),
+            auto.warnings,
+        )
+
+    def test_judge_refreshes_units_after_pretranslation(self) -> None:
+        unit = self.get_unit()
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+        )
+
+        def pretranslate(*args, **kwargs):
+            current = type(unit).objects.get(pk=unit.pk)
+            current.translate(self.user, ["machine target"], STATE_FUZZY)
+
+        with (
+            mock.patch.object(auto, "process_mt", side_effect=pretranslate),
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+            ) as run,
+        ):
+            auto.process_judge(engines=[], threshold=80)
+        judged_units = run.call_args.args[0]
+        self.assertEqual(judged_units[0].target.strip(), "machine target")
+
+    def test_final_state_write_skips_a_target_changed_after_judging(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["original target"], STATE_TRANSLATED)
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+        )
+
+        def fake_batch(units, *, writable_ids, user):
+            current = units[0]
+            request = build_request(current)
+            verdict = JudgeVerdict.objects.create(
+                unit=current,
+                max_severity="none",
+                model_verdict=JudgeVerdict.Verdict.PASS,
+                judge_model="vendor-a/model",
+                seat=1,
+                target_hash=compute_target_hash(request.target_plurals),
+                context_hash=compute_context_hash(
+                    source=request.source,
+                    note=request.note,
+                    glossary_terms=request.glossary_terms,
+                ),
+            )
+            current = type(current).objects.get(pk=current.pk)
+            current.translate(self.user, ["human changed target"], STATE_TRANSLATED)
+            return {current.pk: verdict}
+
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
+        ):
+            auto.process_judge(engines=[], threshold=80)
+        self.assertEqual(self.get_unit().target.strip(), "human changed target")

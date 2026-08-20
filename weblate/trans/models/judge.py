@@ -226,9 +226,51 @@ def latest_round(unit: Unit) -> list[JudgeVerdict]:
     )
 
 
+def current_round(unit: Unit) -> list[JudgeVerdict]:
+    """
+    Return the newest round matching the current target and judge context.
+
+    Unlike ``active_round``, this never falls back to an older parsed round.
+    Orchestration must not repair or finalize a unit using evidence from a
+    transport-dead current run.
+    """
+    target_hash = compute_target_hash(unit.get_target_plurals())
+    context_hash = compute_context_hash(
+        source=unit.source,
+        note=unit.source_unit.note,
+        glossary_terms=[
+            (term.source, term.target) for term in _glossary_terms(unit) if term.target
+        ],
+    )
+    newest = (
+        unit.judge_verdicts.filter(target_hash=target_hash, context_hash=context_hash)
+        .order_by("-timestamp", "-pk")
+        .first()
+    )
+    if newest is None:
+        return []
+    return list(
+        unit.judge_verdicts.filter(
+            target_hash=target_hash,
+            context_hash=context_hash,
+            run_id=newest.run_id,
+            attempt=newest.attempt,
+        ).order_by("seat")
+    )
+
+
+def _glossary_terms(unit: Unit) -> list[Unit]:
+    # Keep the context identity identical to the request sent to the judge.
+    from weblate.glossary.models import (  # ruff: ignore[import-outside-top-level]
+        get_glossary_terms,
+    )
+
+    return get_glossary_terms(unit, full=True)
+
+
 def active_round(unit: Unit) -> list[JudgeVerdict]:
     """
-    Newest round that describes the current text and has a parsed seat.
+    Newest parsed round that describes the current text.
 
     Staleness is handled by filtering on target_hash. An all-unparsed
     newest round is skipped in favour of the newest parsed one, so a
@@ -282,6 +324,11 @@ def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
 def active_verdict(unit: Unit) -> JudgeVerdict | None:
     """Return the collegium verdict that still describes the stored text."""
     return collegium_verdict(active_round(unit))
+
+
+def current_verdict(unit: Unit) -> JudgeVerdict | None:
+    """Return only the verdict from the newest current-context round."""
+    return collegium_verdict(current_round(unit))
 
 
 def describe_latest_verdict(unit: Unit) -> str:

@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-Judge checks: a Check row derived from the latest JudgeVerdict.
+Judge checks: a Check row derived from the current JudgeVerdict.
 
 The check never computes anything itself — it reads the active verdict
-(weblate.trans.models.judge.active_verdict). That keeps Unit.run_checks
+(weblate.trans.models.judge.current_verdict). That keeps Unit.run_checks
 the single writer of judge-* rows, so they cannot diverge from the
 verdict and staleness is free (a stale verdict yields no active round,
 so run_checks removes the row). The trans-model import is local: this
@@ -45,10 +45,10 @@ class BaseJudgeCheck(TargetCheck):
         # verdict would keep the projected row stale. Two reads per
         # run_checks pass instead of one is the price of correctness.
         from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
-            active_verdict,
+            current_verdict,
         )
 
-        return active_verdict(unit)
+        return current_verdict(unit)
 
     def check_target_unit(self, sources, targets, unit) -> bool:
         verdict = self._active_verdict(unit)

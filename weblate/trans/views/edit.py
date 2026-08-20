@@ -65,6 +65,7 @@ from weblate.trans.models.judge import (
     active_round,
     active_verdict,
     compute_context_hash,
+    current_round,
     latest_round,
 )
 from weblate.trans.models.unit import fill_in_source_translation
@@ -1283,7 +1284,11 @@ def get_translate_unit(
 def _judge_view_context(unit: Unit) -> dict[str, Any]:
     """Judge-verdict context for the unit page: round, verdict, staleness."""
     judge_round = latest_round(unit)
+    judge_current_round = current_round(unit)
     judge_verdict = active_verdict(unit)
+    judge_unparsed = bool(judge_current_round) and all(
+        row.unparsed for row in judge_current_round
+    )
     judge_stale = (
         bool(judge_round)
         and judge_verdict is None
@@ -1306,6 +1311,7 @@ def _judge_view_context(unit: Unit) -> dict[str, Any]:
         "judge_verdict": judge_verdict,
         "judge_seats": active_round(unit) if judge_verdict is not None else [],
         "judge_stale": judge_stale,
+        "judge_unparsed": judge_unparsed,
         "judge_context_changed": judge_context_changed,
     }
 

@@ -21,6 +21,7 @@ from weblate.logger import LOGGER
 from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.models import MACHINERY
 from weblate.trans.actions import ActionEvents
+from weblate.trans.judge import JudgeError, validate_judge_configuration
 from weblate.trans.judge_loop import run_judge_batch
 from weblate.trans.models import (
     Category,
@@ -31,7 +32,11 @@ from weblate.trans.models import (
     Translation,
     Unit,
 )
-from weblate.trans.models.judge import JudgeVerdict, state_for_verdict
+from weblate.trans.models.judge import (
+    JudgeVerdict,
+    current_verdict,
+    state_for_verdict,
+)
 from weblate.trans.util import is_plural, split_plural
 from weblate.utils.state import (
     STATE_APPROVED,
@@ -353,6 +358,7 @@ class AutoTranslate(BaseAutoTranslate):
         unit_ids: list[int] | None = None,
         allow_non_shared_tm_source_components: bool = False,
         overwrite_existing: bool = False,
+        judge_limit: int | None = None,
     ) -> None:
         super().__init__(
             user=user,
@@ -370,6 +376,8 @@ class AutoTranslate(BaseAutoTranslate):
         self.written: set[int] = set()
         self.target_state = STATE_TRANSLATED
         self.overwrite_existing = overwrite_existing
+        self.judge_limit = judge_limit
+        self.judge_units_processed = 0
         # D2/fail-safe: a judge translation never starts shippable; the
         # verdict decides the final state per string.
         self.fresh_translation_state = STATE_FUZZY
@@ -422,7 +430,7 @@ class AutoTranslate(BaseAutoTranslate):
                 state,
                 change_action=ActionEvents.AUTO,
                 propagate=False,
-                select_for_update=False,
+                select_for_update=self.mode == "judge",
             )
             self.updated += 1
 
@@ -727,13 +735,21 @@ class AutoTranslate(BaseAutoTranslate):
         self.set_progress(self.progress_base + len(self.written))
 
     def process_judge(self, *, engines: list[str], threshold: int) -> None:
+        validate_judge_configuration()
         units = list(self.get_units().select_related("source_unit"))
-        if len(units) > settings.JUDGE_MAX_UNITS_PER_RUN:
-            self.failure_message = ngettext(
+        judge_limit = (
+            settings.JUDGE_MAX_UNITS_PER_RUN
+            if self.judge_limit is None
+            else self.judge_limit
+        )
+        if len(units) > judge_limit:
+            warning = ngettext(
                 "Judge run refused: %(n)d string exceeds the per-run cap of %(cap)d.",
                 "Judge run refused: %(n)d strings exceed the per-run cap of %(cap)d.",
                 len(units),
-            ) % {"n": len(units), "cap": settings.JUDGE_MAX_UNITS_PER_RUN}
+            ) % {"n": len(units), "cap": judge_limit}
+            self.failure_message = warning
+            self.add_warning(warning)
             return
         writable_ids = {
             unit.id
@@ -753,23 +769,59 @@ class AutoTranslate(BaseAutoTranslate):
                 self.process_mt(engines, threshold)
             finally:
                 self.unit_ids, self.target_state = saved_ids, saved_state
+            units = list(
+                self.translation.unit_set.filter(pk__in=[unit.id for unit in units])
+                .prefetch()
+                .prefetch_source()
+            )
+        else:
+            units = list(
+                self.translation.unit_set.filter(pk__in=[unit.id for unit in units])
+                .prefetch()
+                .prefetch_source()
+            )
 
         # Phase 2: judge everything in q; the state is decided per verdict.
         verdicts = run_judge_batch(units, writable_ids=writable_ids, user=self.user)
+        self.judge_units_processed = len(units)
+        final_snapshots = {
+            unit.id: (unit.target, unit.state) for unit in units if unit.id in verdicts
+        }
         unparsed = 0
-        for unit in units:
+        for unit in (
+            self.translation.unit_set.filter(pk__in=verdicts)
+            .prefetch()
+            .prefetch_source()
+        ):
             verdict = verdicts.get(unit.id)
             if verdict is None:
                 continue
-            if verdict.verdict == JudgeVerdict.Verdict.UNPARSED:
-                unparsed += 1
-            state = state_for_verdict(
-                verdict.verdict,
-                enable_review=self.translation.enable_review,
-                may_approve=settings.JUDGE_MAY_APPROVE,
-            )
-            if state is not None and unit.state != state:
-                self.update(unit, state, unit.get_target_plurals())
+            with transaction.atomic():
+                locked = (
+                    self.translation.unit_set.select_for_update()
+                    .prefetch()
+                    .prefetch_source()
+                    .get(pk=unit.pk)
+                )
+                current = current_verdict(locked)
+                if (
+                    current is None
+                    or current.pk != verdict.pk
+                    or (locked.target, locked.state) != final_snapshots[unit.id]
+                ):
+                    # The target or glossary context changed while requests
+                    # were in flight. Never apply a verdict to a different
+                    # version.
+                    continue
+                if verdict.verdict == JudgeVerdict.Verdict.UNPARSED:
+                    unparsed += 1
+                state = state_for_verdict(
+                    verdict.verdict,
+                    enable_review=self.translation.enable_review,
+                    may_approve=settings.JUDGE_MAY_APPROVE,
+                )
+                if state is not None and locked.state != state:
+                    self.update(locked, state, locked.get_target_plurals())
         if unparsed:  # D5: never a silent no-op on money spent
             self.add_warning(
                 ngettext(
@@ -822,9 +874,10 @@ class AutoTranslate(BaseAutoTranslate):
                 threshold=threshold,
                 source_component_ids=source_component_ids,
             )
-        except (MachineTranslationError, Component.DoesNotExist) as error:
+        except (JudgeError, MachineTranslationError, Component.DoesNotExist) as error:
             translation.log_error("failed automatic translation: %s", error)
             self.failure_message = gettext("Automatic translation failed: %s") % error
+            self.add_warning(self.failure_message)
             return self.failure_message
 
         translation.log_info("completed automatic translation")
@@ -946,6 +999,18 @@ class BatchAutoTranslate(BaseAutoTranslate):
             check_auto_translate_permission(self.user, translation, self.mode)
         )
 
+    def _finish_translation(
+        self, auto_translate: AutoTranslate, judge_remaining: int | None
+    ) -> int | None:
+        if judge_remaining is not None and not auto_translate.failure_message:
+            judge_remaining -= auto_translate.judge_units_processed
+        if auto_translate.failure_message:
+            self.failure_message = auto_translate.failure_message
+        self.updated += auto_translate.updated
+        for warning in auto_translate.get_warnings():
+            self.add_warning(warning)
+        return judge_remaining
+
     def perform(
         self,
         *,
@@ -954,6 +1019,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
         threshold: int,
         source_component_ids: list[int] | None,
     ) -> str:
+        if self.mode == "judge":
+            validate_judge_configuration()
+        judge_remaining = (
+            settings.JUDGE_MAX_UNITS_PER_RUN if self.mode == "judge" else None
+        )
         selected_workspace_source_component_ids: dict[int, list[int]] | None = None
         if (
             auto_source == "others"
@@ -973,6 +1043,14 @@ class BatchAutoTranslate(BaseAutoTranslate):
             if not self._can_process_translation(translation):
                 self.set_progress(pos)
                 continue
+            if self.mode == "judge" and not judge_remaining:
+                self.add_warning(
+                    gettext(
+                        "Judge run skipped because the per-run string cap was reached."
+                    )
+                )
+                self.set_progress(pos)
+                continue
 
             auto_translate = AutoTranslate(
                 user=self.user,
@@ -985,6 +1063,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     self.allow_non_shared_tm_source_components
                 ),
                 overwrite_existing=self.overwrite_existing,
+                judge_limit=judge_remaining,
             )
             auto_translate.progress_range = (
                 100 * (pos - 1) // self.progress_steps,
@@ -1054,9 +1133,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 threshold=threshold,
                 source_component_ids=effective_source_component_ids,
             )
-            self.updated += auto_translate.updated
-            for warning in auto_translate.get_warnings():
-                self.add_warning(warning)
+            judge_remaining = self._finish_translation(auto_translate, judge_remaining)
             self.set_progress(pos)
 
-        return self.get_message()
+        return self.failure_message or self.get_message()

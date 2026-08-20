@@ -79,6 +79,7 @@ from weblate.trans.inherited_settings import (
     INHERITABLE_COMPONENT_SETTINGS,
     get_inherit_field_name,
 )
+from weblate.trans.judge import judge_configuration_ready
 from weblate.trans.models import (
     Announcement,
     Category,
@@ -1342,7 +1343,10 @@ class AutoForm(forms.Form):
         ]
         if user is not None and (user.has_perm("unit.review", obj) or obj is None):
             choices.append(("approved", gettext("Add as approved translation")))
-            choices.append(("judge", gettext("Add as translation with an LLM judge")))
+            if judge_configuration_ready():
+                choices.append(
+                    ("judge", gettext("Add as translation with an LLM judge"))
+                )
         self.fields["mode"].choices = choices
 
         self.helper = FormHelper(self)

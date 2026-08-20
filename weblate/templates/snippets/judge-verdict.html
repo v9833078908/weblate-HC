@@ -1,14 +1,25 @@
-{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_context_changed' in context #}
+{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed' in context #}
 
 {% load humanize i18n icons %}
 
-{% if judge_verdict or judge_stale %}
+{% if judge_verdict or judge_stale or judge_unparsed %}
   <div class="card" id="id_judge_card">
     <div class="card-header">
       <h4 class="card-title">{% translate "AI judge verdict" %}</h4>
     </div>
 
     <div class="list-group">
+      {% if judge_unparsed %}
+        <div class="list-group-item check">
+          <h5 class="list-group-item-heading">
+            {% icon "info.svg" %}
+            {% translate "The latest judge answer was not parsed" %}
+          </h5>
+          <p class="list-group-item-text">
+            {% translate "The latest judge round did not return a usable answer. Any verdict shown below is historical evidence and must not trigger automatic repair." %}
+          </p>
+        </div>
+      {% endif %}
       {% if judge_stale %}
         <div class="list-group-item check">
           <h5 class="list-group-item-heading">
@@ -19,7 +30,7 @@
             {% translate "The judge's opinion below was recorded for an earlier version of this translation; it may no longer apply." %}
           </p>
         </div>
-      {% elif judge_verdict.verdict == "reject" %}
+      {% elif judge_verdict and judge_verdict.verdict == "reject" %}
         <div class="list-group-item check">
           <h5 class="list-group-item-heading">
             <span class="red">{% icon "cancel.svg" %}</span>
@@ -47,7 +58,7 @@
             <p class="list-group-item-text text-muted">{% translate "Both judges reviewed this string independently." %}</p>
           {% endif %}
         </div>
-      {% elif judge_verdict.verdict == "flag" %}
+      {% elif judge_verdict and judge_verdict.verdict == "flag" %}
         <div class="list-group-item check">
           <h5 class="list-group-item-heading">
             {% icon "flag.svg" %}
@@ -71,7 +82,7 @@
             {% endfor %}
           {% endfor %}
         </div>
-      {% else %}
+      {% elif judge_verdict %}
         <div class="list-group-item check">
           <h5 class="list-group-item-heading">
             <span class="green">{% icon "check.svg" %}</span>
