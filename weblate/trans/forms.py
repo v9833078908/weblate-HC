@@ -1228,6 +1228,16 @@ class AutoForm(forms.Form):
         min_value=1,
         max_value=100,
     )
+    overwrite_existing = forms.BooleanField(
+        label=gettext_lazy("Overwrite the existing translation"),
+        required=False,
+        initial=False,
+        help_text=gettext_lazy(
+            "By default the judge mode only translates empty strings and "
+            "strings marked for editing; strings that already have a "
+            "translation are judged, not rewritten."
+        ),
+    )
 
     def __init__(
         self, obj: Component | Project | Workspace | None, user=None, *args, **kwargs
@@ -1332,6 +1342,7 @@ class AutoForm(forms.Form):
         ]
         if user is not None and (user.has_perm("unit.review", obj) or obj is None):
             choices.append(("approved", gettext("Add as approved translation")))
+            choices.append(("judge", gettext("Add as translation with an LLM judge")))
         self.fields["mode"].choices = choices
 
         self.helper = FormHelper(self)
@@ -1341,7 +1352,19 @@ class AutoForm(forms.Form):
             InlineRadios("auto_source"),
             Div("component", css_id="auto_source_others"),
             Div("engines", "threshold", css_id="auto_source_mt"),
+            Field("overwrite_existing"),
         )
+
+    def clean(self):
+        super().clean()
+        if self.cleaned_data.get("overwrite_existing") and self.cleaned_data.get(
+            "mode"
+        ) != "judge":
+            self.add_error(
+                "overwrite_existing",
+                gettext("Overwrite applies only to the LLM judge mode."),
+            )
+        return self.cleaned_data
 
     def clean_component(self):
         if self.cleaned_data.get("auto_source") == "mt":
