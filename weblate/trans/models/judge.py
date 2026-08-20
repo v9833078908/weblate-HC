@@ -11,10 +11,17 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
+from django.utils.html import escape
 from django.utils.translation import gettext_lazy
+
+from weblate.utils.state import STATE_APPROVED, STATE_FUZZY, STATE_TRANSLATED
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
+
+    from weblate.trans.models.unit import Unit
+
+JUDGE_ERROR_SEPARATOR = " | "
 
 
 def _digest(parts: Sequence[str]) -> str:
@@ -147,8 +154,6 @@ class JudgeVerdict(models.Model):
         return self.target_hash != compute_target_hash(target)
 
 
-from weblate.utils.state import STATE_APPROVED, STATE_FUZZY, STATE_TRANSLATED
-
 # Design "Гейт по severity выражается штатными настройками". minor is a
 # pass: the errors are recorded, but they do not hold the string back.
 _SEVERITY_VERDICT = {
@@ -188,3 +193,95 @@ def state_for_verdict(
     if verdict == JudgeVerdict.Verdict.PASS and enable_review and may_approve:
         return STATE_APPROVED
     return STATE_TRANSLATED
+
+
+def latest_round(unit: Unit) -> list[JudgeVerdict]:
+    """Every seat of the newest round, stale or not — for the card's
+    'previous version' note. Not for projection."""
+    newest = unit.judge_verdicts.order_by("-timestamp", "-pk").first()
+    if newest is None:
+        return []
+    return list(
+        unit.judge_verdicts.filter(
+            run_id=newest.run_id, attempt=newest.attempt
+        ).order_by("seat")
+    )
+
+
+def active_round(unit: Unit) -> list[JudgeVerdict]:
+    """Newest round that describes the current text and has a parsed seat.
+
+    Staleness is handled by filtering on target_hash. An all-unparsed
+    newest round is skipped in favour of the newest parsed one, so a
+    transport failure never erases the last real verdict (D5).
+    """
+    current = compute_target_hash(unit.get_target_plurals())
+    newest = (
+        unit.judge_verdicts.filter(target_hash=current)
+        .order_by("-timestamp", "-pk")
+        .first()
+    )
+    if newest is None:
+        return []
+    rows = list(
+        unit.judge_verdicts.filter(
+            target_hash=current, run_id=newest.run_id, attempt=newest.attempt
+        ).order_by("seat")
+    )
+    if any(not row.unparsed for row in rows):
+        return rows
+    parsed = (
+        unit.judge_verdicts.filter(target_hash=current, unparsed=False)
+        .order_by("-timestamp", "-pk")
+        .first()
+    )
+    if parsed is None:
+        return []
+    return list(
+        unit.judge_verdicts.filter(
+            target_hash=current, run_id=parsed.run_id, attempt=parsed.attempt
+        ).order_by("seat")
+    )
+
+
+def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
+    """The strictest opinion of a round. No seat may lower another.
+
+    A transport failure is not an opinion, so an unparsed row neither
+    raises nor lowers the round; only when every seat failed does the
+    round read as unparsed.
+    """
+    if not rows:
+        return None
+    parsed = [row for row in rows if not row.unparsed]
+    if not parsed:
+        return rows[0]
+    return max(parsed, key=lambda row: (SEVERITY_RANK[row.max_severity], -row.seat))
+
+
+def active_verdict(unit: Unit) -> JudgeVerdict | None:
+    """The collegium verdict that still describes the stored text."""
+    return collegium_verdict(active_round(unit))
+
+
+def describe_latest_verdict(unit: Unit) -> str:
+    """Human-readable evidence for the active round, or an empty string.
+
+    Rendered into the check description, which weblate/machinery/llm.py
+    feeds to the translator as failing_checks during repair. Both seats
+    are merged. Descriptions are escaped and joined with an explicit
+    separator: llm.py runs the text through strip_tags().split(), which
+    would otherwise eat game markup like <color=#RRGGBB> and collapse
+    newlines into one blob (review Q1).
+    """
+    lines: list[str] = []
+    for row in active_round(unit):
+        for error in row.errors:
+            line = "{}/{}: {}".format(
+                error.get("severity", "unspecified"),
+                error.get("category", "unspecified"),
+                escape(error.get("description", "")),
+            )
+            if line not in lines:
+                lines.append(line)
+    return JUDGE_ERROR_SEPARATOR.join(lines)
