@@ -2089,6 +2089,13 @@ class Unit(models.Model, LoggerMixin):
         list(result)
         return result
 
+    @property
+    def deterministic_checks(self) -> list[Check]:
+        """Checks shown as facts: judge verdicts render in their own card."""
+        from weblate.checks.judge import JUDGE_CHECKS
+
+        return [check for check in self.all_checks if check.name not in JUDGE_CHECKS]
+
     def clear_checks_cache(self) -> None:
         if "all_checks" in self.__dict__:
             del self.__dict__["all_checks"]
@@ -2440,11 +2447,14 @@ class Unit(models.Model, LoggerMixin):
             change_details=change_details,
         )
 
-        # Enforced checks can revert the state to needs editing (fuzzy)
+        from weblate.checks.judge import JUDGE_CHECKS
+
+        # Enforced checks can revert the state to needs editing (fuzzy);
+        # a judge verdict is an opinion and must never enforce (A7).
         if (
             self.state >= STATE_TRANSLATED
             and component.enforced_checks
-            and self.all_checks_names & set(component.enforced_checks)
+            and (self.all_checks_names & set(component.enforced_checks)) - JUDGE_CHECKS
         ):
             self.state = self.original_state = STATE_NEEDS_REWRITING
             self.save(
