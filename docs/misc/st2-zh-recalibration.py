@@ -51,6 +51,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import re
@@ -464,7 +465,13 @@ def load_prices() -> None:
             completion_price = float(pricing.get("completion", "0"))
             if prompt_price or completion_price:
                 PRICES[entry.get("id", "")] = (prompt_price, completion_price)
-    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+    except (
+        urllib.error.URLError,
+        http.client.HTTPException,
+        TimeoutError,
+        OSError,
+        ValueError,
+    ):
         pass
 
 
@@ -594,7 +601,13 @@ def judge_batch(
         try:
             response = post(payload, api_key, timeout)
             usage.seconds += time.monotonic() - t0
-        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        except (
+            urllib.error.URLError,
+            http.client.HTTPException,
+            TimeoutError,
+            OSError,
+            ValueError,
+        ) as exc:
             usage.seconds += time.monotonic() - t0
             usage.transport_errors[type(exc).__name__] += 1
             if attempt == 0:
