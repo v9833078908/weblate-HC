@@ -1,0 +1,397 @@
+pos	context	speaker	ru	en	fr	ru_checks	en_checks	fr_checks	en_lost_final_punct	fr_lost_final_punct	en_hidden_checks	fr_hidden_checks	duplicate_divergence
+1	hub1_first_1_1	Ray	 Леон, вставай. Мы уже приехали.	 Leon, wake up. We're here.	 Leon, lève-toi. Nous sommes arrivés.								
+2	hub1_first_1_2	Leon	 Хорошо… Давно мы приехали?	 Alright... Have we been here long?	 Bien… Nous sommes arrivés il y a longtemps ?								
+3	hub1_first_1_3	Ray	 Недавно. Ты проспал всю дорогу.	 Not long. You slept the whole way.	 Non. Tu as dormi tout le long du trajet.								
+4	hub1_first_1_4	Leon	 Проспал очередные виды на ебеня? 	 Slept through another set of shitty views? 	 J'ai raté d'autres paysages de merde ? 								
+5	hub1_first_1_5	Leon	Даже не знаю, как я это переживу.	Don't know how I'm gonna survive that.	Je ne sais même pas comment je vais m'en remettre.								
+6	hub1_first_1_6	Hazuo	Добро пожаловать в Столицу. 	Welcome to the capital. 	Bienvenue dans la Capitale 					yes		end_stop	
+7	hub1_first_1_7	Hazuo	Ну, или в самую её «лучшую» часть — Рыбный тупик.	Well, or its “best” part — Fish Alley.	Enfin, dans sa « meilleure » partie — le Cul-de-sac des Poissons.								
+8	hub1_first_1_8	Hazuo	Построили недавно, ещё при третьем императоре Акито.\n	Built recently, back under the third Emperor Akito.\n	Construit récemment, sous le troisième empereur Akira.\n								
+9	hub1_first_1_9	Leon	Он опять завёл эту шарманку.	He's started that broken record again.	Il a encore ressorti son vieux disque.								
+10	hub1_first_1_10	Leon	Я чёт подустал от этих уроков истории.	I'm kinda tired of these history lessons.	J'en ai un peu marre de ces leçons d'histoire.								
+11	hub1_first_1_11	Leon	Все пауки такие?	All you Spiders like that?	Tous les araignées sont comme ça ?								
+12	hub1_first_1_12	Joe	Хранители знаний, да	Keepers of knowledge, yes	Gardiens du savoir, oui								
+13	hub1_first_1_13	Leon	Скукота. 	Boring 	Ennuyeux 				yes	yes	end_stop	end_stop	
+14	hub1_first_1_14	Ray	Очень интересно. И спасибо, что подкинули нас.	Very interesting. And thank you for the ride.	Très intéressant. Et merci de nous avoir déposés.								
+15	hub1_first_1_15	Hazuo	 Без проблем. 	 No problem 	 Pas de problème 				yes	yes	end_stop	end_stop	
+16	hub1_first_1_16	Hazuo	Не мог пройти мимо вас, тем более напоминаете мне племянников. 	Couldn't just pass you by, especially since you remind me of my nephews 	Je ne pouvais pas vous laisser, d’autant plus que vous me rappelez mes neveux 				yes	yes	end_stop	end_stop	
+17	hub1_first_1_17	Hazuo	Только… с чешуей и шерстью.\n	Only… with scales and fur.\n	Seulement… avec des écailles et de la fourrure.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+18	hub1_first_1_18	Hazuo	Заглядывайте ко мне в «Тысячу мелочей»!	"Stop by my ""Thousand Trinkets"" sometime!"	Passez me voir à la « Mille et une babioles » !								
+19	hub1_first_1_19	Ray	 Хорошо, спасибо!	 Alright, thank you!	 D’accord, merci !								
+20	hub1_first_1_20	Joe	 У меня здесь есть свои дела. Встретимся позже	 I have my own business here. See you later	 J’ai mes propres affaires ici. On se voit plus tard								
+21	hub1_first_1_21	Leon	 А как мне тебя найти?	 How am I gonna find you?	 Et comment je te trouve, moi ?								
+22	hub1_first_1_22	Joe	 Я тебя сам найду.	 I'll find you myself.	 Je te trouverai moi-même.								
+23	hub1_first_1_23	Ray	 У меня от него чешуя дыбом стоит. 	 He makes my scales crawl. 	 Il me donne la chair de poule. 								
+24	hub1_first_1_24	Ray	 Серьезно, Хадзуо его собрат, но рядом с ним, я не чувствую такого страха. \n	 Seriously, Hazuo's his kin, but I don't feel that kinda fear around him. \n	 Sérieusement, Hazuo est son frère, mais à côté de lui, je ne ressens pas une telle peur. \n								
+25	hub1_first_1_25	Leon	 А я думал, вы лучшие подружки.\n	 I thought you two were besties.\n	 Et moi qui pensais que vous étiez les meilleures amies du monde.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+26	hub1_first_1_26	Ray	 Ха-ха. Что будем дальше делать?\n	 Haha. What're we gonna do next?\n	 Ha-ha. Qu'est-ce qu'on fait maintenant ?\n								
+27	hub1_first_1_27	Leon	 Кажется, я не ел целую вечность.	 I ain't eaten in ages.	 J'ai l'impression de n'avoir pas mangé depuis une éternité.								
+28	hub1_first_1_28	Leon	Может, набьём животы?	How 'bout we fill our bellies?	Et si on se remplissait la panse ?								
+29	hub1_first_1_29	Ray	 Можно.	 We can.	 On peut.								
+30	hub1_overlook_1_1	Leon	Ого! Как же тут…я не знаю…КРАСИВО!  \n	Whoa! This place is so… I don't know… BEAUTIFUL!  \n	Oh ! Comme c'est… je ne sais pas… BEAU !  \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+31	hub1_overlook_1_2	Ray	Тут? Это же просто трущобы.	Here? This is just a slum.	Ici ? Ce ne sont que des taudis.								
+32	hub1_overlook_1_3	Leon	Я никогда не видел такого большого города! 	I've never seen such a big city 	Je n'ai jamais vu une ville aussi grande 				yes	yes	end_exclamation	end_exclamation	
+33	hub1_overlook_1_4	Ray	Думаю, сама Столица тебя поразит! 	I think the capital itself will amaze you 	Je pense que la Capitale elle-même te surprendra 				yes	yes	end_exclamation	end_exclamation	
+34	hub1_overlook_1_5	Ray	А тут как раз рамен подают. Пойдем! 	And they serve ramen right here. Let's go 	Et ici, ils servent du ramen. Allons-y 				yes	yes	end_exclamation	end_exclamation	
+35	hub1_ramen_1_1	Leon	Это что за фигня?!\n\n	What the fuck is this?!\n\n	C'est quoi ce bordel ?!\n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+36	hub1_ramen_1_2	Ray	Это рамен. Никогда такого не пробовал что ли?\n	It's ramen. You never tried it before?\n	C'est du ramen. Tu n'en as jamais goûté, c'est ça ?\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+37	hub1_ramen_1_3	Leon	Нет. У нас в деревне такого не готовили.\n	Nah. They didn't make this in my village.\n	Non. Dans notre village, on ne préparait pas ça.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+38	hub1_ramen_1_4	Leon	А потом я ел только….с пола….	And after that, I only ate... off the floor....	Et après, je n'ai mangé que… par terre….								
+39	hub1_ramen_1_5	Ray	Ясно. 	I see 	Je vois 				yes	yes	end_stop	end_stop	
+40	hub1_ramen_1_6	Ray	Попробуй скорее. Тебе понравится. \n\n	Try it quickly. You'll like it. \n\n	Goûte vite. Tu vas aimer. \n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+41	hub1_ramen_1_7	Leon	ЕБАТЬ. КАК. ВКУСНО.\n	FUCK. THAT'S. GOOD.\n	PUTAIN. QUE. C'EST. BON.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+42	hub1_ramen_1_9	Motoki	Я всегда говорю. Ешь рамен - БУДЕШЬ КАК КАМЕНЬ!	I always say. Eat ramen, and you'll BE HARD AS A ROCK!	Je dis toujours. Mange du ramen — TU SERAS SOLIDE COMME UN ROC !								
+43	hub1_ramen_1_10	Saki	ЗАТКНИСЬ, СТАРЫЙ! Не приставай к ним! 	SHUT UP, OLD MAN! Leave 'em alone! 	TAIS-TOI, VIEUX ! Ne les embête pas 					yes		end_exclamation	
+44	hub1_ramen_1_11	Motoki	Да я ничего не делал! 	But I ain't doin' nothin'! 	Mais je n'ai rien fait 					yes		end_exclamation	
+45	hub1_ramen_1_12	Saki	Вот и не делай! 	Then don't! 	Alors ne fais rien 					yes		end_exclamation	
+46	hub1_ramen_1_13	Ray	Нам нужно где-то остановиться. 	We need somewhere to stay. 	Nous devons nous arrêter quelque part 					yes		end_stop	
+47	hub1_ramen_1_14	Leon	Мне все равно! 	I don't give a shit! 	Je m'en fous 					yes		end_exclamation	
+48	hub1_ramen_1_15	Leon	Я хочу только узнать, кому продали мою сестру!	All I wanna know is who my sister was sold to!	Je veux juste savoir à qui ma sœur a été vendue !								
+49	hub1_ramen_1_16	Ray	И как ты это сделаешь?	And how will you do that?	Et comment vas-tu faire ça ?								
+50	hub1_ramen_1_17	Leon	Без понятия.	No fuckin' idea.	Aucune idée.								
+51	hub1_ramen_1_18	Ray	Нам нужна комната на несколько дней. 	We need a room for a few days. 	Il nous faut une chambre pour quelques jours 					yes		end_stop	
+52	hub1_ramen_1_19	Motoki	Отлично! А мне нужны постояльцы! \n	Great! And I need lodgers! \n	Parfait ! Et moi, j’ai besoin de clients ! \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+53	hub1_ramen_1_20	Leon	Ты подслушивал?	Were you eavesdropping?	Tu écoutais aux portes ?								
+54	hub1_ramen_1_21	Motoki	Так я всегда подслушиваю.\n	I always eavesdrop.\n	J’écoute toujours aux portes.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+55	hub1_ramen_1_22	Motoki	Вы можете спать в подсобке за раменной. 	You can sleep in the back room behind the ramen shop. 	Vous pouvez dormir dans l’arrière-boutique, derrière le ramen-ya 					yes		end_stop	
+56	hub1_ramen_1_23	Motoki	Только учтите! Все шиитаке посчитаны. \n	Just so you know! All shiitake are accounted for. \n	Mais attention ! Tous les shiitake sont comptés. \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+57	hub1_ramen_1_24	Leon	…что за нахрен шиитаке…\n	...what the fuck are shiitake...\n	…c’est quoi, ces putains de shiitake…\n						end_ellipsis,end_stop		
+58	hub1_ramen_1_25	Ray	Мы бы с радостью у вас остановились. 	We'd gladly stay with you. 	Nous serions ravis de rester chez vous 					yes		end_stop	
+59	hub1_ramen_1_26	Ray	Но у нас совсем немного денег.	But we don't have much money.	Mais nous avons très peu d’argent.								
+60	hub1_ramen_1_27	Motoki	А мне и не нужны деньги.	I don't need money.	Je n’ai pas besoin d’argent.								
+61	hub1_ramen_1_28	Motoki	 Я на вас новые рецепты раменов опробую! По рукам?.	 I'll try out new ramen recipes on ya! Deal?	 Je vais tester de nouvelles recettes de ramen sur vous ! Marché conclu ?.		end_question,end_stop						
+62	hub1_ramen_1_29	Leon	По рукам! \n	Deal! \n	Marché conclu ! \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+63	hub1_ramen_1_30	Ray	А нам бы еще какого-нибудь проводника для города... \n	We could use a guide for the city... \n	Il nous faudrait aussi un guide pour la ville… \n	ellipsis							
+64	hub1_ramen_1_31	Ray	Мы тут совсем не ориентируемся…	We're completely lost here…	Nous ne nous y retrouvons pas du tout…								
+65	hub1_ramen_1_32	Motoki	Никто из наших отсюда носа не высунет в Столицу… 	None of our folk'll stick their nose out into the capital... 	Aucun des nôtres ne mettra le nez dehors dans la Capitale… 						end_ellipsis,end_stop		
+66	hub1_ramen_1_33	Motoki	Хотя, загляните в чайный домик. 	Though, check out the tea house. 	Cependant, passez au salon de thé. 								
+67	hub1_ramen_1_34	Motoki	 Девочки госпожи Яэко частенько в городе бывают. \n	 Lady Yaeko's girls are often in the city. \n	 Les filles de Madame Yaeko sont souvent en ville. \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+68	hub1_ramen_1_35	Leon	Как их найти?	How do we find 'em?	Comment les trouver ?								
+69	hub1_ramen_1_36	Motoki	Вот тут у нас главное место Рыбного тупика - моя раменная! 	Right here's the main spot in Fish Alley - my ramen shop! 	Ici, c'est le cœur du Cul-de-sac des Poissons, mon Ramen-ya ! 								
+70	hub1_ramen_1_37	Motoki	Но это вы и так знаете. 	But you already know that. 	Mais ça, vous le savez déjà. 								
+71	hub1_ramen_1_38	Motoki	Пойдете вот сюда - окажетесь на пристани.	Go this way and you'll end up at the pier.	Si vous allez par là, vous arriverez au quai.								
+72	hub1_ramen_1_39	Motoki	Вот на этот корабль лучше не соваться. 	Better not mess with that ship. 	Mieux vaut ne pas s’aventurer sur ce bateau 					yes		end_stop	
+73	hub1_ramen_1_40	Motoki	Если конечно не хотите встретиться с морскими волками. 	Unless you wanna meet some sea dogs, that is. 	À moins que vous ne vouliez rencontrer les loups de mer 					yes		end_stop	
+74	hub1_ramen_1_41	Motoki	Свернете сюда и окажетесь в банях, шикарное место для отдыха.	Turn here and you'll be at the bathhouse, a great place to relax.	Tournez ici et vous serez aux bains, un endroit magnifique pour se détendre.								
+75	hub1_ramen_1_42	Motoki	Тут будет лавка травника, 	There'll be a herbalist's shop here, 	Ici, il y aura la boutique de l’herboriste, 								
+76	hub1_ramen_1_43	Motoki	а тут барахолка. 	and a junk shop here. 	et là, le marché aux puces 					yes		end_stop	
+77	hub1_ramen_1_44	Motoki	А прямо над нами находится чайный домик. 	And right above us is the tea house. 	Et juste au-dessus de nous se trouve la maison de thé 					yes		end_stop	
+78	hub1_ramen_1_45	Motoki	Если запутаетесь, изучите нашу карту. 	If you get lost, check our map. 	Si vous êtes perdu, consultez notre carte 					yes		end_stop	
+79	hub1_ramen_1_46	Leon	Ясно, погнали. 	Got it, let's go. 	Clair, allons-y 					yes		end_stop	
+80	hub1_fisherman_quest_1_1	Motoki	Вот что  еще вспомнил…	Oh, I just remembered something else…	Ah, et j’ai aussi pensé à…								
+81	hub1_fisherman_quest_1_2	Motoki	Может сделаете для меня кое-чего, молодежь?	Maybe you young'uns can do somethin' for me?	Vous ne pourriez pas me rendre un service, les jeunes ?								
+82	hub1_fisherman_quest_1_3	Motoki	А то мне самому лень.	I'm too lazy to do it myself.	J'ai la flemme de le faire moi-même.								
+83	hub1_fisherman_quest_1_4	Motoki	Вам по пути!	It's on your way!	C'est sur votre chemin !								
+84	hub1_fisherman_quest_1_5	Leon	Ладно, что нужно?\n	Alright, what do you need?\n	Bon, qu'est-ce qu'il faut ?\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+85	hub1_fisherman_quest_1_6	Motoki	Заберите у рыбака на пристани нефритового угря...	Get a jade eel from the fisherman at the pier...	Allez chercher une anguille de jade auprès du pêcheur sur le quai...	ellipsis							
+86	hub1_fisherman_quest_1_7	Motoki	Приготовлю божественный рамен!\n	I'll make divine ramen!\n	Je préparerai un ramen divin !\n								
+87	hub1_fisherman_quest_1_8	Leon	Всего-то? Да без проблем.  \n	That's all? No problem.  \n	C'est tout ? Pas de problème.  \n								
+88	hub1_fisherman_quest_1_9	Leon	Сейчас вообще не до того, извини. 	Got no time for that right now, sorry 	Je n'ai pas le temps pour ça, désolé 				yes	yes	end_stop	end_stop	
+89	hub1_fisherman_quest_1_10	Motoki	Эх, ладно. Выгуляю свои старые кости. 	Ugh, fine. I'll walk my old bones myself 	Pff, d'accord. Je vais dégourdir mes vieilles jambes 				yes	yes	end_stop	end_stop	
+90	hub1_teahouse_1_1	Yaeko	 Ну и кто это у нас?	 Well, who do we have here?	 Mais qui avons-nous là ?								
+91	hub1_teahouse_1_2	Tsuru	О-о-о… какой милый лисёнок.	Ooooh… what a cute little fox.	Oh-oh-oh… quel mignon petit renard.								
+92	hub1_teahouse_1_3	Momo	 И симпатичный наг…	 And a handsome Naga…	 Et un Naga plutôt charmant…								
+93	hub1_teahouse_1_4	Leon	 Даже не начинайте.	 Don't even start.	 Ne commencez même pas.								
+94	hub1_teahouse_1_5	Tsuru	 А зачем тогда пришли? 	 Then why'd ya come here? 	 Alors pourquoi êtes-vous venu ? 								
+95	hub1_teahouse_1_6	Tsuru	Чайный домик — не приют для бездомных.\n	A tea house ain't no shelter for the homeless.\n	La Maison de Thé n’est pas un refuge pour les sans-abri.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+96	hub1_teahouse_1_7	Leon	 Мне нужен сопровождающий в город.	 I need an escort into the city.	 J’ai besoin d’un guide pour la ville.								
+97	hub1_teahouse_1_8	Momo	 ТЕБЕ?!	 YOU?!	 TOI ?!								
+98	hub1_teahouse_1_9	Tsuru	Сопровождающий для дзинко?!\n	An escort for a Jinko?!\n	Un guide pour un Jinko ?!\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+99	hub1_teahouse_1_10	Yaeko	Мальчик, половина Империи захочет сдать за награду раньше...	Boy, half the Empire'll wanna turn you in for a reward before…	Mon garçon, la moitié de l’Empire voudra te livrer pour la récompense avant…	ellipsis							
+100	hub1_teahouse_1_11	Yaeko	Чем ты дойдёшь до соседней улицы.\n	You even make it to the next street.\n	Que tu n’atteignes la rue d’à côté.\n								
+101	hub1_teahouse_1_12	Leon	Да понял я уже, хватит ржать.	Yeah, I get it, stop laughin'.	J'ai compris, arrête de te marrer.								
+102	hub1_teahouse_1_13	Tsuru	А куда тебе вообще надо?	Where do you even need to go?	Mais où tu dois aller, au juste ?								
+103	hub1_teahouse_1_14	Ray	Вообще… нам нужна информация о дзинко. Документы, отчеты…	Well… we need information about Jinko. Documents, reports…	En fait… nous cherchons des informations sur les Jinko. Des documents, des rapports…								
+104	hub1_teahouse_1_15	Ray	Может подскажите, где ее можно найти?\n	Perhaps you could tell us where to find it?\n	Pourriez-vous nous dire où les trouver ?\n								
+105	hub1_teahouse_1_16	Yaeko	Вам нужно в Архивы. 	You need to go to the Archives. 	Vous devez aller aux Archives. 								
+106	hub1_teahouse_1_17	Yaeko	Там хранятся все старые документы Империи.\n	All the Empire's old documents are stored there.\n	Tous les anciens documents de l'Empire y sont conservés.\n								
+107	hub1_teahouse_1_18	Leon	И как туда попасть?	And how do we get there?	Et comment on y va ?								
+108	hub1_teahouse_1_19	Yaeko	Какое совпадение. 	What a coincidence. 	Quelle coïncidence. 								
+109	hub1_teahouse_1_20	Yaeko	У меня предложение, которое будет выгодно нам обоим, молодой человек.\n	I have a proposition that will benefit us both, young man.\n	J'ai une proposition qui nous sera profitable à tous les deux, jeune homme.\n								
+110	hub1_teahouse_1_21	Yaeko	Доставь это послание нашему человеку в Нижнем Городе...	Deliver this message to our contact in the Lower City…	Remets ce message à notre contact dans la Ville Basse…	ellipsis							
+111	hub1_teahouse_1_22	Yaeko	И он даст тебе ключ от туннелей под городом. 	And he'll give you the key to the tunnels under the city. 	Et il te donnera la clé des tunnels sous la ville. 								
+112	hub1_teahouse_1_23	Yaeko	Там можно попасть в Архив.	You can get to the Archives there.	Tu pourras y accéder aux Archives.								en,fr
+113	hub1_teahouse_1_24	Yaeko	Сделка?	Deal?	Marché conclu ?								
+114	hub1_teahouse_1_25	Leon	Уговор.	Deal.	Marché conclu.								fr
+115	hub1_teahouse_1_26	Ray	 Леон, ты с ума сошел? Как ты проберешься через Нижний город?\n	 Leon, have you lost your mind? How will you get through the Lower City?\n	 Leon, tu es fou ? Comment vas-tu traverser la Ville Basse ?\n								
+116	hub1_teahouse_1_27	Leon	 По крышам.	 Over the rooftops.	 Par les toits.								
+117	hub1_teahouse_1_28	Tsuru	Ой, какой самоуверенный.	Oh, so confident.	Oh, comme il est sûr de lui.								
+118	hub1_teahouse_1_29	Momo	 Мне нравится.	 I like it.	 J'aime bien.								
+119	hub1_teahouse_1_30	Yaeko	 Мне тоже. 	 Me too. 	 Moi aussi 					yes		end_stop	
+120	hub1_teahouse_1_31	Yaeko	Я думаю у барахольщика Хадзуо ты найдешь что-нибудь...	I think you'll find something at Hazuo's Thousand Trinkets Shop...	Je pense que tu trouveras quelque chose chez le brocanteur Hazuo...	ellipsis							
+121	hub1_teahouse_1_32	Yaeko	Что поможет тебе в этом пути.	That which will aid you on this path.	Ce qui t'aidera sur ce chemin.								
+122	hub1_teahouse_1_33	Leon	Что именно?	What exactly?	Quoi donc ?								fr
+123	hub1_teahouse_1_34	Yaeko	Он же барахольщик. Какое-нибудь барахло.\n	He's a junk dealer. Some junk or other.\n	C'est un brocanteur. N'importe quelle babiole.\n								en
+124	hub1_teahouse_1_35	Leon	Ладно, я загляну к нему.	Alright, I'll check him out.	D'accord, j'irai le voir.								fr
+125	hub1_scrappy_1_1	Hazuo	А, мои племяннички вернулись! 	Ah, my nephews are back! 	Ah, mes neveux sont de retour 					yes		end_exclamation	fr
+126	hub1_scrappy_1_2	Hazuo	В поисках знаний, или вас привела нужда?\n	Seekin' knowledge, or has necessity brought ya?\n	En quête de savoir, ou la nécessité vous a-t-elle amenés ici ?\n								en,fr
+127	hub1_scrappy_1_3	Ray	 Нужно что-то, чтобы по крышам пройти.\n	 We need somethin' to get across the rooftops.\n	 Il nous faut quelque chose pour passer par les toits.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+128	hub1_scrappy_1_4	Hazuo	 По крышам, говорите…	 Across the rooftops, you say…	 Par les toits, dites-vous…								en
+129	hub1_scrappy_1_5	Hazuo	Ах! Это напоминает мне о мостах из бамбука времён императора Акито! 	Ah! That reminds me of the bamboo bridges from Emperor Akito's time! 	Ah ! Cela me rappelle les ponts de bambou du temps de l'empereur Akito 					yes		end_exclamation	fr
+130	hub1_scrappy_1_6	Hazuo	Знаете ли вы, что его войска….	Do you know that his troops….	Savez-vous que ses troupes…			end_ellipsis,end_stop					
+131	hub1_scrappy_1_7	Leon	Ты уверен, что у тебя в лавке вообще есть хоть что-то полезное?\n	You sure you got anything useful in your shop?\n	Es-tu sûr que ta boutique a quoi que ce soit d'utile ?\n								fr
+132	hub1_scrappy_1_8	Hazuo	Вот, к примеру, веер придворной дамы.	Here, for example, is a court lady's fan.	Tiens, par exemple, l'éventail d'une dame de cour.								en,fr
+133	hub1_scrappy_1_9	Hazuo	Когда она убегала к любовнику, этот звук маскировал её шаги…\n	When she ran off to her lover, the sound of it masked her footsteps...\n	Quand elle s'enfuyait avec son amant, ce son masquait ses pas…\n	multiple_failures	end_newline,newline-count	end_newline,newline-count			end_ellipsis,end_stop		en,fr
+134	hub1_scrappy_1_10	Leon	Может, у тебя есть ещё бамбуковая зубочистка? 	Maybe you got a bamboo toothpick too? 	Tu aurais aussi un cure-dent en bambou ? 								
+135	hub1_scrappy_1_11	Leon	Тоже пригодится, ага.	That'd come in handy, yeah.	Ça me serait utile aussi, ouais.								
+136	hub1_scrappy_1_12	Ray	 Хадзуо, может быть, что-то попрактичнее?\n	 Hazuo, maybe somethin' more practical?\n	 Hazuo, peut-être quelque chose de plus pratique ?\n								
+137	hub1_scrappy_1_13	Hazuo	 А это — маска актёра. 	 And this is an actor's mask. 	 Et ça, c'est le masque d'un acteur. 								fr
+138	hub1_scrappy_1_14	Hazuo	 Один вор использовал её, чтобы стоять неподвижно на площади и притворяться статуей…\n	 A thief once used it to stand still in the square and pretend to be a statue...\n	 Un voleur l'utilisait pour rester immobile sur la place et faire semblant d'être une statue…\n						end_ellipsis,end_stop		en,fr
+139	hub1_scrappy_1_15	Leon	ВСЁ, ХВАТИТ! Мне не нужна коллекция пиздежа!\n	THAT'S ENOUGH! I don't need a collection of bullshit!\n	ÇA SUFFIT, BORDEL ! Je n'ai pas besoin d'une collection de conneries !\n								en,fr
+140	hub1_scrappy_1_16	Hazuo	О! Инструмент кровельщиков. 	Oh! A roofer's tool. 	Oh ! Un outil de couvreur. 								
+141	hub1_scrappy_1_17	Hazuo	С его помощью поднимали черепицу! Для тебя то, что нужно.\n	It was used to lift roof tiles! Just what you need.\n	On s’en servait pour soulever les tuiles ! C’est exactement ce qu’il te faut.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+142	hub1_scrappy_1_18	Leon	Наконец-то. Хоть раз твой мусор оказался в тему.\n	Finally. For once your junk came in handy.\n	Enfin. Pour une fois que tes conneries sont utiles.\n								en,fr
+143	hub1_scrappy_1_19	Ray	 Спасибо, Хадзуо.\n	 Thank you, Hazuo.\n	 Merci, Hazuo.\n								
+144	hub1_scrappy_1_20	Hazuo	 История всегда знает, когда подоспеть.	 History always knows when to arrive.	 L’Histoire sait toujours quand intervenir.								fr
+145	hub1_fisherman_quest_2_1	Ray	Малыш, а ты не видел тут рыбака?\n\n	Kid, have you seen a fisherman around here?\n\n	Petit, tu n’aurais pas vu un pêcheur par ici ?\n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+146	hub1_fisherman_quest_2_2	Boy Haru	Не мешайте мне, я занят. 	Don't bother me, I'm busy. 	Ne me dérangez pas, je suis occupé 					yes		end_stop	
+147	hub1_fisherman_quest_2_3	Boy Haru	Пока не сделаю, меня не трогайте.	Don't touch me until I'm done.	Tant que je n’ai pas fini, ne me touchez pas.								
+148	hub1_fisherman_quest_2_4	Leon	И че ты делаешь?	And what're you doin'?	Et tu fais quoi, là ?								
+149	hub1_fisherman_quest_2_5	Boy Haru	Хочу чтобы моя лягушка допрыгала до корабля.	I want my frog to hop all the way to the ship.	Je veux que ma grenouille saute jusqu’au bateau.								
+150	hub1_fisherman_quest_2_6	Leon	Дай сюда! \n	Gimme that! \n	Donne-moi ça ! \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+151	hub1_fisherman_quest_2_7	Pirate	Я ЩАС КОМУ ТО УШИ ПООТРЫВАЮ! 	I'M GONNA RIP SOMEONE'S EARS OFF! 	JE VAIS ARRACHER LES OREILLES À QUELQU'UN, LÀ 					yes		end_exclamation	
+152	hub1_fisherman_quest_2_8	Leon	Твоя лягушка в трюме. Ну че, где рыбак?\n	Your frog's in the hold. So, where's the fisherman?\n	Ta grenouille est dans la cale. Alors, il est où, le pêcheur ?\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+153	hub1_fisherman_quest_2_9	Boy Haru	Вау! Какой ты сильный! \n	Wow! You're so strong! \n	Waouh ! Tu es si fort ! \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+154	hub1_fisherman_quest_2_10	Boy Haru	Да, дядя Унаги как всегда пьет, наверное. В банях.\n	Yeah, Uncle Unagi's probably drinkin' as usual. At the bathhouse.\n	Oui, oncle Unagi boit comme d'habitude, sûrement. Aux Bains.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+155	hub1_fisherman_quest_2_11	Leon	Меня это начинает раздражать. \n	This is startin' to piss me off. \n	Ça commence à m'énerver. \n								
+156	hub1_fisherman_quest_2_12	Leon	Это разве не легкое задание?	Ain't this s'posed to be an easy job?	Ce n'est pas une tâche facile, ça ?								
+157	hub1_fisherman_quest_2_13	Ray	Спасибо, мальчик! Ты нам очень помог! 	Thank you, boy! You've helped us greatly! 	Merci, petit ! Tu nous as beaucoup aidés 					yes		end_exclamation	
+158	hub1_fisherman_quest_2_14	Leon	Идем в баню. 	Let's go to the bathhouse. 	Allons aux Bains 					yes		end_stop	
+159	hub1_guard_1_1	Ray	Смотри! \n\n	Look! \n\n	Regarde ! \n\n								
+160	hub1_guard_1_2	Ray	За твою голову назначили награду! 	There's a bounty on your head! 	Une récompense a été mise sur ta tête 					yes		end_exclamation	
+161	hub1_guard_1_3	Ray	10 тысяч мон!	10,000 mon!	10 000 mons !	multiple_failures	game-number	game-number					
+162	hub1_guard_1_4	guard	Научись считать - ваще та 100 тысяч мон! 	Learn to count, ya dumbass—it's 100,000 mon 	Apprends à compter, c'est 100 000 mons 	multiple_failures	game-number	game-number	yes	yes	end_exclamation	end_exclamation	
+163	hub1_guard_1_5	Leon	Я только приехал, а уже надо ломать морды.\n	I just got here, and I already gotta bust some heads.\n	Je viens d'arriver et je dois déjà casser des gueules.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+164	hub1_guard_1_6	guard	Не-не-не, мне столько не платят, шобы я даже смотрел в твою сторону.\n	Nah, nah, nah, they don't pay me enough to even look your way.\n	Non, non, non, je ne suis pas payé assez pour même te regarder.\n	multiple_failures	duplicate,end_newline,newline-count	duplicate,end_newline,newline-count					
+165	hub1_guard_1_7	guard	Вы в баню шли? Вот и идите. Иннара в помощь. \n\n	You were goin' to the bathhouse? Then go. Inara be with ya. \n\n	Vous alliez aux bains ? Alors allez-y. Inara vous aide. \n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+166	hub1_fisherman_quest_3_1	Ichiro	О, новые клиенты? Заходите, располагайтесь. \n	Oh, new customers? Come on in, make yourselves at home. \n	Oh, de nouveaux clients ? Entrez, installez-vous. \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+167	hub1_fisherman_quest_3_2	Leon	А ничего, что мы нелюди?\n	Ain't it a problem that we're non-human?\n	Ça ne vous dérange pas qu'on soit des Non-humains ?\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+168	hub1_fisherman_quest_3_3	Ichiro	Мне все равно шерстяной ты или кожаный. \n	I don't care if you're furry or smooth. \n	Que tu sois poilu ou à peau, je m'en fiche. \n								
+169	hub1_fisherman_quest_3_4	Ichiro	Хорошая баня нужна всем.	A good bathhouse is for everyone.	Un bon bain, tout le monde en a besoin.								
+170	hub1_fisherman_quest_3_5	Ichiro	Да и у нас тут не такое не смотрят. \n	And we don't judge that kinda thing here. \n	Et puis, on n'est pas si regardant ici. \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+171	hub1_fisherman_quest_3_6	Unagi	Мокрая шерсть воняет.\n	Wet fur stinks.\n	La fourrure mouillée, ça pue.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+172	hub1_fisherman_quest_3_7	Ichiro	Вот кого я не люблю, так это алкоголиков. \n	The one thing I can't stand is drunks. \n	Ceux que je n'aime pas, ce sont les alcooliques. \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+173	hub1_fisherman_quest_3_8	Ray	...	...	...	ellipsis							
+174	hub1_fisherman_quest_3_9	Ichiro	Ну да, я дал ему саке. Но кто же знал, что он так нажрется.\n	Well, yeah, I gave him sake. But who knew he'd get so wasted.\n	Oui, je lui ai donné du saké. Mais qui aurait cru qu'il se saoulerait à ce point.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+175	hub1_fisherman_quest_3_10	Ichiro	Хотя…. он каждый раз так нажирается.\n\n	Though... he gets wasted like this every time.\n\n	Pourtant... il se saoule comme ça à chaque fois.\n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+176	hub1_fisherman_quest_3_11	Leon	Рыбак Унаги?	Fisherman Unagi?	Le pêcheur Unagi ?								
+177	hub1_fisherman_quest_3_12	Unagi	Че надо?! Я отдыхаю.\n	What d'ya want?! I'm relaxin'.\n	Qu'est-ce que tu veux ?! Je me repose.\n								
+178	hub1_fisherman_quest_3_13	Ichiro	Ты меня достал. \n	You're pissin' me off. \n	Tu me fatigues. \n								
+179	hub1_fisherman_quest_3_14	Ichiro	Ребят, выведите этого алкаша и сможете за мой счет потом попариться. 	Guys, get this drunk outta here and you can use the bathhouse on me later. 	Les gars, sortez cet ivrogne et vous pourrez vous détendre à mes frais après. 								
+180	hub1_fisherman_quest_3_15	Leon	Слышь! 	Hey! 	Hé 					yes		end_exclamation	
+181	hub1_fisherman_quest_3_16	Leon	Нам нужен нефритовый угорь для раменщика. Ты его поймал.\n	We need that jade eel for the ramen guy. You caught it.\n	Il nous faut l'anguille de jade pour le ramen-ya. Tu l'as pêchée.\n								
+182	hub1_fisherman_quest_3_17	Unagi	Может и поймал! А может и не поймал….\n\n	Maybe I did! Or maybe I didn't….\n\n	Peut-être que oui ! Ou peut-être pas…\n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count				end_ellipsis,end_stop	
+183	hub1_fisherman_quest_3_18	Unagi	Тащи опохмел. Без этого я с места не сдвинусь.	Get me a hangover cure. I ain't movin' without it.	Apporte-moi un remède contre la gueule de bois. Sans ça, je ne bougerai pas d'ici.								
+184	hub1_fisherman_quest_3_19	Leon	Я тебя сейчас сам двину! 	I'll move you myself right now! 	Je vais te bouger moi-même 					yes		end_exclamation	
+185	hub1_fisherman_quest_3_20	Ray	Леон, успокойся. Я могу легко сделать то, что приведет его в чувство. 	Leon, calm down. I can easily do something to bring him around. 	Leon, calme-toi. Je peux facilement faire quelque chose pour le remettre d'aplomb 					yes		end_stop	
+186	hub1_fisherman_quest_3_21	Ray	Нужно лишь немного трав.\n	Just need a few herbs.\n	Il suffit de quelques herbes.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+187	hub1_fisherman_quest_3_22	Ray	Здесь должна быть лавка травника.	There should be a herbalist's shop here.	Il devrait y avoir une herboristerie ici.								
+188	hub1_fisherman_quest_3_23	Leon	Ну пойдем поищем.	Well, let's go look for it.	Eh bien, allons chercher.								
+189	hub1_asuna_archive_1_1	Asuna	О, приятно увидеть новый лица в Трущобах. \n	Oh, it's nice to see new faces in the Slums. \n	Oh, c'est agréable de voir de nouveaux visages dans les Bas-Fonds. \n								
+190	hub1_asuna_archive_1_2	Asuna	Особенно такие необычные, как у вас.	Especially such unusual ones as yours.	Surtout des visages aussi inhabituels que les vôtres.								
+191	hub1_asuna_archive_1_3	Ray	Да, мы только приехали! 	Yeah, we just got here! 	Oui, nous venons d’arriver 					yes		end_exclamation	
+192	hub1_asuna_archive_1_4	Ray	Я еще не видел такой большой лавки с травами! 	I ain't never seen such a big herb shop! 	Je n’ai jamais vu une herboristerie aussi grande 					yes		end_exclamation	
+193	hub1_asuna_archive_1_5	Ray	 У вас тут столько всего! Даже желтый многолетник есть! \n	 You got so much stuff in here! Even yellow perennial! \n	 Vous avez tellement de choses ici ! Il y a même une plante vivace jaune ! \n								
+194	hub1_asuna_archive_1_6	Ray	Я его давно не видел.	Ain't seen that in a long time.	Je ne l’avais pas vue depuis longtemps.								
+195	hub1_asuna_archive_1_7	Leon	Может хватит трепаться? Мы вроде по делу пришли. \n	Can we cut the chatter? We're here on business, ain't we? \n	Ça suffit de jacasser ? On est venus pour une raison, non ? \n	multiple_failures	end_newline,newline-count	end_newline,newline-count			end_question,end_stop	end_question,end_stop	
+196	hub1_asuna_archive_1_8	Leon	Или мне вас оставить вдвоем?	Or should I just leave you two alone?	Ou je vous laisse tous les deux ?								
+197	hub1_asuna_archive_1_9	Asuna	Можешь и оставить. Я не против. 	You can leave us. I don't mind. 	Tu peux nous laisser. Ça ne me dérange pas 					yes		end_stop	
+198	hub1_asuna_archive_1_10	Asuna	Думаю, двоим нагам всегда есть о чем поговорить…\n\n	I think two Nagas always have plenty to talk about…\n\n	Je pense que deux Nagas ont toujours des choses à se dire…\n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+199	hub1_asuna_archive_1_11	Asuna	А у тебя горячее сердце. Я чувствую даже отсюда. 	And you have a warm heart. I can feel it even from here. 	Et tu as un cœur ardent. Je le sens même d’ici 					yes		end_stop	
+200	hub1_asuna_archive_1_12	Asuna	Наверное, как и у всех дзинко	Probably like all Jinko	Probablement comme tous les Jinkos								
+201	hub1_asuna_archive_1_13	Leon	И много ты видела дзинко?	How many Jinko you seen?	Et tu as vu beaucoup de Jinko ?								
+202	hub1_asuna_archive_1_14	Asuna	Ты первый. Они же главные враги империи, так что их всех переловили.	You're the first. They're the Empire's main enemies, so they rounded 'em all up.	Tu es le premier. Ce sont les principaux ennemis de l'Empire, alors ils ont tous été capturés.								
+203	hub1_asuna_archive_1_15	Asuna	Я удивлена, что ты разгуливаешь без ошейника. Т	I'm surprised you're walkin' around without a collar. T	Je suis surprise que tu te promènes sans collier. T								
+204	hub1_asuna_archive_1_16	Asuna	Тут за каждым дзинко учет и слежка, не дай боги хоть один сбежит.\n	Every Jinko's accounted for and watched. God forbid one gets away.\n	Chaque Jinko est enregistré et surveillé ici, pour que pas un seul ne s'échappe, par les dieux.\n								
+205	hub1_asuna_archive_1_17	Leon	И где этот “учет” можно посмотреть.	"And where can I check this ""account""?"	Et où peut-on consulter cet « enregistrement » ?	multiple_failures	end_question,end_stop	end_question,end_stop					
+206	hub1_asuna_archive_1_18	Asuna	Я точно не знаю, но…я бы искала в Императорских архивах. 	I don't know for sure, but... I'd look in the Imperial Archives. 	Je ne sais pas exactement, mais… je chercherais dans les Archives Impériales. 								
+207	hub1_asuna_archive_1_19	Asuna	Там же буквально ВСЯ информация в Империи хранится.\n	Literally ALL the Empire's information is stored there.\n	Toutes les informations de l'Empire y sont littéralement stockées.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+208	hub1_asuna_archive_1_20	Leon	Наконец-то хоть что- то полезное!	Finally, somethin' useful!	Enfin, quelque chose d'utile !								
+209	hub1_asuna_archive_1_21	Ray	Вообще мы хотели купить  сушёный корень имбиря и чёрный лотос. \n	Actually, we wanted to buy dried ginger root and black lotus. \n	En fait, nous voulions acheter de la racine de gingembre séchée et du lotus noir. \n								
+210	hub1_asuna_archive_1_22	Ray	У тебя найдется?	Do you have any?	Tu en as ?								fr
+211	hub1_asuna_archive_1_23	Ray	У тебя найдется?	Do you have any?	Tu en as un ?								fr
+212	hub1_asuna_archive_1_24	Asuna	Для тебя все найдется. \n	I have everything for you. \n	J'en ai toujours un pour toi. \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+213	hub1_asuna_archive_1_25	Leon	Теперь понятно где искать информацию об Аки.	Now I know where to look for information about Aki.	Maintenant, je sais où chercher des informations sur Aki.								
+214	hub1_fisherman_quest_4_1	Unagi	Ух, сразу жить захотелось. Спасибо вам, ребятки.\n	Ugh, suddenly I wanna live. Thanks, fellas.\n	Ouf, ça me donne envie de vivre. Merci, les gars.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+215	hub1_fisherman_quest_4_2	Leon	Угорь где?\n\n	Where's the eel?\n\n	Où est l'anguille ?\n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+216	hub1_fisherman_quest_4_3	Unagi	Да я его продал в гейшам в чайном домике. \n\n	I sold it to the geishas at the tea house. \n\n	Je l'ai vendue aux geishas de la Maison de Thé. \n\n								
+217	hub1_fisherman_quest_4_4	Unagi	Они мои любимые покупательницы.	They're my favorite customers.	Ce sont mes clientes préférées.								
+218	hub1_fisherman_quest_4_5	Leon	БЛЯЯЯЯЯ...	FUUUUUUCK...	PUUUUTAIN...	ellipsis							
+219	hub1_fisherman_quest_4_6	Leon	Ладно. Чайный домик. \n\n	Alright. Tea house. \n\n	Bon. La Maison de Thé. \n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+220	hub1_teahouse_2_1	Yaeko	Цуру, ты доставишь послание. \n\n	Tsuru, you'll deliver the message. \n\n	Tsuru, tu livreras le message. \n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+221	hub1_teahouse_2_2	Tsuru	Вынуждена отказать, госпожа Яэко. Я не хочу, чтобы меня видели в этом районе. 	I must refuse, Lady Yaeko. I don't want to be seen in this district. 	Je suis forcée de refuser, Madame Yaeko. Je ne veux pas être vue dans ce quartier 					yes		end_stop	
+222	hub1_teahouse_2_3	Tsuru	 Купец Сэго подумает, что я обслуживаю его конкурентов. А он мой лучший клиент. \n\n	 Merchant Sego will think I'm serving his competitors. And he's my best client. \n\n	 Le marchand Sego pensera que je sers ses concurrents. Et c’est mon meilleur client. \n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+223	hub1_teahouse_2_4	Момо	Я могу сходить, госпожа Яэко. 	I can go, Lady Yaeko. 	Je peux y aller, Madame Yaeko 					yes		end_stop	
+224	hub1_teahouse_2_5	Yaeko	Момо, ты нюня и плакса. Ты все испоганишь. Поэтому пойти должна Цуру.\n\n	Momo, you're a whiner and a crybaby. You'll screw everything up. So Tsuru has to go.\n\n	Momo, tu es une pleurnicheuse et une mauviette. Tu vas tout gâcher. C’est pourquoi Tsuru doit y aller.\n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+225	hub1_teahouse_2_6	Tsuru	Вы оглохли, госпожа Яэко? Я СКАЗАЛА, Я НИКУДА НЕ ПОЙДУ! \n	Are you deaf, Lady Yaeko? I SAID, I'M NOT GOING ANYWHERE! \n	Vous êtes sourde, Madame Yaeko ? J’AI DIT QUE JE N’IRAIS NULLE PART ! \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+226	hub1_teahouse_2_7	Yaeko	Как будто у тебя есть выбор! Запомни, соплячка, ты моя собственность! \n	As if you have a choice! Remember, you little brat, you're my property! \n	Comme si tu avais le choix ! Retiens bien, morveuse, tu es ma propriété ! \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+227	hub1_teahouse_2_8	Tsuru	Пока я приношу больше всего мон чайному дому НАЗВАНИЕ, то могу делать что захочу.\n\n	As long as I bring in the most mon for the tea house NAME, I can do whatever I want.\n\n	Tant que j’apporte le plus de mon au salon de thé NOM, je peux faire ce que je veux.\n\n								
+228	hub1_teahouse_2_9	Yaeko	Ах, ты мелкая дрянь…	Oh, you little bitch…	Ah, sale petite garce…								
+229	hub1_teahouse_2_10		Извините, дамы, можно помешать вашей беседе…\n	Excuse me, ladies, may I interrupt your conversation…\n	Excusez-moi, mesdames, puis-je interrompre votre conversation…\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+230	hub1_teahouse_2_11	Yaeko	А вам что надо, оборванцы? 	What do you want, you beggars? 	Et vous, que voulez-vous, vauriens ? 								
+231	hub1_teahouse_2_12	Yaeko	По вам сразу видно, что у вас нет денег, чтобы даже рядом с чайным домиком постоять. \n	It's obvious you don't have enough money to even stand near a tea house. \n	On voit tout de suite que vous n'avez pas d'argent, même pour vous tenir près de la maison de thé. \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+232	hub1_teahouse_2_13	Leon	Как хорошо, что мои кулаки бесплатные.	Good thing my fists are free.	Tant mieux, mes poings sont gratuits.								
+233	hub1_teahouse_2_14	Ray	Извините, нам просто нужно забрать угря, которого вам продали утром.	Excuse me, we just need to pick up the eel you sold this morning.	Excusez-nous, nous devons juste récupérer l'anguille qu'on vous a vendue ce matin.								
+234	hub1_teahouse_2_15	Tsuru	АХХАХАХА, мальчики,  у вас проблемы с вашими нефритовыми жезлами?\n	AHAHAHAHA, boys, are you having trouble with your jade rods?\n	AHHAHAHA, les garçons, vous avez des problèmes avec vos baguettes de jade ?\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+235	hub1_teahouse_2_16	Leon	Че?	Huh?	Quoi ?								
+236	hub1_teahouse_2_17	Момо	Просто порошок из этой рыбы помогает мужчинам, чтобы их…жезл…ну, дольше…	It's just that powder from this fish helps men so their... rod... well, longer…	La poudre de ce poisson aide les hommes à ce que leur… baguette… enfin, plus longtemps…								
+237	hub1_teahouse_2_18	Tsuru	По ним видно, что они нуждаются в этом.  \n	They clearly need it.  \n	On voit bien qu'ils en ont besoin.  \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+238	hub1_teahouse_2_19	Leon	ВСЕ! Хорошо, что мне все равно кому бить морду.\n	THAT'S IT! Good thing I don't care whose face I punch.\n	ÇA SUFFIT ! Tant mieux, ça m'est égal à qui je casse la gueule.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+239	hub1_teahouse_2_20	Yaeko	Потише, потише, мальчик. Угря уже приготовили на кухне и подали клиентам. 	Easy, easy, boy. The eel has already been prepared in the kitchen and served to customers 	Doucement, doucement, mon garçon. L'anguille a déjà été préparée en cuisine et servie aux clients 				yes	yes	end_stop	end_stop	
+240	hub1_teahouse_2_21	Yaeko	Ты опоздал, к сожалению. \n	You're too late, unfortunately. \n	Tu es en retard, malheureusement. \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+241	hub1_teahouse_2_22	Yaeko	Да и не советую тебе размахивать кулаками. У меня связи по всему городу. 	And I wouldn't advise you to throw punches. I got connections all over the city. 	Je ne te conseille pas de te battre. J'ai des relations dans toute la ville 					yes		end_stop	
+242	hub1_teahouse_2_23	Yaeko	Стоит мне щелкнуть пальцами, и они узнают о том, что в Трущобах скрывается дзинко.\n	All I gotta do is snap my fingers, and they'll know there's a Jinko hidin' in the Slums.\n	Il me suffit de claquer des doigts pour qu'ils apprennent qu'un Jinko se cache dans les Bas-fonds.\n								
+243	hub1_teahouse_2_24	Leon	А че, твои гейши много где бывают? 	So, your geishas get around a lot? 	Et tes geishas, elles vont souvent partout ? 								
+244	hub1_teahouse_2_25	Yaeko	Да, обслуживают клиентов по всему городу. \n	Yes, they serve clients all over the city. \n	Oui, elles servent des clients dans toute la ville. \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+245	hub1_teahouse_2_26	Leon	А в Архивах?	What about the Archives?	Et aux Archives ?								
+246	hub1_teahouse_2_27	Yaeko	Ближе к делу, молодой человек.	Let's get to the point, young man.	Allons droit au but, jeune homme.								
+247	hub1_teahouse_2_28	Leon	Мне нужно как то скрытно попасть в Императорские архивы. 	I need to get into the Imperial Archives stealthily. 	Je dois me rendre discrètement aux Archives Impériales 					yes		end_stop	
+248	hub1_teahouse_2_29	Leon	Как я понимаю твои гейши знают как? \n\n	And I take it your geishas know how? \n\n	Si je comprends bien, tes geishas savent comment faire ? \n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+249	hub1_teahouse_2_30	Yaeko	Какое совпадение. У меня предложение, которое будет выгодно нам обоим, молодой человек. \n\n	What a coincidence. I have a proposition that will benefit us both, young man. \n\n	Quel hasard. J'ai une proposition qui nous sera profitable à tous les deux, jeune homme. \n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+250	hub1_teahouse_2_31	Yaeko	Доставь это послание нашему человеку в Нижнем Городе и он даст тебе ключ от туннелей под городом. 	Deliver this message to our contact in the Lower City, and he'll give you the key to the tunnels beneath the city. 	Remets ce message à notre contact dans la Ville Basse et il te donnera la clé des tunnels sous la ville 					yes		end_stop	
+251	hub1_teahouse_2_32	Yaeko	Там можно попасть в Архив. 	You can get to the Archives from there. 	On peut y accéder aux Archives 					yes		end_stop	en,fr
+252	hub1_teahouse_2_33	Yaeko	Сделка?	Deal?	Marché conclu ?								
+253	hub1_teahouse_2_34	Leon	Уговор. 	Deal. 	Marché conclu 					yes		end_stop	fr
+254	hub1_teahouse_2_35	Ray	Леон, ты с ума сошел? Как ты проберешься через Нижний город.\n	Leon, have you lost your mind? How're you gonna get through the Lower City.\n	Leon, tu es fou ? Comment vas-tu traverser la Ville Basse.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+255	hub1_teahouse_2_36	Leon	По крышам.\n	Over the rooftops.\n	Par les toits.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+256	hub1_teahouse_2_37	Yaeko	Мне нравится твой настрой. 	I like your attitude. 	J'aime ton attitude 					yes		end_stop	
+257	hub1_teahouse_2_38	Yaeko	Я думаю у барахольщика Хадзуо ты найдешь что-нибудь, что поможет тебе в этом пути. \n	I think you'll find something at Hazuo the junk dealer's that'll help you on your way. \n	Je pense que tu trouveras quelque chose chez le brocanteur Hazuo qui t'aidera sur ce chemin. \n								
+258	hub1_teahouse_2_39	Leon	Что именно?\n\n	What exactly?\n\n	Quoi exactement ?\n\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					fr
+259	hub1_teahouse_2_40	Yaeko	Он же барахольщик. Какое-нибудь барахло.	He's a junk dealer. Some junk.	C'est un brocanteur. N'importe quelle babiole.								en
+260	hub1_teahouse_2_41	Leon	Ладно, я загляну к нему. 	Alright, I'll check him out. 	D'accord, je passerai le voir 					yes		end_stop	fr
+261	hub1_scrappy_2_1	Hazuo	 А, мои племяннички вернулись! 	 Ah, my nephews are back! 	 Ah, mes neveux sont de retour ! 								fr
+262	hub1_scrappy_2_2	Hazuo	В поисках знаний, или вас привела нужда?	Seekin' knowledge, or has need brought ya here?	En quête de savoir, ou le besoin vous a-t-il amenés ?								en,fr
+263	hub1_scrappy_2_3	Ray	Нужно что-то, чтобы по крышам пройти.	We need somethin' to get across the rooftops.	Il nous faut quelque chose pour passer par les toits.								
+264	hub1_scrappy_2_4	Hazuo	По крышам, говорите… 	Rooftops, you say… 	Par les toits, dites-vous… 								en
+265	hub1_scrappy_2_5	Hazuo	Ах! Это напоминает мне о мостах из бамбука времён императора Акито! 	Ah! That reminds me of the bamboo bridges from Emperor Akito's time! 	Ah ! Cela me rappelle les ponts de bambou du temps de l’empereur Akito 					yes		end_exclamation	fr
+266	hub1_scrappy_2_6	Hazuo	Знаете ли вы, что его войска…	Did you know his troops…	Savez-vous que ses troupes…								
+267	hub1_scrappy_2_7	Leon	Ты уверен, что у тебя в лавке вообще есть хоть что-то полезное?\n	You sure you got anything useful in your shop?\n	Tu es sûr que tu as quoi que ce soit d’utile dans ta boutique ?\n								fr
+268	hub1_scrappy_2_8	Hazuo	Вот, к примеру, веер придворной дамы.	Here, for example, a court lady's fan.	Tenez, par exemple, un éventail de dame de cour.								en,fr
+269	hub1_scrappy_2_9	Hazuo	Когда она убегала к любовнику, этот звук маскировал её шаги…\n	When she ran off to her lover, this sound masked her footsteps…\n	Quand elle s’enfuyait chez son amant, ce son masquait ses pas…\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					en,fr
+270	hub1_scrappy_2_10	Leon	Может, у тебя есть ещё бамбуковая зубочистка? Тоже пригодится, ага.\n	Maybe you got a bamboo toothpick too? That'd be useful, yeah.\n	Peut-être as-tu aussi un cure-dent en bambou ? Ça serait utile aussi, hein.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+271	hub1_scrappy_2_11	Ray	Хадзуо, может быть, что-то попрактичнее?\n	Hazuo, maybe somethin' more practical?\n	Hazuo, peut-être quelque chose de plus pratique ?\n								
+272	hub1_scrappy_2_12	Hazuo	 А это — маска актёра. 	 And this is an actor's mask. 	 Et ça, c’est un masque d’acteur. 								fr
+273	hub1_scrappy_2_13	Hazuo	Один вор использовал её, чтобы стоять неподвижно на площади и притворяться статуей…	A thief once used it to stand still in the square and pretend to be a statue…	Un voleur l’a utilisé pour rester immobile sur la place et faire semblant d’être une statue…								en,fr
+274	hub1_scrappy_2_14	Leon	ВСЁ, ХВАТИТ! Мне не нужна коллекция пиздежа!	ALRIGHT, ENOUGH! I don't need a collection of bullshit!	ÇA SUFFIT ! Je n’ai pas besoin d’une collection de conneries !								en,fr
+275	hub1_scrappy_2_15	Hazuo	О! Инструмент кровельщиков. С его помощью поднимали черепицу! \n	Oh! A roofer's tool. They used it to lift tiles! \n	Oh ! Un outil de couvreur. Il servait à soulever les tuiles ! \n								
+276	hub1_scrappy_2_16	Hazuo	Для тебя то, что нужно.	Just what you need.	C’est exactement ce qu’il te faut.								
+277	hub1_scrappy_2_17	Leon	Наконец-то. Хоть раз твой мусор оказался в тему.\n	Finally. For once your junk's actually useful.\n	Enfin. Pour une fois, tes vieilleries sont utiles.\n								en,fr
+278	hub1_scrappy_2_18	Ray	Спасибо, Хадзуо.\n	Thank you, Hazuo.\n	Merci, Hazuo.\n								
+279	hub1_scrappy_2_19	Hazuo	 История всегда знает, когда подоспеть.	 History always knows when to arrive.	 L’histoire sait toujours quand arriver.								fr
+280	hub1_fisherman_1_1	Unagi	Давайте-ка потише. Вы мне всю рыбу распугаете.	Let's keep it down. You're gonna scare all my fish away.	Un peu de silence, s’il vous plaît. Vous allez faire fuir tous mes poissons.								
+281	hub1_fisherman_1_2	Leon	Мужик, мы ни слова не сказали.\n	Man, we ain't said a word.\n	Mec, on n'a pas dit un mot.\n								
+282	hub1_fisherman_1_3	Unagi	ТШШШШ! Садитесь и учитесь как надо ловить.	SHHHH! Sit down and learn how to fish.	CHUT ! Asseyez-vous et apprenez à pêcher.								
+283	hub1_fisherman_1_4	Ray	Вы тут каждый день рыбачите?	Do you fish here every day?	Vous pêchez ici tous les jours ?								
+284	hub1_fisherman_1_5	Unagi	Когда рыбачу. Когда сплю. Когда похмелье пережидаю.	When I fish. When I sleep. When I'm waitin' out a hangover.	Quand je pêche. Quand je dors. Quand j'attends que ma gueule de bois passe.								
+285	hub1_fisherman_1_6	Unagi	Море любит постоянство.	The sea loves consistency.	La mer aime la constance.								
+286	hub1_fisherman_1_7	Leon	Понял. Алкаш с жизненной мудростью.	Got it. A drunk with life wisdom.	Compris. Un poivrot avec la sagesse de la vie.								
+287	hub1_fisherman_1_8	Unagi	Я и пьяница и лучший рыбак во всей империи!	I'm a drunk and the best fisherman in the whole damn Empire!	Je suis un ivrogne et le meilleur pêcheur de tout l'Empire !								
+288	hub1_fisherman_1_9	Unagi	И тебя могу научить!	And I can teach you too!	Et je peux t'apprendre !								
+289	hub1_fisherman_1_10	Leon	Пить?	To drink?	À boire ?								
+290	hub1_fisherman_1_11	Unagi	Ловить рыбу! Приходите в любое время.	To fish! Come any time.	À pêcher ! Venez quand vous voulez.								
+291	hub1_fisherman_1_12	Ray	Спасибо за приглашение! 	Thanks for the invitation! 	Merci de l'invitation 					yes		end_exclamation	
+292	hub1_asuna_1_1	Asuna	Ого,  Дзинко и Наг?  	Oh, a Jinko and a Naga?  	Oh, un Jinko et un Naga ?  								
+293	hub1_asuna_1_2	Asuna	Давно не встречала своих, да еще таких симпатичных….	Haven't seen my own kind in a long time, and such handsome ones at that….	Ça fait longtemps que je n'ai pas rencontré les miens, et si charmants en plus…			end_ellipsis,end_stop					
+294	hub1_asuna_1_3	Ray	Кхмх! У вас столько редких трав… Потрясающе. 	Ahem! You have so many rare herbs… Amazing. 	Hum ! Vous avez tant d'herbes rares… C'est incroyable 					yes		end_stop	
+295	hub1_asuna_1_4	Asuna	А еще настоек,мазей, ядов…  Смотря что именно вам нужно.\n	And tinctures, ointments, poisons… Depends on what you need.\n	Et aussi des teintures, des onguents, des poisons… Ça dépend de ce dont vous avez besoin.\n								
+296	hub1_asuna_1_5	Asuna	Хотя тебе я бы просто посоветовала побольше отдыхать.	Though I'd just advise you to get more rest.	Mais toi, je te conseillerais juste de te reposer davantage.								
+297	hub1_asuna_1_6	Asuna	У тебя сердце слишком быстро бьётся.	Your heart's beatin' too fast.	Ton cœur bat trop vite.								
+298	hub1_asuna_1_7	Ray	Ч-что?..	W-what?..	Q-quoi ?..								
+299	hub1_asuna_1_8	Leon	Меня сейчас стошнит.	I'm gonna puke.	Je vais vomir.								
+300	hub1_asuna_1_9	Asuna	А ты чего такой колючий?	Why're you so prickly?	Et toi, pourquoi es-tu si piquant ?								
+301	hub1_asuna_1_10	Asuna	Боишься, что я уведу твоего друга?\n	You scared I'm gonna steal your friend?\n	Tu as peur que je te pique ton ami ?\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+302	hub1_asuna_1_11	Leon	Чего?! За языком следи.	What?! Watch your mouth.	Quoi ?! Surveille ton langage.								
+303	hub1_asuna_1_12	Asuna	Милый ребёнок.	Sweet child.	Cher enfant.								
+304	hub1_asuna_1_13	Asuna	Ладно, если понадобятся редкие травы или зелья — вы знаете, где меня искать.	Alright, if you need rare herbs or potions—you know where to find me.	Bien. Si vous avez besoin d'herbes rares ou de potions, vous savez où me trouver.								
+305	hub1_bathman_1_1	Ichiro	ЭЙ ВЫ! Шерстяной! Чешуйчатый! Да-да, я вам!	HEY YOU! Furry! Scaly! Yeah, you two!	HÉ VOUS ! Le poilu ! L'écailleux ! Oui, oui, c'est à vous que je parle !								
+306	hub1_bathman_1_2	Leon	 …Чего ему надо?	 …What's he want?	 … Qu'est-ce qu'il veut ?								
+307	hub1_bathman_1_3	Ichiro	По лицам вижу — мышцы забиты! 	I can see it in your faces—muscles are tight 	À vos visages, je vois que vos muscles sont noués 				yes	yes	end_exclamation	end_exclamation	
+308	hub1_bathman_1_4	Ichiro	Спины деревянные! Душа уставшая!	Stiff backs! Weary souls!	Le dos raide ! L'âme fatiguée !								
+309	hub1_bathman_1_5	Ichiro	Вам срочно нужна баня!	You desperately need a bathhouse!	Vous avez un besoin urgent de bains !								
+310	hub1_bathman_1_6	Ray	Вообще-то… звучит не так уж плохо.	Actually… that doesn't sound too bad.	En fait… ça ne sonne pas si mal.								
+311	hub1_bathman_1_7	Leon	Даже не начинай.	Don't even start.	Ne commence même pas.								
+312	hub1_bathman_1_8	Ichiro	Пять минут в пару — как заново родишься!	Five minutes in the steam—you'll be born again!	Cinq minutes dans la vapeur, et tu te sentiras renaître !								
+313	hub1_bathman_1_9	Leon	Чтобы снова  проживать всю эту херь? Ну уж нет!	To go through all that shit again? No way!	Pour revivre toute cette merde ? Ah non, pas question !								
+314	hub1_bathman_1_10	Ichiro	Это потому что ты ещё нормально не пропотел!	That's 'cause you ain't sweated it out proper yet!	C'est parce que tu n'as pas encore bien transpiré !								
+315	hub1_bathman_1_11	Ichiro	Заходите, бойцы! Сегодня и каждый день банный марафон!	Come on in, fighters! Today and every day, it's a bathhouse marathon!	Entrez, combattants ! Aujourd'hui et tous les jours, c'est marathon du bain !								
+316	hub1_fisherman_quest_5_1	Ray	Ты можешь поймать еще одного угря?\n	Can you catch another eel?\n	Peux-tu attraper une autre anguille ?\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+317	hub1_fisherman_quest_5_2	Unagi	 Сам ловить? Ха… нет уж. 	 Catch it myself? Ha... no thanks. 	 En pêcher une moi-même ? Ha… non merci. 								
+318	hub1_fisherman_quest_5_3	Unagi	Мои руки… для кружки, не для удочки. 	My hands... are for a mug, not a fishing rod. 	Mes mains… sont faites pour la chope, pas pour la canne à pêche. 								
+319	hub1_fisherman_quest_5_4	Unagi	Но вас научу…	But I'll teach you…	Mais je peux vous apprendre…								
+320	hub1_fisherman_quest_5_5	Leon	Так ты пьяный вусмерть.	You're drunk off your ass.	Alors tu es ivre mort.								
+321	hub1_fisherman_quest_5_6	Leon	Чему ты вообще можешь научить?	What can you even teach?	Qu'est-ce que tu peux bien m'apprendre, toi ?								
+322	hub1_fisherman_quest_5_7	Unagi	Рыбу не я ловлю. 	I don't catch fish. 	Ce n'est pas moi qui pêche. 								
+323	hub1_fisherman_quest_5_8	Unagi	Рыба сама приходит… если правильно позвать.\n	The fish come to me… if you call 'em right.\n	Le poisson vient tout seul… si on l'appelle correctement.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+324	hub1_fisherman_quest_5_9	Unagi	Сушёная лягушка — приманка.	Dried frog is bait.	Une grenouille séchée, c'est l'appât.								
+325	hub1_fisherman_quest_5_10	Unagi	Бросаешь туда, под корягу. 	You throw it there, under the snag. 	Tu la jettes là, sous la souche. 								
+326	hub1_fisherman_quest_5_11	Unagi	Дёргаешь… три раза. Три. Не два… не пять. Три.\n	You tug… three times. Three. Not two… not five. Three.\n	Tu tires… trois fois. Trois. Pas deux… pas cinq. Trois.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+327	hub1_fisherman_quest_5_12	Leon	 Может, ещё хором посчитаем? Раз, два, три?	 Maybe we should count together? One, two, three?	 On peut compter en chœur, si tu veux ? Un, deux, trois ?								
+328	hub1_fisherman_quest_5_13	Unagi	Посчитайте. Угрю всё равно… 	Count. The eel don't care… 	Comptez. L'anguille s'en fout… 								
+329	hub1_fisherman_quest_5_14	Unagi	а вам веселее будет.	but you'll have more fun.	et vous, ça vous amusera.								
+330	hub1_fisherman_quest_5_15	Ray	Спасибо. Мы попробуем.	Thank you. We will try.	Merci. Nous allons essayer.								
+331	hub1_fisherman_quest_5_16	Unagi	 Ну… вот. У вас пошло…	 Well... there. You got it…	 Bon… voilà. Ça a marché…								
+332	hub1_fisherman_quest_5_17	Unagi	Зови, если цунами… а мне надо проспаться…\n	Call me if there's a tsunami... I gotta sleep this off...\n	Appelle si y a un tsunami… moi, faut que je cuve…\n	multiple_failures	end_newline,newline-count	end_newline,newline-count			end_ellipsis,end_stop		
+333	hub1_fisherman_quest_5_18	Leon	Вот охеревший.	What a dick.	Quel enfoiré.								
+334	hub1_fisherman_quest_5_19	Ray	 Зато мы хорошо проведём время.	 But we'll have a good time.	 Mais nous allons passer un bon moment.								
+335	hub1_fisherman_quest_5_20	Leon	 Ну… посмотрим.\n	 Well... we'll see.\n	 On verra bien…\n	multiple_failures	end_newline,newline-count	end_newline,newline-count				end_ellipsis,end_stop	
+336	hub1_fisherman_quest_6_1	Leon	Когда я этого угря выловлю...	When I catch that eel...	Quand j'aurai pêché cette anguille…	ellipsis							
+337	hub1_fisherman_quest_6_2	Leon	я из него всю дурь выбью.	I'm gonna beat the shit outta him.	je lui ferai passer l'envie de faire le con.								
+338	hub1_fisherman_quest_6_3	Leon	Какого черта так долго.	What the hell's takin' so long.	Pourquoi ça prend autant de temps, bordel.								
+339	hub1_fisherman_quest_6_4	Ray	В тебе так много экспрессии!	You have so much expression!	Tu as tellement d'expression !								
+340	hub1_fisherman_quest_6_5	Ray	Я никогда не встречал никого подобного.	I've never met anyone like you.	Je n'ai jamais rencontré quelqu'un comme toi.								
+341	hub1_fisherman_quest_6_6	Leon	Так, я не понял.	Hold on, I don't get it.	Alors, j'ai pas compris.								
+342	hub1_fisherman_quest_6_7	Leon	Ты меня типа унизил или мне показалось? 	Were you tryin' to insult me or somethin'? 	Tu m'as humilié ou c'est moi qui me suis fait des idées ? 								
+343	hub1_fisherman_quest_6_8	Ray	Нет, нет, нет! У тебя очень необычная речь.	No, no, no! Your speech is very unusual.	Non, non, non ! Tu as une façon de parler très particulière.								
+344	hub1_fisherman_quest_6_9	Ray	Ты рубишь с плеча...	You speak bluntly...	Tu vas droit au but...	ellipsis							
+345	hub1_fisherman_quest_6_10	 Ray	но всегда своими словами попадаешь прямо в суть.	but your words always hit the mark.	mais tes mots touchent toujours juste.								
+346	hub1_fisherman_quest_6_11	Ray	В твоей деревне все так общаются?	Does everyone in your village talk like that?	Dans ton village, tout le monde parle comme ça ?								
+347	hub1_fisherman_quest_6_12	Ray	Такие же эмоциональные?	Are they all so emotional?	Aussi émotif ?								
+348	hub1_fisherman_quest_6_13	Leon	А, ты про это.	Oh, you mean that.	Ah, tu parles de ça.								
+349	hub1_fisherman_quest_6_14	Leon	Этот базар мне достался от мразей, у которых я провел всю свою жизнь. 	I picked up this way of talkin' from the scum I spent my whole life with 	Ce langage, je l'ai appris des ordures avec qui j'ai passé toute ma vie 				yes	yes	end_stop	end_stop	
+350	hub1_fisherman_quest_6_15	Leon	А как было в моей родной деревне…я уже плохо помню.	And what it was like in my home village... I barely remember anymore.	Et comment c'était dans mon village natal... je m'en souviens à peine.								
+351	hub1_fisherman_quest_6_16	Ray	Совсем ничего? 	Absolutely nothing? 	Vraiment rien du tout ? 								
+352	hub1_fisherman_quest_6_17	Leon	Я помню сестру, как она мне лепила онигири...	I remember my sister, how she used to make me onigiri...	Je me souviens de ma sœur, elle me préparait des onigiri…	ellipsis							
+353	hub1_fisherman_quest_6_18	Leon	как она заставляла убираться в нашей хижине	how she made me clean our hut	elle me forçait à nettoyer notre cabane								
+354	hub1_fisherman_quest_6_19	Leon	постоянно играла со мной и шутила.	always played with me and joked around.	elle jouait et plaisantait toujours avec moi.								
+355	hub1_fisherman_quest_6_20	Leon	Смешила меня. Мне казалось, что все будет хорошо.	Made me laugh. I thought everything would be fine.	Elle me faisait rire. Je pensais que tout irait bien.								
+356	hub1_fisherman_quest_6_21	Leon	Ну…рядом с ней - всегда так было.	Well... with her around, it always was.	Enfin… avec elle, ça a toujours été comme ça.								
+357	hub1_fisherman_quest_6_22	Ray	Мне так жаль это слышать.	I'm so sorry to hear that.	Je suis désolé d'entendre ça.								
+358	hub1_fisherman_quest_6_23	Ray	Тебе наверное пришлось тяжело.	You must've had a hard time.	Tu as dû traverser des moments difficiles.								
+359	hub1_fisherman_quest_6_24	Ray	Но хорошо, что у тебя есть эти воспоминания о сестре.	But it's good that you have these memories of your sister.	Mais c'est bien que tu aies ces souvenirs de ta sœur.								
+360	hub1_fisherman_quest_6_25	Ray	Они как светлячки в ночи - выведут тебя на верный путь. 	They're like fireflies in the night—they'll lead you on the right path 	Ils sont comme des lucioles dans la nuit, ils te guideront sur le bon chemin 				yes	yes	end_stop	end_stop	
+361	hub1_fisherman_quest_6_26	Leon	….\n	….\n	….\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+362	hub1_fisherman_quest_6_27	Leon	Слышь? 	Hey, 	Tu piges ? 				yes		end_question		
+363	hub1_fisherman_quest_6_28	Leon	Этим задротским словечкам тебя твои родители чудилы научили?	Did your freak parents teach you all them nerdy words?	C’est tes parents, ces cinglés, qui t’ont appris ces mots de merde de geek ?								
+364	hub1_fisherman_quest_6_29	Ray	Ну…да. 	Well…yes. 	Eh bien… oui 					yes		end_stop	
+365	hub1_fisherman_quest_6_30	Ray	Наги редко выбирают стезю воина...	Nagas rarely choose the path of a warrior...	Les Nagas choisissent rarement la voie du guerrier…	ellipsis							
+366	hub1_fisherman_quest_6_31	Ray	большинство из нас становятся врачевателями, счетоводами, поэтами,	most of us become healers, accountants, poets,	La plupart d’entre nous deviennent guérisseurs, comptables, poètes,								
+367	hub1_fisherman_quest_6_32	Ray	некоторые становятся историками.	some become historians.	certains deviennent historiens.								
+368	hub1_fisherman_quest_6_33	Ray	Я даже встречал парочку адвокатов. 	I've even met a couple of lawyers. 	J’ai même rencontré quelques avocats 					yes		end_stop	
+369	hub1_fisherman_quest_6_34	Ray	Поэтому мои родители с детства обучали меня грамоте.	That's why my parents taught me literacy from childhood.	C’est pourquoi mes parents m’ont appris à lire et à écrire dès mon enfance.								
+370	hub1_fisherman_quest_6_35	Leon	ОК, лучше бы я не спрашивал. 	OK, I wish I hadn't asked. 	OK, j’aurais préféré ne pas demander 					yes		end_stop	
+371	hub1_fisherman_quest_6_36	Leon	Все про тебя понятно, чудила.	I get you, weirdo.	Je vois clair en toi, l'original.								
+372	hub1_fisherman_quest_6_37	Leon	Что бы сказали твои родители, увидев тебя с таким как я. 	What would your parents say, seein' you with someone like me 	Qu'auraient dit tes parents en te voyant avec quelqu'un comme moi 				yes	yes	end_stop	end_stop	
+373	hub1_fisherman_quest_6_38	Leon	Ловящим сранного угря посреди самого вонючего уголка Столицы? А? \n	Catchin' a shitty eel in the stinkiest corner of the capital? Huh? \n	À pêcher une putain d'anguille au milieu du coin le plus puant de la Capitale ? Hein ? \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+374	hub1_fisherman_quest_6_39	Ray	Ничего.	Nothing.	Rien.								
+375	hub1_fisherman_quest_6_40	Leon	Почему?	Why?	Pourquoi ?								
+376	hub1_fisherman_quest_6_41	Ray	Когда в нашу деревню пришли рабовладельцы...	When the slavers came to our village...	Quand les esclavagistes sont arrivés dans notre village...	ellipsis							
+377	hub1_fisherman_quest_6_42	Ray	мама и папа не захотели отдавать меня. 	Mom and Dad didn't want to give me up 	maman et papa n'ont pas voulu me laisser partir 				yes	yes	end_stop	end_stop	
+378	hub1_fisherman_quest_6_43	Ray	Их больше нет. \n	They are no longer with us. \n	Ils ne sont plus là. \n								
+379	hub1_fisherman_quest_6_44	Leon	Оу. Я немного перегнул. Извини.\n	Oh. I went a little too far. Sorry.\n	Oh. J'ai un peu dépassé les bornes. Désolé.\n								
+380	hub1_fisherman_quest_6_45	Ray	Я так рад, что мы узнали друг друга лучше! \n	I am so glad we got to know each other better! \n	Je suis si content que nous ayons appris à mieux nous connaître ! \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+381	hub1_fisherman_quest_6_46	Leon	Мда, чувствую что ты от меня не отвалишь. 	Well, I guess you ain't gonna leave me alone. 	Pfff, je sens que tu ne vas pas me lâcher 					yes		end_stop	
+382	hub1_fisherman_quest_6_47	Leon	ЕПТ, УГОРЬ! НАКАНЕЦТА! 	FUCK, AN EEL! FINALLY! 	PUTAIN, L'ANGUILLE ! ENFIN 					yes		end_exclamation	
+383	hub1_fisherman_quest_6_48	Ray	Ура! Мы сделали это! \n	Hooray! We did it! \n	Hourra ! Nous l'avons fait ! \n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+384	hub1_fisherman_quest_7_1	Motoki	О! Нефритовый угорь!	Oh! A jade eel!	Oh ! Une anguille de jade !								
+385	hub1_fisherman_quest_7_2	Motoki	Спасибо вам, ребята. 	Thank you, guys. 	Merci, les gars 					yes		end_stop	
+386	hub1_fisherman_quest_7_3	Motoki	Надеюсь, моя просьба не доставила слишком много хлопот?	I hope my request didn't cause too much trouble?	J'espère que ma demande ne vous a pas causé trop de soucis ?								
+387	hub1_fisherman_quest_7_4	Ray	Что вы! Совсем нет. Мы были рады помочь.\n	Not at all! We were glad to help.\n	Mais non ! Pas du tout. Nous étions ravis de vous aider.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+388	hub1_fisherman_quest_7_5	Leon	Ты нас отправил к рыбаку. А его нет, он бухой!  	You sent us to the fisherman. And he ain't there, he's drunk!  	Tu nous as envoyés chez le pêcheur. Mais il n'est pas là, il est bourré  					yes		end_exclamation	
+389	hub1_fisherman_quest_7_6	Leon	И мы пошли в баню. 	So we went to the bathhouse. 	Et nous sommes allés aux bains 					yes		end_stop	
+390	hub1_fisherman_quest_7_7	Leon	Банщик отправил к травнице, потом обратно в баню,	The bathhouse attendant sent us to the herbalist, then back to the bathhouse,	Le baigneur nous a envoyés chez l'herboriste, puis de nouveau aux bains,								
+391	hub1_fisherman_quest_7_8	Leon	 потом поперлись к гейшам, потом к барахольщику!	 then we went to the geishas, then to the junk dealer!	 puis on est allés voir les geishas, puis le brocanteur !								
+392	hub1_fisherman_quest_7_9	Leon	И в итоге сами выловили эту сраную рыбу!\n	And in the end, we caught that damn fish ourselves!\n	Et au final, on a pêché nous-mêmes ce putain de poisson !\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					
+393	hub1_fisherman_quest_7_10	Leon	Так что да. Было пиздец как несложно.	So yeah. It was fuckin' easy.	Alors oui. C'était putain de facile.								
+394	hub1_fisherman_quest_7_11	Ray	Леон...	Leon...	Leon...	ellipsis							
+395	hub1_fisherman_quest_7_12	Motoki	Эм... Ну...	Um... Well...	Euh... Eh bien...	ellipsis							
+396	hub1_fisherman_quest_7_13	Motoki	В таком случае следующий рамен за мой счёт.\n	In that case, the next ramen's on me.\n	Dans ce cas, le prochain ramen est pour ma pomme.\n	multiple_failures	end_newline,newline-count	end_newline,newline-count					

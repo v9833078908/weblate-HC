@@ -1,0 +1,152 @@
+{
+  "source": "l10n.herocraft.com/projects/heart-abyss/hub-1/",
+  "extracted": "2026-08-20",
+  "source_language": "ru",
+  "units": 396,
+  "translated": {
+    "en": 396,
+    "fr": 396
+  },
+  "approved": {
+    "en": 0,
+    "fr": 0
+  },
+  "suggestions": 0,
+  "comments": 0,
+  "weblate_active_checks": {
+    "ru": 92,
+    "en": 79,
+    "fr": 80
+  },
+  "line_endings_source": {
+    "crlf": 34,
+    "cr_only": 75,
+    "lf_only": 27,
+    "total_breaks": 136
+  },
+  "line_endings_target": {
+    "en_lf": 136,
+    "fr_lf": 136
+  },
+  "newline_false_positives": {
+    "units_flagged": {
+      "en": 79,
+      "fr": 80
+    },
+    "units_flagged_only_by_newline_checks": {
+      "en": 74,
+      "fr": 74
+    },
+    "units_carrying_any_other_check": {
+      "en": 5,
+      "fr": 6
+    },
+    "root_cause": "SameBookendingWhitespace autofix normalises source CR/CRLF to LF and copies the trailing run onto the target; EndNewlineCheck and NewLineCountCheck then compare against the raw source",
+    "targets_byte_equal_to_autofix_output": 792,
+    "targets_deviating_from_autofix_output": 0,
+    "source_units_with_mid_string_break": 0
+  },
+  "break_count_mismatch_after_normalisation": 0,
+  "terminal_punct_checks": {
+    "shown": {
+      "en": 4,
+      "fr": 6
+    },
+    "on_stripped": {
+      "en": 33,
+      "fr": 78
+    },
+    "hidden": {
+      "en": 29,
+      "fr": 72
+    }
+  },
+  "lost_final_punctuation": {
+    "en": {
+      "total": 17,
+      "dot": 11,
+      "excl": 5,
+      "quest": 1
+    },
+    "fr": {
+      "total": 66,
+      "dot": 44,
+      "excl": 22
+    }
+  },
+  "source_lines_with_trailing_space": 138,
+  "lost_punct_all_on_trailing_space_source": true,
+  "whitespace_fidelity_mismatches": {
+    "en": 0,
+    "fr": 0
+  },
+  "duplicate_source_strings": 23,
+  "divergent_target_renderings": {
+    "en": 9,
+    "fr": 16
+  },
+  "apostrophe_fr": {
+    "straight_units": 108,
+    "curly_units": 43
+  },
+  "quotes_en": {
+    "curly_pairs": 1,
+    "straight": 4
+  },
+  "ellipsis_units": {
+    "ru": {
+      "…": 44,
+      "...": 14
+    },
+    "en": {
+      "…": 32,
+      "...": 28
+    },
+    "fr": {
+      "…": 48,
+      "...": 10
+    }
+  },
+  "fr_nnbsp_u202f": 162,
+  "fr_punctuation_spacing_violations": 0,
+  "length_ratio_vs_ru": {
+    "en_median": 1.05,
+    "en_max": 2.08,
+    "fr_median": 1.21,
+    "fr_max": 2.15
+  },
+  "longest_fr_chars": 104,
+  "cyrillic_leak": {
+    "en": 0,
+    "fr": 0
+  },
+  "untranslated_copies": {
+    "en": 0,
+    "fr": 0
+  },
+  "detection_effectiveness": {
+    "punctuation_drops_surfaced": {
+      "surfaced": 0,
+      "total_units": 67
+    },
+    "duplicate_divergences_surfaced": {
+      "surfaced": 0,
+      "total": 25
+    },
+    "glossary_drifts_surfaced": {
+      "surfaced": 0,
+      "total": 6,
+      "reason": "GlossaryCheck default_disabled, check_flags empty on hub-1"
+    },
+    "source_content_bugs_surfaced": {
+      "surfaced": 0,
+      "total": 2
+    },
+    "actionable_units_among_shown": {
+      "en": 2,
+      "fr": 2,
+      "note": "hub1_ramen_1_28 and hub1_asuna_archive_1_17 point at genuine source typos; the rest are false positives on correct translations"
+    }
+  },
+  "inconsistent_check_scope": "content_hash = calculate_hash(source, context) (weblate/trans/models/unit.py:2609); in monolingual formats context differs per key, so duplicate source text with different keys is never compared"
+}
