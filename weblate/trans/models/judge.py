@@ -134,6 +134,57 @@ class JudgeVerdict(models.Model):
     def __str__(self) -> str:
         return f"{self.unit_id}: {self.verdict} (seat {self.seat})"
 
+    @property
+    def verdict(self) -> str:
+        """Derived, never stored: the severity->verdict mapping is
+        reopened by R3 and must change without a data migration (D4)."""
+        if self.unparsed:
+            return self.Verdict.UNPARSED
+        return verdict_for_severity(self.max_severity)
+
     def is_stale(self, target: Sequence[str]) -> bool:
         """Whether the judged text differs from the text stored now."""
         return self.target_hash != compute_target_hash(target)
+
+
+from weblate.utils.state import STATE_APPROVED, STATE_FUZZY, STATE_TRANSLATED
+
+# Design "Гейт по severity выражается штатными настройками". minor is a
+# pass: the errors are recorded, but they do not hold the string back.
+_SEVERITY_VERDICT = {
+    "none": JudgeVerdict.Verdict.PASS,
+    "minor": JudgeVerdict.Verdict.PASS,
+    "major": JudgeVerdict.Verdict.FLAG,
+    "critical": JudgeVerdict.Verdict.REJECT,
+}
+
+# Strictness order, so a round reduces to its strictest seat without a
+# seat ever lowering another. Derived from the declared scale: Severity
+# is ordered by definition (task 2 pins this with a test).
+SEVERITY_RANK = {name: rank for rank, name in enumerate(JudgeVerdict.Severity.values)}
+
+
+def verdict_for_severity(max_severity: str) -> str:
+    """Derive the verdict from the worst error the judge reported."""
+    return _SEVERITY_VERDICT[max_severity]
+
+
+def state_for_verdict(
+    verdict: str, *, enable_review: bool, may_approve: bool
+) -> int | None:
+    """Target state for a verdict, or None when the state must not move.
+
+    ``critical`` lands on STATE_FUZZY, which the project-level
+    ``WITHOUT_NEEDS_EDITING`` commit policy already excludes from export.
+    ``pass`` stops at STATE_TRANSLATED unless the site opts into judge
+    approval (JUDGE_MAY_APPROVE) AND the project has review: measurement
+    shows pass misses real criticals, so the judge does not hand out the
+    top trust state by default (review D2).
+    """
+    if verdict == JudgeVerdict.Verdict.UNPARSED:
+        return None
+    if verdict == JudgeVerdict.Verdict.REJECT:
+        return STATE_FUZZY
+    if verdict == JudgeVerdict.Verdict.PASS and enable_review and may_approve:
+        return STATE_APPROVED
+    return STATE_TRANSLATED
