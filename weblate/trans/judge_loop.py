@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from django.db import transaction
 
+from weblate.checks.judge import JUDGE_CHECKS
 from weblate.glossary.models import get_glossary_terms
 from weblate.machinery.models import MACHINERY
 from weblate.trans.forms import AutoForm
@@ -77,7 +78,10 @@ def build_request(unit: Unit) -> JudgeRequest:
         target_language=translation.language.code,
         note=unit.source_unit.note,
         glossary_terms=_glossary_pairs(unit),
-        failing_checks=sorted(unit.all_checks_names),
+        # The judge's own projection is not evidence: a judge-* row is the
+        # previous round's opinion, and feeding it back lets a seat cite
+        # itself as proof ("the judge-flag check indicates ...").
+        failing_checks=sorted(unit.all_checks_names - JUDGE_CHECKS),
         target_plurals=unit.get_target_plurals(),
     )
 

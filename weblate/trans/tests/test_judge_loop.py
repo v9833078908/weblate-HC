@@ -273,3 +273,29 @@ class JudgeLoopTest(ViewTestCase):
             set(unit.judge_verdicts.values_list("attempt", "seat")),
             {(0, 1), (0, 2), (1, 1), (1, 2)},
         )
+
+    def test_the_judges_own_projection_is_not_sent_back_as_evidence(self) -> None:
+        # Observed live on dev 2026-08-20: a seat justified a major with
+        # "the judge-flag check indicating non-conformance" - its own
+        # previous opinion, handed back to it as proven fact.
+        unit = self.get_unit()
+        request = build_request(unit)
+        JudgeVerdict.objects.create(
+            unit=unit,
+            run_id=uuid.uuid4(),
+            attempt=0,
+            seat=1,
+            judge_model="vendor-a/model",
+            max_severity="major",
+            model_verdict="flag",
+            target_hash=compute_target_hash(request.target_plurals),
+            context_hash=compute_context_hash(
+                source=request.source,
+                note=request.note,
+                glossary_terms=request.glossary_terms,
+            ),
+        )
+        unit.run_checks()
+        unit.clear_checks_cache()
+        self.assertIn("judge-flag", unit.all_checks_names)
+        self.assertNotIn("judge-flag", build_request(unit).failing_checks)
