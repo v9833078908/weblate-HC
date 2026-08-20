@@ -27,17 +27,27 @@ from __future__ import annotations
 
 import argparse
 import collections
-import glob
 import json
-import os
 import statistics as st
 from pathlib import Path
 
 RANK = {"none": 0, "minor": 1, "major": 2, "critical": 3}
 LEVELS = ["none", "minor", "major", "critical"]
 ANCHOR14 = {
-    "24130", "24160", "24161", "24180", "24181", "24182", "24183",
-    "24184", "24190", "24194", "24200", "24221", "24240", "24241",
+    "24130",
+    "24160",
+    "24161",
+    "24180",
+    "24181",
+    "24182",
+    "24183",
+    "24184",
+    "24190",
+    "24194",
+    "24200",
+    "24221",
+    "24240",
+    "24241",
 }
 
 
@@ -51,15 +61,18 @@ def run_label(run: dict) -> dict[str, str]:
 
 def collegium(a: dict, b: dict) -> dict[str, str]:
     return {
-        i: LEVELS[max(maxsev(a[i]["errors"]), maxsev(b.get(i, {"errors": []})["errors"]))]
+        i: LEVELS[
+            max(maxsev(a[i]["errors"]), maxsev(b.get(i, {"errors": []})["errors"]))
+        ]
         for i in a
     }
 
 
 def degenerate(run: dict) -> bool:
-    return all(v.get("unparsed") for v in run.values()) or all(
-        v["verdict"] == "pass" for v in run.values()
-    ) and sum(1 for v in run.values() if v.get("unparsed")) == len(run)
+    return all(v.get("unparsed") for v in run.values()) or (
+        all(v["verdict"] == "pass" for v in run.values())
+        and sum(1 for v in run.values() if v.get("unparsed")) == len(run)
+    )
 
 
 def metrics(lab, gt, true_crit, true_majorplus, true_none):
@@ -73,6 +86,8 @@ def metrics(lab, gt, true_crit, true_majorplus, true_none):
 
 
 def load(fn: Path) -> dict | None:
+    if not fn.exists():
+        return None
     run = json.load(fn.open(encoding="utf-8"))
     return None if degenerate(run) else run
 
@@ -81,26 +96,47 @@ def main() -> None:
     p = argparse.ArgumentParser(description="score zh recalibration arms")
     p.add_argument("--truth", default="st2-zh-groundtruth.json")
     p.add_argument("--out-dir", default="st2-zh-recal")
-    p.add_argument(
-        "--seat1", default="deepseek-v4-pro"
-    )
+    p.add_argument("--seat1", default="deepseek-v4-pro")
     p.add_argument("--seat2", default="qwen3-235b-a22b-2507")
+    # The 2026-08-20 prompt arms are E/F/G, and G is a single-model,
+    # 3-repeat arm: pass --arms G --repeats 3 --seat1 "" for it.
+    p.add_argument("--arms", default="A,B,C,D")
+    p.add_argument("--repeats", type=int, default=5)
     args = p.parse_args()
 
-    gt = {i: v["severity"] for i, v in json.load(open(args.truth, encoding="utf-8"))["labels"].items()}
+    gt = {
+        i: v["severity"]
+        for i, v in json.load(open(args.truth, encoding="utf-8"))["labels"].items()
+    }
     true_crit = {i for i, s in gt.items() if s == "critical"}
     true_majorplus = {i for i, s in gt.items() if RANK[s] >= 2}
     true_none = {i for i, s in gt.items() if s == "none"}
-    print(f"truth: critical {len(true_crit)}  major+ {len(true_majorplus)}  none {len(true_none)}")
+    print(
+        f"truth: critical {len(true_crit)}  major+ {len(true_majorplus)}  none {len(true_none)}"
+    )
 
     out = Path(args.out_dir)
-    for arm in ("A", "B", "C", "D"):
-        s1 = [load(out / f"arm{arm}-{args.seat1}-run{k}.json") for k in range(1, 6)]
-        s2 = [load(out / f"arm{arm}-{args.seat2}-run{k}.json") for k in range(1, 6)]
+    for arm in args.arms.split(","):
+        runs = range(1, args.repeats + 1)
+        s1 = (
+            [load(out / f"arm{arm}-{args.seat1}-run{k}.json") for k in runs]
+            if args.seat1
+            else []
+        )
+        s2 = (
+            [load(out / f"arm{arm}-{args.seat2}-run{k}.json") for k in runs]
+            if args.seat2
+            else []
+        )
         g1 = [r for r in s1 if r is not None]
         g2 = [r for r in s2 if r is not None]
-        print(f"\n=== arm {arm} ===  seat1 good {len(g1)}/5  seat2 good {len(g2)}/5")
-        if len(g1) < 5 or len(g2) < 5:
+        print(
+            f"\n=== arm {arm} ===  seat1 good {len(g1)}/{args.repeats}  "
+            f"seat2 good {len(g2)}/{args.repeats}"
+        )
+        if (args.seat1 and len(g1) < args.repeats) or (
+            args.seat2 and len(g2) < args.repeats
+        ):
             print("  incomplete/degenerate arm — skipping arm-level medians")
         pairs = min(len(g1), len(g2))
         configs = []
@@ -109,10 +145,16 @@ def main() -> None:
         if g2:
             configs.append((args.seat2, [run_label(r) for r in g2]))
         if pairs:
-            configs.append(("collegium", [collegium(g1[k], g2[k]) for k in range(pairs)]))
+            configs.append(
+                ("collegium", [collegium(g1[k], g2[k]) for k in range(pairs)])
+            )
         for name, labs in configs:
+
             def med(key):
-                return st.median(metrics(l, gt, true_crit, true_majorplus, true_none)[key] for l in labs)
+                return st.median(
+                    metrics(l, gt, true_crit, true_majorplus, true_none)[key]
+                    for l in labs
+                )
 
             ids = list(labs[0])
             flip = sum(1 for i in ids if len({RANK[l[i]] >= 2 for l in labs}) > 1)
@@ -122,15 +164,15 @@ def main() -> None:
                 f"REAL@24={med('real24')}/24 FP={med('fp')}/{len(true_none)} "
                 f"noise>=flag={flip}/124"
             )
-        if pairs == 5 and name == "collegium":
+        if pairs == args.repeats and configs and configs[-1][0] == "collegium":
             conf = collections.Counter()
             for lab in configs[-1][1]:
                 for i in lab:
-                    conf[(gt[i], lab[i])] += 1
+                    conf[gt[i], lab[i]] += 1
             print("  confusion (truth rows x judge cols, summed over collegium runs):")
             print("    truth\\judge  none minor major crit")
             for t in LEVELS:
-                print(f"    {t:9} " + "".join(f"{conf[(t, j)]:6}" for j in LEVELS))
+                print(f"    {t:9} " + "".join(f"{conf[t, j]:6}" for j in LEVELS))
 
 
 if __name__ == "__main__":
