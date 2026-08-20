@@ -157,6 +157,42 @@ def _is_caption_row(row: list[str], lang_cols: dict[int, str]) -> bool:
     return False
 
 
+def _is_banner_row(row: list[str], lang_cols: dict[int, str]) -> bool:
+    """
+    Detect a row that structures the sheet instead of holding a string.
+
+    Both shapes seen in shipped kits state the section and nothing else: a
+    caption whose text sits in a comment column (``,МЕНЮ,,``) and a marker key
+    (``#Юниты``). Requiring every language column to be empty keeps the rule
+    from ever dropping translatable text.
+    """
+    if any(_cell(row, col).strip() for col in lang_cols):
+        return False
+    key = _cell(row, _KEY_COLUMN).strip()
+    return not key or key.startswith("#")
+
+
+def _banner_rows(
+    data_rows: list[list[str]], first_data_index: int, lang_cols: dict[int, str]
+) -> list[int]:
+    """Return the 1-based numbers of the banner rows among ``data_rows``."""
+    return [
+        first_data_index + offset + 1
+        for offset, row in enumerate(data_rows)
+        if not _is_blank_row(row) and _is_banner_row(row, lang_cols)
+    ]
+
+
+def _banner_note(banner_rows: list[int]) -> str:
+    shown = ", ".join(str(row) for row in banner_rows[:_MISSING_ROWS_SHOWN])
+    if len(banner_rows) > _MISSING_ROWS_SHOWN:
+        shown += f", +{len(banner_rows) - _MISSING_ROWS_SHOWN} more"
+    return (
+        f"{len(banner_rows)} row(s) hold no text in any language column and are "
+        f"skipped as section banners: row(s) {shown}"
+    )
+
+
 def _sanitize_component(name: str) -> str:
     """
     Reduce a file stem to a valid component name.
@@ -223,6 +259,19 @@ def infer_component(
         ) and not _is_numeric(key_column_values)
     if key_is_language and key_language_code is not None:
         candidates = {_KEY_COLUMN: key_language_code, **candidates}
+
+    # Interior banner rows: a section caption such as ``,МЕНЮ,,`` or a marker
+    # key like ``#Юниты``. Both hold text in no language column, so they carry
+    # nothing translatable, and the parser's key_without_content contract
+    # would otherwise reject a whole kit over rows that are pure structure.
+    # A row that names a real key and still has no text stays an error: that
+    # is a hole in the kit, not a banner. Blank rows are excluded here because
+    # they are already reported as blank.
+    banner_rows = _banner_rows(data_rows, first_data_index, candidates)
+    skip_rows.extend(banner_rows)
+    content_rows -= len(banner_rows)
+    if banner_rows:
+        notes.append(_banner_note(banner_rows))
 
     languages: dict[int, str] = {}
     # Columns whose header is a language code but whose content proves otherwise.

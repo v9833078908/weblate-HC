@@ -149,6 +149,26 @@ def test_late_component_error_leaves_no_artifacts(tmp_path, kit_with_profile):
     assert not output.exists()
 
 
+def test_kit_split_into_sections_by_banner_rows_publishes(tmp_path):
+    kit = tmp_path / "Victory - Common.csv"
+    kit.write_text(
+        "ID \\ LANGID,COMMENTS,RU,EN\n"
+        ",МЕНЮ,,\n"
+        "Continue,,Продолжить,Continue\n"
+        "# Юниты,,,\n"
+        "Tank,,Танк,Tank\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "out"
+    assert main([str(kit), "--out", str(output)]) == 0
+
+    po = (output / "Common" / "ru.po").read_text(encoding="utf-8")
+    assert 'msgid "Continue"' in po
+    assert 'msgid "Tank"' in po
+    assert "МЕНЮ" not in po
+    assert "Юниты" not in po
+
+
 def test_existing_output_is_never_replaced(tmp_path, kit_with_profile):
     kits, profile = kit_with_profile
     temple_csv, terms_csv = kits

@@ -125,6 +125,11 @@ an empty source string, and the number of such keys is reported. In the source
 language they appear as untranslated strings, which is where the missing source
 text is filled in. A row with a key but no text in any language is refused.
 
+Kits that split the sheet into sections are imported as they are. A row that
+states a section instead of a string - one whose language columns are all empty
+and whose key cell is either empty or starts with ``#`` - is skipped, and the
+import report lists the skipped rows.
+
 .. _uploading-glossary-tables:
 
 Glossary tables from CSV, TSV, and XLSX
