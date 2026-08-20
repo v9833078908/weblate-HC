@@ -55,6 +55,7 @@ from weblate.trans.models import (
     Change,
     Component,
     ComponentList,
+    JudgeVerdict,
     Project,
     Translation,
 )
@@ -70,6 +71,7 @@ from weblate.trans.views.reports import get_reports_context
 from weblate.trans.workspace_move import can_offer_project_move
 from weblate.utils import messages
 from weblate.utils.decorators import engage_login_not_required
+from weblate.utils.state import STATE_READONLY
 from weblate.utils.ratelimit import reset_rate_limit, session_ratelimit_post
 from weblate.utils.stats import (
     CategoryLanguage,
@@ -795,7 +797,20 @@ def show_translation(
     last_changes = obj.change_set.prefetch().recent(skip_preload="translation")
     user = request.user
 
-    # Get form
+    # Judge-mode counters for the auto-translate form (server-side: the
+    # number reflects the default filter at page-open time).
+    judge_row_count = None
+    judge_request_estimate = None
+    if settings.JUDGE_ENABLED:
+        judge_row_count = obj.unit_set.exclude(state=STATE_READONLY).search(
+            "state:<translated", parser="unit"
+        ).count()
+        judge_request_estimate = judge_row_count * 2 * (
+            1 + settings.JUDGE_MAX_REPAIR_ATTEMPTS
+        )
+    judge_verdicts_exist = JudgeVerdict.objects.filter(
+        unit__translation=obj
+    ).exists()
     form = get_upload_form(user, obj)
 
     search_form = SearchForm(
@@ -892,6 +907,9 @@ def show_translation(
             "last_changes": last_changes,
             "other_translations": other_translations,
             "exporters": EXPORTERS.list_exporters(obj),
+            "judge_row_count": judge_row_count,
+            "judge_request_estimate": judge_request_estimate,
+            "judge_verdicts_exist": judge_verdicts_exist,
         },
     )
 

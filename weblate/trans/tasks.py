@@ -988,6 +988,7 @@ def auto_translate(
     activity_log_id: int | None = None,
     activity_log_task_count: int | None = None,
     enforce_permissions: bool = True,
+    overwrite_existing: bool = False,
 ) -> dict[str, Any]:
     result: dict[str, Any] = {"warnings": []}
     user = User.objects.get(pk=user_id) if user_id else None
@@ -1021,6 +1022,7 @@ def auto_translate(
             component_wide=component_wide,
             unit_ids=unit_ids,
             enforce_permissions=enforce_permissions,
+            overwrite_existing=overwrite_existing,
         )
         try:
             message = auto.perform(

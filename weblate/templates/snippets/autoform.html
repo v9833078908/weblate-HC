@@ -29,6 +29,25 @@
           {% translate "Automatic translation via machine translation uses active machine translation engines to get the best possible translations and applies them in this project." %}
         </p>
       {% endif %}
+      {% if judge_row_count is not None %}
+        <p class="text-muted" id="id_auto_row_count">
+          {% blocktranslate count counter=judge_row_count trimmed %}
+            The current filter matches {{ counter }} string.
+          {% plural %}
+            The current filter matches {{ counter }} strings.
+          {% endblocktranslate %}
+        </p>
+        <p class="text-muted" id="id_auto_request_estimate">
+          {% translate "A judge run costs in the worst case up to" %}
+          {{ judge_request_estimate }}
+          {% translate "LLM requests (strings × 2 judges × attempts), plus machine translation for empty strings." %}
+        </p>
+      {% endif %}
+      {% if judge_verdicts_exist %}
+        <div class="alert alert-warning" role="alert" id="judge-verdicts-exist">
+          {% translate "This translation already has judge verdicts. Running translate or approved modes with a broad filter will overwrite judge-approved strings." %}
+        </div>
+      {% endif %}
       {% crispy autoform %}
     </div>
     <div class="card-footer">

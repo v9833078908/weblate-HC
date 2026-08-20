@@ -271,6 +271,10 @@ def check_auto_translate_permission(
         if not translation.restrict_direct_editing:
             return True
         return user.has_perm("suggestion.add", translation)
+    if mode == "judge":
+        # The judge decides the state per verdict, including approved;
+        # the same review right as the "approved" mode is required.
+        return user.has_perm("unit.review", translation)
     return user.has_perm("meta:unit.direct_edit", translation)
 
 
@@ -825,6 +829,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         unit_ids: list[int] | None = None,
         allow_non_shared_tm_source_components: bool = False,
         enforce_permissions: bool = True,
+        overwrite_existing: bool = False,
     ) -> None:
         super().__init__(
             user=user,
@@ -839,6 +844,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         self._task_meta: dict[str, Any] = {}
         self.workspace_source_component_ids: dict[int, list[int]] | None = None
         self.enforce_permissions = enforce_permissions
+        self.overwrite_existing = overwrite_existing
 
         match obj:
             case Translation():
@@ -961,6 +967,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 allow_non_shared_tm_source_components=(
                     self.allow_non_shared_tm_source_components
                 ),
+                overwrite_existing=self.overwrite_existing,
             )
 
             effective_source_component_ids = source_component_ids

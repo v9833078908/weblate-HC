@@ -1508,6 +1508,7 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
             source_component_id=autoform.cleaned_data["component"],
             engines=autoform.cleaned_data["engines"],
             threshold=autoform.cleaned_data["threshold"],
+            overwrite_existing=autoform.cleaned_data.get("overwrite_existing", False),
         )
         messages.success(request, result["message"])
         for warning in result.get("warnings", []):
@@ -1527,6 +1528,7 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
             source_component_id=autoform.cleaned_data["component"],
             engines=autoform.cleaned_data["engines"],
             threshold=autoform.cleaned_data["threshold"],
+            overwrite_existing=autoform.cleaned_data.get("overwrite_existing", False),
         )
         messages.success(
             request, gettext("Automatic translation in progress"), f"task:{task.id}"
