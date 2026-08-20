@@ -173,15 +173,25 @@ Repository-specific parts:
 - `weblate_customization/` - a custom-check, custom-autofix, and
   custom-machinery package following `docs/admin/customize.rst`. `checks.py`
   ships `GameMarkupCheck` (`check_id: game-markup`), which asserts that Unity
-  rich-text tags (`<color=#RRGGBB>`, `<link>`, `<size=N>`, `<b>`) and engine
-  placeholders (`{0}`, `%KEY%`) in the target match the source multiset, and
+  rich-text tags (`<color=#RRGGBB>`, `<link>`, `<size=N>`, `<b>`,
+  `<sprite name="fire">`) and engine placeholders (`{0}`, `%KEY%`) in the
+  target match the source multiset, and
   `GameLineBreakCheck` (`check_id: game-line-break`), which asserts that the
   Hero Craft engine line separator `$` is neither lost nor added, and that no
   whitespace hugs it, whenever the source uses `$` tightly as a separator, and
   `GameNumberCheck` (`check_id: game-number`), which asserts that every number
   the source states is present in the target after markup, placeholders and
   full dates are removed and the decimal separator is normalized; a number the
-  target adds is accepted, and the flag is `ignore-game-number`.
+  target adds is accepted, an English ordinal is dropped from the source only
+  (the target renders "24 декабря" as "December 24th"), and the flag is
+  `ignore-game-number`. `GameTokenCheck` (`check_id: game-token`) asserts that
+  every engine substitution identifier the source uses survives into the
+  target: the mission DSL writes `item_type[|{0}]` and
+  `skirmish_league_id[gen|в {0}|в любой лиге]`, whose bracketed bodies are
+  translated while the identifier in front of the bracket is a lookup key, so
+  a translated one (`element_type[`) resolves to nothing at runtime. A bracket
+  without a `|` is ordinary prose, not a substitution. The flag is
+  `ignore-game-token`.
   `autofixes.py` ships `LineSeparatorSpacing`, which deterministically strips
   whitespace hugging a tight `$` separator before the target is stored,
   importing the shared separator regexes from `checks.py` (mirroring how
@@ -343,9 +353,9 @@ the container's `sys.path` via `/app/data/python`. After editing
 cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
 ```
 
-`GameMarkupCheck`, `GameLineBreakCheck`, `CyrillicLeakCheck` and
-`GameNumberCheck` are registered through
-`WEBLATE_ADD_CHECK: weblate_customization.checks.GameMarkupCheck,weblate_customization.checks.GameLineBreakCheck,weblate_customization.checks.CyrillicLeakCheck,weblate_customization.checks.GameNumberCheck`,
+`GameMarkupCheck`, `GameLineBreakCheck`, `CyrillicLeakCheck`,
+`GameNumberCheck` and `GameTokenCheck` are registered through
+`WEBLATE_ADD_CHECK: weblate_customization.checks.GameMarkupCheck,weblate_customization.checks.GameLineBreakCheck,weblate_customization.checks.CyrillicLeakCheck,weblate_customization.checks.GameNumberCheck,weblate_customization.checks.GameTokenCheck`,
 and `LineSeparatorSpacing` through
 `WEBLATE_ADD_AUTOFIX: weblate_customization.autofixes.LineSeparatorSpacing`,
 both in the `weblate` service environment in `dev-docker/docker-compose.yml`

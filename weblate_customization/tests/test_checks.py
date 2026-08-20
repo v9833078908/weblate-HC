@@ -11,6 +11,7 @@ from weblate_customization.checks import (
     GameLineBreakCheck,
     GameMarkupCheck,
     GameNumberCheck,
+    GameTokenCheck,
 )
 
 from weblate.checks.tests.test_checks import CheckTestCase
@@ -33,6 +34,27 @@ class GameMarkupCheckTest(CheckTestCase):
             "game-markup",
         )
         self.test_failure_2 = ("Value {0}", "Значение {1}", "game-markup")
+        # A sprite carries its attribute after a space, not after "=", so the
+        # tag pattern has to accept both spellings or the icon name is unchecked.
+        self.test_failure_3 = (
+            '+{0} health for <sprite name="human"> sailors',
+            '+{0} Gesundheit für <sprite name="fire"> Matrosen',
+            "game-markup",
+        )
+
+    def test_a_sprite_the_target_keeps_passes(self) -> None:
+        self.assertFalse(
+            self.check.check_single(
+                'Damage to <sprite name="construction">',
+                'Schaden an <sprite name="construction">',
+                None,
+            )
+        )
+
+    def test_angle_brackets_in_prose_are_not_tags(self) -> None:
+        # Widening the attribute separator must not turn "<simple thing>" into a
+        # tag, or every string with a stray bracket becomes a failure.
+        self.assertFalse(self.check.check_single("a < b and c > d", "x < y", None))
 
 
 class GameLineBreakCheckTest(CheckTestCase):
@@ -215,3 +237,71 @@ class GameNumberCheckTest(CheckTestCase):
         self.assertTrue(
             self.check.check_single("30,000 for victory", "20.000 für Sieg", None)
         )
+
+    def test_an_ordinal_in_the_target_keeps_the_source_number(self) -> None:
+        # English renders the plain "24 декабря" as "December 24th". Dropping the
+        # target's ordinal would report the source's own 24 as missing.
+        self.assertFalse(
+            self.check.check_single("Начнутся 24 декабря", "Begins December 24th", None)
+        )
+
+    def test_an_ordinal_in_the_target_does_not_hide_a_dropped_number(self) -> None:
+        self.assertTrue(
+            self.check.check_single(
+                "Начнутся 24 декабря, уровень 11", "Begins December 24th", None
+            )
+        )
+
+
+class GameTokenCheckTest(CheckTestCase):
+    check = GameTokenCheck()
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.test_good_matching = (
+            "Install item_type[|{0}] on the ship",
+            "Zainstaluj item_type[|{0}] na statku",
+            "game-token",
+        )
+        # A translated identifier resolves to nothing at runtime.
+        self.test_failure_1 = (
+            "Install item_type[|{0}] on the ship",
+            "Zainstaluj element_type[|{0}] na statku",
+            "game-token",
+        )
+        # A dropped token loses the substitution entirely.
+        self.test_failure_2 = (
+            "Buy item_template[|{0}]",
+            "Mua {0}",
+            "game-token",
+        )
+        # Two tokens in, one translated: a set comparison of one would miss it.
+        self.test_failure_3 = (
+            "Hold skirmish_league_place[|place {0}] skirmish_league_id[|in {0}|in any]",
+            "Bleib skirmish_league_place[|auf Platz {0}] Liga[|in {0}|in jeder]",
+            "game-token",
+        )
+
+    def test_a_case_tag_is_not_part_of_the_identity(self) -> None:
+        # The bracket body is translated, including the grammatical case tag.
+        self.assertFalse(
+            self.check.check_single(
+                "Defeat campaign_enemy[gen|{0}]",
+                "Zwycięż campaign_enemy[acc|{0} w kampanii]",
+                None,
+            )
+        )
+
+    def test_ordinary_bracketed_prose_is_not_a_token(self) -> None:
+        # A bracket with no "|" is an index, not a substitution, so the word in
+        # front of it is prose the target rewrites. The word has to sit right
+        # against the bracket, or the test never reaches the "|" requirement.
+        self.assertFalse(
+            self.check.check_single("Slot[3] unlocked", "Fach 3 freigeschaltet", None)
+        )
+
+    def test_a_source_without_tokens_passes(self) -> None:
+        self.assertFalse(self.check.check_single("Plain text", "item_type[|{0}]", None))
+
+    def test_an_empty_target_passes(self) -> None:
+        self.assertFalse(self.check.check_single("Buy item_template[|{0}]", "", None))
