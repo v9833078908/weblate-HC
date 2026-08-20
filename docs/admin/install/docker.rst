@@ -2372,6 +2372,7 @@ LLM judge
 .. envvar:: WEBLATE_JUDGE_MAX_UNITS_PER_RUN
 .. envvar:: WEBLATE_JUDGE_REQUEST_SLEEP
 .. envvar:: WEBLATE_JUDGE_MAY_APPROVE
+.. envvar:: WEBLATE_JUDGE_REASONING_EFFORT
 
     .. versionadded:: 2026.8.1
 
@@ -2390,6 +2391,7 @@ LLM judge
        * :setting:`JUDGE_MAX_UNITS_PER_RUN`
        * :setting:`JUDGE_REQUEST_SLEEP`
        * :setting:`JUDGE_MAY_APPROVE`
+       * :setting:`JUDGE_REASONING_EFFORT`
 
 
 Changing enabled apps, checks, formats, add-ons, machinery, or autofixes

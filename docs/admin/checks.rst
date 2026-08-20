@@ -175,6 +175,16 @@ checkbox; that same checkbox also gates whether a confirmed defect is
 repaired through the project's configured machine translation engine before
 being judged again.
 
+The judge is told what game it is reviewing from the project's
+:ref:`machine translation configuration <machine-translation-setup>`: the
+``persona`` and ``style`` fields of the engine the project uses for automatic
+translation, so the reviewer and the translator cannot hold different ideas of
+the setting and register. A project that configures neither is judged against
+the source, the string comment and the glossary alone, and the judge is
+instructed not to assume a genre; describing the project is therefore worth
+doing before a large run, because an unstated register is reported as a style
+error less often than a wrongly assumed one.
+
 .. seealso::
 
    * :ref:`auto-translation`

@@ -1884,6 +1884,26 @@ unless an administrator opts in explicitly.
 
    * :setting:`JUDGE_ENABLED`
 
+.. setting:: JUDGE_REASONING_EFFORT
+
+JUDGE_REASONING_EFFORT
+-----------------------
+
+.. versionadded:: 2026.8.1
+
+Reasoning budget requested from a model that supports one, as an OpenRouter
+``effort`` level (``minimal``, ``low``, ``medium`` or ``high``). Empty by
+default, which sends no reasoning parameter at all and leaves each model on
+its own default. Set it to cap the spend: on the first production-shaped run
+reasoning tokens accounted for most of the cost of one seat. The reasoning
+trace itself is always excluded from the response, because the judge reads
+only the structured verdict.
+
+.. seealso::
+
+   * :setting:`JUDGE_ENABLED`
+   * :setting:`JUDGE_BATCH_SIZE`
+
 .. setting:: PIWIK_SITE_ID
 .. setting:: MATOMO_SITE_ID
 

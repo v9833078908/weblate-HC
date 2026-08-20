@@ -117,6 +117,9 @@ WEBLATE_LOC_KIT_PROFILE_OPENROUTER_MODEL=google/gemini-2.5-flash
 #WEBLATE_JUDGE_MAX_UNITS_PER_RUN=2000
 #WEBLATE_JUDGE_REQUEST_SLEEP=0.0
 #WEBLATE_JUDGE_MAY_APPROVE=0
+# Empty sends no reasoning parameter at all; minimal/low/medium/high caps
+# the reasoning spend of a model that supports it.
+#WEBLATE_JUDGE_REASONING_EFFORT=
 
 # --- VCS ----------------------------------------------------------------
 # `http` is needed for the office SCM-Manager, which serves Git over plain
