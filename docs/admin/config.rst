@@ -1739,6 +1739,151 @@ seconds. Defaults to 3600 (one hour).
    * ``WEBLATE_RATELIMIT_LOC_KIT_ANALYSIS_ATTEMPTS``
    * ``WEBLATE_RATELIMIT_LOC_KIT_ANALYSIS_WINDOW``
 
+.. setting:: JUDGE_ENABLED
+
+JUDGE_ENABLED
+-------------
+
+.. versionadded:: 2026.8.1
+
+Enables the site-wide LLM judge, an :ref:`automatic translation <auto-translation>`
+mode that has two independently configured language models review every
+string a filter selects and record a per-string verdict (see
+:ref:`enforcing-checks` for how the resulting checks interact with the commit
+policy). Defaults to ``False``. When disabled, the ``judge`` automatic
+translation mode makes no network call and is refused before it can spend
+anything.
+
+.. seealso::
+
+   * :setting:`JUDGE_OPENROUTER_KEY`
+   * :setting:`JUDGE_MODEL_SEAT_1`
+   * :setting:`JUDGE_MODEL_SEAT_2`
+   * :setting:`JUDGE_MAY_APPROVE`
+
+.. setting:: JUDGE_OPENROUTER_KEY
+
+JUDGE_OPENROUTER_KEY
+---------------------
+
+.. versionadded:: 2026.8.1
+
+Site-wide OpenRouter API key used for the LLM judge. Leave empty to keep the
+judge disabled even when :setting:`JUDGE_ENABLED` is ``True``. This key is
+separate from any machine-translation provider configuration and from
+:setting:`LOC_KIT_PROFILE_OPENROUTER_KEY`; it is never exposed per-project or
+per-user, and it never appears in an error message.
+
+.. seealso::
+
+   * :setting:`JUDGE_ENABLED`
+
+.. setting:: JUDGE_MODEL_SEAT_1
+.. setting:: JUDGE_MODEL_SEAT_2
+
+JUDGE_MODEL_SEAT_1, JUDGE_MODEL_SEAT_2
+---------------------------------------
+
+.. versionadded:: 2026.8.1
+
+OpenRouter model identifiers for the two seats of the judge collegium. Both
+seats judge every string independently; the string's verdict is the
+strictest of the two, so a seat can never lower what the other seat found.
+Configuring the same model on both seats is a valid configuration, not an
+error. Both fields must be set, together with :setting:`JUDGE_OPENROUTER_KEY`,
+for :setting:`JUDGE_ENABLED` to have an effect.
+
+.. seealso::
+
+   * :setting:`JUDGE_ENABLED`
+
+.. setting:: JUDGE_MAX_REPAIR_ATTEMPTS
+
+JUDGE_MAX_REPAIR_ATTEMPTS
+--------------------------
+
+.. versionadded:: 2026.8.1
+
+Number of repair attempts the judge run makes for a string a confirmed
+defect (a ``flag`` or ``reject`` collegium verdict). Defaults to 1. A repair
+re-translates the string through the project's configured machine
+translation engine and both seats judge the result again; a string that is
+still ``flag`` or ``reject`` once the budget is spent keeps its last verdict
+and, for ``reject``, its :ref:`states` hold for the human queue.
+
+.. seealso::
+
+   * :setting:`JUDGE_ENABLED`
+
+.. setting:: JUDGE_BATCH_SIZE
+
+JUDGE_BATCH_SIZE
+-----------------
+
+.. versionadded:: 2026.8.1
+
+Number of strings sent to OpenRouter in a single judge request. Defaults to
+5. Both the per-string cost and the run's wall-clock time scale with this
+value: a smaller batch multiplies the number of requests, which increases
+both the run time and the risk of provider rate limiting.
+
+.. seealso::
+
+   * :setting:`JUDGE_ENABLED`
+   * :setting:`JUDGE_REQUEST_SLEEP`
+
+.. setting:: JUDGE_MAX_UNITS_PER_RUN
+
+JUDGE_MAX_UNITS_PER_RUN
+-------------------------
+
+.. versionadded:: 2026.8.1
+
+Maximum number of strings a single judge run may touch. Defaults to 2000. A
+run whose filter matches more strings than this is refused entirely, before
+any request is sent, so a broad filter cannot silently spend beyond this
+cap.
+
+.. seealso::
+
+   * :setting:`JUDGE_ENABLED`
+
+.. setting:: JUDGE_REQUEST_SLEEP
+
+JUDGE_REQUEST_SLEEP
+---------------------
+
+.. versionadded:: 2026.8.1
+
+Seconds to sleep between judge batches. Defaults to 0.0. Raise this on a
+provider or model that throttles a low-latency run; a batch that receives an
+HTTP 429 or 403 response is retried once with a longer sleep before its
+strings are marked unparsed.
+
+.. seealso::
+
+   * :setting:`JUDGE_ENABLED`
+   * :setting:`JUDGE_BATCH_SIZE`
+
+.. setting:: JUDGE_MAY_APPROVE
+
+JUDGE_MAY_APPROVE
+-------------------
+
+.. versionadded:: 2026.8.1
+
+Allows a ``pass`` collegium verdict to set the string to
+:ref:`approved <states>` instead of stopping at :guilabel:`Translated`, when
+the translation also has :ref:`workflow reviews <workflow-language-restrictions>`
+enabled. Defaults to ``False``. Off by default because measurement shows a
+``pass`` verdict is not a guarantee: it can still miss a genuine critical
+defect, so the judge does not hand out the review-bypassing approved state
+unless an administrator opts in explicitly.
+
+.. seealso::
+
+   * :setting:`JUDGE_ENABLED`
+
 .. setting:: PIWIK_SITE_ID
 .. setting:: MATOMO_SITE_ID
 

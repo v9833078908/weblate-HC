@@ -103,6 +103,21 @@ WEBLATE_LOC_KIT_PROFILE_ANALYSIS_ENABLED=0
 WEBLATE_LOC_KIT_PROFILE_OPENROUTER_KEY=
 WEBLATE_LOC_KIT_PROFILE_OPENROUTER_MODEL=google/gemini-2.5-flash
 
+# LLM judge (separate OpenRouter configuration, unrelated to both the
+# OpenRouter machinery configured in the web UI and the loc-kit profile
+# analysis above). Two seats judge every string independently; the same
+# model on both seats is a valid configuration. Fill the key and both
+# models, then switch the feature on.
+#WEBLATE_JUDGE_ENABLED=0
+#WEBLATE_JUDGE_OPENROUTER_KEY=
+#WEBLATE_JUDGE_MODEL_SEAT_1=
+#WEBLATE_JUDGE_MODEL_SEAT_2=
+#WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS=1
+#WEBLATE_JUDGE_BATCH_SIZE=5
+#WEBLATE_JUDGE_MAX_UNITS_PER_RUN=2000
+#WEBLATE_JUDGE_REQUEST_SLEEP=0.0
+#WEBLATE_JUDGE_MAY_APPROVE=0
+
 # --- VCS ----------------------------------------------------------------
 # `http` is needed for the office SCM-Manager, which serves Git over plain
 # HTTP only (http://192.168.0.3:8080/scm/git/<repo>).

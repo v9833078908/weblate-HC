@@ -2360,6 +2360,38 @@ Loc-kit glossary analysis
        * :setting:`LOC_KIT_IMPORT_DRAFT_EXPIRY`
 
 
+LLM judge
++++++++++
+
+.. envvar:: WEBLATE_JUDGE_ENABLED
+.. envvar:: WEBLATE_JUDGE_OPENROUTER_KEY
+.. envvar:: WEBLATE_JUDGE_MODEL_SEAT_1
+.. envvar:: WEBLATE_JUDGE_MODEL_SEAT_2
+.. envvar:: WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS
+.. envvar:: WEBLATE_JUDGE_BATCH_SIZE
+.. envvar:: WEBLATE_JUDGE_MAX_UNITS_PER_RUN
+.. envvar:: WEBLATE_JUDGE_REQUEST_SLEEP
+.. envvar:: WEBLATE_JUDGE_MAY_APPROVE
+
+    .. versionadded:: 2026.8.1
+
+    Configures the optional LLM judge :ref:`automatic translation
+    <auto-translation>` mode via OpenRouter. See :setting:`JUDGE_ENABLED` and
+    related settings.
+
+    .. seealso::
+
+       * :setting:`JUDGE_ENABLED`
+       * :setting:`JUDGE_OPENROUTER_KEY`
+       * :setting:`JUDGE_MODEL_SEAT_1`
+       * :setting:`JUDGE_MODEL_SEAT_2`
+       * :setting:`JUDGE_MAX_REPAIR_ATTEMPTS`
+       * :setting:`JUDGE_BATCH_SIZE`
+       * :setting:`JUDGE_MAX_UNITS_PER_RUN`
+       * :setting:`JUDGE_REQUEST_SLEEP`
+       * :setting:`JUDGE_MAY_APPROVE`
+
+
 Changing enabled apps, checks, formats, add-ons, machinery, or autofixes
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

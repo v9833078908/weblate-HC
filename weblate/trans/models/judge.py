@@ -293,11 +293,10 @@ def describe_latest_verdict(unit: Unit) -> str:
     lines: list[str] = []
     for row in active_round(unit):
         for error in row.errors:
-            line = "{}/{}: {}".format(
-                error.get("severity", "unspecified"),
-                error.get("category", "unspecified"),
-                escape(error.get("description", "")),
-            )
+            severity = error.get("severity", "unspecified")
+            category = error.get("category", "unspecified")
+            description = escape(error.get("description", ""))
+            line = f"{severity}/{category}: {description}"
             if line not in lines:
                 lines.append(line)
     return JUDGE_ERROR_SEPARATOR.join(lines)

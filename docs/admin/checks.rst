@@ -129,6 +129,59 @@ editing from being committed to the version control.
    * :ref:`additional`
    * :ref:`component-check_flags`
 
+
+.. _llm-judge:
+
+LLM judge
+---------
+
+.. versionadded:: 2026.8.1
+
+The LLM judge is an :ref:`automatic translation <auto-translation>` mode,
+:guilabel:`Add as translation with an LLM judge`, that has two independently
+configured language models review every string a filter selects. Turn it on
+with :setting:`JUDGE_ENABLED` and the related :setting:`JUDGE_OPENROUTER_KEY`,
+:setting:`JUDGE_MODEL_SEAT_1`, and :setting:`JUDGE_MODEL_SEAT_2` settings; the
+mode is off site-wide until all four are configured, and it requires the
+:guilabel:`Review strings` permission the same way
+:guilabel:`Add as approved translation` does.
+
+Both configured models (called seats) judge every selected string
+independently, and the string's verdict is the strictest of the two: a seat
+can never lower what the other seat found. Each seat's opinion, and any
+disagreement between them, is shown on the ``judge`` checks card of the
+string.
+
+The verdict maps to the checks ``judge-flag`` and ``judge-reject``, which
+behave like any other check for navigation, search, and the API (for example
+``check:judge-reject``), but never appear in the :guilabel:`Things to check`
+card and can never be added to a component's :ref:`component-enforced_checks`:
+a probabilistic opinion must not be treated as an enforced, deterministic
+fact.
+
+A ``reject`` verdict sets the string to :ref:`needs editing <states>`, which
+the :ref:`project-commit_policy` :guilabel:`Skip translations marked as
+needing editing` already excludes from being committed to version control
+the same way any other needs-editing string is excluded. This makes
+``reject`` a queue for a human decision, not an automatic guarantee that a
+broken translation never ships: verify with your own held-out sample before
+relying on it, and note that a ``pass`` verdict does not, on its own, move a
+string to :ref:`approved <states>` unless the site additionally sets
+:setting:`JUDGE_MAY_APPROVE`.
+
+A string with an existing translation is judged, not rewritten, unless the
+run explicitly turns on the :guilabel:`Overwrite the existing translation`
+checkbox; that same checkbox also gates whether a confirmed defect is
+repaired through the project's configured machine translation engine before
+being judged again.
+
+.. seealso::
+
+   * :ref:`auto-translation`
+   * :ref:`enforcing-checks`
+   * :ref:`project-commit_policy`
+   * :setting:`JUDGE_ENABLED`
+
 .. _fonts:
 
 Managing fonts
