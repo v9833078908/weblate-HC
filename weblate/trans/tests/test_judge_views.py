@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from django.test import override_settings
 from django.urls import reverse
 
@@ -132,3 +134,100 @@ class JudgeCheckVisibilityTest(ViewTestCase):
         self.assertIn("same", unit.all_checks_names)
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "Unchanged translation")
+
+
+class JudgeVerdictCardTest(ViewTestCase):
+    def make(self, unit, max_severity, *, unparsed=False, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", "c")
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        JudgeVerdict.objects.create(
+            unit=unit, max_severity=max_severity, unparsed=unparsed, **kwargs
+        )
+        unit.run_checks()
+
+    def make_reject(self, unit, **kw):
+        self.make(unit, "critical", **kw)
+
+    def make_flag(self, unit, **kw):
+        self.make(unit, "major", **kw)
+
+    def make_unparsed(self, unit, **kw):
+        self.make(unit, "none", unparsed=True, **kw)
+
+    def make_round(self, unit, *, seat1, seat2):
+        run_id = uuid.uuid4()
+        errors1 = (
+            []
+            if seat1 == "none"
+            else [{"span": "x", "category": "terminology", "severity": seat1,
+                   "description": "seat one's objection"}]
+        )
+        errors2 = (
+            []
+            if seat2 == "none"
+            else [{"span": "y", "category": "fluency", "severity": seat2,
+                   "description": "seat two's objection"}]
+        )
+        JudgeVerdict.objects.create(
+            unit=unit, max_severity=seat1, seat=1, run_id=run_id, errors=errors1,
+            judge_model="vendor/model-a",
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash="c",
+        )
+        JudgeVerdict.objects.create(
+            unit=unit, max_severity=seat2, seat=2, run_id=run_id, errors=errors2,
+            judge_model="vendor/model-b",
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash="c",
+        )
+        unit.run_checks()
+
+    def test_card_shows_the_verdict_and_the_model(self) -> None:
+        unit = self.get_unit()
+        self.make_reject(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "vendor/model-a")
+
+    def test_card_never_shows_a_score(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "id_judge_card")
+        self.assertNotContains(response, "confidence")
+
+    def test_card_shows_seat_disagreement(self) -> None:
+        unit = self.get_unit()
+        self.make_round(unit, seat1="critical", seat2="none")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "id_judge_card")
+        self.assertContains(response, "seat one&#x27;s objection")
+
+    def test_stale_verdict_is_marked_not_hidden(self) -> None:
+        unit = self.get_unit()
+        self.make_reject(unit, target_hash="stale-hash-matches-nothing")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "previous version")
+
+    def test_unparsed_is_not_shown_as_a_verdict(self) -> None:
+        unit = self.get_unit()
+        self.make_unparsed(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "rejected")
+
+    def test_no_verdict_means_no_card(self) -> None:
+        response = self.client.get(self.get_unit().get_absolute_url())
+        self.assertNotContains(response, "id_judge_card")
+
+    def test_context_changed_is_marked(self) -> None:
+        # Q3: glossary/note changed since judging -> flag it.
+        unit = self.get_unit()
+        self.make_reject(unit, context_hash="stale-context-hash")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "context changed")

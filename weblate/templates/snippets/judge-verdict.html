@@ -1,0 +1,111 @@
+{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_context_changed' in context #}
+
+{% load humanize i18n icons %}
+
+{% if judge_verdict or judge_stale %}
+  <div class="card" id="id_judge_card">
+    <div class="card-header">
+      <h4 class="card-title">{% translate "AI judge verdict" %}</h4>
+    </div>
+
+    <div class="list-group">
+      {% if judge_stale %}
+        <div class="list-group-item check">
+          <h5 class="list-group-item-heading">
+            {% icon "info.svg" %}
+            {% translate "Relates to a previous version" %}
+          </h5>
+          <p class="list-group-item-text">
+            {% translate "The judge's opinion below was recorded for an earlier version of this translation; it may no longer apply." %}
+          </p>
+        </div>
+      {% elif judge_verdict.verdict == "reject" %}
+        <div class="list-group-item check">
+          <h5 class="list-group-item-heading">
+            <span class="red">{% icon "cancel.svg" %}</span>
+            {% translate "Rejected" %}
+            <span class="badge text-bg-danger">{% translate "Will not ship" %}</span>
+          </h5>
+          <p class="list-group-item-text text-muted">
+            {% blocktranslate with model=judge_verdict.judge_model when=judge_verdict.timestamp|naturaltime %}{{ model }} · {{ when }}{% endblocktranslate %}
+          </p>
+          {% if judge_context_changed %}
+            <p class="list-group-item-text">
+              {% translate "The context changed (glossary or note updated) since this verdict was recorded." %}
+            </p>
+          {% endif %}
+          {% for seat in judge_seats %}
+            {% for error in seat.errors %}
+              <p class="list-group-item-text">
+                <strong>{{ error.category }}/{{ error.severity }}</strong>
+                ({% blocktranslate with model=seat.judge_model %}seat {{ model }}{% endblocktranslate %}):
+                {{ error.description }}
+              </p>
+            {% endfor %}
+          {% endfor %}
+          {% if judge_seats|length > 1 %}
+            <p class="list-group-item-text text-muted">
+              {% translate "Both judges reviewed this string independently." %}
+            </p>
+          {% endif %}
+        </div>
+      {% elif judge_verdict.verdict == "flag" %}
+        <div class="list-group-item check">
+          <h5 class="list-group-item-heading">
+            {% icon "flag.svg" %}
+            {% translate "Questionable" %}
+          </h5>
+          <p class="list-group-item-text text-muted">
+            {% blocktranslate with model=judge_verdict.judge_model when=judge_verdict.timestamp|naturaltime %}{{ model }} · {{ when }}{% endblocktranslate %}
+          </p>
+          {% if judge_context_changed %}
+            <p class="list-group-item-text">
+              {% translate "The context changed (glossary or note updated) since this verdict was recorded." %}
+            </p>
+          {% endif %}
+          {% for seat in judge_seats %}
+            {% for error in seat.errors %}
+              <p class="list-group-item-text">
+                <strong>{{ error.category }}/{{ error.severity }}</strong>
+                ({% blocktranslate with model=seat.judge_model %}seat {{ model }}{% endblocktranslate %}):
+                {{ error.description }}
+              </p>
+            {% endfor %}
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="list-group-item check">
+          <h5 class="list-group-item-heading">
+            <span class="green">{% icon "check.svg" %}</span>
+            {% translate "Accepted" %}
+          </h5>
+          <p class="list-group-item-text">
+            {% blocktranslate with model=judge_verdict.judge_model when=judge_verdict.timestamp|naturaltime %}{{ model }} · {{ when }}{% endblocktranslate %}
+          </p>
+          {% if judge_context_changed %}
+            <p class="list-group-item-text">
+              {% translate "The context changed (glossary or note updated) since this verdict was recorded." %}
+            </p>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% elif judge_round %}
+  <div class="card" id="id_judge_card">
+    <div class="card-header">
+      <h4 class="card-title">{% translate "AI judge verdict" %}</h4>
+    </div>
+    <div class="list-group">
+      <div class="list-group-item check">
+        <h5 class="list-group-item-heading">
+          {% icon "info.svg" %}
+          {% translate "Judge's answer was not parsed" %}
+        </h5>
+        <p class="list-group-item-text">
+          {% translate "The judge did not return a usable answer for this string. This is a transport failure, not an opinion about the translation." %}
+        </p>
+      </div>
+    </div>
+  </div>
+{% endif %}
