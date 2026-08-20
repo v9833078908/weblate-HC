@@ -190,9 +190,14 @@ class ProhibitedInitialCharacterCheck(TargetCheck):
 
     def check_single(self, source: str, target: str, unit: Unit) -> bool:
         """Check if the source string starts with a prohibited character."""
-        return (target and target[0] in PROHIBITED_INITIAL_CHARS) or (
-            source and source[0] in PROHIBITED_INITIAL_CHARS
-        )
+        # Only the term itself is checked. Glossary matching runs the source
+        # through cleanup_glossary_term, which strips these characters, so a
+        # term starting with one never matches the text it describes. A
+        # translation is never matched, is escaped by the CSV exporter, and is
+        # stripped the same way in the TSV handed to machine translation, so a
+        # character there is a formatting choice of the translator - a label
+        # shortened to "% disruption" for a narrow UI - and not a defect.
+        return bool(source) and source[0] in PROHIBITED_INITIAL_CHARS
 
     def get_description(self, check_obj) -> str:
         """Return description of the check."""

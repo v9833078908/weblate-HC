@@ -51,6 +51,7 @@ Weblate 2026.8.1
 * :ref:`check-xml-chars-around-tags` no longer reports a translation whose word ends with a combining mark, such as a Devanagari vowel sign or anusvara, and is skipped for languages which do not separate words with spaces, where a particle or suffix attached directly to a tagged word is correct.
 * :ref:`check-duplicate` no longer reports a number whose digits are grouped with spaces, such as ``100 000 000``, when the source groups them with a comma.
 * :ref:`check-multiple-failures` no longer counts a dismissed check, so a source string is reported only while its translations still have checks awaiting a decision.
+* :ref:`check-prohibited-initial-character` no longer reports a translation, only the glossary term it translates, so a translation shortened for a narrow interface can start with a character such as ``%``.
 
 .. rubric:: Compatibility
 

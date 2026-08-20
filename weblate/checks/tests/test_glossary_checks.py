@@ -226,6 +226,22 @@ class ProhibitedInitialCharacterCheckTest(ComponentTestCase):
             )
             self.assertTrue(self.check.check_target([term], [term], unit))
 
+    def test_prohibited_initial_character_in_target(self) -> None:
+        """A translation may start with a character the term may not."""
+        unit = self.glossary.add_unit(
+            None,
+            context="",
+            source="disruption chance",
+            target="% disruption chance",
+            author=self.user,
+        )
+        self.assertEqual(Check.objects.filter(name=self.check.check_id).count(), 0)
+        self.assertFalse(
+            self.check.check_target(
+                ["disruption chance"], ["% disruption chance"], unit
+            )
+        )
+
     def test_ignore_prohibited_initial_character(self) -> None:
         """Check that the check can be ignored with flag."""
         term = self.get_term()
