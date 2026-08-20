@@ -479,6 +479,10 @@ a translation for a new component using existing translations
 The automatically translated strings are labelled :guilabel:`Automatically
 translated`.
 
+A started run continues in the background. Its progress is shown at the top of
+every page you open until it finishes, so leaving the page or reloading it does
+not hide the status.
+
 .. seealso::
 
     :ref:`translation-consistency`

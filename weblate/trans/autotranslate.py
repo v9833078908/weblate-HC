@@ -282,6 +282,9 @@ def check_auto_translate_permission(
 class BaseAutoTranslate:
     updated: int = 0
     progress_steps: int = 0
+    # Slice of the overall task progress this instance reports into. A batch
+    # gives each translation its own slice so the percentage never goes back.
+    progress_range: tuple[int, int] = (0, 100)
 
     def __init__(
         self,
@@ -330,10 +333,11 @@ class BaseAutoTranslate:
 
     def set_progress(self, current: int) -> None:
         if current_task and current_task.request.id and self.progress_steps:
+            low, high = self.progress_range
             current_task.update_state(
                 state="PROGRESS",
                 meta=self.get_task_meta()
-                | {"progress": 100 * current // self.progress_steps},
+                | {"progress": low + (high - low) * current // self.progress_steps},
             )
 
 
@@ -981,6 +985,10 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     self.allow_non_shared_tm_source_components
                 ),
                 overwrite_existing=self.overwrite_existing,
+            )
+            auto_translate.progress_range = (
+                100 * (pos - 1) // self.progress_steps,
+                100 * pos // self.progress_steps,
             )
 
             effective_source_component_ids = source_component_ids

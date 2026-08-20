@@ -1602,6 +1602,16 @@ onReady(() => {
   });
 
   /* Generic messages progress */
+  /* A task started on this page is both flashed as a message and kept in the
+   * persistent list, so drop the repeated bars before polling starts. */
+  const seenTasks = new Set();
+  document.querySelectorAll("[data-task]").forEach((message) => {
+    if (seenTasks.has(message.dataset.task)) {
+      message.remove();
+      return;
+    }
+    seenTasks.add(message.dataset.task);
+  });
   const progressBars = document.querySelectorAll(".progress-bar");
   document.querySelectorAll("[data-task]").forEach((message) => {
     const bar = message.querySelector(".progress-bar");

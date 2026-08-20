@@ -475,6 +475,10 @@
         {% endfor %}
       {% endif %}
 
+      {% for task in user_tasks %}
+        {% show_message task.tags task.text %}
+      {% endfor %}
+
       {% if menu_items %}
         {% include 'snippets/menu.html' %}
       {% endif %}

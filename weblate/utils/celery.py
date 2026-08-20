@@ -15,6 +15,7 @@ from typing import Any
 
 from celery import Celery
 from celery.contrib.django.task import DjangoTask
+from celery.result import AsyncResult
 from celery.signals import after_setup_logger, before_task_publish, task_failure
 from django.conf import settings
 from django.core.cache import cache
@@ -77,6 +78,66 @@ def delete_task_metadata(task_id: str | None) -> None:
     if not task_id:
         return
     cache.delete(get_task_metadata_key(task_id))
+
+
+# Tasks the user started are kept for as long as their metadata, so a progress
+# bar can be restored on any page the user opens afterwards.
+USER_TASKS_TTL = TASK_METADATA_TTL
+# Celery answers PENDING for any task it does not know about, so an entry whose
+# task was lost (result backend flushed, task never delivered) would otherwise
+# sit at zero percent until the whole list expires.
+PENDING_TASK_MAX_AGE = 1800
+
+
+def get_user_tasks_key(user_id: int) -> str:
+    return f"user-tasks-{user_id}"
+
+
+def add_user_task(
+    user_id: int, task_id: str | None, *, text: str, label: str, url: str
+) -> None:
+    """Remember a background task started by the user."""
+    if not task_id:
+        return
+    key = get_user_tasks_key(user_id)
+    tasks = [task for task in cache.get(key, []) if task["id"] != task_id]
+    tasks.append(
+        {
+            "id": task_id,
+            "started": time.time(),
+            "text": str(text),
+            "label": str(label),
+            "url": url,
+        }
+    )
+    cache.set(key, tasks, USER_TASKS_TTL)
+
+
+def get_user_tasks(user_id: int) -> list[dict[str, Any]]:
+    """List running tasks started by the user, dropping the settled ones."""
+    if not settings.CELERY_RESULT_BACKEND:
+        # Without a result backend no task state can be read, so there is
+        # nothing to display and nothing to prune.
+        return []
+    key = get_user_tasks_key(user_id)
+    tasks = cache.get(key, [])
+    if not tasks:
+        return []
+    now = time.time()
+    running: list[dict[str, Any]] = []
+    for task in tasks:
+        result: AsyncResult = AsyncResult(task["id"])
+        if result.ready():
+            continue
+        if result.state == "PENDING" and now - task["started"] > PENDING_TASK_MAX_AGE:
+            continue
+        running.append(task)
+    if len(running) != len(tasks):
+        if running:
+            cache.set(key, running, USER_TASKS_TTL)
+        else:
+            cache.delete(key)
+    return running
 
 
 def extract_task_kwargs(body) -> dict[str, Any]:

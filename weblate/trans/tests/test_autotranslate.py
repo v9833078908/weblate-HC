@@ -9,9 +9,10 @@ from __future__ import annotations
 import threading
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import SimpleTestCase
@@ -31,7 +32,11 @@ from weblate.machinery.base import (
 )
 from weblate.machinery.dummy import DummyTranslation
 from weblate.trans.actions import ActionEvents
-from weblate.trans.autotranslate import BatchAutoTranslate, fetch_machinery_matches
+from weblate.trans.autotranslate import (
+    AutoTranslate,
+    BatchAutoTranslate,
+    fetch_machinery_matches,
+)
 from weblate.trans.forms import AutoForm
 from weblate.trans.models import (
     Change,
@@ -44,6 +49,13 @@ from weblate.trans.models import (
 )
 from weblate.trans.tasks import auto_translate, auto_translate_component
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.celery import (
+    PENDING_TASK_MAX_AGE,
+    add_user_task,
+    get_task_metadata,
+    get_user_tasks,
+    get_user_tasks_key,
+)
 from weblate.utils.state import STATE_APPROVED, STATE_READONLY, STATE_TRANSLATED
 from weblate.utils.stats import ProjectLanguage
 from weblate.workspaces.models import Workspace
@@ -512,6 +524,64 @@ class AutoTranslationTest(ViewTestCase):
             expected_count=1,
             expected=1,
         )
+
+    def test_progress_maps_into_assigned_range(self) -> None:
+        """A progress slice scales the reported percentage into itself."""
+        task = SimpleNamespace(
+            request=SimpleNamespace(id="task-progress"), update_state=Mock()
+        )
+        auto = AutoTranslate(
+            user=self.user,
+            translation=self.component2.translation_set.get(language_code="cs"),
+            q="state:<translated",
+            mode="translate",
+        )
+        auto.progress_steps = 4
+        auto.progress_range = (20, 40)
+
+        with patch("weblate.trans.autotranslate.current_task", task):
+            auto.set_progress(2)
+
+        self.assertEqual(
+            task.update_state.call_args.kwargs["meta"]["progress"],
+            30,
+        )
+
+    def test_batch_progress_never_goes_back(self) -> None:
+        """Each translation of a batch reports into its own progress slice."""
+        # Two languages get a source to copy, so both report progress of
+        # their own units on top of the per-translation steps of the batch.
+        self.make_different()
+        self.make_different("de")
+        task = SimpleNamespace(
+            request=SimpleNamespace(id="task-progress"), update_state=Mock()
+        )
+        auto = BatchAutoTranslate(
+            self.component2,
+            user=self.user,
+            q="state:<translated",
+            mode="translate",
+        )
+        self.assertGreater(len(auto.translations), 1)
+
+        with (
+            patch("weblate.trans.autotranslate.current_task", task),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            auto.perform(
+                auto_source="others",
+                engines=[],
+                threshold=100,
+                source_component_ids=[self.component.id],
+            )
+
+        progress_values = [
+            call.kwargs["meta"]["progress"] for call in task.update_state.call_args_list
+        ]
+        self.assertGreater(len(progress_values), len(auto.translations))
+        self.assertEqual(progress_values, sorted(progress_values))
+        self.assertEqual(progress_values[-1], 100)
+        self.assertGreaterEqual(min(progress_values), 0)
 
     def test_autotranslate_project_language_limited_membership(self) -> None:
         czech = Language.objects.get(code="cs")
@@ -1377,3 +1447,111 @@ class MachineryBatchFetchTest(SimpleTestCase):
         self.assertEqual(stored, [])
         self.assertEqual(len(first.batches), 2)
         self.assertEqual(len(second.batches), 2)
+
+
+@override_settings(CELERY_RESULT_BACKEND="redis://localhost:6379")
+class PersistentTaskProgressTest(ViewTestCase):
+    """Progress of a started automatic translation survives a page reload."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        self.task_id = "persistent-task"
+        # Every page render looks up task state; the test settings have no
+        # result backend to answer that.
+        patcher = patch("weblate.utils.celery.AsyncResult", self.running_task)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    @staticmethod
+    def running_task(task_id):
+        return SimpleNamespace(
+            id=task_id, result=None, state="PROGRESS", ready=lambda: False
+        )
+
+    def start_auto_translation(self, path: list[str]):
+        with (
+            override_settings(CELERY_TASK_ALWAYS_EAGER=False),
+            patch(
+                "weblate.trans.views.edit.auto_translate.delay",
+                return_value=SimpleNamespace(id=self.task_id),
+            ),
+        ):
+            return self.client.post(
+                reverse("auto_translation", kwargs={"path": path}),
+                {
+                    "auto_source": "others",
+                    "threshold": "100",
+                    "q": "state:<translated",
+                    "mode": "translate",
+                },
+                follow=True,
+            )
+
+    def test_project_language_task_is_authorized_and_kept(self) -> None:
+        # This scope passes neither component_id nor translation_id, so the
+        # task is only reachable through the user stored in its metadata.
+        project_language = ProjectLanguage(
+            self.project, language=Language.objects.get(code="cs")
+        )
+        self.start_auto_translation(project_language.get_url_path())
+
+        self.assertEqual(
+            get_task_metadata(self.task_id),
+            {
+                "component_id": None,
+                "translation_id": None,
+                "user_id": self.user.id,
+            },
+        )
+        stored = cache.get(get_user_tasks_key(self.user.id))
+        self.assertEqual(len(stored), 1)
+        self.assertEqual(stored[0]["id"], self.task_id)
+        self.assertEqual(stored[0]["text"], "Automatic translation in progress")
+        self.assertEqual(stored[0]["label"], str(project_language))
+        self.assertEqual(stored[0]["url"], project_language.get_absolute_url())
+
+        # The task detail is served instead of the 404 which hides the bar.
+        with patch("weblate.api.views.AsyncResult", self.running_task):
+            response = self.client.get(
+                reverse("api:task-detail", kwargs={"pk": self.task_id})
+            )
+        self.assertEqual(response.status_code, 200)
+
+    def test_progress_bar_is_rendered_on_an_unrelated_page(self) -> None:
+        self.start_auto_translation(self.translation.get_url_path())
+
+        # A fresh request has no flash message left, the bar comes from the
+        # stored task alone.
+        response = self.client.get(reverse("home"))
+
+        task_url = reverse("api:task-detail", kwargs={"pk": self.task_id})
+        self.assertContains(response, f'data-task="{task_url}"')
+        self.assertEqual(response.content.count(b"data-task="), 1)
+        self.assertContains(response, "Automatic translation in progress")
+
+    def test_finished_task_is_forgotten(self) -> None:
+        add_user_task(self.user.id, self.task_id, text="Work", label="Here", url="/")
+
+        with patch(
+            "weblate.utils.celery.AsyncResult",
+            return_value=SimpleNamespace(ready=lambda: True, state="SUCCESS"),
+        ):
+            self.assertEqual(get_user_tasks(self.user.id), [])
+
+        self.assertIsNone(cache.get(get_user_tasks_key(self.user.id)))
+
+    def test_lost_task_is_forgotten_once_stale(self) -> None:
+        add_user_task(self.user.id, self.task_id, text="Work", label="Here", url="/")
+        pending = SimpleNamespace(ready=lambda: False, state="PENDING")
+
+        with patch("weblate.utils.celery.AsyncResult", return_value=pending):
+            self.assertEqual(len(get_user_tasks(self.user.id)), 1)
+
+            key = get_user_tasks_key(self.user.id)
+            tasks = cache.get(key)
+            tasks[0]["started"] -= PENDING_TASK_MAX_AGE + 1
+            cache.set(key, tasks, 60)
+
+            self.assertEqual(get_user_tasks(self.user.id), [])

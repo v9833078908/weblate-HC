@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -15,6 +15,7 @@ import weblate.utils.version
 from weblate.configuration.views import CustomCSSView
 from weblate.legal.utils import get_document_context
 from weblate.trans.validators import SUGGESTION_REJECTION_REASON_LENGTH
+from weblate.utils.celery import get_user_tasks
 from weblate.utils.site import get_site_domain, get_site_url
 from weblate.utils.version_display import (
     hide_detailed_version,
@@ -127,10 +128,21 @@ def weblate_context(request: AuthenticatedHttpRequest):
     # Load user translations if user is authenticated
     watched_projects = None
     theme = "auto"
+    user_tasks: list[dict[str, Any]] = []
     user = getattr(request, "user", None)
     if user is not None and user.is_authenticated:
         watched_projects = user.watched_projects
         theme = user.profile.theme
+        user_tasks = [
+            task
+            | {
+                "tags": f"info task:{task['id']}",
+                "text": format_html(
+                    '{}: <a href="{}">{}</a>', task["text"], task["url"], task["label"]
+                ),
+            }
+            for task in get_user_tasks(user.pk)
+        ]
 
     if settings.OFFER_HOSTING:
         description = gettext(
@@ -185,6 +197,7 @@ def weblate_context(request: AuthenticatedHttpRequest):
         "preconnect_list": get_preconnect_list(),
         "custom_css_hash": CustomCSSView.get_hash(request),
         "theme": theme,
+        "user_tasks": user_tasks,
     }
 
     add_settings_context(context)
