@@ -21,6 +21,7 @@ from weblate.logger import LOGGER
 from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.models import MACHINERY
 from weblate.trans.actions import ActionEvents
+from weblate.trans.judge_loop import run_judge_batch
 from weblate.trans.models import (
     Category,
     Component,
@@ -342,6 +343,7 @@ class AutoTranslate(BaseAutoTranslate):
         component_wide: bool = False,
         unit_ids: list[int] | None = None,
         allow_non_shared_tm_source_components: bool = False,
+        overwrite_existing: bool = False,
     ) -> None:
         super().__init__(
             user=user,
@@ -358,6 +360,10 @@ class AutoTranslate(BaseAutoTranslate):
         self.progress_base = 0
         self.written: set[int] = set()
         self.target_state = STATE_TRANSLATED
+        self.overwrite_existing = overwrite_existing
+        # D2/fail-safe: a judge translation never starts shippable; the
+        # verdict decides the final state per string.
+        self.fresh_translation_state = STATE_FUZZY
         if self.mode == "fuzzy":
             self.target_state = STATE_FUZZY
         elif self.mode == "approved" and translation.enable_review:
@@ -711,6 +717,63 @@ class AutoTranslate(BaseAutoTranslate):
         self.written.update(translations)
         self.set_progress(self.progress_base + len(self.written))
 
+    def process_judge(self, *, engines: list[str], threshold: int) -> None:
+        from weblate.trans.models.judge import JudgeVerdict, state_for_verdict
+
+        units = list(self.get_units().select_related("source_unit"))
+        if len(units) > settings.JUDGE_MAX_UNITS_PER_RUN:
+            self.failure_message = ngettext(
+                "Judge run refused: %(n)d string exceeds the per-run cap of %(cap)d.",
+                "Judge run refused: %(n)d strings exceed the per-run cap of %(cap)d.",
+                len(units),
+            ) % {"n": len(units), "cap": settings.JUDGE_MAX_UNITS_PER_RUN}
+            return
+        writable_ids = {
+            unit.id
+            for unit in units
+            if (not unit.translated or self.overwrite_existing)
+        }
+
+        # Phase 1: pre-translate the writable strings via the native MT
+        # path, scoped by unit_ids, written at needs-editing. Reuses
+        # process_mt / fetch_mt / store_results / update — no second
+        # write path (plan mechanism 5).
+        if writable_ids:
+            saved_ids, saved_state = self.unit_ids, self.target_state
+            self.unit_ids = list(writable_ids)
+            self.target_state = self.fresh_translation_state
+            try:
+                self.process_mt(engines, threshold)
+            finally:
+                self.unit_ids, self.target_state = saved_ids, saved_state
+
+        # Phase 2: judge everything in q; the state is decided per verdict.
+        verdicts = run_judge_batch(units, writable_ids=writable_ids, user=self.user)
+        unparsed = 0
+        for unit in units:
+            verdict = verdicts.get(unit.id)
+            if verdict is None:
+                continue
+            if verdict.verdict == JudgeVerdict.Verdict.UNPARSED:
+                unparsed += 1
+            state = state_for_verdict(
+                verdict.verdict,
+                enable_review=self.translation.enable_review,
+                may_approve=settings.JUDGE_MAY_APPROVE,
+            )
+            if state is not None and unit.state != state:
+                self.update(unit, state, unit.get_target_plurals())
+        if unparsed:  # D5: never a silent no-op on money spent
+            self.add_warning(
+                ngettext(
+                    "%d string was left unjudged (the judge did not answer).",
+                    "%d strings were left unjudged (the judge did not answer).",
+                    unparsed,
+                )
+                % unparsed
+            )
+        self.post_process()
+
     def perform(
         self,
         *,
@@ -731,6 +794,9 @@ class AutoTranslate(BaseAutoTranslate):
             else ", ".join(str(item) for item in source_component_ids or []),
         )
         try:
+            if self.mode == "judge":
+                self.process_judge(engines=engines, threshold=threshold)
+                return self.get_message()
             if auto_source == "mt":
                 self.process_mt(engines, threshold)
             else:
