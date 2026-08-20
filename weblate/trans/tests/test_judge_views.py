@@ -231,3 +231,51 @@ class JudgeVerdictCardTest(ViewTestCase):
         self.make_reject(unit, context_hash="stale-context-hash")
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "context changed")
+
+
+class JudgeBackTranslationTest(ViewTestCase):
+    def make_flag(self, unit, *, back_translation, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", "c")
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        JudgeVerdict.objects.create(
+            unit=unit, max_severity="major", model_verdict="flag",
+            back_translation=back_translation, **kwargs,
+        )
+        unit.run_checks()
+
+    def test_back_translation_renders_next_to_the_string(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(unit, back_translation="The door is blocked by the DOORS")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "The door is blocked by the DOORS")
+
+    def test_back_translation_is_labelled_as_a_reconstruction(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(unit, back_translation="Whatever")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Approximate reconstruction")
+
+    def test_stale_verdict_does_not_render_its_back_translation(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(
+            unit, back_translation="Outdated",
+            target_hash="stale-hash-matches-nothing",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Outdated")
+
+    def test_back_translation_shows_without_secondary_languages(self) -> None:
+        # Q6: the block must live outside {% if secondary %}.
+        unit = self.get_unit()  # this test project has no secondary languages
+        self.make_flag(unit, back_translation="Visible anyway")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Visible anyway")
+
+    def test_empty_back_translation_renders_nothing(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(unit, back_translation="")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Approximate reconstruction")
