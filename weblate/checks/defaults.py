@@ -90,4 +90,6 @@ DEFAULT_CHECK_LIST: tuple[str, ...] = (
     "weblate.checks.fluent.references.FluentReferencesCheck",
     "weblate.checks.fluent.inner_html.FluentSourceInnerHTMLCheck",
     "weblate.checks.fluent.inner_html.FluentTargetInnerHTMLCheck",
+    "weblate.checks.judge.JudgeFlagCheck",
+    "weblate.checks.judge.JudgeRejectCheck",
 )
