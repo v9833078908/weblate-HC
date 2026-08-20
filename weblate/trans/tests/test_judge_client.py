@@ -312,6 +312,28 @@ class JudgeUsageLogTest(TestCase):
         JUDGE_REQUEST_SLEEP=0.0,
     )
     @http_mock.activate
+    def test_usage_is_attributed_to_the_project(self) -> None:
+        # The judge is a paid path outside machinery, which records the
+        # project of every paid request (machinery/openai.py:147). Without
+        # the slug, llm_usage_report cannot bill a judge run to anyone.
+        payload = _reply(
+            [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+        )
+        payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
+        http_mock.register("POST", CHAT_URL, json=payload)
+        request_verdicts([REQ], model="vendor/model-a", project_slug="need-for-greed")
+        self.assertEqual(
+            LLMUsageLog.objects.get(model="vendor/model-a").project_slug,
+            "need-for-greed",
+        )
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
     def test_usage_is_not_recorded_when_the_batch_fails_to_parse(self) -> None:
         http_mock.register(
             "POST", CHAT_URL, json={"choices": [{"message": {"content": "not json"}}]}

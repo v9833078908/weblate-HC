@@ -127,6 +127,10 @@ def run_judge_batch(
     queue (applied by the caller from state_for_verdict).
     """
     run_id = uuid.uuid4()
+    # Accounting must be symmetric with machinery, which attributes every
+    # paid request to a project (machinery/openai.py:147). All units of a
+    # run share one translation, so the slug is read once.
+    project_slug = units[0].translation.component.project.slug if units else ""
     pending = list(units)
     verdicts: dict[int, JudgeVerdict] = {}
     attempts = settings.JUDGE_MAX_REPAIR_ATTEMPTS
@@ -141,7 +145,7 @@ def run_judge_batch(
         # between the two calls (B2': a cascade loses recall).
         for seat, model in seats:
             requests = [build_request(unit) for unit in pending]
-            results = request_verdicts(requests, model=model)
+            results = request_verdicts(requests, model=model, project_slug=project_slug)
             with transaction.atomic():
                 for unit, result in zip(pending, results, strict=True):
                     _write_verdict(unit, seat, attempt, run_id, result, model)

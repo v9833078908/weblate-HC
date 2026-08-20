@@ -199,7 +199,7 @@ def _max_severity(errors: list) -> str:
 JudgeSeverityOrdered = ("none", "minor", "major", "critical")
 
 
-def _write_llm_usage(payload: dict, model: str) -> None:
+def _write_llm_usage(payload: dict, model: str, project_slug: str) -> None:
     usage = payload.get("usage")
     if not isinstance(usage, dict):
         return
@@ -213,7 +213,7 @@ def _write_llm_usage(payload: dict, model: str) -> None:
     completion_details = usage.get("completion_tokens_details") or {}
     LLMUsageLog.objects.create(
         model=model,
-        project_slug="",
+        project_slug=project_slug,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         total_tokens=total_tokens,
@@ -224,7 +224,7 @@ def _write_llm_usage(payload: dict, model: str) -> None:
     )
 
 
-def _record_usage(payload: dict, model: str) -> None:
+def _record_usage(payload: dict, model: str, project_slug: str) -> None:
     """
     Mirror machinery's record_llm_usage (never raises).
 
@@ -233,7 +233,7 @@ def _record_usage(payload: dict, model: str) -> None:
     mechanism, so accounting must be symmetric.
     """
     try:
-        _write_llm_usage(payload, model)
+        _write_llm_usage(payload, model, project_slug)
     except Exception:
         LOGGER.exception("Failed to record LLM usage")
 
@@ -340,7 +340,7 @@ def _post_batch(payload: dict, model: str) -> dict | None:
 
 
 def request_verdicts(
-    requests: Sequence[JudgeRequest], *, model: str
+    requests: Sequence[JudgeRequest], *, model: str, project_slug: str = ""
 ) -> list[JudgeResult]:
     """
     Judge every request; results in input order.
@@ -401,7 +401,7 @@ def request_verdicts(
             if raw is not None:
                 parsed = _parse_reply(raw, len(batch))
                 if parsed is not None:
-                    _record_usage(raw, model)
+                    _record_usage(raw, model, project_slug)
                     break
             if attempt == 0:
                 time.sleep(sleep * 2 + 1.0)

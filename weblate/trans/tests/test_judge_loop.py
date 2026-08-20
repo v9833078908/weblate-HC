@@ -88,6 +88,13 @@ class JudgeLoopTest(ViewTestCase):
         models = [c.kwargs["model"] for c in client.call_args_list]
         self.assertEqual(models, ["vendor-a/model", "vendor-b/model"])
 
+    def test_every_seat_bills_the_units_project(self) -> None:
+        # Without this the paid judge requests land in LLMUsageLog with a
+        # blank project and llm_usage_report cannot attribute the spend.
+        unit, _, client = self.run_batch([PASS, PASS])
+        slugs = {c.kwargs["project_slug"] for c in client.call_args_list}
+        self.assertEqual(slugs, {unit.translation.component.project.slug})
+
     def test_unparsed_neither_raises_nor_lowers_the_other_seat(self) -> None:
         _, verdict, _ = self.run_batch([CRITICAL, DEAD], repair=None)
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
