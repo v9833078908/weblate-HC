@@ -218,3 +218,26 @@ class MultipleFailingCheckTestCase(FixtureTestCase):
         self.assertIn("same", checked_child_unit.all_checks_names)
         self.check.perform_batch(self.component)
         self.assertTrue(self.check.check_source([], source_unit))
+
+    def test_multiple_failures_dismissed(self) -> None:
+        for unit in Unit.objects.filter(
+            translation__component=self.component, source__startswith="Hello, world!\n"
+        ):
+            if not unit.is_source:
+                self.edit_unit(
+                    unit.source,
+                    unit.source,
+                    unit.translation.language.code,
+                    True,
+                    unit.translation,
+                )
+        source_unit = self.get_unit(language="en")
+        child_unit = source_unit.unit_set.exclude(pk=source_unit.id).first()
+        self.assertIsNotNone(child_unit)
+        cast("Unit", child_unit).run_checks()
+        self.assertTrue(self.check.check_source([], source_unit))
+        # A dismissed check is not a failing one anywhere else in Weblate
+        Check.objects.filter(unit__source_unit=source_unit).exclude(
+            unit=source_unit
+        ).update(dismissed=True)
+        self.assertFalse(self.check.check_source([], source_unit))
