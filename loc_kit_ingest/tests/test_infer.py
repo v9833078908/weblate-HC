@@ -181,3 +181,37 @@ def test_prose_header_keeps_the_plain_developer_comment_note():
 
     assert any(note.endswith("-> developer comment") for note in notes)
     assert not any("looks like a language code" in note for note in notes)
+
+
+def test_section_banner_rows_are_skipped_and_leave_the_fill_share_intact():
+    # Shipped kits break the sheet into sections with a caption whose text
+    # sits in a comment column, and with a marker key. Neither row holds a
+    # string, so both must be skipped instead of failing the whole kit.
+    rows = [
+        ["ID", "COMMENTS", "RU", "EN"],
+        ["", "МЕНЮ", "", ""],
+        ["Continue", "", "Продолжить", "Continue"],
+        ["# Юниты", "", "", ""],
+        ["Tank", "", "Танк", "Tank"],
+    ]
+    document, notes = infer_component("Sheet1", rows, component="Test")
+
+    assert document["grammar"]["skip_rows"] == [2, 4]
+    assert document["first_data_row"] == 2
+    # Banners leave the denominator, so a fully translated column reads 100%.
+    assert any("-> language en (2/2 rows, 100.0%)" in note for note in notes)
+    assert any("skipped as section banners: row(s) 2, 4" in note for note in notes)
+
+
+def test_a_real_key_without_any_text_is_not_treated_as_a_banner():
+    # A hole in the kit: the key names a string that no language provides.
+    # Skipping it would hide the omission, so it must reach the parser and
+    # fail there as po.key_without_content.
+    rows = [
+        ["id", "ru", "en"],
+        ["line_1", "Привет", "Hello"],
+        ["line_2", "", ""],
+    ]
+    document, _notes = infer_component("Sheet1", rows, component="Test")
+
+    assert document["grammar"]["skip_rows"] == []
