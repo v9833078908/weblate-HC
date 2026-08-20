@@ -112,7 +112,10 @@ XML_ENTITY_MATCH = re.compile(
 )
 XML_CDATA_MATCH = re.compile(r"<!\[CDATA\[(.*?)]]>")
 
-SINGLE_LETTER_MATCH = regex.compile(r"\p{L}")
+# A letter for the purpose of comparing characters adjacent to XML tags.
+# Combining marks are included, because a word in Devanagari and similar scripts
+# commonly ends with a vowel sign or anusvara, which belongs to the word.
+LETTER_OR_MARK_MATCH = regex.compile(r"[\p{L}\p{M}]")
 
 # Arabic letter Waw ("و", meaning "and") is a conjunction that commonly attaches
 # directly to the adjacent word without a space
@@ -456,6 +459,14 @@ class XMLCharsAroundTagsCheck(BaseXMLCheck):
         "Characters surrounding XML tags in translation do not align with source."
     )
 
+    def should_skip(self, unit: Unit) -> bool:
+        # A language which does not separate words with spaces, and which attaches
+        # grammatical particles directly to the preceding word, can not align the
+        # character adjacent to a tag with a space-separated source.
+        if not unit.translation.language.uses_whitespace():
+            return True
+        return super().should_skip(unit)
+
     def check_single(self, source: str, target: str, unit: Unit) -> bool:
         src_tags = list(XML_MATCH.finditer(source))
         tgt_tags = list(XML_MATCH.finditer(target))
@@ -497,8 +508,8 @@ class XMLCharsAroundTagsCheck(BaseXMLCheck):
         return False
 
     def char_check(self, src_char: str, tgt_char: str) -> bool:
-        src_letter = bool(SINGLE_LETTER_MATCH.search(src_char))
-        tgt_letter = bool(SINGLE_LETTER_MATCH.search(tgt_char))
+        src_letter = bool(LETTER_OR_MARK_MATCH.search(src_char))
+        tgt_letter = bool(LETTER_OR_MARK_MATCH.search(tgt_char))
         if not src_letter ^ tgt_letter:
             return False
         # Arabic letter Waw ("و") is a conjunction that commonly attaches directly

@@ -45,6 +45,8 @@ Weblate 2026.8.1
 * Large language model machine translation services now require the translation to end with the same punctuation as the source, and to repair an existing translation that fails a check instead of treating the check as context only.
 * A machine translation service answering HTTP 429 or 503 is now asked again after a delay instead of being stopped for everyone for half an hour, which used to leave the rest of an :ref:`automatic translation <auto-translation>` run untranslated without saying so. A stop that does happen is now reported as a warning of the run.
 * A large language model service refused because the upstream capacity for its model is momentarily full is now left alone for a minute instead of half an hour, and the batches skipped meanwhile are asked again once the stop passes, so such a refusal costs a moment of an :ref:`automatic translation <auto-translation>` run rather than its remaining strings.
+* :ref:`check-xml-chars-around-tags` no longer reports a translation whose word ends with a combining mark, such as a Devanagari vowel sign or anusvara, and is skipped for languages which do not separate words with spaces, where a particle or suffix attached directly to a tagged word is correct.
+* :ref:`check-duplicate` no longer reports a number whose digits are grouped with spaces, such as ``100 000 000``, when the source groups them with a comma.
 
 .. rubric:: Compatibility
 
