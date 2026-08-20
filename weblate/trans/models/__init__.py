@@ -30,6 +30,7 @@ from weblate.trans.models.change import Change
 from weblate.trans.models.comment import Comment, schedule_comment_stats_update
 from weblate.trans.models.component import Component, ComponentLink
 from weblate.trans.models.componentlist import AutoComponentList, ComponentList
+from weblate.trans.models.judge import JudgeVerdict
 from weblate.trans.models.label import Label
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.models.loc_kit import LocKitImportDraft
@@ -61,6 +62,7 @@ __all__ = [
     "ComponentLink",
     "ComponentList",
     "ContributorAgreement",
+    "JudgeVerdict",
     "LLMUsageLog",
     "Label",
     "LocKitImportDraft",
