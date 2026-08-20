@@ -1678,6 +1678,48 @@ LOC_KIT_IMPORT_DRAFT_EXPIRY = trans_defaults.clamp_loc_kit_import_draft_expiry(
     )
 )
 
+# LLM judge (off by default). The judge sends component strings to
+# OpenRouter; see docs/security/threat-model.rst. The API base URL is
+# fixed and not configurable here.
+JUDGE_ENABLED = get_env_bool(
+    "WEBLATE_JUDGE_ENABLED",
+    trans_defaults.DEFAULT_JUDGE_ENABLED,
+)
+JUDGE_OPENROUTER_KEY = get_env_str(
+    "WEBLATE_JUDGE_OPENROUTER_KEY",
+    trans_defaults.DEFAULT_JUDGE_OPENROUTER_KEY,
+)
+JUDGE_MODEL_SEAT_1 = get_env_str(
+    "WEBLATE_JUDGE_MODEL_SEAT_1",
+    trans_defaults.DEFAULT_JUDGE_MODEL_SEAT_1,
+)
+JUDGE_MODEL_SEAT_2 = get_env_str(
+    "WEBLATE_JUDGE_MODEL_SEAT_2",
+    trans_defaults.DEFAULT_JUDGE_MODEL_SEAT_2,
+)
+JUDGE_MAX_REPAIR_ATTEMPTS = get_env_int(
+    "WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS",
+    trans_defaults.DEFAULT_JUDGE_MAX_REPAIR_ATTEMPTS,
+)
+JUDGE_BATCH_SIZE = get_env_int(
+    "WEBLATE_JUDGE_BATCH_SIZE",
+    trans_defaults.DEFAULT_JUDGE_BATCH_SIZE,
+)
+JUDGE_MAX_UNITS_PER_RUN = get_env_int(
+    "WEBLATE_JUDGE_MAX_UNITS_PER_RUN",
+    trans_defaults.DEFAULT_JUDGE_MAX_UNITS_PER_RUN,
+)
+JUDGE_REQUEST_SLEEP = float(
+    get_env_str(
+        "WEBLATE_JUDGE_REQUEST_SLEEP",
+        str(trans_defaults.DEFAULT_JUDGE_REQUEST_SLEEP),
+    )
+)
+JUDGE_MAY_APPROVE = get_env_bool(
+    "WEBLATE_JUDGE_MAY_APPROVE",
+    trans_defaults.DEFAULT_JUDGE_MAY_APPROVE,
+)
+
 ADDITIONAL_CONFIG = Path("/app/data/settings-override.py")
 if ADDITIONAL_CONFIG.exists():
     code = compile(

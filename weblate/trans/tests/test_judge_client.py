@@ -1,0 +1,217 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from __future__ import annotations
+
+import json
+
+from django.test import SimpleTestCase, TestCase, override_settings
+
+from weblate.trans.judge import (
+    JudgeError,
+    JudgeRequest,
+    render_preview,
+    request_verdicts,
+)
+from weblate.utils.tests import http_mock
+
+CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+REQ = JudgeRequest(
+    unit_key="MENU_DOOR",
+    source="Дверь заблокирована ГЕРМОДВЕРЬМИ",
+    target="La porte est bloquée par les PORTES",
+    source_language="ru",
+    target_language="fr",
+    note="",
+    glossary_terms=[("ГЕРМОДВЕРЬ", "porte blindée")],
+    failing_checks=[],
+)
+
+
+def _reply(segments: list[dict]) -> dict:
+    content = json.dumps({"segments": segments})
+    return {"choices": [{"message": {"content": content}}]}
+
+
+class JudgeClientGateTest(SimpleTestCase):
+    @override_settings(JUDGE_ENABLED=False)
+    @http_mock.activate
+    def test_disabled_makes_no_network_call(self) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(JUDGE_ENABLED=True, JUDGE_OPENROUTER_KEY="")
+    @http_mock.activate
+    def test_missing_key_makes_no_network_call(self) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @http_mock.activate
+    def test_missing_model_makes_no_network_call(self) -> None:
+        with override_settings(JUDGE_ENABLED=True, JUDGE_OPENROUTER_KEY="sk-test"):
+            with self.assertRaises(JudgeError):
+                request_verdicts([REQ], model="")
+        self.assertEqual(len(http_mock.calls), 0)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test-do-not-leak",
+    JUDGE_BATCH_SIZE=5,
+    JUDGE_REQUEST_SLEEP=0.0,
+)
+class JudgeClientTest(SimpleTestCase):
+    @http_mock.activate
+    def test_parses_a_verdict(self) -> None:
+        http_mock.register("POST", CHAT_URL, json=_reply([{
+            "id": 0, "verdict": "reject",
+            "errors": [{"span": "PORTES", "category": "terminology",
+                        "severity": "critical",
+                        "description": "«ВРАТА» rendered as «DOORS»; glossary says Gates"}],
+            "back_translation": "The door is blocked by the DOORS",
+        }]))
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertFalse(result.unparsed)
+        self.assertEqual(result.max_severity, "critical")   # derived from errors
+        self.assertEqual(result.model_verdict, "reject")
+        self.assertIn("Gates", result.errors[0]["description"])
+        self.assertIn("DOORS", result.back_translation)
+
+    @http_mock.activate
+    def test_max_severity_is_derived_from_the_worst_error(self) -> None:
+        http_mock.register("POST", CHAT_URL, json=_reply([{
+            "id": 0, "verdict": "flag",
+            "errors": [
+                {"span": "a", "category": "fluency", "severity": "minor", "description": "x"},
+                {"span": "b", "category": "fluency", "severity": "major", "description": "y"},
+            ],
+            "back_translation": "",
+        }]))
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(result.max_severity, "major")
+
+    @http_mock.activate
+    def test_no_errors_is_severity_none(self) -> None:
+        http_mock.register("POST", CHAT_URL, json=_reply([{
+            "id": 0, "verdict": "pass", "errors": [], "back_translation": "",
+        }]))
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(result.max_severity, "none")
+
+    @http_mock.activate
+    def test_batches_many_requests_and_keeps_order(self) -> None:
+        # D6: one HTTP call per batch of JUDGE_BATCH_SIZE, results aligned
+        # to input order by segment id.
+        reqs = [REQ, REQ, REQ]
+        http_mock.register("POST", CHAT_URL, json=_reply([
+            {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""},
+            {"id": 1, "verdict": "reject",
+             "errors": [{"span": "x", "category": "omission", "severity": "critical",
+                         "description": "z"}], "back_translation": ""},
+            {"id": 2, "verdict": "pass", "errors": [], "back_translation": ""},
+        ]))
+        results = request_verdicts(reqs, model="vendor/model-a")
+        self.assertEqual([r.max_severity for r in results], ["none", "critical", "none"])
+        self.assertEqual(len(http_mock.calls), 1)
+
+    @http_mock.activate
+    def test_sends_strict_schema_batch_and_requires_providers_to_honour_it(self) -> None:
+        http_mock.register("POST", CHAT_URL, json=_reply([
+            {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]))
+        request_verdicts([REQ], model="vendor/model-a")
+        body = json.loads(http_mock.calls[0].request.content)
+        self.assertTrue(body["response_format"]["json_schema"]["strict"])
+        self.assertTrue(body["provider"]["require_parameters"])
+        self.assertEqual(body["model"], "vendor/model-a")
+        user_msg = json.loads(body["messages"][1]["content"])
+        self.assertIn("segments", user_msg)
+
+    @http_mock.activate
+    def test_render_preview_is_attached_when_placeholders_are_present(self) -> None:
+        # Arm D: rendered pair goes into the segment (user precondition).
+        req = JudgeRequest(
+            unit_key="K", source="{0} 个国家 {1}", target="{1} 的 {0}",
+            source_language="ru", target_language="zh_Hans", note="",
+            glossary_terms=[], failing_checks=[],
+        )
+        http_mock.register("POST", CHAT_URL, json=_reply([
+            {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]))
+        request_verdicts([req], model="vendor/model-a")
+        body = json.loads(http_mock.calls[0].request.content)
+        segment = json.loads(body["messages"][1]["content"])["segments"][0]
+        self.assertIn("rendered_source", segment)
+        self.assertIn("rendered_target", segment)
+
+    def test_render_preview_returns_none_without_placeholders(self) -> None:
+        self.assertIsNone(render_preview("plain text"))
+        self.assertIsNotNone(render_preview("has {0} slot"))
+
+    @http_mock.activate
+    def test_malformed_json_makes_the_batch_unparsed(self) -> None:
+        http_mock.register("POST", CHAT_URL,
+                           json={"choices": [{"message": {"content": "not json"}}]})
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+
+    @http_mock.activate
+    def test_http_error_makes_the_batch_unparsed(self) -> None:
+        http_mock.register("POST", CHAT_URL, status_code=500, json={})
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+
+    @http_mock.activate
+    def test_the_api_key_never_reaches_the_exception_text(self) -> None:
+        # A gate failure raises; the key must not be in the message.
+        with override_settings(JUDGE_ENABLED=True, JUDGE_OPENROUTER_KEY=""):
+            with self.assertRaises(JudgeError) as ctx:
+                request_verdicts([REQ], model="vendor/model-a")
+            self.assertNotIn("sk-test", str(ctx.exception))
+
+
+class JudgeUsageLogTest(TestCase):
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_is_recorded_for_a_successful_batch(self) -> None:
+        from weblate.trans.models.llm_usage import LLMUsageLog
+
+        http_mock.register("POST", CHAT_URL, json={
+            "choices": [{"message": {"content": json.dumps({"segments": [
+                {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""},
+            ]})}}],
+            "usage": {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0.001,
+                      "prompt_tokens_details": {"cached_tokens": 2},
+                      "completion_tokens_details": {"reasoning_tokens": 1}},
+            "id": "resp-1",
+        })
+        request_verdicts([REQ], model="vendor/model-a")
+        row = LLMUsageLog.objects.get(model="vendor/model-a")
+        self.assertEqual(row.prompt_tokens, 11)
+        self.assertEqual(row.completion_tokens, 7)
+        self.assertEqual(row.total_tokens, 18)
+        self.assertEqual(row.cached_tokens, 2)
+        self.assertEqual(row.reasoning_tokens, 1)
+        self.assertEqual(row.response_id, "resp-1")
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_is_not_recorded_when_the_batch_fails_to_parse(self) -> None:
+        from weblate.trans.models.llm_usage import LLMUsageLog
+
+        http_mock.register("POST", CHAT_URL,
+                           json={"choices": [{"message": {"content": "not json"}}]})
+        request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(LLMUsageLog.objects.count(), 0)
