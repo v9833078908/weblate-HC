@@ -12,6 +12,7 @@ from weblate.trans.judge import JudgeResult
 from weblate.trans.judge_loop import run_judge_batch
 from weblate.trans.models.judge import JudgeVerdict
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.state import STATE_TRANSLATED
 
 
 def result(severity, verdict, **kw):
@@ -121,7 +122,7 @@ class JudgeLoopTest(ViewTestCase):
         # D3/A3: overwrite off => the unit is not in writable_ids => a
         # false critical never rewrites the human translation.
         unit = self.get_unit()
-        unit.translate(self.user, ["Human translation"], 20)
+        unit.translate(self.user, ["Human translation"], STATE_TRANSLATED)
         _, _verdict, _client = self.run_batch(
             [CRITICAL, CRITICAL], repair=["MACHINE OVERWRITE"], writable=False
         )

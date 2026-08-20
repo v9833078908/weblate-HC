@@ -92,7 +92,7 @@ class JudgeCheckVisibilityTest(ViewTestCase):
         # directly rather than scraping HTML across unrelated page regions
         # (e.g. the nearby-units status tooltip, out of this task's scope).
         unit = self.get_unit()
-        unit.translate(self.user, ["Hello, world!\n"], 20)  # triggers "same"
+        unit.translate(self.user, ["Hello, world!\n"], STATE_TRANSLATED)  # "same"
         self.make_reject(unit)
         names = {check.name for check in unit.deterministic_checks}
         self.assertIn("same", names)
@@ -127,7 +127,7 @@ class JudgeCheckVisibilityTest(ViewTestCase):
         unit = self.get_unit()
         # Translating to the same text triggers the deterministic "same"
         # check via run_checks; it must still render in the card.
-        unit.translate(self.user, ["Hello, world!\n"], 20)
+        unit.translate(self.user, ["Hello, world!\n"], STATE_TRANSLATED)
         unit.run_checks()
         unit.clear_checks_cache()
         self.assertIn("same", unit.all_checks_names)

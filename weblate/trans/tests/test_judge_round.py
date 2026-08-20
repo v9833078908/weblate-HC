@@ -32,7 +32,9 @@ class JudgeRoundTest(ViewTestCase):
         run = uuid.uuid4()
         self.make(unit, "major", seat=1, run_id=run)
         self.make(unit, "critical", seat=2, run_id=run)
-        self.assertEqual(active_verdict(unit).verdict, JudgeVerdict.Verdict.REJECT)
+        verdict = active_verdict(unit)
+        assert verdict is not None
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
 
     def test_no_seat_may_lower_the_other(self) -> None:
         # Seat 2 passing must not clear seat 1's flag: the cascade B2'
@@ -42,6 +44,7 @@ class JudgeRoundTest(ViewTestCase):
         self.make(unit, "major", seat=1, run_id=run)
         self.make(unit, "none", seat=2, run_id=run)
         v = active_verdict(unit)
+        assert v is not None
         self.assertEqual(v.verdict, JudgeVerdict.Verdict.FLAG)
         self.assertEqual(v.seat, 1)
 
@@ -50,7 +53,9 @@ class JudgeRoundTest(ViewTestCase):
         run = uuid.uuid4()
         self.make(unit, "none", seat=1, run_id=run, unparsed=True)
         self.make(unit, "critical", seat=2, run_id=run)
-        self.assertEqual(active_verdict(unit).verdict, JudgeVerdict.Verdict.REJECT)
+        verdict = active_verdict(unit)
+        assert verdict is not None
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
 
     def test_an_all_unparsed_round_keeps_the_previous_verdict(self) -> None:
         # D5: a transport-dead re-judge must not erase the last real verdict
@@ -62,7 +67,9 @@ class JudgeRoundTest(ViewTestCase):
         new = uuid.uuid4()
         self.make(unit, "none", seat=1, run_id=new, unparsed=True)
         self.make(unit, "none", seat=2, run_id=new, unparsed=True)
-        self.assertEqual(active_verdict(unit).verdict, JudgeVerdict.Verdict.REJECT)
+        verdict = active_verdict(unit)
+        assert verdict is not None
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
 
     def test_a_verdict_for_other_text_is_not_active(self) -> None:
         unit = self.get_unit()

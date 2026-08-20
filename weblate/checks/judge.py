@@ -22,6 +22,8 @@ from django.utils.translation import gettext_lazy
 from weblate.checks.base import TargetCheck
 
 if TYPE_CHECKING:
+    from django_stubs_ext import StrOrPromise
+
     from weblate.checks.models import Check
     from weblate.trans.models.unit import Unit
 
@@ -67,7 +69,7 @@ class BaseJudgeCheck(TargetCheck):
         # abstract base contract is satisfied.
         return False
 
-    def get_description(self, check_obj: Check) -> str:
+    def get_description(self, check_obj: Check) -> StrOrPromise:
         """
         Render the active verdict's errors for the repair prompt.
 

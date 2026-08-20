@@ -14,7 +14,12 @@ from django.db import models
 from django.utils.html import escape
 from django.utils.translation import gettext_lazy
 
-from weblate.utils.state import STATE_APPROVED, STATE_FUZZY, STATE_TRANSLATED
+from weblate.utils.state import (
+    STATE_APPROVED,
+    STATE_FUZZY,
+    STATE_TRANSLATED,
+    StringState,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -185,7 +190,7 @@ def verdict_for_severity(max_severity: str) -> str:
 
 def state_for_verdict(
     verdict: str, *, enable_review: bool, may_approve: bool
-) -> int | None:
+) -> StringState | None:
     """
     Target state for a verdict, or None when the state must not move.
 
