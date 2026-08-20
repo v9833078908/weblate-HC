@@ -60,6 +60,9 @@ DEFAULT_JUDGE_BATCH_SIZE = 5
 DEFAULT_JUDGE_MAX_UNITS_PER_RUN = 2000
 DEFAULT_JUDGE_REQUEST_SLEEP = 0.0
 DEFAULT_JUDGE_MAY_APPROVE = False
+# Empty: no reasoning parameter is sent at all, which is what the prompt
+# measurement ran with. Set to minimal/low/medium/high to cap the spend.
+DEFAULT_JUDGE_REASONING_EFFORT = ""
 
 
 # Hard caps enforced regardless of environment input.

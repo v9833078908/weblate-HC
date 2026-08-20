@@ -106,6 +106,28 @@ class JudgeLoopTest(ViewTestCase):
         slugs = {c.kwargs["project_slug"] for c in client.call_args_list}
         self.assertEqual(slugs, {unit.translation.component.project.slug})
 
+    def test_every_seat_gets_the_projects_own_context(self) -> None:
+        # The judge must describe the game from the same configuration the
+        # translator uses, or it argues from a setting nobody configured.
+        project = self.component.project
+        project.machinery_settings = {
+            "openrouter": {
+                "persona": "You judge a dark fantasy game.",
+                "style": "Preserve profanity.",
+            }
+        }
+        project.save(update_fields=["machinery_settings"])
+        _, _, client = self.run_batch([PASS, PASS])
+        contexts = {c.kwargs["project_context"] for c in client.call_args_list}
+        self.assertEqual(
+            contexts, {"You judge a dark fantasy game.\n\nPreserve profanity."}
+        )
+
+    def test_an_unconfigured_project_sends_no_context(self) -> None:
+        _, _, client = self.run_batch([PASS, PASS])
+        contexts = {c.kwargs["project_context"] for c in client.call_args_list}
+        self.assertEqual(contexts, {""})
+
     def test_unparsed_neither_raises_nor_lowers_the_other_seat(self) -> None:
         _, verdict, _ = self.run_batch([CRITICAL, DEAD], repair=None)
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)

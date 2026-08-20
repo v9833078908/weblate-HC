@@ -1719,6 +1719,10 @@ JUDGE_MAY_APPROVE = get_env_bool(
     "WEBLATE_JUDGE_MAY_APPROVE",
     trans_defaults.DEFAULT_JUDGE_MAY_APPROVE,
 )
+JUDGE_REASONING_EFFORT = get_env_str(
+    "WEBLATE_JUDGE_REASONING_EFFORT",
+    trans_defaults.DEFAULT_JUDGE_REASONING_EFFORT,
+)
 
 ADDITIONAL_CONFIG = Path("/app/data/settings-override.py")
 if ADDITIONAL_CONFIG.exists():

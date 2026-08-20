@@ -51,7 +51,11 @@ CATEGORIES = (
 )
 # Deterministic, order-revealing sample values (measured driver).
 _SAMPLE_VALUES = ("3", "7", "15", "28", "42", "56", "64", "77")
-_PLACEHOLDER_RE = re.compile(r"\{\[PARAM(\d+)\]\}|\{(\d+)\}|%([A-Za-z_]+)%")
+# The bracketed dialect is matched before the named one, or {[PARAM0]}
+# would be read as a placeholder named "[PARAM0]" and lose its index.
+_PLACEHOLDER_RE = re.compile(
+    r"\{\[PARAM(\d+)\]\}|\{(\d+)\}|%([A-Za-z_]+)%|\{([A-Za-z_][A-Za-z0-9_]*)\}"
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -127,7 +131,8 @@ def render_preview(text: str) -> str | None:
     """Substitute sample values into engine placeholders; None if none."""
 
     def sub(match: re.Match[str]) -> str:
-        param, plain, named = match.groups()
+        param, plain, percent_named, brace_named = match.groups()
+        named = percent_named if percent_named is not None else brace_named
         if named is not None:
             return _SAMPLE_VALUES[sum(named.encode()) % len(_SAMPLE_VALUES)]
         return _SAMPLE_VALUES[int(param or plain) % len(_SAMPLE_VALUES)]
@@ -136,13 +141,23 @@ def render_preview(text: str) -> str | None:
     return rendered if count else None
 
 
-def _load_prompt(source_language: str, target_language: str) -> str:
-    """
-    Load the arm-D verdict prompt with the language pair filled in.
+# What a project that configured no description gets. Never a genre: an
+# inherited setting is what produced a false major on a post-apocalyptic
+# quest during the first dev run (docs/misc/judge-first-dev-run-2026-08-20.md).
+NEUTRAL_PROJECT_CONTEXT = (
+    "The game's setting, genre, platform and register are not specified here. "
+    "Do not\nassume any: judge the target against the source, the note and the "
+    "glossary only,\nand never argue from a setting you inferred yourself."
+)
 
-    The measured prompt was hardcoded for ru->zh_Hans; generalizing the
-    pair to fields is NOT covered by the measurement and must be
-    validated on the first production run.
+
+def _load_prompt(source_language: str, target_language: str, context: str = "") -> str:
+    """
+    Load the verdict prompt with the languages and the project filled in.
+
+    The text is the one measured as arm E on the sealed S&T2 corpus
+    (docs/misc/st2-zh-recalibration.py). The genre lives in the project
+    context so no project inherits another one's setting.
     """
     template = (
         resources.files("weblate.trans.judge_prompts")
@@ -151,8 +166,10 @@ def _load_prompt(source_language: str, target_language: str) -> str:
     )
     # Not str.format: the prompt deliberately shows literal {0} and
     # {[PARAM0]} placeholder syntax, which format would treat as fields.
-    return template.replace("{source_language}", source_language).replace(
-        "{target_language}", target_language
+    return (
+        template.replace("{source_language}", source_language)
+        .replace("{target_language}", target_language)
+        .replace("{project_context}", context.strip() or NEUTRAL_PROJECT_CONTEXT)
     )
 
 
@@ -392,7 +409,11 @@ def _post_batch(payload: dict, model: str) -> _BatchResponse:
 
 
 def request_verdicts(
-    requests: Sequence[JudgeRequest], *, model: str, project_slug: str = ""
+    requests: Sequence[JudgeRequest],
+    *,
+    model: str,
+    project_slug: str = "",
+    project_context: str = "",
 ) -> list[JudgeResult]:
     """
     Judge every request; results in input order.
@@ -443,7 +464,9 @@ def request_verdicts(
                 {
                     "role": "system",
                     "content": _load_prompt(
-                        batch[0].source_language, batch[0].target_language
+                        batch[0].source_language,
+                        batch[0].target_language,
+                        project_context,
                     ),
                 },
                 {
@@ -459,6 +482,11 @@ def request_verdicts(
                 },
             ],
         }
+        effort = settings.JUDGE_REASONING_EFFORT
+        if isinstance(effort, str) and effort.strip():
+            # exclude: nothing reads the trace, so paying to ship it back
+            # is waste; reasoning was 84% of the first dev run's tokens.
+            payload["reasoning"] = {"effort": effort.strip(), "exclude": True}
         parsed = None
         for attempt in range(2):
             response = _post_batch(payload, model)

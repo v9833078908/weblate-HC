@@ -244,6 +244,24 @@ class JudgeClientTest(SimpleTestCase):
         self.assertIsNone(render_preview("plain text"))
         self.assertIsNotNone(render_preview("has {0} slot"))
 
+    def test_render_preview_substitutes_named_braces(self) -> None:
+        # 156 units on production use {name}; without this branch they
+        # reach the judge with no rendered pair at all.
+        rendered = render_preview("Requires {level} of {faction}")
+        self.assertIsNotNone(rendered)
+        assert rendered is not None
+        self.assertNotIn("{level}", rendered)
+        self.assertNotIn("{faction}", rendered)
+        # Distinct names must render distinctly, or a swapped pair reads
+        # as correct.
+        self.assertNotEqual(
+            render_preview("{level}"),
+            render_preview("{faction}"),
+        )
+        # The bracketed dialect keeps its own branch: {[PARAM0]} must not
+        # be eaten as a named placeholder called "[PARAM0]".
+        self.assertEqual(render_preview("{[PARAM0]}"), render_preview("{0}"))
+
     @http_mock.activate
     def test_malformed_json_makes_the_batch_unparsed(self) -> None:
         http_mock.register(
@@ -400,3 +418,107 @@ class JudgeUsageLogTest(TestCase):
         row = LLMUsageLog.objects.get(model="vendor/model-a")
         self.assertEqual(row.prompt_tokens, 11)
         self.assertEqual(row.completion_tokens, 7)
+
+
+class JudgeReasoningBudgetTest(TestCase):
+    """Reasoning tokens were 84% of the first dev run's cost."""
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_reasoning_is_absent_by_default(self) -> None:
+        # The measurement was run without the parameter; sending one by
+        # default would invalidate it.
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        request_verdicts([REQ], model="vendor/model-a")
+        body = json.loads(http_mock.calls[0].request.content)
+        self.assertNotIn("reasoning", body)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+        JUDGE_REASONING_EFFORT="low",
+    )
+    @http_mock.activate
+    def test_reasoning_effort_is_sent_when_configured(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        request_verdicts([REQ], model="vendor/model-a")
+        body = json.loads(http_mock.calls[0].request.content)
+        # exclude: the judge never reads the trace, so paying to ship it
+        # back is pure waste.
+        self.assertEqual(body["reasoning"], {"effort": "low", "exclude": True})
+
+
+class JudgePromptContextTest(TestCase):
+    """The prompt must carry the project's setting, never a hardcoded one."""
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_prompt_carries_the_project_context(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        request_verdicts(
+            [REQ],
+            model="vendor/model-a",
+            project_context="A dark fantasy world of Hollspeak.",
+        )
+        prompt = json.loads(http_mock.calls[0].request.content)["messages"][0][
+            "content"
+        ]
+        self.assertIn("A dark fantasy world of Hollspeak.", prompt)
+        self.assertNotIn("{project_context}", prompt)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_prompt_falls_back_to_the_neutral_context(self) -> None:
+        # A project that configured nothing must not inherit another
+        # project's setting: that is how a WWII register produced a false
+        # major on a post-apocalyptic quest.
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        request_verdicts([REQ], model="vendor/model-a")
+        prompt = json.loads(http_mock.calls[0].request.content)["messages"][0][
+            "content"
+        ]
+        self.assertNotIn("{project_context}", prompt)
+        for genre in ("World War II", "strategy", "military"):
+            self.assertNotIn(genre, prompt)
+        self.assertIn("not specified", prompt)

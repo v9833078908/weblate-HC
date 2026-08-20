@@ -42,6 +42,7 @@ from weblate.utils.state import STATE_FUZZY
 
 if TYPE_CHECKING:
     from weblate.auth.models import User
+    from weblate.trans.models.project import Project
     from weblate.trans.models.unit import Unit
 
 # A round is left alone (no repair attempt) when it did not confirm a
@@ -103,6 +104,25 @@ def repair_target(unit: Unit, user: User | None) -> list[str] | None:
     if not text or text == unit.target:
         return None
     return [text]
+
+
+def judge_project_context(project: Project) -> str:
+    """
+    Return the project's own description of its game, for the prompt.
+
+    Read from the same machinery configuration the translator uses
+    (``persona`` and ``style`` of the project's MT engine), so the judge
+    and the translator cannot hold different ideas of the game. Nothing
+    configured yields an empty string, and the client then falls back to
+    a neutral context instead of another project's setting.
+    """
+    setting = project.get_machinery_settings().get(AutoForm.DEFAULT_ENGINE)
+    if not setting:
+        return ""
+    parts = [
+        str(setting.get(field, "") or "").strip() for field in ("persona", "style")
+    ]
+    return "\n\n".join(part for part in parts if part)
 
 
 def _write_verdict(
@@ -315,7 +335,11 @@ def run_judge_batch(
     # Accounting must be symmetric with machinery, which attributes every
     # paid request to a project (machinery/openai.py:147). All units of a
     # run share one translation, so the slug is read once.
-    project_slug = units[0].translation.component.project.slug if units else ""
+    project = units[0].translation.component.project
+    project_slug = project.slug
+    # Read once per run: every unit of a run shares one project, and the
+    # value goes into the system message of every batch.
+    project_context = judge_project_context(project)
     pending = list(units)
     verdicts: dict[int, JudgeVerdict] = {}
     attempts = settings.JUDGE_MAX_REPAIR_ATTEMPTS
@@ -350,7 +374,12 @@ def run_judge_batch(
             if not request_units:
                 continue
             requests = [round_requests[unit.id] for unit in request_units]
-            results = request_verdicts(requests, model=model, project_slug=project_slug)
+            results = request_verdicts(
+                requests,
+                model=model,
+                project_slug=project_slug,
+                project_context=project_context,
+            )
             with transaction.atomic():
                 for unit, request, result in zip(
                     request_units, requests, results, strict=True
