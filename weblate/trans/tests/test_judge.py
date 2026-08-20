@@ -4,18 +4,18 @@
 
 from __future__ import annotations
 
-from django.test import SimpleTestCase
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 
 from weblate.trans.models.judge import (
-    JudgeVerdict,
     SEVERITY_RANK,
+    JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
     state_for_verdict,
     verdict_for_severity,
 )
 from weblate.utils.state import (
+    FUZZY_STATES,
     STATE_APPROVED,
     STATE_FUZZY,
     STATE_TRANSLATED,
@@ -70,8 +70,6 @@ class JudgeSeverityGateTest(SimpleTestCase):
         )
 
     def test_reject_lands_on_a_state_that_does_not_ship(self) -> None:
-        from weblate.utils.state import FUZZY_STATES
-
         state = state_for_verdict(
             JudgeVerdict.Verdict.REJECT, enable_review=True, may_approve=True
         )
@@ -84,7 +82,6 @@ class JudgeSeverityGateTest(SimpleTestCase):
                 JudgeVerdict.Verdict.UNPARSED, enable_review=True, may_approve=True
             )
         )
-
 
 
 class JudgeHashTest(SimpleTestCase):

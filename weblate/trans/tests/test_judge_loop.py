@@ -15,11 +15,25 @@ from weblate.trans.tests.test_views import ViewTestCase
 
 
 def result(severity, verdict, **kw):
-    errs = [] if severity == "none" else [
-        {"span": "x", "category": "terminology", "severity": severity, "description": "d"}
-    ]
-    return JudgeResult(max_severity=severity, model_verdict=verdict, errors=errs,
-                       back_translation=kw.get("bt", ""), unparsed=kw.get("unparsed", False))
+    errs = (
+        []
+        if severity == "none"
+        else [
+            {
+                "span": "x",
+                "category": "terminology",
+                "severity": severity,
+                "description": "d",
+            }
+        ]
+    )
+    return JudgeResult(
+        max_severity=severity,
+        model_verdict=verdict,
+        errors=errs,
+        back_translation=kw.get("bt", ""),
+        unparsed=kw.get("unparsed", False),
+    )
 
 
 PASS = result("none", "pass")
@@ -29,8 +43,10 @@ DEAD = JudgeResult("none", "", [], "", unparsed=True)
 
 
 @override_settings(
-    JUDGE_ENABLED=True, JUDGE_OPENROUTER_KEY="sk-test",
-    JUDGE_MODEL_SEAT_1="vendor-a/model", JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_MAX_REPAIR_ATTEMPTS=1,
 )
 class JudgeLoopTest(ViewTestCase):
@@ -43,7 +59,9 @@ class JudgeLoopTest(ViewTestCase):
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
             mock.patch("weblate.trans.judge_loop.repair_target", return_value=repair),
         ):
-            verdicts = run_judge_batch([unit], writable_ids=writable_ids, user=self.user)
+            verdicts = run_judge_batch(
+                [unit], writable_ids=writable_ids, user=self.user
+            )
         return unit, verdicts[unit.id], client
 
     def test_both_seats_judge_every_string(self) -> None:
@@ -82,19 +100,21 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.UNPARSED)
 
     def test_confirmed_defect_triggers_one_repair_judged_by_both_seats(self) -> None:
-        unit, verdict, client = self.run_batch(
-            [CRITICAL, CRITICAL, PASS, PASS], repair=["fixed text"])
+        _unit, verdict, client = self.run_batch(
+            [CRITICAL, CRITICAL, PASS, PASS], repair=["fixed text"]
+        )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
         self.assertEqual(verdict.attempt, 1)
         self.assertEqual(client.call_count, 4)
 
     def test_exhausted_loop_returns_the_last_negative_verdict(self) -> None:
         _, verdict, _ = self.run_batch(
-            [CRITICAL, CRITICAL, CRITICAL, CRITICAL], repair=["still wrong"])
+            [CRITICAL, CRITICAL, CRITICAL, CRITICAL], repair=["still wrong"]
+        )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
 
     def test_repair_that_changes_nothing_stops_the_loop(self) -> None:
-        _, verdict, client = self.run_batch([CRITICAL, CRITICAL], repair=None)
+        _, _verdict, client = self.run_batch([CRITICAL, CRITICAL], repair=None)
         self.assertEqual(client.call_count, 2)
 
     def test_a_human_string_is_not_repaired_when_not_writable(self) -> None:
@@ -102,8 +122,9 @@ class JudgeLoopTest(ViewTestCase):
         # false critical never rewrites the human translation.
         unit = self.get_unit()
         unit.translate(self.user, ["Human translation"], 20)
-        _, verdict, client = self.run_batch(
-            [CRITICAL, CRITICAL], repair=["MACHINE OVERWRITE"], writable=False)
+        _, _verdict, _client = self.run_batch(
+            [CRITICAL, CRITICAL], repair=["MACHINE OVERWRITE"], writable=False
+        )
         self.assertNotEqual(self.get_unit().target, "MACHINE OVERWRITE")
 
     def test_repair_sees_the_round_verdict_projected(self) -> None:
@@ -127,10 +148,12 @@ class JudgeLoopTest(ViewTestCase):
     def test_every_verdict_of_one_run_shares_the_run_id(self) -> None:
         unit, _, _ = self.run_batch([CRITICAL, CRITICAL, PASS, PASS], repair=["fixed"])
         self.assertEqual(
-            len(set(unit.judge_verdicts.values_list("run_id", flat=True))), 1)
+            len(set(unit.judge_verdicts.values_list("run_id", flat=True))), 1
+        )
 
     def test_each_seat_votes_once_per_round(self) -> None:
         unit, _, _ = self.run_batch([CRITICAL, CRITICAL, PASS, PASS], repair=["fixed"])
         self.assertEqual(
             set(unit.judge_verdicts.values_list("attempt", "seat")),
-            {(0, 1), (0, 2), (1, 1), (1, 2)})
+            {(0, 1), (0, 2), (1, 1), (1, 2)},
+        )

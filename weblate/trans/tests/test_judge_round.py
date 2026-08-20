@@ -10,7 +10,6 @@ from weblate.trans.models.judge import (
     JudgeVerdict,
     active_round,
     active_verdict,
-    collegium_verdict,
     compute_target_hash,
     describe_latest_verdict,
     latest_round,
@@ -83,14 +82,32 @@ class JudgeRoundTest(ViewTestCase):
         unit = self.get_unit()
         run = uuid.uuid4()
         self.make(
-            unit, "critical", seat=1, run_id=run,
-            errors=[{"span": "ВРАТА", "category": "terminology", "severity": "critical",
-                     "description": "the Gates are called DOORS here"}],
+            unit,
+            "critical",
+            seat=1,
+            run_id=run,
+            errors=[
+                {
+                    "span": "ВРАТА",
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "the Gates are called DOORS here",
+                }
+            ],
         )
         self.make(
-            unit, "major", seat=2, run_id=run,
-            errors=[{"span": "clause", "category": "fluency", "severity": "major",
-                     "description": "the second clause has no verb"}],
+            unit,
+            "major",
+            seat=2,
+            run_id=run,
+            errors=[
+                {
+                    "span": "clause",
+                    "category": "fluency",
+                    "severity": "major",
+                    "description": "the second clause has no verb",
+                }
+            ],
         )
         description = describe_latest_verdict(unit)
         self.assertIn("the Gates are called DOORS here", description)
@@ -101,14 +118,23 @@ class JudgeRoundTest(ViewTestCase):
         # and errors must stay distinguishable after normalization.
         unit = self.get_unit()
         self.make(
-            unit, "major",
+            unit,
+            "major",
             errors=[
-                {"span": "a", "category": "markup", "severity": "major",
-                 "description": "target dropped <color=#FF0000>"},
-                {"span": "b", "category": "fluency", "severity": "major",
-                 "description": "register too formal"},
+                {
+                    "span": "a",
+                    "category": "markup",
+                    "severity": "major",
+                    "description": "target dropped <color=#FF0000>",
+                },
+                {
+                    "span": "b",
+                    "category": "fluency",
+                    "severity": "major",
+                    "description": "register too formal",
+                },
             ],
         )
         description = describe_latest_verdict(unit)
         self.assertIn("color=#FF0000", description)  # not eaten by strip_tags
-        self.assertIn(" | ", description)            # explicit separator
+        self.assertIn(" | ", description)  # explicit separator

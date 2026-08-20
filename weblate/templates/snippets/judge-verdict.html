@@ -44,9 +44,7 @@
             {% endfor %}
           {% endfor %}
           {% if judge_seats|length > 1 %}
-            <p class="list-group-item-text text-muted">
-              {% translate "Both judges reviewed this string independently." %}
-            </p>
+            <p class="list-group-item-text text-muted">{% translate "Both judges reviewed this string independently." %}</p>
           {% endif %}
         </div>
       {% elif judge_verdict.verdict == "flag" %}

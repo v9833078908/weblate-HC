@@ -2,7 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The two-seat collegium and its repair loop.
+"""
+The two-seat collegium and its repair loop.
 
 Pure orchestration over the judge client: both seats judge EVERY string
 independently (no cascade, no seat may lower another — measurement B2'
@@ -18,8 +19,10 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
+from django.conf import settings
 from django.db import transaction
 
+from weblate.glossary.models import get_glossary_terms
 from weblate.machinery.models import MACHINERY
 from weblate.trans.forms import AutoForm
 from weblate.trans.judge import JudgeRequest, request_verdicts
@@ -35,15 +38,18 @@ if TYPE_CHECKING:
     from weblate.auth.models import User
     from weblate.trans.models.unit import Unit
 
+# A round is left alone (no repair attempt) when it did not confirm a
+# defect: PASS needs no fix, UNPARSED is a transport failure, not an
+# opinion to act on.
+_NON_REPAIRABLE_VERDICTS = frozenset(
+    {JudgeVerdict.Verdict.PASS, JudgeVerdict.Verdict.UNPARSED}
+)
+
 
 def _glossary_pairs(unit: Unit) -> list[tuple[str, str]]:
     """Source/target text of the glossary terms attached to the unit."""
-    from weblate.glossary.models import get_glossary_terms
-
     return [
-        (term.source, term.target)
-        for term in get_glossary_terms(unit)
-        if term.target
+        (term.source, term.target) for term in get_glossary_terms(unit) if term.target
     ]
 
 
@@ -63,7 +69,8 @@ def build_request(unit: Unit) -> JudgeRequest:
 
 
 def repair_target(unit: Unit, user: User | None) -> list[str] | None:
-    """Re-translate the unit through the project MT engine, or None.
+    """
+    Re-translate the unit through the project MT engine, or None.
 
     Judge evidence reaches the repair prompt for free: run_checks() has
     already projected the round's judge-* Check row, and
@@ -111,15 +118,14 @@ def _write_verdict(
 def run_judge_batch(
     units: list[Unit], *, writable_ids: set[int], user: User | None
 ) -> dict[int, JudgeVerdict]:
-    """Judge every unit with both seats; repair writable defects.
+    """
+    Judge every unit with both seats; repair writable defects.
 
     Returns the final active verdict per unit id. The repair loop runs
     until JUDGE_MAX_REPAIR_ATTEMPTS is spent; a string that stays
     negative keeps its last verdict and its state-10 hold for the human
     queue (applied by the caller from state_for_verdict).
     """
-    from django.conf import settings
-
     run_id = uuid.uuid4()
     pending = list(units)
     verdicts: dict[int, JudgeVerdict] = {}
@@ -137,7 +143,7 @@ def run_judge_batch(
             requests = [build_request(unit) for unit in pending]
             results = request_verdicts(requests, model=model)
             with transaction.atomic():
-                for unit, result in zip(pending, results):
+                for unit, result in zip(pending, results, strict=True):
                     _write_verdict(unit, seat, attempt, run_id, result, model)
 
         next_pending = []
@@ -150,15 +156,14 @@ def run_judge_batch(
                 # An all-unparsed round with no prior verdict: surface it
                 # as unparsed (the run's warning counts these), never as
                 # a real pass (D5).
-                verdict = unit.judge_verdicts.filter(
-                    run_id=run_id, attempt=attempt
-                ).order_by("seat").first()
+                verdict = (
+                    unit.judge_verdicts.filter(run_id=run_id, attempt=attempt)
+                    .order_by("seat")
+                    .first()
+                )
             if verdict is not None:
                 verdicts[unit.id] = verdict
-            if verdict is None or verdict.verdict in (
-                JudgeVerdict.Verdict.PASS,
-                JudgeVerdict.Verdict.UNPARSED,
-            ):
+            if verdict is None or verdict.verdict in _NON_REPAIRABLE_VERDICTS:
                 continue
             if attempt >= attempts:
                 continue

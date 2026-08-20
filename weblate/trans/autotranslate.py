@@ -31,6 +31,7 @@ from weblate.trans.models import (
     Translation,
     Unit,
 )
+from weblate.trans.models.judge import JudgeVerdict, state_for_verdict
 from weblate.trans.util import is_plural, split_plural
 from weblate.utils.state import (
     STATE_APPROVED,
@@ -722,8 +723,6 @@ class AutoTranslate(BaseAutoTranslate):
         self.set_progress(self.progress_base + len(self.written))
 
     def process_judge(self, *, engines: list[str], threshold: int) -> None:
-        from weblate.trans.models.judge import JudgeVerdict, state_for_verdict
-
         units = list(self.get_units().select_related("source_unit"))
         if len(units) > settings.JUDGE_MAX_UNITS_PER_RUN:
             self.failure_message = ngettext(
@@ -778,6 +777,21 @@ class AutoTranslate(BaseAutoTranslate):
             )
         self.post_process()
 
+    def _dispatch(
+        self,
+        *,
+        auto_source: Literal["mt", "others"],
+        engines: list[str],
+        threshold: int,
+        source_component_ids: list[int] | None,
+    ) -> None:
+        if self.mode == "judge":
+            self.process_judge(engines=engines, threshold=threshold)
+        elif auto_source == "mt":
+            self.process_mt(engines, threshold)
+        else:
+            self.process_others(source_component_ids)
+
     def perform(
         self,
         *,
@@ -798,13 +812,12 @@ class AutoTranslate(BaseAutoTranslate):
             else ", ".join(str(item) for item in source_component_ids or []),
         )
         try:
-            if self.mode == "judge":
-                self.process_judge(engines=engines, threshold=threshold)
-                return self.get_message()
-            if auto_source == "mt":
-                self.process_mt(engines, threshold)
-            else:
-                self.process_others(source_component_ids)
+            self._dispatch(
+                auto_source=auto_source,
+                engines=engines,
+                threshold=threshold,
+                source_component_ids=source_component_ids,
+            )
         except (MachineTranslationError, Component.DoesNotExist) as error:
             translation.log_error("failed automatic translation: %s", error)
             self.failure_message = gettext("Automatic translation failed: %s") % error

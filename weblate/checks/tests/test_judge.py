@@ -70,9 +70,16 @@ class JudgeCheckTest(ViewTestCase):
     def test_description_carries_escaped_evidence(self) -> None:
         unit = self.get_unit()
         self.make(
-            unit, "critical",
-            errors=[{"span": "x", "category": "terminology", "severity": "critical",
-                     "description": "the Gates are called DOORS here"}],
+            unit,
+            "critical",
+            errors=[
+                {
+                    "span": "x",
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "the Gates are called DOORS here",
+                }
+            ],
         )
         Check.objects.filter(unit=unit).delete()
         unit.run_checks()

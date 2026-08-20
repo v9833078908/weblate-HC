@@ -40,6 +40,7 @@ path = [
   "loc_kit_ingest/.gitignore",
   "loc_kit_ingest/pytest.ini",
   "loc_kit_ingest/tests/fixtures/**",
+  "weblate/trans/judge_prompts/**.txt",
   "weblate/trans/prompts/**.txt",
   "weblate_customization/pyproject.toml"
 ]

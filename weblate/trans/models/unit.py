@@ -28,6 +28,7 @@ from weblate.auth.data import (
 )
 from weblate.auth.results import PermissionResult
 from weblate.checks.flags import Flags
+from weblate.checks.judge import JUDGE_CHECKS
 from weblate.checks.models import CHECKS, Check
 from weblate.formats.helpers import CONTROLCHARS
 from weblate.memory.tasks import (
@@ -2092,8 +2093,6 @@ class Unit(models.Model, LoggerMixin):
     @property
     def deterministic_checks(self) -> list[Check]:
         """Checks shown as facts: judge verdicts render in their own card."""
-        from weblate.checks.judge import JUDGE_CHECKS
-
         return [check for check in self.all_checks if check.name not in JUDGE_CHECKS]
 
     def clear_checks_cache(self) -> None:
@@ -2446,8 +2445,6 @@ class Unit(models.Model, LoggerMixin):
             request=request,
             change_details=change_details,
         )
-
-        from weblate.checks.judge import JUDGE_CHECKS
 
         # Enforced checks can revert the state to needs editing (fuzzy);
         # a judge verdict is an opinion and must never enforce (A7).

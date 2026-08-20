@@ -1357,9 +1357,10 @@ class AutoForm(forms.Form):
 
     def clean(self):
         super().clean()
-        if self.cleaned_data.get("overwrite_existing") and self.cleaned_data.get(
-            "mode"
-        ) != "judge":
+        if (
+            self.cleaned_data.get("overwrite_existing")
+            and self.cleaned_data.get("mode") != "judge"
+        ):
             self.add_error(
                 "overwrite_existing",
                 gettext("Overwrite applies only to the LLM judge mode."),

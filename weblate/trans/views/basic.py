@@ -71,8 +71,8 @@ from weblate.trans.views.reports import get_reports_context
 from weblate.trans.workspace_move import can_offer_project_move
 from weblate.utils import messages
 from weblate.utils.decorators import engage_login_not_required
-from weblate.utils.state import STATE_READONLY
 from weblate.utils.ratelimit import reset_rate_limit, session_ratelimit_post
+from weblate.utils.state import STATE_READONLY
 from weblate.utils.stats import (
     CategoryLanguage,
     GhostCategoryLanguageStats,
@@ -802,15 +802,15 @@ def show_translation(
     judge_row_count = None
     judge_request_estimate = None
     if settings.JUDGE_ENABLED:
-        judge_row_count = obj.unit_set.exclude(state=STATE_READONLY).search(
-            "state:<translated", parser="unit"
-        ).count()
-        judge_request_estimate = judge_row_count * 2 * (
-            1 + settings.JUDGE_MAX_REPAIR_ATTEMPTS
+        judge_row_count = (
+            obj.unit_set.exclude(state=STATE_READONLY)
+            .search("state:<translated", parser="unit")
+            .count()
         )
-    judge_verdicts_exist = JudgeVerdict.objects.filter(
-        unit__translation=obj
-    ).exists()
+        judge_request_estimate = (
+            judge_row_count * 2 * (1 + settings.JUDGE_MAX_REPAIR_ATTEMPTS)
+        )
+    judge_verdicts_exist = JudgeVerdict.objects.filter(unit__translation=obj).exists()
     form = get_upload_form(user, obj)
 
     search_form = SearchForm(

@@ -2,7 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Judge checks: a Check row derived from the latest JudgeVerdict.
+"""
+Judge checks: a Check row derived from the latest JudgeVerdict.
 
 The check never computes anything itself — it reads the active verdict
 (weblate.trans.models.judge.active_verdict). That keeps Unit.run_checks
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from weblate.checks.models import Check
     from weblate.trans.models.unit import Unit
 
+
 class BaseJudgeCheck(TargetCheck):
     """A verdict projected from JudgeVerdict, never computed here."""
 
@@ -40,7 +42,9 @@ class BaseJudgeCheck(TargetCheck):
         # and writing verdicts does not touch the unit), so a cached
         # verdict would keep the projected row stale. Two reads per
         # run_checks pass instead of one is the price of correctness.
-        from weblate.trans.models.judge import active_verdict
+        from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
+            active_verdict,
+        )
 
         return active_verdict(unit)
 
@@ -52,8 +56,8 @@ class BaseJudgeCheck(TargetCheck):
         # Deliberately not cached per check id: a newer verdict must
         # replace the projected row on the very next run_checks of the
         # same instance. translate() invalidates the cache, but a
-        # re-judge writes verdicts without touching the unit. One DB
-        # read per pass is still shared via _ROUND_CACHE_KEY.
+        # re-judge writes verdicts without touching the unit; _active_verdict
+        # reads fresh every call for the same reason.
         if self.should_skip(unit) or self.is_ignored(all_flags):
             return False
         return self.check_target_unit(sources, targets, unit)
@@ -64,12 +68,15 @@ class BaseJudgeCheck(TargetCheck):
         return False
 
     def get_description(self, check_obj: Check) -> str:
-        """Render the active verdict's errors for the repair prompt.
+        """
+        Render the active verdict's errors for the repair prompt.
 
         weblate/machinery/llm.py calls get_description() when it builds
         failing_checks for the translator.
         """
-        from weblate.trans.models.judge import describe_latest_verdict
+        from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
+            describe_latest_verdict,
+        )
 
         return describe_latest_verdict(check_obj.unit) or self.description
 

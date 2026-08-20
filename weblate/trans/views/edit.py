@@ -1279,6 +1279,36 @@ def get_translate_unit(
     return TranslateUnitResult(search_result, num_results, offset, unit)
 
 
+def _judge_view_context(unit: Unit) -> dict[str, Any]:
+    """Judge-verdict context for the unit page: round, verdict, staleness."""
+    judge_round = latest_round(unit)
+    judge_verdict = active_verdict(unit)
+    judge_stale = (
+        bool(judge_round)
+        and judge_verdict is None
+        and judge_round[0].is_stale(unit.get_target_plurals())
+    )
+    judge_context_changed = judge_verdict is not None and (
+        judge_verdict.context_hash
+        != compute_context_hash(
+            source=unit.source,
+            note=unit.source_unit.note,
+            glossary_terms=[
+                (term.source, term.target)
+                for term in get_glossary_terms(unit, full=True)
+                if term.target
+            ],
+        )
+    )
+    return {
+        "judge_round": judge_round,
+        "judge_verdict": judge_verdict,
+        "judge_seats": active_round(unit) if judge_verdict is not None else [],
+        "judge_stale": judge_stale,
+        "judge_context_changed": judge_context_changed,
+    }
+
+
 @transaction.atomic
 def translate(request: AuthenticatedHttpRequest, path: list[str]) -> HttpResponse:
     """Translate, suggest and search view."""
@@ -1358,26 +1388,7 @@ def translate(request: AuthenticatedHttpRequest, path: list[str]) -> HttpRespons
     other_languages_count = max(unit.source_unit.unit_set.count() - 1, 0)
     prepare_glossary_terms([unit], project, full=True)
 
-    judge_round = latest_round(unit)
-    judge_verdict = active_verdict(unit)
-    judge_seats = active_round(unit) if judge_verdict is not None else []
-    judge_stale = (
-        bool(judge_round)
-        and judge_verdict is None
-        and judge_round[0].is_stale(unit.get_target_plurals())
-    )
-    judge_context_changed = judge_verdict is not None and (
-        judge_verdict.context_hash
-        != compute_context_hash(
-            source=unit.source,
-            note=unit.source_unit.note,
-            glossary_terms=[
-                (term.source, term.target)
-                for term in get_glossary_terms(unit, full=True)
-                if term.target
-            ],
-        )
-    )
+    judge_context = _judge_view_context(unit)
 
     return render(
         request,
@@ -1420,11 +1431,7 @@ def translate(request: AuthenticatedHttpRequest, path: list[str]) -> HttpRespons
             "glossaries": glossaries,
             "addterm_form": addterm_form,
             "last_changes": unit.change_set.prefetch().recent(skip_preload="unit"),
-            "judge_round": judge_round,
-            "judge_verdict": judge_verdict,
-            "judge_seats": judge_seats,
-            "judge_stale": judge_stale,
-            "judge_context_changed": judge_context_changed,
+            **judge_context,
             "other_languages_count": other_languages_count,
             "screenshots": (unit.source_unit.screenshots.all() | unit.screenshots.all())
             .distinct()

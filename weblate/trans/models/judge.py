@@ -25,7 +25,8 @@ JUDGE_ERROR_SEPARATOR = " | "
 
 
 def _digest(parts: Sequence[str]) -> str:
-    """Hash a sequence unambiguously.
+    """
+    Hash a sequence unambiguously.
 
     JSON encoding of the whole list keeps element boundaries, so a form
     containing the separator cannot forge another form's digest.
@@ -42,7 +43,8 @@ def compute_target_hash(target: Sequence[str]) -> str:
 def compute_context_hash(
     *, source: str, note: str, glossary_terms: Iterable[tuple[str, str]]
 ) -> str:
-    """Hash what the judge was told besides the target.
+    """
+    Hash what the judge was told besides the target.
 
     Glossary order is not context, so terms are sorted; a reordered
     glossary must not invalidate a verdict.
@@ -52,7 +54,8 @@ def compute_context_hash(
 
 
 class JudgeVerdict(models.Model):
-    """One judge opinion about one version of one unit.
+    """
+    One judge opinion about one version of one unit.
 
     Verdicts are never overwritten: they accumulate per
     ``(unit, run_id, attempt, seat)`` so the collegium and its repair
@@ -64,7 +67,7 @@ class JudgeVerdict(models.Model):
 
     # Stored and API-facing values: deliberately not localized.
     class Verdict(models.TextChoices):
-        PASS = "pass"
+        PASS = "pass"  # ruff: ignore[hardcoded-password-string]
         FLAG = "flag"
         REJECT = "reject"
         # Transport failure, never an opinion. Architecture invariant 4.3.
@@ -121,6 +124,7 @@ class JudgeVerdict(models.Model):
         verbose_name_plural = gettext_lazy("Judge verdicts")
         # No default ordering: it would force a sort on every queryset of
         # a table that accumulates. Callers order explicitly.
+        # ruff: ignore[mutable-class-default]
         indexes = [
             models.Index(fields=["unit", "-timestamp"], name="judge_unit_recent_idx"),
             models.Index(
@@ -129,6 +133,7 @@ class JudgeVerdict(models.Model):
             ),
             models.Index(fields=["run_id"], name="judge_run_idx"),
         ]
+        # ruff: ignore[mutable-class-default]
         constraints = [
             # One vote per seat per round: a round is reduced to its
             # strictest seat and must not see a seat twice.
@@ -143,8 +148,12 @@ class JudgeVerdict(models.Model):
 
     @property
     def verdict(self) -> str:
-        """Derived, never stored: the severity->verdict mapping is
-        reopened by R3 and must change without a data migration (D4)."""
+        """
+        Derive the verdict, never stored.
+
+        The severity->verdict mapping is reopened by R3 and must change
+        without a data migration (D4).
+        """
         if self.unparsed:
             return self.Verdict.UNPARSED
         return verdict_for_severity(self.max_severity)
@@ -177,13 +186,14 @@ def verdict_for_severity(max_severity: str) -> str:
 def state_for_verdict(
     verdict: str, *, enable_review: bool, may_approve: bool
 ) -> int | None:
-    """Target state for a verdict, or None when the state must not move.
+    """
+    Target state for a verdict, or None when the state must not move.
 
     ``critical`` lands on STATE_FUZZY, which the project-level
     ``WITHOUT_NEEDS_EDITING`` commit policy already excludes from export.
     ``pass`` stops at STATE_TRANSLATED unless the site opts into judge
     approval (JUDGE_MAY_APPROVE) AND the project has review: measurement
-    shows pass misses real criticals, so the judge does not hand out the
+    shows pass misses real critical defects, so the judge does not hand out the
     top trust state by default (review D2).
     """
     if verdict == JudgeVerdict.Verdict.UNPARSED:
@@ -196,8 +206,11 @@ def state_for_verdict(
 
 
 def latest_round(unit: Unit) -> list[JudgeVerdict]:
-    """Every seat of the newest round, stale or not — for the card's
-    'previous version' note. Not for projection."""
+    """
+    Return every seat of the newest round, stale or not.
+
+    For the card's 'previous version' note. Not for projection.
+    """
     newest = unit.judge_verdicts.order_by("-timestamp", "-pk").first()
     if newest is None:
         return []
@@ -209,7 +222,8 @@ def latest_round(unit: Unit) -> list[JudgeVerdict]:
 
 
 def active_round(unit: Unit) -> list[JudgeVerdict]:
-    """Newest round that describes the current text and has a parsed seat.
+    """
+    Newest round that describes the current text and has a parsed seat.
 
     Staleness is handled by filtering on target_hash. An all-unparsed
     newest round is skipped in favour of the newest parsed one, so a
@@ -245,7 +259,8 @@ def active_round(unit: Unit) -> list[JudgeVerdict]:
 
 
 def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
-    """The strictest opinion of a round. No seat may lower another.
+    """
+    Return the strictest opinion of a round. No seat may lower another.
 
     A transport failure is not an opinion, so an unparsed row neither
     raises nor lowers the round; only when every seat failed does the
@@ -260,12 +275,13 @@ def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
 
 
 def active_verdict(unit: Unit) -> JudgeVerdict | None:
-    """The collegium verdict that still describes the stored text."""
+    """Return the collegium verdict that still describes the stored text."""
     return collegium_verdict(active_round(unit))
 
 
 def describe_latest_verdict(unit: Unit) -> str:
-    """Human-readable evidence for the active round, or an empty string.
+    """
+    Human-readable evidence for the active round, or an empty string.
 
     Rendered into the check description, which weblate/machinery/llm.py
     feeds to the translator as failing_checks during repair. Both seats

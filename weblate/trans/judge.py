@@ -2,7 +2,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""OpenRouter client for the LLM judge (measured arm D).
+"""
+OpenRouter client for the LLM judge (measured arm D).
 
 Separate from RoutedLLMTranslation on purpose: the judge is not a machine
 translation service. Mirrors the loc-kit profile client
@@ -15,17 +16,20 @@ run — the measured noise/precision/recall/cost numbers assume batching.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
 from importlib import resources
-from typing import TYPE_CHECKING
+from itertools import starmap
+from typing import TYPE_CHECKING, cast
 
 from django.conf import settings
 from django.utils.translation import gettext as _
 
 from weblate.trans.models.judge import SEVERITY_RANK
+from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.requests import fetch_validated_url
 
 if TYPE_CHECKING:
@@ -35,20 +39,29 @@ OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions
 JUDGE_REQUEST_TIMEOUT = 120
 # Measured category set (st2-zh-recalibration.py:59-68).
 CATEGORIES = (
-    "terminology", "mistranslation", "omission", "addition",
-    "fluency", "punctuation", "markup", "register",
+    "terminology",
+    "mistranslation",
+    "omission",
+    "addition",
+    "fluency",
+    "punctuation",
+    "markup",
+    "register",
 )
 # Deterministic, order-revealing sample values (measured driver).
 _SAMPLE_VALUES = ("3", "7", "15", "28", "42", "56", "64", "77")
 _PLACEHOLDER_RE = re.compile(r"\{\[PARAM(\d+)\]\}|\{(\d+)\}|%([A-Za-z_]+)%")
 
-LOGGER = __import__("logging").getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class JudgeError(Exception):
-    """A judge gate failure: disabled or misconfigured. Transport and
-    parse failures do NOT raise — they yield an unparsed result so one
-    bad batch never aborts a run (D5)."""
+    """
+    A judge gate failure: disabled or misconfigured.
+
+    Transport and parse failures do NOT raise — they yield an unparsed
+    result so one bad batch never aborts a run (D5).
+    """
 
 
 @dataclass(frozen=True)
@@ -91,7 +104,8 @@ def render_preview(text: str) -> str | None:
 
 
 def _load_prompt(source_language: str, target_language: str) -> str:
-    """Load the arm-D verdict prompt with the language pair filled in.
+    """
+    Load the arm-D verdict prompt with the language pair filled in.
 
     The measured prompt was hardcoded for ru->zh_Hans; generalizing the
     pair to fields is NOT covered by the measurement and must be
@@ -104,14 +118,14 @@ def _load_prompt(source_language: str, target_language: str) -> str:
     )
     # Not str.format: the prompt deliberately shows literal {0} and
     # {[PARAM0]} placeholder syntax, which format would treat as fields.
-    return (
-        template.replace("{source_language}", source_language)
-        .replace("{target_language}", target_language)
+    return template.replace("{source_language}", source_language).replace(
+        "{target_language}", target_language
     )
 
 
 def _response_schema() -> dict:
-    """Strict schema of the measured arm-D reply shape.
+    """
+    Strict schema of the measured arm-D reply shape.
 
     ``back_translation`` is the single deliberate deviation from the
     measured schema (an extra output field, unmeasured; minimal metric
@@ -185,95 +199,117 @@ def _max_severity(errors: list) -> str:
 JudgeSeverityOrdered = ("none", "minor", "major", "critical")
 
 
+def _write_llm_usage(payload: dict, model: str) -> None:
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return
+    prompt_tokens = usage.get("prompt_tokens") or 0
+    completion_tokens = usage.get("completion_tokens") or 0
+    if not prompt_tokens and not completion_tokens:
+        return
+    total_tokens = usage.get("total_tokens") or (prompt_tokens + completion_tokens)
+    cost = usage.get("cost")
+    prompt_details = usage.get("prompt_tokens_details") or {}
+    completion_details = usage.get("completion_tokens_details") or {}
+    LLMUsageLog.objects.create(
+        model=model,
+        project_slug="",
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total_tokens,
+        cost_usd=Decimal(str(cost)) if cost else None,
+        response_id=str(payload.get("id") or ""),
+        cached_tokens=prompt_details.get("cached_tokens") or 0,
+        reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
+    )
+
+
 def _record_usage(payload: dict, model: str) -> None:
-    """Mirror machinery's record_llm_usage (never raises).
+    """
+    Mirror machinery's record_llm_usage (never raises).
 
     The judge is a paid path outside machinery; the repair path
     (RoutedLLMTranslation <- OpenAITranslation) is logged by the same
     mechanism, so accounting must be symmetric.
     """
     try:
-        from weblate.trans.models.llm_usage import LLMUsageLog
-
-        usage = payload.get("usage")
-        if not isinstance(usage, dict):
-            return
-        prompt_tokens = usage.get("prompt_tokens") or 0
-        completion_tokens = usage.get("completion_tokens") or 0
-        if not prompt_tokens and not completion_tokens:
-            return
-        total_tokens = usage.get("total_tokens") or (prompt_tokens + completion_tokens)
-        cost = usage.get("cost")
-        prompt_details = usage.get("prompt_tokens_details") or {}
-        completion_details = usage.get("completion_tokens_details") or {}
-        LLMUsageLog.objects.create(
-            model=model,
-            project_slug="",
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
-            cost_usd=Decimal(str(cost)) if cost else None,
-            response_id=str(payload.get("id") or ""),
-            cached_tokens=prompt_details.get("cached_tokens") or 0,
-            reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
-        )
+        _write_llm_usage(payload, model)
     except Exception:
         LOGGER.exception("Failed to record LLM usage")
 
 
-def _parse_reply(payload: dict, size: int) -> list[JudgeResult] | None:
-    """Parse a batch reply aligned by segment id; None when unusable."""
+_SEVERITIES = frozenset({"minor", "major", "critical"})
+
+
+def _extract_segments(payload: dict) -> object:
+    """Segments list from a chat-completions reply body, or None if unreadable."""
     try:
         body = payload["choices"][0]["message"]
-        if "parsed" in body:
-            segments = body["parsed"].get("segments", [])
-        elif "content" in body:
-            content = body["content"]
-            if content is None:
-                return None
-            segments = (
-                json.loads(content).get("segments", [])
-                if isinstance(content, str)
-                else content.get("segments", [])
-            )
-        else:
-            segments = body.get("segments", [])
-    except (KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, IndexError):
         return None
+    if "parsed" in body:
+        return body["parsed"].get("segments", [])
+    if "content" not in body:
+        return body.get("segments", [])
+    content = body["content"]
+    if content is None:
+        return None
+    try:
+        if isinstance(content, str):
+            return json.loads(content).get("segments", [])
+        return content.get("segments", [])
+    except (TypeError, ValueError):
+        return None
+
+
+def _valid_error(error: object) -> bool:
+    return (
+        isinstance(error, dict)
+        and error.get("severity") in _SEVERITIES
+        and error.get("category") in CATEGORIES
+    )
+
+
+def _parse_segment(seg: object, size: int) -> tuple[int, JudgeResult] | None:
+    """One validated (index, result) pair, or None when the segment is unusable."""
+    if not isinstance(seg, dict):
+        return None
+    index = seg.get("id")
+    if not isinstance(index, int) or not 0 <= index < size:
+        return None
+    errors = seg.get("errors", [])
+    if not isinstance(errors, list) or not all(_valid_error(e) for e in errors):
+        return None
+    back_translation = seg.get("back_translation", "")
+    if not isinstance(back_translation, str):
+        return None
+    return index, JudgeResult(
+        max_severity=_max_severity(errors),
+        model_verdict=seg.get("verdict", ""),
+        errors=errors,
+        back_translation=back_translation,
+    )
+
+
+def _parse_reply(payload: dict, size: int) -> list[JudgeResult] | None:
+    """Parse a batch reply aligned by segment id; None when unusable."""
+    segments = _extract_segments(payload)
     if not isinstance(segments, list) or len(segments) != size:
         return None
-    results: list[JudgeResult] = [None] * size  # type: ignore[list-item]
+    results: list[JudgeResult | None] = [None] * size
+    seen: set[int] = set()
     for seg in segments:
-        if not isinstance(seg, dict):
+        parsed = _parse_segment(seg, size)
+        if parsed is None:
             return None
-        try:
-            index = seg["id"]
-        except (KeyError, TypeError):
+        index, result = parsed
+        if index in seen:
             return None
-        if not isinstance(index, int) or not 0 <= index < size or results[index]:
-            return None
-        errors = seg.get("errors", [])
-        if not isinstance(errors, list):
-            return None
-        for error in errors:
-            if not isinstance(error, dict):
-                return None
-            if error.get("severity") not in ("minor", "major", "critical"):
-                return None
-            if error.get("category") not in CATEGORIES:
-                return None
-        back_translation = seg.get("back_translation", "")
-        if not isinstance(back_translation, str):
-            return None
-        results[index] = JudgeResult(
-            max_severity=_max_severity(errors),
-            model_verdict=seg.get("verdict", ""),
-            errors=errors,
-            back_translation=back_translation,
-        )
+        seen.add(index)
+        results[index] = result
     if any(result is None for result in results):
         return None
-    return results
+    return cast("list[JudgeResult]", results)
 
 
 def _post_batch(payload: dict, model: str) -> dict | None:
@@ -306,7 +342,8 @@ def _post_batch(payload: dict, model: str) -> dict | None:
 def request_verdicts(
     requests: Sequence[JudgeRequest], *, model: str
 ) -> list[JudgeResult]:
-    """Judge every request; results in input order.
+    """
+    Judge every request; results in input order.
 
     Gate failures (disabled, no key, no model) raise JudgeError before
     any network call. Any batch failure (transport, HTTP >= 400,
@@ -329,7 +366,7 @@ def request_verdicts(
         for start in range(0, len(requests), batch_size)
     ]
     for position, batch in enumerate(batches):
-        segment_payloads = [_segment(index, req) for index, req in enumerate(batch)]
+        segment_payloads = list(starmap(_segment, enumerate(batch)))
         payload = {
             "model": model,
             "stream": False,

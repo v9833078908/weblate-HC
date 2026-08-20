@@ -9,7 +9,6 @@ from weblate.trans.tests.test_views import ViewTestCase
 
 
 class JudgeAutoFormTest(ViewTestCase):
-
     def setUp(self) -> None:
         super().setUp()
         # unit.review is denied project-wide unless review is enabled.

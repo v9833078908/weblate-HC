@@ -11,6 +11,7 @@ from django.urls import reverse
 
 from weblate.trans.models.judge import JudgeVerdict, compute_target_hash
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.state import STATE_TRANSLATED
 
 
 @override_settings(JUDGE_ENABLED=True, JUDGE_MAX_REPAIR_ATTEMPTS=1)
@@ -110,8 +111,6 @@ class JudgeCheckVisibilityTest(ViewTestCase):
 
     def test_a_judge_check_cannot_be_enforced(self) -> None:
         # A7: judge-reject in enforced_checks must not push state 11.
-        from weblate.utils.state import STATE_TRANSLATED
-
         unit = self.get_unit()
         unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
         self.make_reject(unit)
@@ -161,23 +160,43 @@ class JudgeVerdictCardTest(ViewTestCase):
         errors1 = (
             []
             if seat1 == "none"
-            else [{"span": "x", "category": "terminology", "severity": seat1,
-                   "description": "seat one's objection"}]
+            else [
+                {
+                    "span": "x",
+                    "category": "terminology",
+                    "severity": seat1,
+                    "description": "seat one's objection",
+                }
+            ]
         )
         errors2 = (
             []
             if seat2 == "none"
-            else [{"span": "y", "category": "fluency", "severity": seat2,
-                   "description": "seat two's objection"}]
+            else [
+                {
+                    "span": "y",
+                    "category": "fluency",
+                    "severity": seat2,
+                    "description": "seat two's objection",
+                }
+            ]
         )
         JudgeVerdict.objects.create(
-            unit=unit, max_severity=seat1, seat=1, run_id=run_id, errors=errors1,
+            unit=unit,
+            max_severity=seat1,
+            seat=1,
+            run_id=run_id,
+            errors=errors1,
             judge_model="vendor/model-a",
             target_hash=compute_target_hash(unit.get_target_plurals()),
             context_hash="c",
         )
         JudgeVerdict.objects.create(
-            unit=unit, max_severity=seat2, seat=2, run_id=run_id, errors=errors2,
+            unit=unit,
+            max_severity=seat2,
+            seat=2,
+            run_id=run_id,
+            errors=errors2,
             judge_model="vendor/model-b",
             target_hash=compute_target_hash(unit.get_target_plurals()),
             context_hash="c",
@@ -240,8 +259,11 @@ class JudgeBackTranslationTest(ViewTestCase):
         kwargs.setdefault("judge_model", "vendor/model-a")
         kwargs.setdefault("seat", 1)
         JudgeVerdict.objects.create(
-            unit=unit, max_severity="major", model_verdict="flag",
-            back_translation=back_translation, **kwargs,
+            unit=unit,
+            max_severity="major",
+            model_verdict="flag",
+            back_translation=back_translation,
+            **kwargs,
         )
         unit.run_checks()
 
@@ -261,7 +283,8 @@ class JudgeBackTranslationTest(ViewTestCase):
     def test_stale_verdict_does_not_render_its_back_translation(self) -> None:
         unit = self.get_unit()
         self.make_flag(
-            unit, back_translation="Outdated",
+            unit,
+            back_translation="Outdated",
             target_hash="stale-hash-matches-nothing",
         )
         response = self.client.get(unit.get_absolute_url())
