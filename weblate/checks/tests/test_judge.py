@@ -8,7 +8,12 @@ import uuid
 
 from weblate.checks.judge import JUDGE_CHECKS, JudgeFlagCheck, JudgeRejectCheck
 from weblate.checks.models import CHECKS, Check
-from weblate.trans.models.judge import JudgeVerdict, compute_target_hash
+from weblate.trans.models.judge import (
+    JudgeVerdict,
+    active_verdict,
+    compute_context_hash,
+    compute_target_hash,
+)
 from weblate.trans.tests.test_views import ViewTestCase
 
 
@@ -66,6 +71,25 @@ class JudgeCheckTest(ViewTestCase):
         unit.run_checks()
         unit.clear_checks_cache()
         self.assertEqual(unit.all_checks_names & JUDGE_CHECKS, {"judge-flag"})
+
+    def test_a_context_drift_keeps_the_projected_row(self) -> None:
+        # The card shows a context-drifted verdict as "relates to a
+        # previous version" (active_verdict). The row must follow that
+        # reader: a filter and a card may never disagree about a unit.
+        unit = self.get_unit()
+        self.make(
+            unit,
+            "critical",
+            context_hash=compute_context_hash(
+                source=unit.source,
+                note="the note as it was when the judge ran",
+                glossary_terms=[],
+            ),
+        )
+        unit.run_checks()
+        unit.clear_checks_cache()
+        self.assertIn("judge-reject", unit.all_checks_names)
+        self.assertIsNotNone(active_verdict(unit))
 
     def test_description_carries_escaped_evidence(self) -> None:
         unit = self.get_unit()

@@ -3,14 +3,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-Judge checks: a Check row derived from the current JudgeVerdict.
+Judge checks: a Check row derived from the active JudgeVerdict.
 
 The check never computes anything itself — it reads the active verdict
-(weblate.trans.models.judge.current_verdict). That keeps Unit.run_checks
-the single writer of judge-* rows, so they cannot diverge from the
-verdict and staleness is free (a stale verdict yields no active round,
-so run_checks removes the row). The trans-model import is local: this
-module is loaded at app start via CHECK_LIST, before models are ready.
+(weblate.trans.models.judge.active_verdict), the same reader the unit
+card uses, so a filter and a card can never disagree about a unit. That
+keeps Unit.run_checks the single writer of judge-* rows, so they cannot
+diverge from the verdict and staleness is free (a verdict describing
+older text yields no active round, so run_checks removes the row). A
+verdict whose glossary or note context drifted stays projected and is
+marked on the card; hiding it here would strand the card's "relates to a
+previous version" state behind an empty filter. The trans-model import is
+local: this module is loaded at app start via CHECK_LIST, before models
+are ready.
 """
 
 from __future__ import annotations
@@ -45,10 +50,10 @@ class BaseJudgeCheck(TargetCheck):
         # verdict would keep the projected row stale. Two reads per
         # run_checks pass instead of one is the price of correctness.
         from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
-            current_verdict,
+            active_verdict,
         )
 
-        return current_verdict(unit)
+        return active_verdict(unit)
 
     def check_target_unit(self, sources, targets, unit) -> bool:
         verdict = self._active_verdict(unit)
