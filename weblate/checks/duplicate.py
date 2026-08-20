@@ -57,7 +57,15 @@ class DuplicateCheck(TargetCheck):
         for word in NON_WORD.split(text):
             if not word:
                 continue
-            if word not in ignored and len(word) >= 2 and previous == word:
+            # A number is not a word: a language which groups digits with spaces
+            # (100 000 000) would otherwise report every such number, while the
+            # source spelling it as 100,000,000 has no repetition at all.
+            if (
+                word not in ignored
+                and len(word) >= 2
+                and not word.isdigit()
+                and previous == word
+            ):
                 group += 1
             elif group > 1 and previous is not None:
                 groups.append(group)

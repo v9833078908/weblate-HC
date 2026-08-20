@@ -37,6 +37,22 @@ class DuplicateCheckTest(CheckTestCase):
             self._run_check("Mám 222 222 citrónů", source="I have 222 222 lemons")
         )
 
+    def test_check_number_group_separator(self) -> None:
+        # The source groups digits with a comma, the target with spaces, which
+        # is a number and not a repeated word
+        self.assertFalse(
+            self._run_check(
+                "Limit je 100 000 000 kreditů",
+                source="The limit is 100,000,000 credits",
+            )
+        )
+
+    def test_check_number_between_words(self) -> None:
+        # A number separates the words around it
+        self.assertFalse(self._run_check("mám 5 mám"))
+        # A repeated word next to a number is still reported
+        self.assertTrue(self._run_check("mám mám 100 000 000"))
+
     def test_check_duplicated_letter(self) -> None:
         self.assertFalse(self._run_check("I have A A A"))
 

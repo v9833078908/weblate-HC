@@ -220,6 +220,31 @@ class XMLCharsAroundTagsCheckTest(CheckTestCase):
             (".<a>word</a>", "و<a>كلمة</a>", ""),
         )
 
+    def test_combining_marks(self) -> None:
+        # A Devanagari word commonly ends with a combining vowel sign or
+        # anusvara, which belongs to the word and is not a separator
+        self.do_test(
+            False,
+            ("<b>Press the button</b> to start.", "<b>बटन दबाएं</b>।", ""),
+            lang="hi",
+        )
+        # A missing space in the same script is still reported
+        self.do_test(True, ("text <a>word</a>", "पाठ<a>शब्द</a>", ""), lang="hi")
+
+    def test_no_space_languages(self) -> None:
+        # Japanese does not separate words with spaces and attaches a particle
+        # directly to the tagged word, so there is nothing to align
+        source = "<b>Level up</b> to unlock new ships."
+        target = "<b>レベル</b>を上げて、新しい艦船をアンロックしよう。"
+        for lang in ("ja", "zh_Hans", "ko", "th"):
+            with self.subTest(lang=lang):
+                self.do_test(False, (source, target, ""), lang=lang)
+                self.assertTrue(
+                    self.check.should_skip(make_unit(None, "", lang, source=source))
+                )
+        # The very same strings are still compared for a language using spaces
+        self.do_test(True, (source, target, ""), lang="de")
+
 
 class MarkdownRefLinkCheckTest(CheckTestCase):
     check = MarkdownRefLinkCheck()
