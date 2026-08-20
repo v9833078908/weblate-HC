@@ -95,7 +95,7 @@ class MultipleFailingCheck(SourceCheck, BatchCheckMixin):
         from weblate.checks.models import Check
 
         return (
-            Check.objects.filter(unit__source_unit_id__in=unit_ids)
+            Check.objects.filter(unit__source_unit_id__in=unit_ids, dismissed=False)
             .exclude(unit_id__in=unit_ids)
             .select_related("unit__translation")
         )
