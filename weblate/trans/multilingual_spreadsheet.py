@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import csv
 import xml.etree.ElementTree
-
 from collections import Counter
 from dataclasses import dataclass
 from io import BytesIO, StringIO
@@ -21,8 +20,8 @@ from django.core.exceptions import ValidationError
 from weblate.formats.exporters import CSVExporter
 from weblate.formats.external import CSV_DIALECT
 from weblate.formats.ttkit import CSVUnit
-from weblate.trans.protected_tokens import markup_tokens, placeholder_sequence
 from weblate.trans.models import Unit
+from weblate.trans.protected_tokens import markup_tokens, placeholder_sequence
 from weblate.utils.validators import validate_translation_upload_size
 from weblate.utils.zip import ZipSafetyError, ZipSafetyLimits, validate_zip_members
 
@@ -144,7 +143,7 @@ def export_component(component: Component, format_name: Literal["csv", "xlsx"]) 
     for source_unit in source_units:
         values = [*_identity(component, source_unit, schema.has_context)[:1]]
         values.extend(
-            units[(source_unit.pk, language)].target
+            units[source_unit.pk, language].target
             for language in languages
         )
         if schema.has_context:
@@ -162,7 +161,8 @@ def _parse_csv(content: bytes) -> list[list[str]]:
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError as error:
-        raise ValidationError("CSV must use UTF-8 encoding.") from error
+        msg = "CSV must use UTF-8 encoding."
+        raise ValidationError(msg) from error
     return [
         [CSVUnit.unescape_csv(value) for value in row]
         for row in csv.reader(StringIO(text), dialect=CSV_DIALECT)
@@ -197,7 +197,8 @@ def _parse_xlsx(component: Component, content: bytes) -> list[list[str]]:
         KeyError,
         xml.etree.ElementTree.ParseError,
     ) as error:
-        raise ValidationError("Invalid XLSX upload.") from error
+        msg = "Invalid XLSX upload."
+        raise ValidationError(msg) from error
     if len(workbook.worksheets) != 1:
         _error("XLSX upload must contain exactly one worksheet.")
     worksheet = workbook.worksheets[0]

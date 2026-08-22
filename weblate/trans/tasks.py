@@ -1337,7 +1337,6 @@ def cleanup_loc_kit_drafts() -> None:
     qs.delete()
 
 
-
 @app.task(trail=False)
 def cleanup_component_spreadsheet_import_drafts() -> None:
     # ruff: ignore[import-outside-top-level]
@@ -1347,6 +1346,7 @@ def cleanup_component_spreadsheet_import_drafts() -> None:
     for draft in qs.iterator():
         draft.delete_storage()
     qs.delete()
+
 
 def report_restore_component_progress(completed: int, total: int) -> None:
     if total:

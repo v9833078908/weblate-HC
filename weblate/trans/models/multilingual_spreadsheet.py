@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from django.conf import settings
 
+from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 from django.db import models
 from django.db.models.signals import post_delete
@@ -32,8 +32,8 @@ class ComponentSpreadsheetImportDraft(models.Model):
     class State(models.TextChoices):
         PREVIEW_READY = "preview-ready", gettext_lazy("Preview ready")
         CONSUMED = "consumed", gettext_lazy("Consumed")
-    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -94,5 +94,7 @@ class ComponentSpreadsheetImportDraft(models.Model):
 
 
 @receiver(post_delete, sender=ComponentSpreadsheetImportDraft)
-def _delete_draft_storage(sender, instance: ComponentSpreadsheetImportDraft, **kwargs) -> None:
+def _delete_draft_storage(
+    sender, instance: ComponentSpreadsheetImportDraft, **kwargs
+) -> None:
     instance.delete_storage()

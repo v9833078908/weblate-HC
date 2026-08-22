@@ -185,11 +185,6 @@ real_patterns = [
         name="download_component_list",
     ),
     path(
-        "upload-multilingual/<object_path:path>/",
-        weblate.trans.views.files.multilingual_upload,
-        name="multilingual-upload",
-    ),
-    path(
         "upload-multilingual/confirm/<uuid:token>/",
         weblate.trans.views.files.multilingual_confirm,
         name="multilingual-confirm",
@@ -198,6 +193,11 @@ real_patterns = [
         "upload-multilingual/cancel/<uuid:token>/",
         weblate.trans.views.files.multilingual_cancel,
         name="multilingual-cancel",
+    ),
+    path(
+        "upload-multilingual/<object_path:path>/",
+        weblate.trans.views.files.multilingual_upload,
+        name="multilingual-upload",
     ),
     path(
         "upload/<object_path:path>/",
