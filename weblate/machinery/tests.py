@@ -39,6 +39,7 @@ from google.cloud.translate import (
 )
 from google.cloud.translate_v3 import Glossary
 from google.oauth2 import service_account
+from weblate_customization.checks import GameMarkupCheck
 
 from weblate.checks import flags as check_flags
 from weblate.checks import models as check_models
@@ -7634,6 +7635,73 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             "Unterminated string",
             str(error.exception.__cause__),
         )
+
+
+class ConditionalDslLLMTranslationTest(TestCase):
+    def test_translate_preserves_conditional_dsl_syntax(self) -> None:
+        machine = OpenAITranslation(
+            {"key": "x", "model": "auto", "persona": "", "style": ""}
+        )
+        amount = "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+        human_timer_en = (
+            "{hours:cond:>0?{hours}h. |}"
+            "{minutes:cond:>0?{minutes}m. |}"
+            "{seconds:cond:>=0?{seconds}s.|}"
+        )
+        human_timer_de = (
+            "{hours:cond:>0?{hours}Std. |}"
+            "{minutes:cond:>0?{minutes}Min. |}"
+            "{seconds:cond:>=0?{seconds}Sek.|}"
+        )
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            parts = json.loads(content)["strings"][0]["parts"]
+            placeholders = [part for part in parts if part["type"] == "placeholder"]
+            self.assertTrue(placeholders)
+            self.assertTrue(
+                all(
+                    part["kind"] == "syntax" and not part["translatable"]
+                    for part in placeholders
+                )
+            )
+            translated_parts = []
+            for part in parts:
+                translated = part.copy()
+                if translated["type"] == "text":
+                    translated["text"] = {
+                        "Amount: ": "Betrag: ",
+                        "h. ": "Std. ",
+                        "m. ": "Min. ",
+                        "s.": "Sek.",
+                    }.get(translated["text"], translated["text"])
+                translated_parts.append(translated)
+            return json.dumps([{"parts": translated_parts}])
+
+        original_check = check_models.CHECKS.get("game-markup")
+        check_models.CHECKS["game-markup"] = GameMarkupCheck()
+        try:
+            with patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ):
+                amount_translation = machine.translate(
+                    make_unit(code="de", source=f"Amount: {amount}")
+                )
+                timer_translation = machine.translate(
+                    make_unit(code="de", source=human_timer_en)
+                )
+        finally:
+            if original_check is None:
+                check_models.CHECKS.data.pop("game-markup")
+            else:
+                check_models.CHECKS["game-markup"] = original_check
+
+        self.assertEqual(amount_translation[0][0]["text"], f"Betrag: {amount}")
+        self.assertEqual(timer_translation[0][0]["text"], human_timer_de)
 
 
 class OpenAILLMContextTest(FixtureComponentTestCase):

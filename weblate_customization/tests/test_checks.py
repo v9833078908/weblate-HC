@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from itertools import pairwise
+
 from weblate_customization.checks import (
     CyrillicLeakCheck,
     GameLengthCheck,
@@ -13,10 +15,62 @@ from weblate_customization.checks import (
     GameMarkupCheck,
     GameNumberCheck,
     GameTokenCheck,
+    conditional_dsl_syntax_spans,
 )
 
 from weblate.checks.tests.test_checks import CheckTestCase
 from weblate.trans.tests.factories import make_unit
+
+AMOUNT_FORMATTED = (
+    "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+)
+TIMER = "{hours:cond:>0?{hours:00}:|}{minutes:00}:{seconds:00}"
+HUMAN_TIMER_EN = (
+    "{hours:cond:>0?{hours}h. |}"
+    "{minutes:cond:>0?{minutes}m. |}"
+    "{seconds:cond:>=0?{seconds}s.|}"
+)
+HUMAN_TIMER_DE = (
+    "{hours:cond:>0?{hours}Std. |}"
+    "{minutes:cond:>0?{minutes}Min. |}"
+    "{seconds:cond:>=0?{seconds}Sek.|}"
+)
+
+
+class ConditionalDslSyntaxSpansTest(CheckTestCase):
+    def test_protects_conditional_syntax_but_not_branch_text(self) -> None:
+        for text in (AMOUNT_FORMATTED, TIMER):
+            spans = conditional_dsl_syntax_spans(text)
+            protected = "".join(text[start:end] for start, end in spans)
+            self.assertIn(":cond:", protected)
+            self.assertIn("?", protected)
+            self.assertIn(
+                "{value:amount()}", protected if text == AMOUNT_FORMATTED else text
+            )
+            self.assertEqual(spans, sorted(spans))
+            self.assertTrue(all(left[1] <= right[0] for left, right in pairwise(spans)))
+        self.assertIn(
+            (TIMER.index("}:{") + 1, TIMER.index("}:{") + 2),
+            conditional_dsl_syntax_spans(TIMER),
+        )
+        self.assertFalse(
+            any(
+                HUMAN_TIMER_DE[start:end] in {"Std.", "Min.", "Sek."}
+                for start, end in conditional_dsl_syntax_spans(HUMAN_TIMER_DE)
+            )
+        )
+
+    def test_malformed_or_nonconditional_text_has_no_conditional_spans(self) -> None:
+        self.assertEqual(
+            conditional_dsl_syntax_spans(AMOUNT_FORMATTED[:-1]),
+            [],
+        )
+        self.assertEqual(conditional_dsl_syntax_spans(TIMER[:-1]), [])
+        self.assertEqual(conditional_dsl_syntax_spans("{" * 100_000), [])
+        self.assertEqual(
+            conditional_dsl_syntax_spans("Text {value:00}: text"),
+            [],
+        )
 
 
 class GameMarkupCheckTest(CheckTestCase):
@@ -71,6 +125,19 @@ class GameMarkupCheckTest(CheckTestCase):
         )
         self.assertTrue(self.check.check_single(source, "<b>Value</b>", None))
         self.assertFalse(self.check.check_single(source, "", None))
+
+    def test_conditional_dsl_highlights_leave_branch_text_translatable(self) -> None:
+        unit = make_unit(source=AMOUNT_FORMATTED, code="de")
+        highlights = self.check.check_highlight(AMOUNT_FORMATTED, unit)
+        self.assertTrue(highlights)
+        self.assertTrue(all(highlight.kind == "syntax" for highlight in highlights))
+        self.assertFalse(
+            any(
+                highlight.text in {"Std.", "Min.", "Sek."}
+                for highlight in self.check.check_highlight(HUMAN_TIMER_DE, unit)
+            )
+        )
+        self.assertFalse(self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_DE, unit))
 
 
 class GameLineBreakCheckTest(CheckTestCase):

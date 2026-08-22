@@ -101,6 +101,42 @@ class MultilingualSpreadsheetExportTest(ViewTestCase):
         with self.assertRaises(ValidationError):
             build_preview(self.component, parsed)
 
+    def test_preview_accepts_translated_conditional_branches(self) -> None:
+        from weblate.trans.multilingual_spreadsheet import (
+            build_preview,
+            export_component,
+            parse_upload,
+        )
+
+        source = (
+            "{hours:cond:>0?{hours}h. |}"
+            "{minutes:cond:>0?{minutes}m. |}"
+            "{seconds:cond:>=0?{seconds}s.|}"
+        )
+        target = (
+            "{hours:cond:>0?{hours}Std. |}"
+            "{minutes:cond:>0?{minutes}Min. |}"
+            "{seconds:cond:>=0?{seconds}Sek.|}"
+        )
+        unit = self.translation.unit_set.order_by("pk").first()
+        assert unit is not None
+        source_unit = unit.source_unit
+        source_unit.source = source
+        source_unit.target = source
+        source_unit.save()
+        unit.source = source
+        unit.save(update_fields=["source"])
+        unit.translate(self.user, target, unit.state)
+
+        parsed = parse_upload(
+            self.component,
+            SimpleUploadedFile(
+                "translations.csv", export_component(self.component, "csv")
+            ),
+        )
+
+        self.assertTrue(build_preview(self.component, parsed).changes)
+
 
 class MultilingualSpreadsheetValidationTest(ViewTestCase):
     def create_component(self):

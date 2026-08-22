@@ -14,12 +14,18 @@ from __future__ import annotations
 
 import unicodedata
 from collections import Counter
+from itertools import pairwise
 
 import regex
 from django.utils.translation import gettext_lazy
 
-from weblate.checks.base import TargetCheck
-from weblate.trans.protected_tokens import MARKUP, markup_tokens, placeholder_sequence
+from weblate.checks.base import Highlight, TargetCheck
+from weblate.trans.protected_tokens import (
+    MARKUP,
+    PLACEHOLDER_PATTERN,
+    markup_tokens,
+    placeholder_sequence,
+)
 
 # A number in the source is a fact the player acts on: damage, radius, seconds.
 # Losing or altering it is a defect in every language. A number the target adds
@@ -102,6 +108,78 @@ def _tokens_dsl(text: str) -> Counter[str]:
     return Counter(match.group(1) for match in TOKEN_PATTERN.finditer(text))
 
 
+_CONDITIONAL_HEADER = regex.compile(
+    r"(?P<identifier>[A-Za-z_][A-Za-z0-9_]*):cond:(?P<comparison>[^{}?|]+)\?"
+)
+
+
+def _balanced_brace_blocks(
+    text: str,
+) -> list[tuple[int, int, list[tuple[int, int]]]]:
+    """Return a non-recursive tree of balanced brace blocks in one pass."""
+    blocks: list[tuple[int, int, list[tuple[int, int]]]] = []
+    starts: list[tuple[int, list[tuple[int, int]]]] = []
+    for position, char in enumerate(text):
+        if char == "{":
+            starts.append((position, []))
+        elif char == "}" and starts:
+            start, children = starts.pop()
+            block = (start, position + 1, children)
+            blocks.append(block)
+            if starts:
+                starts[-1][1].append((start, position + 1))
+    return [] if starts else blocks
+
+
+def conditional_dsl_syntax_spans(text: str) -> list[tuple[int, int]]:
+    """
+    Return immutable spans in the documented Hero Craft conditional DSL.
+
+    Branch text remains unprotected so it can be translated. Nested brace
+    placeholders, delimiters, and a directly adjacent placeholder separator
+    are syntax rather than rendered text.
+    """
+    blocks = _balanced_brace_blocks(text)
+    spans: list[tuple[int, int]] = []
+
+    for start, end, children in blocks:
+        header = _CONDITIONAL_HEADER.match(text, start + 1, end - 1)
+        if header is None:
+            continue
+
+        # The header's comparison cannot cross a nested placeholder. The
+        # matching outer brace proved every nested placeholder is complete.
+        spans.extend(
+            (
+                (start, start + 1),
+                (start + 1, header.end()),
+                (end - 1, end),
+            )
+        )
+        spans.extend(children)
+
+        depth = 0
+        for position in range(header.end(), end - 1):
+            char = text[position]
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+            elif char == "|" and depth == 0:
+                spans.append((position, position + 1))
+
+    simple_placeholders = [
+        (match.start(), match.end())
+        for match in PLACEHOLDER_PATTERN.finditer(text)
+        if match.group().startswith("{")
+    ]
+    for previous, following in pairwise(simple_placeholders):
+        if previous[1] + 1 == following[0] and text[previous[1]] == ":":
+            spans.append((previous[1], following[0]))
+
+    return sorted({span for span in spans if span[0] < span[1]})
+
+
 class GameMarkupCheck(TargetCheck):
     """Translation markup must match source: tags (with attributes) and placeholders."""
 
@@ -120,6 +198,23 @@ class GameMarkupCheck(TargetCheck):
         return Counter(markup_tokens(source)) != Counter(
             markup_tokens(target)
         ) or placeholder_sequence(source) != placeholder_sequence(target)
+
+    def check_highlight(self, source: str, unit):
+        if self.should_skip(unit):
+            return []
+
+        spans: dict[tuple[int, int], str] = {}
+        for match in MARKUP.finditer(source):
+            spans[match.start(), match.end()] = (
+                "markup" if match.group().startswith("<") else "syntax"
+            )
+        for span in conditional_dsl_syntax_spans(source):
+            spans[span] = "syntax"
+
+        return [
+            Highlight(start, end, source[start:end], kind=kind)
+            for (start, end), kind in sorted(spans.items())
+        ]
 
 
 class GameLineBreakCheck(TargetCheck):

@@ -12,8 +12,15 @@ from weblate_customization.autofixes import (
     LineSeparatorSpacing,
     RemoveAddedFinalStop,
 )
+from weblate_customization.checks import GameMarkupCheck
 
+from weblate.checks import models as check_models
 from weblate.trans.tests.factories import make_unit
+
+AMOUNT_FORMATTED = (
+    "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+)
+TIMER = "{hours:cond:>0?{hours:00}:|}{minutes:00}:{seconds:00}"
 
 
 class LineSeparatorSpacingTest(SimpleTestCase):
@@ -265,6 +272,35 @@ class AddFrenchPunctuationSpacingTest(SimpleTestCase):
         self.assertEqual(
             self.fix.fix_target(["Vraiment?"], unit), (["Vraiment?"], False)
         )
+
+    def test_conditional_dsl_syntax_is_unchanged(self) -> None:
+        source = f"Amount: {AMOUNT_FORMATTED}"
+        target = f"Montant: {AMOUNT_FORMATTED}"
+        unit = make_unit(source=source, code="fr")
+        original_check = check_models.CHECKS.get("game-markup")
+        check_models.CHECKS["game-markup"] = GameMarkupCheck()
+        try:
+            self.assertEqual(
+                self.fix.fix_target([target], unit),
+                ([f"Montant\u00a0: {AMOUNT_FORMATTED}"], True),
+            )
+        finally:
+            if original_check is None:
+                check_models.CHECKS.data.pop("game-markup")
+            else:
+                check_models.CHECKS["game-markup"] = original_check
+
+    def test_adjacent_placeholder_separator_is_unchanged(self) -> None:
+        unit = make_unit(source=TIMER, code="fr")
+        original_check = check_models.CHECKS.get("game-markup")
+        check_models.CHECKS["game-markup"] = GameMarkupCheck()
+        try:
+            self.assertEqual(self.fix.fix_target([TIMER], unit), ([TIMER], False))
+        finally:
+            if original_check is None:
+                check_models.CHECKS.data.pop("game-markup")
+            else:
+                check_models.CHECKS["game-markup"] = original_check
 
 
 class TerminalAndFrenchSpacingOrderTest(SimpleTestCase):
