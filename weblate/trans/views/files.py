@@ -11,6 +11,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import DatabaseError, transaction
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext
 from django.views.decorators.http import require_POST
 
@@ -39,8 +40,11 @@ from weblate.utils.state import STATE_EMPTY, STATE_TRANSLATED
 from weblate.utils import messages
 from weblate.utils.errors import report_error
 from weblate.utils.files import get_upload_message
+from weblate.trans.util import get_upload_error_message
+from weblate.utils.data import data_dir
 from weblate.utils.stats import CategoryLanguage, ProjectLanguage
 from weblate.utils.views import (
+
     download_translation_file,
     parse_path,
     show_form_errors,
@@ -274,7 +278,13 @@ def multilingual_download(request: AuthenticatedHttpRequest, path, format_name: 
         raise PermissionDenied
     if format_name not in {"csv", "xlsx"}:
         raise Http404
-    content = export_component(component, format_name)
+    try:
+        content = export_component(component, format_name)
+    except ValidationError as error:
+        message = error.messages[0] if error.messages else str(error)
+        messages.error(request, message)
+        return redirect(component)
+
     content_type = (
         "text/csv; charset=utf-8"
         if format_name == "csv"
@@ -287,9 +297,57 @@ def multilingual_download(request: AuthenticatedHttpRequest, path, format_name: 
     return response
 
 
+def _baseline_snapshot(component: Component) -> dict[str, list]:
+    """Snapshot every unit in the component (incl. source) for stale detection."""
+    return {
+        str(unit.pk): [unit.target, unit.state]
+        for unit in Unit.objects.filter(translation__component=component)
+    }
+
+
+def _apply_preview(component: Component, preview, user) -> None:
+    """Apply a parsed preview to the component, mapping rows to source units by (source, context)."""
+    from weblate.trans.multilingual_spreadsheet import _identity, _schema
+
+    source_units = list(component.source_translation.unit_set.select_for_update())
+    schema = _schema(component, source_units)
+    source_by_identity = {
+        _identity(component, unit, schema.has_context): unit for unit in source_units
+    }
+    source_code = component.source_language.code
+    for row in preview.parsed.rows:
+        identity = (
+            (row.values[0], row.values[-1])
+            if schema.has_context
+            else (row.values[0],)
+        )
+        source = source_by_identity.get(identity)
+        if source is None:
+            msg = f"Unknown row identity at line {row.row_number}: {row.values!r}"
+            raise ValidationError(msg)
+        for column, target in zip(
+            preview.parsed.headers[1:], row.values[1:], strict=True
+        ):
+            if column in {"context", source_code}:
+                continue
+            unit = Unit.objects.select_for_update().get(
+                translation__component=component,
+                translation__language__code=column,
+                source_unit=source,
+            )
+            if unit.target != target:
+                unit.translate(
+                    user,
+                    target,
+                    STATE_TRANSLATED if target else STATE_EMPTY,
+                    propagate=False,
+                    select_for_update=False,
+                )
+
 
 def multilingual_upload(request: AuthenticatedHttpRequest, path):
     component = parse_path(request, path, (Component,))
+
     if not request.user.has_perm("upload.perform", component):
         raise PermissionDenied
     if request.method == "POST":
@@ -317,14 +375,8 @@ def multilingual_upload(request: AuthenticatedHttpRequest, path):
                             "rows": [row.values for row in preview.parsed.rows],
                         }
                     ),
-                    baseline_json=json.dumps(
-                        {
-                            str(unit.pk): [unit.target, unit.state]
-                            for unit in Unit.objects.filter(
-                                translation__component=component
-                            ).exclude(translation=component.source_translation)
-                        }
-                    ),
+                    baseline_json=json.dumps(_baseline_snapshot(component)),
+
                 )
                 draft.uploaded.save(uploaded.name, uploaded, save=False)
                 draft.save()
@@ -338,65 +390,89 @@ def multilingual_upload(request: AuthenticatedHttpRequest, path):
 
 @require_POST
 def multilingual_confirm(request: AuthenticatedHttpRequest, token):
+    """Apply a previously staged multilingual spreadsheet import."""
     draft = ComponentSpreadsheetImportDraft.get_active(
         token=token, owner=request.user, session_key=request.session.session_key
     )
     if draft is None:
         raise Http404
     component = draft.component
+    if component.locked:
+        messages.error(request, gettext("Access denied."))
+        return redirect(component)
     if not request.user.has_perm("upload.perform", component):
         raise PermissionDenied
-    with transaction.atomic():
-        baseline = json.loads(draft.baseline_json)
-        current = {
-            str(unit.pk): [unit.target, unit.state]
-            for unit in Unit.objects.select_for_update().filter(
-                translation__component=component
-            ).exclude(translation=component.source_translation)
-        }
-        if current != baseline:
-            raise ValidationError("The component changed after preview.")
-        parsed = parse_upload(component, draft.uploaded)
-        build_preview(component, parsed)
-        source_units = component.source_translation.unit_set.select_for_update()
-        key_field = "context" if component.has_template() else "source"
-        source_by_key = {getattr(unit, key_field): unit for unit in source_units}
-        for row in parsed.rows:
-            source = source_by_key[row.values[0]]
-            for language, target in zip(parsed.headers[1:], row.values[1:], strict=True):
-                if language in {"context", component.source_language.code}:
-                    continue
-                unit = Unit.objects.select_for_update().get(
-                    translation__component=component,
-                    translation__language__code=language,
-                    source_unit=source,
+    try:
+        with transaction.atomic():
+            locked_component = (
+                Component.objects.select_for_update()
+                .filter(pk=component.pk)
+                .first()
+            )
+            if locked_component is None or locked_component.locked:
+                messages.error(request, gettext("Access denied."))
+                return redirect(component)
+            locked_draft = (
+                ComponentSpreadsheetImportDraft.objects.select_for_update()
+                .filter(
+                    pk=draft.pk,
+                    state=ComponentSpreadsheetImportDraft.State.PREVIEW_READY,
+                    expires_at__gt=timezone_now(),
                 )
-                if unit.target != target:
-                    unit.translate(
-                        request.user,
-                        target,
-                        STATE_TRANSLATED if target else STATE_EMPTY,
-                        propagate=False,
-                        select_for_update=False,
-                    )
-        draft.state = ComponentSpreadsheetImportDraft.State.CONSUMED
-        draft.save(update_fields=["state"])
+                .first()
+            )
+            if locked_draft is None:
+                raise Http404
+            baseline = json.loads(locked_draft.baseline_json)
+            current = {
+                str(unit.pk): [unit.target, unit.state]
+                for unit in Unit.objects.select_for_update().filter(
+                    translation__component=component
+                )
+            }
+            if current != baseline:
+                messages.error(
+                    request,
+                    gettext("The component changed after preview; reload to retry."),
+                )
+                return redirect(component)
+            parsed = parse_upload(component, locked_draft.uploaded)
+            preview = build_preview(component, parsed)
+            _apply_preview(component, preview, request.user)
+            locked_draft.state = ComponentSpreadsheetImportDraft.State.CONSUMED
+            locked_draft.save(update_fields=["state"])
+    except ValidationError as error:
+        messages.error(request, "; ".join(error.messages))
+        return redirect(component)
     messages.success(request, gettext("Multilingual spreadsheet imported."))
     return redirect(component)
 
 
+
+
 @require_POST
 def multilingual_cancel(request: AuthenticatedHttpRequest, token):
-    draft = ComponentSpreadsheetImportDraft.get_active(
-        token=token, owner=request.user, session_key=request.session.session_key
-    )
-    if draft is None:
-        raise Http404
-    component = draft.component
-    if not request.user.has_perm("upload.perform", component):
-        raise PermissionDenied
-    draft.delete()
+    """Discard a previously staged multilingual spreadsheet import."""
+    with transaction.atomic():
+        draft = (
+            ComponentSpreadsheetImportDraft.objects.select_for_update()
+            .filter(
+                token=token,
+                owner=request.user,
+                session_key=request.session.session_key,
+                state=ComponentSpreadsheetImportDraft.State.PREVIEW_READY,
+            )
+            .first()
+        )
+        if draft is None or draft.is_expired:
+            raise Http404
+        component = draft.component
+        if not request.user.has_perm("upload.perform", component):
+            raise PermissionDenied
+        draft.delete()
     return redirect(component)
+
+
 
 @require_POST
 def upload(request: AuthenticatedHttpRequest, path):

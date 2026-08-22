@@ -240,6 +240,108 @@ class MultilingualSpreadsheetPluralTest(ViewTestCase):
                 SimpleUploadedFile("translations.csv", b"key,en,cs\nhello,hello,ahoj\n"),
             )
 
+    def test_plural_component_download_returns_error_redirect(self) -> None:
+        from django.urls import reverse
+
+        from django.contrib.messages import get_messages
+
+        manager = self.user
+        manager.is_superuser = True
+        manager.save()
+        self.client.force_login(manager)
+        for format_name in ("csv", "xlsx"):
+            with self.subTest(format_name):
+                response = self.client.get(
+                    reverse(
+                        "multilingual-download",
+                        kwargs={
+                            "path": self.component.get_url_path(),
+                            "format_name": format_name,
+                        },
+                    ),
+                    follow=True,
+                )
+                self.assertEqual(response.status_code, 200)
+                rendered = [str(message) for message in get_messages(response.wsgi_request)]
+                self.assertTrue(
+                    any("Plural units" in text for text in rendered),
+                    rendered,
+                )
+
+    def test_preview_renders_table_and_cancel_button(self) -> None:
+        import csv
+        from io import StringIO
+
+        from django.urls import reverse
+
+        from weblate.trans.models.multilingual_spreadsheet import (
+            ComponentSpreadsheetImportDraft,
+        )
+        from weblate.trans.multilingual_spreadsheet import export_component
+
+        self.make_manager()
+        self.user.clear_permissions_cache()
+        self.client.force_login(self.user)
+        self.component.source_translation.unit_set.all().delete()
+        self.component.source_translation.add_unit(
+            None, "ctx-a", "Hello", target="Hello", author=self.user
+        )
+        cs = self.component.translation_set.get(language__code="cs")
+        cs_unit = cs.unit_set.get(context="ctx-a")
+        cs_unit.translate(self.user, "Ahoj", 20)
+        cs_unit.refresh_from_db()
+        self.assertEqual(cs_unit.target, "Ahoj")
+
+
+        export_bytes = export_component(self.component, "csv")
+        rows = list(csv.reader(StringIO(export_bytes.decode("utf-8"))))
+        headers = rows[0]
+        source_code = self.component.source_language.code
+        skip_indexes = {0}  # key column
+        if "context" in headers:
+            skip_indexes.add(headers.index("context"))
+        if source_code in headers:
+            skip_indexes.add(headers.index(source_code))
+        edited_rows = [headers]
+        for row in rows[1:]:
+            new_row = list(row)
+            for column_index, value in enumerate(new_row):
+                if column_index in skip_indexes:
+                    continue
+                new_row[column_index] = value + " nov"
+            edited_rows.append(new_row)
+        buffer = StringIO()
+        csv.writer(buffer).writerows(edited_rows)
+        new_content = buffer.getvalue().encode("utf-8")
+
+        uploaded = SimpleUploadedFile("translations.csv", new_content)
+        response = self.client.post(
+            reverse(
+                "multilingual-upload",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            data={"file": uploaded},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<th scope=\"col\">en</th>")
+        self.assertContains(response, "<th scope=\"col\">cs</th>")
+        self.assertContains(response, "Hello nov")
+        self.assertContains(response, "/upload-multilingual/cancel/")
+        self.assertContains(response, "/upload-multilingual/confirm/")
+
+        draft = ComponentSpreadsheetImportDraft.objects.get(
+            component=self.component, owner=self.user
+        )
+        cancel_response = self.client.post(
+            reverse("multilingual-cancel", kwargs={"token": draft.token})
+        )
+        self.assertEqual(cancel_response.status_code, 302)
+        self.assertFalse(
+            ComponentSpreadsheetImportDraft.objects.filter(pk=draft.pk).exists()
+        )
+
+
 
 class ComponentSpreadsheetImportDraftCleanupTest(ViewTestCase):
     def test_cleanup_removes_expired_draft_and_private_file(self) -> None:

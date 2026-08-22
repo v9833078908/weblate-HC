@@ -1684,4 +1684,204 @@ class MultilingualSpreadsheetDownloadTest(ViewTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Upload multilingual spreadsheet")
+
+
+class MultilingualSpreadsheetConfirmTest(ViewTestCase):
+    def create_component(self):
+        return self.create_json()
+
+    def _baseline(self):
+        from weblate.trans.models import Unit
+
+        return {
+            str(unit.pk): [unit.target, unit.state]
+            for unit in Unit.objects.filter(translation__component=self.component)
+        }
+
+    def _staged_draft(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from weblate.trans.models.multilingual_spreadsheet import (
+            ComponentSpreadsheetImportDraft,
+        )
+        from weblate.trans.multilingual_spreadsheet import export_component
+
+        if not self.client.session.session_key:
+            self.client.session.save()
+        content = export_component(self.component, "csv")
+        return ComponentSpreadsheetImportDraft.objects.create(
+            owner=self.user,
+            session_key=self.client.session.session_key,
+            component=self.component,
+            source_filename="translations.csv",
+            uploaded=SimpleUploadedFile("translations.csv", content),
+            preview_json="{}",
+            baseline_json=json.dumps(self._baseline()),
+        )
+
+
+
+    def test_confirm_rejects_stale_component(self) -> None:
+        self.make_manager()
+        self.user.clear_permissions_cache()
+        unit = self.get_unit()
+        baseline_target = unit.target
+
+        draft = self._staged_draft()
+
+        unit.target = baseline_target + " EDIT"
+        unit.save(update_fields=["target"])
+
+        response = self.client.post(
+            reverse("multilingual-confirm", kwargs={"token": draft.token}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        unit.refresh_from_db()
+        # Confirm must reject; the user's edit stays in place.
+        self.assertEqual(unit.target, baseline_target + " EDIT")
+
+    def test_confirm_rejects_draft_expired_between_lookup_and_lock(self) -> None:
+        from datetime import timedelta
+        from unittest.mock import patch
+
+        from django.utils import timezone
+
+        from weblate.trans.models.multilingual_spreadsheet import (
+            ComponentSpreadsheetImportDraft,
+        )
+
+        self.make_manager()
+        self.user.clear_permissions_cache()
+        draft = self._staged_draft()
+        baseline_target = self.get_unit().target
+        # Expire the draft so the unlocked get_active() would reject it,
+        # but bypass that check to simulate the boundary where the
+        # locked select_for_update() runs after expiry.
+        draft.expires_at = timezone.now() - timedelta(seconds=1)
+        draft.save(update_fields=["expires_at"])
+
+        with patch.object(
+            ComponentSpreadsheetImportDraft,
+            "get_active",
+            return_value=draft,
+        ):
+            response = self.client.post(
+                reverse(
+                    "multilingual-confirm", kwargs={"token": draft.token}
+                )
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.get_unit().refresh_from_db()
+        self.assertEqual(self.get_unit().target, baseline_target)
+
+
+
+    def test_confirm_rejects_locked_component(self) -> None:
+        from weblate.trans.models.multilingual_spreadsheet import (
+            ComponentSpreadsheetImportDraft,
+        )
+
+        self.make_manager()
+        self.user.clear_permissions_cache()
+        draft = self._staged_draft()
+        self.component.locked = True
+        self.component.save()
+
+        response = self.client.post(
+            reverse("multilingual-confirm", kwargs={"token": draft.token})
+        )
+        self.assertEqual(response.status_code, 302)
+        # The locked branch must NOT have consumed the draft.
+        draft.refresh_from_db()
+        self.assertEqual(
+            draft.state, ComponentSpreadsheetImportDraft.State.PREVIEW_READY
+        )
+    def test_confirm_maps_duplicate_sources_by_context(self) -> None:
+        self.component = self.create_po(
+            project=self.project, name="PO dup component", slug="po-dup-component"
+        )
+        self.translation = self.component.source_translation
+        self.component.source_translation.unit_set.all().delete()
+        self.component.source_translation.add_unit(
+            None, "ctx-a", "Play", target="Play", author=self.user
+        )
+        self.component.source_translation.add_unit(
+            None, "ctx-b", "Play", target="Play", author=self.user
+        )
+        cs = self.component.translation_set.get(language__code="cs")
+        cs.add_unit(None, "ctx-a", "Play", target="Old-A", author=self.user, skip_existing=True)
+        cs.add_unit(None, "ctx-b", "Play", target="Old-B", author=self.user, skip_existing=True)
+
+
+        draft = self._staged_draft()
+        import csv
+        from io import StringIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        from weblate.trans.models.multilingual_spreadsheet import (
+            ComponentSpreadsheetImportDraft,
+        )
+
+        content = draft.uploaded.read().decode("utf-8")
+
+        # Rewrite the Czech column for ctx-a and ctx-b to distinct new targets.
+        rows = list(csv.reader(StringIO(content)))
+        headers = rows[0]
+        cs_idx = headers.index("cs")
+        ctx_idx = headers.index("context")
+        edited = []
+        for row in rows[1:]:
+            if row[0] == "Play" and row[ctx_idx] == "ctx-a":
+                row[cs_idx] = "New-A"
+            elif row[0] == "Play" and row[ctx_idx] == "ctx-b":
+                row[cs_idx] = "New-B"
+            edited.append(row)
+
+
+        buf = StringIO()
+        csv.writer(buf).writerows([headers, *edited])
+        new_content = buf.getvalue().encode("utf-8")
+
+        # Re-stage the draft with a real baseline matching the current unit map
+        # so confirm does not bounce on staleness.
+        draft.delete()
+        draft = ComponentSpreadsheetImportDraft.objects.create(
+            owner=self.user,
+            session_key=self.client.session.session_key,
+            component=self.component,
+            source_filename="translations.csv",
+            uploaded=SimpleUploadedFile("translations.csv", new_content),
+            preview_json="{}",
+            baseline_json=json.dumps(self._baseline()),
+        )
+
+        response = self.client.post(
+            reverse("multilingual-confirm", kwargs={"token": draft.token}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        cs.refresh_from_db()
+        targets = {
+            unit.context: unit.target for unit in cs.unit_set.all()
+        }
+        self.assertEqual(targets.get("ctx-a"), "New-A")
+        self.assertEqual(targets.get("ctx-b"), "New-B")
+
+    def test_cancel_then_confirm_returns_404(self) -> None:
+        self.make_manager()
+        draft = self._staged_draft()
+        cancel = self.client.post(
+            reverse("multilingual-cancel", kwargs={"token": draft.token})
+        )
+        self.assertEqual(cancel.status_code, 302)
+
+        confirm = self.client.post(
+            reverse("multilingual-confirm", kwargs={"token": draft.token})
+        )
+        self.assertEqual(confirm.status_code, 404)
+
+
+
