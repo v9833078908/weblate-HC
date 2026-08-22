@@ -306,7 +306,6 @@ def multilingual_upload(request: AuthenticatedHttpRequest, path):
             except ValidationError as error:
                 messages.error(request, "; ".join(error.messages))
             else:
-                request.session.save()
                 draft = ComponentSpreadsheetImportDraft(
                     owner=request.user,
                     session_key=request.session.session_key,
@@ -318,7 +317,14 @@ def multilingual_upload(request: AuthenticatedHttpRequest, path):
                             "rows": [row.values for row in preview.parsed.rows],
                         }
                     ),
-                    baseline_json="{}",
+                    baseline_json=json.dumps(
+                        {
+                            str(unit.pk): [unit.target, unit.state]
+                            for unit in Unit.objects.filter(
+                                translation__component=component
+                            ).exclude(translation=component.source_translation)
+                        }
+                    ),
                 )
                 draft.uploaded.save(uploaded.name, uploaded, save=False)
                 draft.save()
@@ -341,6 +347,15 @@ def multilingual_confirm(request: AuthenticatedHttpRequest, token):
     if not request.user.has_perm("upload.perform", component):
         raise PermissionDenied
     with transaction.atomic():
+        baseline = json.loads(draft.baseline_json)
+        current = {
+            str(unit.pk): [unit.target, unit.state]
+            for unit in Unit.objects.select_for_update().filter(
+                translation__component=component
+            ).exclude(translation=component.source_translation)
+        }
+        if current != baseline:
+            raise ValidationError("The component changed after preview.")
         parsed = parse_upload(component, draft.uploaded)
         build_preview(component, parsed)
         source_units = component.source_translation.unit_set.select_for_update()
@@ -367,6 +382,20 @@ def multilingual_confirm(request: AuthenticatedHttpRequest, token):
         draft.state = ComponentSpreadsheetImportDraft.State.CONSUMED
         draft.save(update_fields=["state"])
     messages.success(request, gettext("Multilingual spreadsheet imported."))
+    return redirect(component)
+
+
+@require_POST
+def multilingual_cancel(request: AuthenticatedHttpRequest, token):
+    draft = ComponentSpreadsheetImportDraft.get_active(
+        token=token, owner=request.user, session_key=request.session.session_key
+    )
+    if draft is None:
+        raise Http404
+    component = draft.component
+    if not request.user.has_perm("upload.perform", component):
+        raise PermissionDenied
+    draft.delete()
     return redirect(component)
 
 @require_POST
