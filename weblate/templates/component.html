@@ -88,6 +88,14 @@
              href="{% url 'download' path=object.get_url_path %}?format=zip:xlsx"
              title="{% translate "Download for offline translation." %}">{% blocktranslate %}Download translations as XLSX in a ZIP file{% endblocktranslate %}</a>
         </li>
+        <li>
+          <a class="dropdown-item"
+             href="{% url 'multilingual-download' path=object.get_url_path format_name='csv' %}">{% translate "Download multilingual CSV" %}</a>
+        </li>
+        <li>
+          <a class="dropdown-item"
+             href="{% url 'multilingual-download' path=object.get_url_path format_name='xlsx' %}">{% translate "Download multilingual XLSX" %}</a>
+        </li>
         {% if object.has_template %}
           <li>
             <a class="dropdown-item"

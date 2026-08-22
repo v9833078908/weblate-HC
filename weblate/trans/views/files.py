@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import DatabaseError
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.translation import gettext
 from django.views.decorators.http import require_POST
@@ -27,7 +27,7 @@ from weblate.trans.models import (
     Project,
     Translation,
 )
-from weblate.trans.util import get_upload_error_message
+from weblate.trans.multilingual_spreadsheet import export_component
 from weblate.utils import messages
 from weblate.utils.data import data_dir
 from weblate.utils.errors import report_error
@@ -258,6 +258,26 @@ def download(request: AuthenticatedHttpRequest, path):
     msg = f"Unsupported download: {obj}"
     raise TypeError(msg)
 
+
+
+def multilingual_download(request: AuthenticatedHttpRequest, path, format_name: str):
+    """Download one component as a multilingual CSV or XLSX table."""
+    component = parse_path(request, path, (Component,))
+    if not request.user.has_perm("translation.download", component):
+        raise PermissionDenied
+    if format_name not in {"csv", "xlsx"}:
+        raise Http404
+    content = export_component(component, format_name)
+    content_type = (
+        "text/csv; charset=utf-8"
+        if format_name == "csv"
+        else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response = HttpResponse(content, content_type=content_type)
+    response["Content-Disposition"] = (
+        f'attachment; filename="{component.slug}-multilingual.{format_name}"'
+    )
+    return response
 
 @require_POST
 def upload(request: AuthenticatedHttpRequest, path):

@@ -1659,3 +1659,21 @@ class ImportExportAddTest(ViewTestCase):
             follow=True,
         )
         self.assertContains(response, "(skipped: 0, not found: 0, updated: 1)")
+
+
+
+class MultilingualSpreadsheetDownloadTest(ViewTestCase):
+    def create_component(self):
+        return self.create_json()
+
+    def test_component_download_returns_one_csv_file(self) -> None:
+        response = self.client.get(
+            reverse(
+                "multilingual-download",
+                kwargs={"path": self.component.get_url_path(), "format_name": "csv"},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv; charset=utf-8")
+        self.assertNotIn(b"PK", response.content)

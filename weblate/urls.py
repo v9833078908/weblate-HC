@@ -175,6 +175,11 @@ real_patterns = [
         name="download",
     ),
     path(
+        "download-multilingual/<object_path:path>/<str:format_name>/",
+        weblate.trans.views.files.multilingual_download,
+        name="multilingual-download",
+    ),
+    path(
         "download-list/<name:name>/",
         weblate.trans.views.files.download_component_list,
         name="download_component_list",
