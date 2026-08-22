@@ -611,6 +611,14 @@ Size and rate assumptions:
   :setting:`LOC_KIT_IMPORT_DRAFT_EXPIRY` (one hour), are owner-and-session
   bound, and are removed by periodic cleanup. *(documented)* (source:
   :doc:`/admin/config`)
+* Component multilingual spreadsheet uploads are accepted only from authenticated
+  users with ``upload.perform`` on the selected component. CSV/XLSX parsing is
+  local and bounded by the ordinary translation upload limit; XLSX archives are
+  additionally bounded by member count and aggregate uncompressed size. A private
+  one-hour owner-and-session-bound draft is previewed before confirmation, then
+  reparsed and compared to a server-side baseline under component and unit locks.
+  No data is sent to an outbound service. *(maintainer)*
+
 
 Adversary model
 ---------------

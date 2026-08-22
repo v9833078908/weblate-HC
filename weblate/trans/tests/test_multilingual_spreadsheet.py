@@ -143,3 +143,34 @@ class MultilingualSpreadsheetValidationTest(ViewTestCase):
                 self.component,
                 SimpleUploadedFile("translations.xlsx", output.getvalue()),
             )
+
+
+class ComponentSpreadsheetImportDraftTest(ViewTestCase):
+    def test_draft_is_owner_session_bound_and_expires(self) -> None:
+        from django.utils import timezone
+
+        from weblate.trans.models.multilingual_spreadsheet import (
+            ComponentSpreadsheetImportDraft,
+        )
+
+        draft = ComponentSpreadsheetImportDraft.objects.create(
+            owner=self.user,
+            session_key=self.client.session.session_key,
+            component=self.component,
+            source_filename="translations.csv",
+            preview_json="{}",
+            baseline_json="{}",
+        )
+
+        self.assertIsNotNone(
+            ComponentSpreadsheetImportDraft.get_active(
+                token=draft.token, owner=self.user, session_key=self.client.session.session_key
+            )
+        )
+        draft.expires_at = timezone.now()
+        draft.save(update_fields=["expires_at"])
+        self.assertIsNone(
+            ComponentSpreadsheetImportDraft.get_active(
+                token=draft.token, owner=self.user, session_key=self.client.session.session_key
+            )
+        )

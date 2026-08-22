@@ -1337,6 +1337,17 @@ def cleanup_loc_kit_drafts() -> None:
     qs.delete()
 
 
+
+@app.task(trail=False)
+def cleanup_component_spreadsheet_import_drafts() -> None:
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import ComponentSpreadsheetImportDraft
+
+    qs = ComponentSpreadsheetImportDraft.objects.filter(expires_at__lt=timezone.now())
+    for draft in qs.iterator():
+        draft.delete_storage()
+    qs.delete()
+
 def report_restore_component_progress(completed: int, total: int) -> None:
     if total:
         report_task_progress(30 + (60 * completed // total))
@@ -1486,4 +1497,9 @@ def setup_periodic_tasks(sender, **kwargs) -> None:
     )
     sender.add_periodic_task(
         900, cleanup_loc_kit_drafts.s(), name="cleanup-loc-kit-drafts"
+    )
+    sender.add_periodic_task(
+        900,
+        cleanup_component_spreadsheet_import_drafts.s(),
+        name="cleanup-component-spreadsheet-import-drafts",
     )
