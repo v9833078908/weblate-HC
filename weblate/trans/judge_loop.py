@@ -52,7 +52,6 @@ if TYPE_CHECKING:
 _NON_REPAIRABLE_VERDICTS = frozenset(
     {
         JudgeVerdict.Verdict.PASS,
-        JudgeVerdict.Verdict.FLAG,
         JudgeVerdict.Verdict.UNPARSED,
     }
 )
@@ -322,8 +321,8 @@ def run_judge_batch(
 
     Returns the final active verdict per unit id. The repair loop runs
     until JUDGE_MAX_REPAIR_ATTEMPTS is spent; a string that stays
-    negative keeps its last verdict and its state-10 hold for the human
-    queue (applied by the caller from state_for_verdict).
+    negative keeps its last verdict for the caller to project into the
+    appropriate human-review state.
     """
     if not units:
         return {}

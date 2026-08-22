@@ -28,9 +28,11 @@ from weblate.trans.file_format_params import (
     BaseFileFormatParam,
     register_file_format_param,
 )
+from weblate.trans.judge_workflow import TARGET_PROJECT_SLUGS
 from weblate.trans.management.commands.reapply_autofixes import Command
-from weblate.trans.models import Change, Component, Translation, Unit
+from weblate.trans.models import Change, Component, Project, Translation, Unit
 from weblate.trans.models.pending import PendingUnitChange
+from weblate.trans.models.project import CommitPolicyChoices
 from weblate.trans.tests.test_models import RepoTestCase
 from weblate.trans.tests.test_views import (
     ComponentTestCase,
@@ -420,6 +422,81 @@ class BasicCommandTest(FixtureComponentTestCase):
     def test_check(self) -> None:
         with self.assertRaises(SystemCheckError):
             call_command("check", "--deploy")
+
+
+class JudgeWorkflowCommandTest(ComponentTestCase):
+    def create_rollout_projects(self) -> list[Project]:
+
+        projects = []
+        for slug in TARGET_PROJECT_SLUGS:
+            project, _created = Project.objects.get_or_create(name=slug, slug=slug)
+            projects.append(project)
+        return projects
+
+    def test_enable_review_workflow_updates_only_rollout_projects(self) -> None:
+        projects = self.create_rollout_projects()
+        other = Project.objects.create(name="Other", slug="other")
+        call_command("enable_review_workflow")
+        for project in projects:
+            project.refresh_from_db()
+            self.assertTrue(project.translation_review)
+            self.assertEqual(
+                project.commit_policy, CommitPolicyChoices.WITHOUT_NEEDS_EDITING
+            )
+        other.refresh_from_db()
+        self.assertFalse(other.translation_review)
+
+    def test_enable_review_workflow_dry_run_and_idempotency(self) -> None:
+        projects = self.create_rollout_projects()
+        output = StringIO()
+        call_command("enable_review_workflow", "--dry-run", stdout=output)
+        self.assertTrue(output.getvalue())
+        for project in projects:
+            project.refresh_from_db()
+            self.assertFalse(project.translation_review)
+        call_command("enable_review_workflow")
+        output = StringIO()
+        call_command("enable_review_workflow", stdout=output)
+        self.assertEqual(output.getvalue(), "")
+
+    def test_enable_review_workflow_missing_project_writes_nothing(self) -> None:
+        projects = self.create_rollout_projects()
+        projects[0].delete()
+        with self.assertRaises(CommandError):
+            call_command("enable_review_workflow")
+        for project in projects[1:]:
+            project.refresh_from_db()
+            self.assertFalse(project.translation_review)
+
+    def test_check_judge_repair_routes_uses_explicit_project_scope(self) -> None:
+        self.project.machinery_settings = {"openrouter": {"key": "test-key"}}
+        self.project.save(update_fields=["machinery_settings"])
+        engine = Mock()
+        engine.return_value.resolve_model.return_value = "vendor/model"
+        output = StringIO()
+        with patch("weblate.trans.judge_workflow.MACHINERY", {"openrouter": engine}):
+            call_command(
+                "check_judge_repair_routes",
+                "--project",
+                self.project.slug,
+                stdout=output,
+            )
+        self.assertIn(f"{self.project.slug}/", output.getvalue())
+
+    def test_check_judge_repair_routes_fails_for_missing_route(self) -> None:
+        self.project.machinery_settings = {"openrouter": {"key": "test-key"}}
+        self.project.save(update_fields=["machinery_settings"])
+        engine = Mock()
+        engine.return_value.resolve_model.return_value = None
+        with (
+            patch("weblate.trans.judge_workflow.MACHINERY", {"openrouter": engine}),
+            self.assertRaises(CommandError),
+        ):
+            call_command("check_judge_repair_routes", "--project", self.project.slug)
+
+    def test_check_judge_repair_routes_fails_without_engine_setting(self) -> None:
+        with self.assertRaises(CommandError):
+            call_command("check_judge_repair_routes", "--project", self.project.slug)
 
 
 class WeblateComponentCommandMixin:

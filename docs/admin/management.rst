@@ -400,6 +400,18 @@ Performs cleanup of stored SSH host keys:
 
    :ref:`ssh-repos`
 
+check_judge_repair_routes
+-------------------------
+
+.. weblate-admin:: check_judge_repair_routes [--project <slug>]
+
+Checks that the configured automatic-translation engine has a usable
+per-language repair route for every project in the judge review rollout. It
+does not contact the provider or expose credentials. Use ``--project`` for a
+single explicit development-project preflight.
+
+See :ref:`project-translation_review`.
+
 createadmin
 -----------
 
@@ -453,6 +465,15 @@ Dumps userdata to a file for later use by :wladmin:`importuserdata`.
 .. hint::
 
    This comes in handy when migrating or merging Weblate instances.
+
+enable_review_workflow
+----------------------
+
+.. weblate-admin:: enable_review_workflow [--dry-run]
+
+Enables :ref:`project-translation_review` and the commit policy that excludes
+strings needing human review for the predefined judge rollout projects. Use
+``--dry-run`` to inspect the affected projects without changing them.
 
 import_demo
 -----------

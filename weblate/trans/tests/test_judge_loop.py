@@ -88,11 +88,22 @@ class JudgeLoopTest(ViewTestCase):
         _, verdict, _ = self.run_batch([MAJOR, CRITICAL], repair=None)
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
 
-    def test_flag_does_not_trigger_a_repair(self) -> None:
-        unit, verdict, client = self.run_batch([MAJOR, MAJOR], repair=["fixed"])
+    def test_flag_triggers_one_repair_judged_by_both_seats(self) -> None:
+        _unit, verdict, client = self.run_batch(
+            [MAJOR, MAJOR, PASS, PASS], repair=["fixed text"]
+        )
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
+        self.assertEqual(verdict.attempt, 1)
+        self.assertEqual(self.get_unit().target.strip(), "fixed text")
+        self.assertEqual(client.call_count, 4)
+
+    def test_exhausted_flag_repair_keeps_the_last_flag(self) -> None:
+        _unit, verdict, client = self.run_batch(
+            [MAJOR, MAJOR, MAJOR, MAJOR], repair=["still wrong"]
+        )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
-        self.assertEqual(client.call_count, 2)
-        self.assertNotEqual(unit.target, "fixed")
+        self.assertEqual(verdict.attempt, 1)
+        self.assertEqual(client.call_count, 4)
 
     def test_each_seat_uses_its_configured_model(self) -> None:
         _, _, client = self.run_batch([PASS, PASS])

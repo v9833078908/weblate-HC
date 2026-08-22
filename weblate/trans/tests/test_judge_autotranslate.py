@@ -9,6 +9,7 @@ from unittest import mock
 from django.test import override_settings
 
 from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
+from weblate.trans.judge import JudgeResult
 from weblate.trans.judge_loop import build_request
 from weblate.trans.models.judge import (
     JudgeVerdict,
@@ -68,11 +69,11 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.perform(JudgeVerdict.Verdict.REJECT, severity="critical")
         self.assertIn(self.get_unit().state, FUZZY_STATES)
 
-    def test_flag_ships_but_is_not_approved(self) -> None:
+    def test_flag_lands_on_a_state_that_does_not_ship(self) -> None:
         unit = self.get_unit()
         unit.translate(self.user, ["some target"], STATE_TRANSLATED)
         self.perform(JudgeVerdict.Verdict.FLAG, severity="major")
-        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
+        self.assertIn(self.get_unit().state, FUZZY_STATES)
 
     def test_unparsed_leaves_the_state_untouched(self) -> None:
         unit = self.get_unit()
@@ -166,6 +167,37 @@ class JudgeAutoTranslateTest(ViewTestCase):
             auto.process_judge(engines=[], threshold=80)
         judged_units = run.call_args.args[0]
         self.assertEqual(judged_units[0].target.strip(), "machine target")
+
+    def test_major_repair_passes_through_the_operator_path(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["existing translation"], STATE_TRANSLATED)
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q="",
+            mode="judge",
+            overwrite_existing=True,
+            unit_ids=[unit.id],
+        )
+        major = JudgeResult("major", "flag", [], "")
+        passed = JudgeResult("none", "pass", [], "")
+        client = mock.Mock(side_effect=[[major], [major], [passed], [passed]])
+        with (
+            mock.patch.object(auto, "process_mt"),
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.repair_target",
+                return_value=["repaired translation"],
+            ),
+        ):
+            auto.process_judge(engines=[], threshold=80)
+        stored = self.get_unit()
+        self.assertEqual(stored.target.strip(), "repaired translation")
+        self.assertEqual(stored.state, STATE_TRANSLATED)
+        self.assertEqual(
+            stored.judge_verdicts.latest("pk").verdict, JudgeVerdict.Verdict.PASS
+        )
+        self.assertEqual(client.call_count, 4)
 
     def test_final_state_write_skips_a_target_changed_after_judging(self) -> None:
         unit = self.get_unit()

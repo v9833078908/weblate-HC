@@ -18,6 +18,7 @@ from weblate.utils.state import (
     FUZZY_STATES,
     STATE_APPROVED,
     STATE_FUZZY,
+    STATE_NEEDS_CHECKING,
     STATE_TRANSLATED,
 )
 
@@ -61,13 +62,12 @@ class JudgeSeverityGateTest(SimpleTestCase):
             STATE_TRANSLATED,
         )
 
-    def test_flag_ships_but_is_not_approved(self) -> None:
-        self.assertEqual(
-            state_for_verdict(
-                JudgeVerdict.Verdict.FLAG, enable_review=True, may_approve=True
-            ),
-            STATE_TRANSLATED,
+    def test_flag_lands_on_a_state_that_does_not_ship(self) -> None:
+        state = state_for_verdict(
+            JudgeVerdict.Verdict.FLAG, enable_review=True, may_approve=True
         )
+        self.assertEqual(state, STATE_NEEDS_CHECKING)
+        self.assertIn(state, FUZZY_STATES)
 
     def test_reject_lands_on_a_state_that_does_not_ship(self) -> None:
         state = state_for_verdict(

@@ -159,11 +159,14 @@ card and can never be added to a component's :ref:`component-enforced_checks`:
 a probabilistic opinion must not be treated as an enforced, deterministic
 fact.
 
-A ``reject`` verdict sets the string to :ref:`needs editing <states>`, which
-the :ref:`project-commit_policy` :guilabel:`Skip translations marked as
-needing editing` already excludes from being committed to version control
-the same way any other needs-editing string is excluded. This makes
-``reject`` a queue for a human decision, not an automatic guarantee that a
+A ``flag`` verdict sets the string to :ref:`needs checking <states>` and a
+``reject`` verdict sets it to :ref:`needs editing <states>`. The
+:ref:`project-commit_policy` :guilabel:`Skip translations marked as needing
+editing` excludes both states from version control commits. Either parsed
+negative verdict on a writable string is eligible for one repair through the
+project's configured machine translation engine, followed by another
+two-seat judgment. A repaired ``pass`` ships as translated; an unresolved
+verdict stays in the human queue. This is not an automatic guarantee that a
 broken translation never ships: verify with your own held-out sample before
 relying on it, and note that a ``pass`` verdict does not, on its own, move a
 string to :ref:`approved <states>` unless the site additionally sets

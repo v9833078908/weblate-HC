@@ -6,6 +6,8 @@ Weblate 2026.8.1
 .. rubric:: New features
 
 * Added an optional :ref:`LLM judge <llm-judge>` automatic translation mode, where two independently configured language models review each string in a filter and record a per-string verdict; a rejected string is held in the existing :guilabel:`Needs editing` queue for a human decision instead of shipping automatically.
+* Major LLM-judge verdicts are now repaired once when possible and otherwise held in :guilabel:`Needs checking`, so they are excluded from guarded commits instead of shipping automatically.
+* Added guarded ``check_judge_repair_routes`` and ``enable_review_workflow`` management commands for the LLM judge rollout.
 * Components can now exchange all language targets through one multilingual CSV
   or XLSX spreadsheet, with previewed imports that protect keys and placeholders.
 

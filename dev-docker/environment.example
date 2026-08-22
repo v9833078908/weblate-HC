@@ -1,0 +1,11 @@
+# Copyright © HCGameLoc
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+USER_ID=
+GROUP_ID=
+WEBLATE_HOST=localhost
+WEBLATE_PORT=3001
+
+# Keep this development-only credential out of Git.
+WEBLATE_JUDGE_OPENROUTER_KEY=

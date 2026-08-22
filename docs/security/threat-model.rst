@@ -313,9 +313,11 @@ Reachability preconditions:
   automatic translation run in judge mode, and an outbound request finding
   only when :setting:`JUDGE_ENABLED`, the site-wide key, and both seat
   models are configured. A run over :setting:`JUDGE_MAX_UNITS_PER_RUN` is
-  refused before any request is sent. Repair of a confirmed defect is
-  reachable only for strings the run explicitly marked writable (empty,
-  needing editing, or with the overwrite checkbox on); a run without the
+  refused before any request is sent. Repair of a parsed major or critical
+  finding uses the already-modelled, project-configured machine-translation
+  data flow, but is reachable only for strings the run explicitly marked
+  writable (empty, needing editing, or with the overwrite checkbox on). An
+  end user cannot choose its endpoint, key, or model; a run without the
   checkbox never rewrites an existing human translation, judges it instead.
   *(documented)* (source: :ref:`llm-judge`, :doc:`/admin/config`)
 

@@ -93,7 +93,7 @@ class JudgeFlagCheck(BaseJudgeCheck):
     judge_verdict = "flag"
     name = gettext_lazy("Judge: questionable")
     description = gettext_lazy(
-        "An LLM judge reported a major problem. The string still ships."
+        "An LLM judge reported a major problem. The string is held for review."
     )
 
 
