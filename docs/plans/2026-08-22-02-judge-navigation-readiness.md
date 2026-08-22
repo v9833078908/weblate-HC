@@ -1,0 +1,714 @@
+# Plan 02: LLM Judge Navigation and Release Readiness
+
+> **For Claude:** REQUIRED SUB-SKILL: Use `executing-plans` to implement this plan task-by-task. Use `test-driven-development`, `frontend-design`, `lightpanda-browser`, `requesting-code-review`, and `verification-before-completion` where specified below.
+
+**Goal:** Give a producer a component-first Weblate path from per-language release readiness to exact LLM-judge queues and a bounded, cost-aware judge run, without implying that a probabilistic verdict approves a release.
+
+**Architecture:** Keep `JudgeVerdict` as immutable evidence and add one database-queryable fingerprint of the exact stored target. One shared annotation contract drives search and lazy cached translation statistics. Render a separate readiness table above the existing component language table. Its primary action deep-links to the existing language-scoped automatic-translation form. Preview and execution share scope, ordering, permissions, and cap. Delivery remains a separate axis based only on `PendingUnitChange` commit-policy accounting.
+
+**Tech Stack:** Django, PostgreSQL, Celery, existing Weblate stats cache, Django templates, Bootstrap, vanilla JavaScript, pytest.
+
+---
+
+## Approved contract
+
+### Producer flow
+
+1. Entry: existing component page, for example `/projects/need-for-greed/buyers/`, **Languages** tab.
+2. Add a separate **Release readiness** table above the existing language table. Do not extend generic `snippets/list-objects.html`.
+3. Show it only when `JUDGE_ENABLED=True` and the component is not a glossary. Exclude source/ghost translations and read-only units from AI coverage.
+4. Columns: **Language**, **Delivery**, **AI coverage**, **Advisory**, **Held for decision**, **Primary action**.
+5. Delivery and AI are independent:
+   - Delivery: exact `PendingUnitChange` `eligible_for_commit` and `commit_policy_skipped` counts.
+   - AI: parsed evidence for the exact current target.
+6. Copy: **Evaluated - no blocking concern**, **Advisory - ships**, **Held for decision**, **Not evaluated**, **Stale**, **Latest attempt incomplete**, **No blocking action**.
+7. Never render **Approved by AI**, **AI approved**, or **Ready for release**. A pass remains state 20 by default.
+8. Primary action priority:
+   1. uncovered/stale -> **Evaluate N**;
+   2. critical -> **Review N**;
+   3. commit-policy-held updates -> policy-aware native review/fix action;
+   4. advisory -> **Inspect N**;
+   5. otherwise -> **No blocking action**.
+9. AI counts open exact language-scoped Zen queues. Delivery counts are informational, not links: `detailed_count()` includes pending history/retry semantics that a current-state q cannot represent exactly. Its action opens a clearly labelled broader native pending queue.
+10. **Evaluate N** opens that language's existing Automatic translation tab with `mode=judge`, `q=NOT has:judge`, and a safe return URL. It never starts a paid call automatically.
+11. Reuse persistent task progress. Completion reports evaluated/pass/advisory/held/incomplete/cap remainder and links back to readiness.
+
+### Verdict semantics
+
+1. Fresh coverage: newest parsed collegium round for the exact current target.
+2. Strictest parsed seat maps `none|minor -> pass`, `major -> flag`, `critical -> reject`.
+3. A latest all-unparsed attempt does not erase an older parsed verdict for the same target; it adds an independent warning. Without older parsed evidence, the unit is not evaluated.
+4. `has:judge`: fresh parsed evidence for current target.
+5. `NOT has:judge`: never parsed, target-stale, or current-target-only-unparsed.
+6. `judge:stale`: parsed history exists but none matches current target.
+7. Context-only source/note/glossary changes keep aggregate target coverage; the unit card retains its existing `context changed` warning.
+8. Plan 02 implements only `has:judge`, `judge:pass`, `judge:flag`, `judge:reject`, `judge:stale`, `judge:unparsed`. Exhausted/override/resolution belong to Plan 03.
+
+### Preview and cost
+
+1. Judge mode inserts `NOT has:judge` only while q is untouched; custom q is never overwritten.
+2. Preview shows matched `N`, this-run `K=min(N, cap)`, remainder, empty/writable `W`, exact initial/worst-case judge batch calls, observed judge USD range, and separate observed OpenRouter pre-translation range.
+3. Initial calls: `2 * ceil(K / JUDGE_BATCH_SIZE)`. Worst case: initial calls times `1 + JUDGE_MAX_REPAIR_ATTEMPTS`.
+4. Cost is a recent observed range, not a quote: newest 20 priced requests for the same project/model/operation, minimum 5 samples, min-max billed cost per unit. Missing evidence makes that leg unavailable; never invent a total.
+5. Invalid q or zero matches disables **Apply**. Preview transport failure warns but does not block because the backend validates and caps again.
+6. Execution processes stable first `K`; it must not estimate N and then refuse because N exceeds cap.
+
+### Permissions and unavailable states
+
+1. Component viewers see aggregates allowed by normal object access.
+2. Previewing financial details and running judge require existing automatic-translation access plus `unit.review` on the target translation.
+3. With judge enabled but incomplete seat configuration, keep Delivery visible; AI reads **Unavailable**, Evaluate is disabled, and ordinary viewers receive no model/key details.
+4. Only an existing settings-capable user sees a configuration link.
+
+### Out of scope
+
+- Plan 03 producer decisions, resolution/reasons/history.
+- Background context-only re-judging.
+- Project/category/workspace readiness dashboards.
+- Glossary readiness.
+- Custom review queue or replacement editor.
+- Live readiness polling.
+- Auto-approval or changes to `JUDGE_MAY_APPROVE`.
+- Production enablement/deploy, shared-stack rebuild, or paid live model run.
+
+---
+
+## Task 1: Persist the queryable target fingerprint
+
+**Files:**
+- Modify: `weblate/trans/models/judge.py`
+- Create: `weblate/trans/migrations/0103_judge_target_storage_hash.py`
+- Create: `weblate/trans/tests/test_judge_migration.py`
+- Modify: `weblate/trans/judge_loop.py`
+- Modify: `weblate/trans/tests/test_judge.py`
+- Modify: `weblate/trans/tests/test_judge_loop.py`
+
+### Step 1: Write failing fingerprint tests
+
+Add tests for `compute_target_storage_hash(target: str)`:
+
+- stable for Unicode;
+- hashes the exact serialized plural target, including `\x1e\x1e`;
+- changes when one plural changes;
+- leaves existing SHA-256 `compute_target_hash()` unchanged.
+
+Expected implementation contract:
+
+```python
+def compute_target_storage_hash(target: str) -> str:
+    return hashlib.md5(target.encode(), usedforsecurity=False).hexdigest()
+```
+
+### Step 2: Prove RED, implement the helper, and prove GREEN
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge.py
+```
+
+Expected first run: missing helper. Add the minimal helper to
+`weblate/trans/models/judge.py`, rerun, and expect the focused tests to pass.
+
+### Step 3: Write a failing migration test
+
+Use `MigrationExecutor`. Before migration create:
+
+- Unicode singular and plural current targets;
+- a matching parsed and unparsed round;
+- an old-target round.
+
+After migration assert only provably current rows receive MD5 of exact
+`Unit.target`; stale/unprovable rows remain null; all evidence fields remain
+unchanged.
+
+### Step 4: Prove RED
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_migration.py
+```
+
+Expected: migration `0103_judge_target_storage_hash` is missing.
+
+### Step 5: Add the runtime field and migration 0103
+
+Declare nullable indexed
+`JudgeVerdict.target_storage_hash(max_length=32)`. The data migration must:
+
+- iterate only units with verdicts in bounded chunks;
+- locally reproduce SHA-256 plural hashing with
+  `target.split("\x1e\x1e")` and the exact JSON serialization;
+- update only rows whose old `target_hash` matches the current target;
+- leave all other rows null;
+- not import current runtime model helpers.
+
+Do not add the `LLMUsageLog` fields here; Task 5 owns a separate migration so
+the runtime model and migration state remain aligned after every task.
+
+### Step 6: Test and update the verdict-write seam
+
+Add a failing assertion that `_write_verdict` stores both the existing audit
+SHA-256 and the new storage MD5. Populate the new field in `judge_loop.py`.
+After evidence is persisted, invalidate affected translation stats through
+existing `Translation.invalidate_cache()` without making invalidation failure
+able to erase evidence.
+
+### Step 7: Verify and commit
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_migration.py weblate/trans/tests/test_judge_loop.py
+git add weblate/trans/models/judge.py weblate/trans/migrations/0103_judge_target_storage_hash.py weblate/trans/tests/test_judge_migration.py weblate/trans/judge_loop.py weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_loop.py
+git commit -m "feat(judge): persist queryable target fingerprints"
+```
+
+---
+
+## Task 2: Add target-fresh verdict annotations
+
+**Files:**
+- Modify: `weblate/trans/models/judge.py`
+- Modify: `weblate/trans/tests/test_judge_round.py`
+
+### Step 1: Write failing annotation tests
+
+Add database cases for a shared `judge_status_annotations()` helper:
+
+- no evidence;
+- strictest of two parsed seats;
+- latest all-unparsed plus older parsed same-target fallback;
+- only all-unparsed current-target evidence;
+- old-target parsed history;
+- re-judge after target edit;
+- context hash changes with target unchanged.
+
+Required annotations:
+
+```text
+judge_active_severity: none|minor|major|critical|None
+judge_has_parsed_history: bool
+judge_latest_incomplete: bool
+```
+
+### Step 2: Prove RED
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_round.py
+```
+
+Expected: the annotation helper is missing. The schema and backfill from Task
+1 are already present, so these tests can execute against the real persisted
+fingerprint.
+
+### Step 3: Implement one annotation contract
+
+In `models/judge.py`:
+
+- compare `JudgeVerdict.target_storage_hash` with PostgreSQL
+  `MD5(Unit.target)`;
+- locate the newest parsed row for the current target, use its
+  `(run_id, attempt)`, then reduce that round by explicit severity rank;
+- locate the newest current-target round independently for incomplete status;
+- use `-timestamp, -pk` tie-breaking;
+- return one annotation dict reusable by search and stats.
+
+Do not add a mutable `JudgeStatus` projection or mutate history.
+
+### Step 4: Verify and commit
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_round.py weblate/trans/tests/test_judge_loop.py
+git add weblate/trans/models/judge.py weblate/trans/tests/test_judge_round.py
+git commit -m "feat(judge): add target-fresh verdict queries"
+```
+
+---
+
+## Task 3: Add exact judge search filters
+
+**Files:**
+- Modify: `weblate/utils/search.py`
+- Modify: `weblate/trans/filter.py`
+- Modify: `weblate/trans/tests/test_search.py`
+- Modify: existing filter-choice test file found from current `FILTERS` tests
+
+### Step 1: Write failing fixture-backed tests
+
+Pin result sets for:
+
+- `has:judge` and `NOT has:judge`;
+- pass (`none|minor`), flag (`major`), reject (`critical`);
+- stale;
+- newest current-target all-unparsed, including older parsed fallback;
+- composition with `state:>=translated` and negation;
+- unsupported `judge:override` raising normal search error.
+
+### Step 2: Prove RED
+
+```bash
+./rundev.sh test weblate/trans/tests/test_search.py -k judge
+```
+
+### Step 3: Implement through parser annotations
+
+`UnitTermExpr.get_annotations()` returns `judge_status_annotations()` only for judge terms. Predicates consume annotations, never Python `JudgeVerdict.verdict` and never bare `Exists(JudgeVerdict)`.
+
+Dropdown choices now: Not evaluated, Advisory - ships, Held for decision, Stale, Latest attempt incomplete. Keep pass queryable but not prominent. No exhausted/override.
+
+### Step 4: Verify and commit
+
+```bash
+./rundev.sh test weblate/trans/tests/test_search.py weblate/trans/tests/test_filter.py
+git add weblate/utils/search.py weblate/trans/filter.py weblate/trans/tests/test_search.py weblate/trans/tests/test_filter.py
+git commit -m "feat(judge): add current-verdict search filters"
+```
+
+If the established filter test has another filename, use it instead of creating a duplicate convention.
+
+---
+
+## Task 4: Add cached AI stats and batched Delivery counts
+
+**Files:**
+- Modify: `weblate/utils/stats.py`
+- Modify: `weblate/trans/tests/test_stats.py`
+- Modify: `weblate/trans/models/pending.py`
+- Modify: `weblate/trans/tests/test_pending.py`
+
+### Step 1: Write failing stats tests
+
+Add lazy translation keys:
+
+```text
+judge_total, judge_evaluated, judge_pass, judge_flag,
+judge_reject, judge_stale, judge_unparsed
+```
+
+Pin invariants:
+
+- total excludes read-only;
+- pass+flag+reject=evaluated;
+- unparsed may overlap evaluated due historical fallback;
+- each bucket equals its search filter;
+- target edit invalidates cache and moves evaluated -> stale/uncovered;
+- new current-target round restores coverage;
+- context-only change preserves coverage.
+
+### Step 2: Prove RED
+
+```bash
+./rundev.sh test weblate/trans/tests/test_stats.py -k judge
+```
+
+### Step 3: Implement one-pass lazy judge stats
+
+Define separate `JUDGE_KEYS`; do not add them to ordinary unit delta buckets. `TranslationStats.calculate_by_name()` calculates every judge key from one queryset using shared annotations and stores them together. Existing target-edit invalidation and Task 1 verdict-write invalidation must clear them.
+
+Do not add project/global judge stats.
+
+### Step 4: Write failing pending aggregation tests
+
+For multiple target translations and both commit policies, assert new `detailed_count_by_translation(component)` equals existing `detailed_count(translation)` for:
+
+- no pending;
+- eligible;
+- policy skipped;
+- older eligible plus newer held;
+- retry-ineligible blocking history.
+
+### Step 5: Implement batched aggregation
+
+Run component-level retry/blocking logic once, then group distinct units per translation before retry, after retry, and after policy. Zero-fill translations without pending rows. Do not change `detailed_count()` semantics.
+
+### Step 6: Verify and commit
+
+```bash
+./rundev.sh test weblate/trans/tests/test_stats.py weblate/trans/tests/test_pending.py
+git add weblate/utils/stats.py weblate/trans/tests/test_stats.py weblate/trans/models/pending.py weblate/trans/tests/test_pending.py
+git commit -m "feat(judge): cache readiness statistics"
+```
+
+---
+
+## Task 5: Record operation-aware usage and observed cost ranges
+
+**Files:**
+- Create: `weblate/trans/migrations/0104_llm_usage_operation.py`
+- Modify: `weblate/trans/models/llm_usage.py`
+- Modify: `weblate/trans/judge.py`
+- Modify: `weblate/machinery/llm.py`
+- Modify: `weblate/machinery/openai.py`
+- Modify: `weblate/trans/tests/test_llm_usage.py`
+- Modify: `weblate/trans/tests/test_judge_client.py`
+- Modify: `weblate/machinery/tests.py`
+- Modify: `weblate_customization/tests/test_machinery.py`
+
+### Step 1: Write failing attribution tests
+
+Assert:
+
+- judge responses log `operation="judge"`, `unit_count=len(batch)`;
+- billed retry responses each log actual batch size;
+- OpenRouter MT logs `operation="translation"` and actual source batch size, including split recovery;
+- accounting failure remains non-fatal;
+- legacy/default fields may be blank/null.
+
+### Step 2: Prove RED
+
+```bash
+./rundev.sh test weblate/trans/tests/test_llm_usage.py weblate/trans/tests/test_judge_client.py weblate/machinery/tests.py -k usage
+```
+
+### Step 3: Add model fields and migration 0104
+
+Create `0104_llm_usage_operation.py` in the same step as the runtime model declaration:
+
+```python
+class Operation(models.TextChoices):
+    TRANSLATION = "translation"
+    JUDGE = "judge"
+
+operation = models.CharField(max_length=20, choices=Operation, blank=True, db_index=True)
+unit_count = models.PositiveIntegerField(null=True, blank=True)
+```
+
+Pass `len(batch)` through judge usage. Add a `ContextVar` beside `llm_batch_project`, set/reset it around sync/async LLM batch fetches, and record it in OpenAI usage.
+
+### Step 4: Write observed-range tests
+
+A data-only helper must:
+
+- filter exact project/model/operation;
+- ignore null cost and null/zero count;
+- use newest 20 rows;
+- return `None` below 5 samples;
+- return Decimal min/max `cost_usd / unit_count` at 5+;
+- never mix translation/judge or projects.
+
+### Step 5: Implement, verify, commit
+
+```bash
+./rundev.sh test weblate/trans/tests/test_llm_usage.py weblate/trans/tests/test_judge_client.py weblate/machinery/tests.py -k "usage or batch"
+./rundev.sh test weblate_customization/tests/test_machinery.py
+git add weblate/trans/migrations/0104_llm_usage_operation.py weblate/trans/models/llm_usage.py weblate/trans/judge.py weblate/machinery/llm.py weblate/machinery/openai.py weblate/trans/tests/test_llm_usage.py weblate/trans/tests/test_judge_client.py weblate/machinery/tests.py weblate_customization/tests/test_machinery.py
+git commit -m "feat(judge): track observed per-unit costs"
+```
+
+---
+
+## Task 6: Share preview scope with capped execution
+
+**Files:**
+- Modify: `weblate/trans/autotranslate.py`
+- Modify: `weblate/trans/tasks.py`
+- Modify: `weblate/trans/tests/test_judge_autotranslate.py`
+- Modify: `weblate/trans/tests/test_autotranslate.py`
+
+### Step 1: Write failing cap tests
+
+For translation and component scopes assert:
+
+- K matches -> K processed;
+- K+1 -> stable first K by translation order then unit position/PK, one remains;
+- multiple languages share one global cap;
+- read-only and denied translations do not consume it;
+- preview/execution matched/processed/remaining/writable counts agree;
+- the old above-cap refusal disappears.
+
+### Step 2: Prove RED
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_autotranslate.py -k judge
+```
+
+### Step 3: Add a small immutable preview result
+
+For example:
+
+```python
+@dataclass(frozen=True, slots=True)
+class JudgeScopePreview:
+    matched: int
+    processed: int
+    remaining: int
+    writable: int
+    initial_calls: int
+    worst_case_calls: int
+```
+
+`BatchAutoTranslate.preview_judge_scope()` follows the exact ordered, permission-filtered execution scope. Cost lookup remains separate.
+
+### Step 4: Slice instead of refuse
+
+`AutoTranslate.process_judge()` counts, orders, slices to remaining cap, and processes only K. Preserve snapshot/race checks and repair. Aggregate actual verdict buckets and global remainder in `BatchAutoTranslate`.
+
+### Step 5: Add judge completion summary
+
+Example contract:
+
+```text
+50 evaluated: 31 with no blocking concern, 14 advisory, 5 held for decision, 0 incomplete. 346 matching strings remain because of the per-run cap.
+```
+
+Generic modes retain generic messages.
+
+### Step 6: Verify and commit
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_autotranslate.py
+git add weblate/trans/autotranslate.py weblate/trans/tasks.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_autotranslate.py
+git commit -m "feat(judge): preview and cap judge batches"
+```
+
+---
+
+## Task 7: Add secured live preview and mode-aware form
+
+**Files:**
+- Modify: `weblate/trans/forms.py`
+- Modify: `weblate/trans/views/edit.py`
+- Modify: `weblate/urls.py`
+- Modify: `weblate/templates/snippets/autoform.html`
+- Modify: `weblate/static/loader-bootstrap.js`
+- Modify: `weblate/trans/tests/test_judge_form.py`
+- Modify: `weblate/trans/tests/test_judge_views.py`
+
+### Step 1: Write failing form/navigation tests
+
+Pin:
+
+- permitted deep-link initializes `mode=judge`, `q=NOT has:judge`, safe `next`;
+- unauthorized/unsupported mode is not forced;
+- external next is rejected through `redirect_next`;
+- eager and async launch return/link to component readiness;
+- warning copy says judge-evaluated, not judge-approved.
+
+### Step 2: Write failing preview endpoint tests
+
+Add `auto-translate-preview/<object_path:path>/` tests for authentication/object access, automatic-translation+review permissions, invalid q 400, zero/below/above cap, read-only exclusion, exact calls, separate cost legs, insufficient history, incomplete config without details, and zero writes/tasks/provider calls.
+
+### Step 3: Prove RED
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_form.py weblate/trans/tests/test_judge_views.py
+```
+
+### Step 4: Implement safe initialization and return
+
+- Add hidden `next` to `AutoForm` outside visible crispy layout.
+- Accept GET initial values only when they are current valid choices.
+- Use `redirect_next()` after launch.
+- Give `add_user_task()` the safe component return URL/label for dashboard-started runs.
+
+### Step 5: Implement bounded JSON preview
+
+Response shape:
+
+```json
+{
+  "matched": 396,
+  "processed": 50,
+  "remaining": 346,
+  "writable": 8,
+  "judge_calls_initial": 20,
+  "judge_calls_worst_case": 40,
+  "judge_cost": {"available": true, "min": "0.06", "max": "0.11"},
+  "pretranslation_cost": {"available": false}
+}
+```
+
+Use the same `AutoForm` validation and scope helper as POST/execution. For cross-project or unresolved model scope, mark the cost leg unavailable. Return no secrets/model IDs.
+
+### Step 6: Replace misleading static counters
+
+In `autoform.html`:
+
+- remove current `state:<translated` and `strings x 2 judges x attempts` copy;
+- add judge-only `aria-live="polite"` lines for scope/cap/calls/cost;
+- give Apply a stable ID;
+- preserve one outer form and `FormHelper` behavior;
+- replace judge-approved copy with judge-evaluated.
+
+### Step 7: Implement non-destructive JS
+
+Per form instance:
+
+- track whether q was edited;
+- insert default only for untouched/default q;
+- debounce and abort stale preview requests;
+- disable Apply for invalid/zero;
+- warn but keep Apply available on transport failure;
+- hide preview outside judge mode;
+- preserve existing auto-source behavior.
+
+No inline script, framework, or modal.
+
+### Step 8: Verify and commit
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_form.py weblate/trans/tests/test_judge_views.py weblate/trans/tests/test_autotranslate.py
+git add weblate/trans/forms.py weblate/trans/views/edit.py weblate/urls.py weblate/templates/snippets/autoform.html weblate/static/loader-bootstrap.js weblate/trans/tests/test_judge_form.py weblate/trans/tests/test_judge_views.py
+git commit -m "feat(judge): add bounded run preview"
+```
+
+---
+
+## Task 8: Render component-first readiness
+
+**Files:**
+- Modify: `weblate/trans/views/basic.py`
+- Modify: `weblate/templates/component.html`
+- Create: `weblate/templates/snippets/judge-readiness.html`
+- Modify: `weblate/trans/tests/test_views.py`
+- Modify: `weblate/trans/tests/test_judge_views.py`
+
+### Step 1: Write failing component contracts
+
+Assert:
+
+- card precedes existing language table;
+- regular enabled component only; disabled/glossary hidden;
+- source/ghost absent, target language once, existing user sort retained;
+- read-only excluded from denominator;
+- Delivery matches batched pending counts;
+- incomplete config shows Delivery plus AI unavailable;
+- viewer sees counts but no Evaluate/configure;
+- reviewer with auto permission sees Evaluate;
+- settings-capable user alone sees Configure;
+- AI URLs/q are exact;
+- Delivery numbers are plain text;
+- broader action uses `has:pending state:<translated` for `WITHOUT_NEEDS_EDITING`, `has:pending NOT state:approved` for `APPROVED_ONLY`;
+- priority order and **No blocking action** copy.
+
+### Step 2: Prove RED
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_views.py weblate/trans/tests/test_views.py -k component
+```
+
+### Step 3: Build rows in `show_component()`
+
+Reuse existing sorted translations; select real non-source targets; prefetch stats; fetch all Delivery data once; create simple row dictionaries with counts, exact AI URLs, broader pending URL, Evaluate deep-link, permissions, and primary action. Do not query in the template.
+
+### Step 4: Render native accessible table
+
+Use existing `card`, table, scroll-wrapper, link/button classes; semantic heading and `<th scope>`; text in addition to color; secondary stale/incomplete details. No score, chart, card grid, inline style, or raw verdict terms.
+
+Include it immediately before current language-list include in `component.html`.
+
+### Step 5: Verify and commit
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_views.py weblate/trans/tests/test_views.py -k "component or judge"
+git add weblate/trans/views/basic.py weblate/templates/component.html weblate/templates/snippets/judge-readiness.html weblate/trans/tests/test_views.py weblate/trans/tests/test_judge_views.py
+git commit -m "feat(judge): add component release readiness"
+```
+
+---
+
+## Task 9: Document and verify Plan 02 end to end
+
+**Files:**
+- Modify: `docs/user/translating.rst`
+- Modify: `docs/admin/checks.rst`
+- Modify: `docs/changes.rst`
+- Modify only implementation files changed by an in-scope review fix
+
+### Step 1: Update existing English docs
+
+Extend, do not duplicate:
+
+- `docs/user/translating.rst`: readiness location, separate axes, stale/incomplete, exact queues, capped preview, observed-cost disclaimer, no approval implication.
+- `docs/admin/checks.rst`: unavailable state, permissions, no configuration leakage, context-only warning semantics.
+- top unreleased `docs/changes.rst`: concise linked entry.
+
+Do not rewrite the approved Russian design document.
+
+### Step 2: Run focused behavioral suite
+
+```bash
+./rundev.sh test \
+  weblate/trans/tests/test_judge.py \
+  weblate/trans/tests/test_judge_round.py \
+  weblate/trans/tests/test_judge_migration.py \
+  weblate/trans/tests/test_judge_client.py \
+  weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_judge_autotranslate.py \
+  weblate/trans/tests/test_judge_form.py \
+  weblate/trans/tests/test_judge_views.py \
+  weblate/trans/tests/test_llm_usage.py \
+  weblate/trans/tests/test_search.py \
+  weblate/trans/tests/test_stats.py \
+  weblate/trans/tests/test_pending.py
+```
+
+Expected: all selected tests pass.
+
+### Step 3: Run affected hooks once
+
+```bash
+uv run prek run --files \
+  weblate/trans/models/judge.py \
+  weblate/trans/models/llm_usage.py \
+  weblate/trans/models/pending.py \
+  weblate/trans/judge.py \
+  weblate/trans/judge_loop.py \
+  weblate/trans/autotranslate.py \
+  weblate/trans/tasks.py \
+  weblate/trans/forms.py \
+  weblate/trans/views/basic.py \
+  weblate/trans/views/edit.py \
+  weblate/utils/search.py \
+  weblate/utils/stats.py \
+  weblate/machinery/llm.py \
+  weblate/machinery/openai.py \
+  weblate/urls.py \
+  weblate/templates/component.html \
+  weblate/templates/snippets/judge-readiness.html \
+  weblate/templates/snippets/autoform.html \
+  weblate/static/loader-bootstrap.js \
+  docs/user/translating.rst docs/admin/checks.rst docs/changes.rst
+```
+
+Expected: all affected hooks pass. Do not use `--all-files` to absorb unrelated baseline failures.
+
+### Step 4: Browser smoke-test real producer flow
+
+Use the running dev instance and real controls. Do not rebuild/restart the shared stack and do not submit a paid run.
+
+1. Reviewer opens regular component `/projects/need-for-greed/buyers/`.
+2. Readiness appears above unchanged language table; source absent.
+3. AI count click opens exact Zen q and matching count.
+4. **Evaluate N** opens chosen language Auto tab with judge/default q/return link.
+5. Custom q survives mode changes.
+6. Invalid and zero q disable Apply.
+7. Valid q shows cap/calls and separate cost legs in live region.
+8. Keyboard focus and labels work without color.
+9. View-only account sees aggregates, not Evaluate/configure.
+10. Glossary component has no card.
+11. Browser console/network show no new errors.
+
+Click real controls; never substitute `form.submit()` or direct POST.
+
+### Step 5: Independent review
+
+Use `requesting-code-review`. Check:
+
+- no historical target counts as current;
+- SQL and `active_round()` agree;
+- preview/execution scope cannot drift;
+- no secret/cost leakage;
+- no component-page N+1;
+- no nested forms/accessibility regression;
+- no approval/release guarantee;
+- no Plan 03 behavior.
+
+Fix only in-scope findings and rerun affected evidence.
+
+### Step 6: Commit docs/review fixes and push
+
+```bash
+git add docs/user/translating.rst docs/admin/checks.rst docs/changes.rst
+git add <only source/tests changed by an in-scope review fix>
+git commit -m "docs(judge): document Plan 02 readiness workflow"
+git push
+```
+
+Final evidence must show: focused tests green, affected hooks green, browser flow observed, branch committed/pushed, no production change, no paid provider call.
