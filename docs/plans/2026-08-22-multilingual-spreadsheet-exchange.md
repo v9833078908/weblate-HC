@@ -17,10 +17,10 @@
 - Row identity: for monolingual formats, `key` is `Unit.context`; for bilingual formats, it is the source text. `context` is included only for a distinct bilingual `msgctxt`; it is omitted when it would duplicate `key` or is empty for every row. The service must reject an export or import when the visible identity (`key`, plus `context` when present) is not unique. It must never guess from row position.
 - One source unit produces exactly one row. A language cell is its sibling unit's target. Empty cells are exported unchanged.
 - Plural units are not supported by this one-row-per-source-unit format. Export and import must reject a component containing a plural source unit or sibling translation unit with a typed validation error before emitting a file, creating a draft, or changing data. This avoids serializing Weblate's internal plural separator into a spreadsheet cell.
-- CSV uses UTF-8 with an Excel-compatible dialect; XLSX contains one worksheet. Cells are literal text, never formulas, and the same header and cell values must round-trip through Google Sheets.
+- CSV uses UTF-8 with an Excel-compatible dialect; XLSX contains exactly one worksheet. Import rejects every workbook that does not contain exactly one worksheet, including hidden worksheets. Cells are literal text, never formulas, and the same header and cell values must round-trip through Google Sheets. Before XLSX parsing, validate the ordinary upload size with `validate_translation_upload_size` and validate the archive with `validate_zip_members(..., limits=ZipSafetyLimits(max_members=1000, max_total_uncompressed_size=settings.TRANSLATION_UPLOAD_MAX_SIZE))`.
 - Import accepts only the same component's exported schema. It rejects unknown/missing language columns, duplicate headers or row identities, unknown keys, an unexpected or absent required independent `context` column, and malformed CSV/XLSX before any changes are written.
 - A blank language cell means "not translated": after confirmation it clears that translation and gives it the normal untranslated state. It is not a no-op.
-- Every non-empty changed target must preserve all protected tokens from its source in the same order. This reuses and tightens the game-markup token extraction, including `{0}`, `{playerName}`, `%s`, `%KEY%`, and Unity markup. An invalid row is reported in the preview and blocks confirmation; it is never silently fixed.
+- Every non-empty changed target must preserve source placeholders in the same order. This reuses and tightens the game-markup token extraction for `{0}`, `{playerName}`, `%s`, and `%KEY%`. Unity markup must retain its existing tag-and-attribute multiset, but its relative position is not restricted by spreadsheet import. An invalid row is reported in the preview and blocks confirmation; it is never silently fixed.
 - Existing source files, Git workflows, and the existing per-language ZIP/CSV/XLSX/XLIFF downloads stay unchanged.
 
 Production evidence, read-only on 2026-08-22: `pirate-ships/localization-json` has 3,735 source units and no blank `Unit.context`; `lang_name_en` maps to Russian source `Английский` and all language targets. `need-for-greed/buyers` (`xlsx`) likewise stores `Buyer1` in `Unit.context`. In both formats `context` is already the file key, not additional translator context.
@@ -37,7 +37,7 @@ Production evidence, read-only on 2026-08-22: `pirate-ships/localization-json` h
 
 Cover a monolingual test component with source and target translations. Assert that the parsed CSV and XLSX both have exactly the same headers and rows; `key` is first, language headers use `Language.code`, source is included, and `context` is appended only for a distinct contextual identity. Assert literal preservation of commas, quotes, newlines, Unicode, and formula-like cell values.
 
-Add rejection tests for duplicate headers, a missing language column, an unknown language column, duplicated visible row identities, a changed key or independent context, and a workbook with more than one selected worksheet. Add a plural source unit and a plural sibling unit case, and assert that both CSV/XLSX export and upload parsing refuse the component before emitting data or producing a parsed preview. Every rejection must be a typed validation error with a row/column diagnostic where a row/column exists.
+Add rejection tests for duplicate headers, a missing language column, an unknown language column, duplicated visible row identities, a changed key or independent context, a workbook with anything other than one worksheet (including hidden worksheets), and XLSX archives exceeding the member or uncompressed-size limits. Add a plural source unit and a plural sibling unit case, and assert that both CSV/XLSX export and upload parsing refuse the component before emitting data or producing a parsed preview. Every rejection must be a typed validation error with a row/column diagnostic where a row/column exists.
 
 **Step 2: Run the new tests to verify they fail.**
 
@@ -61,7 +61,7 @@ def build_preview(
 
 Query the component's source translation once, fetch sibling units by `source_unit_id` and language, and map them by source-unit primary key. Before exporting or accepting an upload, reject the component if a source unit or any sibling unit is plural. Resolve incoming rows by `key` alone unless the exported schema includes an independent `context`, then use `(key, context)`; error rather than resolving an ambiguous identity. Do not instantiate `BaseExporter` or emit a file per `Translation`.
 
-Use the existing CSV escaping conventions from `CSVExporter.string_filter()` and reverse its wrapped formula escaping with `CSVUnit.unescape_csv()` while parsing CSV, so a formula-looking value round-trips without stored apostrophes or escaped pipes. Use the existing `XlsxFormat` serialization/parsing path so formula-looking strings are handled consistently with current Weblate XLSX behavior. Keep the table schema validation in this service, not in a view.
+Use the existing CSV escaping conventions from `CSVExporter.string_filter()` and reverse its wrapped formula escaping with `CSVUnit.unescape_csv()` while parsing CSV, so a formula-looking value round-trips without stored apostrophes or escaped pipes. Before calling the existing `XlsxFormat` serialization/parsing path, enforce the upload and archive limits from the format contract and reject a workbook whose complete worksheet collection has any count other than one. Keep the table schema validation in this service, not in a view.
 
 **Step 4: Run focused tests.**
 
@@ -76,7 +76,7 @@ git add weblate/trans/multilingual_spreadsheet.py weblate/trans/tests/test_multi
 git commit -m "feat(trans): add multilingual spreadsheet exchange service"
 ```
 
-## Task 2: Make protected-token validation shared and ordered
+## Task 2: Share protected syntax and enforce placeholder order
 
 **Files:**
 
@@ -87,17 +87,17 @@ git commit -m "feat(trans): add multilingual spreadsheet exchange service"
 
 **Step 1: Write failing token-order tests.**
 
-Add cases proving `{0}` followed by `{playerName}` is valid only in that order; swapping them fails. Cover `%s`, `%KEY%`, nested Unity markup, a target without source tokens, and an empty target. The empty target is valid because it represents an untranslated cell.
+Add cases proving `{0}` followed by `{playerName}` is valid only in that order; swapping them fails. Cover `%s`, `%KEY%`, nested Unity markup with the same tags and attributes, a target without source tokens, and an empty target. The empty target is valid because it represents an untranslated cell.
 
 **Step 2: Run the focused custom-check tests to verify the new ordering case fails.**
 
 Run: `./rundev.sh test weblate_customization/tests/test_checks.py -k markup`
 
-Expected: the reordered-token case currently passes because `GameMarkupCheck` sorts token lists.
+Expected: the reordered-placeholder case currently passes because `GameMarkupCheck` sorts token lists.
 
 **Step 3: Extract and reuse the existing token parser.**
 
-Move the existing Unity-tag pattern, placeholder pattern, and combined `MARKUP` pattern to `weblate/trans/protected_tokens.py`, alongside the shared protected-token sequence extractor. Extend the placeholder pattern for printf-style placeholders such as `%s`. Import `MARKUP` back into `checks.py` so `GameNumberCheck` keeps stripping exactly the same protected syntax before examining numbers. Change `GameMarkupCheck.check_single()` to import the sequence helper and compare ordered sequences rather than unordered multisets; the spreadsheet preview validator imports the same core helper. `weblate_customization` is a consumer of the core helper, never an import dependency of a core Weblate module. Do not introduce a second placeholder regex in the importer.
+Move the existing Unity-tag pattern, placeholder pattern, and combined `MARKUP` pattern to `weblate/trans/protected_tokens.py`, alongside a shared protected-token extractor and an ordered placeholder-sequence extractor. Extend the placeholder pattern for printf-style placeholders such as `%s`. Import `MARKUP` back into `checks.py` so `GameNumberCheck` keeps stripping exactly the same protected syntax before examining numbers. Change `GameMarkupCheck.check_single()` to retain its existing unordered tag-and-attribute comparison while additionally comparing placeholder sequences in order; the spreadsheet preview validator imports the same core helper. `weblate_customization` is a consumer of the core helper, never an import dependency of a core Weblate module. Do not introduce a second placeholder regex in the importer.
 
 **Step 4: Run custom-check and spreadsheet tests.**
 
@@ -109,7 +109,7 @@ Run:
 ./rundev.sh test weblate/trans/tests/test_multilingual_spreadsheet.py
 ```
 
-Expected: exact order passes, changed/missing/added/reordered protected tokens fail, `GameNumberCheck` retains its existing markup-stripping behavior, and blank targets remain importable as untranslated.
+Expected: exact placeholder order passes; changed, missing, added, or reordered placeholders fail; `GameNumberCheck` retains its existing markup-stripping behavior; Unity markup retains its current comparison behavior; and blank targets remain importable as untranslated.
 
 **Step 5: Commit.**
 
@@ -131,7 +131,7 @@ git commit -m "fix(checks): preserve protected token order"
 
 **Step 1: Write failing draft lifecycle tests.**
 
-Test that a draft is readable only by its creating user and Django session; it expires after at most one hour, is inaccessible after consumption, deletes its private uploaded file on explicit deletion and cascade deletion, and the cleanup task removes expired drafts. Test that a source/component schema or identity change after upload, and a target or state change in any editable cell after preview, causes confirmation to fail before any row is written. Exercise two simultaneous confirmation attempts and assert that only one can consume and apply a draft. A `Component.locked_for_update()` timeout must leave the draft active and write no data so the user can retry.
+Test that a draft is readable only by its creating user and Django session; it expires after at most one hour, is inaccessible after consumption, deletes its private uploaded file on explicit deletion and cascade deletion, and the cleanup task removes expired drafts. Test that a source/component schema or identity change after upload, and a target or state change in any editable cell after preview, causes confirmation to fail before any row is written. Exercise two simultaneous confirmation attempts and assert that only one can consume and apply a draft. Upload to an already locked component must create no draft. A `Component.locked_for_update()` timeout while confirming an existing draft must leave that draft active and write no data so the user can retry.
 
 **Step 2: Run the lifecycle tests to verify they fail.**
 
@@ -143,7 +143,7 @@ Expected: failure because no draft model exists.
 
 Create `ComponentSpreadsheetImportDraft` rather than widening the glossary-specific `LocKitImportDraft`. Store an unguessable UUID token, owner, session key, target component, original filename, private `FileSystemStorage` upload, serialized validated preview, a server-generated immutable baseline, state (`preview-ready` / `consumed`), timestamps, and a hard one-hour expiry. The baseline records the component language schema, each source row's visible identity and source value, and each editable target unit's primary key, target, and state. Its lookup must return no distinguishing information for missing, wrong-owner, wrong-session, expired, or consumed tokens. Add storage deletion through a post-delete receiver and a Celery cleanup task.
 
-The uploaded file and serialized preview are untrusted. Confirmation must reparse the private file and rebuild the preview against the current component, so a forged preview JSON cannot choose targets or values. The baseline is derived only from the server-side component state at upload time; it is rechecked under row locks at confirmation and any mismatch invalidates the apply without writes.
+The uploaded file and serialized preview are untrusted. Confirmation must revalidate the private file's upload and XLSX archive limits, then reparse it and rebuild the preview against the current component, so a forged preview JSON cannot choose targets or values. The baseline is derived only from the server-side component state at upload time; it is rechecked under row locks at confirmation and any mismatch invalidates the apply without writes.
 
 Add the new table-import surface to the threat model: authenticated `upload.perform` caller, bounded application upload limits, private short-lived storage, owner/session token binding, fully local parsing, preview-before-apply, and no outbound request. This is required because it adds an import format.
 
@@ -185,7 +185,7 @@ Test these exact behaviors:
 - a target or state changed by another user after preview blocks confirmation with no writes;
 - importing a value for a shared source unit does not modify a matching unit outside the selected component;
 - simultaneous confirmation attempts cannot apply the same draft twice;
-- a locked component cannot upload or confirm;
+- upload to an already locked component creates no draft; a lock timeout while confirming an existing draft preserves it for retry;
 - the original `upload` endpoint and existing ZIP downloads are unchanged.
 
 **Step 2: Run the new view tests to verify they fail.**
@@ -201,7 +201,7 @@ Expected: failures because the endpoint, form, and template do not exist.
 
 **Step 3: Add component-only routes and menu controls.**
 
-Add download routes that accept only `csv` or `xlsx` and call `export_component()`. Add upload, preview, confirm, and cancel routes that resolve exactly a `Component`; do not overload the current translation-only `upload()` view. Check `translation.download` for export and `upload.perform` for every upload/preview/confirm request, and recheck component lock status at confirmation.
+Add download routes that accept only `csv` or `xlsx` and call `export_component()`. Add upload, preview, confirm, and cancel routes that resolve exactly a `Component`; do not overload the current translation-only `upload()` view. Check `translation.download` for export and `upload.perform` for every upload/preview/confirm request. Reject an upload to a locked component before creating a draft; confirm attempts the component lock before consuming its existing draft, preserving that draft on timeout.
 
 In `component.html`, place two translated entries under the existing `Files` menu: "Download multilingual CSV" and "Download multilingual XLSX". Add one translated "Upload multilingual spreadsheet" entry that opens the new form. Set `FormHelper.form_tag = False` for forms rendered inside template-owned forms.
 
