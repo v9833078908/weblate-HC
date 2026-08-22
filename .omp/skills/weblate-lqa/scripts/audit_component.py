@@ -428,6 +428,19 @@ def resolve_review_scope(
             "reviewed_unit_ids or remove the mismatched verdicts."
         )
 
+    # Every scored verdict must declare a non-empty 'context' - this is what lets the
+    # check below catch a wrong unit_id instead of silently skipping validation for
+    # a verdict that just omits the field.
+    missing_context = [v.get("unit_id") for v in verdicts if not str(v.get("context", "")).strip()]
+    if missing_context:
+        raise ValueError(
+            f"{len(missing_context)} verdict(s) are missing a non-empty 'context' field "
+            f"(unit ID(s): {missing_context[:10]}{'...' if len(missing_context) > 10 else ''}). "
+            "Every scored verdict must declare the context of the unit it describes, copied "
+            "directly from tool output - omitting it would let a wrong unit_id bypass the "
+            "transcription-error check below."
+        )
+
     # Catch unit_id transcription errors: a verdict's declared context must match
     # the actual context of the unit at that ID. Hand-authoring verdicts by typing
     # IDs from memory (instead of copying them from tool output) can silently attach
@@ -437,7 +450,7 @@ def resolve_review_scope(
     for v in verdicts:
         actual_ctx = scoped_by_id.get(v.get("unit_id"), {}).get("context", "")
         declared_ctx = str(v.get("context", "")).split("[plural_")[0]  # strip plural-form suffix
-        if declared_ctx and actual_ctx and declared_ctx != actual_ctx:
+        if declared_ctx != actual_ctx:
             mismatched.append((v.get("unit_id"), declared_ctx, actual_ctx))
     if mismatched:
         detail = "; ".join(f"unit {uid}: verdict says '{d}', actual context is '{a}'" for uid, d, a in mismatched[:5])
