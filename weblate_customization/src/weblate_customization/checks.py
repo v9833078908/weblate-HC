@@ -92,6 +92,10 @@ def separator_is_tight(source: str) -> bool:
 
 
 
+# Mission DSL substitution identifier before a bracketed, translated body:
+# item_type[|{0}], skirmish_league_id[gen|в {0}|в любой лиге]. A bracket
+# without a `|` is ordinary prose, not a substitution.
+TOKEN_PATTERN = regex.compile(r"([a-z][a-z0-9_]*)\[[^\]]*\|")
 
 def _tokens_dsl(text: str) -> Counter[str]:
     """Count engine substitution identifiers, ignoring their translated bodies."""
