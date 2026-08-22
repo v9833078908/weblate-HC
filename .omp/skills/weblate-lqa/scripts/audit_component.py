@@ -6,8 +6,9 @@
 Weblate Component LQA Auditor & MQM-Core Scorecard Generator.
 
 Supports both online Weblate API components and offline loc-kit files
-(XLSX, CSV, TSV, PO, JSON). Categorizes failing checks, identifies review
-candidates, and computes official MQM scores when reviewed verdicts are supplied.
+(XLSX, CSV, TSV, PO, JSON), with full plural-form normalization. Categorizes
+failing checks, identifies review candidates, and computes official MQM scores
+when reviewed verdicts are supplied.
 """
 
 from __future__ import annotations
@@ -48,6 +49,33 @@ def load_token(env_path: str | None = None) -> str | None:
             except Exception:
                 continue
     return None
+
+
+def normalize_to_string_list(val: Any) -> list[str]:
+    """Normalize any source/target field (str, multistring, list, tuple) to a list of strings."""
+    if val is None:
+        return []
+    if hasattr(val, "strings"):  # translate-toolkit multistring for PO plurals
+        res = []
+        for s in val.strings:
+            s_str = str(s)
+            if s_str and s_str not in res:
+                res.append(s_str)
+        return res or ([str(val)] if str(val) else [])
+    if isinstance(val, (list, tuple)):
+        return [str(item) for item in val if item is not None]
+    if isinstance(val, str):
+        return [val]
+    return [str(val)]
+
+
+def join_forms(forms: list[str]) -> str:
+    """Format plural forms cleanly for display."""
+    if not forms:
+        return ""
+    if len(forms) == 1:
+        return forms[0]
+    return " | ".join(forms)
 
 
 class WeblateAuditor:
@@ -104,8 +132,63 @@ class WeblateAuditor:
         return failing_by_id
 
 
+def _extract_po_multiline(keyword: str, block: str) -> str | None:
+    """Extract full string (with line concatenations) for a PO keyword."""
+    m = re.search(rf'{keyword}\s+"((?:[^"\\]|\\.)*)"((?:\s*\n\s*"((?:[^"\\]|\\.)*)")*)', block)
+    if not m:
+        return None
+    first = m.group(1)
+    rest = re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(2)) if m.group(2) else []
+    full = first + "".join(rest)
+    return full.replace(r"\n", "\n").replace(r'\"', '"').replace(r"\t", "\t")
+
+
+def _parse_po_fallback(file_path: Path) -> list[dict[str, Any]]:
+    """Robust fallback PO parser for multiline strings and plural forms when translate-toolkit is unavailable."""
+    with file_path.open("r", encoding="utf-8", errors="replace") as f:
+        content = f.read()
+
+    blocks = re.split(r"\n\s*\n", content)
+    units = []
+    idx = 1
+
+    for block in blocks:
+        if not block.strip() or block.startswith("#, fuzzy"):
+            continue
+
+        ctx = _extract_po_multiline("msgctxt", block) or f"entry_{idx}"
+        msgid = _extract_po_multiline("msgid", block)
+        if msgid is None or (msgid == "" and idx == 1):  # skip header msgid ""
+            continue
+
+        msgid_plural = _extract_po_multiline("msgid_plural", block)
+        src_list = [msgid, msgid_plural] if msgid_plural else [msgid]
+
+        # Parse msgstr / msgstr[N]
+        plural_indices = re.findall(r'msgstr\[(\d+)\]', block)
+        if plural_indices:
+            tgt_list = []
+            for p_idx in sorted(set(map(int, plural_indices))):
+                val = _extract_po_multiline(rf'msgstr\[{p_idx}\]', block)
+                if val is not None:
+                    tgt_list.append(val)
+        else:
+            msgstr = _extract_po_multiline("msgstr", block)
+            tgt_list = [msgstr] if msgstr is not None else []
+
+        units.append({
+            "id": idx,
+            "context": ctx,
+            "source": src_list,
+            "target": tgt_list,
+        })
+        idx += 1
+
+    return units
+
+
 def load_units_from_file(file_path: str, target_lang: str | None = None) -> list[dict[str, Any]]:
-    """Parse translation units from a local file (XLSX, CSV, TSV, PO, JSON)."""
+    """Parse translation units from a local file (XLSX, CSV, TSV, PO, JSON) with plural support."""
     p = Path(file_path)
     if not p.exists():
         raise FileNotFoundError(f"Local file not found: {file_path}")
@@ -118,7 +201,6 @@ def load_units_from_file(file_path: str, target_lang: str | None = None) -> list
         try:
             from loc_kit_ingest.reader import read_sheets
         except ImportError:
-            # Fallback path if run outside repository root
             sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
             from loc_kit_ingest.reader import read_sheets
 
@@ -150,30 +232,33 @@ def load_units_from_file(file_path: str, target_lang: str | None = None) -> list
                     units.append({
                         "id": idx,
                         "context": ctx_val,
-                        "source": src_val,
-                        "target": tgt_val,
+                        "source": normalize_to_string_list(src_val),
+                        "target": normalize_to_string_list(tgt_val),
                     })
                     idx += 1
 
-    # 2. Gettext PO files via translate.storage.pypo
+    # 2. Gettext PO files (translate.storage.pypo with fallback parser)
     elif ext == ".po":
-        from translate.storage.pypo import pofile
-        po = pofile(open(p, "rb"))
-        idx = 1
-        for unit in po.units:
-            if unit.isheader() or unit.isfuzzy():
-                continue
-            src = unit.source
-            tgt = unit.target
-            ctx = unit.getcontext() or f"po_unit_{idx}"
-            if src:
-                units.append({
-                    "id": idx,
-                    "context": ctx,
-                    "source": src,
-                    "target": tgt,
-                })
-                idx += 1
+        try:
+            from translate.storage.pypo import pofile
+            po = pofile(open(p, "rb"))
+            idx = 1
+            for unit in po.units:
+                if unit.isheader() or unit.isfuzzy():
+                    continue
+                src_list = normalize_to_string_list(unit.source)
+                tgt_list = normalize_to_string_list(unit.target)
+                ctx = unit.getcontext() or f"po_unit_{idx}"
+                if src_list:
+                    units.append({
+                        "id": idx,
+                        "context": ctx,
+                        "source": src_list,
+                        "target": tgt_list,
+                    })
+                    idx += 1
+        except ImportError:
+            units = _parse_po_fallback(p)
 
     # 3. JSON files
     elif ext == ".json":
@@ -184,8 +269,8 @@ def load_units_from_file(file_path: str, target_lang: str | None = None) -> list
                     units.append({
                         "id": item.get("id", idx),
                         "context": item.get("context", item.get("key", f"unit_{idx}")),
-                        "source": item.get("source", item.get("src", "")),
-                        "target": item.get("target", item.get("tgt", "")),
+                        "source": normalize_to_string_list(item.get("source", item.get("src", ""))),
+                        "target": normalize_to_string_list(item.get("target", item.get("tgt", ""))),
                     })
             elif isinstance(data, dict):
                 idx = 1
@@ -194,15 +279,15 @@ def load_units_from_file(file_path: str, target_lang: str | None = None) -> list
                         units.append({
                             "id": idx,
                             "context": k,
-                            "source": v.get("source", v.get("src", "")),
-                            "target": v.get("target", v.get("tgt", "")),
+                            "source": normalize_to_string_list(v.get("source", v.get("src", ""))),
+                            "target": normalize_to_string_list(v.get("target", v.get("tgt", ""))),
                         })
-                    elif isinstance(v, str):
+                    elif isinstance(v, (str, list)):
                         units.append({
                             "id": idx,
                             "context": k,
-                            "source": k,
-                            "target": v,
+                            "source": [k],
+                            "target": normalize_to_string_list(v),
                         })
                     idx += 1
     else:
@@ -212,65 +297,64 @@ def load_units_from_file(file_path: str, target_lang: str | None = None) -> list
 
 
 def extract_candidates(units: list[dict[str, Any]], target_lang: str) -> list[dict[str, Any]]:
-    """Extract candidate anomalies (heuristics) clearly labeled as hypotheses."""
+    """Extract candidate anomalies (heuristics) across all plural forms."""
     candidates = []
     for u in units:
-        src = u["source"][0] if isinstance(u.get("source"), list) else u.get("source", "")
-        tgt = u["target"][0] if isinstance(u.get("target"), list) else u.get("target", "")
+        src_list = normalize_to_string_list(u.get("source"))
+        tgt_list = normalize_to_string_list(u.get("target"))
         ctx = u.get("context", "")
         uid = u.get("id")
 
-        if not tgt:
-            continue
+        for form_idx, tgt in enumerate(tgt_list):
+            if not tgt:
+                continue
+            src = src_list[form_idx] if form_idx < len(src_list) else (src_list[0] if src_list else "")
 
-        # 1. Acronym leak heuristic (English acronyms in non-EN targets)
-        if target_lang not in ("en", "ru"):
-            m = re.search(r"\b(AT|HP|XP|DPS|LMB|RMB|Cancel|Exit|Damage|Heal)\b", tgt)
-            if m:
-                matched_token = m.group(1)
+            # 1. Acronym leak heuristic (English acronyms in non-EN targets)
+            if target_lang not in ("en", "ru"):
+                m = re.search(r"\b(AT|HP|XP|DPS|LMB|RMB|Cancel|Exit|Damage|Heal)\b", tgt)
+                if m:
+                    matched_token = m.group(1)
+                    candidates.append({
+                        "unit_id": uid,
+                        "context": f"{ctx}[plural_{form_idx}]" if len(tgt_list) > 1 else ctx,
+                        "source": src,
+                        "target": tgt,
+                        "candidate_type": "acronym_leak",
+                        "matched": matched_token,
+                        "note": f"Found English token '{matched_token}' in {target_lang.upper()} target (form {form_idx+1}/{len(tgt_list)}).",
+                    })
+
+            # 2. Cyrillic leak heuristic (in Latin/CJK targets)
+            if target_lang not in ("ru", "uk", "be", "sr"):
+                if re.search(r"[\u0400-\u04FF]", tgt):
+                    candidates.append({
+                        "unit_id": uid,
+                        "context": f"{ctx}[plural_{form_idx}]" if len(tgt_list) > 1 else ctx,
+                        "source": src,
+                        "target": tgt,
+                        "candidate_type": "cyrillic_leak",
+                        "note": f"Cyrillic character detected in {target_lang.upper()} target.",
+                    })
+
+            # 3. Placeholder / bracket mismatch heuristic
+            src_brackets = src.count("[") + src.count("]")
+            tgt_brackets = tgt.count("[") + tgt.count("]")
+            if src_brackets != tgt_brackets:
                 candidates.append({
                     "unit_id": uid,
-                    "context": ctx,
+                    "context": f"{ctx}[plural_{form_idx}]" if len(tgt_list) > 1 else ctx,
                     "source": src,
                     "target": tgt,
-                    "candidate_type": "acronym_leak",
-                    "matched": matched_token,
-                    "note": f"Found English token '{matched_token}' in {target_lang.upper()} target.",
+                    "candidate_type": "bracket_count_mismatch",
+                    "note": f"Source has {src_brackets} bracket symbols, target has {tgt_brackets}.",
                 })
-
-        # 2. Cyrillic leak heuristic (in Latin/CJK targets)
-        if target_lang not in ("ru", "uk", "be", "sr"):
-            if re.search(r"[\u0400-\u04FF]", tgt):
-                candidates.append({
-                    "unit_id": uid,
-                    "context": ctx,
-                    "source": src,
-                    "target": tgt,
-                    "candidate_type": "cyrillic_leak",
-                    "note": f"Cyrillic character detected in {target_lang.upper()} target.",
-                })
-
-        # 3. Placeholder / bracket mismatch heuristic
-        src_brackets = src.count("[") + src.count("]")
-        tgt_brackets = tgt.count("[") + tgt.count("]")
-        if src_brackets != tgt_brackets:
-            candidates.append({
-                "unit_id": uid,
-                "context": ctx,
-                "source": src,
-                "target": tgt,
-                "candidate_type": "bracket_count_mismatch",
-                "note": f"Source has {src_brackets} bracket symbols, target has {tgt_brackets}.",
-            })
 
     return candidates
 
 
 def compute_mqm_score(total_words: int, verdicts: list[dict[str, Any]]) -> dict[str, Any]:
-    """Calculate MQM penalty points and score based on reviewed verdicts.
-    
-    Raises ValueError if any verdict is unreviewed or has pending/invalid severity.
-    """
+    """Calculate MQM penalty points and score based on reviewed verdicts."""
     weights = {"neutral": 0, "minor": 1, "major": 5, "critical": 25}
     counts = {"neutral": 0, "minor": 0, "major": 0, "critical": 0}
     total_penalty = 0
@@ -344,7 +428,7 @@ def format_markdown_report(
     md.append(f"- **Target:** `{target_name}`")
     md.append(f"- **Language:** `{language}`")
     md.append(f"- **Total Units:** {total_units}")
-    md.append(f"- **Total Source Words:** {total_words}")
+    md.append(f"- **Total Source Words (all plural forms):** {total_words}")
     total_check_units = sum(len(ulist) for ulist in failing_checks.values())
     if total_check_units > 0:
         md.append(f"- **Active Check Warnings:** {total_check_units} (across {len(failing_checks)} check types)\n")
@@ -381,8 +465,8 @@ def format_markdown_report(
         for cid, ulist in failing_checks.items():
             md.append(f"### Check: `{cid}` ({len(ulist)} strings)")
             for u in ulist:
-                src = u["source"][0] if isinstance(u.get("source"), list) else u.get("source", "")
-                tgt = u["target"][0] if isinstance(u.get("target"), list) else u.get("target", "")
+                src = join_forms(normalize_to_string_list(u.get("source")))
+                tgt = join_forms(normalize_to_string_list(u.get("target")))
                 md.append(f"- Unit {u['id']} (`{u.get('context')}`): `{src}` $\\to$ `{tgt}`")
             md.append("")
 
@@ -435,9 +519,9 @@ def main():
 
     total_units = len(units)
 
-    # Word count
+    # Word count across all plural forms
     total_words = sum(
-        len((u["source"][0] if isinstance(u.get("source"), list) else u.get("source", "")).split())
+        sum(len(s.split()) for s in normalize_to_string_list(u.get("source")))
         for u in units
     )
 
