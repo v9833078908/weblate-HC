@@ -174,3 +174,48 @@ class ComponentSpreadsheetImportDraftTest(ViewTestCase):
                 token=draft.token, owner=self.user, session_key=self.client.session.session_key
             )
         )
+
+
+class MultilingualSpreadsheetPluralTest(ViewTestCase):
+    def test_plural_component_rejects_both_exports_and_upload(self) -> None:
+        from weblate.trans.multilingual_spreadsheet import export_component, parse_upload
+
+        for format_name in ("csv", "xlsx"):
+            with self.subTest(format_name), self.assertRaises(ValidationError):
+                export_component(self.component, format_name)
+        with self.assertRaises(ValidationError):
+            parse_upload(
+                self.component,
+                SimpleUploadedFile("translations.csv", b"key,en,cs\nhello,hello,ahoj\n"),
+            )
+
+
+class ComponentSpreadsheetImportDraftCleanupTest(ViewTestCase):
+    def test_cleanup_removes_expired_draft_and_private_file(self) -> None:
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from weblate.trans.models.multilingual_spreadsheet import (
+            COMPONENT_SPREADSHEET_DRAFT_STORAGE,
+            ComponentSpreadsheetImportDraft,
+        )
+        from weblate.trans.tasks import cleanup_component_spreadsheet_import_drafts
+
+        draft = ComponentSpreadsheetImportDraft.objects.create(
+            owner=self.user,
+            session_key=self.client.session.session_key,
+            component=self.component,
+            source_filename="translations.csv",
+            uploaded=SimpleUploadedFile("translations.csv", b"key,en,cs\n"),
+            preview_json="{}",
+            baseline_json="{}",
+            expires_at=timezone.now() - timedelta(seconds=1),
+        )
+        name = draft.uploaded.name
+        self.assertTrue(COMPONENT_SPREADSHEET_DRAFT_STORAGE.exists(name))
+
+        cleanup_component_spreadsheet_import_drafts()
+
+        self.assertFalse(ComponentSpreadsheetImportDraft.objects.filter(pk=draft.pk).exists())
+        self.assertFalse(COMPONENT_SPREADSHEET_DRAFT_STORAGE.exists(name))
