@@ -10,7 +10,7 @@ from unittest import mock
 from django.test import override_settings
 
 from weblate.trans.judge import JudgeResult
-from weblate.trans.judge_loop import build_request, run_judge_batch
+from weblate.trans.judge_loop import build_request, repair_target, run_judge_batch
 from weblate.trans.models.judge import (
     JudgeVerdict,
     compute_context_hash,
@@ -75,6 +75,20 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
         self.assertEqual(client.call_count, 2)
         self.assertEqual(unit.judge_verdicts.count(), 2)
+
+    def test_repair_target_selects_a_candidate_per_plural_form(self) -> None:
+        unit = self.get_unit()
+        engine = mock.Mock()
+        engine.return_value.translate.return_value = [
+            [
+                {"text": "lower quality", "quality": 50},
+                {"text": "fixed text", "quality": 100},
+            ]
+        ]
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
+        with mock.patch("weblate.trans.judge_loop.MACHINERY", {"openrouter": engine}):
+            self.assertEqual(repair_target(unit, self.user), ["fixed text"])
 
     def test_no_seat_may_lower_the_other(self) -> None:
         _, verdict, _ = self.run_batch([MAJOR, PASS])

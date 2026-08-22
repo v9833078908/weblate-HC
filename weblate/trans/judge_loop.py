@@ -100,13 +100,20 @@ def repair_target(unit: Unit, user: User | None) -> list[str] | None:
     if setting is None or engine_id not in MACHINERY:
         return None
     results = MACHINERY[engine_id](setting).translate(unit, user)
-    if not results:
+    if not results or len(results) != len(unit.get_target_plurals()):
         return None
-    best = max(results, key=lambda item: item.get("quality", 0))
-    text = best.get("text", "")
-    if not text or text == unit.target:
+    texts: list[str] = []
+    for candidates in results:
+        if not candidates:
+            return None
+        best = max(candidates, key=lambda item: item.get("quality", 0))
+        text = best.get("text", "")
+        if not isinstance(text, str) or not text:
+            return None
+        texts.append(text)
+    if texts == unit.get_target_plurals():
         return None
-    return [text]
+    return texts
 
 
 def judge_project_context(project: Project) -> str:
