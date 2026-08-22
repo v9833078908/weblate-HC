@@ -393,29 +393,97 @@ git commit -m "docs(admin): document enable_review_workflow"
 
 ## Phase 4: Dev judge wiring [DEPLOY-GATE]
 
-### Task 9: Add judge environment variables to the dev container
+### Task 9: Add non-secret judge settings and protect the secrets env_file
+
+`dev-docker/docker-compose.yml`'s `weblate:` service already loads
+`env_file: - ./environment` (lines 65-66) in addition to its inline
+`environment:` block. `docker-compose.yml` is tracked in git (confirmed via
+`git ls-files`); `dev-docker/environment` is untracked **and not currently
+gitignored** - a pre-existing gap (it already holds `WEBLATE_ADMIN_PASSWORD`
+and `WEBLATE_EMAIL_HOST_PASSWORD`). Task 10 adds a live OpenRouter key to
+that file, so this task closes the gap first.
 
 **Files:**
-- Modify: `dev-docker/docker-compose.yml` (the `weblate:` service's `environment:` list, alongside the existing `WEBLATE_ADD_CHECK`/`WEBLATE_ADD_MACHINERY` entries per `AGENTS.md`'s "Deploying custom checks and machinery" section)
+- Modify: `.gitignore` (after line 33, `/dev-docker/.env`)
+- Modify: `dev-docker/docker-compose.yml` (after the `WEBLATE_ADD_AUTOFIX` line, currently line 64 - confirm the exact line before editing, do not guess it)
 
-**Step 1: Open the file and locate the `weblate:` service's `environment:` block**
+**Step 1: Gitignore the secrets env_file**
 
-Read the file first (`WEBLATE_ADD_MACHINERY: weblate_customization.machinery.RoutedLLMTranslation` is the anchor line per `AGENTS.md`) to get exact current line numbers before editing - do not guess them from this plan.
+Insert after `.gitignore:33`:
+```
+/dev-docker/environment
+```
 
-**Step 2: Add these lines to the `environment:` block**
+**Step 2: Add the three non-secret judge settings to `docker-compose.yml`**
 
 ```yaml
       WEBLATE_JUDGE_ENABLED: 1
-      WEBLATE_JUDGE_OPENROUTER_KEY: "<dev OpenRouter key - obtain before running this task>"
       WEBLATE_JUDGE_MODEL_SEAT_1: deepseek/deepseek-v4-pro
       WEBLATE_JUDGE_MODEL_SEAT_2: qwen/qwen3-235b-a22b-2507
 ```
+`WEBLATE_JUDGE_OPENROUTER_KEY` deliberately does **not** go here - it goes in
+the now-gitignored `dev-docker/environment` file instead (Task 10), which
+this same service already loads via `env_file:`.
 
-Leave `WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS`, `WEBLATE_JUDGE_BATCH_SIZE`, `WEBLATE_JUDGE_MAX_UNITS_PER_RUN`, `WEBLATE_JUDGE_REQUEST_SLEEP` unset (code defaults: 1, 5, 2000, 0.0). Leave `WEBLATE_JUDGE_MAY_APPROVE` unset (defaults to off, per the earlier decision).
+**Step 3: Commit**
 
-**Blocking prerequisite:** an OpenRouter API key for the judge. Per `deploy/environment.example:106-108`, this is deliberately a separate credential from both the `RoutedLLMTranslation` machinery key and the loc-kit profile key - do not reuse either. Obtain or mint this key before running this task.
+```bash
+git add .gitignore dev-docker/docker-compose.yml
+git commit -m "chore(dev): wire non-secret judge settings, gitignore env_file secrets"
+```
 
-### Task 10: Update the environment template
+### Task 10: Reuse the existing RoutedLLMTranslation OpenRouter key for the judge
+
+Per the decision to reuse rather than mint a separate key. The key is not an
+env var today - it lives in the DB (`weblate.configuration.models.Setting`,
+`category=SettingCategory.MT`, `name="openrouter"`, `value["key"]`, matching
+the `KeyMachineryForm`/`BaseOpenAIMachineryForm` field name). This task reads
+it from **dev's own** `Setting` row and writes it into `dev-docker/environment`
+- entirely inside the container, piped via stdin, so the key value never
+appears in a shell command line, this plan, or any tool output.
+
+**Files:**
+- Modify (at runtime, not via git): `dev-docker/environment`
+
+**Step 1: Write the extraction script to a local temp file**
+
+```bash
+cat > /tmp/judge_key_reuse.py << 'PYEOF'
+from pathlib import Path
+
+from weblate.configuration.models import Setting, SettingCategory
+
+setting = Setting.objects.filter(
+    category=SettingCategory.MT, name="openrouter"
+).first()
+if setting is None or not setting.value.get("key"):
+    raise SystemExit(
+        "No OpenRouter key configured for the 'openrouter' machinery service - "
+        "configure RoutedLLMTranslation in /manage/machinery/ first."
+    )
+key = setting.value["key"]
+env_path = Path("/app/src/dev-docker/environment")
+with env_path.open("a", encoding="utf-8") as f:
+    f.write(f"\nWEBLATE_JUDGE_OPENROUTER_KEY={key}\n")
+print(f"Appended WEBLATE_JUDGE_OPENROUTER_KEY ({len(key)} chars) to {env_path}")
+PYEOF
+```
+
+**Step 2: Run it inside the container via stdin**
+
+Run: `./rundev.sh exec -T weblate weblate shell < /tmp/judge_key_reuse.py`
+Expected: `Appended WEBLATE_JUDGE_OPENROUTER_KEY (NN chars) to /app/src/dev-docker/environment` - a length, never the key itself. If it instead raises the `SystemExit` above, dev's machinery is not configured yet; configure it first.
+
+**Step 3: Delete the temp script (it never held the key, only the DB query - this is tidiness, not a secrets cleanup)**
+
+Run: `rm /tmp/judge_key_reuse.py`
+
+**Step 4: Confirm the line landed, without displaying it**
+
+Run: `grep -c '^WEBLATE_JUDGE_OPENROUTER_KEY=' dev-docker/environment`
+Expected: `1`
+
+### Task 11: Update the environment template
 
 **Files:**
 - Modify: `deploy/environment.example:111-115`
@@ -438,7 +506,10 @@ WEBLATE_JUDGE_MODEL_SEAT_1=deepseek/deepseek-v4-pro
 WEBLATE_JUDGE_MODEL_SEAT_2=qwen/qwen3-235b-a22b-2507
 WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS=1
 ```
-Keep `WEBLATE_JUDGE_ENABLED=0` here (this is the prod template default, staying off until the later, separate decision to run judge on prod) - only the calibrated model names are filled in as documentation of the measured pair.
+Keep `WEBLATE_JUDGE_ENABLED=0` here (this is the prod template default,
+staying off until the later, separate decision to run judge on prod) - only
+the calibrated model names are filled in as documentation of the measured
+pair. Prod's own key reuse (if wanted later) is out of scope for this plan.
 
 **Step 2: Commit**
 
@@ -447,7 +518,7 @@ git add deploy/environment.example
 git commit -m "docs(deploy): document the calibrated judge model pair in the env template"
 ```
 
-### Task 11: [DEPLOY-GATE] Rebuild the dev container
+### Task 12: [DEPLOY-GATE] Rebuild the dev container
 
 **This step changes a running instance - get explicit go-ahead immediately before running it, even though the plan is approved.**
 
@@ -456,12 +527,12 @@ git commit -m "docs(deploy): document the calibrated judge model pair in the env
 Run: `./rundev.sh`
 Expected: Container rebuilds and comes up healthy (`docker compose ps` eventually shows `weblate-dev:...healthy`, matching the `wait` subcommand's own check).
 
-**Step 2: Confirm judge settings landed**
+**Step 2: Confirm judge settings landed, without printing the key**
 
-Run: `./rundev.sh exec -T weblate weblate shell -c "from django.conf import settings; print(settings.JUDGE_ENABLED, settings.JUDGE_MODEL_SEAT_1, settings.JUDGE_MODEL_SEAT_2)"`
-Expected output: `True deepseek/deepseek-v4-pro qwen/qwen3-235b-a22b-2507`
+Run: `./rundev.sh exec -T weblate weblate shell -c "from django.conf import settings; print(settings.JUDGE_ENABLED, settings.JUDGE_MODEL_SEAT_1, settings.JUDGE_MODEL_SEAT_2, bool(settings.JUDGE_OPENROUTER_KEY))"`
+Expected output: `True deepseek/deepseek-v4-pro qwen/qwen3-235b-a22b-2507 True`
 
-### Task 12: Run the full test suite in the rebuilt container
+### Task 13: Run the full test suite in the rebuilt container
 
 **Step 1: Run it**
 
@@ -472,9 +543,9 @@ Expected: PASS. (These tests override judge settings per-test via `@override_set
 
 ## Phase 5: Dev functional verification (live judge calls - real, small OpenRouter cost) [DEPLOY-GATE]
 
-**Every task in this phase makes real calls to OpenRouter using the dev key from Task 9. Confirm the key has a budget/limit you're comfortable with before running any of them.**
+**Every task in this phase makes real calls to OpenRouter using the reused key from Task 10, drawing against the same budget as the existing `RoutedLLMTranslation` machinery. Confirm that's acceptable before running any of them.**
 
-### Task 13: Enable the gate on a dev test project
+### Task 14: Enable the gate on a dev test project
 
 **Step 1: Toggle settings on whatever demo project exists in the dev container**
 
@@ -490,9 +561,9 @@ print(p.slug, p.translation_review, p.commit_policy)
 "`
 Expected: prints the demo project's slug, `True`, `20`.
 
-### Task 14: Verify `REJECT` without overwrite holds the string back but does not rewrite it
+### Task 15: Verify `REJECT` without overwrite holds the string back but does not rewrite it
 
-**Step 1: Pick a translated unit, note its target, launch Judge mode without "overwrite existing" via the UI (Automatic translation on that translation, mode Judge, `unit.review` permission required), on a string you expect the judge to reject (or force one - see Task 16 for a scripted alternative if the UI path is inconvenient).**
+**Step 1: Pick a translated unit, note its target, launch Judge mode without "overwrite existing" via the UI (Automatic translation on that translation, mode Judge, `unit.review` permission required), on a string you expect the judge to reject (or force one - see Task 17 for a scripted alternative if the UI path is inconvenient).**
 
 **Step 2: Confirm**
 
@@ -500,16 +571,16 @@ Expected: prints the demo project's slug, `True`, `20`.
 - Unit target text is unchanged from before the run.
 - A `judge-reject` check is visible on the unit.
 
-### Task 15: Verify `REJECT` with overwrite repairs and re-ships on success
+### Task 16: Verify `REJECT` with overwrite repairs and re-ships on success
 
-**Step 1: Repeat Task 14's run on a different (or the same, reset) unit, this time checking "overwrite existing translations" in the Automatic translation form.**
+**Step 1: Repeat Task 15's run on a different (or the same, reset) unit, this time checking "overwrite existing translations" in the Automatic translation form.**
 
 **Step 2: Confirm**
 
 - If the repaired candidate is re-judged as `PASS`: the unit ends at `STATE_TRANSLATED` (20) with the **new**, repaired target text - it shipped and self-healed.
 - If the repair is still rejected: the unit ends at `STATE_FUZZY` (10) with the repair attempt's text (not necessarily the original), for a human to finish.
 
-### Task 16: Verify `FLAG` lands on `STATE_NEEDS_CHECKING` end to end (not just in the unit test)
+### Task 17: Verify `FLAG` lands on `STATE_NEEDS_CHECKING` end to end (not just in the unit test)
 
 **Step 1: Find or engineer a unit the judge scores `major` severity (a plausible terminology/register issue works well for this - the model pair is not perfectly deterministic, so this may take more than one attempt).**
 
@@ -518,9 +589,9 @@ Expected: prints the demo project's slug, `True`, `20`.
 - Unit state is `STATE_NEEDS_CHECKING` (12).
 - A `judge-flag` check is visible on the unit.
 
-### Task 17: Verify the commit policy actually excludes the held-back units from the exported file
+### Task 18: Verify the commit policy actually excludes the held-back units from the exported file
 
-**Step 1: Trigger a commit on the translation from Task 14/16 (e.g. via the component's "Commit pending changes" action, or `./rundev.sh exec -T weblate weblate commit_pending <project>/<component>`).**
+**Step 1: Trigger a commit on the translation from Task 15/17 (e.g. via the component's "Commit pending changes" action, or `./rundev.sh exec -T weblate weblate commit_pending <project>/<component>`).**
 
 **Step 2: Confirm**
 
@@ -532,7 +603,7 @@ Read the exported translation file from the repository (e.g. `./rundev.sh exec -
 
 **Prod judge is explicitly out of scope for this plan - only `translation_review`/`commit_policy` are touched. Do not add `WEBLATE_JUDGE_*` to `deploy/.env.local` as part of this phase.**
 
-### Task 18: [DEPLOY-GATE] Dry-run the command against prod
+### Task 19: [DEPLOY-GATE] Dry-run the command against prod
 
 **Get explicit go-ahead immediately before this task, separate from the plan approval.**
 
@@ -541,7 +612,7 @@ Read the exported translation file from the repository (e.g. `./rundev.sh exec -
 Run: `./deploy/vps.sh ssh "docker exec hcgameloc-weblate-1 weblate enable_review_workflow --dry-run"`
 Expected: 8 lines, one per project slug, each showing `translation_review False -> True, commit_policy 0 -> 20 (WITHOUT_NEEDS_EDITING) [dry run]`, plus a final `Dry run: 8 project(s) would change.` (matches the settings this plan's earlier investigation found live on prod for all 8 projects).
 
-### Task 19: [DEPLOY-GATE] Run it for real
+### Task 20: [DEPLOY-GATE] Run it for real
 
 **Get explicit go-ahead immediately before this task.**
 
@@ -550,7 +621,7 @@ Expected: 8 lines, one per project slug, each showing `translation_review False 
 Run: `./deploy/vps.sh ssh "docker exec hcgameloc-weblate-1 weblate enable_review_workflow"`
 Expected: Same 8 lines without `[dry run]`, final `Updated 8 project(s).`
 
-### Task 20: Verify via the REST API
+### Task 21: Verify via the REST API
 
 **Step 1: Confirm all 8 projects**
 
@@ -564,7 +635,7 @@ done
 ```
 Expected: `<slug> True 20` for all 8 lines.
 
-### Task 21: Final push
+### Task 22: Final push
 
 **Step 1: Confirm everything from Phases 1-3 is committed, then push**
 
@@ -572,7 +643,7 @@ Expected: `<slug> True 20` for all 8 lines.
 git status --short
 git push origin main
 ```
-Expected: clean tree, push succeeds. (Phases 4-6 are config/settings/deploy actions, not source changes beyond Tasks 9's docker-compose.yml and Task 10's already-committed environment.example - if Task 9 was applied, commit `dev-docker/docker-compose.yml` too, without the real OpenRouter key value in the commit message or anywhere logged.)
+Expected: clean tree, push succeeds. (Phases 4-6 are config/settings/deploy actions, not further source changes beyond Task 9's `.gitignore`/`docker-compose.yml` and Task 11's `environment.example` - `dev-docker/environment` from Task 10 must never appear in `git status` as anything but ignored.)
 
 ---
 
@@ -582,3 +653,4 @@ Expected: clean tree, push succeeds. (Phases 4-6 are config/settings/deploy acti
 - A Celery-beat scheduler for automatic judge triggering (manual trigger was the explicit decision).
 - `EnglishAcronymLeakCheck` and enforcing `reused` via `Component.enforced_checks` (an earlier, separate recommendation in this conversation, not yet approved).
 - Any change to `JUDGE_MAY_APPROVE` (stays off, per the earlier decision).
+- Reusing the OpenRouter key on **prod** (only dev is wired in this plan; prod judge enablement is deferred).
