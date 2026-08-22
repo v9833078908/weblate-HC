@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import csv
+from collections import Counter
 from dataclasses import dataclass
 from io import BytesIO, StringIO
 from typing import TYPE_CHECKING, Literal
@@ -18,6 +19,7 @@ from django.core.exceptions import ValidationError
 from weblate.formats.exporters import CSVExporter
 from weblate.formats.external import CSV_DIALECT
 from weblate.formats.ttkit import CSVUnit
+from weblate.trans.protected_tokens import markup_tokens, placeholder_sequence
 from weblate.trans.models import Unit
 from weblate.utils.validators import validate_translation_upload_size
 from weblate.utils.zip import ZipSafetyError, ZipSafetyLimits, validate_zip_members
@@ -243,4 +245,28 @@ def parse_upload(component: Component, uploaded: UploadedFile) -> ParsedSpreadsh
 
 def build_preview(component: Component, parsed: ParsedSpreadsheet) -> SpreadsheetPreview:
     _validate_rows(component, [list(parsed.headers), *(list(row.values) for row in parsed.rows)])
+    source_units, _units = _component_units(component)
+    schema = _schema(component, source_units)
+    source_by_identity = {
+        _identity(component, source_unit, schema.has_context): source_unit
+        for source_unit in source_units
+    }
+    source_code = component.source_language.code
+    for row in parsed.rows:
+        identity = (
+            (row.values[0], row.values[-1]) if schema.has_context else (row.values[0],)
+        )
+        source = source_by_identity[identity].source
+        for column, target in zip(parsed.headers[1:], row.values[1:], strict=True):
+            if column == "context" or column == source_code or not target:
+                continue
+            if (
+                Counter(markup_tokens(source)) != Counter(markup_tokens(target))
+                or placeholder_sequence(source) != placeholder_sequence(target)
+            ):
+                _error(
+                    "Protected tokens do not match the source.",
+                    row=row.row_number,
+                    column=column,
+                )
     return SpreadsheetPreview(parsed, parsed.rows)

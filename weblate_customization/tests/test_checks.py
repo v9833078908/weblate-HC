@@ -57,6 +57,25 @@ class GameMarkupCheckTest(CheckTestCase):
         self.assertFalse(self.check.check_single("a < b and c > d", "x < y", None))
 
 
+    def test_placeholder_order_and_printf_tokens_are_preserved(self) -> None:
+        source = "<b>{0} {playerName} %s %KEY%</b>"
+
+        self.assertFalse(
+            self.check.check_single(
+                source, "<b>{0} {playerName} %s %KEY%</b>", None
+            )
+        )
+        self.assertTrue(
+            self.check.check_single(
+                source, "<b>{playerName} {0} %s %KEY%</b>", None
+            )
+        )
+        self.assertTrue(
+            self.check.check_single(source, "<b>{0} {playerName} %KEY%</b>", None)
+        )
+        self.assertTrue(self.check.check_single(source, "<b>Value</b>", None))
+        self.assertFalse(self.check.check_single(source, "", None))
+
 class GameLineBreakCheckTest(CheckTestCase):
     check = GameLineBreakCheck()
 

@@ -60,6 +60,36 @@ class MultilingualSpreadsheetExportTest(ViewTestCase):
         self.assertEqual(len(workbook.worksheets), 1)
         self.assertEqual(workbook.active.cell(row=2, column=len(expected_headers)).data_type, "s")
 
+    def test_preview_rejects_reordered_placeholders(self) -> None:
+        from weblate.trans.multilingual_spreadsheet import (
+            build_preview,
+            export_component,
+            parse_upload,
+        )
+
+        unit = self.translation.unit_set.order_by("pk").first()
+        assert unit is not None
+        source_unit = unit.source_unit
+        source_unit.source = "{0} {playerName}"
+        source_unit.target = source_unit.source
+        source_unit.save()
+        unit.source = source_unit.source
+        unit.save(update_fields=["source"])
+
+        parsed = parse_upload(
+            self.component,
+            SimpleUploadedFile("translations.csv", export_component(self.component, "csv")),
+        )
+        values = list(parsed.rows[0].values)
+        values[parsed.headers.index(self.translation.language.code)] = "{playerName} {0}"
+        parsed = parsed.__class__(
+            parsed.headers,
+            (parsed.rows[0].__class__(parsed.rows[0].row_number, tuple(values)), *parsed.rows[1:]),
+        )
+
+        with self.assertRaises(ValidationError):
+            build_preview(self.component, parsed)
+
 
 class MultilingualSpreadsheetValidationTest(ViewTestCase):
     def create_component(self):

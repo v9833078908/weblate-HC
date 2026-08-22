@@ -18,27 +18,8 @@ from collections import Counter
 import regex
 from django.utils.translation import gettext_lazy
 
+from weblate.trans.protected_tokens import MARKUP, markup_tokens, placeholder_sequence
 from weblate.checks.base import TargetCheck
-
-# Paired tags where attributes must match source exactly. `sprite` carries its
-# attribute after a space (`<sprite name="fire">`) rather than after `=`, so an
-# attribute starts at either character.
-TAG_PATTERN = regex.compile(
-    r"</?(color|link|size|b|i|u|s|sprite)(?:[=\s][^>]*)?/?>",
-    regex.IGNORECASE,
-)
-# Engine placeholders: {0}, {c}, {1}, {SEASON}, %PLAYER, %SHIP%
-PLACEHOLDER_PATTERN = regex.compile(r"\{[^{}]*\}|%[A-Z][A-Z0-9_]+%")
-
-# The mission DSL: `item_type[|{0}]`, `skirmish_league_id[gen|в {0}|в любой лиге]`.
-# The identifier in front of the bracket is an engine lookup key, so it stays
-# in English while the bracketed alternatives are translated. A `|` inside the
-# brackets is what separates a substitution from ordinary bracketed prose.
-TOKEN_PATTERN = regex.compile(r"([A-Za-z_][A-Za-z0-9_]*)\[[^\[\]]*\|[^\[\]]*\]")
-
-# Tags and placeholders together: `_tokens` compares them, `_numbers` removes
-# them so that `<size=14>` and `{0}` are never read as quantities.
-MARKUP = regex.compile(rf"(?:{TAG_PATTERN.pattern})|(?:{PLACEHOLDER_PATTERN.pattern})")
 
 # A number in the source is a fact the player acts on: damage, radius, seconds.
 # Losing or altering it is a defect in every language. A number the target adds
@@ -110,9 +91,6 @@ def separator_is_tight(source: str) -> bool:
     return "$" in source and not SEPARATOR_LOOSE_IN_SOURCE.search(source)
 
 
-def _tokens(text: str) -> list[str]:
-    """Extract ordered markup tokens (tags with attrs + placeholders)."""
-    return [match.group() for match in MARKUP.finditer(text)]
 
 
 def _tokens_dsl(text: str) -> Counter[str]:
@@ -133,10 +111,12 @@ class GameMarkupCheck(TargetCheck):
     default_disabled = False
 
     def check_single(self, source: str, target: str, unit) -> bool:
-        source_tokens = _tokens(source)
-        if not source_tokens:
+        if not target:
             return False
-        return sorted(source_tokens) != sorted(_tokens(target))
+        return (
+            Counter(markup_tokens(source)) != Counter(markup_tokens(target))
+            or placeholder_sequence(source) != placeholder_sequence(target)
+        )
 
 
 class GameLineBreakCheck(TargetCheck):
