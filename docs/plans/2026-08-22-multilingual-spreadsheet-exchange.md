@@ -13,14 +13,16 @@
 ## Approved format contract
 
 - Scope: exactly one component per file, exposed from that component's :guilabel:`Files` menu. Project/category/workspace downloads remain ZIP exports and are not changed.
-- Columns: `key`, every component language in Weblate code order (source language included), then `context` when at least one source unit has context. Example: `key,ru,en,pt_BR,zh_Hans,context`.
-- Row identity: `key` is the source unit's key (`context` for monolingual formats, otherwise the source text); `context` disambiguates contextual source units. The service must reject an export or import when this visible pair is not unique. It must never guess from row position.
+- Columns: `key`, then every component language in Weblate code order (source language included). Append `context` only when it is independent of `key` and needed to disambiguate a row. A monolingual JSON/XLSX component therefore has `key,ru,en,pt_BR,zh_Hans`, while a contextual bilingual component has `key,ru,en,context`.
+- Row identity: for monolingual formats, `key` is `Unit.context`; for bilingual formats, it is the source text. `context` is included only for a distinct bilingual `msgctxt`; it is omitted when it would duplicate `key` or is empty for every row. The service must reject an export or import when the visible identity (`key`, plus `context` when present) is not unique. It must never guess from row position.
 - One source unit produces exactly one row. A language cell is its sibling unit's target. Empty cells are exported unchanged.
 - CSV uses UTF-8 with an Excel-compatible dialect; XLSX contains one worksheet. Cells are literal text, never formulas, and the same header and cell values must round-trip through Google Sheets.
-- Import accepts only the same component's exported schema. It rejects unknown/missing language columns, duplicate headers or row identities, unknown keys, an absent required context, unexpected keys, and malformed CSV/XLSX before any changes are written.
+- Import accepts only the same component's exported schema. It rejects unknown/missing language columns, duplicate headers or row identities, unknown keys, an unexpected or absent required independent `context` column, and malformed CSV/XLSX before any changes are written.
 - A blank language cell means "not translated": after confirmation it clears that translation and gives it the normal untranslated state. It is not a no-op.
 - Every non-empty changed target must preserve all protected tokens from its source in the same order. This reuses and tightens the game-markup token extraction, including `{0}`, `{playerName}`, `%s`, `%KEY%`, and Unity markup. An invalid row is reported in the preview and blocks confirmation; it is never silently fixed.
 - Existing source files, Git workflows, and the existing per-language ZIP/CSV/XLSX/XLIFF downloads stay unchanged.
+
+Production evidence, read-only on 2026-08-22: `pirate-ships/localization-json` has 3,735 source units and no blank `Unit.context`; `lang_name_en` maps to Russian source `Английский` and all language targets. `need-for-greed/buyers` (`xlsx`) likewise stores `Buyer1` in `Unit.context`. In both formats `context` is already the file key, not additional translator context.
 
 ## Task 1: Add the tabular exchange service and its contract tests
 
@@ -31,9 +33,9 @@
 
 **Step 1: Write failing export/import parser tests.**
 
-Cover a monolingual test component with source and target translations. Assert that the parsed CSV and XLSX both have exactly the same headers and rows; `key` is first, language headers use `Language.code`, source is included, and `context` is last only when required. Assert literal preservation of commas, quotes, newlines, Unicode, and formula-like cell values.
+Cover a monolingual test component with source and target translations. Assert that the parsed CSV and XLSX both have exactly the same headers and rows; `key` is first, language headers use `Language.code`, source is included, and `context` is appended only for a distinct contextual identity. Assert literal preservation of commas, quotes, newlines, Unicode, and formula-like cell values.
 
-Add rejection tests for duplicate headers, a missing language column, an unknown language column, duplicated `(key, context)`, a changed key/context, and a workbook with more than one selected worksheet. Every rejection must be a typed validation error with a row/column diagnostic.
+Add rejection tests for duplicate headers, a missing language column, an unknown language column, duplicated visible row identities, a changed key or independent context, and a workbook with more than one selected worksheet. Every rejection must be a typed validation error with a row/column diagnostic.
 
 **Step 2: Run the new tests to verify they fail.**
 
@@ -51,7 +53,7 @@ def parse_upload(component: Component, uploaded: UploadedFile) -> ParsedSpreadsh
 def build_preview(component: Component, parsed: ParsedSpreadsheet) -> SpreadsheetPreview: ...
 ```
 
-Query the component's source translation once, fetch sibling units by `source_unit_id` and language, and map them by source-unit primary key. Use `(key, context)` as the visible identity map; error rather than resolving an ambiguous identity. Do not instantiate `BaseExporter` or emit a file per `Translation`.
+Query the component's source translation once, fetch sibling units by `source_unit_id` and language, and map them by source-unit primary key. Resolve incoming rows by `key` alone unless the exported schema includes an independent `context`, then use `(key, context)`; error rather than resolving an ambiguous identity. Do not instantiate `BaseExporter` or emit a file per `Translation`.
 
 Use the existing CSV escaping conventions from `CSVExporter.string_filter()` and the existing `XlsxFormat` serialization/parsing path so that formula-looking strings are handled consistently with current Weblate CSV/XLSX behavior. Keep the table schema validation in this service, not in a view.
 
