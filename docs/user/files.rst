@@ -18,6 +18,20 @@ Downloading translations
 From the project or component dashboard, translatable files can be downloaded
 in the :guilabel:`Files` menu.
 
+Multilingual component spreadsheets
+----------------------------------
+
+Components can export every language in one CSV or XLSX file through
+:guilabel:`Files`. The first column is ``key`` followed by Weblate language
+codes; ``context`` is present only when needed to make a bilingual key unique.
+Every source unit occupies one row. Plural components are not supported.
+
+Edit literal cells in Google Sheets or another spreadsheet editor, then upload
+the file from the component :guilabel:`Files` menu. A blank target clears that
+translation. Weblate rejects changed keys, language columns, formulas, missing
+or reordered protected placeholders, and altered Unity markup. Review the
+preview before confirming the import.
+
 The first option is to download the file in the original format as it is stored in the
 repository. In this case, any pending changes in the translation are getting committed
 and the up-to-date file is yield without any conversions.
