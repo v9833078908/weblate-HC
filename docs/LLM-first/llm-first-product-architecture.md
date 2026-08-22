@@ -583,15 +583,41 @@ end_stop 58-71 против 18-28).
 
 ### Фаза 2 — судья v1 (после успешной калибровки B2)
 
+Дополнено 2026-08-22: ядро судьи (план
+`plans/2026-08-13-01-judge-verdict-core.md`) и универсализация промпта
+(плечо H плана `plans/2026-08-20-judge-prompt-universalization.md`)
+реализованы. Ремонтный контур и review-gate (план
+`docs/plans/2026-08-22-03-judge-review-gate.md`) развёрнуты на проде:
+major/critical вердикты на записываемых строках получают один ремонтный
+кандидат от `openrouter`-machinery и повторное суждение обоих мест;
+прошедший ремонт становится `Translated`, нерешённый major —
+`Needs checking` + `judge-flag`, нерешённый critical — `Needs editing` +
+`judge-reject` (исключены из экспорта через `WITHOUT_NEEDS_EDITING`).
+Судья включён на проде (`JUDGE_ENABLED`, два места,
+`JUDGE_MAX_REPAIR_ATTEMPTS=1`, `JUDGE_MAY_APPROVE` выключен), а
+`translation_review=True` + `commit_policy=WITHOUT_NEEDS_EDITING`
+выставлены на восьми проектах (col4, pirate-ships, heart-abyss,
+strategy-and-tactics-2, korotkij-test, need-for-greed, space-arena,
+victory-banner). Запуск — только вручную оператором («Add as translation
+with an LLM judge»), автоматического расписания нет. Отклонение от плана
+роллаута: ключ судьи на проде сейчас совпадает с MT-ключом `openrouter`
+(выделенный `JUDGE_OPENROUTER_KEY` требует отдельного ключа OpenRouter —
+см. фазу 4, переезд на LiteLLM).
+
 - MQM-судья по 4.2-4.3: structured output, другое семейство моделей,
   BT как улика. Запись: комментарии + Check-строки; сначала
-  `--dry-run`, затем flag/reject, без auto-approve.
-- `translation_review=True` на проекте, judge-бот с `unit.review`.
+  `--dry-run`, затем flag/reject, без auto-approve. — **сделано**,
+  см. статус выше.
+- `translation_review=True` на проекте, judge-бот с `unit.review`. —
+  **сделано** на восьми проектах.
 - Второй проход `q=has:check` (TEaR на существующем коде — ревизия,
   п. 3.3): судья флагует -> `failing_checks` уходит в промпт -> модель
   чинит -> судья пересуживает. Приёмка правки — по инварианту
   no-regress из 4.3; доля холостых правок (у Cathedral — 52% вызовов
   редактора) — обязательная метрика eval-харнесса второго прохода.
+  Ремонтный цикл major/critical реализован планом judge-review-gate;
+  незакрытая часть — метрика доли холостых правок и широкий второй
+  проход по `has:check`.
 
 ### Фаза 3 — auto-approve и релизный гейт
 
@@ -610,6 +636,44 @@ end_stop 58-71 против 18-28).
 - Каскад дешёвая -> дорогая модель перевода (бывший P3), если дефекты
   сконцентрируются в конкретных языках.
 - Дистилляция судьи (паттерн TQLite) при росте объёмов.
+
+Дополнено 2026-08-22 — три плана этой фазы:
+
+- **Соседние реплики в контексте судьи** —
+  `plans/2026-08-20-judge-dialog-context.md` (статус: ожидает
+  одобрения). Плечо H2: в каждый сегмент payload'а добавляются
+  `prev_source`/`next_source` соседей по `position`, строка в
+  `verdict.txt`, соседи входят в `compute_context_hash` (правка соседа
+  протухает вердикт). Гейтится замером H2 против принятого плеча H на
+  корпусе S&T2 ru->zh_Hans (`missed_crit = 0`, остальные метрики не
+  хуже). Закрывает наблюдённые промахи класса «изолированный сегмент»
+  (heart-abyss/hub-1). Обратная гипотеза — соседние target — в срез не
+  входит.
+- **`RepeatDriftCheck` и аудит живого глоссария** —
+  `plans/2026-08-14-intra-component-consistency-check.md` (статус: не
+  начат). Детерминированный TargetCheck: одинаковый исходник внутри
+  одного компонента обязан иметь одинаковый перевод (на col4/data/fr
+  57.5% групп повторов разошлись, стоковый `inconsistent` не пометил
+  ни одной). Дрейф повторов — сравнение, а не понимание смысла, поэтому
+  слой принадлежит коду, а не судье, который дрожит на 16% идентичных
+  прогонов.
+- **Переезд судьи на корпоративный LiteLLM-прокси** (по образцу
+  game_pulse, `game_pulse_saas/docs/LiteLLM/00-architecture-and-roadmap.md`).
+  Сейчас endpoint судьи захардкожен
+  (`OPENROUTER_CHAT_COMPLETIONS_URL`, «The API base URL is fixed and not
+  configurable here»), а ключ — отдельный `JUDGE_OPENROUTER_KEY`.
+  Минимальный инкремент: настройка `WEBLATE_JUDGE_BASE_URL` (умолчание —
+  OpenRouter) в `settings_docker.py`, подстановка в `_post_batch`,
+  значение `https://hcbifrost.herocraft.com/litellm/v1` на проде и
+  выделенный ключ прокси — заодно закрывает отклонение с общим MT-ключом
+  (см. фазу 2). Endpoint остаётся конфигурацией оператора, не
+  пользователя (threat model). Проверить контракт прокси до переключения
+  моделей мест: таймаут gateway ~60 s, `usage.cost` отсутствует (теневые
+  цены), не всякая модель прокси поддерживает strict structured outputs
+  и отключение reasoning. Выбор моделей мест — по eval-замеру на
+  корпусе S&T2 (правило R3: смена промпта или модели обнуляет замер).
+  Маппинг моделей (`JUDGE_MODEL_SEAT_1/2`) уже env-driven, кода не
+  требует.
 
 ### Порядок зависимостей
 
