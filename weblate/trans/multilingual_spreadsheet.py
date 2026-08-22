@@ -7,6 +7,8 @@
 from __future__ import annotations
 
 import csv
+import xml.etree.ElementTree
+
 from collections import Counter
 from dataclasses import dataclass
 from io import BytesIO, StringIO
@@ -167,33 +169,58 @@ def _parse_csv(content: bytes) -> list[list[str]]:
     ]
 
 
-def _parse_xlsx(content: bytes) -> list[list[str]]:
-    try:
-        with ZipFile(BytesIO(content)) as archive:
-            validate_zip_members(
-                archive,
-                limits=ZipSafetyLimits(
-                    max_members=1000,
-                    max_total_uncompressed_size=settings.TRANSLATION_UPLOAD_MAX_SIZE,
-                ),
-            )
-        from openpyxl import load_workbook
+def _parse_xlsx(component: Component, content: bytes) -> list[list[str]]:
 
-        workbook = load_workbook(BytesIO(content), data_only=False, read_only=True)
-    except (BadZipFile, ZipSafetyError) as error:
+    source_units, _units = _component_units(component)
+    expected_columns = len(_schema(component, source_units).headers)
+    expected_rows = len(source_units) + 1
+    from openpyxl import load_workbook
+    from openpyxl.utils.exceptions import InvalidFileException
+
+    with ZipFile(BytesIO(content)) as archive:
+        validate_zip_members(
+            archive,
+            limits=ZipSafetyLimits(
+                max_members=1000,
+                max_total_uncompressed_size=settings.TRANSLATION_UPLOAD_MAX_SIZE,
+            ),
+        )
+    try:
+        workbook = load_workbook(
+            BytesIO(content), data_only=False, read_only=True
+        )
+    except (
+        BadZipFile,
+        ZipSafetyError,
+        InvalidFileException,
+        ValueError,
+        KeyError,
+        xml.etree.ElementTree.ParseError,
+    ) as error:
         raise ValidationError("Invalid XLSX upload.") from error
     if len(workbook.worksheets) != 1:
         _error("XLSX upload must contain exactly one worksheet.")
     worksheet = workbook.worksheets[0]
+    if (
+        (worksheet.max_column is not None and worksheet.max_column > expected_columns)
+        or (worksheet.max_row is not None and worksheet.max_row > expected_rows)
+    ):
+        _error("XLSX dimensions exceed the component schema.")
     rows: list[list[str]] = []
     for row_number, row in enumerate(worksheet.iter_rows(), start=1):
         values: list[str] = []
         for cell in row:
             if cell.data_type == "f":
-                _error("Formula cells are not supported.", row=row_number, column=cell.column_letter)
+                _error(
+                    "Formula cells are not supported.",
+                    row=row_number,
+                    column=cell.column_letter,
+                )
             values.append("" if cell.value is None else str(cell.value))
         if any(values):
             rows.append(values)
+        if len(rows) > expected_rows:
+            _error("XLSX contains more rows than the component has source units.")
     return rows
 
 
@@ -237,7 +264,7 @@ def parse_upload(component: Component, uploaded: UploadedFile) -> ParsedSpreadsh
     if name.endswith(".csv"):
         rows = _parse_csv(content)
     elif name.endswith(".xlsx"):
-        rows = _parse_xlsx(content)
+        rows = _parse_xlsx(component, content)
     else:
         _error("Only CSV and XLSX uploads are supported.")
     return _validate_rows(component, rows)

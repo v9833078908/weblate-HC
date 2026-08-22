@@ -144,6 +144,57 @@ class MultilingualSpreadsheetValidationTest(ViewTestCase):
                 SimpleUploadedFile("translations.xlsx", output.getvalue()),
             )
 
+    def test_rejects_xlsx_with_inflated_dimension(self) -> None:
+        # An attacker inflates the worksheet dimension (DoS / zip bomb) without
+        # writing many real cells. In read-only mode openpyxl reports max_row
+        # and max_column from the XML dimension attribute.
+        import re
+        import zipfile
+
+        from weblate.trans.multilingual_spreadsheet import export_component, parse_upload
+
+        source = BytesIO(export_component(self.component, "xlsx"))
+        output = BytesIO()
+        with zipfile.ZipFile(source) as zin, zipfile.ZipFile(output, "w") as zout:
+            for item in zin.infolist():
+                payload = zin.read(item.filename)
+                if item.filename == "xl/worksheets/sheet1.xml":
+                    payload = re.sub(
+                        rb'dimension ref="[^"]*"',
+                        b'dimension ref="A1:XFD1048576"',
+                        payload,
+                        count=1,
+                    )
+                zout.writestr(item, payload)
+
+        with self.assertRaises(ValidationError):
+            parse_upload(
+                self.component,
+                SimpleUploadedFile("translations.xlsx", output.getvalue()),
+            )
+
+    def test_rejects_malformed_xlsx_xml(self) -> None:
+        # Valid ZIP container, but the worksheet XML is truncated so openpyxl
+        # raises InvalidFileException. Without the catch, that bubbles up as a 500.
+        import zipfile
+
+        from weblate.trans.multilingual_spreadsheet import export_component, parse_upload
+
+        source = BytesIO(export_component(self.component, "xlsx"))
+        output = BytesIO()
+        with zipfile.ZipFile(source) as zin, zipfile.ZipFile(output, "w") as zout:
+            for item in zin.infolist():
+                payload = zin.read(item.filename)
+                if item.filename == "xl/worksheets/sheet1.xml":
+                    payload = b"<worksheet><broken"
+                zout.writestr(item, payload)
+
+        with self.assertRaises(ValidationError):
+            parse_upload(
+                self.component,
+                SimpleUploadedFile("translations.xlsx", output.getvalue()),
+            )
+
 
 class ComponentSpreadsheetImportDraftTest(ViewTestCase):
     def test_draft_is_owner_session_bound_and_expires(self) -> None:
