@@ -1,264 +1,253 @@
-# LLM Judge Review Gate Rollout Implementation Plan
+# LLM judge repair and review-gate rollout plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+## Goal
 
-**Goal:** Close the gap where a judge `FLAG` (major-severity) verdict ships unblocked despite the review gate, then enable the reviewer-approval workflow and the `WITHOUT_NEEDS_EDITING` commit gate on all 8 HCGameLoc projects, with the LLM judge itself configured (but manually triggered, per prior decision) in the dev container.
+Make a manually started **Add as translation with an LLM judge** run safe and
+useful for the next localization job:
 
-**Architecture:** A one-branch fix to `state_for_verdict()` routes `FLAG` to `STATE_NEEDS_CHECKING` (12, already in `FUZZY_STATES`) instead of falling through to `STATE_TRANSLATED` (20), so both `REJECT` and `FLAG` are held back by the existing `WITHOUT_NEEDS_EDITING` commit policy without requiring the stricter `APPROVED_ONLY`, which would force a human click on every translated string project-wide, not just judge findings. A new project-scoped management command, `enable_review_workflow`, bulk-toggles `translation_review`/`commit_policy` on the 8 named projects, idempotently and with a `--dry-run` preview. Judge itself (OpenRouter key + the already-calibrated model pair) is wired into the **dev** container only in this plan; enabling and running judge against **prod** content is a separate, later decision (per the prior conversation).
+1. Every parsed `major` or `critical` verdict on a writable string is sent to
+   the configured `openrouter` repair engine.
+2. Both judge seats evaluate the repaired text again.
+3. A repaired `pass` becomes `Translated` and is eligible for export.
+4. A remaining `major` becomes `Needs checking` with `judge-flag`; a remaining
+   `critical` becomes `Needs editing` with `judge-reject`. Both are excluded by
+   `WITHOUT_NEEDS_EDITING` and remain visible in the judge verdict card and
+   search.
+5. This workflow is available on the eight HCGameLoc projects after an
+   explicitly approved production activation, but it is never scheduled
+   automatically and does not touch already translated production strings.
 
-**Tech Stack:** Django (management commands, model fields, migrations-free settings toggle), pytest via `./rundev.sh test` (dev container, `DJANGO_SETTINGS_MODULE=weblate.settings_test`), Docker Compose (`dev-docker/`), the fork's existing LLM judge (`weblate/trans/judge_loop.py`, `weblate/trans/models/judge.py`, `weblate/trans/autotranslate.py`).
+The repair is performed by the project's configured
+`RoutedLLMTranslation` (`openrouter`) engine, not by the two judge seats
+themselves. The judge supplies its structured error descriptions as repair
+context, then re-evaluates the candidate.
 
----
+## Scope and invariants
 
-## Deviations from the generic writing-plans/executing-plans defaults (read first)
+- An operator must intentionally select **Add as translation with an LLM
+  judge**. The ordinary automatic-translation mode stays unchanged.
+- A fresh/needs-editing string is writable. An existing translation is
+  rewritten only when the operator selects **Overwrite the existing
+  translation**.
+- `JUDGE_MAY_APPROVE` remains off. A judge `pass` means `Translated`, not
+  human-review-bypassing `Approved`.
+- `JUDGE_MAX_REPAIR_ATTEMPTS=1`: each selected string receives at most one
+  repair candidate per judge run, followed by one two-seat re-judgment. A
+  remaining negative verdict is held for a human.
+- The production judge key is a dedicated
+  `WEBLATE_JUDGE_OPENROUTER_KEY`, separate from the machine-translation and
+  loc-kit keys, as documented by `JUDGE_OPENROUTER_KEY`.
+- This plan does not repair the existing German loc-kit or run a bulk judge
+  pass against production content.
 
-- **No dedicated worktree.** The generic skill default is a fresh worktree. This repo's own recorded convention is the opposite for anything touching `dev-docker/`: the dev stack is a single shared resource (fixed host ports, one compose project name), so a worktree copy would collide with the main checkout's containers instead of isolating from them. Phase 4 of this plan edits `dev-docker/docker-compose.yml` and runs `./rundev.sh`. **Execute this plan in the main checkout**, on a normal feature branch, not a worktree.
-- **Deployment gates are explicit stop points, not just plan-approval.** Per `AGENTS.md`'s working agreement, approving this plan authorizes writing and committing code. It does **not** authorize: starting or rebuilding `dev-docker` via `./rundev.sh`, running a management command against prod, or any `deploy/vps.sh` command. Every task below that is one of those is marked **[DEPLOY-GATE]** and must get its own explicit go-ahead at execution time, even though the plan itself is approved.
-- **Commit messages** use Conventional Commits (`<type>(<scope>): <description>`) per `AGENTS.md`.
+## Phase 1: Repair `major` and `critical` verdicts
 
----
-
-## Phase 1: Close the judge `FLAG`-ships-unblocked gap
-
-### Task 1: Update the failing unit test for `state_for_verdict`
-
-**Files:**
-- Modify: `weblate/trans/tests/test_judge.py:17-22` (imports), `weblate/trans/tests/test_judge.py:64-70` (test body)
-
-**Step 1: Write the failing test**
-
-Change the import block (add `STATE_NEEDS_CHECKING`):
-
-```python
-from weblate.utils.state import (
-    FUZZY_STATES,
-    STATE_APPROVED,
-    STATE_FUZZY,
-    STATE_NEEDS_CHECKING,
-    STATE_TRANSLATED,
-)
-```
-
-Replace the `test_flag_ships_but_is_not_approved` test (lines 64-70) with:
-
-```python
-    def test_flag_lands_on_a_state_that_does_not_ship(self) -> None:
-        # A major-severity finding must not slip through WITHOUT_NEEDS_EDITING
-        # the way a clean pass does - it needs a human look, same as a
-        # critical REJECT, just without the automatic repair attempt (that
-        # stays REJECT-only, see judge_loop._NON_REPAIRABLE_VERDICTS).
-        state = state_for_verdict(
-            JudgeVerdict.Verdict.FLAG, enable_review=True, may_approve=True
-        )
-        self.assertEqual(state, STATE_NEEDS_CHECKING)
-        self.assertIn(state, FUZZY_STATES)
-```
-
-**Step 2: Run test to verify it fails**
-
-Run: `./rundev.sh test weblate/trans/tests/test_judge.py -k test_flag_lands_on_a_state_that_does_not_ship -v`
-Expected: FAIL - `AssertionError: 20 != 12` (current code still returns `STATE_TRANSLATED`).
-
-### Task 2: Update the failing integration test through `AutoTranslate.process_judge`
+### Task 1: Specify the missing `FLAG` repair behavior
 
 **Files:**
-- Modify: `weblate/trans/tests/test_judge_autotranslate.py:71-75`
 
-**Step 1: Write the failing test**
+- Modify: `weblate/trans/tests/test_judge_loop.py`
 
-Replace `test_flag_ships_but_is_not_approved` (lines 71-75) with:
+Add failing tests alongside the existing repair-loop tests:
 
 ```python
-    def test_flag_lands_on_a_state_that_does_not_ship(self) -> None:
-        unit = self.get_unit()
-        unit.translate(self.user, ["some target"], STATE_TRANSLATED)
-        self.perform(JudgeVerdict.Verdict.FLAG, severity="major")
-        self.assertIn(self.get_unit().state, FUZZY_STATES)
+def test_flag_triggers_one_repair_judged_by_both_seats(self) -> None:
+    unit, verdict, client = self.run_batch(
+        [MAJOR, MAJOR, PASS, PASS], repair=["fixed text"]
+    )
+    self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
+    self.assertEqual(verdict.attempt, 1)
+    self.assertEqual(self.get_unit().target, "fixed text")
+    self.assertEqual(client.call_count, 4)
+
+def test_exhausted_flag_repair_keeps_the_last_flag(self) -> None:
+    _unit, verdict, client = self.run_batch(
+        [MAJOR, MAJOR, MAJOR, MAJOR], repair=["still wrong"]
+    )
+    self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+    self.assertEqual(verdict.attempt, 1)
+    self.assertEqual(client.call_count, 4)
 ```
 
-No import changes needed - `FUZZY_STATES` is already imported at line 19.
+Replace the current `test_flag_does_not_trigger_a_repair`; its asserted
+behavior is the exact gap this plan closes.
 
-**Step 2: Run test to verify it fails**
+Run:
 
-Run: `./rundev.sh test weblate/trans/tests/test_judge_autotranslate.py -k test_flag_lands_on_a_state_that_does_not_ship -v`
-Expected: FAIL - the unit's state is `STATE_TRANSLATED` (20), which is not in `FUZZY_STATES`.
+```sh
+./rundev.sh test weblate/trans/tests/test_judge_loop.py -k flag -v
+```
 
-### Task 3: Implement the `state_for_verdict` fix
+Expected before implementation: the pass-after-repair test fails because a
+`FLAG` is currently non-repairable.
+
+### Task 2: Make `FLAG` repairable
 
 **Files:**
-- Modify: `weblate/trans/models/judge.py:17-22` (imports), `weblate/trans/models/judge.py:191-210` (function body)
 
-**Step 1: Write the minimal implementation**
+- Modify: `weblate/trans/judge_loop.py`
 
-Add `STATE_NEEDS_CHECKING` to the existing import:
+Remove `JudgeVerdict.Verdict.FLAG` from `_NON_REPAIRABLE_VERDICTS`; only
+`PASS` and `UNPARSED` are non-repairable. Keep the existing safety guards:
 
-```python
-from weblate.utils.state import (
-    STATE_APPROVED,
-    STATE_FUZZY,
-    STATE_NEEDS_CHECKING,
-    STATE_TRANSLATED,
-    StringState,
-)
-```
+- only units in `writable_ids` can be changed;
+- repair begins in `STATE_FUZZY`;
+- a candidate that adds a deterministic check is rolled back;
+- the repaired candidate is judged by both seats;
+- repair stops at `JUDGE_MAX_REPAIR_ATTEMPTS`.
 
-Replace the function body:
+Do not add a parallel repair implementation or bypass `repair_target()`.
+That function already uses the effective project `openrouter` configuration
+and carries the judge descriptions through `failing_checks`.
 
-```python
-def state_for_verdict(
-    verdict: str, *, enable_review: bool, may_approve: bool
-) -> StringState | None:
-    """
-    Target state for a verdict, or None when the state must not move.
+Update the stale `run_judge_batch()` docstring that currently promises every
+unresolved negative a “state-10 hold”; the final state is projected later, so
+an unresolved major will instead have the state-12 hold described below.
 
-    ``critical`` lands on STATE_FUZZY and ``major`` lands on
-    STATE_NEEDS_CHECKING - both are in FUZZY_STATES, so either the
-    project-level ``WITHOUT_NEEDS_EDITING`` or ``APPROVED_ONLY`` commit
-    policy already excludes them from export. ``pass`` stops at
-    STATE_TRANSLATED unless the site opts into judge approval
-    (JUDGE_MAY_APPROVE) AND the project has review: measurement shows pass
-    misses real critical defects, so the judge does not hand out the top
-    trust state by default (review D2).
-    """
-    if verdict == JudgeVerdict.Verdict.UNPARSED:
-        return None
-    if verdict == JudgeVerdict.Verdict.REJECT:
-        return STATE_FUZZY
-    if verdict == JudgeVerdict.Verdict.FLAG:
-        return STATE_NEEDS_CHECKING
-    if verdict == JudgeVerdict.Verdict.PASS and enable_review and may_approve:
-        return STATE_APPROVED
-    return STATE_TRANSLATED
-```
-
-**Step 2: Run tests to verify they pass**
-
-Run: `./rundev.sh test weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_autotranslate.py -v`
-Expected: PASS, all tests in both files green.
-
-### Task 4: Run the full judge test suite as a regression net
-
-**Step 1: Run every judge-related test file**
-
-Run: `./rundev.sh test weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_judge_client.py weblate/trans/tests/test_judge_loop.py weblate/trans/tests/test_judge_round.py weblate/trans/tests/test_judge_form.py weblate/trans/tests/test_judge_views.py -v`
-Expected: PASS, no other test's assertions reference `STATE_TRANSLATED` for a `FLAG` verdict (confirmed absent by this plan's own investigation - `test_judge_loop.py::test_flag_does_not_trigger_a_repair` only asserts the verdict and that `client.call_count == 2` / target unchanged, not the final state, so it is unaffected).
-
-**Step 2: Commit**
-
-```bash
-git add weblate/trans/models/judge.py weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_autotranslate.py
-git commit -m "fix(judge): hold major-severity FLAG verdicts back from shipping
-
-state_for_verdict() let a FLAG verdict fall through to STATE_TRANSLATED,
-so a major-severity finding shipped identically to a clean pass under the
-WITHOUT_NEEDS_EDITING commit policy - only REJECT was ever held back.
-FLAG now lands on STATE_NEEDS_CHECKING (12), already in FUZZY_STATES, so
-both restrictive commit policies exclude it without requiring
-APPROVED_ONLY project-wide."
-```
-
----
-
-## Phase 2: Bulk project-workflow management command
-
-### Task 5: Write the failing test for `enable_review_workflow`
+### Task 3: Hold unresolved `FLAG` verdicts back from export
 
 **Files:**
-- Create: `weblate/trans/tests/test_commands.py` (append to existing file, near other simple command tests)
-- Test target (not yet created): `weblate/trans/management/commands/enable_review_workflow.py`
 
-**Step 1: Write the failing test**
+- Modify: `weblate/trans/models/judge.py`
+- Modify: `weblate/trans/tests/test_judge.py`
+- Modify: `weblate/trans/tests/test_judge_autotranslate.py`
 
-Append to `weblate/trans/tests/test_commands.py` (add `CommitPolicyChoices` to the existing `weblate.trans.models` import on line 32, which currently reads `from weblate.trans.models import Change, Component, Translation, Unit` - change it to also import `CommitPolicyChoices`):
+Map `JudgeVerdict.Verdict.FLAG` to `STATE_NEEDS_CHECKING`. Preserve the
+existing mappings:
 
-```python
-from weblate.trans.models import Change, CommitPolicyChoices, Component, Translation, Unit
+| Final verdict | Final state |
+| --- | --- |
+| `PASS` | `STATE_APPROVED` only when both project review and `JUDGE_MAY_APPROVE` are enabled; otherwise `STATE_TRANSLATED` |
+| `FLAG` | `STATE_NEEDS_CHECKING` |
+| `REJECT` | `STATE_FUZZY` |
+| `UNPARSED` | no state transition |
+
+Update the existing direct and `AutoTranslate.process_judge` tests to assert
+that `FLAG` lands in `FUZZY_STATES`. Add the required
+`STATE_NEEDS_CHECKING` import to `test_judge.py`.
+
+Also add one real `process_judge()` integration test in
+`test_judge_autotranslate.py`; do not mock `run_judge_batch()` in this test.
+Start with an existing translated unit and `overwrite_existing=True`, mock
+the initial `process_mt()` to avoid an unrelated translation request, and
+mock only `request_verdicts()` plus `repair_target()` with
+`MAJOR, MAJOR, PASS, PASS` and a replacement target. Assert that the stored
+target is the repair, the final active verdict is `PASS`, and the final state
+is `STATE_TRANSLATED`. This proves the operator-visible path, rather than
+only the loop and final-state projections in isolation.
+
+### Task 4: Regression-test the complete state machine
+
+Run:
+
+```sh
+./rundev.sh test \
+  weblate/trans/tests/test_judge.py \
+  weblate/trans/tests/test_judge_autotranslate.py \
+  weblate/trans/tests/test_judge_client.py \
+  weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_judge_round.py \
+  weblate/trans/tests/test_judge_form.py \
+  weblate/trans/tests/test_judge_views.py \
+  weblate/checks/tests/test_judge.py -v
 ```
 
-Then append this test class at the end of the file:
+The suite must demonstrate all of these paths:
 
-```python
-class EnableReviewWorkflowCommandTest(RepoTestCase):
-    def test_enables_review_and_gate_on_target_projects(self) -> None:
-        component = self.create_component()
-        project = component.project
-        project.slug = "victory-banner"
-        project.save(update_fields=["slug"])
-        self.assertFalse(project.translation_review)
-        self.assertEqual(project.commit_policy, CommitPolicyChoices.ALL)
+- `critical -> repair -> pass -> Translated`;
+- `major -> repair -> pass -> Translated`;
+- `critical -> unresolved -> Needs editing + judge-reject`;
+- `major -> unresolved -> Needs checking + judge-flag`;
+- existing text remains unchanged when overwrite is off;
+- an all-unparsed round does not accidentally ship a new translation.
 
-        call_command("enable_review_workflow")
+Commit:
 
-        project.refresh_from_db()
-        self.assertTrue(project.translation_review)
-        self.assertEqual(
-            project.commit_policy, CommitPolicyChoices.WITHOUT_NEEDS_EDITING
-        )
-
-    def test_dry_run_changes_nothing(self) -> None:
-        component = self.create_component()
-        project = component.project
-        project.slug = "space-arena"
-        project.save(update_fields=["slug"])
-
-        out = StringIO()
-        call_command("enable_review_workflow", "--dry-run", stdout=out)
-
-        project.refresh_from_db()
-        self.assertFalse(project.translation_review)
-        self.assertEqual(project.commit_policy, CommitPolicyChoices.ALL)
-        self.assertIn("would change", out.getvalue())
-
-    def test_ignores_projects_outside_the_target_list(self) -> None:
-        component = self.create_component()
-        project = component.project
-        # create_component()'s default slug is not one of the 8 target slugs.
-        call_command("enable_review_workflow")
-        project.refresh_from_db()
-        self.assertFalse(project.translation_review)
-        self.assertEqual(project.commit_policy, CommitPolicyChoices.ALL)
-
-    def test_is_idempotent_on_second_run(self) -> None:
-        component = self.create_component()
-        project = component.project
-        project.slug = "col4"
-        project.save(update_fields=["slug"])
-        call_command("enable_review_workflow")
-
-        out = StringIO()
-        call_command("enable_review_workflow", stdout=out)
-        self.assertIn("already up to date", out.getvalue())
+```sh
+git add \
+  weblate/trans/judge_loop.py \
+  weblate/trans/models/judge.py \
+  weblate/trans/tests/test_judge.py \
+  weblate/trans/tests/test_judge_autotranslate.py \
+  weblate/trans/tests/test_judge_loop.py
+git commit -m "fix(judge): repair major verdicts before holding them back"
 ```
 
-`call_command`, `StringIO`, and `RepoTestCase` are already imported in this file (lines 17, 10, 34 respectively) - no new imports needed for those.
+## Phase 2: Fail closed when the repair engine is unavailable
 
-**Step 2: Run test to verify it fails**
+The judge can identify a defect without the repair engine being able to
+translate it. That would still hold the string, but it would not provide the
+automatic repair promised by this rollout. Check this before enabling the
+workflow on a project.
 
-Run: `./rundev.sh test weblate/trans/tests/test_commands.py -k EnableReviewWorkflowCommandTest -v`
-Expected: FAIL - `django.core.management.base.CommandError: Unknown command: 'enable_review_workflow'`.
-
-### Task 6: Implement the command
+### Task 5: Add a route-preflight command
 
 **Files:**
+
+- Create: `weblate/trans/judge_workflow.py`
+- Create: `weblate/trans/management/commands/check_judge_repair_routes.py`
+- Modify: `weblate/trans/tests/test_commands.py`
+
+Give both new Python files the repository copyright and
+`SPDX-License-Identifier: GPL-3.0-or-later` header, plus
+`from __future__ import annotations`.
+
+Define `TARGET_PROJECT_SLUGS` once in `weblate/trans/judge_workflow.py`; both
+management commands import it rather than carrying diverging hard-coded
+copies. By default, the read-only command checks that target set. Add
+`--project <slug>` solely for a non-production dev preflight of one explicit
+project, rather than scanning every project. For every non-source target
+translation in the selected scope, it must instantiate the effective
+`AutoForm.DEFAULT_ENGINE` configuration and validate:
+
+1. the current default (`openrouter`) is registered in `MACHINERY`;
+2. its effective configuration contains a non-empty key;
+3. the instantiated machinery exposes `resolve_model()` and its routing
+   resolves for that translation's `language.code`.
+
+The check must use `project.get_machinery_settings()`, so field-by-field
+project overrides are honored. It must not make a provider request or print a
+key. Exit with `CommandError` if the engine is unavailable, has the wrong
+implementation, lacks a usable key, or any target language lacks a route;
+otherwise print only the project/language/model route that was validated.
+
+Tests must cover a valid fallback route, a missing `openrouter` setting, a
+target language with no route, and the explicit `--project` scope. Patch or
+register the machinery explicitly in the test because `settings_test.py` does
+not load the Docker-only custom machinery registration. The failing cases must
+not modify project settings.
+
+Run:
+
+```sh
+./rundev.sh test weblate/trans/tests/test_commands.py -k JudgeRepairRoute -v
+```
+
+Commit:
+
+```sh
+git add \
+  weblate/trans/judge_workflow.py \
+  weblate/trans/management/commands/check_judge_repair_routes.py \
+  weblate/trans/tests/test_commands.py
+git commit -m "feat(judge): verify repair routes before workflow rollout"
+```
+
+## Phase 3: Enable the review and commit gate atomically
+
+### Task 6: Strengthen `enable_review_workflow`
+
+**Files:**
+
+- Modify: `weblate/trans/judge_workflow.py`
 - Create: `weblate/trans/management/commands/enable_review_workflow.py`
+- Modify: `weblate/trans/tests/test_commands.py`
 
-**Step 1: Write the minimal implementation**
+Give the new command the same repository copyright and GPL SPDX header.
+
+Keep the eight reviewed slugs in the shared `judge_workflow.py` module:
 
 ```python
-# Copyright © HCGameLoc
-#
-# SPDX-License-Identifier: GPL-3.0-or-later
-
-from __future__ import annotations
-
-from typing import Any
-
-from weblate.trans.models import CommitPolicyChoices, Project
-from weblate.utils.management.base import BaseCommand
-
-# The 8 HCGameLoc projects on this Weblate instance. Hardcoded and reviewed
-# by hand instead of --all, so a newly created test/throwaway project never
-# silently picks up the review gate.
 TARGET_PROJECT_SLUGS = (
     "col4",
     "pirate-ships",
@@ -269,388 +258,365 @@ TARGET_PROJECT_SLUGS = (
     "space-arena",
     "victory-banner",
 )
-
-
-class Command(BaseCommand):
-    help = (
-        "Enables the reviewer-approval workflow (translation_review) and the "
-        "WITHOUT_NEEDS_EDITING commit gate on the HCGameLoc projects."
-    )
-
-    def add_arguments(self, parser) -> None:
-        parser.add_argument(
-            "--dry-run",
-            action="store_true",
-            help="Print what would change without saving anything.",
-        )
-
-    def handle(self, *args: Any, **options: Any) -> None:
-        dry_run = options["dry_run"]
-        projects = Project.objects.filter(slug__in=TARGET_PROJECT_SLUGS)
-        found_slugs = set(projects.values_list("slug", flat=True))
-        for missing_slug in sorted(set(TARGET_PROJECT_SLUGS) - found_slugs):
-            self.stderr.write(f"Project slug not found, skipping: {missing_slug}")
-
-        changed = 0
-        for project in projects:
-            if (
-                project.translation_review
-                and project.commit_policy
-                == CommitPolicyChoices.WITHOUT_NEEDS_EDITING
-            ):
-                self.stdout.write(f"{project.slug}: already up to date, skipping")
-                continue
-
-            changed += 1
-            self.stdout.write(
-                f"{project.slug}: translation_review "
-                f"{project.translation_review} -> True, commit_policy "
-                f"{project.commit_policy} -> "
-                f"{CommitPolicyChoices.WITHOUT_NEEDS_EDITING} "
-                f"(WITHOUT_NEEDS_EDITING){' [dry run]' if dry_run else ''}"
-            )
-            if not dry_run:
-                project.translation_review = True
-                project.commit_policy = CommitPolicyChoices.WITHOUT_NEEDS_EDITING
-                project.save(update_fields=["translation_review", "commit_policy"])
-
-        if dry_run:
-            self.stdout.write(f"Dry run: {changed} project(s) would change.")
-        else:
-            self.stdout.write(f"Updated {changed} project(s).")
 ```
 
-**Step 2: Run tests to verify they pass**
+The command must:
 
-Run: `./rundev.sh test weblate/trans/tests/test_commands.py -k EnableReviewWorkflowCommandTest -v`
-Expected: PASS, all 4 tests green.
+1. load the target set and fail with `CommandError` before any write when one
+   of the eight is missing;
+2. support `--dry-run`;
+3. idempotently set `translation_review=True` and
+   `commit_policy=CommitPolicyChoices.WITHOUT_NEEDS_EDITING`;
+4. after the complete target set has been validated, wrap the entire
+   non-dry-run mutation loop in `transaction.atomic()`;
+5. write each changed project through
+   `Project.save(update_fields={"translation_review", "commit_policy"})`, so
+   the normal audit log remains intact and a later database failure rolls back
+   every project setting and audit entry.
 
-**Step 3: Commit**
+Tests must cover successful changes, dry run, idempotency, ignoring a
+non-target project, and a missing target slug that leaves already-found
+projects unchanged.
 
-```bash
-git add weblate/trans/management/commands/enable_review_workflow.py weblate/trans/tests/test_commands.py
-git commit -m "feat(trans): add enable_review_workflow management command
+Run:
 
-Bulk-toggles translation_review=True and commit_policy=WITHOUT_NEEDS_EDITING
-on the 8 named HCGameLoc projects. Idempotent, supports --dry-run."
+```sh
+./rundev.sh test weblate/trans/tests/test_commands.py -k EnableReviewWorkflow -v
 ```
 
----
+Commit:
 
-## Phase 3: Documentation
+```sh
+git add \
+  weblate/trans/judge_workflow.py \
+  weblate/trans/management/commands/enable_review_workflow.py \
+  weblate/trans/tests/test_commands.py
+git commit -m "feat(trans): add guarded review workflow rollout command"
+```
 
-### Task 7: Add a changelog entry
+## Phase 4: Align documentation and check wording
+
+### Task 7: Update the user-facing judge contract
 
 **Files:**
-- Modify: `docs/changes.rst` (top section, `Weblate 2026.8.1` / `Improvements` rubric, currently ending after the `game-length` check bullet at line 43)
 
-**Step 1: Add two bullets**
+- Modify: `weblate/checks/judge.py`
+- Modify: `weblate/checks/tests/test_judge.py`
+- Modify: `docs/admin/checks.rst`
+- Modify: `docs/security/threat-model.rst`
+- Modify: `docs/changes.rst`
 
-Insert after the existing `game-length` bullet (line 43), still inside `.. rubric:: Improvements`:
+Make the `JudgeFlagCheck` description say that a major problem is held back,
+not that it still ships. Update `docs/admin/checks.rst` to document that both
+parsed `flag` and `reject` verdicts are eligible for one repair on writable
+strings; a re-judged pass ships, while an unresolved verdict stays in the
+human queue.
 
-```rst
-* The :ref:`LLM judge <llm-judge>`'s major-severity ``flag`` verdict now lands on :guilabel:`Needs checking` instead of shipping identically to a clean pass, so a component under the ``WITHOUT_NEEDS_EDITING`` commit policy holds it back the same way it already held back a critical ``reject``.
-* Added the :wladmin:`enable_review_workflow` management command, which enables the reviewer-approval workflow and the ``WITHOUT_NEEDS_EDITING`` commit policy on the HCGameLoc projects.
-```
+Update the threat model to state that either negative verdict can trigger a
+configured MT repair only for writable strings. The judge seats remain the
+fixed-host judge data flow. A repair uses the already-modelled,
+project-configured machine-translation data flow, and this change must not
+give an end user control of its endpoint, key, or model.
 
-**Step 2: Commit**
+Add concise changelog entries for:
 
-```bash
-git add docs/changes.rst
-git commit -m "docs(changes): note the judge FLAG fix and enable_review_workflow"
-```
+- major verdicts no longer shipping and now being repairable;
+- the guarded workflow and route-preflight commands.
 
-### Task 8: Register `enable_review_workflow` for the `:wladmin:` cross-reference
-
-**Files:**
-- Modify: `docs/admin/management.rst` (near `reapply_autofixes` at line 1049-1052)
-
-**Step 1: Add a matching entry**
-
-Insert a new section right after the `reapply_autofixes` section ends (find its closing blank line following line 1052's directive and its prose - read the surrounding 15-20 lines first to place this after the full existing entry, not mid-paragraph):
-
-```rst
-enable_review_workflow
------------------------
-
-.. weblate-admin:: enable_review_workflow [--dry-run]
-
-Enables the reviewer-approval workflow (:setting:`translation_review`) and
-sets the commit policy to :guilabel:`Skip translations marked as needing
-editing` on the HCGameLoc projects. Idempotent - a project already at the
-target settings is reported and skipped. Pass ``--dry-run`` to preview the
-changes without saving anything.
-```
-
-**Step 2: Commit**
-
-```bash
-git add docs/admin/management.rst
-git commit -m "docs(admin): document enable_review_workflow"
-```
-
----
-
-## Phase 4: Dev judge wiring [DEPLOY-GATE]
-
-### Task 9: Add non-secret judge settings and protect the secrets env_file
-
-`dev-docker/docker-compose.yml`'s `weblate:` service already loads
-`env_file: - ./environment` (lines 65-66) in addition to its inline
-`environment:` block. `docker-compose.yml` is tracked in git (confirmed via
-`git ls-files`); `dev-docker/environment` is untracked **and not currently
-gitignored** - a pre-existing gap (it already holds `WEBLATE_ADMIN_PASSWORD`
-and `WEBLATE_EMAIL_HOST_PASSWORD`). Task 10 adds a live OpenRouter key to
-that file, so this task closes the gap first.
+### Task 8: Document the management commands
 
 **Files:**
-- Modify: `.gitignore` (after line 33, `/dev-docker/.env`)
-- Modify: `dev-docker/docker-compose.yml` (after the `WEBLATE_ADD_AUTOFIX` line, currently line 64 - confirm the exact line before editing, do not guess it)
 
-**Step 1: Gitignore the secrets env_file**
+- Modify: `docs/admin/management.rst`
 
-Insert after `.gitignore:33`:
-```
-/dev-docker/environment
-```
+Add `:wladmin:` entries for `enable_review_workflow [--dry-run]` and
+`check_judge_repair_routes [--project <slug>]`. Refer to the project setting using
+the `:ref:` role with target `project-translation_review`, not `:setting:`.
 
-**Step 2: Add the three non-secret judge settings to `docker-compose.yml`**
+Commit:
 
-```yaml
-      WEBLATE_JUDGE_ENABLED: 1
-      WEBLATE_JUDGE_MODEL_SEAT_1: deepseek/deepseek-v4-pro
-      WEBLATE_JUDGE_MODEL_SEAT_2: qwen/qwen3-235b-a22b-2507
-```
-`WEBLATE_JUDGE_OPENROUTER_KEY` deliberately does **not** go here - it goes in
-the now-gitignored `dev-docker/environment` file instead (Task 10), which
-this same service already loads via `env_file:`.
-
-**Step 3: Commit**
-
-```bash
-git add .gitignore dev-docker/docker-compose.yml
-git commit -m "chore(dev): wire non-secret judge settings, gitignore env_file secrets"
+```sh
+git add \
+  weblate/checks/judge.py \
+  weblate/checks/tests/test_judge.py \
+  docs/admin/checks.rst \
+  docs/admin/management.rst \
+  docs/changes.rst \
+  docs/security/threat-model.rst
+git commit -m "docs(judge): document major repair and review gating"
 ```
 
-### Task 10: Reuse the existing RoutedLLMTranslation OpenRouter key for the judge
+## Phase 5: Secure the development configuration and enable the dev judge
 
-Per the decision to reuse rather than mint a separate key. The key is not an
-env var today - it lives in the DB (`weblate.configuration.models.Setting`,
-`category=SettingCategory.MT`, `name="openrouter"`, `value["key"]`, matching
-the `KeyMachineryForm`/`BaseOpenAIMachineryForm` field name). This task reads
-it from **dev's own** `Setting` row and writes it into `dev-docker/environment`
-- entirely inside the container, piped via stdin, so the key value never
-appears in a shell command line, this plan, or any tool output.
+### Task 9: Stop tracking the existing secrets file
+
+`dev-docker/environment` is currently tracked, so adding it to `.gitignore`
+alone does not protect a judge key.
 
 **Files:**
-- Modify (at runtime, not via git): `dev-docker/environment`
 
-**Step 1: Write the extraction script to a local temp file**
+- Modify: `.gitignore`
+- Remove from Git index while preserving locally: `dev-docker/environment`
+- Create: `dev-docker/environment.example`
+- Modify: `dev-docker/docker-compose.yml`
 
-```bash
-cat > /tmp/judge_key_reuse.py << 'PYEOF'
-from pathlib import Path
+Steps:
 
-from weblate.configuration.models import Setting, SettingCategory
+1. Use `git rm --cached -- dev-docker/environment`; do not print its content.
+2. Add `/dev-docker/environment` to `.gitignore`.
+3. Add a sanitized `dev-docker/environment.example` containing only variable
+   names and safe defaults, never copied credentials.
+4. Add only these non-secret settings to `dev-docker/docker-compose.yml`:
 
-setting = Setting.objects.filter(
-    category=SettingCategory.MT, name="openrouter"
-).first()
-if setting is None or not setting.value.get("key"):
-    raise SystemExit(
-        "No OpenRouter key configured for the 'openrouter' machinery service - "
-        "configure RoutedLLMTranslation in /manage/machinery/ first."
-    )
-key = setting.value["key"]
-env_path = Path("/app/src/dev-docker/environment")
-with env_path.open("a", encoding="utf-8") as f:
-    f.write(f"\nWEBLATE_JUDGE_OPENROUTER_KEY={key}\n")
-print(f"Appended WEBLATE_JUDGE_OPENROUTER_KEY ({len(key)} chars) to {env_path}")
-PYEOF
-```
+   ```yaml
+         WEBLATE_JUDGE_ENABLED: 1
+         WEBLATE_JUDGE_MODEL_SEAT_1: deepseek/deepseek-v4-pro
+         WEBLATE_JUDGE_MODEL_SEAT_2: qwen/qwen3-235b-a22b-2507
+         WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS: 1
+   ```
 
-**Step 2: Run it inside the container via stdin**
+5. Obtain a dedicated development judge key. Append one
+   `WEBLATE_JUDGE_OPENROUTER_KEY=...` line to the ignored
+   `dev-docker/environment` file without displaying it.
 
-Run: `./rundev.sh exec -T weblate weblate shell < /tmp/judge_key_reuse.py`
-Expected: `Appended WEBLATE_JUDGE_OPENROUTER_KEY (NN chars) to /app/src/dev-docker/environment` - a length, never the key itself. If it instead raises the `SystemExit` above, dev's machinery is not configured yet; configure it first.
+Do not reuse the `RoutedLLMTranslation` key. The existing
+`WEBLATE_JUDGE_OPENROUTER_KEY` contract deliberately separates spending,
+rotation, and revocation from automatic translation.
 
-**Step 3: Delete the temp script (it never held the key, only the DB query - this is tidiness, not a secrets cleanup)**
-
-Run: `rm /tmp/judge_key_reuse.py`
-
-**Step 4: Confirm the line landed, without displaying it**
-
-Run: `grep -c '^WEBLATE_JUDGE_OPENROUTER_KEY=' dev-docker/environment`
-Expected: `1`
-
-### Task 11: Update the environment template
+### Task 10: Update the production environment template
 
 **Files:**
-- Modify: `deploy/environment.example:111-115`
 
-**Step 1: Uncomment the existing judge block**
+- Modify: `deploy/environment.example`
 
-Change:
-```
-#WEBLATE_JUDGE_ENABLED=0
-#WEBLATE_JUDGE_OPENROUTER_KEY=
-#WEBLATE_JUDGE_MODEL_SEAT_1=
-#WEBLATE_JUDGE_MODEL_SEAT_2=
-#WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS=1
-```
-to:
-```
+Uncomment the judge variables with a disabled default and the calibrated model
+pair:
+
+```text
 WEBLATE_JUDGE_ENABLED=0
 WEBLATE_JUDGE_OPENROUTER_KEY=
 WEBLATE_JUDGE_MODEL_SEAT_1=deepseek/deepseek-v4-pro
 WEBLATE_JUDGE_MODEL_SEAT_2=qwen/qwen3-235b-a22b-2507
 WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS=1
-```
-Keep `WEBLATE_JUDGE_ENABLED=0` here (this is the prod template default,
-staying off until the later, separate decision to run judge on prod) - only
-the calibrated model names are filled in as documentation of the measured
-pair. Prod's own key reuse (if wanted later) is out of scope for this plan.
-
-**Step 2: Commit**
-
-```bash
-git add deploy/environment.example
-git commit -m "docs(deploy): document the calibrated judge model pair in the env template"
+WEBLATE_JUDGE_BATCH_SIZE=5
+WEBLATE_JUDGE_MAX_UNITS_PER_RUN=2000
+WEBLATE_JUDGE_REQUEST_SLEEP=0.0
+WEBLATE_JUDGE_MAY_APPROVE=0
 ```
 
-### Task 12: [DEPLOY-GATE] Rebuild the dev container
+Leave `JUDGE_MAY_APPROVE` disabled. No secret belongs in this tracked
+template.
 
-**This step changes a running instance - get explicit go-ahead immediately before running it, even though the plan is approved.**
+Commit:
 
-**Step 1: Rebuild and restart**
-
-Run: `./rundev.sh`
-Expected: Container rebuilds and comes up healthy (`docker compose ps` eventually shows `weblate-dev:...healthy`, matching the `wait` subcommand's own check).
-
-**Step 2: Confirm judge settings landed, without printing the key**
-
-Run: `./rundev.sh exec -T weblate weblate shell -c "from django.conf import settings; print(settings.JUDGE_ENABLED, settings.JUDGE_MODEL_SEAT_1, settings.JUDGE_MODEL_SEAT_2, bool(settings.JUDGE_OPENROUTER_KEY))"`
-Expected output: `True deepseek/deepseek-v4-pro qwen/qwen3-235b-a22b-2507 True`
-
-### Task 13: Run the full test suite in the rebuilt container
-
-**Step 1: Run it**
-
-Run: `./rundev.sh test weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_judge_client.py weblate/trans/tests/test_judge_loop.py weblate/trans/tests/test_judge_round.py weblate/trans/tests/test_judge_form.py weblate/trans/tests/test_judge_views.py weblate/trans/tests/test_commands.py -k "Judge or EnableReviewWorkflow" -v`
-Expected: PASS. (These tests override judge settings per-test via `@override_settings`, so they do not depend on the real `WEBLATE_JUDGE_OPENROUTER_KEY` or make real network calls - this is a health check of the rebuilt container, not a live-judge test; that is Phase 5.)
-
----
-
-## Phase 5: Dev functional verification (live judge calls - real, small OpenRouter cost) [DEPLOY-GATE]
-
-**Every task in this phase makes real calls to OpenRouter using the reused key from Task 10, drawing against the same budget as the existing `RoutedLLMTranslation` machinery. Confirm that's acceptable before running any of them.**
-
-### Task 14: Enable the gate on a dev test project
-
-**Step 1: Toggle settings on whatever demo project exists in the dev container**
-
-`enable_review_workflow` only targets the 8 real prod slugs, which do not exist in the dev container's demo data - do not use it here. Instead:
-
-Run: `./rundev.sh exec -T weblate weblate shell -c "
-from weblate.trans.models import CommitPolicyChoices, Project
-p = Project.objects.all().first()
-p.translation_review = True
-p.commit_policy = CommitPolicyChoices.WITHOUT_NEEDS_EDITING
-p.save(update_fields=['translation_review', 'commit_policy'])
-print(p.slug, p.translation_review, p.commit_policy)
-"`
-Expected: prints the demo project's slug, `True`, `20`.
-
-### Task 15: Verify `REJECT` without overwrite holds the string back but does not rewrite it
-
-**Step 1: Pick a translated unit, note its target, launch Judge mode without "overwrite existing" via the UI (Automatic translation on that translation, mode Judge, `unit.review` permission required), on a string you expect the judge to reject (or force one - see Task 17 for a scripted alternative if the UI path is inconvenient).**
-
-**Step 2: Confirm**
-
-- Unit state is one of `STATE_FUZZY`/`STATE_NEEDS_REWRITING`/`STATE_NEEDS_CHECKING` (10/11/12).
-- Unit target text is unchanged from before the run.
-- A `judge-reject` check is visible on the unit.
-
-### Task 16: Verify `REJECT` with overwrite repairs and re-ships on success
-
-**Step 1: Repeat Task 15's run on a different (or the same, reset) unit, this time checking "overwrite existing translations" in the Automatic translation form.**
-
-**Step 2: Confirm**
-
-- If the repaired candidate is re-judged as `PASS`: the unit ends at `STATE_TRANSLATED` (20) with the **new**, repaired target text - it shipped and self-healed.
-- If the repair is still rejected: the unit ends at `STATE_FUZZY` (10) with the repair attempt's text (not necessarily the original), for a human to finish.
-
-### Task 17: Verify `FLAG` lands on `STATE_NEEDS_CHECKING` end to end (not just in the unit test)
-
-**Step 1: Find or engineer a unit the judge scores `major` severity (a plausible terminology/register issue works well for this - the model pair is not perfectly deterministic, so this may take more than one attempt).**
-
-**Step 2: Confirm**
-
-- Unit state is `STATE_NEEDS_CHECKING` (12).
-- A `judge-flag` check is visible on the unit.
-
-### Task 18: Verify the commit policy actually excludes the held-back units from the exported file
-
-**Step 1: Trigger a commit on the translation from Task 15/17 (e.g. via the component's "Commit pending changes" action, or `./rundev.sh exec -T weblate weblate commit_pending <project>/<component>`).**
-
-**Step 2: Confirm**
-
-Read the exported translation file from the repository (e.g. `./rundev.sh exec -T weblate weblate ls_translations <project>/<component>` or inspect the file directly) and confirm the held-back units' current (possibly still-broken) text is **not** the value written to the file - the committed value should be whatever was there before the run, unchanged.
-
----
-
-## Phase 6: Prod settings rollout [DEPLOY-GATE]
-
-**Prod judge is explicitly out of scope for this plan - only `translation_review`/`commit_policy` are touched. Do not add `WEBLATE_JUDGE_*` to `deploy/.env.local` as part of this phase.**
-
-### Task 19: [DEPLOY-GATE] Dry-run the command against prod
-
-**Get explicit go-ahead immediately before this task, separate from the plan approval.**
-
-**Step 1: Run**
-
-Run: `./deploy/vps.sh ssh "docker exec hcgameloc-weblate-1 weblate enable_review_workflow --dry-run"`
-Expected: 8 lines, one per project slug, each showing `translation_review False -> True, commit_policy 0 -> 20 (WITHOUT_NEEDS_EDITING) [dry run]`, plus a final `Dry run: 8 project(s) would change.` (matches the settings this plan's earlier investigation found live on prod for all 8 projects).
-
-### Task 20: [DEPLOY-GATE] Run it for real
-
-**Get explicit go-ahead immediately before this task.**
-
-**Step 1: Run**
-
-Run: `./deploy/vps.sh ssh "docker exec hcgameloc-weblate-1 weblate enable_review_workflow"`
-Expected: Same 8 lines without `[dry run]`, final `Updated 8 project(s).`
-
-### Task 21: Verify via the REST API
-
-**Step 1: Confirm all 8 projects**
-
-Run (reusing the already-known `PROD_WEBLATE_API_TOKEN` from `deploy/.env.local`, without printing its value):
-```bash
-for slug in col4 pirate-ships heart-abyss strategy-and-tactics-2 korotkij-test need-for-greed space-arena victory-banner; do
-  curl -s -H "Authorization: Token $PROD_WEBLATE_API_TOKEN" \
-    "https://l10n.herocraft.com/api/projects/$slug/" \
-    | python3 -c "import json,sys; d=json.load(sys.stdin); print('$slug', d['translation_review'], d['commit_policy'])"
-done
+```sh
+git add \
+  .gitignore \
+  dev-docker/environment.example \
+  dev-docker/docker-compose.yml \
+  deploy/environment.example
+git commit -m "chore(judge): configure isolated development credentials"
 ```
-Expected: `<slug> True 20` for all 8 lines.
 
-### Task 22: Final push
+Before committing, verify that `git status --short` shows the removal of the
+previously tracked environment file and does not show its ignored replacement.
+The earlier `git rm --cached` has already staged that removal, so do not add
+the ignored local replacement back to the index.
+If this repository has been shared, rotate any credentials that were ever
+committed in that file.
 
-**Step 1: Confirm everything from Phases 1-3 is committed, then push**
+### Task 11: [DEPLOY-GATE] Recreate the development container
 
-```bash
-git status --short
-git push origin main
+Obtain explicit approval immediately before this step.
+
+Run:
+
+```sh
+./rundev.sh
+./rundev.sh exec -T weblate weblate shell -c \
+  "from django.conf import settings; print(
+      settings.JUDGE_ENABLED,
+      settings.JUDGE_MODEL_SEAT_1,
+      settings.JUDGE_MODEL_SEAT_2,
+      settings.JUDGE_MAX_REPAIR_ATTEMPTS,
+      bool(settings.JUDGE_OPENROUTER_KEY),
+  )"
 ```
-Expected: clean tree, push succeeds. (Phases 4-6 are config/settings/deploy actions, not further source changes beyond Task 9's `.gitignore`/`docker-compose.yml` and Task 11's `environment.example` - `dev-docker/environment` from Task 10 must never appear in `git status` as anything but ignored.)
 
----
+Expected:
+
+```text
+True deepseek/deepseek-v4-pro qwen/qwen3-235b-a22b-2507 1 True
+```
+
+Then run:
+
+```sh
+./rundev.sh test \
+  weblate/trans/tests/test_judge.py \
+  weblate/trans/tests/test_judge_autotranslate.py \
+  weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_judge_round.py \
+  weblate/trans/tests/test_judge_form.py \
+  weblate/trans/tests/test_judge_views.py \
+  weblate/trans/tests/test_commands.py \
+  weblate/checks/tests/test_judge.py -v
+uv run prek run --files \
+  weblate/trans/judge_loop.py \
+  weblate/trans/models/judge.py \
+  weblate/trans/judge_workflow.py \
+  weblate/trans/management/commands/check_judge_repair_routes.py \
+  weblate/trans/management/commands/enable_review_workflow.py \
+  weblate/trans/tests/test_judge.py \
+  weblate/trans/tests/test_judge_autotranslate.py \
+  weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_commands.py \
+  weblate/checks/judge.py \
+  weblate/checks/tests/test_judge.py \
+  docs/admin/checks.rst \
+  docs/admin/management.rst \
+  docs/security/threat-model.rst \
+  docs/changes.rst \
+  .gitignore \
+  dev-docker/docker-compose.yml \
+  dev-docker/environment.example \
+  deploy/environment.example
+```
+
+## Phase 6: Dev end-to-end verification [DEPLOY-GATE]
+
+Obtain explicit approval immediately before the paid OpenRouter calls.
+
+1. On one non-production dev project, configure the existing `openrouter`
+   machinery with a dedicated development MT credential and a target-language
+   route. Keep that credential separate from the judge key and out of Git.
+   Then enable `translation_review` and `WITHOUT_NEEDS_EDITING`.
+2. Confirm `check_judge_repair_routes --project <dev-slug>` succeeds for its
+   target language.
+3. Run **Judge** mode with `auto_source=mt`, `engines=openrouter`, and
+   `q=state:empty` on a deliberately small test selection.
+4. Verify each deterministic test path with controlled mocks first, then
+   smoke-test a live negative example:
+
+   - a writable major/critical candidate is repaired and both seats judge the
+     repair;
+   - a repaired pass is `Translated` with the repaired text;
+   - an unresolved major is `Needs checking` plus `judge-flag`;
+   - an unresolved critical is `Needs editing` plus `judge-reject`;
+   - a pre-existing string without overwrite is never changed;
+   - a commit omits held-back unit changes from the exported file.
+
+The live smoke test supplements the deterministic tests; it must not be the
+only evidence for major-repair behavior.
+
+## Phase 7: Production code and configuration rollout [DEPLOY-GATE]
+
+Production activation has two separate approval points. Neither starts a
+judge run or changes an existing translation.
+
+### Task 12: Deploy the reviewed source changes
+
+After the normal feature-branch review and merge have placed the verified
+commits on `main`, use a clean checkout already on `main` whose `HEAD` matches
+`origin/main`. Do not switch branches, reset, or stash user work in the
+current workspace. Obtain explicit approval and run:
+
+```sh
+./deploy/vps.sh deploy
+```
+
+Verify the deployed container is healthy. Do not use a feature branch as an
+implicit replacement for the reviewed `main` release.
+
+### Task 13: Configure and restart the production judge
+
+Obtain a second explicit approval immediately before modifying the production
+environment.
+
+On the server, update the ignored `deploy/.env` used by
+`deploy/docker-compose.yml`, not the local VPN credential file
+`deploy/.env.local`. Set a dedicated judge key and these non-secret values:
+
+```text
+WEBLATE_JUDGE_ENABLED=1
+WEBLATE_JUDGE_MODEL_SEAT_1=deepseek/deepseek-v4-pro
+WEBLATE_JUDGE_MODEL_SEAT_2=qwen/qwen3-235b-a22b-2507
+WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS=1
+WEBLATE_JUDGE_MAY_APPROVE=0
+```
+
+Do not print the key, put it in Git, or reuse an MT/loc-kit credential. Then
+recreate only the Weblate service so Compose reads the changed environment:
+
+```sh
+./deploy/vps.sh ssh \
+  "cd /srv/hcgameloc/deploy && docker compose up -d --force-recreate weblate"
+```
+
+Confirm only non-secret values:
+
+```sh
+./deploy/vps.sh ssh \
+  "docker exec hcgameloc-weblate-1 weblate shell -c \
+  \"from django.conf import settings; print(
+      settings.JUDGE_ENABLED,
+      settings.JUDGE_MODEL_SEAT_1,
+      settings.JUDGE_MODEL_SEAT_2,
+      settings.JUDGE_MAX_REPAIR_ATTEMPTS,
+      bool(settings.JUDGE_OPENROUTER_KEY),
+  )\""
+```
+
+### Task 14: Verify routes and enable the eight project gates
+
+Obtain a third explicit approval immediately before changing project settings.
+
+Run the read-only route preflight first:
+
+```sh
+./deploy/vps.sh ssh \
+  "docker exec hcgameloc-weblate-1 weblate check_judge_repair_routes"
+```
+
+It must succeed for every configured target language before enabling a project
+gate. Then preview and apply the workflow settings:
+
+```sh
+./deploy/vps.sh ssh \
+  "docker exec hcgameloc-weblate-1 weblate enable_review_workflow --dry-run"
+./deploy/vps.sh ssh \
+  "docker exec hcgameloc-weblate-1 weblate enable_review_workflow"
+```
+
+The dry run and real run must each cover exactly the eight target slugs.
+Verify the resulting `translation_review=True` and
+`commit_policy=WITHOUT_NEEDS_EDITING` through the authenticated project API
+without printing its token.
+
+## Operator workflow after rollout
+
+For a new localization:
+
+1. Configure the project's `openrouter` routing, persona, style, glossary,
+   and the target language route before starting work.
+2. An operator with `unit.review` selects **Add as translation with an LLM
+   judge**, **Machine translation**, `openrouter`, and normally
+   `state:empty`.
+3. New strings are translated, judged by both seats, repaired once for either
+   a major or critical verdict, and judged again.
+4. Repaired passes export normally. Remaining major/critical strings stay in
+   the judge queue and are discoverable via `check:judge-flag` and
+   `check:judge-reject`.
+5. For existing human text, select **Overwrite the existing translation**
+   only when automatic replacement is intentionally authorized.
 
 ## Explicitly out of scope
 
-- Running judge against real prod content (a future, separate decision - needs a cost/scope estimate first, per the earlier conversation).
-- A Celery-beat scheduler for automatic judge triggering (manual trigger was the explicit decision).
-- `EnglishAcronymLeakCheck` and enforcing `reused` via `Component.enforced_checks` (an earlier, separate recommendation in this conversation, not yet approved).
-- Any change to `JUDGE_MAY_APPROVE` (stays off, per the earlier decision).
-- Reusing the OpenRouter key on **prod** (only dev is wired in this plan; prod judge enablement is deferred).
+- A Celery-beat schedule or changing the normal automatic-translation mode to
+  judge mode.
+- Enabling `JUDGE_MAY_APPROVE`.
+- Bulk judging, rewriting, or otherwise modifying the already translated
+  German loc-kit.
+- Treating a judge verdict as a deterministic enforced check.
+- Silent deployment, production configuration changes, or paid live judge
+  runs without the separate approvals listed above.
