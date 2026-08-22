@@ -7,8 +7,10 @@
 import uuid
 
 import django.db.models.deletion
+import weblate.trans.models.multilingual_spreadsheet
 from django.conf import settings
 from django.db import migrations, models
+
 
 
 class Migration(migrations.Migration):
@@ -23,18 +25,29 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "id",
-                    models.BigAutoField(
+                    models.AutoField(
                         auto_created=True,
                         primary_key=True,
                         serialize=False,
                         verbose_name="ID",
                     ),
                 ),
+
                 ("token", models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
                 ("session_key", models.CharField(max_length=40)),
-                ("source_filename", models.CharField(max_length=500)),
-                ("uploaded", models.FileField(blank=True, upload_to="")),
+                ("source_filename", models.CharField(max_length=400)),
+
+                (
+                    "uploaded",
+                    models.FileField(
+                        blank=True,
+                        storage=weblate.trans.models.multilingual_spreadsheet.COMPONENT_SPREADSHEET_DRAFT_STORAGE,
+                        upload_to="",
+                    ),
+                ),
                 ("preview_json", models.TextField(blank=True)),
+
+
                 ("baseline_json", models.TextField(blank=True)),
                 (
                     "state",
