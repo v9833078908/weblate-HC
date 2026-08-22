@@ -35,7 +35,7 @@ python .claude/skills/weblate-lqa/scripts/audit_component.py \
   --lang <lang_code> \
   --save-verdicts-draft /tmp/verdicts_draft.json
 ```
-*(The script loads the API token securely from `deploy/.env.local` or environment variables without printing secrets).*
+*(The script loads the API token securely from `deploy/.env.local` or environment variables without printing secrets. Fill in `review_scope` in the saved draft before scoring — see Step 5.)*
 
 ### Step 3: Layer 0 — Weblate Check Diagnostics
 Group all failing checks by their exact `check_id` (`same`, `multiple_capital`, `reused`, `game-token`, `game-number`, `game-markup`, `game-length`, `cyrillic-leak`).
@@ -63,17 +63,31 @@ Assign severity penalty points for reviewed findings:
 - **Major (5 pt):** Terminology/acronym leak, mechanic distortion, wrong domain register.
 - **Critical (25 pt / Auto-Reject):** Corrupted placeholder, untranslated leak, major context hallucination.
 
+**Coverage discipline (mandatory):** Track the exact set of unit IDs actually read
+during this step — not just the ones that turned out to have a defect. That tracked
+list becomes `review_scope.reviewed_unit_ids` in Step 5. Reviewing 100% of a
+component is not required, but the resulting score can never be presented as
+covering more than what was actually tracked here — see
+`references/mqm-game-profile.md` §4 (Sampling & Coverage).
+
 ### Step 5: Scorecard Generation & Remediation Plan
-1. Calculate the official **MQM Quality Score**:
-   $$\text{MQM Score} = \max\left(0, 100 - \left(\frac{\sum \text{Penalties}}{\text{Total Source Words}} \times 100\right)\right)$$
-2. Determine the **Release Gate Grade**:
-   - **Grade A ($\ge 95.0$, 0 Critical):** Approved for Release.
-   - **Grade B ($85.0 - 94.9$, 0 Critical):** Conditional Approval (fix Major issues).
-   - **Grade C ($70.0 - 84.9$):** Blocked (Re-translation pass required).
-   - **Fail ($< 70.0$ or any Critical):** Rejected.
+1. Build the verdicts file with an explicit `review_scope` — either
+   `{"coverage": "full"}` (every unit in the component was actually reviewed) or
+   `{"reviewed_unit_ids": [...]}` (the exact IDs tracked in Step 4, including units
+   checked and found clean, not just units with a defect). Run
+   `audit_component.py --verdicts <file> ...`; it refuses to score a file missing
+   `review_scope` rather than silently dividing by the wrong denominator.
+2. Read `mqm_score`, `coverage_mode`, and `grade` from the tool's own output —
+   never recompute by hand. Under `coverage_mode: "sample"` the grade is always
+   `Not gradable (partial coverage)` regardless of the numeric score, per
+   `references/mqm-game-profile.md` §§4-5.
 3. Formulate concrete remediation actions:
    - Specific string translations to update via API.
    - Exact Weblate flags to add (`ignore-same`, `ignore-multiple-capital`, `ignore-reused`).
+4. Label every finding as **analyst-reviewed** (manual or LLM-assisted analysis run
+   this session) unless the fork's actual two-seat LLM judge
+   (`weblate/trans/judge.py`) was invoked and its verdicts used verbatim — never
+   present manual analysis as automated judge output.
 
 ---
 
@@ -84,18 +98,27 @@ Always structure the LQA report using this format:
 ```markdown
 # Weblate LQA Audit: [Project]/[Component] ([LANG])
 
+> Findings are [analyst-reviewed manually / LLM-judge verdicts from weblate/trans/judge.py] — state which.
+
 ## 1. MQM-Core Quality Scorecard
+
+| Metric | Value |
+|---|---|
+| **Coverage mode** | `full` / `sample` |
+| **Units reviewed** | [N] / [Total] ([%]) |
+| **Words reviewed (MQM denominator)** | [N] / [Total] ([%]) |
+
 | Metric | Value | Status |
 |---|---|---|
-| **MQM Quality Score** | **[Score] / 100** | **[Grade A/B/C/Fail]** |
-| **Release Gate Status** | [Approved / Blocked] | [🟢 / 🔴] |
+| **MQM Score** | **[Score] / 100** | **[Grade A/B/C/Fail/Not gradable (partial coverage)]** |
+| **Release Gate Status** | [Approved / Blocked / Blocked — audit incomplete] | [🟢 / 🔴] |
 | **Critical Defects (25 pt)** | [Count] | [None / Details] |
 | **Major Defects (5 pt)** | [Count] | [Details] |
 | **Minor Defects (1 pt)** | [Count] | [Details] |
-| **Total Penalty Points** | [Sum] pt | [Word count base] |
+| **Total Penalty Points** | [Sum] pt | [Reviewed word count base — NOT total component words unless coverage is full] |
 
 ## 2. Reviewed Defect Log (MQM Categories)
-- 🔴/🟠/🟡 **[SEVERITY]** `[context]` (Unit [ID]):
+- 🔴/🟠/🟡/⚪ **[SEVERITY]** `[context]` (Unit [ID]):
   - **Source:** `[Source text]`
   - **Target:** `[Target text]`
   - **Category:** `[category/subcategory]`
@@ -108,9 +131,24 @@ Always structure the LQA report using this format:
 ## 4. Actionable Remediation Plan
 1. **String Corrections:** List of exact unit IDs and new target texts.
 2. **Weblate Flags to Apply:** List of units and exact flags (`ignore-same`, `ignore-reused`, etc.).
+3. **If coverage is partial:** state exactly what remains unreviewed and what the
+   next review pass needs to cover before any component-wide grade can be issued.
 ```
 
 ---
+
+## Known Pitfalls (from dogfooding this skill)
+
+- **Denominator mismatch.** A 2026-08-22 self-audit of `victory-banner/common` (DE)
+  found `total_words` was computed over the *full* component while defects were only
+  searched for in a ~28%-of-units manual sample — inflating the score (96.67 instead
+  of the honest 94.82 sample-scoped figure) by silently assuming the unreviewed 72%
+  was defect-free. `review_scope` exists specifically to make this mistake
+  impossible to reproduce silently — always let the tool compute the denominator
+  from the declared scope, never pass a raw word count by hand.
+- **Style vs grammar_syntax.** A grammatically correct string that merely differs in
+  pattern from its siblings is `style` (Neutral), not `grammar_syntax` (Minor). See
+  `references/mqm-game-profile.md` §1.3.
 
 ## 3. Bundled Resources
 - `references/mqm-game-profile.md` — Full MQM typology, scoring mathematics, and release gates.
