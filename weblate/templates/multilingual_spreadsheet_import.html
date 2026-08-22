@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+  <h1>{% blocktranslate with component=component.name %}Upload multilingual spreadsheet for {{ component }}{% endblocktranslate %}</h1>
+  {% if draft %}
+    <p>{% translate "Spreadsheet validated. Confirmation will apply its changes." %}</p>
+  {% else %}
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <label for="id_file">{% translate "File" %}</label>
+      <input id="id_file" name="file" type="file" accept=".csv,.xlsx" required>
+      <button type="submit">{% translate "Preview" %}</button>
+    </form>
+  {% endif %}
+{% endblock %}

@@ -107,6 +107,10 @@
           <li>
             <a class="dropdown-item" data-bs-target="#upload" data-bs-toggle="tab" href="#">{% translate "Upload translation" %}</a>
           </li>
+          <li>
+            <a class="dropdown-item"
+               href="{% url 'multilingual-upload' path=object.get_url_path %}">{% translate "Upload multilingual spreadsheet" %}</a>
+          </li>
           {% if object.is_glossary %}
             <li>
               <a class="dropdown-item"

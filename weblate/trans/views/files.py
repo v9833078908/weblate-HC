@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from __future__ import annotations
 
+import json
 import os
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import DatabaseError
 from django.http import Http404, HttpResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext
 from django.views.decorators.http import require_POST
 
@@ -27,9 +28,13 @@ from weblate.trans.models import (
     Project,
     Translation,
 )
-from weblate.trans.multilingual_spreadsheet import export_component
+from weblate.trans.models.multilingual_spreadsheet import ComponentSpreadsheetImportDraft
+from weblate.trans.multilingual_spreadsheet import (
+    build_preview,
+    export_component,
+    parse_upload,
+)
 from weblate.utils import messages
-from weblate.utils.data import data_dir
 from weblate.utils.errors import report_error
 from weblate.utils.files import get_upload_message
 from weblate.utils.stats import CategoryLanguage, ProjectLanguage
@@ -278,6 +283,49 @@ def multilingual_download(request: AuthenticatedHttpRequest, path, format_name: 
         f'attachment; filename="{component.slug}-multilingual.{format_name}"'
     )
     return response
+
+
+
+def multilingual_upload(request: AuthenticatedHttpRequest, path):
+    component = parse_path(request, path, (Component,))
+    if not request.user.has_perm("upload.perform", component):
+        raise PermissionDenied
+    if request.method == "POST":
+        if component.locked:
+            messages.error(request, gettext("Access denied."))
+            return redirect(component)
+        uploaded = request.FILES.get("file")
+        if uploaded is None:
+            messages.error(request, gettext("Please select a file."))
+        else:
+            try:
+                parsed = parse_upload(component, uploaded)
+                preview = build_preview(component, parsed)
+            except ValidationError as error:
+                messages.error(request, "; ".join(error.messages))
+            else:
+                request.session.save()
+                draft = ComponentSpreadsheetImportDraft(
+                    owner=request.user,
+                    session_key=request.session.session_key,
+                    component=component,
+                    source_filename=uploaded.name,
+                    preview_json=json.dumps(
+                        {
+                            "headers": preview.parsed.headers,
+                            "rows": [row.values for row in preview.parsed.rows],
+                        }
+                    ),
+                    baseline_json="{}",
+                )
+                draft.uploaded.save(uploaded.name, uploaded, save=False)
+                draft.save()
+                return render(
+                    request,
+                    "multilingual_spreadsheet_import.html",
+                    {"component": component, "draft": draft, "preview": preview},
+                )
+    return render(request, "multilingual_spreadsheet_import.html", {"component": component})
 
 @require_POST
 def upload(request: AuthenticatedHttpRequest, path):

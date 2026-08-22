@@ -1677,3 +1677,11 @@ class MultilingualSpreadsheetDownloadTest(ViewTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "text/csv; charset=utf-8")
         self.assertNotIn(b"PK", response.content)
+
+    def test_component_upload_renders_form(self) -> None:
+        response = self.client.get(
+            reverse("multilingual-upload", kwargs={"path": self.component.get_url_path()})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Upload multilingual spreadsheet")
