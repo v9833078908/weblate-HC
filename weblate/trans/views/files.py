@@ -30,21 +30,24 @@ from weblate.trans.models import (
     Translation,
     Unit,
 )
-from weblate.trans.models.multilingual_spreadsheet import ComponentSpreadsheetImportDraft
+from weblate.trans.models.multilingual_spreadsheet import (
+    ComponentSpreadsheetImportDraft,
+)
 from weblate.trans.multilingual_spreadsheet import (
+    _identity,
+    _schema,
     build_preview,
     export_component,
     parse_upload,
 )
-from weblate.utils.state import STATE_EMPTY, STATE_TRANSLATED
+from weblate.trans.util import get_upload_error_message
 from weblate.utils import messages
+from weblate.utils.data import data_dir
 from weblate.utils.errors import report_error
 from weblate.utils.files import get_upload_message
-from weblate.trans.util import get_upload_error_message
-from weblate.utils.data import data_dir
+from weblate.utils.state import STATE_EMPTY, STATE_TRANSLATED
 from weblate.utils.stats import CategoryLanguage, ProjectLanguage
 from weblate.utils.views import (
-
     download_translation_file,
     parse_path,
     show_form_errors,
@@ -270,7 +273,6 @@ def download(request: AuthenticatedHttpRequest, path):
     raise TypeError(msg)
 
 
-
 def multilingual_download(request: AuthenticatedHttpRequest, path, format_name: str):
     """Download one component as a multilingual CSV or XLSX table."""
     component = parse_path(request, path, (Component,))
@@ -307,8 +309,6 @@ def _baseline_snapshot(component: Component) -> dict[str, list]:
 
 def _apply_preview(component: Component, preview, user) -> None:
     """Apply a parsed preview to the component, mapping rows to source units by (source, context)."""
-    from weblate.trans.multilingual_spreadsheet import _identity, _schema
-
     source_units = list(component.source_translation.unit_set.select_for_update())
     schema = _schema(component, source_units)
     source_by_identity = {
@@ -317,9 +317,7 @@ def _apply_preview(component: Component, preview, user) -> None:
     source_code = component.source_language.code
     for row in preview.parsed.rows:
         identity = (
-            (row.values[0], row.values[-1])
-            if schema.has_context
-            else (row.values[0],)
+            (row.values[0], row.values[-1]) if schema.has_context else (row.values[0],)
         )
         source = source_by_identity.get(identity)
         if source is None:
@@ -376,7 +374,6 @@ def multilingual_upload(request: AuthenticatedHttpRequest, path):
                         }
                     ),
                     baseline_json=json.dumps(_baseline_snapshot(component)),
-
                 )
                 draft.uploaded.save(uploaded.name, uploaded, save=False)
                 draft.save()
@@ -385,7 +382,9 @@ def multilingual_upload(request: AuthenticatedHttpRequest, path):
                     "multilingual_spreadsheet_import.html",
                     {"component": component, "draft": draft, "preview": preview},
                 )
-    return render(request, "multilingual_spreadsheet_import.html", {"component": component})
+    return render(
+        request, "multilingual_spreadsheet_import.html", {"component": component}
+    )
 
 
 @require_POST
@@ -403,44 +402,7 @@ def multilingual_confirm(request: AuthenticatedHttpRequest, token):
     if not request.user.has_perm("upload.perform", component):
         raise PermissionDenied
     try:
-        with transaction.atomic():
-            locked_component = (
-                Component.objects.select_for_update()
-                .filter(pk=component.pk)
-                .first()
-            )
-            if locked_component is None or locked_component.locked:
-                messages.error(request, gettext("Access denied."))
-                return redirect(component)
-            locked_draft = (
-                ComponentSpreadsheetImportDraft.objects.select_for_update()
-                .filter(
-                    pk=draft.pk,
-                    state=ComponentSpreadsheetImportDraft.State.PREVIEW_READY,
-                    expires_at__gt=timezone_now(),
-                )
-                .first()
-            )
-            if locked_draft is None:
-                raise Http404
-            baseline = json.loads(locked_draft.baseline_json)
-            current = {
-                str(unit.pk): [unit.target, unit.state]
-                for unit in Unit.objects.select_for_update().filter(
-                    translation__component=component
-                )
-            }
-            if current != baseline:
-                messages.error(
-                    request,
-                    gettext("The component changed after preview; reload to retry."),
-                )
-                return redirect(component)
-            parsed = parse_upload(component, locked_draft.uploaded)
-            preview = build_preview(component, parsed)
-            _apply_preview(component, preview, request.user)
-            locked_draft.state = ComponentSpreadsheetImportDraft.State.CONSUMED
-            locked_draft.save(update_fields=["state"])
+        _confirm_locked_apply(component, draft, request.user)
     except ValidationError as error:
         messages.error(request, "; ".join(error.messages))
         return redirect(component)
@@ -448,6 +410,41 @@ def multilingual_confirm(request: AuthenticatedHttpRequest, token):
     return redirect(component)
 
 
+def _confirm_locked_apply(component: Component, draft, user) -> None:
+    """Apply a staged draft under a row lock, raising on stale drafts."""
+    with transaction.atomic():
+        locked_component = (
+            Component.objects.select_for_update().filter(pk=component.pk).first()
+        )
+        if locked_component is None or locked_component.locked:
+            raise ValidationError(gettext("Access denied."))
+        locked_draft = (
+            ComponentSpreadsheetImportDraft.objects.select_for_update()
+            .filter(
+                pk=draft.pk,
+                state=ComponentSpreadsheetImportDraft.State.PREVIEW_READY,
+                expires_at__gt=timezone_now(),
+            )
+            .first()
+        )
+        if locked_draft is None:
+            raise Http404
+        baseline = json.loads(locked_draft.baseline_json)
+        current = {
+            str(unit.pk): [unit.target, unit.state]
+            for unit in Unit.objects.select_for_update().filter(
+                translation__component=component
+            )
+        }
+        if current != baseline:
+            raise ValidationError(
+                gettext("The component changed after preview; reload to retry.")
+            )
+        parsed = parse_upload(component, locked_draft.uploaded)
+        preview = build_preview(component, parsed)
+        _apply_preview(component, preview, user)
+        locked_draft.state = ComponentSpreadsheetImportDraft.State.CONSUMED
+        locked_draft.save(update_fields=["state"])
 
 
 @require_POST
@@ -471,7 +468,6 @@ def multilingual_cancel(request: AuthenticatedHttpRequest, token):
             raise PermissionDenied
         draft.delete()
     return redirect(component)
-
 
 
 @require_POST

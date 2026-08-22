@@ -40,7 +40,9 @@ class MultilingualSpreadsheetExportTest(ViewTestCase):
         self.assertEqual(
             parse_upload(
                 self.component,
-                SimpleUploadedFile("translations.csv", csv_content, content_type="text/csv"),
+                SimpleUploadedFile(
+                    "translations.csv", csv_content, content_type="text/csv"
+                ),
             ).headers,
             expected_headers,
         )
@@ -58,7 +60,9 @@ class MultilingualSpreadsheetExportTest(ViewTestCase):
 
         workbook = load_workbook(BytesIO(xlsx_content), data_only=False)
         self.assertEqual(len(workbook.worksheets), 1)
-        self.assertEqual(workbook.active.cell(row=2, column=len(expected_headers)).data_type, "s")
+        self.assertEqual(
+            workbook.active.cell(row=2, column=len(expected_headers)).data_type, "s"
+        )
 
     def test_preview_rejects_reordered_placeholders(self) -> None:
         from weblate.trans.multilingual_spreadsheet import (
@@ -78,13 +82,20 @@ class MultilingualSpreadsheetExportTest(ViewTestCase):
 
         parsed = parse_upload(
             self.component,
-            SimpleUploadedFile("translations.csv", export_component(self.component, "csv")),
+            SimpleUploadedFile(
+                "translations.csv", export_component(self.component, "csv")
+            ),
         )
         values = list(parsed.rows[0].values)
-        values[parsed.headers.index(self.translation.language.code)] = "{playerName} {0}"
+        values[parsed.headers.index(self.translation.language.code)] = (
+            "{playerName} {0}"
+        )
         parsed = parsed.__class__(
             parsed.headers,
-            (parsed.rows[0].__class__(parsed.rows[0].row_number, tuple(values)), *parsed.rows[1:]),
+            (
+                parsed.rows[0].__class__(parsed.rows[0].row_number, tuple(values)),
+                *parsed.rows[1:],
+            ),
         )
 
         with self.assertRaises(ValidationError):
@@ -108,7 +119,6 @@ class MultilingualSpreadsheetValidationTest(ViewTestCase):
     def _parse_csv_rows(self, rows: list[list[str]]) -> None:
         from weblate.trans.multilingual_spreadsheet import parse_upload
 
-
         content = StringIO(newline="")
         csv.writer(content, dialect="unix").writerows(rows)
         parse_upload(
@@ -130,7 +140,10 @@ class MultilingualSpreadsheetValidationTest(ViewTestCase):
                 self._parse_csv_rows([headers, *body])
 
     def test_rejects_xlsx_with_hidden_extra_worksheet(self) -> None:
-        from weblate.trans.multilingual_spreadsheet import export_component, parse_upload
+        from weblate.trans.multilingual_spreadsheet import (
+            export_component,
+            parse_upload,
+        )
 
         workbook = load_workbook(BytesIO(export_component(self.component, "xlsx")))
         worksheet = workbook.create_sheet("hidden")
@@ -151,7 +164,10 @@ class MultilingualSpreadsheetValidationTest(ViewTestCase):
         import re
         import zipfile
 
-        from weblate.trans.multilingual_spreadsheet import export_component, parse_upload
+        from weblate.trans.multilingual_spreadsheet import (
+            export_component,
+            parse_upload,
+        )
 
         source = BytesIO(export_component(self.component, "xlsx"))
         output = BytesIO()
@@ -178,7 +194,10 @@ class MultilingualSpreadsheetValidationTest(ViewTestCase):
         # raises InvalidFileException. Without the catch, that bubbles up as a 500.
         import zipfile
 
-        from weblate.trans.multilingual_spreadsheet import export_component, parse_upload
+        from weblate.trans.multilingual_spreadsheet import (
+            export_component,
+            parse_upload,
+        )
 
         source = BytesIO(export_component(self.component, "xlsx"))
         output = BytesIO()
@@ -215,21 +234,28 @@ class ComponentSpreadsheetImportDraftTest(ViewTestCase):
 
         self.assertIsNotNone(
             ComponentSpreadsheetImportDraft.get_active(
-                token=draft.token, owner=self.user, session_key=self.client.session.session_key
+                token=draft.token,
+                owner=self.user,
+                session_key=self.client.session.session_key,
             )
         )
         draft.expires_at = timezone.now()
         draft.save(update_fields=["expires_at"])
         self.assertIsNone(
             ComponentSpreadsheetImportDraft.get_active(
-                token=draft.token, owner=self.user, session_key=self.client.session.session_key
+                token=draft.token,
+                owner=self.user,
+                session_key=self.client.session.session_key,
             )
         )
 
 
 class MultilingualSpreadsheetPluralTest(ViewTestCase):
     def test_plural_component_rejects_both_exports_and_upload(self) -> None:
-        from weblate.trans.multilingual_spreadsheet import export_component, parse_upload
+        from weblate.trans.multilingual_spreadsheet import (
+            export_component,
+            parse_upload,
+        )
 
         for format_name in ("csv", "xlsx"):
             with self.subTest(format_name), self.assertRaises(ValidationError):
@@ -237,13 +263,14 @@ class MultilingualSpreadsheetPluralTest(ViewTestCase):
         with self.assertRaises(ValidationError):
             parse_upload(
                 self.component,
-                SimpleUploadedFile("translations.csv", b"key,en,cs\nhello,hello,ahoj\n"),
+                SimpleUploadedFile(
+                    "translations.csv", b"key,en,cs\nhello,hello,ahoj\n"
+                ),
             )
 
     def test_plural_component_download_returns_error_redirect(self) -> None:
-        from django.urls import reverse
-
         from django.contrib.messages import get_messages
+        from django.urls import reverse
 
         manager = self.user
         manager.is_superuser = True
@@ -262,7 +289,9 @@ class MultilingualSpreadsheetPluralTest(ViewTestCase):
                     follow=True,
                 )
                 self.assertEqual(response.status_code, 200)
-                rendered = [str(message) for message in get_messages(response.wsgi_request)]
+                rendered = [
+                    str(message) for message in get_messages(response.wsgi_request)
+                ]
                 self.assertTrue(
                     any("Plural units" in text for text in rendered),
                     rendered,
@@ -291,7 +320,6 @@ class MultilingualSpreadsheetPluralTest(ViewTestCase):
         cs_unit.translate(self.user, "Ahoj", 20)
         cs_unit.refresh_from_db()
         self.assertEqual(cs_unit.target, "Ahoj")
-
 
         export_bytes = export_component(self.component, "csv")
         rows = list(csv.reader(StringIO(export_bytes.decode("utf-8"))))
@@ -324,8 +352,8 @@ class MultilingualSpreadsheetPluralTest(ViewTestCase):
             follow=True,
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "<th scope=\"col\">en</th>")
-        self.assertContains(response, "<th scope=\"col\">cs</th>")
+        self.assertContains(response, '<th scope="col">en</th>')
+        self.assertContains(response, '<th scope="col">cs</th>')
         self.assertContains(response, "Hello nov")
         self.assertContains(response, "/upload-multilingual/cancel/")
         self.assertContains(response, "/upload-multilingual/confirm/")
@@ -340,7 +368,6 @@ class MultilingualSpreadsheetPluralTest(ViewTestCase):
         self.assertFalse(
             ComponentSpreadsheetImportDraft.objects.filter(pk=draft.pk).exists()
         )
-
 
 
 class ComponentSpreadsheetImportDraftCleanupTest(ViewTestCase):
@@ -370,5 +397,7 @@ class ComponentSpreadsheetImportDraftCleanupTest(ViewTestCase):
 
         cleanup_component_spreadsheet_import_drafts()
 
-        self.assertFalse(ComponentSpreadsheetImportDraft.objects.filter(pk=draft.pk).exists())
+        self.assertFalse(
+            ComponentSpreadsheetImportDraft.objects.filter(pk=draft.pk).exists()
+        )
         self.assertFalse(COMPONENT_SPREADSHEET_DRAFT_STORAGE.exists(name))

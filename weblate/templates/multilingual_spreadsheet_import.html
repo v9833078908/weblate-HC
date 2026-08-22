@@ -56,7 +56,9 @@
           {% csrf_token %}
           <button type="submit" class="btn btn-primary">{% translate "Confirm import" %}</button>
         </form>
-        <form action="{% url 'multilingual-cancel' token=draft.token %}" method="post" class="form-inline">
+        <form action="{% url 'multilingual-cancel' token=draft.token %}"
+              method="post"
+              class="form-inline">
           {% csrf_token %}
           <button type="submit" class="btn btn-link">{% translate "Cancel import" %}</button>
         </form>
@@ -71,7 +73,9 @@
       {% csrf_token %}
       <button type="submit" class="btn btn-primary">{% translate "Confirm import" %}</button>
     </form>
-    <form method="post" action="{% url 'multilingual-cancel' token=draft.token %}" class="form-inline">
+    <form method="post"
+          action="{% url 'multilingual-cancel' token=draft.token %}"
+          class="form-inline">
       {% csrf_token %}
       <button type="submit" class="btn btn-link">{% translate "Cancel import" %}</button>
     </form>

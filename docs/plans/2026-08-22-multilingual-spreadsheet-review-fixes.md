@@ -10,9 +10,10 @@
 
 ---
 
-### Task 1: Restore TOKEN_PATTERN in checks.py
+## Task 1: Restore TOKEN_PATTERN in checks.py
 
 **Files:**
+
 - Modify: `weblate_customization/src/weblate_customization/checks.py` (before `_tokens_dsl`, ~line 93)
 
 **Step 1: Verify the regression exists**
@@ -35,6 +36,7 @@ TOKEN_PATTERN = regex.compile(r"([a-z][a-z0-9_]*)\[[^\]]*\|")
 cp weblate_customization/src/weblate_customization/checks.py dev-docker/data/python/weblate_customization/checks.py
 ./rundev.sh test weblate_customization/tests/test_checks.py -k GameTokenCheck
 ```
+
 Expected: PASS
 
 Note: `/dev-docker/data/` is gitignored (line 35 of `.gitignore`). The `cp` above is local-only container setup; do **not** `git add` it.
@@ -49,6 +51,7 @@ git commit -m "fix(checks): restore token pattern for GameTokenCheck"
 ### Task 2: Bound XLSX dimensions and convert parse errors to ValidationError
 
 **Files:**
+
 - Modify: `weblate/trans/multilingual_spreadsheet.py` (`_parse_xlsx`, lines ~168-200)
 - Test: `weblate/trans/tests/test_multilingual_spreadsheet.py` (extend `MultilingualSpreadsheetValidationTest`)
 
@@ -66,7 +69,10 @@ def test_rejects_xlsx_with_inflated_dimension(self) -> None:
     output = BytesIO()
     workbook.save(output)
     with self.assertRaises(ValidationError):
-        parse_upload(self.component, SimpleUploadedFile("translations.xlsx", output.getvalue()))
+        parse_upload(
+            self.component, SimpleUploadedFile("translations.xlsx", output.getvalue())
+        )
+
 
 def test_rejects_malformed_xlsx_xml(self) -> None:
     # valid ZIP, broken sheet XML
@@ -82,7 +88,9 @@ def test_rejects_malformed_xlsx_xml(self) -> None:
                 payload = b"<worksheet><broken"
             zout.writestr(item, payload)
     with self.assertRaises(ValidationError):
-        parse_upload(self.component, SimpleUploadedFile("translations.xlsx", output.getvalue()))
+        parse_upload(
+            self.component, SimpleUploadedFile("translations.xlsx", output.getvalue())
+        )
 ```
 
 Run: `./rundev.sh test weblate/trans/tests/test_multilingual_spreadsheet.py -k "inflated or malformed"`
@@ -126,6 +134,7 @@ Expected: PASS (serial, per repo xdist flakiness note)
 ### Task 3: Fix migration 0102 storage drift
 
 **Files:**
+
 - Modify: `weblate/trans/migrations/0102_component_spreadsheet_import_draft.py` (uploaded field, ~line 36)
 
 **Step 1: Match the loc-kit pattern**
@@ -157,6 +166,7 @@ Expected: no new migration proposed.
 ### Task 4: Harden confirm/cancel in files.py
 
 **Files:**
+
 - Modify: `weblate/trans/views/files.py` (`multilingual_upload`, `multilingual_confirm`, `multilingual_cancel`, lines ~287-390)
 - Modify: `weblate/trans/multilingual_spreadsheet.py` (export `_identity`/`_schema` helpers or add a public `resolve_source_units(component)` helper)
 - Test: `weblate/trans/tests/test_files.py` (new `MultilingualSpreadsheetConfirmTest`)
@@ -214,6 +224,7 @@ Expected: PASS
 ### Task 5: Plural download handling
 
 **Files:**
+
 - Modify: `weblate/trans/views/files.py` (`multilingual_download`)
 - Modify: `weblate/templates/component.html` (lines ~92-99, the two multilingual-download links)
 
@@ -226,6 +237,7 @@ Expected: PASS
 ### Task 6: Preview table + cancel button in template
 
 **Files:**
+
 - Modify: `weblate/templates/multilingual_spreadsheet_import.html`
 - Modify: `weblate/trans/views/files.py` (`multilingual_upload` render context: pass a compact diff — rows where any target differs, with language/key/old/new)
 

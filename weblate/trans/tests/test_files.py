@@ -1661,7 +1661,6 @@ class ImportExportAddTest(ViewTestCase):
         self.assertContains(response, "(skipped: 0, not found: 0, updated: 1)")
 
 
-
 class MultilingualSpreadsheetDownloadTest(ViewTestCase):
     def create_component(self):
         return self.create_json()
@@ -1680,7 +1679,9 @@ class MultilingualSpreadsheetDownloadTest(ViewTestCase):
 
     def test_component_upload_renders_form(self) -> None:
         response = self.client.get(
-            reverse("multilingual-upload", kwargs={"path": self.component.get_url_path()})
+            reverse(
+                "multilingual-upload", kwargs={"path": self.component.get_url_path()}
+            )
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1718,8 +1719,6 @@ class MultilingualSpreadsheetConfirmTest(ViewTestCase):
             preview_json="{}",
             baseline_json=json.dumps(self._baseline()),
         )
-
-
 
     def test_confirm_rejects_stale_component(self) -> None:
         self.make_manager()
@@ -1767,16 +1766,12 @@ class MultilingualSpreadsheetConfirmTest(ViewTestCase):
             return_value=draft,
         ):
             response = self.client.post(
-                reverse(
-                    "multilingual-confirm", kwargs={"token": draft.token}
-                )
+                reverse("multilingual-confirm", kwargs={"token": draft.token})
             )
 
         self.assertEqual(response.status_code, 404)
         self.get_unit().refresh_from_db()
         self.assertEqual(self.get_unit().target, baseline_target)
-
-
 
     def test_confirm_rejects_locked_component(self) -> None:
         from weblate.trans.models.multilingual_spreadsheet import (
@@ -1798,6 +1793,7 @@ class MultilingualSpreadsheetConfirmTest(ViewTestCase):
         self.assertEqual(
             draft.state, ComponentSpreadsheetImportDraft.State.PREVIEW_READY
         )
+
     def test_confirm_maps_duplicate_sources_by_context(self) -> None:
         self.component = self.create_po(
             project=self.project, name="PO dup component", slug="po-dup-component"
@@ -1811,9 +1807,12 @@ class MultilingualSpreadsheetConfirmTest(ViewTestCase):
             None, "ctx-b", "Play", target="Play", author=self.user
         )
         cs = self.component.translation_set.get(language__code="cs")
-        cs.add_unit(None, "ctx-a", "Play", target="Old-A", author=self.user, skip_existing=True)
-        cs.add_unit(None, "ctx-b", "Play", target="Old-B", author=self.user, skip_existing=True)
-
+        cs.add_unit(
+            None, "ctx-a", "Play", target="Old-A", author=self.user, skip_existing=True
+        )
+        cs.add_unit(
+            None, "ctx-b", "Play", target="Old-B", author=self.user, skip_existing=True
+        )
 
         draft = self._staged_draft()
         import csv
@@ -1840,7 +1839,6 @@ class MultilingualSpreadsheetConfirmTest(ViewTestCase):
                 row[cs_idx] = "New-B"
             edited.append(row)
 
-
         buf = StringIO()
         csv.writer(buf).writerows([headers, *edited])
         new_content = buf.getvalue().encode("utf-8")
@@ -1864,9 +1862,7 @@ class MultilingualSpreadsheetConfirmTest(ViewTestCase):
         )
         self.assertEqual(response.status_code, 200)
         cs.refresh_from_db()
-        targets = {
-            unit.context: unit.target for unit in cs.unit_set.all()
-        }
+        targets = {unit.context: unit.target for unit in cs.unit_set.all()}
         self.assertEqual(targets.get("ctx-a"), "New-A")
         self.assertEqual(targets.get("ctx-b"), "New-B")
 
@@ -1882,6 +1878,3 @@ class MultilingualSpreadsheetConfirmTest(ViewTestCase):
             reverse("multilingual-confirm", kwargs={"token": draft.token})
         )
         self.assertEqual(confirm.status_code, 404)
-
-
-
