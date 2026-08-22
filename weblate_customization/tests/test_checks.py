@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from weblate_customization.checks import (
     CyrillicLeakCheck,
+    GameLengthCheck,
     GameLineBreakCheck,
     GameMarkupCheck,
     GameNumberCheck,
@@ -56,25 +57,21 @@ class GameMarkupCheckTest(CheckTestCase):
         # tag, or every string with a stray bracket becomes a failure.
         self.assertFalse(self.check.check_single("a < b and c > d", "x < y", None))
 
-
     def test_placeholder_order_and_printf_tokens_are_preserved(self) -> None:
         source = "<b>{0} {playerName} %s %KEY%</b>"
 
         self.assertFalse(
-            self.check.check_single(
-                source, "<b>{0} {playerName} %s %KEY%</b>", None
-            )
+            self.check.check_single(source, "<b>{0} {playerName} %s %KEY%</b>", None)
         )
         self.assertTrue(
-            self.check.check_single(
-                source, "<b>{playerName} {0} %s %KEY%</b>", None
-            )
+            self.check.check_single(source, "<b>{playerName} {0} %s %KEY%</b>", None)
         )
         self.assertTrue(
             self.check.check_single(source, "<b>{0} {playerName} %KEY%</b>", None)
         )
         self.assertTrue(self.check.check_single(source, "<b>Value</b>", None))
         self.assertFalse(self.check.check_single(source, "", None))
+
 
 class GameLineBreakCheckTest(CheckTestCase):
     check = GameLineBreakCheck()
@@ -324,3 +321,59 @@ class GameTokenCheckTest(CheckTestCase):
 
     def test_an_empty_target_passes(self) -> None:
         self.assertFalse(self.check.check_single("Buy item_template[|{0}]", "", None))
+
+
+class GameLengthCheckTest(CheckTestCase):
+    check = GameLengthCheck()
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.test_good_matching = ("Chest space", "Espacio de cofre", "game-length")
+        # A short label blown well past the minimum and the ratio.
+        self.test_failure_1 = (
+            "Claim reward",
+            "Reclamar recompensa garantizada ahora mismo",
+            "game-length",
+        )
+        # A long sentence growing past the global 1.35x ceiling.
+        self.test_failure_2 = (
+            "Every hero starts with a few basic items and equipment to begin",
+            (
+                "Jeder Held beginnt mit ein paar grundlegenden Gegenständen und "
+                "Ausrüstung sowie weiteren Dingen, die den Start erleichtern"
+            ),
+            "game-length",
+        )
+        # A mid-length source (11..30) doubling past its 2.0x tier.
+        self.test_failure_3 = (
+            "Storage capacity",
+            "Permanente Lagerkapazität des gesamten Lagers",
+            "game-length",
+        )
+
+    def test_moderate_expansion_passes(self) -> None:
+        # 11 -> 20 visible characters: a normal Romance-language growth, under 2x.
+        self.assertFalse(
+            self.check.check_single("Select item", "Seleccionar elemento", None)
+        )
+
+    def test_a_legitimate_short_label_passes(self) -> None:
+        # 7 -> 25 is 3.6x, but the shortest tier only fires past 28 target
+        # characters: a one-word UI label may grow that far legitimately.
+        self.assertFalse(
+            self.check.check_single("Storage", "Almacenamiento permanente", None)
+        )
+
+    def test_markup_and_placeholders_are_not_measured(self) -> None:
+        # Only the visible text counts; the tags and placeholders around it do
+        # not, so a long tag cannot push a short string over the threshold.
+        self.assertFalse(
+            self.check.check_single(
+                "<color=#E3BA59>Superspace</color> {0}",
+                "<color=#E3BA59>Superespacio</color> {0}",
+                None,
+            )
+        )
+
+    def test_an_empty_target_passes(self) -> None:
+        self.assertFalse(self.check.check_single("Claim reward", "", None))

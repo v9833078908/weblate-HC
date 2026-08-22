@@ -18,8 +18,8 @@ from collections import Counter
 import regex
 from django.utils.translation import gettext_lazy
 
-from weblate.trans.protected_tokens import MARKUP, markup_tokens, placeholder_sequence
 from weblate.checks.base import TargetCheck
+from weblate.trans.protected_tokens import MARKUP, markup_tokens, placeholder_sequence
 
 # A number in the source is a fact the player acts on: damage, radius, seconds.
 # Losing or altering it is a defect in every language. A number the target adds
@@ -91,11 +91,11 @@ def separator_is_tight(source: str) -> bool:
     return "$" in source and not SEPARATOR_LOOSE_IN_SOURCE.search(source)
 
 
-
 # Mission DSL substitution identifier before a bracketed, translated body:
 # item_type[|{0}], skirmish_league_id[gen|в {0}|в любой лиге]. A bracket
 # without a `|` is ordinary prose, not a substitution.
 TOKEN_PATTERN = regex.compile(r"([a-z][a-z0-9_]*)\[[^\]]*\|")
+
 
 def _tokens_dsl(text: str) -> Counter[str]:
     """Count engine substitution identifiers, ignoring their translated bodies."""
@@ -117,10 +117,9 @@ class GameMarkupCheck(TargetCheck):
     def check_single(self, source: str, target: str, unit) -> bool:
         if not target:
             return False
-        return (
-            Counter(markup_tokens(source)) != Counter(markup_tokens(target))
-            or placeholder_sequence(source) != placeholder_sequence(target)
-        )
+        return Counter(markup_tokens(source)) != Counter(
+            markup_tokens(target)
+        ) or placeholder_sequence(source) != placeholder_sequence(target)
 
 
 class GameLineBreakCheck(TargetCheck):
@@ -232,3 +231,48 @@ class GameTokenCheck(TargetCheck):
         if not source_tokens or not target:
             return False
         return bool(source_tokens - _tokens_dsl(target))
+
+
+def _visible_length(text: str) -> int:
+    """Length of what the player reads: markup tags and engine placeholders removed."""
+    return len(MARKUP.sub("", text))
+
+
+# Expansion is not linear: a one-word button legitimately doubles where a full
+# sentence grows by a third. Tiers follow the loc-industry guidance; the floor
+# keeps a tiny source ("OK", "+{0}") from firing on a reasonable short target.
+# This is a character proxy for a rendered width: it catches gross overflow,
+# not a pixel-perfect fit. For that, use max-size with the game font.
+_LENGTH_TIERS = (
+    # (max source length, ratio, minimum target length)
+    (10, 3.0, 28),
+    (30, 2.0, 40),
+    (80, 1.5, 90),
+)
+_LENGTH_MAX_RATIO = 1.35
+
+
+class GameLengthCheck(TargetCheck):
+    """Translation is far longer than the source and likely overflows its slot."""
+
+    check_id = "game-length"
+    name = gettext_lazy("Game length")
+    description = gettext_lazy(
+        "The translation is much longer than the source and likely overflows "
+        "its UI slot. Ignore with the ignore-game-length flag when the space "
+        "is known to fit."
+    )
+    # Always on: an overflowing label clips in the running game.
+    default_disabled = False
+
+    def check_single(self, source: str, target: str, unit) -> bool:
+        if not source or not target:
+            return False
+        source_len = _visible_length(source)
+        target_len = _visible_length(target)
+        if source_len == 0 or target_len == 0:
+            return False
+        for max_source, ratio, minimum in _LENGTH_TIERS:
+            if source_len <= max_source:
+                return target_len > minimum and target_len > source_len * ratio
+        return target_len > source_len * _LENGTH_MAX_RATIO
