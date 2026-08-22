@@ -4,6 +4,10 @@
   <h1>{% blocktranslate with component=component.name %}Upload multilingual spreadsheet for {{ component }}{% endblocktranslate %}</h1>
   {% if draft %}
     <p>{% translate "Spreadsheet validated. Confirmation will apply its changes." %}</p>
+    <form method="post" action="{% url 'multilingual-confirm' token=draft.token %}">
+      {% csrf_token %}
+      <button type="submit">{% translate "Confirm import" %}</button>
+    </form>
   {% else %}
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}

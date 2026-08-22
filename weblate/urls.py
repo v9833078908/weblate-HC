@@ -190,6 +190,11 @@ real_patterns = [
         name="multilingual-upload",
     ),
     path(
+        "upload-multilingual/confirm/<uuid:token>/",
+        weblate.trans.views.files.multilingual_confirm,
+        name="multilingual-confirm",
+    ),
+    path(
         "upload/<object_path:path>/",
         weblate.trans.views.files.upload,
         name="upload",

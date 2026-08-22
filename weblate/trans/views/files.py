@@ -8,7 +8,7 @@ import os
 from typing import TYPE_CHECKING
 
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import DatabaseError
+from django.db import DatabaseError, transaction
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext
@@ -27,6 +27,7 @@ from weblate.trans.models import (
     ComponentList,
     Project,
     Translation,
+    Unit,
 )
 from weblate.trans.models.multilingual_spreadsheet import ComponentSpreadsheetImportDraft
 from weblate.trans.multilingual_spreadsheet import (
@@ -34,6 +35,7 @@ from weblate.trans.multilingual_spreadsheet import (
     export_component,
     parse_upload,
 )
+from weblate.utils.state import STATE_EMPTY, STATE_TRANSLATED
 from weblate.utils import messages
 from weblate.utils.errors import report_error
 from weblate.utils.files import get_upload_message
@@ -326,6 +328,46 @@ def multilingual_upload(request: AuthenticatedHttpRequest, path):
                     {"component": component, "draft": draft, "preview": preview},
                 )
     return render(request, "multilingual_spreadsheet_import.html", {"component": component})
+
+
+@require_POST
+def multilingual_confirm(request: AuthenticatedHttpRequest, token):
+    draft = ComponentSpreadsheetImportDraft.get_active(
+        token=token, owner=request.user, session_key=request.session.session_key
+    )
+    if draft is None:
+        raise Http404
+    component = draft.component
+    if not request.user.has_perm("upload.perform", component):
+        raise PermissionDenied
+    with transaction.atomic():
+        parsed = parse_upload(component, draft.uploaded)
+        build_preview(component, parsed)
+        source_units = component.source_translation.unit_set.select_for_update()
+        key_field = "context" if component.has_template() else "source"
+        source_by_key = {getattr(unit, key_field): unit for unit in source_units}
+        for row in parsed.rows:
+            source = source_by_key[row.values[0]]
+            for language, target in zip(parsed.headers[1:], row.values[1:], strict=True):
+                if language in {"context", component.source_language.code}:
+                    continue
+                unit = Unit.objects.select_for_update().get(
+                    translation__component=component,
+                    translation__language__code=language,
+                    source_unit=source,
+                )
+                if unit.target != target:
+                    unit.translate(
+                        request.user,
+                        target,
+                        STATE_TRANSLATED if target else STATE_EMPTY,
+                        propagate=False,
+                        select_for_update=False,
+                    )
+        draft.state = ComponentSpreadsheetImportDraft.State.CONSUMED
+        draft.save(update_fields=["state"])
+    messages.success(request, gettext("Multilingual spreadsheet imported."))
+    return redirect(component)
 
 @require_POST
 def upload(request: AuthenticatedHttpRequest, path):
