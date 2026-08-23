@@ -1,502 +1,502 @@
 {
- "model": "openai/gpt-5.4-mini",
- "unparsed": 0,
- "labels": {
-  "24130": {
-   "severity": "major",
-   "reason": "The sentence is understandable, but '[PARAM1] to receive' is mistranslated as 'pay [PARAM1]' instead of 'for [PARAM1]'/the cost, which distorts the purchase condition."
-  },
-  "24131": {
-   "severity": "none",
-   "reason": "Faithful translation: the agitation campaign motivates workers, and for the next {[PARAM1]} turns you receive {[PARAM0]}% income bonus; glossary terms match."
-  },
-  "24132": {
-   "severity": "none",
-   "reason": "Faithful translation: it says extra funding is requested to finish all ongoing research early, and shows active research and turns saved correctly."
-  },
-  "24133": {
-   "severity": "none",
-   "reason": "Correct glossary-conformant rendering of 'Агитационная кампания' as '动员活动'."
-  },
-  "24134": {
-   "severity": "none",
-   "reason": "Faithful translation: attack enemy artillery and air force; they cannot retreat and will be destroyed immediately."
-  },
-  "24135": {
-   "severity": "none",
-   "reason": "Correct: \"省份{[PARAM0]}是最佳攻击目标\" faithfully renders \"Province {[PARAM0]} is the best target for attack.\""
-  },
-  "24136": {
-   "severity": "none",
-   "reason": "Correct meaning: \"支付{[PARAM0]}在本任务结束前获得额外科学点数？\" matches the offer to pay {[PARAM0]} to get an extra science point before mission end."
-  },
-  "24137": {
-   "severity": "none",
-   "reason": "Correct: \"达到{[PARAM0]}级可解锁额外增援槽位\" accurately means reaching level {[PARAM0]} unlocks additional reinforcement slots."
-  },
-  "24138": {
-   "severity": "none",
-   "reason": "Correct: \"达到{[PARAM0]}级可解锁外交行动\" faithfully conveys reaching level {[PARAM0]} to unlock diplomatic actions."
-  },
-  "24139": {
-   "severity": "none",
-   "reason": "Correct: the enemy was hit by mines in province {[PARAM0]} and enemy divisions destroyed are {[PARAM1]}; the Chinese preserves both facts."
-  },
-  "24140": {
-   "severity": "none",
-   "reason": "‘The enemy fell into the trap!’ matches the source meaning."
-  },
-  "24141": {
-   "severity": "none",
-   "reason": "Glossary term matches: ‘Новобранцы’ = ‘新兵’ ('recruits')."
-  },
-  "24142": {
-   "severity": "none",
-   "reason": "Glossary term matches: ‘Бывалые’ = ‘熟练兵’ ('seasoned soldiers')."
-  },
-  "24143": {
-   "severity": "none",
-   "reason": "Glossary term matches: ‘Ветераны’ = ‘老兵’ ('veterans')."
-  },
-  "24144": {
-   "severity": "none",
-   "reason": "‘MAX’ is a faithful rendering of ‘МАКС’ in an all-caps UI label."
-  },
-  "24145": {
-   "severity": "none",
-   "reason": "Faithful: “every survived turn and every survived battle” correctly renders the source and uses the glossary term 回合."
-  },
-  "24146": {
-   "severity": "none",
-   "reason": "Correct translation: “attack and defense bonus” matches the source and the placeholder/percent format is preserved."
-  },
-  "24147": {
-   "severity": "none",
-   "reason": "Faithful: “survived turns: {[PARAM0]}” correctly conveys the source and matches the glossary term 回合."
-  },
-  "24148": {
-   "severity": "none",
-   "reason": "Correct: “survived battles: {[PARAM0]}” preserves the meaning and placeholder exactly."
-  },
-  "24149": {
-   "severity": "none",
-   "reason": "Correct glossary match: 征战历程 faithfully renders Боевой путь."
-  },
-  "24150": {
-   "severity": "none",
-   "reason": "Faithful rendering: \"Battle in province {0}\" matches the source and keeps the placeholder correct."
-  },
-  "24151": {
-   "severity": "none",
-   "reason": "Correct translation: \"Victory\"."
-  },
-  "24152": {
-   "severity": "none",
-   "reason": "Correct translation: \"Defeat\"."
-  },
-  "24153": {
-   "severity": "none",
-   "reason": "Correct translation: \"Damage\"."
-  },
-  "24154": {
-   "severity": "none",
-   "reason": "Faithful imperative: \"Get everything at once now!\" matches the source."
-  },
-  "24155": {
-   "severity": "none",
-   "reason": "‘News about convoys’ is faithfully rendered as 商队新闻."
-  },
-  "24156": {
-   "severity": "none",
-   "reason": "The message matches: the convoy reached {0} country, goods worth {1} were loaded, and it departed home."
-  },
-  "24157": {
-   "severity": "none",
-   "reason": "The meaning is preserved: the convoy returned from {0} country with goods worth {1}, followed by {2}."
-  },
-  "24158": {
-   "severity": "none",
-   "reason": "The convoy’s warships returned to province {0}; the wording is faithful and the glossary term is respected."
-  },
-  "24159": {
-   "severity": "none",
-   "reason": "The target correctly says this is the {0}th turn of the convoy’s return from {1} country and that everything is going smoothly."
-  },
-  "24160": {
-   "severity": "major",
-   "reason": "Source says the convoy is on the {0}th turn of returning home and successfully repelled an attack; Chinese says “on the {0}th day,” changing the time unit and conflicting with the glossary term for ход, though the rest is understandable."
-  },
-  "24161": {
-   "severity": "major",
-   "reason": "Source says the convoy was attacked and lost part of its goods, {2}%; Chinese says “lost {2}% of the cargo,” which is close but changes ‘part of the goods’ to the whole cargo and misses the exact phrasing."
-  },
-  "24162": {
-   "severity": "none",
-   "reason": "Correctly means ‘The convoy’s losses were: {0}.’"
-  },
-  "24163": {
-   "severity": "none",
-   "reason": "Correctly means there are no available provinces to place the returning convoy and compensation is {0} resources."
-  },
-  "24164": {
-   "severity": "none",
-   "reason": "Correctly means ‘Results of the victorious battle in province {0}’ with the following lines preserved."
-  },
-  "24165": {
-   "severity": "none",
-   "reason": "Correct: \"在省份{0}战斗失败的结果\" faithfully means the results of a lost battle in province {0}."
-  },
-  "24166": {
-   "severity": "none",
-   "reason": "Correct: the troops won a great victory in province {0} over the army of country {1}, with placeholders preserved."
-  },
-  "24167": {
-   "severity": "none",
-   "reason": "Correct: \"我们的军队在省份{0}被{1}的军队击溃\" accurately says our troops were routed by country {1}'s army in province {0}."
-  },
-  "24168": {
-   "severity": "none",
-   "reason": "Correct: the Marines sent to province {0} were annihilated, matching the source."
-  },
-  "24169": {
-   "severity": "none",
-   "reason": "Correct: the Marines successfully landed in province {0}; meaning and placeholders are preserved."
-  },
-  "24170": {
-   "severity": "none",
-   "reason": "Correct: \"国家{0}派往省份{1}的海军陆战队已被歼灭\" faithfully means the marines sent to province {1} were destroyed."
-  },
-  "24171": {
-   "severity": "none",
-   "reason": "Correct: \"已在省份{1}登陆\" accurately renders that the marines landed in province {1}."
-  },
-  "24172": {
-   "severity": "none",
-   "reason": "Correct: \"敌方省份{0}炮击结果\" and \"造成伤害\" preserve the shelling results and damage dealt."
-  },
-  "24173": {
-   "severity": "none",
-   "reason": "Correct: \"国家{1}炮击了省份{0}\" and \"受到伤害\" accurately mean country {1} shelled province {0} and damage was received."
-  },
-  "24174": {
-   "severity": "none",
-   "reason": "Correct: \"我军已占领省份{0}\" faithfully states that our troops captured province {0}."
-  },
-  "24175": {
-   "severity": "none",
-   "reason": "Correct translation: “our province {0} was occupied by the troops of country {1}” with the placeholder {2} preserved."
-  },
-  "24176": {
-   "severity": "none",
-   "reason": "Correct: “enemy air force {0} attacked our province {1} from province {2}”; damage lines and placeholders match the source."
-  },
-  "24177": {
-   "severity": "major",
-   "reason": "The source says “Results of an air raid on the enemy province {0},” but the Chinese reads “enemy province {0} air raid results,” which distorts the relation; the casualty lines are otherwise correct."
-  },
-  "24178": {
-   "severity": "none",
-   "reason": "Correct: “air battle results over province {0}”; both loss lines are faithfully rendered."
-  },
-  "24179": {
-   "severity": "minor",
-   "reason": "Faithful overall, but “成功突袭” back-translates as “successful raid,” which is a stylistic mismatch for “successful assault on fortifications”; meaning remains clear."
-  },
-  "24180": {
-   "severity": "major",
-   "reason": "Back-translation is roughly “province {0} fortifications failed defense result,” which distorts the source “results of a failed defense of fortifications in province {0}” but remains understandable."
-  },
-  "24181": {
-   "severity": "major",
-   "reason": "Back-translation is roughly “province {0} fortifications failed attack result,” which distorts the source “results of a failed assault on fortifications in province {0}” but the intended battle outcome is still recoverable."
-  },
-  "24182": {
-   "severity": "major",
-   "reason": "Back-translation is roughly “province {0} fortifications successful defense result,” which reverses the source’s “successful defense of fortifications in province {0}” into an awkward but still understandable phrase."
-  },
-  "24183": {
-   "severity": "none",
-   "reason": "Meaning is preserved: “province {0} naval battle victory result,” with casualties/losses for our troops and the enemy correctly rendered."
-  },
-  "24184": {
-   "severity": "none",
-   "reason": "Meaning is preserved: “province {0} naval battle defeat result,” with our losses and enemy losses correctly rendered."
-  },
-  "24185": {
-   "severity": "none",
-   "reason": "“海上胜利” correctly means “victory at sea.”"
-  },
-  "24186": {
-   "severity": "none",
-   "reason": "“海上失败” correctly means “defeat at sea.”"
-  },
-  "24187": {
-   "severity": "none",
-   "reason": "“防御工事进攻失败” means “failed attack on fortifications,” matching the source and glossary terms."
-  },
-  "24188": {
-   "severity": "none",
-   "reason": "“敌军防御工事进攻失败” means “enemy’s failed attack on fortifications,” correctly adding the enemy agent."
-  },
-  "24189": {
-   "severity": "none",
-   "reason": "“防御工事进攻成功” means “successful attack on fortifications,” matching the source and glossary terms."
-  },
-  "24190": {
-   "severity": "minor",
-   "reason": "Faithful overall: \"defense of fortifications failed\"; the wording is slightly unnatural and shifts emphasis, but meaning is clear."
-  },
-  "24191": {
-   "severity": "none",
-   "reason": "Correct: \"consequences of the air raid\" matches the Russian source."
-  },
-  "24192": {
-   "severity": "none",
-   "reason": "Correct: \"we carried out an air raid\" preserves the meaning."
-  },
-  "24193": {
-   "severity": "none",
-   "reason": "Correct: \"results of the air battle\" matches the source."
-  },
-  "24194": {
-   "severity": "none",
-   "reason": "Correct: all placeholders and meanings match; the damage log is rendered faithfully."
-  },
-  "24195": {
-   "severity": "none",
-   "reason": "Faithful: \"Passive skill 'troops do not retreat' activated\" matches the source."
-  },
-  "24196": {
-   "severity": "none",
-   "reason": "Faithful: \"Passive skill 'fleet does not retreat' activated\" matches the source."
-  },
-  "24197": {
-   "severity": "none",
-   "reason": "Faithful: \"Defenders of fortifications will never retreat!\" preserves the meaning and glossary term."
-  },
-  "24198": {
-   "severity": "none",
-   "reason": "Faithful: \"No one survived\" matches \"Нет выживших\"."
-  },
-  "24199": {
-   "severity": "none",
-   "reason": "Faithful: \"Survivors: {0}\" matches the source and keeps the placeholder correct."
-  },
-  "24200": {
-   "severity": "none",
-   "reason": "Correct: '幸存国家 {0}: {1}' faithfully renders 'Surviving countries {0}: {1}'."
-  },
-  "24201": {
-   "severity": "none",
-   "reason": "Correct: '您的损失: {0}' means 'Your losses: {0}'."
-  },
-  "24202": {
-   "severity": "none",
-   "reason": "Correct: '国家 {0} 的损失: {1}' means 'Country {0}'s losses: {1}'."
-  },
-  "24203": {
-   "severity": "none",
-   "reason": "Correct: '幸存者影响力: {0}' matches 'Influence of survivors: {0}'."
-  },
-  "24204": {
-   "severity": "none",
-   "reason": "Correct: '敌方幸存者影响力: {0}' means 'Enemy survivors' influence: {0}'."
-  },
-  "24205": {
-   "severity": "none",
-   "reason": "Correct: '状态变更！' faithfully renders 'Status changed!'."
-  },
-  "24206": {
-   "severity": "none",
-   "reason": "Correct: '您的国家状态已变更: {0} 至 {1}！' preserves the status change and both placeholders."
-  },
-  "24207": {
-   "severity": "none",
-   "reason": "Correct: the target faithfully renders '{0} countries {1} status changed from {2} to {3}!' with all roles intact."
-  },
-  "24208": {
-   "severity": "none",
-   "reason": "Correct: '国家 {0} 的状态已变更: {1} 状态 {2}！' matches the source meaning and placeholders."
-  },
-  "24209": {
-   "severity": "none",
-   "reason": "Correct: '已提升' means 'promoted/raised,' matching 'повышен'."
-  },
-  "24210": {
-   "severity": "none",
-   "reason": "Correct: \"понижен\" is rendered as \"降级\" ('demoted/downgraded')."
-  },
-  "24211": {
-   "severity": "none",
-   "reason": "Correct: \"повышен\" is rendered as \"晋升\" ('promoted')."
-  },
-  "24212": {
-   "severity": "none",
-   "reason": "Correct: \"понижен\" is rendered as \"降级\" ('demoted/downgraded')."
-  },
-  "24213": {
-   "severity": "none",
-   "reason": "Correct: \"потерян\" is rendered as \"失去\" ('lost')."
-  },
-  "24214": {
-   "severity": "none",
-   "reason": "Correct: \"получен\" is rendered as \"获得\" ('obtained/received')."
-  },
-  "24215": {
-   "severity": "none",
-   "reason": "‘盟国’ correctly renders ‘allied’ as ‘allied countries’; meaning is preserved."
-  },
-  "24216": {
-   "severity": "none",
-   "reason": "‘敌国’ correctly means ‘enemy countries’ and matches the source."
-  },
-  "24217": {
-   "severity": "none",
-   "reason": "‘中立国’ correctly means ‘neutral countries’ and matches the source."
-  },
-  "24218": {
-   "severity": "none",
-   "reason": "‘部队新等级！’ faithfully means ‘New troop level!’ and matches the glossary term ‘等级’."
-  },
-  "24219": {
-   "severity": "none",
-   "reason": "All placeholders and meanings are correct: congratulations, division {0} reached new level {1}, served for {3} turns, had {2} battles, and is in province {4}."
-  },
-  "24220": {
-   "severity": "none",
-   "reason": "‘精锐部队的损失！’ faithfully conveys ‘Losses among the elite!’"
-  },
-  "24221": {
-   "severity": "none",
-   "reason": "The target correctly says ‘A division of level {1} {0} was lost in battle; battles fought: {2},’ matching the source and glossary."
-  },
-  "24222": {
-   "severity": "none",
-   "reason": "‘沙特阿拉伯’ is the correct Chinese name for Saudi Arabia."
-  },
-  "24223": {
-   "severity": "none",
-   "reason": "‘利比里亚’ is the correct Chinese name for Liberia."
-  },
-  "24224": {
-   "severity": "none",
-   "reason": "‘委内瑞拉’ is the correct Chinese name for Venezuela."
-  },
-  "24225": {
-   "severity": "none",
-   "reason": "Correct translation: “Iceland” matches the glossary and source."
-  },
-  "24226": {
-   "severity": "none",
-   "reason": "Correct translation: “Iran” matches the source and glossary."
-  },
-  "24227": {
-   "severity": "none",
-   "reason": "Correct translation: “Argentina” matches the source and glossary."
-  },
-  "24228": {
-   "severity": "none",
-   "reason": "Faithful translation: the country placeholder is preserved, and the meaning about arriving trade representatives, a proposed trade agreement, and sending trade convoys after signing is correctly conveyed."
-  },
-  "24229": {
-   "severity": "none",
-   "reason": "Correct translation of “Trade agreement” as “贸易协定,” matching the glossary."
-  },
-  "24230": {
-   "severity": "none",
-   "reason": "Correct: ‘to sign a trade agreement, accumulate more diplomatic points’ and ‘the ambassadors will return soon (in {[PARAM0]} turns)’ are faithfully rendered; glossary term 回合 matches."
-  },
-  "24231": {
-   "severity": "none",
-   "reason": "Correct: ‘You failed to accumulate enough diplomatic points to conclude a trade agreement’ matches the source."
-  },
-  "24232": {
-   "severity": "none",
-   "reason": "Correct: ‘Согласиться’ is rendered as ‘同意’ (‘Agree’)."
-  },
-  "24233": {
-   "severity": "none",
-   "reason": "Correct: ‘Отказаться’ is rendered as ‘拒绝’ (‘Decline/Refuse’)."
-  },
-  "24234": {
-   "severity": "none",
-   "reason": "Correct: ‘Want to send a convoy to country {[PARAM0]}? Estimated duration = {[PARAM1]} turns, estimated profit = {[PARAM2]} resources’ is faithfully rendered; glossary terms 商队 and 回合 match."
-  },
-  "24235": {
-   "severity": "none",
-   "reason": "Correct: “要为商船提供护航吗？未护航的船只可能遭受攻击！” faithfully means the caravans/merchant ships can be attacked if not escorted."
-  },
-  "24236": {
-   "severity": "major",
-   "reason": "“没有可用的省份选择护航！” means “No available provinces to choose escort,” but the Russian says there are no provinces available for selecting an escort; the added “省份选择” is awkward and distorts the meaning of the unavailable selection."
-  },
-  "24237": {
-   "severity": "none",
-   "reason": "Correct: the header means “Send the convoy,” and the glossary term “конвой → 商队” is used properly."
-  },
-  "24238": {
-   "severity": "none",
-   "reason": "Correct: “派遣” accurately renders “Отправить” in this UI context."
-  },
-  "24239": {
-   "severity": "none",
-   "reason": "Correct: “不派遣” faithfully renders “Не отправлять.”"
-  },
-  "24240": {
-   "severity": "major",
-   "reason": "The target omits the glossary term and means 'send a caravan' rather than 'send a convoy'; the rest 'accelerate its return by {[PARAM0]} turns' is understandable."
-  },
-  "24241": {
-   "severity": "none",
-   "reason": "'购买车队加速失败' correctly means 'failed to buy caravan/convoy boost'."
-  },
-  "24242": {
-   "severity": "none",
-   "reason": "'选择护卫' correctly means 'choose the escort/guard'."
-  },
-  "24243": {
-   "severity": "none",
-   "reason": "'地雷' correctly renders the division name 'Mines'."
-  },
-  "24244": {
-   "severity": "none",
-   "reason": "The Chinese correctly says mines are placed in controlled provinces to damage advancing enemy ground units and infantry."
-  },
-  "24245": {
-   "severity": "none",
-   "reason": "Faithful: “you have received a veteran division”; veterans deal more damage in attack and take less in defense; double-click the division icon for details."
-  },
-  "24246": {
-   "severity": "major",
-   "reason": "The noun is garbled: “累计经验与升级所需经验” back-translates as “accumulated experience and experience needed to upgrade,” dropping the intended “level” reference and making the phrase awkward/incomplete."
-  },
-  "24247": {
-   "severity": "none",
-   "reason": "Correct: “view the division’s combat path/campaign” matches “Посмотрите боевой путь дивизии.”"
-  },
-  "24248": {
-   "severity": "none",
-   "reason": "Accurate: “you have unlocked a new weapon type — mines” matches the source and glossary."
-  },
-  "24249": {
-   "severity": "none",
-   "reason": "Correct meaning: mines can be bought like any other reinforcement in the game; please do it now."
-  },
-  "24250": {
-   "severity": "none",
-   "reason": "Faithful: '地雷对攻击该省份的地面部队和空降部队造成伤害…所有雷区均被视为已清除' correctly matches the source."
-  },
-  "24251": {
-   "severity": "none",
-   "reason": "Faithful: '此图标表示该省份已布设地雷' correctly renders that mines are installed in the province."
-  },
-  "24252": {
-   "severity": "none",
-   "reason": "Faithful: '超过12个雷区…地雷越多，造成的伤害就越大' preserves the meaning and gameplay instruction."
-  },
-  "24253": {
-   "severity": "none",
-   "reason": "Faithful: '是否想立即花费{0}解锁修改版…模式？' keeps the same question, amount, and placeholder name."
+  "model": "openai/gpt-5.4-mini",
+  "unparsed": 0,
+  "labels": {
+    "24130": {
+      "severity": "major",
+      "reason": "The sentence is understandable, but '[PARAM1] to receive' is mistranslated as 'pay [PARAM1]' instead of 'for [PARAM1]'/the cost, which distorts the purchase condition."
+    },
+    "24131": {
+      "severity": "none",
+      "reason": "Faithful translation: the agitation campaign motivates workers, and for the next {[PARAM1]} turns you receive {[PARAM0]}% income bonus; glossary terms match."
+    },
+    "24132": {
+      "severity": "none",
+      "reason": "Faithful translation: it says extra funding is requested to finish all ongoing research early, and shows active research and turns saved correctly."
+    },
+    "24133": {
+      "severity": "none",
+      "reason": "Correct glossary-conformant rendering of 'Агитационная кампания' as '动员活动'."
+    },
+    "24134": {
+      "severity": "none",
+      "reason": "Faithful translation: attack enemy artillery and air force; they cannot retreat and will be destroyed immediately."
+    },
+    "24135": {
+      "severity": "none",
+      "reason": "Correct: \"省份{[PARAM0]}是最佳攻击目标\" faithfully renders \"Province {[PARAM0]} is the best target for attack.\""
+    },
+    "24136": {
+      "severity": "none",
+      "reason": "Correct meaning: \"支付{[PARAM0]}在本任务结束前获得额外科学点数？\" matches the offer to pay {[PARAM0]} to get an extra science point before mission end."
+    },
+    "24137": {
+      "severity": "none",
+      "reason": "Correct: \"达到{[PARAM0]}级可解锁额外增援槽位\" accurately means reaching level {[PARAM0]} unlocks additional reinforcement slots."
+    },
+    "24138": {
+      "severity": "none",
+      "reason": "Correct: \"达到{[PARAM0]}级可解锁外交行动\" faithfully conveys reaching level {[PARAM0]} to unlock diplomatic actions."
+    },
+    "24139": {
+      "severity": "none",
+      "reason": "Correct: the enemy was hit by mines in province {[PARAM0]} and enemy divisions destroyed are {[PARAM1]}; the Chinese preserves both facts."
+    },
+    "24140": {
+      "severity": "none",
+      "reason": "‘The enemy fell into the trap!’ matches the source meaning."
+    },
+    "24141": {
+      "severity": "none",
+      "reason": "Glossary term matches: ‘Новобранцы’ = ‘新兵’ ('recruits')."
+    },
+    "24142": {
+      "severity": "none",
+      "reason": "Glossary term matches: ‘Бывалые’ = ‘熟练兵’ ('seasoned soldiers')."
+    },
+    "24143": {
+      "severity": "none",
+      "reason": "Glossary term matches: ‘Ветераны’ = ‘老兵’ ('veterans')."
+    },
+    "24144": {
+      "severity": "none",
+      "reason": "‘MAX’ is a faithful rendering of ‘МАКС’ in an all-caps UI label."
+    },
+    "24145": {
+      "severity": "none",
+      "reason": "Faithful: “every survived turn and every survived battle” correctly renders the source and uses the glossary term 回合."
+    },
+    "24146": {
+      "severity": "none",
+      "reason": "Correct translation: “attack and defense bonus” matches the source and the placeholder/percent format is preserved."
+    },
+    "24147": {
+      "severity": "none",
+      "reason": "Faithful: “survived turns: {[PARAM0]}” correctly conveys the source and matches the glossary term 回合."
+    },
+    "24148": {
+      "severity": "none",
+      "reason": "Correct: “survived battles: {[PARAM0]}” preserves the meaning and placeholder exactly."
+    },
+    "24149": {
+      "severity": "none",
+      "reason": "Correct glossary match: 征战历程 faithfully renders Боевой путь."
+    },
+    "24150": {
+      "severity": "none",
+      "reason": "Faithful rendering: \"Battle in province {0}\" matches the source and keeps the placeholder correct."
+    },
+    "24151": {
+      "severity": "none",
+      "reason": "Correct translation: \"Victory\"."
+    },
+    "24152": {
+      "severity": "none",
+      "reason": "Correct translation: \"Defeat\"."
+    },
+    "24153": {
+      "severity": "none",
+      "reason": "Correct translation: \"Damage\"."
+    },
+    "24154": {
+      "severity": "none",
+      "reason": "Faithful imperative: \"Get everything at once now!\" matches the source."
+    },
+    "24155": {
+      "severity": "none",
+      "reason": "‘News about convoys’ is faithfully rendered as 商队新闻."
+    },
+    "24156": {
+      "severity": "none",
+      "reason": "The message matches: the convoy reached {0} country, goods worth {1} were loaded, and it departed home."
+    },
+    "24157": {
+      "severity": "none",
+      "reason": "The meaning is preserved: the convoy returned from {0} country with goods worth {1}, followed by {2}."
+    },
+    "24158": {
+      "severity": "none",
+      "reason": "The convoy’s warships returned to province {0}; the wording is faithful and the glossary term is respected."
+    },
+    "24159": {
+      "severity": "none",
+      "reason": "The target correctly says this is the {0}th turn of the convoy’s return from {1} country and that everything is going smoothly."
+    },
+    "24160": {
+      "severity": "major",
+      "reason": "Source says the convoy is on the {0}th turn of returning home and successfully repelled an attack; Chinese says “on the {0}th day,” changing the time unit and conflicting with the glossary term for ход, though the rest is understandable."
+    },
+    "24161": {
+      "severity": "major",
+      "reason": "Source says the convoy was attacked and lost part of its goods, {2}%; Chinese says “lost {2}% of the cargo,” which is close but changes ‘part of the goods’ to the whole cargo and misses the exact phrasing."
+    },
+    "24162": {
+      "severity": "none",
+      "reason": "Correctly means ‘The convoy’s losses were: {0}.’"
+    },
+    "24163": {
+      "severity": "none",
+      "reason": "Correctly means there are no available provinces to place the returning convoy and compensation is {0} resources."
+    },
+    "24164": {
+      "severity": "none",
+      "reason": "Correctly means ‘Results of the victorious battle in province {0}’ with the following lines preserved."
+    },
+    "24165": {
+      "severity": "none",
+      "reason": "Correct: \"在省份{0}战斗失败的结果\" faithfully means the results of a lost battle in province {0}."
+    },
+    "24166": {
+      "severity": "none",
+      "reason": "Correct: the troops won a great victory in province {0} over the army of country {1}, with placeholders preserved."
+    },
+    "24167": {
+      "severity": "none",
+      "reason": "Correct: \"我们的军队在省份{0}被{1}的军队击溃\" accurately says our troops were routed by country {1}'s army in province {0}."
+    },
+    "24168": {
+      "severity": "none",
+      "reason": "Correct: the Marines sent to province {0} were annihilated, matching the source."
+    },
+    "24169": {
+      "severity": "none",
+      "reason": "Correct: the Marines successfully landed in province {0}; meaning and placeholders are preserved."
+    },
+    "24170": {
+      "severity": "none",
+      "reason": "Correct: \"国家{0}派往省份{1}的海军陆战队已被歼灭\" faithfully means the marines sent to province {1} were destroyed."
+    },
+    "24171": {
+      "severity": "none",
+      "reason": "Correct: \"已在省份{1}登陆\" accurately renders that the marines landed in province {1}."
+    },
+    "24172": {
+      "severity": "none",
+      "reason": "Correct: \"敌方省份{0}炮击结果\" and \"造成伤害\" preserve the shelling results and damage dealt."
+    },
+    "24173": {
+      "severity": "none",
+      "reason": "Correct: \"国家{1}炮击了省份{0}\" and \"受到伤害\" accurately mean country {1} shelled province {0} and damage was received."
+    },
+    "24174": {
+      "severity": "none",
+      "reason": "Correct: \"我军已占领省份{0}\" faithfully states that our troops captured province {0}."
+    },
+    "24175": {
+      "severity": "none",
+      "reason": "Correct translation: “our province {0} was occupied by the troops of country {1}” with the placeholder {2} preserved."
+    },
+    "24176": {
+      "severity": "none",
+      "reason": "Correct: “enemy air force {0} attacked our province {1} from province {2}”; damage lines and placeholders match the source."
+    },
+    "24177": {
+      "severity": "major",
+      "reason": "The source says “Results of an air raid on the enemy province {0},” but the Chinese reads “enemy province {0} air raid results,” which distorts the relation; the casualty lines are otherwise correct."
+    },
+    "24178": {
+      "severity": "none",
+      "reason": "Correct: “air battle results over province {0}”; both loss lines are faithfully rendered."
+    },
+    "24179": {
+      "severity": "minor",
+      "reason": "Faithful overall, but “成功突袭” back-translates as “successful raid,” which is a stylistic mismatch for “successful assault on fortifications”; meaning remains clear."
+    },
+    "24180": {
+      "severity": "major",
+      "reason": "Back-translation is roughly “province {0} fortifications failed defense result,” which distorts the source “results of a failed defense of fortifications in province {0}” but remains understandable."
+    },
+    "24181": {
+      "severity": "major",
+      "reason": "Back-translation is roughly “province {0} fortifications failed attack result,” which distorts the source “results of a failed assault on fortifications in province {0}” but the intended battle outcome is still recoverable."
+    },
+    "24182": {
+      "severity": "major",
+      "reason": "Back-translation is roughly “province {0} fortifications successful defense result,” which reverses the source’s “successful defense of fortifications in province {0}” into an awkward but still understandable phrase."
+    },
+    "24183": {
+      "severity": "none",
+      "reason": "Meaning is preserved: “province {0} naval battle victory result,” with casualties/losses for our troops and the enemy correctly rendered."
+    },
+    "24184": {
+      "severity": "none",
+      "reason": "Meaning is preserved: “province {0} naval battle defeat result,” with our losses and enemy losses correctly rendered."
+    },
+    "24185": {
+      "severity": "none",
+      "reason": "“海上胜利” correctly means “victory at sea.”"
+    },
+    "24186": {
+      "severity": "none",
+      "reason": "“海上失败” correctly means “defeat at sea.”"
+    },
+    "24187": {
+      "severity": "none",
+      "reason": "“防御工事进攻失败” means “failed attack on fortifications,” matching the source and glossary terms."
+    },
+    "24188": {
+      "severity": "none",
+      "reason": "“敌军防御工事进攻失败” means “enemy’s failed attack on fortifications,” correctly adding the enemy agent."
+    },
+    "24189": {
+      "severity": "none",
+      "reason": "“防御工事进攻成功” means “successful attack on fortifications,” matching the source and glossary terms."
+    },
+    "24190": {
+      "severity": "minor",
+      "reason": "Faithful overall: \"defense of fortifications failed\"; the wording is slightly unnatural and shifts emphasis, but meaning is clear."
+    },
+    "24191": {
+      "severity": "none",
+      "reason": "Correct: \"consequences of the air raid\" matches the Russian source."
+    },
+    "24192": {
+      "severity": "none",
+      "reason": "Correct: \"we carried out an air raid\" preserves the meaning."
+    },
+    "24193": {
+      "severity": "none",
+      "reason": "Correct: \"results of the air battle\" matches the source."
+    },
+    "24194": {
+      "severity": "none",
+      "reason": "Correct: all placeholders and meanings match; the damage log is rendered faithfully."
+    },
+    "24195": {
+      "severity": "none",
+      "reason": "Faithful: \"Passive skill 'troops do not retreat' activated\" matches the source."
+    },
+    "24196": {
+      "severity": "none",
+      "reason": "Faithful: \"Passive skill 'fleet does not retreat' activated\" matches the source."
+    },
+    "24197": {
+      "severity": "none",
+      "reason": "Faithful: \"Defenders of fortifications will never retreat!\" preserves the meaning and glossary term."
+    },
+    "24198": {
+      "severity": "none",
+      "reason": "Faithful: \"No one survived\" matches \"Нет выживших\"."
+    },
+    "24199": {
+      "severity": "none",
+      "reason": "Faithful: \"Survivors: {0}\" matches the source and keeps the placeholder correct."
+    },
+    "24200": {
+      "severity": "none",
+      "reason": "Correct: '幸存国家 {0}: {1}' faithfully renders 'Surviving countries {0}: {1}'."
+    },
+    "24201": {
+      "severity": "none",
+      "reason": "Correct: '您的损失: {0}' means 'Your losses: {0}'."
+    },
+    "24202": {
+      "severity": "none",
+      "reason": "Correct: '国家 {0} 的损失: {1}' means 'Country {0}'s losses: {1}'."
+    },
+    "24203": {
+      "severity": "none",
+      "reason": "Correct: '幸存者影响力: {0}' matches 'Influence of survivors: {0}'."
+    },
+    "24204": {
+      "severity": "none",
+      "reason": "Correct: '敌方幸存者影响力: {0}' means 'Enemy survivors' influence: {0}'."
+    },
+    "24205": {
+      "severity": "none",
+      "reason": "Correct: '状态变更！' faithfully renders 'Status changed!'."
+    },
+    "24206": {
+      "severity": "none",
+      "reason": "Correct: '您的国家状态已变更: {0} 至 {1}！' preserves the status change and both placeholders."
+    },
+    "24207": {
+      "severity": "none",
+      "reason": "Correct: the target faithfully renders '{0} countries {1} status changed from {2} to {3}!' with all roles intact."
+    },
+    "24208": {
+      "severity": "none",
+      "reason": "Correct: '国家 {0} 的状态已变更: {1} 状态 {2}！' matches the source meaning and placeholders."
+    },
+    "24209": {
+      "severity": "none",
+      "reason": "Correct: '已提升' means 'promoted/raised,' matching 'повышен'."
+    },
+    "24210": {
+      "severity": "none",
+      "reason": "Correct: \"понижен\" is rendered as \"降级\" ('demoted/downgraded')."
+    },
+    "24211": {
+      "severity": "none",
+      "reason": "Correct: \"повышен\" is rendered as \"晋升\" ('promoted')."
+    },
+    "24212": {
+      "severity": "none",
+      "reason": "Correct: \"понижен\" is rendered as \"降级\" ('demoted/downgraded')."
+    },
+    "24213": {
+      "severity": "none",
+      "reason": "Correct: \"потерян\" is rendered as \"失去\" ('lost')."
+    },
+    "24214": {
+      "severity": "none",
+      "reason": "Correct: \"получен\" is rendered as \"获得\" ('obtained/received')."
+    },
+    "24215": {
+      "severity": "none",
+      "reason": "‘盟国’ correctly renders ‘allied’ as ‘allied countries’; meaning is preserved."
+    },
+    "24216": {
+      "severity": "none",
+      "reason": "‘敌国’ correctly means ‘enemy countries’ and matches the source."
+    },
+    "24217": {
+      "severity": "none",
+      "reason": "‘中立国’ correctly means ‘neutral countries’ and matches the source."
+    },
+    "24218": {
+      "severity": "none",
+      "reason": "‘部队新等级！’ faithfully means ‘New troop level!’ and matches the glossary term ‘等级’."
+    },
+    "24219": {
+      "severity": "none",
+      "reason": "All placeholders and meanings are correct: congratulations, division {0} reached new level {1}, served for {3} turns, had {2} battles, and is in province {4}."
+    },
+    "24220": {
+      "severity": "none",
+      "reason": "‘精锐部队的损失！’ faithfully conveys ‘Losses among the elite!’"
+    },
+    "24221": {
+      "severity": "none",
+      "reason": "The target correctly says ‘A division of level {1} {0} was lost in battle; battles fought: {2},’ matching the source and glossary."
+    },
+    "24222": {
+      "severity": "none",
+      "reason": "‘沙特阿拉伯’ is the correct Chinese name for Saudi Arabia."
+    },
+    "24223": {
+      "severity": "none",
+      "reason": "‘利比里亚’ is the correct Chinese name for Liberia."
+    },
+    "24224": {
+      "severity": "none",
+      "reason": "‘委内瑞拉’ is the correct Chinese name for Venezuela."
+    },
+    "24225": {
+      "severity": "none",
+      "reason": "Correct translation: “Iceland” matches the glossary and source."
+    },
+    "24226": {
+      "severity": "none",
+      "reason": "Correct translation: “Iran” matches the source and glossary."
+    },
+    "24227": {
+      "severity": "none",
+      "reason": "Correct translation: “Argentina” matches the source and glossary."
+    },
+    "24228": {
+      "severity": "none",
+      "reason": "Faithful translation: the country placeholder is preserved, and the meaning about arriving trade representatives, a proposed trade agreement, and sending trade convoys after signing is correctly conveyed."
+    },
+    "24229": {
+      "severity": "none",
+      "reason": "Correct translation of “Trade agreement” as “贸易协定,” matching the glossary."
+    },
+    "24230": {
+      "severity": "none",
+      "reason": "Correct: ‘to sign a trade agreement, accumulate more diplomatic points’ and ‘the ambassadors will return soon (in {[PARAM0]} turns)’ are faithfully rendered; glossary term 回合 matches."
+    },
+    "24231": {
+      "severity": "none",
+      "reason": "Correct: ‘You failed to accumulate enough diplomatic points to conclude a trade agreement’ matches the source."
+    },
+    "24232": {
+      "severity": "none",
+      "reason": "Correct: ‘Согласиться’ is rendered as ‘同意’ (‘Agree’)."
+    },
+    "24233": {
+      "severity": "none",
+      "reason": "Correct: ‘Отказаться’ is rendered as ‘拒绝’ (‘Decline/Refuse’)."
+    },
+    "24234": {
+      "severity": "none",
+      "reason": "Correct: ‘Want to send a convoy to country {[PARAM0]}? Estimated duration = {[PARAM1]} turns, estimated profit = {[PARAM2]} resources’ is faithfully rendered; glossary terms 商队 and 回合 match."
+    },
+    "24235": {
+      "severity": "none",
+      "reason": "Correct: “要为商船提供护航吗？未护航的船只可能遭受攻击！” faithfully means the caravans/merchant ships can be attacked if not escorted."
+    },
+    "24236": {
+      "severity": "major",
+      "reason": "“没有可用的省份选择护航！” means “No available provinces to choose escort,” but the Russian says there are no provinces available for selecting an escort; the added “省份选择” is awkward and distorts the meaning of the unavailable selection."
+    },
+    "24237": {
+      "severity": "none",
+      "reason": "Correct: the header means “Send the convoy,” and the glossary term “конвой → 商队” is used properly."
+    },
+    "24238": {
+      "severity": "none",
+      "reason": "Correct: “派遣” accurately renders “Отправить” in this UI context."
+    },
+    "24239": {
+      "severity": "none",
+      "reason": "Correct: “不派遣” faithfully renders “Не отправлять.”"
+    },
+    "24240": {
+      "severity": "major",
+      "reason": "The target omits the glossary term and means 'send a caravan' rather than 'send a convoy'; the rest 'accelerate its return by {[PARAM0]} turns' is understandable."
+    },
+    "24241": {
+      "severity": "none",
+      "reason": "'购买车队加速失败' correctly means 'failed to buy caravan/convoy boost'."
+    },
+    "24242": {
+      "severity": "none",
+      "reason": "'选择护卫' correctly means 'choose the escort/guard'."
+    },
+    "24243": {
+      "severity": "none",
+      "reason": "'地雷' correctly renders the division name 'Mines'."
+    },
+    "24244": {
+      "severity": "none",
+      "reason": "The Chinese correctly says mines are placed in controlled provinces to damage advancing enemy ground units and infantry."
+    },
+    "24245": {
+      "severity": "none",
+      "reason": "Faithful: “you have received a veteran division”; veterans deal more damage in attack and take less in defense; double-click the division icon for details."
+    },
+    "24246": {
+      "severity": "major",
+      "reason": "The noun is garbled: “累计经验与升级所需经验” back-translates as “accumulated experience and experience needed to upgrade,” dropping the intended “level” reference and making the phrase awkward/incomplete."
+    },
+    "24247": {
+      "severity": "none",
+      "reason": "Correct: “view the division’s combat path/campaign” matches “Посмотрите боевой путь дивизии.”"
+    },
+    "24248": {
+      "severity": "none",
+      "reason": "Accurate: “you have unlocked a new weapon type — mines” matches the source and glossary."
+    },
+    "24249": {
+      "severity": "none",
+      "reason": "Correct meaning: mines can be bought like any other reinforcement in the game; please do it now."
+    },
+    "24250": {
+      "severity": "none",
+      "reason": "Faithful: '地雷对攻击该省份的地面部队和空降部队造成伤害…所有雷区均被视为已清除' correctly matches the source."
+    },
+    "24251": {
+      "severity": "none",
+      "reason": "Faithful: '此图标表示该省份已布设地雷' correctly renders that mines are installed in the province."
+    },
+    "24252": {
+      "severity": "none",
+      "reason": "Faithful: '超过12个雷区…地雷越多，造成的伤害就越大' preserves the meaning and gameplay instruction."
+    },
+    "24253": {
+      "severity": "none",
+      "reason": "Faithful: '是否想立即花费{0}解锁修改版…模式？' keeps the same question, amount, and placeholder name."
+    }
   }
- }
 }

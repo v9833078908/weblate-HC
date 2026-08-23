@@ -1,21 +1,21 @@
 {
- "_source": "deterministic check_glossary with short-form variants (省,级) per plans/2026-08-14-intra-component-consistency-check.md; computed offline on frozen corpus st2-zh-units.jsonl",
- "_note": "24221 not fired: its blocking defect is placeholder-role inversion (judge-owned); 级别 is covered by the 级 short-form variant",
- "checks": {
-  "24160": [
-   "check_glossary: 'ход' should render as approved 回合"
-  ],
-  "24161": [
-   "check_glossary: 'ход' should render as approved 回合"
-  ],
-  "24179": [
-   "check_glossary: 'штурм' should render as approved 进攻"
-  ],
-  "24240": [
-   "check_glossary: 'конвой' should render as approved 商队"
-  ],
-  "24241": [
-   "check_glossary: 'конвой' should render as approved 商队"
-  ]
- }
+  "_source": "deterministic check_glossary with short-form variants (省,级) per plans/2026-08-14-intra-component-consistency-check.md; computed offline on frozen corpus st2-zh-units.jsonl",
+  "_note": "24221 not fired: its blocking defect is placeholder-role inversion (judge-owned); 级别 is covered by the 级 short-form variant",
+  "checks": {
+    "24160": [
+      "check_glossary: 'ход' should render as approved 回合"
+    ],
+    "24161": [
+      "check_glossary: 'ход' should render as approved 回合"
+    ],
+    "24179": [
+      "check_glossary: 'штурм' should render as approved 进攻"
+    ],
+    "24240": [
+      "check_glossary: 'конвой' should render as approved 商队"
+    ],
+    "24241": [
+      "check_glossary: 'конвой' should render as approved 商队"
+    ]
+  }
 }

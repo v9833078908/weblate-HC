@@ -1,1 +1,924 @@
-{"24130": {"verdict": "reject", "errors": [{"category": "mistranslation", "description": "The target says '并支付{[PARAM1]}以获得{[PARAM0]}%收入加成吗？' (and pay [PARAM1] to receive [PARAM0]% income bonus), which introduces a cost payment that is not in the source. The source says 'получать {[PARAM0]}% к доходу за {[PARAM1]}' (receive [PARAM0]% income bonus for [PARAM1]).", "severity": "critical", "span": "并支付{[PARAM1]}以获得{[PARAM0]}%收入加成吗？"}], "model_verdict": "reject", "unparsed": false}, "24131": {"verdict": "pass", "errors": [{"category": "addition", "description": "The target adds '更加' (even more). The source says 'трудиться еще усерднее' (work even harder), which is correctly conveyed by '更加努力', however, the addition of '更加' (more) in '更加努力' is a correct translation of 'усерднее' (harder) - review needed. Wait, the source says 'трудиться еще усерднее' (work even harder). The target says '更加努力' (work even harder). This is fine. No error.", "severity": "minor", "span": "更加努力"}], "model_verdict": "pass", "unparsed": false}, "24132": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24133": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24134": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24135": {"verdict": "flag", "errors": [{"category": "terminology", "description": "The target renders 'уровень' as '级', but the approved glossary term is '等级'. Back-translation: 'level {[PARAM0]}'. This violates the glossary conformance rule.", "severity": "major", "span": "级"}], "model_verdict": "flag", "unparsed": false}, "24136": {"verdict": "flag", "errors": [{"category": "terminology", "description": "The target renders 'уровень' as '级', but the approved glossary term is '等级'. Back-translation: 'level {[PARAM0]}'. This violates the glossary conformance rule.", "severity": "major", "span": "级"}], "model_verdict": "flag", "unparsed": false}, "24137": {"verdict": "flag", "errors": [{"category": "terminology", "description": "The target renders 'дивизий' as '师团', but the approved glossary term is '师'. Back-translation: 'divisions'. This violates the glossary conformance rule.", "severity": "major", "span": "师团"}], "model_verdict": "flag", "unparsed": false}, "24138": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24139": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24140": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24141": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24142": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24143": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24144": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24145": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24146": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24147": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24148": {"verdict": "flag", "errors": [{"category": "mistranslation", "description": "The target '存活战斗数' back-translates as 'survived battles count'. The source 'Cражений пережито' means 'battles survived' or 'number of battles survived'. The phrasing '存活战斗数' sounds like the number of battles that survived, rather than the number of battles the unit survived. A more accurate rendering would shift the focus to the unit's survival through battles, e.g., '经历的战斗数'.", "severity": "major", "span": "存活战斗数"}], "model_verdict": "flag", "unparsed": false}, "24149": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24150": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24151": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24152": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24153": {"verdict": "reject", "errors": [{"span": "伤害", "category": "mistranslation", "severity": "critical", "description": "The target says '伤害', which means 'Damage' (as in inflicted harm), whereas the source 'Урон' can mean 'Damage' but in the context of a minefield attack it might also refer to 'Casualties' or 'Losses'. Given the military setting, using a generic 'Damage' term could mislead players about the specific mechanic, potentially confusing them about whether it refers to unit health, equipment, or personnel. This falls under critical as it could lead to a misunderstanding of game mechanics."}], "model_verdict": "reject", "unparsed": false}, "24154": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24155": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24156": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24157": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24158": {"verdict": "flag", "errors": [{"span": "省", "category": "terminology", "severity": "major", "description": "The glossary entry for 'провинцию' is '省份', but the target uses the abbreviated form '省'. This is a terminology mismatch."}], "model_verdict": "flag", "unparsed": false}, "24159": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24160": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24161": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24162": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24163": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24164": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24165": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24166": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24167": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24168": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24169": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24170": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24171": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24172": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24173": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24174": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24175": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24176": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24177": {"verdict": "flag", "errors": [{"span": "敌方省份", "category": "mistranslation", "severity": "major", "description": "The target says '敌方省份{0}' which means 'enemy province {0}', whereas the source refers to 'a raid ON an enemy province', i.e. the province is the target of the raid. The modifier '敌方' (enemy) is placed as if it's part of the province's name, creating a grammatical and semantic distortion where the raid results belong to the enemy province itself rather than being the results of a raid on it."}], "model_verdict": "flag", "unparsed": false}, "24178": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24179": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24180": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24181": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24182": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24183": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24184": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24185": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24186": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24187": {"verdict": "pass", "errors": [{"category": "mistranslation", "description": "The target says '防御工事进攻失败', which means 'fortifications attack failed' or 'the attack on the fortifications failed', whereas the source 'Провальный штурм укреплений' means 'Failed assault on the fortifications'. The placement of '失败' (failed) at the end of the phrase suggests the failure is a general event, but the source specifically states the 'штурм' (assault/attack) was 'провальный' (failed). The nuance is slightly altered, and the phrase structure is awkward, making it sound like the fortifications themselves are attacking.", "severity": "minor", "span": "防御工事进攻失败"}], "model_verdict": "flag", "unparsed": false}, "24188": {"verdict": "flag", "errors": [{"category": "mistranslation", "description": "The target says '敌军防御工事进攻失败', which means 'enemy fortifications attack failed' or 'the enemy fortifications' attack failed', whereas the source 'Провальный штурм укреплений врагами' means 'Failed assault on the fortifications by enemies'. The agent of the assault is the enemy, but the target makes '敌军' (enemy) an attributive to '防御工事' (fortifications), creating a possessive structure that reads 'the enemy's fortifications' attack failed'. This misplaces the agent and distorts the meaning.", "severity": "major", "span": "敌军防御工事进攻失败"}], "model_verdict": "flag", "unparsed": false}, "24189": {"verdict": "pass", "errors": [{"category": "mistranslation", "description": "The target says '防御工事进攻成功', which means 'fortifications attack succeeded', whereas the source 'Успешный штурм укреплений' means 'Successful assault on the fortifications'. The structure is similarly awkward to segment 2, making it sound like the fortifications are conducting an attack, instead of the attack being conducted upon them.", "severity": "minor", "span": "防御工事进攻成功"}], "model_verdict": "flag", "unparsed": false}, "24190": {"verdict": "reject", "errors": [{"span": "防御工事惨败", "category": "mistranslation", "severity": "critical", "description": "The target says '防御工事惨败' meaning 'A disastrous defeat of the fortifications', whereas the source means 'A failed defense of the fortifications'. The target inverts the subject; it blames the fortifications themselves, not the defense of them."}], "model_verdict": "reject", "unparsed": false}, "24191": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24192": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24193": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24194": {"verdict": "flag", "errors": [{"span": "非装甲单位承受伤害", "category": "mistranslation", "severity": "major", "description": "The target says '非装甲单位承受伤害' meaning 'Damage sustained by non-armored units', whereas the source 'Получено урона по небронированным' means 'Damage received TO non-armored (targets)'. The direction is slightly distorted by focusing on the unit type, but the overall meaning of incoming damage is recoverable."}, {"span": "装甲单位承受伤害", "category": "mistranslation", "severity": "major", "description": "The target says '装甲单位承受伤害' meaning 'Damage sustained by armored units', whereas the source 'Получено урона по бронированным' means 'Damage received TO armored (targets)'. Same distortion as above."}, {"span": "非装甲单位造成伤害", "category": "mistranslation", "severity": "major", "description": "The target says '非装甲单位造成伤害' meaning 'Damage caused by non-armored units', whereas the source 'Нанесено урона по небронированным' means 'Damage dealt TO non-armored (targets)'. The target attributes the damage to non-armored units as the actor, changing the referent."}, {"span": "装甲单位造成伤害", "category": "mistranslation", "severity": "major", "description": "The target says '装甲单位造成伤害' meaning 'Damage caused by armored units', whereas the source 'Нанесено урона по бронированным' means 'Damage dealt TO armored (targets)'. The target attributes the damage to armored units as the actor, changing the referent."}], "model_verdict": "flag", "unparsed": false}, "24195": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24196": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24197": {"verdict": "flag", "errors": [{"span": "绝不撤退", "category": "mistranslation", "severity": "major", "description": "The target says 'absolutely will not retreat', which adds an emphatic 'never/absolutely', whereas the source 'не отступают' simply states 'do not retreat'. The added intensity distorts the neutral military register of the original."}], "model_verdict": "flag", "unparsed": false}, "24198": {"verdict": "flag", "errors": [{"span": "无人生还", "category": "mistranslation", "severity": "major", "description": "The target says 'no one survived', which is a narrative statement typically used for people. The source 'Нет выживших' means 'No survivors', a more formal and neutral report appropriate for a military context reporting on units."}], "model_verdict": "flag", "unparsed": false}, "24199": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24200": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24201": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24202": {"verdict": "pass", "errors": [{"category": "fluency", "description": "The target contains an unnecessary space between '国家' and the placeholder '{0}', which is not typical in Chinese and slightly affects fluency.", "severity": "minor", "span": "国家 {0}"}], "model_verdict": "pass", "unparsed": false}, "24203": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24204": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24205": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24206": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24207": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24208": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24209": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24210": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24211": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24212": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24213": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24214": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24215": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24216": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24217": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24218": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24219": {"verdict": "flag", "errors": [{"span": "省", "category": "terminology", "severity": "major", "description": "The target uses '省' instead of the approved glossary translation '省份' for the term 'провинции'."}], "model_verdict": "flag", "unparsed": false}, "24220": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24221": {"verdict": "reject", "errors": [{"category": "mistranslation", "description": "The target says 'уровня' + '{0}', which means '{0} level', whereas the source says '{1} уровня', i.e. 'level {1}'. The level placeholder is swapped with the division identifier, resulting in a wrong referent.", "severity": "critical", "span": "{0}级别的{1}师"}, {"category": "terminology", "description": "The glossary term 'уровня' should be rendered as '等级', but the target uses '级别'. This constitutes a glossary violation.", "severity": "major", "span": "级别"}], "model_verdict": "reject", "unparsed": false}, "24222": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24223": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24224": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24225": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24226": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24227": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24228": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24229": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24230": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24231": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24232": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24233": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24234": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24235": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24236": {"verdict": "pass", "errors": [{"category": "fluency", "description": "The span '选择护航' means 'select escort', but in this context the full sentence '没有可用的省份选择护航' is ungrammatical, reading like 'no available provinces choose escort' rather than 'no provinces available to choose an escort'. A conjunction such as 来 or 以供 is missing.", "severity": "minor", "span": "选择护航"}], "model_verdict": "pass", "unparsed": false}, "24237": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24238": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24239": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24240": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24241": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24242": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24243": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24244": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24245": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24246": {"verdict": "flag", "errors": [{"span": "升级所需经验", "category": "terminology", "severity": "major", "description": "The target translates 'уровень' (level) as '升级' (upgrade). The approved glossary term is '等级'. This is a terminology violation."}], "model_verdict": "flag", "unparsed": false}, "24247": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24248": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24249": {"verdict": "flag", "errors": [{"span": "增援", "category": "mistranslation", "severity": "major", "description": "The target translates 'подкрепление' (reinforcements) as '增援' (reinforcements). The source is 'Мины покупаются как любое другое подкрепление' (Mines are purchased like any other reinforcement). While this is a literal translation, 'reinforcement' in this context refers to troop replenishment, but the purchase of mines is more akin to other purchasable 'equipment' or 'units'. The comparison creates a conceptual mismatch for a player, who might think 'reinforcement' refers to calling in unit reinforcements, not buying mines from a menu."}], "model_verdict": "flag", "unparsed": false}, "24250": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24251": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24252": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24253": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}}
+{
+  "24130": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '并支付{[PARAM1]}以获得{[PARAM0]}%收入加成吗？' (and pay [PARAM1] to receive [PARAM0]% income bonus), which introduces a cost payment that is not in the source. The source says 'получать {[PARAM0]}% к доходу за {[PARAM1]}' (receive [PARAM0]% income bonus for [PARAM1]).",
+        "severity": "critical",
+        "span": "并支付{[PARAM1]}以获得{[PARAM0]}%收入加成吗？"
+      }
+    ],
+    "model_verdict": "reject",
+    "unparsed": false
+  },
+  "24131": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "category": "addition",
+        "description": "The target adds '更加' (even more). The source says 'трудиться еще усерднее' (work even harder), which is correctly conveyed by '更加努力', however, the addition of '更加' (more) in '更加努力' is a correct translation of 'усерднее' (harder) - review needed. Wait, the source says 'трудиться еще усерднее' (work even harder). The target says '更加努力' (work even harder). This is fine. No error.",
+        "severity": "minor",
+        "span": "更加努力"
+      }
+    ],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24132": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24133": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24134": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24135": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "terminology",
+        "description": "The target renders 'уровень' as '级', but the approved glossary term is '等级'. Back-translation: 'level {[PARAM0]}'. This violates the glossary conformance rule.",
+        "severity": "major",
+        "span": "级"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24136": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "terminology",
+        "description": "The target renders 'уровень' as '级', but the approved glossary term is '等级'. Back-translation: 'level {[PARAM0]}'. This violates the glossary conformance rule.",
+        "severity": "major",
+        "span": "级"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24137": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "terminology",
+        "description": "The target renders 'дивизий' as '师团', but the approved glossary term is '师'. Back-translation: 'divisions'. This violates the glossary conformance rule.",
+        "severity": "major",
+        "span": "师团"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24138": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24139": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24140": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24141": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24142": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24143": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24144": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24145": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24146": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24147": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24148": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target '存活战斗数' back-translates as 'survived battles count'. The source 'Cражений пережито' means 'battles survived' or 'number of battles survived'. The phrasing '存活战斗数' sounds like the number of battles that survived, rather than the number of battles the unit survived. A more accurate rendering would shift the focus to the unit's survival through battles, e.g., '经历的战斗数'.",
+        "severity": "major",
+        "span": "存活战斗数"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24149": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24150": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24151": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24152": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24153": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "伤害",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "The target says '伤害', which means 'Damage' (as in inflicted harm), whereas the source 'Урон' can mean 'Damage' but in the context of a minefield attack it might also refer to 'Casualties' or 'Losses'. Given the military setting, using a generic 'Damage' term could mislead players about the specific mechanic, potentially confusing them about whether it refers to unit health, equipment, or personnel. This falls under critical as it could lead to a misunderstanding of game mechanics."
+      }
+    ],
+    "model_verdict": "reject",
+    "unparsed": false
+  },
+  "24154": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24155": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24156": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24157": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24158": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "省",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The glossary entry for 'провинцию' is '省份', but the target uses the abbreviated form '省'. This is a terminology mismatch."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24159": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24160": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24161": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24162": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24163": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24164": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24165": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24166": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24167": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24168": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24169": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24170": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24171": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24172": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24173": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24174": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24175": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24176": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24177": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "敌方省份",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target says '敌方省份{0}' which means 'enemy province {0}', whereas the source refers to 'a raid ON an enemy province', i.e. the province is the target of the raid. The modifier '敌方' (enemy) is placed as if it's part of the province's name, creating a grammatical and semantic distortion where the raid results belong to the enemy province itself rather than being the results of a raid on it."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24178": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24179": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24180": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24181": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24182": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24183": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24184": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24185": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24186": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24187": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '防御工事进攻失败', which means 'fortifications attack failed' or 'the attack on the fortifications failed', whereas the source 'Провальный штурм укреплений' means 'Failed assault on the fortifications'. The placement of '失败' (failed) at the end of the phrase suggests the failure is a general event, but the source specifically states the 'штурм' (assault/attack) was 'провальный' (failed). The nuance is slightly altered, and the phrase structure is awkward, making it sound like the fortifications themselves are attacking.",
+        "severity": "minor",
+        "span": "防御工事进攻失败"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24188": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '敌军防御工事进攻失败', which means 'enemy fortifications attack failed' or 'the enemy fortifications' attack failed', whereas the source 'Провальный штурм укреплений врагами' means 'Failed assault on the fortifications by enemies'. The agent of the assault is the enemy, but the target makes '敌军' (enemy) an attributive to '防御工事' (fortifications), creating a possessive structure that reads 'the enemy's fortifications' attack failed'. This misplaces the agent and distorts the meaning.",
+        "severity": "major",
+        "span": "敌军防御工事进攻失败"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24189": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '防御工事进攻成功', which means 'fortifications attack succeeded', whereas the source 'Успешный штурм укреплений' means 'Successful assault on the fortifications'. The structure is similarly awkward to segment 2, making it sound like the fortifications are conducting an attack, instead of the attack being conducted upon them.",
+        "severity": "minor",
+        "span": "防御工事进攻成功"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24190": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "防御工事惨败",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "The target says '防御工事惨败' meaning 'A disastrous defeat of the fortifications', whereas the source means 'A failed defense of the fortifications'. The target inverts the subject; it blames the fortifications themselves, not the defense of them."
+      }
+    ],
+    "model_verdict": "reject",
+    "unparsed": false
+  },
+  "24191": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24192": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24193": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24194": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "非装甲单位承受伤害",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target says '非装甲单位承受伤害' meaning 'Damage sustained by non-armored units', whereas the source 'Получено урона по небронированным' means 'Damage received TO non-armored (targets)'. The direction is slightly distorted by focusing on the unit type, but the overall meaning of incoming damage is recoverable."
+      },
+      {
+        "span": "装甲单位承受伤害",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target says '装甲单位承受伤害' meaning 'Damage sustained by armored units', whereas the source 'Получено урона по бронированным' means 'Damage received TO armored (targets)'. Same distortion as above."
+      },
+      {
+        "span": "非装甲单位造成伤害",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target says '非装甲单位造成伤害' meaning 'Damage caused by non-armored units', whereas the source 'Нанесено урона по небронированным' means 'Damage dealt TO non-armored (targets)'. The target attributes the damage to non-armored units as the actor, changing the referent."
+      },
+      {
+        "span": "装甲单位造成伤害",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target says '装甲单位造成伤害' meaning 'Damage caused by armored units', whereas the source 'Нанесено урона по бронированным' means 'Damage dealt TO armored (targets)'. The target attributes the damage to armored units as the actor, changing the referent."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24195": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24196": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24197": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "绝不撤退",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target says 'absolutely will not retreat', which adds an emphatic 'never/absolutely', whereas the source 'не отступают' simply states 'do not retreat'. The added intensity distorts the neutral military register of the original."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24198": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "无人生还",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target says 'no one survived', which is a narrative statement typically used for people. The source 'Нет выживших' means 'No survivors', a more formal and neutral report appropriate for a military context reporting on units."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24199": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24200": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24201": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24202": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "category": "fluency",
+        "description": "The target contains an unnecessary space between '国家' and the placeholder '{0}', which is not typical in Chinese and slightly affects fluency.",
+        "severity": "minor",
+        "span": "国家 {0}"
+      }
+    ],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24203": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24204": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24205": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24206": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24207": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24208": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24209": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24210": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24211": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24212": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24213": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24214": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24215": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24216": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24217": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24218": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24219": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "省",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The target uses '省' instead of the approved glossary translation '省份' for the term 'провинции'."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24220": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24221": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says 'уровня' + '{0}', which means '{0} level', whereas the source says '{1} уровня', i.e. 'level {1}'. The level placeholder is swapped with the division identifier, resulting in a wrong referent.",
+        "severity": "critical",
+        "span": "{0}级别的{1}师"
+      },
+      {
+        "category": "terminology",
+        "description": "The glossary term 'уровня' should be rendered as '等级', but the target uses '级别'. This constitutes a glossary violation.",
+        "severity": "major",
+        "span": "级别"
+      }
+    ],
+    "model_verdict": "reject",
+    "unparsed": false
+  },
+  "24222": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24223": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24224": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24225": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24226": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24227": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24228": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24229": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24230": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24231": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24232": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24233": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24234": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24235": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24236": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "category": "fluency",
+        "description": "The span '选择护航' means 'select escort', but in this context the full sentence '没有可用的省份选择护航' is ungrammatical, reading like 'no available provinces choose escort' rather than 'no provinces available to choose an escort'. A conjunction such as 来 or 以供 is missing.",
+        "severity": "minor",
+        "span": "选择护航"
+      }
+    ],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24237": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24238": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24239": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24240": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24241": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24242": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24243": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24244": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24245": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24246": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "升级所需经验",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The target translates 'уровень' (level) as '升级' (upgrade). The approved glossary term is '等级'. This is a terminology violation."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24247": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24248": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24249": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "增援",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target translates 'подкрепление' (reinforcements) as '增援' (reinforcements). The source is 'Мины покупаются как любое другое подкрепление' (Mines are purchased like any other reinforcement). While this is a literal translation, 'reinforcement' in this context refers to troop replenishment, but the purchase of mines is more akin to other purchasable 'equipment' or 'units'. The comparison creates a conceptual mismatch for a player, who might think 'reinforcement' refers to calling in unit reinforcements, not buying mines from a menu."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24250": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24251": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24252": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24253": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  }
+}

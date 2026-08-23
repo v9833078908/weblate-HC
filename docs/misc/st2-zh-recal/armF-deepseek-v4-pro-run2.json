@@ -1,1 +1,884 @@
-{"24130": {"verdict": "reject", "errors": [{"span": "支付{[PARAM1]}以获得{[PARAM0]}%收入加成", "category": "mistranslation", "severity": "critical", "description": "The target says 'pay {[PARAM1]} to get {[PARAM0]}% income bonus', which means the player must spend a resource to receive the bonus. The source says 'receive {[PARAM0]}% to income for {[PARAM1]}', meaning the bonus is granted for a duration of {[PARAM1]} turns with no cost mentioned. This misinforms the player about a core game mechanic."}], "model_verdict": "", "unparsed": false}, "24131": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24132": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24133": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24134": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24135": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24136": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24137": {"verdict": "flag", "errors": [{"span": "槽位", "category": "addition", "severity": "major", "description": "The target says '额外增援槽位' (additional reinforcement slots), adding '槽位' (slots) that does not appear in the source, which only says 'дополнительных подкреплений' (additional reinforcements). This may mislead the player about what is unlocked."}], "model_verdict": "", "unparsed": false}, "24138": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24139": {"verdict": "flag", "errors": [{"span": "师团", "category": "terminology", "severity": "major", "description": "The target uses '师团' for 'дивизий' (divisions), but the approved glossary term is '师'."}], "model_verdict": "", "unparsed": false}, "24140": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24141": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24142": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24143": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24144": {"verdict": "pass", "errors": [{"span": "MAX", "category": "register", "severity": "minor", "description": "The target uses the English 'MAX' rather than a Chinese equivalent like '最大'. This does not change the meaning for the player but departs from the expected Chinese locale and the formal military register of the game."}], "model_verdict": "", "unparsed": false}, "24145": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24146": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24147": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24148": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24149": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24150": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24151": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24152": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24153": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24154": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24155": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24156": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24157": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24158": {"verdict": "flag", "errors": [{"category": "terminology", "description": "The target uses '省' for 'province', but the glossary specifies '省份' for 'провинцию'. This deviation from the approved term could cause inconsistency, though the player still understands.", "severity": "major", "span": "省"}], "model_verdict": "", "unparsed": false}, "24159": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24160": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24161": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24162": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24163": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24164": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24165": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24166": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24167": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24168": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24169": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24170": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24171": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24172": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24173": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24174": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24175": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24176": {"verdict": "reject", "errors": [{"span": "从省份{2}袭击了我们的省份{1}", "category": "mistranslation", "severity": "critical", "description": "The target says 'from province {2} attacked our province {1}', which means the enemy air force {0} is attacking from province {2}. The source says the enemy air force {0} attacked province {1}, and the attack came 'from provinces: {2}', which means {2} is the origin province. This inverts the roles of {1} and {2}, misleading the player about which province was attacked and which was the origin."}], "model_verdict": "", "unparsed": false}, "24177": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24178": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24179": {"verdict": "flag", "errors": [{"span": "突袭", "category": "terminology", "severity": "major", "description": "The target translates 'штурма' as '突袭' (raid/surprise attack), whereas the approved glossary term is '进攻' (assault/offensive). A player familiar with the game's terms might misunderstand the type of action taken."}], "model_verdict": "", "unparsed": false}, "24180": {"verdict": "flag", "errors": [{"span": "省份{0}防御工事失败防御结果", "category": "fluency", "severity": "major", "description": "The target concatenates nouns and verbs into an ungrammatical phrase meaning 'Province {0} fortifications fail defense result'. This is not a complete sentence; the source is a descriptive header 'Результаты провальной обороны укреплений в провинции {0}' ('Results of the failed defense of fortifications in province {0}')."}], "model_verdict": "", "unparsed": false}, "24181": {"verdict": "flag", "errors": [{"span": "省份{0}防御工事失败进攻结果", "category": "fluency", "severity": "major", "description": "The target is an ungrammatical string meaning 'Province {0} fortifications fail assault result'. The source is a descriptive phrase 'Результаты провального штурма укреплений в провинции {0}' ('Results of the failed assault on fortifications in province {0}'). The target lacks a normal Chinese structure for such a header, such as starting with the event result."}], "model_verdict": "", "unparsed": false}, "24182": {"verdict": "flag", "errors": [{"span": "省份{0}防御工事成功防御结果", "category": "fluency", "severity": "major", "description": "The target is an ungrammatical string meaning 'Province {0} fortifications successful defense result'. The source is a descriptive phrase 'Результаты удачной обороны укреплений в провинции {0}' ('Results of the successful defense of fortifications in province {0}'). The target lacks the standard grammatical structure for a result header in Chinese."}], "model_verdict": "", "unparsed": false}, "24183": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24184": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24185": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24186": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24187": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24188": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24189": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24190": {"verdict": "flag", "errors": [{"span": "防御工事惨败", "category": "omission", "severity": "major", "description": "The target says '防御工事惨败' which means 'fortifications catastrophic defeat', omitting the word 'оборона' (defence). The source states a 'failed defence of fortifications', not merely a defeat of the fortifications themselves."}], "model_verdict": "", "unparsed": false}, "24191": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24192": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24193": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24194": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24195": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24196": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24197": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24198": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24199": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24200": {"verdict": "reject", "errors": [{"category": "mistranslation", "description": "The target says '幸存国家', which means 'surviving countries', whereas the source 'Выжившие страны' means 'survivors of the country' (a genitive construction referring to survivors belonging to a specific country).", "severity": "critical", "span": "幸存国家"}], "model_verdict": "", "unparsed": false}, "24201": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24202": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24203": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24204": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24205": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24206": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24207": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24208": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24209": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24210": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24211": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24212": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24213": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24214": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24215": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24216": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24217": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24218": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24219": {"verdict": "flag", "errors": [{"span": "已服役足够长时间", "category": "mistranslation", "severity": "minor", "description": "The target says \"has served enough time,\" while the source \"прожила достаточно долго\" means \"has lived/existed long enough.\" The shift from living to serving is minor and does not mislead."}, {"span": "42省", "category": "terminology", "severity": "major", "description": "The glossary requires \"省份\" for \"province\" (провинции), but the rendered target uses \"省\" instead. This violates the approved term."}], "model_verdict": "", "unparsed": false}, "24220": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24221": {"verdict": "reject", "errors": [{"span": "一支{0}级别的{1}师", "category": "mistranslation", "severity": "critical", "description": "The target says '一支3级别的7师', which means 'a level-3 7th division', swapping the division number ({0}) and the level number ({1}), whereas the source says 'дивизия 3 уровня 7' meaning 'division 3 of level 7'. The player would be misled about which division died and at what experience level."}, {"span": "级别", "category": "terminology", "severity": "major", "description": "The target uses '级别' for 'уровня', whereas the approved glossary term is '等级'."}], "model_verdict": "", "unparsed": false}, "24222": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24223": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24224": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24225": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24226": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24227": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24228": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24229": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24230": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24231": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24232": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24233": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24234": {"verdict": "pass", "errors": [{"category": "omission", "description": "The target omits the word for 'country' (as in 'страну 3' → '3'), so the rendered text '要向3派遣商队吗？' reads as 'dispatch caravan to 3', which could be slightly ambiguous, whereas the source explicitly says 'to country 3'.", "severity": "minor", "span": "страну"}], "model_verdict": "", "unparsed": false}, "24235": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24236": {"verdict": "pass", "errors": [{"span": "可用的省份选择护航", "category": "fluency", "severity": "minor", "description": "The target phrase means 'available provinces choose escort', which is grammatically awkward. The source says 'Нет доступных провинций для выбора охраны', meaning 'No available provinces for choosing escort'. The target is missing a preposition equivalent to 'for' (e.g., '可供选择护航的省份' or '用于选择护航的省份'), making the relationship between the provinces and the action unclear."}], "model_verdict": "", "unparsed": false}, "24237": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24238": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24239": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24240": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24241": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24242": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24243": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24244": {"verdict": "pass", "errors": [{"category": "mistranslation", "description": "The target says '地面单位', which means 'ground units', whereas the source says 'наземной технике', meaning 'ground vehicles/equipment'. The translation uses a generic term instead of the specific vehicle reference, losing the distinction between vehicles and infantry and creating a tautology with the following '步兵'.", "severity": "minor", "span": "地面单位"}], "model_verdict": "", "unparsed": false}, "24245": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24246": {"verdict": "flag", "errors": [{"span": "累计经验与升级所需经验", "category": "mistranslation", "severity": "major", "description": "The target rephrases the source into a single noun phrase 'accumulated experience and experience needed to level up'. The source explicitly lists two separate items: 'Accumulated experience' AND 'experience necessary to advance to the next level'. The player may misunderstand this as a single value or a sum, rather than two distinct data points, which could be confusing in a stats widget."}], "model_verdict": "", "unparsed": false}, "24247": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24248": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24249": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24250": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24251": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24252": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}, "24253": {"verdict": "pass", "errors": [], "model_verdict": "", "unparsed": false}}
+{
+  "24130": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "支付{[PARAM1]}以获得{[PARAM0]}%收入加成",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "The target says 'pay {[PARAM1]} to get {[PARAM0]}% income bonus', which means the player must spend a resource to receive the bonus. The source says 'receive {[PARAM0]}% to income for {[PARAM1]}', meaning the bonus is granted for a duration of {[PARAM1]} turns with no cost mentioned. This misinforms the player about a core game mechanic."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24131": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24132": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24133": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24134": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24135": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24136": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24137": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "槽位",
+        "category": "addition",
+        "severity": "major",
+        "description": "The target says '额外增援槽位' (additional reinforcement slots), adding '槽位' (slots) that does not appear in the source, which only says 'дополнительных подкреплений' (additional reinforcements). This may mislead the player about what is unlocked."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24138": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24139": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "师团",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The target uses '师团' for 'дивизий' (divisions), but the approved glossary term is '师'."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24140": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24141": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24142": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24143": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24144": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "span": "MAX",
+        "category": "register",
+        "severity": "minor",
+        "description": "The target uses the English 'MAX' rather than a Chinese equivalent like '最大'. This does not change the meaning for the player but departs from the expected Chinese locale and the formal military register of the game."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24145": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24146": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24147": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24148": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24149": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24150": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24151": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24152": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24153": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24154": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24155": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24156": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24157": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24158": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "terminology",
+        "description": "The target uses '省' for 'province', but the glossary specifies '省份' for 'провинцию'. This deviation from the approved term could cause inconsistency, though the player still understands.",
+        "severity": "major",
+        "span": "省"
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24159": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24160": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24161": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24162": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24163": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24164": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24165": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24166": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24167": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24168": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24169": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24170": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24171": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24172": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24173": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24174": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24175": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24176": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "从省份{2}袭击了我们的省份{1}",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "The target says 'from province {2} attacked our province {1}', which means the enemy air force {0} is attacking from province {2}. The source says the enemy air force {0} attacked province {1}, and the attack came 'from provinces: {2}', which means {2} is the origin province. This inverts the roles of {1} and {2}, misleading the player about which province was attacked and which was the origin."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24177": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24178": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24179": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "突袭",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The target translates 'штурма' as '突袭' (raid/surprise attack), whereas the approved glossary term is '进攻' (assault/offensive). A player familiar with the game's terms might misunderstand the type of action taken."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24180": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "省份{0}防御工事失败防御结果",
+        "category": "fluency",
+        "severity": "major",
+        "description": "The target concatenates nouns and verbs into an ungrammatical phrase meaning 'Province {0} fortifications fail defense result'. This is not a complete sentence; the source is a descriptive header 'Результаты провальной обороны укреплений в провинции {0}' ('Results of the failed defense of fortifications in province {0}')."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24181": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "省份{0}防御工事失败进攻结果",
+        "category": "fluency",
+        "severity": "major",
+        "description": "The target is an ungrammatical string meaning 'Province {0} fortifications fail assault result'. The source is a descriptive phrase 'Результаты провального штурма укреплений в провинции {0}' ('Results of the failed assault on fortifications in province {0}'). The target lacks a normal Chinese structure for such a header, such as starting with the event result."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24182": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "省份{0}防御工事成功防御结果",
+        "category": "fluency",
+        "severity": "major",
+        "description": "The target is an ungrammatical string meaning 'Province {0} fortifications successful defense result'. The source is a descriptive phrase 'Результаты удачной обороны укреплений в провинции {0}' ('Results of the successful defense of fortifications in province {0}'). The target lacks the standard grammatical structure for a result header in Chinese."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24183": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24184": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24185": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24186": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24187": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24188": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24189": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24190": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "防御工事惨败",
+        "category": "omission",
+        "severity": "major",
+        "description": "The target says '防御工事惨败' which means 'fortifications catastrophic defeat', omitting the word 'оборона' (defence). The source states a 'failed defence of fortifications', not merely a defeat of the fortifications themselves."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24191": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24192": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24193": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24194": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24195": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24196": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24197": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24198": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24199": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24200": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '幸存国家', which means 'surviving countries', whereas the source 'Выжившие страны' means 'survivors of the country' (a genitive construction referring to survivors belonging to a specific country).",
+        "severity": "critical",
+        "span": "幸存国家"
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24201": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24202": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24203": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24204": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24205": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24206": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24207": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24208": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24209": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24210": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24211": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24212": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24213": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24214": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24215": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24216": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24217": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24218": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24219": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "已服役足够长时间",
+        "category": "mistranslation",
+        "severity": "minor",
+        "description": "The target says \"has served enough time,\" while the source \"прожила достаточно долго\" means \"has lived/existed long enough.\" The shift from living to serving is minor and does not mislead."
+      },
+      {
+        "span": "42省",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The glossary requires \"省份\" for \"province\" (провинции), but the rendered target uses \"省\" instead. This violates the approved term."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24220": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24221": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "一支{0}级别的{1}师",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "The target says '一支3级别的7师', which means 'a level-3 7th division', swapping the division number ({0}) and the level number ({1}), whereas the source says 'дивизия 3 уровня 7' meaning 'division 3 of level 7'. The player would be misled about which division died and at what experience level."
+      },
+      {
+        "span": "级别",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The target uses '级别' for 'уровня', whereas the approved glossary term is '等级'."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24222": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24223": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24224": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24225": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24226": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24227": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24228": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24229": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24230": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24231": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24232": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24233": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24234": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "category": "omission",
+        "description": "The target omits the word for 'country' (as in 'страну 3' → '3'), so the rendered text '要向3派遣商队吗？' reads as 'dispatch caravan to 3', which could be slightly ambiguous, whereas the source explicitly says 'to country 3'.",
+        "severity": "minor",
+        "span": "страну"
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24235": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24236": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "span": "可用的省份选择护航",
+        "category": "fluency",
+        "severity": "minor",
+        "description": "The target phrase means 'available provinces choose escort', which is grammatically awkward. The source says 'Нет доступных провинций для выбора охраны', meaning 'No available provinces for choosing escort'. The target is missing a preposition equivalent to 'for' (e.g., '可供选择护航的省份' or '用于选择护航的省份'), making the relationship between the provinces and the action unclear."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24237": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24238": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24239": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24240": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24241": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24242": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24243": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24244": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '地面单位', which means 'ground units', whereas the source says 'наземной технике', meaning 'ground vehicles/equipment'. The translation uses a generic term instead of the specific vehicle reference, losing the distinction between vehicles and infantry and creating a tautology with the following '步兵'.",
+        "severity": "minor",
+        "span": "地面单位"
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24245": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24246": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "累计经验与升级所需经验",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target rephrases the source into a single noun phrase 'accumulated experience and experience needed to level up'. The source explicitly lists two separate items: 'Accumulated experience' AND 'experience necessary to advance to the next level'. The player may misunderstand this as a single value or a sum, rather than two distinct data points, which could be confusing in a stats widget."
+      }
+    ],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24247": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24248": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24249": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24250": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24251": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24252": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  },
+  "24253": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "",
+    "unparsed": false
+  }
+}

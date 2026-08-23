@@ -29,6 +29,7 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 [[annotations]]
 path = [
   ".claude/skills/**.md",
+  ".omp/skills/**.md",
   "docs/**.md",
   "docs/misc/**.csv",
   "docs/misc/**.json",
@@ -40,6 +41,10 @@ path = [
   "loc_kit_ingest/.gitignore",
   "loc_kit_ingest/pytest.ini",
   "loc_kit_ingest/tests/fixtures/**",
+  "misc/**.json",
+  "misc/**.md",
+  "misc/**.tsv",
+  "prototypes/**.html",
   "weblate/trans/judge_prompts/**.txt",
   "weblate/trans/prompts/**.txt",
   "weblate_customization/pyproject.toml"

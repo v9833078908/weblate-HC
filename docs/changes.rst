@@ -8,15 +8,13 @@ Weblate 2026.8.1
 * Added an optional :ref:`LLM judge <llm-judge>` automatic translation mode, where two independently configured language models review each string in a filter and record a per-string verdict; a rejected string is held in the existing :guilabel:`Needs editing` queue for a human decision instead of shipping automatically.
 * Major LLM-judge verdicts are now repaired once when possible and otherwise held in :guilabel:`Needs checking`, so they are excluded from guarded commits instead of shipping automatically.
 * Added guarded ``check_judge_repair_routes`` and ``enable_review_workflow`` management commands for the LLM judge rollout.
-* Components can now exchange all language targets through one multilingual CSV
-  or XLSX spreadsheet, with previewed imports that protect keys and placeholders.
+* Components can now exchange all language targets through one multilingual CSV or XLSX spreadsheet, with previewed imports that protect keys and placeholders.
 
 .. rubric:: Improvements
 
 * The component :guilabel:`Files` menu can now download all translations as monolingual JSON files in a ZIP archive, for components with a template.
 * Project-level :ref:`automatic suggestion <machine-translation-setup>` configuration now overrides the site-wide one field by field, so a project can set its own translator persona, style, and language-specific instructions without restating credentials.
-* LLM machine translation now records per-request token usage and cost,
-  reportable via the ``llm_usage_report`` management command.
+* LLM machine translation now records per-request token usage and cost, reportable via the ``llm_usage_report`` management command.
 * Large language model machine translation services now receive the note left by developers for a string, see :ref:`llm-translation-context`.
 * Added optional :ref:`TBX glossary import from CSV, TSV, and XLSX tables <uploading-glossary-tables>`, with a locally validated profile proposal path.
 * Glossary tables with only language columns are now mapped deterministically without contacting the automatic analyzer, and the sheet-selection step is skipped for single-sheet uploads, see :ref:`uploading-glossary-tables`.
@@ -46,8 +44,7 @@ Weblate 2026.8.1
 
 .. rubric:: Bug fixes
 
-* French punctuation spacing and automatic translation no longer modify syntax
-  in Hero Craft conditional game placeholders.
+* French punctuation spacing and automatic translation no longer modify syntax in Hero Craft conditional game placeholders.
 * Large language model machine translation services no longer fail when the optional persona and style settings are absent from the stored configuration, as happens when the service is installed through the REST API.
 * Repository actions now require permission on every component sharing the affected repository, including linked components in other projects.
 * Large language model machine translation services now tolerate replies that echo reference fields such as the string key, accept an unwrapped single result, and retry a rejected batch in halves instead of discarding all its strings.

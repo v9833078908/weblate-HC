@@ -1,1 +1,1034 @@
-{"24130": {"verdict": "reject", "errors": [{"span": "支付{[PARAM1]}以获得{[PARAM0]}%收入加成", "category": "mistranslation", "severity": "critical", "description": "The target says 'pay {[PARAM1]} to gain {[PARAM0]}% income bonus', which means the player must pay a cost to receive the bonus, whereas the source says 'activate it until the end of the mission and receive {[PARAM0]}% to income for {[PARAM1]}', meaning the campaign runs until mission end and yields a bonus funded by the game, not paid by the player. The roles of cost and reward are reversed."}], "model_verdict": "reject", "unparsed": false}, "24131": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24132": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24133": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24134": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24135": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24136": {"verdict": "flag", "errors": [{"span": "支付", "category": "mistranslation", "severity": "major", "description": "The target says '支付' (pay), which means the player must spend resources, whereas the source says 'за' (for), which in this context means 'in exchange for' without implying cost or payment."}], "model_verdict": "flag", "unparsed": false}, "24137": {"verdict": "flag", "errors": [{"span": "等级", "category": "terminology", "severity": "major", "description": "The target uses '等级' for 'уровень', but the glossary does not list this pair; the approved term for 'уровень' is '级' as used in segment 3, making this a deviation from the project's terminology standard."}], "model_verdict": "flag", "unparsed": false}, "24138": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24139": {"verdict": "flag", "errors": [{"span": "省份", "category": "terminology", "severity": "major", "description": "The glossary specifies 'провинции' → '省份', but in the target, '省份' appears after the placeholder as '3省份', which is incorrect word order; the correct structure should place the term before the value, like '省份3', to match the source structure 'провинции 3'."}, {"span": "师团", "category": "terminology", "severity": "major", "description": "The target uses '师团', but the glossary specifies 'дивизий' → '师'; '师团' is not the approved term and introduces an inconsistent or incorrect rendering of military unit."}], "model_verdict": "flag", "unparsed": false}, "24140": {"verdict": "flag", "errors": [{"category": "mistranslation", "description": "The target says '敌人中计了！' which means 'The enemy has fallen for a trick!', whereas the source says 'Враг попался в ловушку!' meaning 'The enemy has stepped into a trap!'. While both imply the enemy was caught, '中计' specifically refers to being deceived by a scheme or ruse, while 'ловушка' (trap) is broader and does not necessarily imply deception. The nuance shifts from physical entrapment to psychological trickery, which may mislead the player about the nature of the event.", "severity": "major", "span": "敌人中计了！"}], "model_verdict": "flag", "unparsed": false}, "24141": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24142": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24143": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24144": {"verdict": "pass", "errors": [{"category": "terminology", "description": "The target uses 'MAX' in Latin script, whereas the source 'МАКС' is in Cyrillic but represents the same word. While 'MAX' is understandable, the glossary does not specify a preferred form, but consistency with script is expected in localized interfaces. The use of Latin instead of Cyrillic may stand out visually in a fully localized UI, though meaning is preserved. However, since no glossary entry is provided for this string and the meaning is clear, this is a minor issue.", "severity": "minor", "span": "MAX"}], "model_verdict": "flag", "unparsed": false}, "24145": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24146": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24147": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24148": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24149": {"verdict": "flag", "errors": [{"category": "terminology", "description": "The target says '征战历程', which means 'military campaign history' or 'journey of conquest', whereas the source says 'Боевой путь', which means 'Combat Path' or 'Path of Battle'. The glossary explicitly approves '征战历程' as the correct term for 'Боевой путь', so the translation matches the approved rendering.", "severity": "major", "span": "征战历程"}], "model_verdict": "flag", "unparsed": false}, "24150": {"verdict": "pass", "errors": [{"span": "省份{0}的战斗", "category": "fluency", "severity": "minor", "description": "The target says '省份{0}的战斗', which places the placeholder {0} after '省份' without a space or particle, resulting in a slightly awkward but understandable phrase. While the word order is acceptable, native Chinese tends to prefer a more natural modifier structure such as '{0}省份的战斗' for smoother reading. However, meaning is preserved and the player can still understand the intended message."}], "model_verdict": "flag", "unparsed": false}, "24151": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24152": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24153": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24154": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24155": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24156": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24157": {"verdict": "reject", "errors": [{"span": "15", "category": "mistranslation", "severity": "critical", "description": "The target says '15' as a standalone sentence, which means a number is incorrectly placed and not integrated into the sentence, whereas the source includes it as a value inserted via placeholder {2} and expects it to be part of a structured message."}], "model_verdict": "reject", "unparsed": false}, "24158": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24159": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24160": {"verdict": "flag", "errors": [{"category": "terminology", "description": "The target says '第{0}天' (day {0}), which means a calendar day or natural day, whereas the source says '{0} ход' (turn {0}), which is a discrete game turn. The glossary requires 'ход' to render as '回合', not '天'.", "severity": "major", "span": "第{0}天"}, {"category": "omission", "description": "The source specifies 'возвращения конвоя из страны {1}' (return of the convoy from country {1}), but the target omits 'country' and renders '{1}' as a bare number. The geopolitical entity 'страны {1}' is not conveyed.", "severity": "minor", "span": "страны {1}"}], "model_verdict": "flag", "unparsed": false}, "24161": {"verdict": "flag", "errors": [{"category": "terminology", "description": "The target says '第{0}天' (day {0}), which means a calendar day or natural day, whereas the source says '{0} ход' (turn {0}), which is a discrete game turn. The glossary requires 'ход' to render as '回合', not '天'.", "severity": "major", "span": "第{0}天"}, {"category": "omission", "description": "The source specifies 'из страны {1}' (from country {1}), but the target renders '{1}' without indicating it is a country. The geopolitical entity is not conveyed.", "severity": "minor", "span": "страны {1}"}], "model_verdict": "flag", "unparsed": false}, "24162": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24163": {"verdict": "pass", "errors": [{"category": "fluency", "description": "The target says '补偿为{0}资源', which is grammatically awkward and unnatural in Chinese. The more fluent and standard form would be '补偿为{0}个资源' or '获得{0}资源作为补偿'. The current form omits the measure word, reducing clarity.", "severity": "minor", "span": "补偿为{0}资源"}], "model_verdict": "pass", "unparsed": false}, "24164": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24165": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24166": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24167": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24168": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24169": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24170": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24171": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24172": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24173": {"verdict": "reject", "errors": [{"span": "受到伤害：{4}", "category": "mistranslation", "severity": "critical", "description": "The target says '受到伤害：{4}', which means 'damage received: {4}', whereas the source says 'Получено урона: {4}', meaning 'damage received: {4}' — but in context, the subject is the enemy causing damage, not the player receiving it. The correct interpretation should be 'caused damage', not 'received damage'. The target misleads the player about who suffered the damage."}], "model_verdict": "reject", "unparsed": false}, "24174": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24175": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24176": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24177": {"verdict": "pass", "errors": [{"category": "mistranslation", "description": "The target says '敌方省份{0}空袭结果', which means 'Results of air raid on enemy province {0}', whereas the source says 'Results of air raid on enemy province {0}'. While the meaning is close, the target reverses perspective: it presents the raid as if conducted *by* the enemy on their own province, not *by us* on the enemy's. However, the placeholders and damage lines are correctly ordered and match the rendered source. The phrase '敌方省份{0}空袭结果' ambiguously modifies '空袭' — it could mean 'air raid on enemy province' or 'enemy's air raid on province'. Given the rest of the message describes damage to *our* air force and enemy ground troops, the action must be *our* raid. The current phrasing fails to clarify agency clearly, but does not invert it. Upon closer inspection, '敌方省份{0}空袭结果' is a condensed form meaning 'air raid results on enemy province {0}', a common pattern in Chinese military reports. This is a stylistic compression, not a mistranslation. No actual error.", "severity": "minor", "span": "敌方省份{0}空袭结果"}], "model_verdict": "pass", "unparsed": false}, "24178": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24179": {"verdict": "flag", "errors": [{"category": "terminology", "description": "The target uses '突袭' (surprise attack/raid), whereas the glossary requires 'штурма' to be rendered as '进攻' (assault). '突袭' emphasizes surprise, while 'штурма' refers specifically to a direct, forceful attack on fortified positions. The approved term '进攻' better matches the military context of storming fortifications. The deviation is against the glossary and changes the nuance.", "severity": "major", "span": "突袭"}], "model_verdict": "flag", "unparsed": false}, "24180": {"verdict": "flag", "errors": [{"category": "mistranslation", "description": "The target says '防御工事失败防御结果' which means 'defensive works failed defense result', whereas the source says 'результаты провальной обороны укреплений' meaning 'results of a failed defense of fortifications'. The word 'обороны' (defense) is repeated incorrectly in the target, creating redundancy and confusion. The correct structure should distinguish between the event (failed defense) and the object (fortifications).", "severity": "major", "span": "防御工事失败防御结果"}], "model_verdict": "flag", "unparsed": false}, "24181": {"verdict": "flag", "errors": [{"category": "mistranslation", "description": "The target says '防御工事失败进攻结果' which means 'defensive works failed attack result', whereas the source says 'результаты провального штурма укреплений' meaning 'results of a failed assault on fortifications'. The target incorrectly places '进攻' (attack) after '失败' (failure), making it read as if the attack itself failed, rather than clearly stating that the assault on fortifications failed. The structure should reflect that the *assault* on fortifications failed, not that the attack was a failed attack.", "severity": "major", "span": "防御工事失败进攻结果"}], "model_verdict": "flag", "unparsed": false}, "24182": {"verdict": "flag", "errors": [{"category": "mistranslation", "description": "The target says '防御工事成功防御结果' which means 'defensive works successful defense result', whereas the source says 'результаты удачной обороны укреплений' meaning 'results of a successful defense of fortifications'. The repetition of '防御' (defense) creates a redundant and awkward phrase. The target incorrectly implies 'successful defense of defensive works' instead of 'successful defense of fortifications', distorting the syntactic relationship.", "severity": "major", "span": "防御工事成功防御结果"}], "model_verdict": "flag", "unparsed": false}, "24183": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24184": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24185": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24186": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24187": {"verdict": "flag", "errors": [{"span": "防御工事进攻失败", "category": "mistranslation", "severity": "major", "description": "The target says '防御工事进攻失败' which means 'failure of attacking fortifications', whereas the source 'Провальный штурм укреплений' means 'failed assault on fortifications'. The translation reverses the modifier-head order, making 'fortifications' appear to modify 'attack' as if it were an adjective-noun compound, while the source clearly treats 'штурм' (assault) as the main noun modified by 'провальный' (failed). This distorts syntactic structure and emphasis."}], "model_verdict": "flag", "unparsed": false}, "24188": {"verdict": "flag", "errors": [{"span": "敌军防御工事进攻失败", "category": "mistranslation", "severity": "major", "description": "The target says '敌军防御工事进攻失败' which means 'failure of attacking enemy fortifications', whereas the source 'Провальный штурм укреплений врагами' means 'failed assault on fortifications by the enemy'. The target incorrectly attributes the assault to the enemy as the target of attack, rather than correctly indicating the enemy as the attacker. This inverts agency and misleads about who performed the action."}], "model_verdict": "flag", "unparsed": false}, "24189": {"verdict": "flag", "errors": [{"span": "防御工事进攻成功", "category": "mistranslation", "severity": "major", "description": "The target says '防御工事进攻成功' which means 'success of attacking fortifications', whereas the source 'Успешный штурм укреплений' means 'successful assault on fortifications'. As in id 2, the translation distorts the syntactic structure by reversing the modifier-head order, making 'fortifications' appear to compound 'attack' rather than being the object of assault. This misrepresents grammatical relations and emphasis."}], "model_verdict": "flag", "unparsed": false}, "24190": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24191": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24192": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24193": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24194": {"verdict": "reject", "errors": [{"category": "mistranslation", "description": "The target says '非装甲单位承受伤害', which means 'unarmored units received damage', whereas the source says 'Получено урона по небронированным', meaning 'damage received by unarmored [targets]'. The subject is what receives damage, not who receives it. The second instance '非装甲单位造成伤害' says 'unarmored units caused damage', which matches 'Нанесено урона по небронированным' (damage dealt to unarmored [targets]). The first pair incorrectly reverses the direction of action.", "severity": "critical", "span": "非装甲单位承受伤害"}, {"category": "mistranslation", "description": "The target says '装甲单位承受伤害', which means 'armored units received damage', whereas the source says 'Получено урона по бронированным', meaning 'damage received by armored [targets]'. Same issue as above: the Chinese renders the recipient of damage as the agent, which distorts the meaning. The second pair '装甲单位造成伤害' correctly means 'armored units caused damage', matching 'Нанесено урона по бронированным'. The first pair is inverted.", "severity": "critical", "span": "装甲单位承受伤害"}], "model_verdict": "reject", "unparsed": false}, "24195": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24196": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24197": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24198": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24199": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24200": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24201": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24202": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24203": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24204": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24205": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24206": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24207": {"verdict": "reject", "errors": [{"span": "3 个国家 7", "category": "mistranslation", "severity": "critical", "description": "the target says '3 个国家 7', which means '3 countries 7', whereas the source says 'Статус 3 стран 7', meaning 'the status of 7's 3 countries'; the word order in Chinese incorrectly places the number of countries before the country identifier, reversing the syntactic relationship and misrepresenting who owns the status change"}], "model_verdict": "reject", "unparsed": false}, "24208": {"verdict": "reject", "errors": [{"span": "7 状态 15", "category": "mistranslation", "severity": "critical", "description": "the target says '7 状态 15', which means '7 status 15', whereas the source says '7 статус 15', meaning 'status changed from 7 to 15'; the Chinese translation incorrectly treats the first number as a subject and the second as a status value, failing to express a transition between two status levels"}], "model_verdict": "reject", "unparsed": false}, "24209": {"verdict": "reject", "errors": [{"span": "已提升", "category": "mistranslation", "severity": "critical", "description": "the target says '已提升', which means 'has been promoted', whereas the source says 'повышен', meaning 'raised' or 'increased'; in the context of status change, '提升' implies an active achievement or promotion system, while the source is a neutral description of a numeric status increase, leading the player to believe an achievement was earned rather than a value simply changed"}], "model_verdict": "reject", "unparsed": false}, "24210": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24211": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24212": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24213": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24214": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24215": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24216": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24217": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24218": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24219": {"verdict": "flag", "errors": [{"span": "省份", "category": "terminology", "severity": "major", "description": "The target uses '省份' which means 'province', but the glossary specifies 'провинции' should be translated as '省'. Using '省份' instead of '省' violates the approved terminology."}], "model_verdict": "flag", "unparsed": false}, "24220": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24221": {"verdict": "reject", "errors": [{"span": "等级", "category": "terminology", "severity": "major", "description": "the target uses '等级' for 'уровня', but the glossary specifies '等级' as the approved term for 'уровня', however the phrase structure '3级别' is not standard Chinese and contradicts proper placement; 'level' should be translated as '级' when used in a numeral-level construction like 'level 3', but here '级别' means 'grade' or 'tier' and creates ambiguity; the correct term per usage context should be '级', not '级别', making this a violation of glossary intent and proper collocation"}, {"span": "{0}级别", "category": "mistranslation", "severity": "critical", "description": "the target says '{0}级别', which means 'grade {0}' or 'tier {0}', whereas the source says 'дивизия {0} уровня' meaning 'division of level {0}'; in the rendered example, '3级别' reads as 'grade 3', but the source clearly states 'уровня 3' as 'level 3'; in military context, 'level' refers to experience or progression level, not structural grade; this inversion misleads the player about the meaning of the number"}, {"span": "{1}师", "category": "mistranslation", "severity": "critical", "description": "the target places '{1}师' meaning 'Division {1}', but the source has 'дивизия {0} уровня {1}', where {0} is the level and {1} is the division number; in the rendered example, '7师' reads as 'Division 7', but {1} is the level (7), not the division number; the correct order should be '第{1}师 {0}级' or similar to reflect that {1} is the division identifier and {0} is the level; thus, the roles of {0} and {1} are swapped in interpretation, leading the player to believe the division number and level are reversed"}], "model_verdict": "reject", "unparsed": false}, "24222": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24223": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24224": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24225": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24226": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24227": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24228": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24229": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24230": {"verdict": "flag", "errors": [{"span": "回合数", "category": "terminology", "severity": "major", "description": "The target says '回合数', which means 'number of rounds', whereas the source says 'через ходов: {[PARAM0]}' meaning 'in {[PARAM0]} turns'. The term '回合数' incorrectly implies a count or total amount rather than a countdown. The glossary specifies 'ходов' → '回合', so the correct rendering should be '回合' alone, not '回合数'."}], "model_verdict": "flag", "unparsed": false}, "24231": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24232": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24233": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24234": {"verdict": "flag", "errors": [{"span": "回合", "category": "terminology", "severity": "major", "description": "The target uses '回合' correctly per the glossary, but the source phrase '7 ходов' means '7 turns', while the target renders it as '{[PARAM1]}回合' which in Chinese reads as a noun phrase rather than a duration. However, '回合' is the approved term for 'ходов'. The structure is acceptable in context, so this is not a critical error. But since the glossary only confirms 'ходов' → '回合', and the usage here is consistent, no error stands. Re-evaluated: no error."}], "model_verdict": "pass", "unparsed": false}, "24235": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24236": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24237": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24238": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24239": {"verdict": "flag", "errors": [{"span": "Не отправлять", "category": "mistranslation", "severity": "major", "description": "the target says '不派遣', which means 'do not dispatch', whereas the source says 'Не отправлять', meaning 'do not send'; while similar, 'отправлять' and 'отправить' are used consistently in the interface for 'send', and the mismatch in verb aspect or lexical choice breaks consistency with the related option 'Отправить' translated as '派遣'"}], "model_verdict": "flag", "unparsed": false}, "24240": {"verdict": "flag", "errors": [{"category": "terminology", "description": "The target uses '车队' (fleet/convoy of vehicles), which means a general transport unit, whereas the source specifies 'конвой' and the glossary requires '商队' (caravan), a specific type of convoy typically used in trade or overland travel.", "severity": "major", "span": "车队"}], "model_verdict": "flag", "unparsed": false}, "24241": {"verdict": "flag", "errors": [{"category": "terminology", "description": "The target uses '车队' (fleet/convoy of vehicles), which means a general transport unit, whereas the source specifies 'конвоя' and the glossary requires '商队' (caravan), a specific type of convoy for trade or overland travel.", "severity": "major", "span": "车队"}], "model_verdict": "flag", "unparsed": false}, "24242": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24243": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24244": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24245": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24246": {"verdict": "reject", "errors": [{"span": "经验", "category": "mistranslation", "severity": "critical", "description": "the target says '累计经验与升级所需经验' which means 'accumulated experience and experience required for upgrading', whereas the source says 'накопленный опыт и опыта, необходимый для перехода на следующий уровень' which contains a grammatical error in Russian (redundant 'и опыта'), but clearly refers to 'accumulated experience and the experience needed to advance to the next level'; however, the repetition of '经验' in Chinese renders both instances as the same word, which fails to reflect that the source has a case-form mismatch (именительный and родительный падеж), but more critically, the Chinese output appears tautological and obscures the structural issue — yet since the meaning of 'experience toward next level' is preserved, and the glossary does not specify handling of grammatical cases, this is not a critical error. Re-evaluation: no actual meaning loss — the Chinese clearly conveys the two values: current accumulated and required. The source itself is flawed. No error."}], "model_verdict": "pass", "unparsed": false}, "24247": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24248": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24249": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24250": {"verdict": "flag", "errors": [{"category": "mistranslation", "description": "The target says '此后，该省份的所有雷区均被视为已清除', which means 'after this, all minefields in the province are considered cleared', whereas the source says 'считаются уничтоженными' meaning 'are considered destroyed'. 'Cleared' implies removal or neutralization by an external force, while 'destroyed' implies they were detonated in action. This changes the in-game consequence: the player may believe the minefields are safely removed rather than spent through detonation.", "severity": "major", "span": "此后，该省份的所有雷区均被视为已清除"}], "model_verdict": "flag", "unparsed": false}, "24251": {"verdict": "pass", "errors": [], "model_verdict": "pass", "unparsed": false}, "24252": {"verdict": "pass", "errors": [{"category": "mistranslation", "description": "The target says '您可以在一个省份布设超过12个雷区', which means 'you can deploy more than 12 minefields in a province', whereas the source says 'больше 12 минных полей' — 'more than 12 minefields' — but the verb 'установить' means 'to set up' or 'to place', not 'deploy' in a continuous sense. However, the critical error is that the Russian uses 'больше 12', meaning 'more than 12', while the Chinese uses '超过12个', which is correct. But the source actually says 'можете установить больше 12' — 'can set up more than 12', which is grammatically ambiguous in Russian but contextually implies a limit. The bigger issue is that the glossary does not include 'минные поля' or 'мины', but 'Мины' is glossed as '地雷'. The term '雷区' (minefield) is acceptable as a contextual rendering of 'мины' in military context. No terminology violation.", "severity": "minor", "span": "布设超过12个雷区"}], "model_verdict": "flag", "unparsed": false}, "24253": {"verdict": "pass", "errors": [{"category": "fluency", "description": "The target starts with '是否想立即花费', which is grammatically awkward in Chinese. The more natural word order would be '想不想立即花费' or '是否想立即花费'. However, '是否想' is acceptable in formal questions. The rendered target correctly substitutes {0} with '3', showing correct placeholder handling. The use of '修改版' for 'модифицированный' is accurate. No markup error: <color=\"white\">{[NAME]}</color> is preserved correctly.", "severity": "minor", "span": "是否想立即花费"}], "model_verdict": "flag", "unparsed": false}}
+{
+  "24130": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "支付{[PARAM1]}以获得{[PARAM0]}%收入加成",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "The target says 'pay {[PARAM1]} to gain {[PARAM0]}% income bonus', which means the player must pay a cost to receive the bonus, whereas the source says 'activate it until the end of the mission and receive {[PARAM0]}% to income for {[PARAM1]}', meaning the campaign runs until mission end and yields a bonus funded by the game, not paid by the player. The roles of cost and reward are reversed."
+      }
+    ],
+    "model_verdict": "reject",
+    "unparsed": false
+  },
+  "24131": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24132": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24133": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24134": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24135": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24136": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "支付",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target says '支付' (pay), which means the player must spend resources, whereas the source says 'за' (for), which in this context means 'in exchange for' without implying cost or payment."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24137": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "等级",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The target uses '等级' for 'уровень', but the glossary does not list this pair; the approved term for 'уровень' is '级' as used in segment 3, making this a deviation from the project's terminology standard."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24138": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24139": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "省份",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The glossary specifies 'провинции' → '省份', but in the target, '省份' appears after the placeholder as '3省份', which is incorrect word order; the correct structure should place the term before the value, like '省份3', to match the source structure 'провинции 3'."
+      },
+      {
+        "span": "师团",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The target uses '师团', but the glossary specifies 'дивизий' → '师'; '师团' is not the approved term and introduces an inconsistent or incorrect rendering of military unit."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24140": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '敌人中计了！' which means 'The enemy has fallen for a trick!', whereas the source says 'Враг попался в ловушку!' meaning 'The enemy has stepped into a trap!'. While both imply the enemy was caught, '中计' specifically refers to being deceived by a scheme or ruse, while 'ловушка' (trap) is broader and does not necessarily imply deception. The nuance shifts from physical entrapment to psychological trickery, which may mislead the player about the nature of the event.",
+        "severity": "major",
+        "span": "敌人中计了！"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24141": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24142": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24143": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24144": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "category": "terminology",
+        "description": "The target uses 'MAX' in Latin script, whereas the source 'МАКС' is in Cyrillic but represents the same word. While 'MAX' is understandable, the glossary does not specify a preferred form, but consistency with script is expected in localized interfaces. The use of Latin instead of Cyrillic may stand out visually in a fully localized UI, though meaning is preserved. However, since no glossary entry is provided for this string and the meaning is clear, this is a minor issue.",
+        "severity": "minor",
+        "span": "MAX"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24145": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24146": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24147": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24148": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24149": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "terminology",
+        "description": "The target says '征战历程', which means 'military campaign history' or 'journey of conquest', whereas the source says 'Боевой путь', which means 'Combat Path' or 'Path of Battle'. The glossary explicitly approves '征战历程' as the correct term for 'Боевой путь', so the translation matches the approved rendering.",
+        "severity": "major",
+        "span": "征战历程"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24150": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "span": "省份{0}的战斗",
+        "category": "fluency",
+        "severity": "minor",
+        "description": "The target says '省份{0}的战斗', which places the placeholder {0} after '省份' without a space or particle, resulting in a slightly awkward but understandable phrase. While the word order is acceptable, native Chinese tends to prefer a more natural modifier structure such as '{0}省份的战斗' for smoother reading. However, meaning is preserved and the player can still understand the intended message."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24151": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24152": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24153": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24154": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24155": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24156": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24157": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "15",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "The target says '15' as a standalone sentence, which means a number is incorrectly placed and not integrated into the sentence, whereas the source includes it as a value inserted via placeholder {2} and expects it to be part of a structured message."
+      }
+    ],
+    "model_verdict": "reject",
+    "unparsed": false
+  },
+  "24158": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24159": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24160": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "terminology",
+        "description": "The target says '第{0}天' (day {0}), which means a calendar day or natural day, whereas the source says '{0} ход' (turn {0}), which is a discrete game turn. The glossary requires 'ход' to render as '回合', not '天'.",
+        "severity": "major",
+        "span": "第{0}天"
+      },
+      {
+        "category": "omission",
+        "description": "The source specifies 'возвращения конвоя из страны {1}' (return of the convoy from country {1}), but the target omits 'country' and renders '{1}' as a bare number. The geopolitical entity 'страны {1}' is not conveyed.",
+        "severity": "minor",
+        "span": "страны {1}"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24161": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "terminology",
+        "description": "The target says '第{0}天' (day {0}), which means a calendar day or natural day, whereas the source says '{0} ход' (turn {0}), which is a discrete game turn. The glossary requires 'ход' to render as '回合', not '天'.",
+        "severity": "major",
+        "span": "第{0}天"
+      },
+      {
+        "category": "omission",
+        "description": "The source specifies 'из страны {1}' (from country {1}), but the target renders '{1}' without indicating it is a country. The geopolitical entity is not conveyed.",
+        "severity": "minor",
+        "span": "страны {1}"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24162": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24163": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "category": "fluency",
+        "description": "The target says '补偿为{0}资源', which is grammatically awkward and unnatural in Chinese. The more fluent and standard form would be '补偿为{0}个资源' or '获得{0}资源作为补偿'. The current form omits the measure word, reducing clarity.",
+        "severity": "minor",
+        "span": "补偿为{0}资源"
+      }
+    ],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24164": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24165": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24166": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24167": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24168": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24169": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24170": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24171": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24172": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24173": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "受到伤害：{4}",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "The target says '受到伤害：{4}', which means 'damage received: {4}', whereas the source says 'Получено урона: {4}', meaning 'damage received: {4}' — but in context, the subject is the enemy causing damage, not the player receiving it. The correct interpretation should be 'caused damage', not 'received damage'. The target misleads the player about who suffered the damage."
+      }
+    ],
+    "model_verdict": "reject",
+    "unparsed": false
+  },
+  "24174": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24175": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24176": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24177": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '敌方省份{0}空袭结果', which means 'Results of air raid on enemy province {0}', whereas the source says 'Results of air raid on enemy province {0}'. While the meaning is close, the target reverses perspective: it presents the raid as if conducted *by* the enemy on their own province, not *by us* on the enemy's. However, the placeholders and damage lines are correctly ordered and match the rendered source. The phrase '敌方省份{0}空袭结果' ambiguously modifies '空袭' — it could mean 'air raid on enemy province' or 'enemy's air raid on province'. Given the rest of the message describes damage to *our* air force and enemy ground troops, the action must be *our* raid. The current phrasing fails to clarify agency clearly, but does not invert it. Upon closer inspection, '敌方省份{0}空袭结果' is a condensed form meaning 'air raid results on enemy province {0}', a common pattern in Chinese military reports. This is a stylistic compression, not a mistranslation. No actual error.",
+        "severity": "minor",
+        "span": "敌方省份{0}空袭结果"
+      }
+    ],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24178": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24179": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "terminology",
+        "description": "The target uses '突袭' (surprise attack/raid), whereas the glossary requires 'штурма' to be rendered as '进攻' (assault). '突袭' emphasizes surprise, while 'штурма' refers specifically to a direct, forceful attack on fortified positions. The approved term '进攻' better matches the military context of storming fortifications. The deviation is against the glossary and changes the nuance.",
+        "severity": "major",
+        "span": "突袭"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24180": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '防御工事失败防御结果' which means 'defensive works failed defense result', whereas the source says 'результаты провальной обороны укреплений' meaning 'results of a failed defense of fortifications'. The word 'обороны' (defense) is repeated incorrectly in the target, creating redundancy and confusion. The correct structure should distinguish between the event (failed defense) and the object (fortifications).",
+        "severity": "major",
+        "span": "防御工事失败防御结果"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24181": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '防御工事失败进攻结果' which means 'defensive works failed attack result', whereas the source says 'результаты провального штурма укреплений' meaning 'results of a failed assault on fortifications'. The target incorrectly places '进攻' (attack) after '失败' (failure), making it read as if the attack itself failed, rather than clearly stating that the assault on fortifications failed. The structure should reflect that the *assault* on fortifications failed, not that the attack was a failed attack.",
+        "severity": "major",
+        "span": "防御工事失败进攻结果"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24182": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '防御工事成功防御结果' which means 'defensive works successful defense result', whereas the source says 'результаты удачной обороны укреплений' meaning 'results of a successful defense of fortifications'. The repetition of '防御' (defense) creates a redundant and awkward phrase. The target incorrectly implies 'successful defense of defensive works' instead of 'successful defense of fortifications', distorting the syntactic relationship.",
+        "severity": "major",
+        "span": "防御工事成功防御结果"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24183": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24184": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24185": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24186": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24187": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "防御工事进攻失败",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target says '防御工事进攻失败' which means 'failure of attacking fortifications', whereas the source 'Провальный штурм укреплений' means 'failed assault on fortifications'. The translation reverses the modifier-head order, making 'fortifications' appear to modify 'attack' as if it were an adjective-noun compound, while the source clearly treats 'штурм' (assault) as the main noun modified by 'провальный' (failed). This distorts syntactic structure and emphasis."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24188": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "敌军防御工事进攻失败",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target says '敌军防御工事进攻失败' which means 'failure of attacking enemy fortifications', whereas the source 'Провальный штурм укреплений врагами' means 'failed assault on fortifications by the enemy'. The target incorrectly attributes the assault to the enemy as the target of attack, rather than correctly indicating the enemy as the attacker. This inverts agency and misleads about who performed the action."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24189": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "防御工事进攻成功",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "The target says '防御工事进攻成功' which means 'success of attacking fortifications', whereas the source 'Успешный штурм укреплений' means 'successful assault on fortifications'. As in id 2, the translation distorts the syntactic structure by reversing the modifier-head order, making 'fortifications' appear to compound 'attack' rather than being the object of assault. This misrepresents grammatical relations and emphasis."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24190": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24191": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24192": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24193": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24194": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '非装甲单位承受伤害', which means 'unarmored units received damage', whereas the source says 'Получено урона по небронированным', meaning 'damage received by unarmored [targets]'. The subject is what receives damage, not who receives it. The second instance '非装甲单位造成伤害' says 'unarmored units caused damage', which matches 'Нанесено урона по небронированным' (damage dealt to unarmored [targets]). The first pair incorrectly reverses the direction of action.",
+        "severity": "critical",
+        "span": "非装甲单位承受伤害"
+      },
+      {
+        "category": "mistranslation",
+        "description": "The target says '装甲单位承受伤害', which means 'armored units received damage', whereas the source says 'Получено урона по бронированным', meaning 'damage received by armored [targets]'. Same issue as above: the Chinese renders the recipient of damage as the agent, which distorts the meaning. The second pair '装甲单位造成伤害' correctly means 'armored units caused damage', matching 'Нанесено урона по бронированным'. The first pair is inverted.",
+        "severity": "critical",
+        "span": "装甲单位承受伤害"
+      }
+    ],
+    "model_verdict": "reject",
+    "unparsed": false
+  },
+  "24195": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24196": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24197": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24198": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24199": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24200": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24201": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24202": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24203": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24204": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24205": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24206": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24207": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "3 个国家 7",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "the target says '3 个国家 7', which means '3 countries 7', whereas the source says 'Статус 3 стран 7', meaning 'the status of 7's 3 countries'; the word order in Chinese incorrectly places the number of countries before the country identifier, reversing the syntactic relationship and misrepresenting who owns the status change"
+      }
+    ],
+    "model_verdict": "reject",
+    "unparsed": false
+  },
+  "24208": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "7 状态 15",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "the target says '7 状态 15', which means '7 status 15', whereas the source says '7 статус 15', meaning 'status changed from 7 to 15'; the Chinese translation incorrectly treats the first number as a subject and the second as a status value, failing to express a transition between two status levels"
+      }
+    ],
+    "model_verdict": "reject",
+    "unparsed": false
+  },
+  "24209": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "已提升",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "the target says '已提升', which means 'has been promoted', whereas the source says 'повышен', meaning 'raised' or 'increased'; in the context of status change, '提升' implies an active achievement or promotion system, while the source is a neutral description of a numeric status increase, leading the player to believe an achievement was earned rather than a value simply changed"
+      }
+    ],
+    "model_verdict": "reject",
+    "unparsed": false
+  },
+  "24210": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24211": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24212": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24213": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24214": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24215": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24216": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24217": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24218": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24219": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "省份",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The target uses '省份' which means 'province', but the glossary specifies 'провинции' should be translated as '省'. Using '省份' instead of '省' violates the approved terminology."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24220": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24221": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "等级",
+        "category": "terminology",
+        "severity": "major",
+        "description": "the target uses '等级' for 'уровня', but the glossary specifies '等级' as the approved term for 'уровня', however the phrase structure '3级别' is not standard Chinese and contradicts proper placement; 'level' should be translated as '级' when used in a numeral-level construction like 'level 3', but here '级别' means 'grade' or 'tier' and creates ambiguity; the correct term per usage context should be '级', not '级别', making this a violation of glossary intent and proper collocation"
+      },
+      {
+        "span": "{0}级别",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "the target says '{0}级别', which means 'grade {0}' or 'tier {0}', whereas the source says 'дивизия {0} уровня' meaning 'division of level {0}'; in the rendered example, '3级别' reads as 'grade 3', but the source clearly states 'уровня 3' as 'level 3'; in military context, 'level' refers to experience or progression level, not structural grade; this inversion misleads the player about the meaning of the number"
+      },
+      {
+        "span": "{1}师",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "the target places '{1}师' meaning 'Division {1}', but the source has 'дивизия {0} уровня {1}', where {0} is the level and {1} is the division number; in the rendered example, '7师' reads as 'Division 7', but {1} is the level (7), not the division number; the correct order should be '第{1}师 {0}级' or similar to reflect that {1} is the division identifier and {0} is the level; thus, the roles of {0} and {1} are swapped in interpretation, leading the player to believe the division number and level are reversed"
+      }
+    ],
+    "model_verdict": "reject",
+    "unparsed": false
+  },
+  "24222": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24223": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24224": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24225": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24226": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24227": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24228": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24229": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24230": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "回合数",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The target says '回合数', which means 'number of rounds', whereas the source says 'через ходов: {[PARAM0]}' meaning 'in {[PARAM0]} turns'. The term '回合数' incorrectly implies a count or total amount rather than a countdown. The glossary specifies 'ходов' → '回合', so the correct rendering should be '回合' alone, not '回合数'."
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24231": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24232": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24233": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24234": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "回合",
+        "category": "terminology",
+        "severity": "major",
+        "description": "The target uses '回合' correctly per the glossary, but the source phrase '7 ходов' means '7 turns', while the target renders it as '{[PARAM1]}回合' which in Chinese reads as a noun phrase rather than a duration. However, '回合' is the approved term for 'ходов'. The structure is acceptable in context, so this is not a critical error. But since the glossary only confirms 'ходов' → '回合', and the usage here is consistent, no error stands. Re-evaluated: no error."
+      }
+    ],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24235": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24236": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24237": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24238": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24239": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "span": "Не отправлять",
+        "category": "mistranslation",
+        "severity": "major",
+        "description": "the target says '不派遣', which means 'do not dispatch', whereas the source says 'Не отправлять', meaning 'do not send'; while similar, 'отправлять' and 'отправить' are used consistently in the interface for 'send', and the mismatch in verb aspect or lexical choice breaks consistency with the related option 'Отправить' translated as '派遣'"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24240": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "terminology",
+        "description": "The target uses '车队' (fleet/convoy of vehicles), which means a general transport unit, whereas the source specifies 'конвой' and the glossary requires '商队' (caravan), a specific type of convoy typically used in trade or overland travel.",
+        "severity": "major",
+        "span": "车队"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24241": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "terminology",
+        "description": "The target uses '车队' (fleet/convoy of vehicles), which means a general transport unit, whereas the source specifies 'конвоя' and the glossary requires '商队' (caravan), a specific type of convoy for trade or overland travel.",
+        "severity": "major",
+        "span": "车队"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24242": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24243": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24244": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24245": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24246": {
+    "verdict": "reject",
+    "errors": [
+      {
+        "span": "经验",
+        "category": "mistranslation",
+        "severity": "critical",
+        "description": "the target says '累计经验与升级所需经验' which means 'accumulated experience and experience required for upgrading', whereas the source says 'накопленный опыт и опыта, необходимый для перехода на следующий уровень' which contains a grammatical error in Russian (redundant 'и опыта'), but clearly refers to 'accumulated experience and the experience needed to advance to the next level'; however, the repetition of '经验' in Chinese renders both instances as the same word, which fails to reflect that the source has a case-form mismatch (именительный and родительный падеж), but more critically, the Chinese output appears tautological and obscures the structural issue — yet since the meaning of 'experience toward next level' is preserved, and the glossary does not specify handling of grammatical cases, this is not a critical error. Re-evaluation: no actual meaning loss — the Chinese clearly conveys the two values: current accumulated and required. The source itself is flawed. No error."
+      }
+    ],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24247": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24248": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24249": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24250": {
+    "verdict": "flag",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '此后，该省份的所有雷区均被视为已清除', which means 'after this, all minefields in the province are considered cleared', whereas the source says 'считаются уничтоженными' meaning 'are considered destroyed'. 'Cleared' implies removal or neutralization by an external force, while 'destroyed' implies they were detonated in action. This changes the in-game consequence: the player may believe the minefields are safely removed rather than spent through detonation.",
+        "severity": "major",
+        "span": "此后，该省份的所有雷区均被视为已清除"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24251": {
+    "verdict": "pass",
+    "errors": [],
+    "model_verdict": "pass",
+    "unparsed": false
+  },
+  "24252": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "category": "mistranslation",
+        "description": "The target says '您可以在一个省份布设超过12个雷区', which means 'you can deploy more than 12 minefields in a province', whereas the source says 'больше 12 минных полей' — 'more than 12 minefields' — but the verb 'установить' means 'to set up' or 'to place', not 'deploy' in a continuous sense. However, the critical error is that the Russian uses 'больше 12', meaning 'more than 12', while the Chinese uses '超过12个', which is correct. But the source actually says 'можете установить больше 12' — 'can set up more than 12', which is grammatically ambiguous in Russian but contextually implies a limit. The bigger issue is that the glossary does not include 'минные поля' or 'мины', but 'Мины' is glossed as '地雷'. The term '雷区' (minefield) is acceptable as a contextual rendering of 'мины' in military context. No terminology violation.",
+        "severity": "minor",
+        "span": "布设超过12个雷区"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  },
+  "24253": {
+    "verdict": "pass",
+    "errors": [
+      {
+        "category": "fluency",
+        "description": "The target starts with '是否想立即花费', which is grammatically awkward in Chinese. The more natural word order would be '想不想立即花费' or '是否想立即花费'. However, '是否想' is acceptable in formal questions. The rendered target correctly substitutes {0} with '3', showing correct placeholder handling. The use of '修改版' for 'модифицированный' is accurate. No markup error: <color=\"white\">{[NAME]}</color> is preserved correctly.",
+        "severity": "minor",
+        "span": "是否想立即花费"
+      }
+    ],
+    "model_verdict": "flag",
+    "unparsed": false
+  }
+}

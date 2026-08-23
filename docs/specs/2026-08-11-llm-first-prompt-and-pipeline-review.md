@@ -67,22 +67,22 @@ few-shot-ответ демонстрировал сырой UTF-8, то есть
 (`weblate/trans/loc_kit.py:425-443`):
 
 ```python
-    payload = {
-        "model": settings.LOC_KIT_PROFILE_OPENROUTER_MODEL,
-        "stream": False,
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "loc_kit_profile_envelope",
-                "strict": True,
-                "schema": _openrouter_response_schema(),
-            },
+payload = {
+    "model": settings.LOC_KIT_PROFILE_OPENROUTER_MODEL,
+    "stream": False,
+    "response_format": {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "loc_kit_profile_envelope",
+            "strict": True,
+            "schema": _openrouter_response_schema(),
         },
-        "provider": {
-            "require_parameters": True,
-        },
-        ...
-    }
+    },
+    "provider": {
+        "require_parameters": True,
+    },
+    # ...
+}
 ```
 
 Ценность не только в снятии 36 JSON-ошибок. В `llm.py:1346-1580` лежит примерно 250 строк
@@ -262,14 +262,12 @@ few-shot-ответ демонстрировал сырой UTF-8, то есть
 источник/перевод из того же `unit_set`, отбирая кандидатов так:
 
 ```python
-            candidates = unit_set.filter(
-                state__gte=STATE_TRANSLATED,
-                state__lt=STATE_READONLY,
-            ).exclude(target="")
-            ...
-            candidates = candidates.order_by("-last_updated")[
-                : LLM_PREVIOUS_EXAMPLE_LIMIT * 4
-            ]
+candidates = unit_set.filter(
+    state__gte=STATE_TRANSLATED,
+    state__lt=STATE_READONLY,
+).exclude(target="")
+# ...
+candidates = candidates.order_by("-last_updated")[: LLM_PREVIOUS_EXAMPLE_LIMIT * 4]
 ```
 
 Отбор идёт по **свежести**, а не по похожести, и включает любой переведённый юнит -

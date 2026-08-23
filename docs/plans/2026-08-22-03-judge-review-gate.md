@@ -188,8 +188,8 @@ workflow on a project.
 - Create: `weblate/trans/management/commands/check_judge_repair_routes.py`
 - Modify: `weblate/trans/tests/test_commands.py`
 
-Give both new Python files the repository copyright and
-`SPDX-License-Identifier: GPL-3.0-or-later` header, plus
+Give both new Python files the repository copyright and the project's usual
+`SPDX-License-Identifier` header (`GPL-3.0-or-later`), plus
 `from __future__ import annotations`.
 
 Define `TARGET_PROJECT_SLUGS` once in `weblate/trans/judge_workflow.py`; both

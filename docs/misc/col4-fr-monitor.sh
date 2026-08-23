@@ -8,7 +8,7 @@
 
 set -uo pipefail
 
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../.." || exit
 
 TASK_ID=${TASK_ID:-ff7843b4-cf61-42a6-b9aa-39b58173eee8}
 INTERVAL=${INTERVAL:-180}
