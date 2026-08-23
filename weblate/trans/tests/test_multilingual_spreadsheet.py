@@ -5,12 +5,28 @@
 from __future__ import annotations
 
 import csv
+import re
+import zipfile
+from datetime import timedelta
 from io import BytesIO, StringIO
 
+from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.urls import reverse
+from django.utils import timezone
 from openpyxl import load_workbook
 
+from weblate.trans.models.multilingual_spreadsheet import (
+    COMPONENT_SPREADSHEET_DRAFT_STORAGE,
+    ComponentSpreadsheetImportDraft,
+)
+from weblate.trans.multilingual_spreadsheet import (
+    build_preview,
+    export_component,
+    parse_upload,
+)
+from weblate.trans.tasks import cleanup_component_spreadsheet_import_drafts
 from weblate.trans.tests.test_views import ViewTestCase
 
 
@@ -19,10 +35,6 @@ class MultilingualSpreadsheetExportTest(ViewTestCase):
         return self.create_json()
 
     def test_csv_and_xlsx_export_one_component_table(self) -> None:
-        from weblate.trans.multilingual_spreadsheet import (
-            export_component,
-            parse_upload,
-        )
 
         unit = self.translation.unit_set.order_by("pk").first()
         assert unit is not None
@@ -65,11 +77,6 @@ class MultilingualSpreadsheetExportTest(ViewTestCase):
         )
 
     def test_preview_rejects_reordered_placeholders(self) -> None:
-        from weblate.trans.multilingual_spreadsheet import (
-            build_preview,
-            export_component,
-            parse_upload,
-        )
 
         unit = self.translation.unit_set.order_by("pk").first()
         assert unit is not None
@@ -102,11 +109,6 @@ class MultilingualSpreadsheetExportTest(ViewTestCase):
             build_preview(self.component, parsed)
 
     def test_preview_accepts_translated_conditional_branches(self) -> None:
-        from weblate.trans.multilingual_spreadsheet import (
-            build_preview,
-            export_component,
-            parse_upload,
-        )
 
         source = (
             "{hours:cond:>0?{hours}h. |}"
@@ -143,7 +145,6 @@ class MultilingualSpreadsheetValidationTest(ViewTestCase):
         return self.create_json()
 
     def _csv_rows(self) -> list[list[str]]:
-        from weblate.trans.multilingual_spreadsheet import export_component
 
         return list(
             csv.reader(
@@ -153,7 +154,6 @@ class MultilingualSpreadsheetValidationTest(ViewTestCase):
         )
 
     def _parse_csv_rows(self, rows: list[list[str]]) -> None:
-        from weblate.trans.multilingual_spreadsheet import parse_upload
 
         content = StringIO(newline="")
         csv.writer(content, dialect="unix").writerows(rows)
@@ -176,10 +176,6 @@ class MultilingualSpreadsheetValidationTest(ViewTestCase):
                 self._parse_csv_rows([headers, *body])
 
     def test_rejects_xlsx_with_hidden_extra_worksheet(self) -> None:
-        from weblate.trans.multilingual_spreadsheet import (
-            export_component,
-            parse_upload,
-        )
 
         workbook = load_workbook(BytesIO(export_component(self.component, "xlsx")))
         worksheet = workbook.create_sheet("hidden")
@@ -197,13 +193,6 @@ class MultilingualSpreadsheetValidationTest(ViewTestCase):
         # An attacker inflates the worksheet dimension (DoS / zip bomb) without
         # writing many real cells. In read-only mode openpyxl reports max_row
         # and max_column from the XML dimension attribute.
-        import re
-        import zipfile
-
-        from weblate.trans.multilingual_spreadsheet import (
-            export_component,
-            parse_upload,
-        )
 
         source = BytesIO(export_component(self.component, "xlsx"))
         output = BytesIO()
@@ -228,12 +217,6 @@ class MultilingualSpreadsheetValidationTest(ViewTestCase):
     def test_rejects_malformed_xlsx_xml(self) -> None:
         # Valid ZIP container, but the worksheet XML is truncated so openpyxl
         # raises InvalidFileException. Without the catch, that bubbles up as a 500.
-        import zipfile
-
-        from weblate.trans.multilingual_spreadsheet import (
-            export_component,
-            parse_upload,
-        )
 
         source = BytesIO(export_component(self.component, "xlsx"))
         output = BytesIO()
@@ -253,11 +236,6 @@ class MultilingualSpreadsheetValidationTest(ViewTestCase):
 
 class ComponentSpreadsheetImportDraftTest(ViewTestCase):
     def test_draft_is_owner_session_bound_and_expires(self) -> None:
-        from django.utils import timezone
-
-        from weblate.trans.models.multilingual_spreadsheet import (
-            ComponentSpreadsheetImportDraft,
-        )
 
         draft = ComponentSpreadsheetImportDraft.objects.create(
             owner=self.user,
@@ -288,10 +266,6 @@ class ComponentSpreadsheetImportDraftTest(ViewTestCase):
 
 class MultilingualSpreadsheetPluralTest(ViewTestCase):
     def test_plural_component_rejects_both_exports_and_upload(self) -> None:
-        from weblate.trans.multilingual_spreadsheet import (
-            export_component,
-            parse_upload,
-        )
 
         for format_name in ("csv", "xlsx"):
             with self.subTest(format_name), self.assertRaises(ValidationError):
@@ -305,8 +279,6 @@ class MultilingualSpreadsheetPluralTest(ViewTestCase):
             )
 
     def test_plural_component_download_returns_error_redirect(self) -> None:
-        from django.contrib.messages import get_messages
-        from django.urls import reverse
 
         manager = self.user
         manager.is_superuser = True
@@ -334,15 +306,6 @@ class MultilingualSpreadsheetPluralTest(ViewTestCase):
                 )
 
     def test_preview_renders_table_and_cancel_button(self) -> None:
-        import csv
-        from io import StringIO
-
-        from django.urls import reverse
-
-        from weblate.trans.models.multilingual_spreadsheet import (
-            ComponentSpreadsheetImportDraft,
-        )
-        from weblate.trans.multilingual_spreadsheet import export_component
 
         self.make_manager()
         self.user.clear_permissions_cache()
@@ -408,15 +371,6 @@ class MultilingualSpreadsheetPluralTest(ViewTestCase):
 
 class ComponentSpreadsheetImportDraftCleanupTest(ViewTestCase):
     def test_cleanup_removes_expired_draft_and_private_file(self) -> None:
-        from datetime import timedelta
-
-        from django.utils import timezone
-
-        from weblate.trans.models.multilingual_spreadsheet import (
-            COMPONENT_SPREADSHEET_DRAFT_STORAGE,
-            ComponentSpreadsheetImportDraft,
-        )
-        from weblate.trans.tasks import cleanup_component_spreadsheet_import_drafts
 
         draft = ComponentSpreadsheetImportDraft.objects.create(
             owner=self.user,

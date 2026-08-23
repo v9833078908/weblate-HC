@@ -399,10 +399,12 @@ builtin = "clear,rare,informal,usage"
 count = true
 dictionary = "scripts/codespell.txt,-"
 # Vai is a language name; bloc is a French glossary rendering; mis- is an
-# English prefix; ons/te are French verb-ending and clitic literals in the
-# COL4 mutation generator; sanity-check is used across this codebase
-ignore-words-list = "assertIn,Vai,master,bloc,mis,ons,te,sanity-check"
-skip = '*.po,*.pot,*.json,*.jsonl,*.tmx,*.tbx,*.csv,*/vendor/*,weblate/trans/specialchars.py,weblate/trans/tests/data/known_hosts,docs/changes/contributors/*.rst,docs/misc/col4-judge-annotation.md'
+# English prefix; nd is the ordinal-suffix branch of \b\d+(?:st|nd|rd|th)\b
+# (weblate_customization/checks.py); ons/te are French verb-ending and
+# clitic literals in the COL4 mutation generator; sanity-check is used
+# across this codebase
+ignore-words-list = "assertIn,Vai,master,bloc,mis,nd,ons,te,sanity-check"
+skip = '*.po,*.pot,*.json,*.jsonl,*.tmx,*.tbx,*.csv,*.tsv,*/vendor/*,weblate/trans/specialchars.py,weblate/trans/tests/data/known_hosts,docs/changes/contributors/*.rst,docs/misc/col4-judge-annotation.md,misc/heart-abyss-hub-1-translation-qa.md'
 
 [tool.coverage.paths]
 source = [

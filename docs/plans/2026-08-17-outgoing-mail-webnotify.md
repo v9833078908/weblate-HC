@@ -215,14 +215,14 @@ J=$(mktemp)
 curl -s -c "$J" -H 'Host: l10n.herocraft.com' http://127.0.0.1:8081/accounts/reset/ > /tmp/reset.html
 CSRF=$(grep -o 'name="csrfmiddlewaretoken" value="[^"]*"' /tmp/reset.html | head -1 | sed 's/.*value="//;s/"//')
 Q=$(grep -oE 'What is [0-9]+ [-+*] [0-9]+' /tmp/reset.html | head -1)
-ANS=$(python3 -c "print(eval('$Q'.replace('What is ','')))")
+ANSWER=$(python3 -c "print(eval('$Q'.replace('What is ','')))")
 # 2) POST с ответом
 curl -s -o /dev/null -w '%{http_code} -> %{redirect_url}\n' \
   -b "$J" -c "$J" -H 'Host: l10n.herocraft.com' \
   -e http://127.0.0.1:8081/accounts/reset/ \
   --data-urlencode "csrfmiddlewaretoken=$CSRF" \
   --data-urlencode "email=i.efimov@herocraft.com" \
-  --data-urlencode "captcha=$ANS" \
+  --data-urlencode "captcha=$ANSWER" \
   http://127.0.0.1:8081/accounts/reset/
 ```
 

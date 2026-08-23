@@ -123,7 +123,7 @@ verified glossary check semantics:
   typed advisory schema defined in Task 6. Cathedral lost 19.6 % of judge
   verdicts to free-text parsing; more than half of its correction queue
   (75 963 of 141 936 rows) were unparsed verdicts, not bad translations. An
-  unparseable judge response is an infrastructure error, never a silent
+  unparsable judge response is an infrastructure error, never a silent
   default verdict that routes work.
 - Never promote `check_glossary` wholesale to blocking or to Weblate
   `enforced_checks`: the check fires on the union of its hard part
@@ -811,7 +811,7 @@ The report schema reserves a typed `advisories` array with a closed severity
 enum for probabilistic findings. A future LLM judge writes only into that
 slot, produces its verdict through structured output with a strict JSON
 schema (the contract `weblate_customization` machinery already uses for
-OpenRouter), and treats an unparseable model response as an infrastructure
+  OpenRouter), and treats an unparsable model response as an infrastructure
 error, never as a default verdict or a finding. Cathedral's correction queue
 doubled because unparsed free-text verdicts were routed as findings.
 

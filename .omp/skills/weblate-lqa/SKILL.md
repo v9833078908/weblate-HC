@@ -54,7 +54,7 @@ Consult `references/weblate-checks-guide.md` to classify every triggered check:
 Audit the units against the 4 core dimensions in `references/mqm-game-profile.md`:
 - **Accuracy (`accuracy/`):** mistranslation, omission, addition, context hallucination.
 - **Terminology & Lore (`terminology/`):** glossary violations, acronym leaks (e.g. English `AT` in German instead of `Pz.-`), inappropriate domain register.
-- **Fluency & Style (`fluency/`):** grammar, noun capitalization, compound spacing, formality register (*Sie* vs *Du*).
+- **Fluency & Style (`fluency/`):** grammar, noun capitalization, compound spacing, formality register (*Sie* vs *Du*). <!-- # codespell:ignore -->
 - **Game Engine (`game_engine/`):** placeholder corruption, keybinding syntax, length overflow.
 
 Assign severity penalty points for reviewed findings:

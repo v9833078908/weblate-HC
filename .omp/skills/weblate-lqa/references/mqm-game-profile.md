@@ -27,7 +27,7 @@ Evaluates adherence to game canon, approved glossaries, and consistent terminolo
 Evaluates the linguistic correctness and natural tone in the target language.
 - `grammar_syntax`: ACTUAL grammatical errors only — wrong case endings, incorrect agreement, or word order a native speaker would flag as broken. A stylistic pattern difference between grammatically CORRECT sibling strings (e.g. one UI hint using a verb phrase where its neighbors use a noun) is NOT `grammar_syntax` — classify it as `style` (Neutral) instead. Test: "would a native-speaker proofreader mark this as wrong," not "does it match nearby strings."
 - `spelling_orthography`: Typos, wrong capitalization (e.g. uncapitalized German nouns or incorrect compound spacing *Deppenleerzeichen*).
-- `register_tone`: Inconsistent formality (mixing polite *Sie* with informal *Du*, or breaking character voice in narrative letters).
+- `register_tone`: Inconsistent formality (mixing polite *Sie* with informal *Du*, or breaking character voice in narrative letters). <!-- # codespell:ignore -->
 - `punctuation`: Missing or malformed terminal punctuation, quotes, or dashes violating target locale conventions.
 - `style`: A valid, grammatically correct alternative phrasing, register choice, or structural pattern a native speaker would accept as-is — logged for translator awareness but never penalized (always `Neutral`, 0 pt). Use this instead of `grammar_syntax` whenever the target text is not actually wrong.
 

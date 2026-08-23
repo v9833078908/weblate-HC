@@ -49,7 +49,7 @@ All citations are `path:line` with verbatim quotes.
 
 ### 1.2 Execution Invariants (architecture.md:4.3)
 
-9. **Unparseable/empty response is transport failure, not verdict.** `architecture.md:428-430`
+9. **Unparsable/empty response is transport failure, not verdict.** `architecture.md:428-430`
    > Неразобранный или пустой ответ судьи — сбой транспорта, не
    > вердикт. Ретрай, затем пропуск строки со счётчиком в метриках
    > прогона. Никогда не эскалация в flag/reject.
@@ -434,7 +434,7 @@ doesn't define the character set.
 | flag / major | expanded | ошибки со спанами, мнения обоих судей, история починок, плашка «отгружается, но не подтверждено» |
 | reject / critical | expanded | то же + «не уйдёт в сборку» + предложение исправления как suggestion |
 | stale | grey | «вердикт относится к предыдущей версии», кнопка «пересудить» |
-| unparseable | grey | «ответ судьи не разобран» — сбой транспорта, **не вердикт** |
+| unparsable | grey | «ответ судьи не разобран» — сбой транспорта, **не вердикт** |
 
 **Separate card on language overview.** `2026-08-13-judge-native-ui-design.md:444-460`
 > Виджет `Strings status` остаётся детерминированным; рядом встаёт
