@@ -993,7 +993,5 @@ git add \
   docs/llm-first/measurements/2026-08-24-batch-semantic-alignment-shadow.md \
   docs/llm-first/measurements/judge-measurements-index.md
 git commit -m "docs(llm-first): record alignment shadow results"
-git fetch origin
-git rebase origin/main
 git push origin HEAD
 ```
