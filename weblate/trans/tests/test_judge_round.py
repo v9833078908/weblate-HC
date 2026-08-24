@@ -6,6 +6,10 @@ from __future__ import annotations
 
 import uuid
 
+from weblate.glossary.models import (
+    get_glossary_terms,
+    get_matched_glossary_prompt_entries,
+)
 from weblate.trans.judge_loop import build_request
 from weblate.trans.models.judge import (
     JudgeVerdict,
@@ -18,6 +22,7 @@ from weblate.trans.models.judge import (
     describe_latest_verdict,
     latest_round,
 )
+from weblate.trans.models.variant import Variant
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.hash import calculate_hash
 from weblate.utils.state import STATE_TRANSLATED
@@ -252,3 +257,73 @@ class JudgeGlossaryContextTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "context changed")
+
+    def add_variant_sibling(self) -> None:
+        """Group a second term with the matched one, as a variant would."""
+        variant = Variant.objects.create(
+            component=self.glossary_component, variant_regex="", key="greeting"
+        )
+        id_hash = calculate_hash("Greeting", "")
+        source_unit = self.glossary_component.source_translation.unit_set.create(
+            source="Greeting",
+            target="Greeting",
+            context="",
+            id_hash=id_hash,
+            position=2,
+            state=STATE_TRANSLATED,
+        )
+        self.glossary.unit_set.create(
+            source="Greeting",
+            target="Zdravím",
+            context="",
+            source_unit=source_unit,
+            id_hash=id_hash,
+            position=2,
+            state=STATE_TRANSLATED,
+            variant=variant,
+        )
+        self.glossary.unit_set.filter(source="Hello").update(variant=variant)
+        self.glossary.invalidate_cache()
+
+    def test_narrower_cached_selection_keeps_the_round_reachable(self) -> None:
+        """A check selecting without variants must not decide judge context."""
+        self.add_term()
+        self.add_variant_sibling()
+        unit = self.get_unit()
+        unit.glossary_terms = None
+        request = build_request(unit)
+        self.assertEqual(len(request.glossary_terms), 2)
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="major",
+            model_verdict="flag",
+            judge_model="vendor/model-a",
+            seat=1,
+            run_id=uuid.uuid4(),
+            target_hash=compute_target_hash(request.target_plurals or [request.target]),
+            context_hash=compute_context_hash(
+                source=request.source,
+                note=request.note,
+                glossary_terms=request.glossary_terms,
+            ),
+        )
+
+        # `run_checks` asks for the narrower selection first and caches it.
+        reread = self.get_unit()
+        narrow = list(get_glossary_terms(reread, include_variants=False))
+        self.assertEqual(len(narrow), 1)
+
+        self.assertEqual(len(current_round(reread)), 1)
+        self.assertEqual(reread.glossary_terms, narrow)
+
+    def test_matched_entries_leave_an_unfetched_unit_unfetched(self) -> None:
+        """The judge's wider selection must not become a later check's answer."""
+        self.add_term()
+        self.add_variant_sibling()
+        unit = self.get_unit()
+        unit.glossary_terms = None
+
+        self.assertEqual(len(get_matched_glossary_prompt_entries(unit)), 2)
+
+        self.assertIsNone(unit.glossary_terms)
+        self.assertEqual(len(get_glossary_terms(unit, include_variants=False)), 1)

@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from typing import Any
 from unittest import mock
 
@@ -58,9 +57,7 @@ class SegmentGlossaryTest(SimpleTestCase):
         # ruff: ignore[import-outside-top-level]
         from weblate.trans.judge import _segment
 
-        request = replace(REQ, glossary_terms=list(REQ.glossary_terms))
-
-        self.assertEqual(_segment(0, request)["glossary"], list(request.glossary_terms))
+        self.assertEqual(_segment(0, REQ)["glossary"], list(REQ.glossary_terms))
 
     def test_prompt_defines_glossary_context_and_modes(self) -> None:
         # ruff: ignore[import-outside-top-level]

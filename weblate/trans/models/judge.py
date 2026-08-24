@@ -50,7 +50,13 @@ def compute_target_hash(target: Sequence[str]) -> str:
 def compute_context_hash(
     *, source: str, note: str, glossary_terms: Iterable[Mapping[str, object]]
 ) -> str:
-    """Hash source, note and every prompt-visible glossary-entry field."""
+    """
+    Hash source, note and every prompt-visible glossary-entry field.
+
+    Neither mapping key order nor glossary order is context, so keys and
+    serialized entries are both sorted: a reordered glossary must not
+    invalidate a verdict. Entry content and multiplicity are context.
+    """
     terms = sorted(
         json.dumps(
             dict(entry),

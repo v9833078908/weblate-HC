@@ -27,6 +27,18 @@ blocked by pre-existing loc-kit VCS failures outside this plan's scope.
   clean merge-base `1e0593812b689471fa7ee443f8be8ddf52aa5ea8` and at the final
   branch: each normalized to 120 error findings (171 output lines), with no
   added or removed findings.
+- Code review of the final diff, 2026-08-24, found that the matched accessor
+  did not yet enforce this plan's own invariant: `get_glossary_terms` serves
+  any list already cached on the unit and ignores its selection arguments, so
+  a check running first with `include_variants=False` decided the judge's
+  context and made a stored verdict unreachable. Reproduced by
+  `JudgeGlossaryContextTest.test_narrower_cached_selection_keeps_the_round_reachable`
+  (`current_round` returned 0 rows). The accessor now resolves its selection
+  in isolation and restores the exact prior cache state, so it can neither
+  read nor leave another consumer's selection.
+- After that fix: 1,422 passed, 59 skipped across the glossary, machinery,
+  judge, glossary-check and same-check suites; mypy unchanged at 120
+  normalized findings.
 
 **Goal:** Give the LLM judge the same prompt-entry representation the LLM
 translator uses for every glossary term it receives: cleaned source and target,

@@ -384,6 +384,8 @@ def _normalize_prompt_text(text: str | None) -> str:
 def build_glossary_prompt_entry(unit: Unit) -> GlossaryPromptEntry | None:
     """Serialize one glossary unit for an LLM prompt, or exclude it."""
     modes = get_glossary_term_modes(unit)
+    # Pairs marked not applicable for this target language never reach
+    # the prompt
     if "not-applicable" in modes:
         return None
 
@@ -405,6 +407,10 @@ def build_glossary_prompt_entry(unit: Unit) -> GlossaryPromptEntry | None:
     if target_explanation := _normalize_prompt_text(getattr(unit, "explanation", "")):
         entry["target_explanation"] = target_explanation
 
+    # Inclusion above is decided by `modes`, so the advertised flags are
+    # derived from it too rather than from a second, wider source. Only
+    # `terminology` is outside it: it is a source-side bookkeeping flag,
+    # not a glossary mode.
     effective_flags = set(modes)
     if "terminology" in unit.all_flags:
         effective_flags.add("terminology")
@@ -433,10 +439,23 @@ def build_glossary_prompt_entries(
 
 
 def get_matched_glossary_prompt_entries(unit: Unit) -> list[GlossaryPromptEntry]:
-    """Return prompt entries matched against one unit for the judge."""
-    return build_glossary_prompt_entries(
-        get_glossary_terms(unit, full=True, include_variants=True)
-    )
+    """
+    Return prompt entries matched against one unit for the judge.
+
+    ``get_glossary_terms`` serves whatever is already cached on the unit and
+    ignores its own selection arguments. A narrower selection cached by a
+    check would otherwise decide what the judge is told and make a stored
+    verdict unreachable, and the judge's own wider selection left behind would
+    just as silently feed a later check terms it excluded. So the judge
+    resolves its selection in isolation and restores the exact prior state.
+    """
+    cached = unit.glossary_terms
+    unit.glossary_terms = None
+    try:
+        terms = get_glossary_terms(unit, full=True, include_variants=True)
+    finally:
+        unit.glossary_terms = cached
+    return build_glossary_prompt_entries(terms)
 
 
 def fetch_glossary_terms(  # ruff: ignore[complex-structure]

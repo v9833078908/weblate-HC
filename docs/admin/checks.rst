@@ -162,7 +162,9 @@ glossary or a batch-wide union.
 Explanations scope an entry to the concept it names. For example, an entry that
 names a game mode does not require the same target word for a verb derived from
 that mode name. The ``exact``, ``read-only`` and ``forbidden`` flags retain their
-glossary meanings. See :ref:`glossary` for maintaining terms and explanations.
+glossary meanings, while ``terminology`` is maintenance metadata and does not
+make an entry stricter. See :ref:`glossary` for maintaining terms and
+explanations.
 
 The verdict maps to the checks ``judge-flag`` and ``judge-reject``, which
 behave like any other check for navigation, search, and the API (for example
