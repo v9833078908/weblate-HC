@@ -208,6 +208,7 @@ class GameNumberCheckTest(CheckTestCase):
         self.test_failure_2 = ("Deals 200 damage over 3 s", "Infliger des degats", "")
         # Two values, both wrong, and neither is absent - only the set differs.
         self.test_failure_3 = ("Deals 20% and 30%", "Infligge 30% e 10%", "")
+
     def test_a_scale_word_is_part_of_the_value(self) -> None:
         source = "Награда - 10 тысяч мон!"
         for target, expected in (
@@ -222,7 +223,9 @@ class GameNumberCheckTest(CheckTestCase):
             ("報酬は10万文!", True),
         ):
             with self.subTest(target=target):
-                self.assertEqual(self.check.check_single(source, target, None), expected)
+                self.assertEqual(
+                    self.check.check_single(source, target, None), expected
+                )
 
     def test_a_myriad_scale_error_is_reported(self) -> None:
         source = "Научись считать - ваще та 100 тысяч мон!"
@@ -237,7 +240,9 @@ class GameNumberCheckTest(CheckTestCase):
             ("学学数数吧--那可是一百万文!", True),
         ):
             with self.subTest(target=target):
-                self.assertEqual(self.check.check_single(source, target, None), expected)
+                self.assertEqual(
+                    self.check.check_single(source, target, None), expected
+                )
 
     def test_a_number_the_target_adds_is_accepted(self) -> None:
         # Japanese counts what Russian words: "каждый третий" -> "3回に1回", on
