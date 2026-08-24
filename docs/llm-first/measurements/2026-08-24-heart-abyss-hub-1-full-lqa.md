@@ -321,3 +321,37 @@ error and fires on eight correct strings.
 - `/tmp/lqa/scored_full_<lang>.json` - tool-computed MQM output.
 - `/tmp/lqa/full_<lang>_<1|2>.tsv` - the review chunks handed to the linguistic reviewers.
 - `/tmp/lqa/glossary_<lang>.tsv` - terminology authority extracted from the `all-glossary` TBX.
+
+## 10. Applied to production on 2026-08-24
+
+Every item of §8.1 was written and re-read from the API. §8.2, §8.3 and §8.4 are
+untouched and remain outstanding.
+
+| Scope | Units | Result |
+| --- | --- | --- |
+| §8.1 German rotation | 370314-370317 | rewritten per §5.1; `hub1_asuna_1_6` needed a translation authored from scratch, the content existed nowhere in the component |
+| §8.1 Korean inversion | 371598 | `그래서 말이야. 존나게 쉬웠어.` |
+| §8.1 Japanese reversal | 371110 | `私がお前の友達を奪うのが怖いのか？` |
+| §8.1 Japanese scale | 370970, 370971 | `1万文！` and `…こいつは10万文だぜ！` |
+| §8.1 Simplified Chinese scale | 371763 | `学学数数吧——那可是十万文！` |
+| §9 source punctuation | ru 342463, 342581 | terminal `?` added, changing only the last character |
+
+The German repair is confirmed by an independent tool: the detector added in
+`.omp/skills/weblate-lqa/scripts/detect_misalignment.py` reports two offset runs
+covering 370314-370317 on the pre-repair snapshot and none afterwards. See
+`2026-08-24-batch-misalignment-radius-scan.md` §6.
+
+### 10.1 Cost of the source repair, and what it bought
+
+Editing a source string of a monolingual component moves every translation of
+that string to `STATE_NEEDS_REWRITING` (`weblate/trans/models/unit.py:1969-1975`),
+so two source edits flagged 18 targets across nine languages. Seven of those
+already rendered the interrogative correctly and were restored to
+`STATE_TRANSLATED` without touching their text: `de`, `es`, `it` and `zh_Hant` on
+`hub1_teahouse_2_35`, and `de`, `es` and `zh_Hant` on
+`hub1_fisherman_quest_6_37`.
+
+The remaining eleven now carry a failing check where they carried none before,
+because the source finally asks a question. Weblate's own partition of the
+eighteen matches this audit exactly - eleven failing, seven clean - which is the
+point of repairing a source rather than patching targets one by one.
