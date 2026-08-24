@@ -6,7 +6,7 @@
 
 **Goal:** Make `game-markup` reject parser-breaking changes to Hero Craft conditional DSL while continuing to allow localized branch text.
 
-**Architecture:** Refactor the conditional recognition already used by `conditional_dsl_syntax_spans()` into one linear parser that returns both highlight spans and ordered immutable signatures, without narrowing the grammar it recognizes. `GameMarkupCheck.check_single()` compares those signatures after its existing markup and placeholder comparisons, and only for a source that actually contains a recognized conditional; branch text stays outside the signature and remains translatable.
+**Architecture:** Refactor the conditional recognition already used by `conditional_dsl_syntax_spans()` into one non-recursive parser that returns both highlight spans and ordered immutable signatures, without narrowing the grammar it recognizes. `GameMarkupCheck.check_single()` compares those signatures after its existing markup and placeholder comparisons, and only for a source that actually contains a recognized conditional; branch text stays outside the signature and remains translatable.
 
 **Tech Stack:** Python, `regex`, Django/Weblate `TargetCheck`, `unittest` assertions executed by pytest in the shared dev Docker stack.
 
@@ -82,7 +82,8 @@ Two more measurements shape the design:
    header unrecognized, and both fail.
 7. Only the outermost recognized conditional is a record. A nested one travels
    verbatim inside its parent's signature, which keeps spans non-overlapping
-   and keeps every branch interior walked exactly once. The deliberate
+   and keeps every branch interior walked exactly once, instead of re-walking a
+   parent interior for each conditional nested in it. The deliberate
    consequence is that branch text inside a nested conditional is immutable.
    The dev corpus contains no nested conditional, and over-protection is the
    safe direction for a string the engine parses.
@@ -353,7 +354,7 @@ Never delete or weaken a row to reach green output.
 
 ---
 
-### Task 3: Return spans and signatures from one linear parser
+### Task 3: Return spans and signatures from one non-recursive parser
 
 **Files:**
 
@@ -443,6 +444,12 @@ Three details are load-bearing:
   conditional nested inside an ordinary brace group is still recorded.
 - The signature holds no constant brace characters. Every recognized block has
   them, so they would carry no information.
+
+Cost, stated precisely so nobody has to guess: `_balanced_brace_blocks()` is
+one pass over the text, the `sorted()` call is `O(B log B)` in the number of
+balanced brace blocks, and the branch interiors walked afterwards are disjoint,
+so they cost one more pass over the text in total. `check_single()` reaches none
+of this unless the source contains `:cond:`.
 
 #### Step 2: Make the public scanner consume the parser
 
