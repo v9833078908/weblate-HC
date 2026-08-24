@@ -69,6 +69,9 @@ POSTGRES_PORT=5432
 # --- Cache / queue ------------------------------------------------------
 REDIS_HOST=cache
 REDIS_PORT=6379
+# Judge runs can hold an unacknowledged task for hours. Keep the Redis message
+# invisible until the worker completes or dies to avoid duplicate execution.
+WEBLATE_CELERY_VISIBILITY_TIMEOUT=14400
 
 # --- Mail ---------------------------------------------------------------
 # Outgoing mail goes through Yandex 360 for herocraft.com: implicit SSL on

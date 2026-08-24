@@ -6,7 +6,11 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import subprocess
+import sys
 import threading
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
@@ -1599,3 +1603,43 @@ class AutoFormRenderingTest(ViewTestCase):
             1,
             "crispy rendered a nested <form>; the Apply button falls outside it",
         )
+
+
+class AutoTranslateDurabilityTest(SimpleTestCase):
+    def test_auto_translate_acks_late(self) -> None:
+        for task in (auto_translate, auto_translate_component):
+            self.assertTrue(task.acks_late, f"{task.name} acks early")
+            self.assertTrue(
+                task.reject_on_worker_lost, f"{task.name} is lost on worker death"
+            )
+
+    def test_visibility_timeout_covers_long_tasks(self) -> None:
+        code = """
+from pathlib import Path
+Path.read_text = lambda *args, **kwargs: "test-secret"
+import json
+from weblate import settings_docker
+print(json.dumps(
+    [
+        settings_docker.CELERY_BROKER_TRANSPORT_OPTIONS,
+        settings_docker.CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS,
+        settings_docker.CELERY_VISIBILITY_TIMEOUT,
+    ]
+))
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            check=False,
+            env=os.environ
+            | {
+                "WEBLATE_DATABASES": "0",
+                "WEBLATE_SITE_DOMAIN": "example.com",
+            },
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        options, result_options, visibility_timeout = json.loads(result.stdout)
+        self.assertGreaterEqual(options.get("visibility_timeout", 0), 4 * 3600)
+        self.assertEqual(result_options, options)
+        self.assertEqual(visibility_timeout, options["visibility_timeout"])
