@@ -21,7 +21,7 @@ from weblate.logger import LOGGER
 from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.models import MACHINERY
 from weblate.trans.actions import ActionEvents
-from weblate.trans.judge import JudgeError, validate_judge_configuration
+from weblate.trans.judge import JUDGE_SEATS, JudgeError, validate_judge_configuration
 from weblate.trans.judge_loop import run_judge_batch
 from weblate.trans.models import (
     Category,
@@ -761,28 +761,59 @@ class AutoTranslate(BaseAutoTranslate):
         # path, scoped by unit_ids, written at needs-editing. Reuses
         # process_mt / fetch_mt / store_results / update — no second
         # write path (plan mechanism 5).
+        base_low, base_high = self.progress_range
+        split = base_low + (base_high - base_low) // 10
+        # set_progress has no clamp. Phase 2 restarts its counter, so the
+        # phases use disjoint ranges to keep task progress monotonic.
         if writable_ids:
-            saved_ids, saved_state = self.unit_ids, self.target_state
+            saved_ids, saved_state, saved_range = (
+                self.unit_ids,
+                self.target_state,
+                self.progress_range,
+            )
             self.unit_ids = list(writable_ids)
             self.target_state = self.fresh_translation_state
+            self.progress_range = (base_low, split)
             try:
                 self.process_mt(engines, threshold)
             finally:
-                self.unit_ids, self.target_state = saved_ids, saved_state
-            units = list(
-                self.translation.unit_set.filter(pk__in=[unit.id for unit in units])
-                .prefetch()
-                .prefetch_source()
-            )
-        else:
-            units = list(
-                self.translation.unit_set.filter(pk__in=[unit.id for unit in units])
-                .prefetch()
-                .prefetch_source()
-            )
+                self.unit_ids, self.target_state, self.progress_range = (
+                    saved_ids,
+                    saved_state,
+                    saved_range,
+                )
+        # Phase 1 may have written targets, so the judged instances are always
+        # reloaded, whether or not anything was writable.
+        units = list(
+            self.translation.unit_set.filter(pk__in=[unit.id for unit in units])
+            .prefetch()
+            .prefetch_source()
+        )
 
         # Phase 2: judge everything in q; the state is decided per verdict.
-        verdicts = run_judge_batch(units, writable_ids=writable_ids, user=self.user)
+        judged = 0
+
+        def tick(_requests, results) -> None:
+            nonlocal judged
+            judged += len(results)
+            self.set_progress(min(judged, self.progress_steps))
+
+        self.progress_range = (split, base_high)
+        # A defect is re-judged by both seats once per repair attempt, so the
+        # denominator is the worst case. Sizing it to one round would clamp the
+        # bar at the phase maximum and freeze it for the whole repair loop.
+        self.progress_steps = (
+            len(units) * len(JUDGE_SEATS) * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)
+        )
+        try:
+            verdicts = run_judge_batch(
+                units,
+                writable_ids=writable_ids,
+                user=self.user,
+                on_batch=tick,
+            )
+        finally:
+            self.progress_range = (base_low, base_high)
         self.judge_units_processed = len(units)
         final_snapshots = {
             unit.id: (unit.target, unit.state) for unit in units if unit.id in verdicts

@@ -36,6 +36,7 @@ from weblate.glossary.models import (
     get_glossary_terms,
     get_matched_glossary_prompt_entries,
 )
+from weblate.logger import LOGGER
 from weblate.screenshots.forms import ScreenshotForm
 from weblate.trans.actions import ActionEvents
 from weblate.trans.exceptions import (
@@ -83,7 +84,7 @@ from weblate.trans.util import redirect_next, render
 from weblate.trans.validators import SUGGESTION_REJECTION_REASON_LENGTH
 from weblate.utils import messages
 from weblate.utils.antispam import is_spam
-from weblate.utils.celery import add_user_task, store_task_metadata
+from weblate.utils.celery import add_user_task, get_queue_length, store_task_metadata
 from weblate.utils.hash import hash_to_checksum
 from weblate.utils.html import format_html_join_comma, list_to_tuples
 from weblate.utils.lock import WeblateLockTimeoutError
@@ -1582,7 +1583,25 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
             translation_id=translation_id,
             user_id=request.user.id,
         )
-        message = gettext("Automatic translation in progress")
+        try:
+            queued_ahead = get_queue_length("translate")
+        except Exception:
+            # The run is already queued; a broker hiccup must not fail the
+            # request over the wording of its confirmation message.
+            LOGGER.exception("could not read the translate queue length")
+            queued_ahead = 0
+        if queued_ahead > 1:
+            message = ngettext(
+                "Automatic translation queued: %d run is ahead of it. "
+                "You can close this page.",
+                "Automatic translation queued: %d runs are ahead of it. "
+                "You can close this page.",
+                queued_ahead - 1,
+            ) % (queued_ahead - 1)
+        else:
+            # The task is queued, not started: a free worker is not observable
+            # from here, so the message never claims the run is running.
+            message = gettext("Automatic translation queued. You can close this page.")
         add_user_task(
             request.user.id,
             task.id,

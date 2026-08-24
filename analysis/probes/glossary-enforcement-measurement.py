@@ -19,6 +19,8 @@ Read-only. Pipe into ``weblate shell``.
 
 from __future__ import annotations
 
+import json
+import os
 import re
 from collections import Counter, defaultdict
 
@@ -35,11 +37,29 @@ from weblate.glossary.models import (
     get_glossary_term_modes,
     glossary_matcher_fingerprint,
 )
+from weblate.lang.data import NO_SPACE_LANGUAGES
 from weblate.trans.models import Component
 from weblate.utils.state import STATE_TRANSLATED
 
 CHUNK = 200
 SAMPLE_LIMIT = 6
+
+# The source-side stem comparison only exists for languages in
+# SOURCE_STEM_LANGUAGES, so the default cohort filter keeps them. The target
+# side does not depend on it: set ALL_SOURCE_LANGUAGES=1 to measure every
+# component regardless of its source language, which is the only way an
+# en-source component such as space-arena/lockit enters the measurement.
+ALL_SOURCE_LANGUAGES = os.environ.get("ALL_SOURCE_LANGUAGES") == "1"
+
+# A language whose terms carry no inflection: the expected target either
+# appears verbatim or is genuinely absent, so a firing is not morphological
+# uncertainty. NO_SPACE_LANGUAGES covers zh/ja/th/km/lo/my/ko; Vietnamese is
+# isolating too and sits beside them in the 2026-08-11 report as "no stemmer
+# needed", while still using word boundaries.
+NON_INFLECTING = frozenset(NO_SPACE_LANGUAGES) | {"vi"}
+
+# Every firing in a non-inflecting target language, dumped for review.
+DUMP_PATH = os.environ.get("FIRING_DUMP_PATH", "")
 
 
 def inflected_surfaces(term: str, text: str, language_code: str) -> list[str]:
@@ -65,11 +85,20 @@ def inflected_surfaces(term: str, text: str, language_code: str) -> list[str]:
 
 
 def cohorts():
-    """Yield translations whose component and glossary stem on the source side."""
+    """
+    Yield translations whose project carries a glossary in the source language.
+
+    By default only source languages with a stem comparison are measured, so
+    the source-side columns mean something. ALL_SOURCE_LANGUAGES=1 lifts that
+    restriction for the target-side measurement.
+    """
     for component in Component.objects.filter(is_glossary=False).select_related(
         "project", "source_language"
     ):
-        if component.source_language.base_code not in SOURCE_STEM_LANGUAGES:
+        if (
+            not ALL_SOURCE_LANGUAGES
+            and component.source_language.base_code not in SOURCE_STEM_LANGUAGES
+        ):
             continue
         glossaries = [
             glossary
@@ -117,6 +146,7 @@ lifted_samples = []
 lifted_pairs: Counter = Counter()
 recovered_pairs: Counter = Counter()
 fingerprints = {}
+firings = []
 
 for component, translation in cohorts():
     units = list(
@@ -130,29 +160,36 @@ for component, translation in cohorts():
         continue
     label = f"{component.project.slug}/{component.slug}/{translation.language.code}"
 
-    baseline = with_stem(units, enabled=False)
-    stemmed = with_stem(units, enabled=True)
-
+    # The source-side comparison only means something where a stemmer exists.
+    # Where it does not, the terms still have to be attached, because the
+    # lifted computation below reads unit.glossary_terms.
+    source_stems = component.source_language.base_code in SOURCE_STEM_LANGUAGES
     recovered_units = 0
     recovered_terms = 0
-    for unit in units:
-        extra = stemmed[unit.pk] - baseline[unit.pk]
-        if extra:
-            recovered_units += 1
-            recovered_terms += len(extra)
-            for term_source in extra:
-                for surface in inflected_surfaces(
-                    term_source, unit.source, component.source_language.code
-                ):
-                    recovered_pairs[
-                        term_source,
-                        surface.lower(),
-                        term_source[:1].isupper(),
-                        surface[:1].isupper(),
-                        term_source.isupper() and len(term_source) <= 5,
-                    ] += 1
-            if len(recovered_samples) < SAMPLE_LIMIT:
-                recovered_samples.append((label, sorted(extra), unit.source[:110]))
+    if not source_stems:
+        matched(units)
+    else:
+        baseline = with_stem(units, enabled=False)
+        stemmed = with_stem(units, enabled=True)
+
+        for unit in units:
+            extra = stemmed[unit.pk] - baseline[unit.pk]
+            if extra:
+                recovered_units += 1
+                recovered_terms += len(extra)
+                for term_source in extra:
+                    for surface in inflected_surfaces(
+                        term_source, unit.source, component.source_language.code
+                    ):
+                        recovered_pairs[
+                            term_source,
+                            surface.lower(),
+                            term_source[:1].isupper(),
+                            surface[:1].isupper(),
+                            term_source.isupper() and len(term_source) <= 5,
+                        ] += 1
+                if len(recovered_samples) < SAMPLE_LIMIT:
+                    recovered_samples.append((label, sorted(extra), unit.source[:110]))
 
     # Target side runs on the shipped configuration, i.e. stem fallback on.
     language = translation.language
@@ -168,6 +205,32 @@ for component, translation in cohorts():
         for term_source in sorted(hard):
             if len(hard_samples) < SAMPLE_LIMIT * 4:
                 hard_samples.append((label, term_source, source[:80], target[:80]))
+        # Every firing in a non-inflecting target language goes to review:
+        # there the expected target either appears verbatim or is absent, so a
+        # firing is a terminology question, not morphological uncertainty.
+        if language.base_code in NON_INFLECTING and (hard or advisory):
+            by_source = {term.source: term for term in unit.glossary_terms or []}
+            for kind, names in (("hard", hard), ("advisory", advisory)):
+                for name in sorted(names):
+                    term = by_source.get(name)
+                    modes = get_glossary_term_modes(term) if term else frozenset()
+                    expected = term.target if term else ""
+                    if "read-only" in modes:
+                        expected = name
+                    firings.append(
+                        {
+                            "kind": kind,
+                            "project": component.project.slug,
+                            "component": component.slug,
+                            "language": language.code,
+                            "unit": unit.pk,
+                            "context": unit.context,
+                            "source": source,
+                            "target": target,
+                            "term": name,
+                            "expected": cleanup_glossary_term(expected),
+                        }
+                    )
         # A term neither hard nor advisory whose exact expected form is absent
         # was accepted by the morphological comparison alone.
         for term in unit.glossary_terms or []:
@@ -189,9 +252,13 @@ for component, translation in cohorts():
                 if len(lifted_samples) < SAMPLE_LIMIT:
                     lifted_samples.append((label, name, expected, target[:90]))
 
+    recovered_report = (
+        f"recovered_units={recovered_units:5d} recovered_terms={recovered_terms:5d}"
+        if source_stems
+        else f"{'recovered=n/a':>39s}"
+    )
     print(
-        f"{label:52s} units={len(units):6d} "
-        f"recovered_units={recovered_units:5d} recovered_terms={recovered_terms:5d} "
+        f"{label:52s} units={len(units):6d} {recovered_report} "
         f"hard={hard_n:4d} advisory={advisory_n:5d} lifted={lifted_n:5d}"
     )
     totals["units"] += len(units)
@@ -264,3 +331,17 @@ print("=== LIFTED BY MORPHOLOGY (check none is a real miss) ===")
 for label, name, expected, target in lifted_samples:
     print(f"  [{label}] term={name!r} expected={expected!r}")
     print(f"     TGT {target!r}")
+print()
+print("=== NON-INFLECTING TARGETS: firings per project and language ===")
+print("Denominator for the top-3 choice and the review queue.")
+firing_counts: Counter = Counter()
+for firing in firings:
+    firing_counts[firing["project"], firing["language"], firing["kind"]] += 1
+for (project, language_code, kind), count in sorted(firing_counts.items()):
+    print(f"  {project:20s} {language_code:8s} {kind:8s} {count:6d}")
+print(f"  TOTAL {len(firings)}")
+
+if DUMP_PATH:
+    with open(DUMP_PATH, "w", encoding="utf-8") as handle:
+        json.dump(firings, handle, ensure_ascii=False, indent=2, sort_keys=True)
+    print(f"FIRINGS DUMPED: {len(firings)} -> {DUMP_PATH}")

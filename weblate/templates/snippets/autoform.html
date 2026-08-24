@@ -42,6 +42,9 @@
           {{ judge_request_estimate }}
           {% translate "LLM requests (strings × 2 judges × attempts), plus machine translation for empty strings." %}
         </p>
+        <p class="text-muted" id="id_auto_duration_estimate">
+          {% translate "A judge run holds an automatic translation slot for tens of minutes per few hundred strings, so other projects may wait." %}
+        </p>
       {% endif %}
       {% if judge_verdicts_exist %}
         <div class="alert alert-warning" role="alert" id="judge-verdicts-exist">

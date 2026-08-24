@@ -967,6 +967,8 @@ def get_auto_translate_target(
     autoretry_for=(WeblateLockTimeoutError,),
     retry_backoff=600,
     retry_backoff_max=3600,
+    acks_late=True,
+    reject_on_worker_lost=True,
 )
 # ruff: ignore[too-many-arguments]
 def auto_translate(
@@ -1068,6 +1070,8 @@ def auto_translate(
     autoretry_for=(WeblateLockTimeoutError,),
     retry_backoff=600,
     retry_backoff_max=3600,
+    acks_late=True,
+    reject_on_worker_lost=True,
 )
 def auto_translate_component(
     component_id: int,
