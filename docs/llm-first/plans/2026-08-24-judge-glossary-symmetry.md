@@ -10,7 +10,21 @@ SPDX-License-Identifier: GPL-3.0-or-later
 > plan task-by-task. Use `test-driven-development` for Tasks 1-3 and
 > `verification-before-completion` for Task 5.
 
-**Date:** 2026-08-24. **Status:** approved, implementation pending.
+**Date:** 2026-08-24. **Status:** implemented; full verification is blocked by
+pre-existing loc-kit VCS failures outside this plan's scope.
+
+**Verification (2026-08-24):**
+
+- Focused glossary and machinery suites plus the two affected loc-kit contract
+  tests: 1,243 passed, 53 skipped, 34 subtests passed.
+- Judge migration suite: 114 passed, 3 subtests passed. Judge client suite: 25
+  passed.
+- The full host owning suite: 1,441 passed, 53 skipped, 37 subtests passed;
+  two unrelated `LocKitGlossaryUploadUITest` cases failed in
+  `Component.trigger_post_update` with `Invalid revision range ..<revision>`.
+- Focused `prek` hooks passed. The prescribed mypy command reported 210
+  findings in 27 files, none at changed lines, so it does not establish a
+  clean baseline.
 
 **Goal:** Give the LLM judge the same prompt-entry representation the LLM
 translator uses for every glossary term it receives: cleaned source and target,
