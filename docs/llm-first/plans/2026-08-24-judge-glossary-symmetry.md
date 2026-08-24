@@ -10,8 +10,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 > plan task-by-task. Use `test-driven-development` for Tasks 1-3 and
 > `verification-before-completion` for Task 5.
 
-**Date:** 2026-08-24. **Status:** implemented; full verification is blocked by
-pre-existing loc-kit VCS failures outside this plan's scope.
+**Date:** 2026-08-24. **Status:** implemented and verified against the clean
+baseline.
 
 **Verification (2026-08-24):**
 
@@ -21,10 +21,12 @@ pre-existing loc-kit VCS failures outside this plan's scope.
   passed.
 - The full host owning suite: 1,441 passed, 53 skipped, 37 subtests passed;
   two unrelated `LocKitGlossaryUploadUITest` cases failed in
-  `Component.trigger_post_update` with `Invalid revision range ..<revision>`.
-- Focused `prek` hooks passed. The prescribed mypy command reported 210
-  findings in 27 files, none at changed lines, so it does not establish a
-  clean baseline.
+  `Component.trigger_post_update` with `Invalid revision range ..<revision>`,
+  the same pre-existing VCS error class recorded in Task 0.
+- Focused `prek` hooks passed. The prescribed mypy command was run both at
+  clean merge-base `1e0593812b689471fa7ee443f8be8ddf52aa5ea8` and at the final
+  branch: each normalized to 120 error findings (171 output lines), with no
+  added or removed findings.
 
 **Goal:** Give the LLM judge the same prompt-entry representation the LLM
 translator uses for every glossary term it receives: cleaned source and target,
