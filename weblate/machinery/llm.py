@@ -2499,6 +2499,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 return None
             result.append(normalized)
         return result
+
     @classmethod
     def _resolve_reply_order(
         cls, translations: list[JSONValue], string_ids: list[str]
@@ -2524,7 +2525,6 @@ class BaseLLMTranslation(BatchMachineTranslation):
         if by_id.keys() != set(string_ids):
             return None
         return [by_id[string_id] for string_id in string_ids]
-
 
     @classmethod
     def _validate_translations(

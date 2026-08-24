@@ -47,6 +47,7 @@ from weblate.checks.utils import highlight_string
 from weblate.configuration.models import Setting, SettingCategory
 from weblate.glossary.models import render_glossary_units_tsv
 from weblate.lang.models import Language
+from weblate.machinery import llm
 from weblate.machinery.alibaba import AlibabaTranslation
 from weblate.machinery.anthropic import AnthropicTranslation
 from weblate.machinery.apertium import ApertiumAPYTranslation
@@ -76,7 +77,6 @@ from weblate.machinery.libretranslate import (
     LibreTranslateTranslation,
     LTEngineTranslation,
 )
-from weblate.machinery import llm
 from weblate.machinery.llm import (
     LLM_CURATED_PREVIOUS_EXAMPLE_SOURCES,
     LLM_NEUTRAL_PREVIOUS_EXAMPLE_SOURCES,
@@ -3866,6 +3866,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 },
             },
         )
+
     def patch_string_ids(self):
         """Deterministic request ids, so a static mocked reply can echo them."""
         return patch.object(
@@ -3873,6 +3874,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             "_build_string_ids",
             staticmethod(lambda count: [f"s{index}" for index in range(count)]),
         )
+
     @http_mock.activate
     def test_request_string_ids_are_unique_and_not_positional(self) -> None:
         machine = self.get_machine()
@@ -3907,6 +3909,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(len(set(ids)), 3)
         self.assertNotEqual(ids, [str(index) for index in range(3)])
         self.assertTrue(all(string_id.startswith("s") for string_id in ids))
+
     @http_mock.activate
     def test_previous_messages_demonstrate_the_id_contract(self) -> None:
         machine = self.get_machine()
@@ -3943,11 +3946,14 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         demo_request_ids, demo_reply_ids = observed[0]
         self.assertTrue(demo_request_ids)
         self.assertEqual(demo_reply_ids, demo_request_ids)
+
     def test_prompt_examples_never_show_an_id_less_structured_item(self) -> None:
+        # ruff: ignore[private-member-access]
         prompt = self.get_machine()._get_prompt("cs")
 
         self.assertNotIn('{"parts"', prompt)
         self.assertIn('"id"', prompt)
+
     @http_mock.activate
     def test_translate_refuses_a_batch_reply_with_shifted_ids(self) -> None:
         machine = self.get_machine()
@@ -4085,6 +4091,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(batch_sizes, [2, 1, 1])
         self.assertEqual(translations["Alpha"][0]["text"], "Alpha (fr)")
         self.assertEqual(translations["Beta"][0]["text"], "Beta (fr)")
+
     @http_mock.activate
     def test_translate_rescues_only_the_prefix_that_kept_its_ids(self) -> None:
         machine = self.get_machine()
@@ -4097,10 +4104,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             _previous_response: str,
         ) -> str:
             strings = json.loads(content)["strings"]
-            if len(strings) == 1:
-                answered = strings
-            else:
-                answered = strings[:1]
+            answered = strings if len(strings) == 1 else strings[:1]
             return json.dumps(
                 [
                     {
@@ -4683,6 +4687,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         )
 
         self.assertNotEqual(original, changed)
+
     def test_translation_cache_key_carries_the_batch_protocol_version(self) -> None:
         machine = self.get_machine()
         unit = make_unit(code="fr", source="Alpha")
@@ -5513,9 +5518,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 [{"@@PH0@@": "%d"}, {"@@PH0@@": "%s"}],
             )
             replies = []
-            for item, text in zip(
-                strings, (" fichier", " fichiers"), strict=True
-            ):
+            for item, text in zip(strings, (" fichier", " fichiers"), strict=True):
                 parts = [part.copy() for part in item["parts"]]
                 text_parts = [part for part in parts if part["type"] == "text"]
                 self.assertEqual(len(text_parts), 1)
@@ -5933,9 +5936,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 [
                     {
                         "id": item["id"],
-                        "parts": [
-                            {"type": "text", "text": f"{item['source']} (fr)"}
-                        ],
+                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
                     }
                     for item in strings
                 ]
@@ -5973,9 +5974,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 [
                     {
                         "id": item["id"],
-                        "parts": [
-                            {"type": "text", "text": f"{item['source']} (fr)"}
-                        ],
+                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
                     }
                     for item in strings
                 ]
@@ -6014,9 +6013,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 [
                     {
                         "id": item["id"],
-                        "parts": [
-                            {"type": "text", "text": f"{item['source']} (fr)"}
-                        ],
+                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
                     }
                     for item in strings[: len(strings) // 2]
                 ]
@@ -6460,9 +6457,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                     {"id": strings[0]["id"], "parts": output_parts},
                     {
                         "id": strings[1]["id"],
-                        "parts": [
-                            {"type": "text", "text": "Bonjour le monde!"}
-                        ],
+                        "parts": [{"type": "text", "text": "Bonjour le monde!"}],
                     },
                 ]
             )
