@@ -5,8 +5,11 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 from unittest import mock
+
+import httpx2
 
 from django.test import SimpleTestCase, TestCase, override_settings
 
@@ -31,6 +34,16 @@ REQ = JudgeRequest(
     glossary_terms=[("ГЕРМОДВЕРЬ", "porte blindée")],
     failing_checks=[],
 )
+
+class DrippingStream(httpx2.SyncByteStream):
+    def __init__(self, content: bytes, delay: float) -> None:
+        self.content = content
+        self.delay = delay
+
+    def __iter__(self):
+        for chunk in self.content:
+            time.sleep(self.delay)
+            yield bytes([chunk])
 
 
 def _reply(segments: list[dict]) -> dict:
@@ -67,6 +80,17 @@ class JudgeClientGateTest(SimpleTestCase):
             self.assertRaises(JudgeError),
         ):
             request_verdicts([REQ], model="")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_REQUEST_DEADLINE=0,
+    )
+    @http_mock.activate
+    def test_nonpositive_deadline_makes_no_network_call(self) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
         self.assertEqual(len(http_mock.calls), 0)
 
 
@@ -355,6 +379,82 @@ class JudgeRequestLoggingTest(SimpleTestCase):
         with self.assertLogs("weblate.trans.judge", level="WARNING") as logs:
             request_verdicts([REQ], model="vendor/model-a")
         self.assertTrue(any("500" in line for line in logs.output))
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_REQUEST_SLEEP=0.0,
+)
+class JudgeRequestDeadlineTest(TestCase):
+    def _dripping_response(self) -> httpx2.Response:
+        body = json.dumps(
+            _reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            )
+        ).encode()
+        return httpx2.Response(200, stream=DrippingStream(body, 0.01))
+
+    @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_REQUEST_DEADLINE=0.1)
+    @http_mock.activate
+    def test_deadline_marks_a_dripping_batch_unparsed_without_usage_or_retry(
+        self,
+    ) -> None:
+        http_mock.register_callback(
+            "POST",
+            CHAT_URL,
+            lambda _request: self._dripping_response(),
+        )
+        started = time.monotonic()
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        elapsed = time.monotonic() - started
+
+        self.assertTrue(result.unparsed)
+        self.assertLess(elapsed, 1)
+        self.assertEqual(LLMUsageLog.objects.count(), 0)
+        self.assertEqual(len(http_mock.calls), 1)
+
+    @override_settings(JUDGE_BATCH_SIZE=1, JUDGE_REQUEST_DEADLINE=0.1)
+    @http_mock.activate
+    def test_deadline_marks_only_the_dripping_batch_unparsed(self) -> None:
+        http_mock.register_callback(
+            "POST",
+            CHAT_URL,
+            lambda _request: self._dripping_response(),
+        )
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+
+        first, second = request_verdicts([REQ, REQ], model="vendor/model-a")
+
+        self.assertTrue(first.unparsed)
+        self.assertFalse(second.unparsed)
+
+    @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_REQUEST_DEADLINE=3)
+    @http_mock.activate
+    def test_chunked_body_inside_deadline_parses_normally(self) -> None:
+        body = json.dumps(
+            _reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            )
+        ).encode()
+        http_mock.register_callback(
+            "POST",
+            CHAT_URL,
+            lambda _request: httpx2.Response(
+                200,
+                stream=DrippingStream(body, 0.01),
+            ),
+        )
+
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+
+        self.assertFalse(result.unparsed)
 
 
 class JudgeUsageLogTest(TestCase):

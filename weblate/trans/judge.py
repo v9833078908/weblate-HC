@@ -31,7 +31,7 @@ from django.utils.translation import gettext as _
 
 from weblate.trans.models.judge import SEVERITY_RANK
 from weblate.trans.models.llm_usage import LLMUsageLog
-from weblate.utils.requests import fetch_validated_url
+from weblate.utils.requests import stream_validated_url
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -96,6 +96,11 @@ def validate_judge_configuration() -> None:
         and settings.JUDGE_MODEL_SEAT_1.strip()
         and isinstance(settings.JUDGE_MODEL_SEAT_2, str)
         and settings.JUDGE_MODEL_SEAT_2.strip()
+    ):
+        raise JudgeError(_("The LLM judge is not configured."))
+    if not (
+        isinstance(settings.JUDGE_REQUEST_DEADLINE, (int, float))
+        and settings.JUDGE_REQUEST_DEADLINE > 0
     ):
         raise JudgeError(_("The LLM judge is not configured."))
 
@@ -381,8 +386,9 @@ def _parse_reply(payload: dict, size: int) -> list[JudgeResult] | None:
 
 def _post_batch(payload: dict, model: str) -> _BatchResponse:
     """One POST, preserving HTTP status for retry decisions."""
+    started = time.monotonic()
     try:
-        response = fetch_validated_url(
+        with stream_validated_url(
             "POST",
             OPENROUTER_CHAT_COMPLETIONS_URL,
             # Built inline so the bearer token is never bound to a frame
@@ -393,13 +399,23 @@ def _post_batch(payload: dict, model: str) -> _BatchResponse:
             },
             json=payload,
             timeout=JUDGE_REQUEST_TIMEOUT,
-            raise_for_status=False,
             follow_redirects=False,
-        )
+        ) as response:
+            deadline = started + settings.JUDGE_REQUEST_DEADLINE
+            buffer = bytearray()
+            for chunk in response.iter_bytes():
+                if time.monotonic() > deadline:
+                    LOGGER.warning(
+                        "judge batch deadline exceeded: model=%s elapsed=%dms",
+                        model,
+                        int((time.monotonic() - started) * 1000),
+                    )
+                    return _BatchResponse(None, None)
+                buffer.extend(chunk)
     except Exception:
         return _BatchResponse(None, None)
     try:
-        body = response.json()
+        body = json.loads(buffer)
     except Exception:
         body = None
     return _BatchResponse(
@@ -432,6 +448,11 @@ def request_verdicts(
     ):
         raise JudgeError(_("The LLM judge is not configured."))
     if not isinstance(model, str) or not model.strip():
+        raise JudgeError(_("The LLM judge is not configured."))
+    if not (
+        isinstance(settings.JUDGE_REQUEST_DEADLINE, (int, float))
+        and settings.JUDGE_REQUEST_DEADLINE > 0
+    ):
         raise JudgeError(_("The LLM judge is not configured."))
 
     batch_size = settings.JUDGE_BATCH_SIZE

@@ -1715,6 +1715,10 @@ JUDGE_REQUEST_SLEEP = float(
         str(trans_defaults.DEFAULT_JUDGE_REQUEST_SLEEP),
     )
 )
+JUDGE_REQUEST_DEADLINE = get_env_float(
+    "WEBLATE_JUDGE_REQUEST_DEADLINE",
+    trans_defaults.DEFAULT_JUDGE_REQUEST_DEADLINE,
+)
 JUDGE_MAY_APPROVE = get_env_bool(
     "WEBLATE_JUDGE_MAY_APPROVE",
     trans_defaults.DEFAULT_JUDGE_MAY_APPROVE,
