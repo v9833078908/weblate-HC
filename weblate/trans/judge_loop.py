@@ -16,6 +16,7 @@ is judged, never rewritten.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -55,6 +56,8 @@ _NON_REPAIRABLE_VERDICTS = frozenset(
         JudgeVerdict.Verdict.UNPARSED,
     }
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _glossary_pairs(unit: Unit) -> list[tuple[str, str]]:
@@ -379,6 +382,13 @@ def run_judge_batch(
             if cached is not None:
                 cached_ids.add(unit.id)
                 verdicts[unit.id] = cached
+        LOGGER.info(
+            "judge run %s: %d strings, %d writable, %d cached",
+            run_id,
+            len(units),
+            len(writable_ids),
+            len(cached_ids),
+        )
         for seat, model in seats:
             request_units = [unit for unit in pending if unit.id not in cached_ids]
             if not request_units:
@@ -395,6 +405,13 @@ def run_judge_batch(
                     request_units, requests, results, strict=True
                 ):
                     _write_verdict(unit, request, seat, attempt, run_id, result, model)
+            LOGGER.info(
+                "judge run %s: seat %d done, %d strings judged with %s",
+                run_id,
+                seat,
+                len(request_units),
+                model,
+            )
 
         next_pending = []
         for unit in pending:
@@ -422,4 +439,5 @@ def run_judge_batch(
         attempt += 1
         if attempt > attempts:
             break
+        LOGGER.info("judge run %s: starting repair attempt %d", run_id, attempt)
     return verdicts

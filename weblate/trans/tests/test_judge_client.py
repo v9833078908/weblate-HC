@@ -327,6 +327,36 @@ class JudgeClientTest(SimpleTestCase):
             self.assertNotIn("sk-test", str(ctx.exception))
 
 
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_BATCH_SIZE=5,
+    JUDGE_REQUEST_SLEEP=0.0,
+)
+class JudgeRequestLoggingTest(SimpleTestCase):
+    @http_mock.activate
+    def test_batch_outcome_is_logged_with_elapsed_time(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        with self.assertLogs("weblate.trans.judge", level="INFO") as logs:
+            request_verdicts([REQ], model="vendor/model-a")
+        joined = "\n".join(logs.output)
+        self.assertIn("batch", joined)
+        self.assertIn("ms", joined)
+
+    @http_mock.activate
+    def test_failed_batch_is_logged_at_warning(self) -> None:
+        http_mock.register("POST", CHAT_URL, status_code=500, json={})
+        with self.assertLogs("weblate.trans.judge", level="WARNING") as logs:
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(any("500" in line for line in logs.output))
+
+
 class JudgeUsageLogTest(TestCase):
     @override_settings(
         JUDGE_ENABLED=True,

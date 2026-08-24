@@ -489,7 +489,29 @@ def request_verdicts(
             payload["reasoning"] = {"effort": effort.strip(), "exclude": True}
         parsed = None
         for attempt in range(2):
+            started = time.monotonic()
             response = _post_batch(payload, model)
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            if response.payload is None or (
+                response.status_code is not None and response.status_code >= 400
+            ):
+                LOGGER.warning(
+                    "judge batch %d/%d failed: model=%s status=%s elapsed=%dms",
+                    position + 1,
+                    len(batches),
+                    model,
+                    response.status_code,
+                    elapsed_ms,
+                )
+            else:
+                LOGGER.info(
+                    "judge batch %d/%d ok: model=%s strings=%d elapsed=%dms",
+                    position + 1,
+                    len(batches),
+                    model,
+                    len(batch),
+                    elapsed_ms,
+                )
             if response.payload is not None:
                 _record_usage(response.payload, model, project_slug)
             if response.payload is not None and (

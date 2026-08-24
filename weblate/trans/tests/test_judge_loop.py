@@ -76,6 +76,13 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(client.call_count, 2)
         self.assertEqual(unit.judge_verdicts.count(), 2)
 
+    def test_run_and_seat_are_logged(self) -> None:
+        with self.assertLogs("weblate.trans.judge_loop", level="INFO") as logs:
+            self.run_batch([PASS, PASS])
+        joined = "\n".join(logs.output)
+        self.assertIn("judge run", joined)
+        self.assertIn("seat", joined)
+
     def test_repair_target_selects_a_candidate_per_plural_form(self) -> None:
         unit = self.get_unit()
         engine = mock.Mock()
