@@ -4,17 +4,26 @@
 
 **Status:** awaiting approval
 
-**Goal:** Make `game-number` compare numeric values for the scale notations used by the measured languages, catch the Japanese and Chinese tenfold errors from `heart-abyss/hub-1`, and add no new firing to the replay corpora.
+**Goal:** Read the scale notation the measured languages actually use, so that `10 тысяч` matches
+`10,000`, `10 Tausend`, `10 mila`, `10천` and `一万` while `10万` does not, and so that no target
+language outside `ja`, `zh` and `ko` gains a firing it does not already have.
 
-**Architecture:** Keep the existing URL, markup, date, ordinal, digit-folding and grouping preprocessing. Replace token strings with `Counter[Decimal]`, parse scale words only through a language-specific vocabulary, and parse CJK numeral runs only for CJK languages. Preserve the old silent behavior for a target language whose scale notation is unsupported by subtracting only source occurrences derived from a scale; never infer a scale from an arbitrary word following a number.
+**Architecture:** A stated quantity carries two readings: the value we believe, and the literal
+digits today's check would have counted. A *closed* notation, the CJK scale characters, replaces the
+digits inside it, because the character set is finite and parsed exhaustively. An *open* notation, a
+scale word from a language table, only adds a reading and leaves the digits in place, because the
+set of spellings is not enumerable. The verdict matches believed readings first and falls back to
+literal ones. There is no per-language "supported notation" switch and no compatibility subtraction.
 
-**Tech Stack:** Python 3.13, `decimal.Decimal`, `regex`, Weblate `TargetCheck`, pytest in the existing `dev-docker` container.
+**Tech Stack:** Python 3.13, `decimal.Decimal`, `collections.Counter`, `regex`, Weblate
+`TargetCheck`, pytest in the existing `dev-docker` container.
 
 ---
 
 ## Why this fix exists
 
-`docs/llm-first/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` section 3.1 measured two production strings:
+`docs/llm-first/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` section 3.1 measured two
+production strings across nine languages:
 
 | Context | Russian value | Defective target | Actual value |
 |---|---:|---|---:|
@@ -22,112 +31,114 @@
 | `hub1_guard_1_4` | 100,000 | `ja` `100万文` | 1,000,000 |
 | `hub1_guard_1_4` | 100,000 | `zh_Hans` `一百万文` | 1,000,000 |
 
-The current `_numbers` extracts digit tokens. It sees `10` in both `10 тысяч` and `10万`, so the Japanese tenfold error is invisible. It also sees `10` in `10 тысяч` and `10000` in a correct `10,000`, so correct translations fire.
+`_numbers` counts digit tokens, so `10 тысяч` and `10万` look identical and the tenfold error is
+invisible, while a correct `10,000` looks different from `10 тысяч` and fires. Measured on the code
+in production today: 6 of the 18 frozen matrix rows correct, 1 of the 6 bounty rows correct, and 5
+firings over 1176 local corpus pairs of which 4 are this one false-positive class.
 
-Measured result on the two contexts:
+The three production strings were repaired on 2026-08-24, so verification uses the frozen
+pre-repair values as the defect side and the repaired values as the no-noise side.
 
-- 11 current firings: 10 false positives and 1 accidental true positive.
-- 2 additional Japanese false negatives.
-- 3 genuine magnitude defects in total.
+## What the previous draft of this plan got wrong
 
-The three production strings were already repaired on 2026-08-24. Verification therefore uses the frozen pre-repair values from the measurement and the repaired values as the no-noise side.
+It consulted a per-language word table for the *target* and, for a language outside that table,
+subtracted every scale-derived source occurrence from the result. A prototype of that design was
+measured against the batteries below. Both mechanisms are dropped:
 
-## Review corrections incorporated
+| Rejected mechanism | Measured consequence |
+|---|---|
+| A word table consulted for the target, so a spelling outside it reads as a bare mantissa | 8 correct translations start firing: `de` `10 Tsd.`, `de` `5 Mio.`, `de` `10 Tausende`, `it` `5 mln`, `fr` `5 M`, `es` `2 mil millones`, `en` `10k`, `en` `10 K` |
+| Compatibility subtraction for a language outside the table | Dropped and wrong quantities go silent: `10 тысяч` against `Ödül mon`, and against `Ödül 20 bin mon` |
+| Target `K/M/B/T` parsed whenever the source held a scale | `ja` `10k文` starts firing, and an identifier such as `245B` still misreads when the source holds a scale |
 
-This revision replaces the rejected design from the first draft:
+That design scored 1/12 on correct translations that must stay silent and 3/7 on real defects that
+must fire, against 9/12 and 6/7 for the code in production today. The goal was right and the
+direction of the failure was wrong: a check with `default_disabled = False` must not turn correct
+work red in order to catch a defect that is invisible today anyway.
 
-1. There is no `UNKNOWN_SCALE_NOTATION` and no generic `\p{L}` guard. `10 mon`, `200 durability` and other ordinary number-plus-noun phrases cannot masquerade as scales.
-2. Both `values` and `scaled` are `Counter[Decimal]`; repeated quantities stay count-aware.
-3. CJK parsing is strict and returns `None` for malformed runs. `Decimal` conversion cannot escape as `InvalidOperation`.
-4. Explicit zero is distinct from an omitted numeral, so `0万 == 0`.
-5. Plain values are canonical `Decimal` values, so `1000 == 1000.0`.
-6. Target abbreviations are parsed only when the source contains a scale-derived quantity. This accepts `10K` for `10 thousand` without reading identifiers such as `245B` in unrelated strings as 245 billion.
-7. The implementation is one coherent TDD task; no Task 1 code references symbols defined in Task 2.
-8. Rollout runs check recomputation synchronously with `update_state=False` and queries only the selected component.
-9. The corpus replay script is committed, the obsolete Part B is removed, and the final task commits and pushes every plan-owned file.
+## The rule set
 
-## Proven prototype before implementation
+**Rule 1. A source quantity is a value plus a fallback.** A plain number is `(value, no fallback)`.
+A scale word from the table for the source language is `(mantissa * factor, fallback [mantissa])`. A
+descending compound folded into one quantity keeps every mantissa in its fallback, and all of them
+must be present for the fallback to apply.
 
-The revised algorithm was executed against the current preprocessing regexes before this plan was written.
+**Rule 2. The target yields every reading it admits.** Every plain number token, as today. Plus, for
+`ja`, `zh` and `ko`, every parsed CJK scale run, which *replaces* the digits it contains. Plus, for a
+target language that has a word table, the word-scale reading, which is *added* while the digits
+stay.
 
-| Corpus | Result |
-|---|---:|
-| Frozen section 3.1 matrix | 18/18 expected verdicts |
-| Existing `GameNumberCheckTest` contracts | 25/25 preserved |
-| New edge matrix | 11/11 expected verdicts |
-| `heart-abyss/hub-1`, `ru -> en,fr` | 0 firings / 792 pairs |
-| `st2`, `ru -> zh_Hans` | 0 firings / 124 pairs |
-| `col4-b0-annotations`, `ru -> fr` | 1 firing / 260 pairs |
+**Rule 3. Match believed readings first, then fallbacks.** Pass one consumes each quantity's value
+from the target multiset. Pass two lets a survivor consume its whole fallback instead. Anything
+still unmatched fires.
 
-The one retained Col4 firing is `EVENT_516_RESULT_977`: `_x000b_` occurs twice in the source and its `000` fragments are still read as numbers. That is a separate XLSX/control-character ingestion defect and remains out of scope.
+The open and closed distinction is the load-bearing part. `10万` cannot mean ten, so the run owns
+its digits and a source value of 10,000 finds nothing to match: the defect fires. `10 Tsd.` might be
+any spelling of any scale, so the literal `10` stays available and the fallback of `10 тысяч` matches
+it: the correct translation stays silent. The same rule keeps `zh` `千万不要忘记，奖励10k文` silent,
+because the idiom parses as a run of its own and the `10` of `10k` is untouched. A fallback accepts
+only the *matching* mantissa, so a wrong value is still caught without knowing the word: `100 тысяч`
+against `de` `10 Tsd.` fires, because neither 100,000 nor 100 is present.
 
-## Behavior contract
+What is compared by value: plain numbers in any Unicode decimal digit script with the locale
+decimal separator and grouping, already handled by `NUMBER` and `THOUSANDS`; word scales for `ru`
+and `en` on whichever side speaks that language; descending compounds such as
+`1 million 500 thousand`; CJK section and myriad scales for `ja`, `zh` and `ko`, including `1万5000`,
+`2万5千`, `1億5000万`, `1兆2億` and full-width digits. One case is knowingly given up: a target that
+drops the scale word and keeps the mantissa, `10 тысяч` against `Reward 10 mon`, stays silent in a
+non-CJK language. It is silent today, and buying it costs the eight false positives above.
 
-### Supported comparisons
+The rules imply an invariant, and the implementation must prove it rather than assume it:
 
-- Plain numeric values in any Unicode decimal digit script.
-- Locale decimal separators already covered by `NUMBER`.
-- Locale grouping already covered by `THOUSANDS`.
-- Language-specific word scales for `ru`, `en`, `de`, `es`, `fr`, and `it`.
-- CJK section and myriad scales for `ja`, `zh`, and `ko`.
-- Compound descending word scales such as `1 million 500 thousand`.
-- Compound CJK values such as `1万5000`, `2万5千`, `1億5000万`, and `1兆2億`.
-- Uppercase adjacent target abbreviations `K/M/B/T` and `К/М/Б/Т`, but only when the source contains a scale-derived quantity.
+> For a pair whose target holds no parsed CJK scale run, the new check must not fire where the
+> current check is silent.
 
-### Unsupported target languages
+Such a target yields exactly today's number multiset, and every source quantity keeps today's
+literal reading as its fallback. That is **measured on a prototype, not proven**: the CJK tokenizer
+and the two matching passes are what could break it on a mixed run. Task 3 therefore commits a gate
+that re-measures it on every local corpus pair, and Task 1 pins the mixed-run cases as tests.
 
-For a target language outside the word-scale table and outside CJK:
+## Prototype measurements
 
-1. Plain source quantities keep the current check behavior.
-2. A source occurrence derived from a scale is removed from `missing` if it remains unmatched.
-3. Other missing source occurrences remain failures.
+The rules were executed against the current preprocessing regexes before this plan was written.
 
-This is deliberate uncertainty, not guessed semantics. For example:
+| Battery | Today | This plan |
+|---|---:|---:|
+| Frozen section 3.1 matrix, 18 rows | 6/18 | 18/18 |
+| Repaired and pre-repair bounty rows, 6 rows | 1/6 | 6/6 |
+| Correct translations that must stay silent, 12 rows | 9/12 | 11/12 |
+| Real defects that must fire, 7 rows | 6/7 | 6/7 |
+| Existing contracts, run as `ru -> ja` and as `en -> de` | 26/26 | 26/26 |
+| Parser edges: zero, malformed, compound, myriad, idiom, prose, 12 rows | 6/12 | 11/12 |
+| `heart-abyss/hub-1`, `ru -> en,fr`, 792 pairs | 2 keys | 0 keys |
+| `st2`, `ru -> zh_Hans`, 124 pairs | 0 keys | 0 keys |
+| `col4-b0-annotations`, `ru -> fr`, 260 pairs | 1 key | 1 key |
+| Invariant violations over all 1176 corpus pairs | n/a | 0 |
 
-```text
-source ru: 10 тысяч мон
-tr target: 10 bin mon       -> silent; Turkish scale parsing is unsupported
-tr target: 10 mon           -> also silent for this scale-derived source value
-source en: Shield 2000
-tr target: Kalkan 200       -> fires; the source value was plain, not scale-derived
-```
+Two rows are not reached and stay as they are today: `th` `1 หมื่น` for 10,000 and `de`
+`1,5 Millionen` for 1,500,000 both fire now and keep firing. Each closes later by adding that
+language to the word table, which under Rule 2 can only add a target reading and therefore cannot
+create a firing. Vocabulary growth is safe to do lazily, one complaint at a time.
 
-For supported English, `10 тысяч` against `Reward 10 mon` fires because `mon` is not an English scale word. This is the regression that the former generic guard hid.
-
-### Data flow
-
-```text
-source / target text
-        |
-        v
-URL + markup + date removal
-ordinal removal on source only
-Unicode digit folding
-thousands-group collapse
-        |
-        +--> language-specific word-scale spans ----+
-        |                                            |
-        +--> CJK spans, CJK languages only ----------+--> Counter[Decimal] values
-        |                                            |    Counter[Decimal] scaled
-        +--> target abbreviation spans, only when ---+
-        |    source.scaled is non-empty
-        |
-        +--> remaining NUMBER tokens as Decimal
-
-missing = source.values - target.values
-if target scale notation is unsupported:
-    missing = missing - source.scaled
-failure = bool(missing)
-```
+**Coverage caveat, read before trusting the corpus rows.** No target in any local corpus holds a
+parsed CJK scale run: `analysis/data/heart-abyss-hub-1-units.tsv` carries only the `ru`, `en` and
+`fr` columns, and the Chinese corpus writes its numbers with Arabic digits. The corpora therefore
+support the invariant for open notation and say nothing about `ja`, `zh` and `ko`, whose only
+evidence is the constructed matrix. Task 5 Step 3 closes that gap and blocks verification until it
+does.
 
 ## Ground rules
 
-1. Work in the main checkout on a branch. Do not create a git worktree: `dev-docker` is a shared fixed-port stack.
-2. Before every container test, copy `weblate_customization/src/weblate_customization` to `dev-docker/data/python/`.
-3. Do not rebuild, restart, or deploy until the separately gated rollout task.
+1. Work in the main checkout on a branch. Do not create a git worktree: `dev-docker` is a shared
+   fixed-port stack.
+2. Before every container test, copy `weblate_customization/src/weblate_customization` to
+   `dev-docker/data/python/`.
+3. Do not rebuild, restart or deploy until the separately gated rollout task.
 4. Keep the check ID and ignore flag unchanged: `game-number` and `ignore-game-number`.
-5. Do not add a numeral-parsing dependency. The supported grammar is small, deterministic and already covered by the installed `regex` module.
-6. Do not extend the language vocabulary beyond the reviewed words in this plan during implementation.
+5. Add no numeral-parsing dependency. The grammar is small, deterministic and covered by the
+   installed `regex` module.
+6. Add no word table for a language this plan does not list. Adding one is safe under Rule 2, but it
+   is a separate change with its own measurement.
 
 ## Baseline command
 
@@ -140,34 +151,61 @@ Measured baseline: 120 passed, 26 skipped.
 
 ---
 
-## Task 1: Write the value-comparison regression tests
+## Task 1: Write the regression tests
 
 **Files:**
 
 - Modify: `weblate_customization/tests/test_checks.py:11-22,189-337`
 
-### Step 1: Add a language-aware unit helper
+### Step 1: Make every case state its languages
 
-Import `make_language` beside `make_unit` and add this helper above `GameNumberCheckTest`:
+The check now reads both languages off the unit, so a test passing `None` would assert a shape
+production never produces. Import `game_number_fails` beside `GameNumberCheck`, `make_language`
+beside `make_unit`, and add two helpers above `GameNumberCheckTest`:
 
 ```python
-def make_number_unit(
-    source: str,
-    target: str,
-    *,
-    source_code: str,
-    target_code: str,
-):
+def fails(
+    source: str, target: str, *, source_code: str = "en", target_code: str = "cs"
+) -> bool:
+    """The verdict for one pair, with both languages stated."""
+    return game_number_fails(
+        source, target, source_language=source_code, target_language=target_code
+    )
+
+
+def make_number_unit(source: str, target: str, *, source_code: str, target_code: str):
+    """A unit whose component source language is not the factory default."""
     unit = make_unit(source=source, target=target, code=target_code)
     unit.translation.component.source_language = make_language(source_code)
     return unit
 ```
 
-The factory defaults the component source language to English. The helper changes only the unsaved component object used by `GameNumberCheck`; no database write occurs.
+`make_unit` fixes the component source language to English
+(`weblate/trans/tests/factories.py:145`), so the helper replaces it on the unsaved component; no
+database write occurs.
 
-### Step 2: Add the frozen 18-row matrix
+Then rewrite the twenty existing `self.check.check_single(source, target, None)` calls as
+`fails(source, target)`. Mechanical, and no expectation changes: `en -> cs` is a real configuration
+with no word table on the target side, so each case keeps asserting the same numeric contract. The
+base-class cases in `setUp` already run through a real `en -> cs` unit and stay untouched.
 
-Add one test using `subTest` and the exact rows below:
+### Step 2: Prove the adapter reads the unit
+
+```python
+def test_the_check_reads_both_languages_from_the_unit(self) -> None:
+    source = "10 тысяч мон!"
+    for target, target_code, expected in (
+        ("報酬は10万文!", "ja", True),
+        ("Reward - 10,000 mon!", "en", False),
+    ):
+        with self.subTest(target_code=target_code):
+            unit = make_number_unit(
+                source, target, source_code="ru", target_code=target_code
+            )
+            self.assertEqual(self.check.check_single(source, target, unit), expected)
+```
+
+### Step 3: Add the frozen 18-row matrix
 
 ```python
 def test_scale_values_match_the_measured_matrix(self) -> None:
@@ -195,305 +233,257 @@ def test_scale_values_match_the_measured_matrix(self) -> None:
     )
     for source, target, target_code, expected in rows:
         with self.subTest(target_code=target_code, target=target):
-            unit = make_number_unit(
-                source,
-                target,
-                source_code="ru",
-                target_code=target_code,
-            )
             self.assertEqual(
-                self.check.check_single(source, target, unit),
+                fails(source, target, source_code="ru", target_code=target_code),
                 expected,
             )
 ```
 
-### Step 3: Add the blocking guard regression
+Every `False` row for `de`, `es`, `fr` and `it` passes without a word table for those languages, and
+must keep passing if a later change adds one.
 
-```python
-def test_an_ordinary_target_noun_is_not_a_scale(self) -> None:
-    source = "10 тысяч мон!"
-    target = "Reward 10 mon!"
-    unit = make_number_unit(source, target, source_code="ru", target_code="en")
-    self.assertTrue(self.check.check_single(source, target, unit))
-```
+### Step 4: Add the behavior table
 
-This test is mandatory. A generic number-plus-word guard makes it fail.
+One test, one row per line, driven through `fails` with `subTest` exactly as in Step 3. Every row
+was measured on the prototype.
 
-### Step 4: Add unsupported-language compatibility tests
+| Source | Source | Target | Target | Fires | Why this row exists |
+|---|---|---|---|---|---|
+| `10 тысяч мон` | ru | `Belohnung 10 Tsd. Mon` | de | no | An abbreviation outside the table keeps its digits |
+| `5 миллионов мон` | ru | `5 Mio. Mon` | de | no | Same, for millions |
+| `10 тысяч мон` | ru | `10 Tausende Mon` | de | no | An inflected form the table does not carry |
+| `5 миллионов мон` | ru | `5 mln di mon` | it | no | Italian abbreviation |
+| `5 миллионов мон` | ru | `5 M de mons` | fr | no | Single-letter French abbreviation |
+| `2 миллиарда мон` | ru | `2 mil millones de mon` | es | no | Two Spanish scale words in a row |
+| `10 тысяч мон` | ru | `Reward 10k mon` | en | no | Lowercase magnitude letter |
+| `10 тысяч мон` | ru | `Reward 10 K mon` | en | no | Detached magnitude letter |
+| `2 млрд мон` | ru | `2,000,000,000 mon` | en | no | The Russian table now covers billions |
+| `в 10 тысячах мон` | ru | `in 10,000 mon` | en | no | Prepositional Russian form |
+| `10 тысяч мон` | ru | `報酬は10k文` | ja | no | A CJK target where no run parses |
+| `10 тысяч мон` | ru | `千万不要忘记，奖励10k文` | zh_Hans | no | The parsed run is an idiom, not the quantity |
+| `10 тысяч мон!` | ru | `Ödül mon!` | tr | yes | The quantity is gone |
+| `10 тысяч мон!` | ru | `Ödül 20 bin mon!` | tr | yes | Wrong mantissa in an unlisted language |
+| `5 миллионов мон` | ru | `Nagroda 7 milionów mon` | pl | yes | Same, for millions |
+| `100 тысяч мон` | ru | `10 Tausend Mon` | de | yes | A fallback accepts only its own mantissa |
+| `100 тысяч мон` | ru | `10 Tsd. Mon` | de | yes | Same, without knowing the word |
+| `Reward 100000` | en | `Награда 10 тысяч мон` | ru | yes | Tenfold error into a listed language |
+| `уровень 3, награда 10 тысяч` | ru | `レベル3、報酬10万文` | ja | yes | Mixed run: a correct 3 beside a wrong myriad |
+| `Reward 1 million 500 thousand` | en | `Reward 1 million` | en | yes | A folded compound needs its whole fallback |
+| `Reward 0` | en | `報酬は0万文` | ja | no | Explicit zero is not an omitted numeral |
+| `Reward 1.2.3` | en | `報酬は1.2.3万文` | ja | no | A malformed run degrades, and never raises |
+| `Reward 10000` | en | `報酬は1万.以上` | ja | no | A run may carry trailing punctuation |
+| `Reward 1000` | en | `Reward 1000.0` | en | no | Decimal values compare numerically |
+| `Reward 1 million 500 thousand` | en | `Reward 1,500,000` | en | no | Descending compounds fold |
+| `Reward 1 thousand 2 million` | en | `Reward 2001000` | en | yes | Ascending ones do not |
+| `Reward 1,000,000,000` | en | `Reward 10億` | ja | no | Myriad scales use their real values |
+| `Reward 1 trillion` | en | `報酬は1兆文` | ja | no | Largest scale in the table |
+| `Reward 15000000` | en | `報酬は1,500万文` | ja | no | Grouping inside a run |
+| `Reward 100000` | en | `報酬は１０万文` | ja | no | Full-width digits |
+| `Every third repair heals 10 HP` | en | `三回に一回の修理は10回復します` | ja | no | CJK numerals in prose are not quantities |
+| `Never do that, 5 times` | en | `千万不要那样做，5次` | zh_Hans | no | Neither is an idiom |
+| `10 thousand + 10 thousand` | en | `10000` | en | yes | Repeated quantities stay a multiset |
 
-```python
-def test_an_unsupported_target_scale_language_stays_silent(self) -> None:
-    source = "10 тысяч мон!"
-    for target, code in (
-        ("Ödül 10 bin mon!", "tr"),
-        ("Thưởng 10 nghìn mon!", "vi"),
-        ("Nagroda - 10 tysięcy mon!", "pl"),
-        ("Hadiah 10 ribu mon!", "id"),
-        ("Beloning - 10 duizend mon!", "nl"),  # codespell:ignore
-        ("รางวัล 1 หมื่นมอน!", "th"),
-        ("پاداش ۱۰ هزار مون!", "fa"),
-        ("इनाम 10 हज़ार मोन!", "hi"),
-    ):
-        with self.subTest(code=code):
-            unit = make_number_unit(source, target, source_code="ru", target_code=code)
-            self.assertFalse(self.check.check_single(source, target, unit))
-
-
-def test_an_unsupported_language_does_not_hide_a_plain_source_error(self) -> None:
-    source = "Shield 2000 durability"
-    target = "Kalkan 200 dayanıklılık"
-    unit = make_number_unit(source, target, source_code="en", target_code="tr")
-    self.assertTrue(self.check.check_single(source, target, unit))
-```
-
-### Step 5: Add multiset, zero, strictness and canonicalization tests
-
-Add separate tests for these observable contracts:
-
-```python
-cases = (
-    # Repeated values remain a multiset.
-    ("10 thousand + 10 thousand", "10K", "en", "en", True),
-    # Unsupported compatibility removes every scale-derived occurrence.
-    ("10 thousand + 10 thousand", "Reward", "en", "tr", False),
-    # It does not remove a plain occurrence with the same value.
-    ("10000 + 10 thousand", "Reward", "en", "tr", True),
-    # Explicit zero is not an implicit one.
-    ("Reward 0", "報酬は0万文", "en", "ja", False),
-    # A malformed run is left to the existing NUMBER tokenizer and never raises.
-    ("Reward 1.2.3", "報酬は1.2.3万文", "en", "ja", False),
-    # Plain values compare numerically.
-    ("Reward 1000", "Reward 1000.0", "en", "en", False),
-    # Descending compound word scales form one value.
-    ("Reward 1 million 500 thousand", "Reward 1,500,000", "en", "en", False),
-    # Large CJK scales use their actual values.
-    ("Reward 1,000,000,000", "Reward 10億", "en", "ja", False),
-    ("Reward 1 trillion", "報酬は1兆文", "en", "ja", False),
-    # Lowercase m stays a unit; uppercase adjacent K is a magnitude abbreviation.
-    ("Reward 10 thousand", "Reward 10m", "en", "en", True),
-    ("Reward 10 thousand", "Reward 10K", "en", "en", False),
-)
-```
-
-Drive every row through `make_number_unit` and `check_single`. The malformed case must fail the test if an exception escapes.
-
-### Step 6: Run the red tests
+### Step 5: Run the red tests
 
 ```sh
 cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
 ./rundev.sh test "weblate_customization/tests/test_checks.py::GameNumberCheckTest"
 ```
 
-Expected before implementation:
-
-- The frozen matrix fails on the current false positives and false negatives.
-- `test_an_ordinary_target_noun_is_not_a_scale` fails because the current check sees `10` on both sides.
-- The decimal canonicalization, compound word-scale, large CJK and lowercase-`m` cases fail.
-- Tests that protect already-correct legacy behavior may pass; they are regression tests, not artificial red tests.
-
-Do not assert an exact failing-method count. `subTest` aggregation and the pre-existing base-class checks make that count incidental.
+Before implementation the frozen matrix, the adapter test and the CJK edges fail. The
+no-new-firing rows and most rewritten legacy rows already pass: they protect current behavior and
+are regression tests, not artificial red tests. Do not assert an exact failing count; `subTest`
+aggregation makes it incidental.
 
 ---
 
-## Task 2: Replace token comparison with strict language-aware values
+## Task 2: Replace token comparison with two-reading matching
 
 **Files:**
 
-- Modify: `weblate_customization/src/weblate_customization/checks.py:15-20,30-55,269-310`
-- Test: `weblate_customization/tests/test_checks.py:189-390`
+- Modify: `weblate_customization/src/weblate_customization/checks.py:15-20,282-310`
 
-### Step 1: Add the data model and reviewed vocabularies
+### Step 1: Tables
 
-Add `Decimal` and `InvalidOperation` from `decimal`, and `NamedTuple` from `typing`.
-
-Use language-specific word tables. Do not combine them into one global alternation:
+Add `from decimal import Decimal, InvalidOperation` and `NamedTuple` to the typing import. Place the
+tables beside the existing number regexes, keeping the file's habit of explaining each constant.
 
 ```python
+# A scale word carries the zeros a digit would spell out, so "10 тысяч" and
+# "10 thousand" are one quantity with two readings. Only the languages this fork
+# uses as a source are listed: a target whose spelling is not here keeps its
+# literal digits and therefore behaves exactly as before.
 WORD_SCALES: dict[str, dict[str, int]] = {
-    "ru": {
-        "тыс": 1_000,
-        "тысяча": 1_000,
-        "тысячи": 1_000,
-        "тысяч": 1_000,
-        "млн": 1_000_000,
-        "миллион": 1_000_000,
-        "миллиона": 1_000_000,
-        "миллионов": 1_000_000,
-    },
-    "en": {
-        "thousand": 1_000,
-        "million": 1_000_000,
-        "millions": 1_000_000,
-        "billion": 1_000_000_000,
-        "billions": 1_000_000_000,
-        "trillion": 1_000_000_000_000,
-        "trillions": 1_000_000_000_000,
-    },
-    "de": {
-        "tausend": 1_000,
-        "million": 1_000_000,
-        "millionen": 1_000_000,
-    },
-    "es": {
-        "mil": 1_000,
-        "millon": 1_000_000,  # codespell:ignore
-        "millón": 1_000_000,
-        "millones": 1_000_000,
-    },
-    "fr": {
-        "mille": 1_000,
-        "million": 1_000_000,
-        "millions": 1_000_000,
-    },
-    "it": {
-        "mila": 1_000,
-        "milione": 1_000_000,
-        "milioni": 1_000_000,
-    },
+    "ru": dict.fromkeys(("тыс", "тысяча", "тысячи", "тысяч", "тысячу", "тысячах"), 1_000)
+    | dict.fromkeys(("млн", "миллион", "миллиона", "миллионов"), 1_000_000)
+    | dict.fromkeys(("млрд", "миллиард", "миллиарда", "миллиардов"), 1_000_000_000),
+    "en": dict.fromkeys(("thousand", "thousands"), 1_000)
+    | dict.fromkeys(("million", "millions"), 1_000_000)
+    | dict.fromkeys(("billion", "billions"), 1_000_000_000)
+    | dict.fromkeys(("trillion", "trillions"), 1_000_000_000_000),
 }
-
-SECTION_SCALES = {
-    "十": 10,
-    "百": 100,
-    "千": 1_000,
-    "십": 10,
-    "백": 100,
-    "천": 1_000,
-}
-BIG_SCALES = {
-    "万": 10_000,
-    "萬": 10_000,
-    "만": 10_000,
-    "億": 100_000_000,
-    "亿": 100_000_000,
-    "억": 100_000_000,
-    "兆": 1_000_000_000_000,
-    "조": 1_000_000_000_000,
-}
-CJK_DIGITS = {
-    "〇": 0,
+# CJK scale notation is a closed character set, so a parsed run is the whole
+# quantity and its digits are not separately readable: that is what makes "10万"
+# ten times "1万" instead of a restatement of "10". Each group holds the same
+# scale written in Japanese, Chinese and Korean.
+SECTION_SCALES = {"十": 10, "百": 100, "千": 1_000, "십": 10, "백": 100, "천": 1_000}
+BIG_SCALES = (
+    dict.fromkeys("万萬만", 10_000)
+    | dict.fromkeys("億亿억", 100_000_000)
+    | dict.fromkeys("兆조", 1_000_000_000_000)
+)
+CJK_DIGITS = {char: value for value, char in enumerate("〇一二三四五六七八九")} | {
     "零": 0,
-    "一": 1,
-    "二": 2,
-    "三": 3,
-    "四": 4,
-    "五": 5,
-    "六": 6,
-    "七": 7,
-    "八": 8,
-    "九": 9,
     "两": 2,
     "兩": 2,
 }
+# Language.is_cjk() holds the same set, but the verdict stays a pure string
+# function so the offline probes can share it.
 CJK_LANGUAGES = frozenset({"ja", "zh", "ko"})
-ABBREVIATION_SCALES = {
-    "K": 1_000,
-    "M": 1_000_000,
-    "B": 1_000_000_000,
-    "T": 1_000_000_000_000,
-    "К": 1_000,
-    "М": 1_000_000,
-    "Б": 1_000_000_000,
-    "Т": 1_000_000_000_000,
+
+_MANTISSA = r"\d+(?:[.,]\d+)?"
+# One compiled pattern per language: a single alternation over every table would
+# read a Russian word in a German string. Case-insensitive, because "Tausend",
+# "Million" and "Тысяч" are all normal spellings.
+WORD_SCALE_PATTERNS = {
+    code: regex.compile(
+        rf"({_MANTISSA})\s*(" + "|".join(sorted(table, key=len, reverse=True)) + r")\b",
+        regex.IGNORECASE,
+    )
+    for code, table in WORD_SCALES.items()
 }
+_CJK_NUMERALS = "".join((*CJK_DIGITS, *SECTION_SCALES, *BIG_SCALES))
+# A run is a maximal stretch of numerals, digits and their separators holding at
+# least one CJK numeral. "3回に1回" holds none and stays two plain numbers.
+CJK_RUN = regex.compile(
+    rf"[\d.,{_CJK_NUMERALS}]*[{_CJK_NUMERALS}][\d.,{_CJK_NUMERALS}]*"
+)
+_WHOLE_MANTISSA = regex.compile(rf"\A{_MANTISSA}\Z")
 
-class Quantities(NamedTuple):
-    values: Counter[Decimal]
-    scaled: Counter[Decimal]
+
+class Quantity(NamedTuple):
+    """A stated quantity: the value read, and the literal reading it may fall back to.
+
+    An empty fallback means the reading admits no alternative.
+    """
+
+    value: Decimal
+    fallback: tuple[Decimal, ...]
 ```
 
-`scaled` is a `Counter`, not a set. It records how many source occurrences were produced from scale notation.
+A lowercase-only match would fail the German rows of the frozen matrix, so `regex.IGNORECASE` is
+load-bearing, not decoration.
 
-### Step 2: Compile one word-scale pattern per language
+### Step 2: The CJK state machine
 
-Compile patterns once at import time. Each pattern matches only words from its language table. The number token must be strict: `\d+(?:[.,]\d+)?`.
-
-The extractor may combine adjacent pairs only when:
-
-1. The text between them is whitespace only.
-2. Scale factors are strictly descending.
-
-Therefore:
-
-```text
-1 million 500 thousand -> 1,500,000
-1 thousand 2 million   -> two quantities; malformed ascending compound is not folded
-```
-
-Return spans and values rather than rewriting arbitrary text. Plain-number extraction skips consumed spans.
-
-### Step 3: Implement a strict CJK state machine
-
-The CJK parser must enforce these invariants:
-
-- It runs only for base languages `ja`, `zh`, and `ko`.
-- A run must contain a section or big scale.
-- ASCII decimal fragments use a strict anchored match; `1.2.3万` returns `None`.
-- Section scales and big scales descend within their groups.
-- A big scale requires an explicit group. Bare `万` and idiomatic `万一` are not quantities.
-- `group_seen` distinguishes `0万` from an omitted numeral.
-- `InvalidOperation` is caught and returns `None`.
-
-Core big-scale branch:
+Strict by construction. Every rejection returns `None`, which leaves the run to the plain
+tokenizer, so a malformed run degrades to today's behavior instead of raising.
 
 ```python
-elif char in BIG_SCALES:
-    scale = BIG_SCALES[char]
-    if not group_seen or scale >= last_big_scale:
+def _cjk_value(run: str) -> Decimal | None:
+    """Value of a CJK numeral run, or None when it is not a well-formed quantity."""
+    total = section = Decimal(0)
+    current: Decimal | None = None
+    group_seen = scale_seen = False
+    last_section = last_big = Decimal("Infinity")
+    index = 0
+    while index < len(run):
+        char = run[index]
+        if char.isdigit():
+            end = index
+            while end < len(run) and (run[end].isdigit() or run[end] in ".,"):
+                end += 1
+            chunk = run[index:end].rstrip(".,")
+            if current is not None or not _WHOLE_MANTISSA.match(chunk):
+                return None
+            if (current := _decimal(chunk)) is None:
+                return None
+            group_seen = True
+            index += len(chunk)
+            continue
+        if char in CJK_DIGITS:
+            # Two numerals in a row are not a quantity: "一二万" is prose.
+            if current is not None:
+                return None
+            current = Decimal(CJK_DIGITS[char])
+            group_seen = True
+        elif char in SECTION_SCALES:
+            scale = Decimal(SECTION_SCALES[char])
+            if scale >= last_section:
+                return None
+            # A bare section scale means one of it: "十" is ten.
+            section += (Decimal(1) if current is None else current) * scale
+            current, group_seen, last_section, scale_seen = None, True, scale, True
+        elif char in BIG_SCALES:
+            scale = Decimal(BIG_SCALES[char])
+            # A big scale needs an explicit group, so "万一" is not a quantity.
+            # Never write `current or Decimal(1)`: that turns "0万" into 10000.
+            if not group_seen or scale >= last_big:
+                return None
+            total += (section + (current if current is not None else Decimal(0))) * scale
+            section, current, group_seen = Decimal(0), None, False
+            last_section, last_big, scale_seen = Decimal("Infinity"), scale, True
+        else:
+            return None
+        index += 1
+    if not scale_seen:
         return None
-    group = section + (Decimal(0) if current is None else current)
-    total += group * scale
-    section = Decimal(0)
-    current = None
-    group_seen = False
-    last_section_scale = float("inf")
-    last_big_scale = scale
+    return total + section + (current if current is not None else Decimal(0))
 ```
 
-Do not use `group or Decimal(1)`; that converts explicit zero to one.
-
-### Step 4: Extract all quantities as `Decimal`
-
-Replace `_numbers` with `_quantities`:
+`_decimal` replaces the inline `.replace()` chain `_numbers` used, and is the only place
+`InvalidOperation` is handled:
 
 ```python
-def _quantities(
-    text: str,
-    language: str | None,
-    *,
-    drop_ordinals: bool = False,
-    parse_abbreviations: bool = False,
-) -> Quantities:
-    ...
+def _decimal(text: str) -> Decimal | None:
+    """A number token as a value, or None when it will not parse."""
+    try:
+        return Decimal(text.replace(",", ".").replace("\u066b", "."))
+    except InvalidOperation:
+        return None
 ```
 
-Order:
+### Step 3: Extraction
 
-1. `_fold_digits(URL.sub(" ", text))`.
-2. `MARKUP` and `FULL_DATE` removal.
-3. Source-only ordinal removal.
-4. `_collapse_grouping`.
-5. Language-specific word-scale spans.
-6. CJK spans for CJK languages.
-7. Target abbreviations only when `parse_abbreviations=True`.
-8. Remaining `NUMBER` spans converted through `Decimal`.
+Five small functions, each doing exactly what its name says. Spans are half-open `(start, end)` over
+the prepared body, and a span list is always in text order.
 
-Every consumed scale span increments both counters. Every remaining plain number increments only `values`.
+| Function | Contract |
+|---|---|
+| `_prepare(text, *, drop_ordinals) -> str` | `URL` to a space, then `MARKUP` and `FULL_DATE` to a space, then `ORDINAL` when asked, then `_collapse_grouping`. Exactly the body `_numbers` counted. |
+| `_covered(start, end, spans) -> bool` | Whether the range overlaps any span. |
+| `_number_tokens(body, skip) -> list[Decimal]` | Every `NUMBER` match not covered by `skip`, through `_decimal`. |
+| `_closed_spans(body, language) -> list[(start, end, value, digits)]` | Empty unless the language is in `CJK_LANGUAGES`. For each `CJK_RUN` match, strip leading and trailing `.` and `,`, then keep the span when `_cjk_value` parses it. `digits` are the ASCII number tokens inside the run, and become the fallback. |
+| `_open_spans(body, language, skip) -> list[(start, end, value, mantissas)]` | Empty unless the language has a table. Skip a match covered by `skip`. Fold a match into the previous span when only whitespace separates them and its factor is strictly smaller: the folded span carries the summed value and both mantissas. Otherwise start a new span. |
 
-Normalize probe/API codes through their base prefix:
+The two sides then differ in exactly one place:
+
+```python
+def _quantities(text: str, language: str | None, *, drop_ordinals: bool) -> list[Quantity]:
+    """Every quantity the text states, each with its literal fallback."""
+    # closed and open spans become Quantity(value, fallback);
+    # every NUMBER token outside both becomes Quantity(value, ()).
+
+
+def _readings(text: str, language: str | None) -> Counter[Decimal]:
+    """Every value the text can be read as. A closed run replaces its digits."""
+    # values of the closed and open spans, plus every NUMBER token outside the
+    # closed spans ONLY, so a word-scale reading is added while its digits stay.
+```
+
+`_readings` prepares the body with `drop_ordinals=False`: an ordinal in the translation keeps its
+digit, which is the existing contract.
+
+### Step 4: The verdict
 
 ```python
 def _base_language(code: str | None) -> str | None:
+    """`zh_Hans` and `zh-Hant` both write 萬, so only the base code matters."""
     if code is None:
         return None
     return code.split("_", 1)[0].split("-", 1)[0]
-```
 
-### Step 5: Implement one authoritative comparison function
 
-Add a public pure function so the Weblate adapter and offline probes use the same verdict:
-
-```python
 def game_number_fails(
     source: str,
     target: str,
@@ -501,86 +491,79 @@ def game_number_fails(
     source_language: str | None,
     target_language: str | None,
 ) -> bool:
-    source_code = _base_language(source_language)
-    target_code = _base_language(target_language)
-    source_quantities = _quantities(
-        source,
-        source_code,
-        drop_ordinals=True,
-    )
-    if not source_quantities.values or not target:
+    """Whether a quantity the source states is missing from the translation."""
+    stated = _quantities(source, _base_language(source_language), drop_ordinals=True)
+    if not stated or not target:
         return False
-
-    target_quantities = _quantities(
-        target,
-        target_code,
-        parse_abbreviations=bool(source_quantities.scaled),
-    )
-    missing = source_quantities.values - target_quantities.values
-
-    target_understands_scales = (
-        target_code in WORD_SCALES or target_code in CJK_LANGUAGES
-    )
-    if not target_understands_scales:
-        missing -= source_quantities.scaled
-
-    return bool(missing)
+    available = _readings(target, _base_language(target_language))
+    pending = []
+    for quantity in stated:
+        if available[quantity.value]:
+            available[quantity.value] -= 1
+        else:
+            pending.append(quantity)
+    for quantity in pending:
+        if not quantity.fallback:
+            return True
+        if not all(available[value] for value in set(quantity.fallback)):
+            return True
+        for value in quantity.fallback:
+            available[value] -= 1
+    return False
 ```
 
-This is the complete compatibility rule. Do not add a generic unknown-word regex beside it.
+Both passes are count-aware, and the value pass runs to completion before any fallback is spent, so
+an exact match is never consumed by a tolerant one. `Counter.__getitem__` returns zero for an absent
+key without inserting it, and every decrement follows a non-zero check.
 
-### Step 6: Adapt `GameNumberCheck`
+### Step 5: The adapter
+
+Delete `_numbers` and reduce the check to:
 
 ```python
-def check_single(self, source: str, target: str, unit) -> bool:
-    if unit is None:
-        source_language = target_language = None
-    else:
-        source_language = unit.translation.component.source_language.base_code
-        target_language = unit.translation.language.base_code
-    return game_number_fails(
-        source,
-        target,
-        source_language=source_language,
-        target_language=target_language,
-    )
+    def check_single(self, source: str, target: str, unit) -> bool:
+        return game_number_fails(
+            source,
+            target,
+            source_language=unit.translation.component.source_language.base_code,
+            target_language=unit.translation.language.base_code,
+        )
 ```
 
-The `unit is None` path preserves the existing direct tests for plain numbers. Production always supplies a unit through `TargetCheck.check_target_unit`.
+Reading the source language off the unit inside a check follows
+`weblate/checks/duplicate.py:81` and `weblate/checks/same.py:177`. `base_code` is already a base
+code; `_base_language` exists for the probes, which pass `zh_Hans`. Update the class docstring to
+state that values are compared as a multiset of `Decimal`, that a scale word is understood for `ru`
+and `en` while any other spelling keeps its literal digits, that CJK scale notation is parsed
+exactly, and that spelled-out numbers are out of scope.
 
-Update the class docstring to state:
-
-- Values are compared as a multiset of `Decimal`.
-- Word scales are language-specific.
-- Unsupported target scale languages skip only scale-derived source occurrences.
-- Entirely spelled-out number words remain unsupported.
-
-### Step 7: Run the focused tests
+### Step 6: Run the focused tests
 
 ```sh
 cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
 ./rundev.sh test "weblate_customization/tests/test_checks.py::GameNumberCheckTest"
 ```
 
-Expected: all existing and new `GameNumberCheckTest` tests pass.
+### Step 7: Prove the tests defend the branches
 
-### Step 8: Prove the regression tests defend the critical branches
-
-Temporarily make each mutation, run the named test, then restore the implementation before continuing:
+Make each mutation, run the named test, restore before continuing.
 
 | Mutation | Test that must fail |
 |---|---|
-| Treat any word after a number as an unknown scale | `test_an_ordinary_target_noun_is_not_a_scale` |
-| Change `scaled` to a set or subtract one occurrence only | unsupported duplicate-scale case |
-| Replace explicit zero handling with `group or Decimal(1)` | `0万` case |
-| Let the ASCII scanner consume repeated decimal separators | malformed `1.2.3万` case |
-| Parse abbreviations for every source string | corpus replay adds `EVENT_280` from `245B`/`81B` |
-| Disable target-language compatibility subtraction | unsupported-language matrix fires |
-| Apply compatibility subtraction to plain values | unsupported plain `2000 -> 200` case becomes silent |
+| Let `_readings` skip the open spans too | `de` `10 Tsd.` and `zh` idiom rows of Step 4 |
+| Let `_readings` keep the digits of a closed span | `ja` rows of the frozen matrix |
+| Drop `regex.IGNORECASE` | `de` rows of the frozen matrix |
+| Replace the explicit-zero handling with `current or Decimal(1)` | `0万` edge |
+| Accept a run without a scale | `三回に一回` edge |
+| Let the ASCII scanner accept repeated separators | `1.2.3万` edge |
+| Spend fallbacks in the same pass as values | repeated-quantity edge |
+| Accept a partial fallback | `1 million 500 thousand` against `1 million` |
+| Fold ascending compounds | `1 thousand 2 million` edge |
 
-### Step 9: Lint and commit
+### Step 8: Lint and commit
 
-Do not run the repository-wide `typos` hook here; it ignores `--files` and currently reports unrelated findings under `analysis/data/`.
+The repository-wide `typos` hook ignores `--files` and currently reports unrelated findings under
+`analysis/data/`, so name the hooks.
 
 ```sh
 uv run prek run ruff-check ruff-format codespell trailing-whitespace end-of-file-fixer \
@@ -593,22 +576,17 @@ git commit -m "fix(checks): compare game numbers by value"
 
 ---
 
-## Task 3: Update probes, changelog and the superseded plan
+## Task 3: Move the probes onto the shipped verdict
 
 **Files:**
 
 - Modify: `analysis/probes/game-number-probe.py`
-- Create: `analysis/probes/game-number-scale-replay.py`
-- Modify: `docs/changes.rst`
-- Modify: `docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md:1309-1673`
+- Create: `analysis/probes/game-number-replay.py`
 
-### Step 1: Move the live probe to the authoritative verdict
+### Step 1: Fix the live probe
 
-Replace the `_numbers` import and difference with:
-
-```python
-from weblate_customization.checks import game_number_fails
-```
+It imports the deleted `_numbers` and, at line 44, compares without `drop_ordinals`, so it never
+matched the shipped rule. Replace the import with `game_number_fails` and the comparison with:
 
 ```python
 if game_number_fails(
@@ -619,79 +597,130 @@ if game_number_fails(
 ):
 ```
 
-### Step 2: Add the committed local-corpus replay
+Correct the usage comment in the header. The module needs Django settings, so the invocation is
 
-Create `analysis/probes/game-number-scale-replay.py` with the repository copyright/SPDX header. It reads:
+```sh
+DJANGO_SETTINGS_MODULE=weblate.settings_test \
+PYTHONPATH=weblate_customization/src \
+python3 analysis/probes/game-number-probe.py
+```
 
-- `analysis/data/heart-abyss-hub-1-units.tsv` as `ru -> en,fr`.
-- `analysis/data/st2-zh-units.jsonl` as `ru -> zh`.
-- `analysis/data/col4-b0-annotations.jsonl` as `ru -> fr`.
+A bare `PYTHONPATH=... python3 ...` fails with `No module named 'weblate.settings'`.
 
-It calls `game_number_fails` with explicit language codes and prints every firing key.
+### Step 2: Commit the gate
+
+Create `analysis/probes/game-number-replay.py` with the repository copyright and SPDX header. It
+reads `analysis/data/heart-abyss-hub-1-units.tsv` as `ru -> en,fr`,
+`analysis/data/st2-zh-units.jsonl` as `ru -> zh_Hans` and
+`analysis/data/col4-b0-annotations.jsonl` as `ru -> fr`, and asserts three things:
+
+1. The firing keys per corpus are exactly `{}`, `{}` and `{"EVENT_516_RESULT_977"}`.
+2. The invariant: no pair fires under the new rule while the old digit-multiset rule is silent,
+   unless the target holds a parsed CJK run. Keep the old rule inline in the script, five lines over
+   `NUMBER`, rather than reviving `_numbers` in the product module.
+3. How many targets held a parsed CJK run, so a reader sees how much closed notation the corpora
+   exercise.
 
 Expected output:
 
 ```text
 heart-abyss/hub-1 ru->en,fr: 0 firings / 792 pairs
-st2 ru->zh: 0 firings / 124 pairs
+st2 ru->zh_Hans: 0 firings / 124 pairs
 col4 b0 ru->fr: 1 firing / 260 pairs
   EVENT_516_RESULT_977
+invariant violations: 0 / 1176 pairs
+targets with a parsed CJK run: 0
 ```
 
-The probe must fail with a nonzero exit code if the counts or retained Col4 key differ. It is a verification gate, not a report-only script.
+The retained Col4 key holds `_x000b_` in the source, whose `000` fragments read as numbers. That is
+an XLSX control-character ingestion defect and stays out of scope.
 
-### Step 3: Extend the unreleased changelog entry
+Statements at module level, no `if __name__ == "__main__":` guard, and `raise SystemExit(1)` on any
+mismatch. The guard would matter: running the file through `weblate shell -c "exec(open(...).read())"`
+executes with `__name__` set to the shell command module, because
+`django/core/management/commands/shell.py:261` passes its own globals, so a guarded body would print
+nothing and exit zero. Task 5 therefore invokes the file directly.
 
-The check is unreleased. Extend its existing `docs/changes.rst` entry instead of adding a second bullet:
-
-```rst
-Quantities written with supported scale words or CJK scale characters are compared by numeric value, so ``10 тысяч``, ``10 Tausend``, ``10,000``, ``10천`` and ``一万`` are equal while ``10万`` is ten times larger. Languages without supported scale notation retain the previous silent behavior for scale-derived source quantities.
-```
-
-### Step 4: Remove obsolete Part B cleanly
-
-In `docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md`:
-
-1. Replace lines from `## Part B: make game-number compare values, not digits` through the separator before `### Out of scope` with:
-
-```markdown
-## Part B: superseded
-
-The independent `game-number` work moved to
-`docs/product/plans/2026-08-24-game-number-value-comparison.md` after engineering
-review found that the original generic scale folding broke compound values,
-unsupported languages, multiplicity and malformed-input handling. Do not execute
-the removed B1-B3 tasks.
-
----
-```
-
-2. Promote `### Out of scope` to `## Out of scope`.
-3. Remove the Part B sentence from the architecture paragraph at line 7 and the custom-check package from the tech-stack sentence at line 9.
-4. Preserve Part A unchanged.
-
-### Step 5: Lint and commit
+### Step 3: Lint and commit
 
 ```sh
 uv run prek run ruff-check ruff-format codespell trailing-whitespace end-of-file-fixer \
-  --files analysis/probes/game-number-probe.py \
-  analysis/probes/game-number-scale-replay.py
-uv run prek run rumdl codespell trailing-whitespace end-of-file-fixer \
-  --files docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md
+  --files analysis/probes/game-number-probe.py analysis/probes/game-number-replay.py
+git add analysis/probes/game-number-probe.py analysis/probes/game-number-replay.py
+git commit -m "test(checks): gate game-number on the local corpora"
+```
+
+---
+
+## Task 4: Documentation
+
+**Files:**
+
+- Modify: `docs/changes.rst:31`
+- Modify: `docs/guides/producer-guide.md:397`
+- Modify: `docs/guides/producer-guide-weblate.md:397`
+- Modify: `docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md:7,9,1320-1682,1684`
+
+### Step 1: Extend the unreleased changelog entry
+
+The check is unreleased, so extend the existing bullet instead of adding a second one. Append to
+`docs/changes.rst:31`:
+
+```rst
+Quantities written with a scale word or with CJK scale characters are compared by numeric value, so ``10 тысяч``, ``10 Tausend``, ``10,000``, ``10천`` and ``一万`` are equal while ``10万`` is ten times larger. A spelling the check cannot read keeps its literal digits, so it is reported exactly as before.
+```
+
+### Step 2: Extend the producer guides
+
+Both guides describe the check for the game teams and carry the same row. Replace it in each with:
+
+```markdown
+| `game-number` | В переводе нет числа, которое есть в исходнике: другой урон, радиус или длительность. Значение сравнивается с учётом масштаба: `10 тысяч`, `10,000`, `10 Tausend`, `10천` и `一万` равны, а `10万` в десять раз больше |
+```
+
+### Step 3: Retire the superseded Part B
+
+In `docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md`:
+
+1. Replace lines 1320 to 1682, from `## Part B: make game-number compare values, not digits`
+   through the `---` separator preceding `### Out of scope` at line 1684, with:
+
+   ```markdown
+   ## Part B: superseded
+
+   The `game-number` work moved to
+   `docs/product/plans/2026-08-24-game-number-value-comparison.md`, which rejected the global
+   scale table proposed here: one alternation over every language reads a Russian word in a
+   German string, and folding a target's digits into a scale it cannot verify turns correct
+   translations red. Do not execute the removed B1-B3 tasks.
+
+   ---
+   ```
+
+2. Promote `### Out of scope` at line 1684 to `## Out of scope`.
+3. Remove the Part B clause from the architecture sentence at line 7 and the custom-check package
+   from the tech-stack sentence at line 9.
+4. Leave Part A untouched.
+
+### Step 4: Lint and commit
+
+```sh
 uv run prek run rst-double-space rst-http rst-bullet-stop sphinx-lint codespell \
   --files docs/changes.rst
-git add analysis/probes/game-number-probe.py \
-  analysis/probes/game-number-scale-replay.py \
-  docs/changes.rst \
+uv run prek run rumdl codespell trailing-whitespace end-of-file-fixer \
+  --files docs/guides/producer-guide.md docs/guides/producer-guide-weblate.md \
+  docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md
+git add docs/changes.rst docs/guides/producer-guide.md \
+  docs/guides/producer-guide-weblate.md \
   docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md
 git commit -m "docs(checks): document game-number value comparison"
 ```
 
 ---
 
-## Task 4: Full verification
+## Task 5: Verification
 
-### Step 1: Run all affected suites
+### Step 1: The affected suites
 
 ```sh
 cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
@@ -700,20 +729,45 @@ cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
 ./rundev.sh test weblate/checks
 ```
 
-Expected: all suites pass. If the dev container shows changing mass setup errors or extreme slowdown, check Docker memory pressure before changing code; this stack shares Docker resources with other projects.
+If the container returns mass setup errors whose count changes between identical runs, or a test
+suddenly takes twenty times longer, check `docker stats --no-stream` before touching code: this
+stack shares Docker memory with every other compose project.
 
-### Step 2: Run the committed corpus gate
+### Step 2: The committed gate
 
 ```sh
 docker compose -f dev-docker/docker-compose.yml exec -T weblate \
-  weblate shell -c "exec(open('/app/src/analysis/probes/game-number-scale-replay.py').read())"
+  python /app/src/analysis/probes/game-number-replay.py
 ```
 
-Expected: exact output from Task 3 Step 2 and exit code 0.
+Expected: the output from Task 3 Step 2 and exit code 0.
 
-### Step 3: Check repaired and pre-repair bounty values
+### Step 3: Close the CJK coverage gap
 
-Run `game_number_fails` inside `weblate shell` with these six rows and explicit `ru`/target codes:
+The corpora hold no CJK scale notation, so replay the nine languages the component actually has.
+This is a read-only API call against the live instance, not a deployment.
+
+```sh
+DJANGO_SETTINGS_MODULE=weblate.settings_test PYTHONPATH=weblate_customization/src \
+PROBE_DOMAIN=l10n.herocraft.com PROBE_TOKEN=... \
+PROBE_COMPONENT=heart-abyss/hub-1 PROBE_SOURCE=ru \
+PROBE_LANGUAGES=ru,de,en,es,fr,it,ja,ko,zh_Hans,zh_Hant \
+python3 analysis/probes/game-number-probe.py
+```
+
+Run it once on `HEAD~` and once on the branch. Verification requires that no key firing on the
+branch is silent on `HEAD~` unless its target holds a CJK scale run, and that the two repaired
+bounty keys fire on neither. Record both runs in
+`docs/product/measurements/2026-08-24-game-number-nine-language-replay.md` and save the dump as
+`analysis/data/heart-abyss-hub-1-units-9lang.tsv`, so the committed gate can consume it afterwards.
+If the instance is unreachable this step blocks the plan: say so, and do not report Task 5 as green
+on the three-corpus gate alone.
+
+### Step 4: The bounty rows
+
+Run these six rows through `game_number_fails` inside the container with explicit `ru` and target
+codes. The command must `raise SystemExit(1)` on any disagreement rather than printing a failure and
+exiting zero.
 
 | Source | Target | Target code | Expected |
 |---|---|---|---:|
@@ -724,48 +778,52 @@ Run `game_number_fails` inside `weblate shell` with these six rows and explicit 
 | `100 тысяч мон!` | `100万文だぜ!` | `ja` | true |
 | `100 тысяч мон!` | `一百万文!` | `zh_Hans` | true |
 
-The command must raise `SystemExit(1)` on any disagreement, not merely print `BAD` and exit successfully.
+### Step 5: Report
 
-### Step 4: Verify no generic guard or set-based scale state returned
-
-```sh
-python - <<'PY'
-from pathlib import Path
-text = Path("weblate_customization/src/weblate_customization/checks.py").read_text()
-assert "UNKNOWN_SCALE_NOTATION" not in text
-assert "unread_mantissas" not in text
-assert "scaled: frozenset" not in text
-PY
-```
-
-This is a narrow architecture assertion for three specifically rejected constructs, not a substitute for behavioral tests.
-
-### Step 5: Report verification
-
-Part B is verified only when:
-
-- The frozen matrix gives exactly the three genuine pre-repair firings.
-- All 25 old contracts and all new edge contracts pass.
-- The corpus gate prints `0 / 792`, `0 / 124`, and only `EVENT_516_RESULT_977` for Col4.
-- All three affected suites are green.
+Verified only when the three suites are green, the committed gate prints `0 / 792`, `0 / 124`, one
+Col4 key and `invariant violations: 0`, the nine-language replay adds no firing outside a CJK run,
+and the six bounty rows agree.
 
 ---
 
-## Task 5: Dev rollout - REQUIRES EXPLICIT USER APPROVAL
+## Task 6: Finish the branch
 
-Restarting the shared dev service is deployment under `AGENTS.md`. Nothing in this task runs without a separate instruction from the user.
+**Files:**
 
-### Step 1: Restart the code consumers
+- Modify: `docs/product/plans/2026-08-24-game-number-value-comparison.md`
 
-The copied package lives under `/app/data/python`; Granian watches `/app/src/weblate`, not that directory. The single `weblate` compose service supervises web and Celery processes, so restart that service after the copy:
+Set **Status** to `complete` once Task 5 is green. Rollout is a separate gate and is not required to
+call the implementation complete.
+
+```sh
+uv run prek run rumdl codespell trailing-whitespace end-of-file-fixer \
+  --files docs/product/plans/2026-08-24-game-number-value-comparison.md
+git add docs/product/plans/2026-08-24-game-number-value-comparison.md
+git commit -m "docs(plan): complete game-number value comparison"
+git push origin HEAD
+```
+
+Do not add `typos` to the scoped commands. If the push is rejected because another session advanced
+`origin/main`, integrate the remote commits without discarding unrelated working-tree changes and
+push the same commits.
+
+---
+
+## Task 7: Dev rollout - REQUIRES EXPLICIT USER APPROVAL
+
+Restarting the shared dev service is deployment under `AGENTS.md`. Nothing here runs without a
+separate instruction.
+
+### Step 1: Restart the consumers
+
+Granian watches `/app/src/weblate`, not `/app/data/python`, so the copied package needs a restart of
+the service supervising both web and Celery:
 
 ```sh
 docker compose -f dev-docker/docker-compose.yml restart weblate
 ```
 
-### Step 2: Recompute synchronously without changing unit state
-
-Do not enqueue `schedule_update_checks` and immediately query. Run the task synchronously with the component's current cache token and `update_state=False`:
+### Step 2: Recompute one component, synchronously
 
 ```sh
 docker compose -f dev-docker/docker-compose.yml exec -T weblate weblate shell -c "
@@ -781,85 +839,27 @@ cache.set(component.update_checks_key, token)
 update_checks.run(component.pk, token, update_state=False)
 
 checks = (
-    Check.objects.filter(
-        name='game-number',
-        unit__translation__component=component,
-    )
+    Check.objects.filter(name='game-number', unit__translation__component=component)
     .select_related('unit__translation__language')
     .order_by('unit__translation__language__code', 'unit__context')
 )
 print(f'component game-number count: {checks.count()}')
 for check in checks:
     unit = check.unit
-    print(
-        unit.translation.language.code,
-        unit.context,
-        repr(unit.source),
-        repr(unit.target),
-    )
+    print(unit.translation.language.code, unit.context, repr(unit.source), repr(unit.target))
 "
 ```
 
-The synchronous call returns only after recomputation. The query is component-scoped and prints enough evidence to inspect every survivor. `update_state=False` avoids unrelated read-only state recalculation and the extra row locks it requires.
+The synchronous call returns only after recomputation, the query is component-scoped, and
+`update_state=False` avoids unrelated state recalculation and its row locks. Expected for the
+repaired component: zero active `game-number` checks. If any remain, inspect the printed rows and
+stop.
 
-Expected for the repaired `heart-abyss/hub-1`: zero active `game-number` checks. If any remain, stop and inspect the printed rows; do not proceed to production.
+### Step 3: Production stays gated
 
-### Step 3: Production remains separately gated
-
-Production requires its own explicit approval and the repository's deployment path. After deployment:
-
-1. Recompute only the intended component first.
-2. Query the same component-scoped evidence.
-3. Remove obsolete `ignore-game-number` flags only in a separately approved production write.
-
----
-
-## Task 6: Finish the branch
-
-**Files:**
-
-- Modify: `docs/product/plans/2026-08-24-game-number-value-comparison.md`
-
-### Step 1: Update plan status
-
-Change:
-
-```markdown
-**Status:** awaiting approval
-```
-
-to:
-
-```markdown
-**Status:** complete
-```
-
-Do this only after Task 4 is green. Dev or production rollout is not required to mark the implementation complete; rollout remains a separate approval gate.
-
-### Step 2: Run final scoped lint
-
-```sh
-uv run prek run ruff-check ruff-format codespell trailing-whitespace end-of-file-fixer \
-  --files weblate_customization/src/weblate_customization/checks.py \
-  weblate_customization/tests/test_checks.py \
-  analysis/probes/game-number-probe.py \
-  analysis/probes/game-number-scale-replay.py
-uv run prek run rumdl codespell trailing-whitespace end-of-file-fixer \
-  --files docs/product/plans/2026-08-24-game-number-value-comparison.md \
-  docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md
-```
-
-Do not add `typos` to these scoped commands.
-
-### Step 3: Commit and push all plan-owned changes
-
-```sh
-git add docs/product/plans/2026-08-24-game-number-value-comparison.md
-git commit -m "docs(plan): complete game-number value comparison"
-git push origin HEAD
-```
-
-If the push is rejected because another session advanced `origin/main`, integrate the remote commits without discarding unrelated working-tree changes, then push the same commits.
+Production needs its own approval and the repository's deployment path. Recompute the intended
+component first, query the same component-scoped evidence, and remove obsolete
+`ignore-game-number` flags only in a separately approved production write.
 
 ---
 
@@ -867,39 +867,35 @@ If the push is rejected because another session advanced `origin/main`, integrat
 
 | Item | Reason |
 |---|---|
-| Entirely spelled-out quantities such as `десять тысяч` | No numeric mantissa; requires language NLP rather than deterministic numeric parsing |
-| Pure CJK digits without a scale, such as `二〇二五` | Ambiguous with years and prose; the measured defects all contain scale characters |
-| Korean number words such as `일만` | Require a Korean lexical parser; measured Korean targets use ASCII mantissas with `천`/`만` |
-| Full Turkish, Vietnamese, Polish, Indonesian, Dutch, Thai, Persian, Hindi and Portuguese scale vocabularies | Unsupported target languages use the explicit compatibility path and gain no new noise |
-| Lowercase magnitude abbreviations | `m` is also metre; only uppercase adjacent target abbreviations are parsed, and only for a scale-derived source |
-| `_x000b_` escaped control characters | An ingestion/XLSX cleanup defect, not numeral semantics |
-| Removing production ignore flags | Production write requiring separate approval |
-| Repairing any other production translations | Separate LQA remediation scope |
+| Word tables for `de`, `es`, `fr`, `it` and other targets | Not needed for any measured row; adding one only adds a target reading, so it is safe later, one reported complaint at a time |
+| A target that drops the scale word and keeps the mantissa | Indistinguishable from a legitimate unknown spelling without that language's table; silent today |
+| Entirely spelled-out quantities such as `десять тысяч` | No mantissa to anchor; needs language NLP |
+| Pure CJK digit strings such as `二〇二五` | Ambiguous with years; every measured defect carries a scale character |
+| Magnitude abbreviations `K/M/B/T` | The fallback already accepts them, and not parsing them keeps an identifier such as `245B` from becoming 245 billion |
+| `_x000b_` control characters | XLSX ingestion defect, not numeral semantics |
+| Removing production ignore flags, repairing other production strings | Separate approvals, separate LQA scope |
 
 ## Risks and defenses
 
 | Risk | Defense |
 |---|---|
-| Ordinary nouns hide wrong values | No generic word guard; per-language scale vocabulary; `10 thousand -> 10 mon` regression test |
-| Duplicate quantities collapse | `Counter[Decimal]` for both `values` and `scaled`; duplicate tests |
-| Explicit zero becomes implicit one | `group_seen` state and `0万` test |
-| Malformed text raises `InvalidOperation` | Strict anchored decimal token, `InvalidOperation` fallback, malformed-run test |
-| IDs such as `245B` become magnitudes | Parse target abbreviations only when `source.scaled` is non-empty; Col4 replay gate |
-| Unsupported locales become noisy | Remove only scale-derived missing occurrences for unsupported targets; constructed language matrix |
-| Compatibility hides plain numeric defects | Plain values are absent from `source.scaled`; `2000 -> 200` unsupported-language test |
-| Existing decimal/grouping behavior moves | All 25 existing contracts remain green and plain values use `Decimal` |
-| Rollout reads stale/global results | Synchronous recomputation and component-scoped evidence query |
-| Two plans prescribe different code | Remove old Part B and leave one superseding link |
+| A correct translation turns red | An unreadable spelling keeps its literal digits; twelve no-new-firing rows plus the committed gate |
+| A wrong value hides behind a fallback | A fallback accepts only its own mantissa, and all of a compound's mantissas; eight still-fires rows |
+| A dropped quantity goes silent | No compatibility subtraction anywhere; the `tr`, `pl` and `de` rows |
+| An idiom or unparsed run makes a CJK target strict | Strictness is local to a parsed run, not a property of the string; the `千万` and `10k文` rows |
+| Counts drift on a mixed run | Both passes count-aware, values matched before any fallback is spent; the repeated-quantity and `レベル3、報酬10万文` rows |
+| Explicit zero becomes an implicit one | `group_seen`, no `current or Decimal(1)`; the `0万` row |
+| Malformed text raises `InvalidOperation` | `_decimal` returns `None` and the run falls back to the plain tokenizer; the `1.2.3万` row |
+| CJK evidence rests on constructed rows only | Task 5 Step 3 blocks verification until the nine-language replay runs |
+| The corpus gate passes silently | Module-level statements, `SystemExit(1)`, invoked as a file rather than through `shell -c` |
+| Two plans prescribe different code | Part B replaced by a link, Part A untouched |
 
-## GSTACK REVIEW REPORT
+## Review record
 
-| Review | Trigger | Why | Runs | Status | Findings |
-|---|---|---|---:|---|---|
-| Eng Review | `/plan-eng-review` | Architecture, code quality, tests, performance | 2 | CLEAR | 10 findings resolved in this rewrite; 3 prior blockers removed |
-| CEO Review | `/plan-ceo-review` | Scope and strategy | 0 | Not run | Backend bug fix; not required |
-| Design Review | `/plan-design-review` | UI/UX | 0 | Not run | No UI changes |
-| Outside Voice | `/codex review` | Independent second opinion | 0 | Not run | Not required for this scoped fix |
-
-**VERDICT:** ENG CLEARED - ready for user approval and implementation.
+| Round | Outcome |
+|---|---|
+| First engineering review | Cleared the previous draft |
+| Second engineering review | Rejected it. Prototype measurements: 8 correct translations start firing in listed languages, dropped and wrong quantities go silent in unlisted ones, the corpus gate exercised the new path on 4 of 1176 pairs and on no target at all, the gate command could not fail, and the German rows failed the plan's own matrix for want of case-insensitive matching |
+| This revision | Rewritten around the open and closed distinction. Prototype measured 18/18, 6/6, 11/12, 6/7, 26/26, 11/12 and zero invariant violations. Awaiting approval |
 
 NO UNRESOLVED DECISIONS
