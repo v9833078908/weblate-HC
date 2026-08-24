@@ -3865,6 +3865,13 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 },
             },
         )
+    def patch_string_ids(self):
+        """Deterministic request ids, so a static mocked reply can echo them."""
+        return patch.object(
+            self.MACHINE_CLS,
+            "_build_string_ids",
+            staticmethod(lambda count: [f"s{index}" for index in range(count)]),
+        )
     @http_mock.activate
     def test_request_string_ids_are_unique_and_not_positional(self) -> None:
         machine = self.get_machine()
@@ -4295,11 +4302,29 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
     @http_mock.activate
     def test_batch_fetches_glossary_terms_once(self) -> None:
         """One query for a batch, not one per string of it."""
-        self.mock_response('["Ahoj", "Nazdar"]')
         units = [
             make_unit(code=self.SUPPORTED, source="Hello", target="target"),
             make_unit(code=self.SUPPORTED, source="Hi", target="target"),
         ]
+        machine = self.get_machine(use_cache=True)
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": translation}],
+                    }
+                    for item, translation in zip(
+                        json.loads(content)["strings"], ("Ahoj", "Nazdar"), strict=True
+                    )
+                ]
+            )
 
         def fetch(fetched: list[Unit], *, include_variants: bool) -> None:
             # What the real function does, and what lets every later user of the
@@ -4313,8 +4338,11 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 "weblate.machinery.llm.fetch_glossary_terms", side_effect=fetch
             ) as fetch_terms,
             patch("weblate.machinery.llm.get_glossary_terms", return_value=[]),
+            patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ),
         ):
-            self.get_machine(use_cache=True).batch_translate(units)
+            machine.batch_translate(units)
 
         fetch_terms.assert_called_once_with(units, include_variants=False)
 
@@ -4458,7 +4486,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertLess(self.MACHINE_CLS.batch_size, DummyTranslation.batch_size)
 
     def test_prompt_forbids_metadata_output(self) -> None:
-        self.assertIn('object containing only "parts"', PROMPT)
+        self.assertIn('object containing only "id" and "parts"', PROMPT)
         self.assertIn(
             "Do not emit empty extra strings, diagnostics, explanations, or metadata.",
             PROMPT,
@@ -5345,7 +5373,17 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 [item["secondary"]["text"] for item in strings],
                 ["Secondary text", "Secondary text"],
             )
-            return json.dumps(["Bonjour le monde!", "Salut le monde!"])
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": translation}],
+                    }
+                    for item, translation in zip(
+                        strings, ("Bonjour le monde!", "Salut le monde!"), strict=True
+                    )
+                ]
+            )
 
         with (
             patch.object(Unit, "unit_set", new=property(lambda _unit: unit_set)),
@@ -5463,7 +5501,16 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 [item["placeholders"] for item in strings],
                 [{"@@PH0@@": "%d"}, {"@@PH0@@": "%s"}],
             )
-            return json.dumps(["@@PH0@@ fichier", "@@PH0@@ fichiers"])
+            replies = []
+            for item, text in zip(
+                strings, (" fichier", " fichiers"), strict=True
+            ):
+                parts = [part.copy() for part in item["parts"]]
+                text_parts = [part for part in parts if part["type"] == "text"]
+                self.assertEqual(len(text_parts), 1)
+                text_parts[0]["text"] = text
+                replies.append({"id": item["id"], "parts": parts})
+            return json.dumps(replies)
 
         with patch.object(
             machine, "fetch_llm_translations", side_effect=request_callback
@@ -5866,12 +5913,22 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             _previous_content: str,
             _previous_response: str,
         ) -> str:
-            batch = [item["source"] for item in json.loads(content)["strings"]]
-            requested.append(len(batch))
-            if len(batch) == len(sources):
+            strings = json.loads(content)["strings"]
+            requested.append(len(strings))
+            if len(strings) == len(sources):
                 # Truncated reply: fewer items than requested strings.
-                batch = batch[:-1]
-            return json.dumps([f"{text} (fr)" for text in batch])
+                strings = strings[:-1]
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [
+                            {"type": "text", "text": f"{item['source']} (fr)"}
+                        ],
+                    }
+                    for item in strings
+                ]
+            )
 
         with patch.object(
             machine, "fetch_llm_translations", side_effect=request_callback
@@ -5897,11 +5954,21 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             _previous_content: str,
             _previous_response: str,
         ) -> str:
-            batch = [item["source"] for item in json.loads(content)["strings"]]
-            requested.append(len(batch))
-            if len(batch) == len(sources):
-                batch = batch[:-1]
-            return json.dumps([f"{text} (fr)" for text in batch])
+            strings = json.loads(content)["strings"]
+            requested.append(len(strings))
+            if len(strings) == len(sources):
+                strings = strings[:-1]
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [
+                            {"type": "text", "text": f"{item['source']} (fr)"}
+                        ],
+                    }
+                    for item in strings
+                ]
+            )
 
         with patch.object(
             machine,
@@ -5928,11 +5995,21 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             _previous_content: str,
             _previous_response: str,
         ) -> str:
-            batch = [item["source"] for item in json.loads(content)["strings"]]
-            requested.append(len(batch))
+            strings = json.loads(content)["strings"]
+            requested.append(len(strings))
             # Every reply covers only half of what was asked, so continuing
             # would never terminate on its own.
-            return json.dumps([f"{text} (fr)" for text in batch[: len(batch) // 2]])
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [
+                            {"type": "text", "text": f"{item['source']} (fr)"}
+                        ],
+                    }
+                    for item in strings[: len(strings) // 2]
+                ]
+            )
 
         with patch.object(
             machine, "fetch_llm_translations", side_effect=request_callback
@@ -6052,15 +6129,16 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
     @http_mock.activate
     def test_translate_repairs_truncated_structured_json_container(self) -> None:
         self.mock_response(
-            '[{"parts":[{"type":"text","text":"Genel Müdür"}]},'
-            '{"parts":[{"type":"text","text":"CEO\'dan beri"}]}'
+            '[{"id":"s0","parts":[{"type":"text","text":"Genel Müdür"}]},'
+            '{"id":"s1","parts":[{"type":"text","text":"CEO\'dan beri"}]}'
         )
 
-        translation = self.get_machine().download_multiple_translations(
-            "en",
-            "tr",
-            [("CEO", None), ("CEO Since", None)],
-        )
+        with self.patch_string_ids():
+            translation = self.get_machine().download_multiple_translations(
+                "en",
+                "tr",
+                [("CEO", None), ("CEO Since", None)],
+            )
 
         self.assertEqual(translation["CEO"][0]["text"], "Genel Müdür")
         self.assertEqual(translation["CEO Since"][0]["text"], "CEO'dan beri")
@@ -6341,7 +6419,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
         self.assertEqual(translation[0][0]["text"], "Utiliser __snake_case__.")
 
-    def test_translate_accepts_mixed_structured_and_legacy_reply(self) -> None:
+    def test_translate_accepts_structured_batch_reply(self) -> None:
         machine = self.get_machine()
         source = "Use :guilabel:`Save`."
         unit = make_unit(code="fr", source=source, flags="rst-text")
@@ -6354,10 +6432,10 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             _previous_content: str,
             _previous_response: str,
         ) -> str:
-            parts = json.loads(content)["strings"][0]["parts"]
+            strings = json.loads(content)["strings"]
             output_parts = []
             text_translations = iter(("Utiliser ", "."))
-            for part in parts:
+            for part in strings[0]["parts"]:
                 if part["type"] == "text":
                     output_parts.append(
                         {"type": "text", "text": next(text_translations)}
@@ -6366,7 +6444,17 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                     output_part = part.copy()
                     output_part["text"] = "Enregistrer"
                     output_parts.append(output_part)
-            return json.dumps([{"parts": output_parts}, "Bonjour le monde!"])
+            return json.dumps(
+                [
+                    {"id": strings[0]["id"], "parts": output_parts},
+                    {
+                        "id": strings[1]["id"],
+                        "parts": [
+                            {"type": "text", "text": "Bonjour le monde!"}
+                        ],
+                    },
+                ]
+            )
 
         with patch.object(
             machine, "fetch_llm_translations", side_effect=request_callback
