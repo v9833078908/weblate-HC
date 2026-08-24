@@ -423,23 +423,6 @@ git commit -m "feat(judge): track observed per-unit costs"
 
 ## Task 6: Share preview scope, cap, and judge progress reporting
 
-> **Amended 2026-08-24 by the incident plan**
-> `docs/llm-first/plans/2026-08-24-auto-translate-queue-and-progress.md`.
-> Two changes, because that plan lands first and creates the same seam:
->
-> 1. **The seam signature carries arguments.** This task specified
->    `Callable[[], None]`. Per-batch verdict persistence needs the batch's
->    requests and results, so the seam is now
->    `OnBatch = Callable[[Sequence[JudgeRequest], Sequence[JudgeResult]], None]`.
->    A progress tick ignores both arguments (`lambda *_: tick()`). Do not start
->    this task against the old signature.
-> 2. **The seam, `progress_steps`, the 1/10 range split and the per-batch write
->    already exist.** The incident plan ships them for the single-translation
->    judge path. This task keeps what it alone owns: the shared preview scope,
->    the global cap, cap-aware `progress_steps`, the completion summary, and
->    the exact-count assertions below. Extend the landed plumbing; do not
->    reintroduce it.
-
 **Files:**
 
 - Modify: `weblate/trans/judge.py`
@@ -464,9 +447,8 @@ For translation and component scopes assert:
 
 Add callback tests at the two judge seams:
 
-- `request_verdicts()` calls an optional `on_batch(requests, results)` exactly
-  once after each completed batch, whether that batch parses or becomes
-  unparsed. A 403/429
+- `request_verdicts()` calls an optional `on_batch` exactly once after each
+  completed batch, whether that batch parses or becomes unparsed. A 403/429
   retry remains one completed batch, not two ticks. For retry coverage,
   register a 429 response followed by a valid 200 response, mock its sleep,
   and assert two HTTP calls but one callback tick. Separately register
