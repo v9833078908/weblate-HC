@@ -51,6 +51,7 @@ from weblate.glossary.models import (
     render_glossary_units_tsv,
 )
 from weblate.lang.models import Language
+from weblate.machinery import llm
 from weblate.machinery.alibaba import AlibabaTranslation
 from weblate.machinery.anthropic import AnthropicTranslation
 from weblate.machinery.apertium import ApertiumAPYTranslation
@@ -3870,6 +3871,316 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             },
         )
 
+    def patch_string_ids(self):
+        """Deterministic request ids, so a static mocked reply can echo them."""
+        return patch.object(
+            self.MACHINE_CLS,
+            "_build_string_ids",
+            staticmethod(lambda count: [f"s{index}" for index in range(count)]),
+        )
+
+    @http_mock.activate
+    def test_request_string_ids_are_unique_and_not_positional(self) -> None:
+        machine = self.get_machine()
+        observed: list[list[str]] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            strings = json.loads(content)["strings"]
+            observed.append([item["id"] for item in strings])
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
+                    }
+                    for item in strings
+                ]
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in ("Alpha", "Beta", "Gamma")]
+            )
+
+        ids = observed[0]
+        self.assertEqual(len(set(ids)), 3)
+        self.assertNotEqual(ids, [str(index) for index in range(3)])
+        self.assertTrue(all(string_id.startswith("s") for string_id in ids))
+
+    @http_mock.activate
+    def test_previous_messages_demonstrate_the_id_contract(self) -> None:
+        machine = self.get_machine()
+        observed: list[tuple[list[str], list[str]]] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            previous_content: str,
+            previous_response: str,
+        ) -> str:
+            observed.append(
+                (
+                    [item["id"] for item in json.loads(previous_content)["strings"]],
+                    [item["id"] for item in json.loads(previous_response)],
+                )
+            )
+            strings = json.loads(content)["strings"]
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": "Ahoj"}],
+                    }
+                    for item in strings
+                ]
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            machine.download_multiple_translations("en", "cs", [("Hello", None)])
+
+        demo_request_ids, demo_reply_ids = observed[0]
+        self.assertTrue(demo_request_ids)
+        self.assertEqual(demo_reply_ids, demo_request_ids)
+
+    def test_prompt_examples_never_show_an_id_less_structured_item(self) -> None:
+        # ruff: ignore[private-member-access]
+        prompt = self.get_machine()._get_prompt("cs")
+
+        self.assertNotIn('{"parts"', prompt)
+        self.assertIn('"id"', prompt)
+
+    @http_mock.activate
+    def test_translate_refuses_a_batch_reply_with_shifted_ids(self) -> None:
+        machine = self.get_machine()
+        sources = ["Alpha", "Beta", "Gamma"]
+        batch_sizes: list[int] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            strings = json.loads(content)["strings"]
+            batch_sizes.append(len(strings))
+            if len(strings) == 1:
+                return json.dumps(
+                    [
+                        {
+                            "id": strings[0]["id"],
+                            "parts": [
+                                {
+                                    "type": "text",
+                                    "text": f"{strings[0]['source']} (fr)",
+                                }
+                            ],
+                        }
+                    ]
+                )
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
+                    }
+                    for item in strings[1:]
+                ]
+                + [
+                    {
+                        "id": "sffff",
+                        "parts": [{"type": "text", "text": "Epsilon (fr)"}],
+                    }
+                ]
+            )
+
+        with (
+            patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ),
+            patch.object(
+                machine, "log_handled_error", wraps=machine.log_handled_error
+            ) as handled,
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in sources]
+            )
+
+        self.assertEqual(
+            {text: translations[text][0]["text"] for text in sources},
+            {text: f"{text} (fr)" for text in sources},
+        )
+        self.assertEqual(batch_sizes[0], 3)
+        self.assertGreater(len(batch_sizes), 1)
+        self.assertTrue(
+            any(
+                call.args[0].startswith("Mismatching assistant reply ids")
+                for call in handled.call_args_list
+            )
+        )
+
+    @http_mock.activate
+    def test_translate_pairs_a_shuffled_batch_reply_by_id(self) -> None:
+        machine = self.get_machine()
+        sources = ["Alpha", "Beta", "Gamma"]
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            strings = json.loads(content)["strings"]
+            return json.dumps(
+                list(
+                    reversed(
+                        [
+                            {
+                                "id": item["id"],
+                                "parts": [
+                                    {
+                                        "type": "text",
+                                        "text": f"{item['source']} (fr)",
+                                    }
+                                ],
+                            }
+                            for item in strings
+                        ]
+                    )
+                )
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in sources]
+            )
+
+        self.assertEqual(
+            {text: translations[text][0]["text"] for text in sources},
+            {text: f"{text} (fr)" for text in sources},
+        )
+
+    @http_mock.activate
+    def test_translate_refuses_an_id_less_batch_reply(self) -> None:
+        machine = self.get_machine()
+        batch_sizes: list[int] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            strings = json.loads(content)["strings"]
+            batch_sizes.append(len(strings))
+            return json.dumps([f"{item['source']} (fr)" for item in strings])
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [("Alpha", None), ("Beta", None)]
+            )
+
+        self.assertEqual(batch_sizes, [2, 1, 1])
+        self.assertEqual(translations["Alpha"][0]["text"], "Alpha (fr)")
+        self.assertEqual(translations["Beta"][0]["text"], "Beta (fr)")
+
+    @http_mock.activate
+    def test_translate_rescues_only_the_prefix_that_kept_its_ids(self) -> None:
+        machine = self.get_machine()
+        sources = ["Alpha", "Beta", "Gamma"]
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            strings = json.loads(content)["strings"]
+            answered = strings if len(strings) == 1 else strings[:1]
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
+                    }
+                    for item in answered
+                ]
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in sources]
+            )
+
+        self.assertEqual(
+            {text: translations[text][0]["text"] for text in sources},
+            {text: f"{text} (fr)" for text in sources},
+        )
+
+    @http_mock.activate
+    def test_translate_rescues_nothing_from_a_reply_with_wrong_ids(self) -> None:
+        machine = self.get_machine()
+        batch_sizes: list[int] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            strings = json.loads(content)["strings"]
+            batch_sizes.append(len(strings))
+            if len(strings) == 1:
+                return json.dumps(
+                    [
+                        {
+                            "id": strings[0]["id"],
+                            "parts": [
+                                {
+                                    "type": "text",
+                                    "text": f"{strings[0]['source']} (fr)",
+                                }
+                            ],
+                        }
+                    ]
+                )
+            return json.dumps(
+                [
+                    {
+                        "id": strings[1]["id"],
+                        "parts": [
+                            {"type": "text", "text": f"{strings[0]['source']} (fr)"}
+                        ],
+                    }
+                ]
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [("Alpha", None), ("Beta", None)]
+            )
+
+        self.assertEqual(batch_sizes, [2, 1, 1])
+        self.assertEqual(translations["Alpha"][0]["text"], "Alpha (fr)")
+        self.assertEqual(translations["Beta"][0]["text"], "Beta (fr)")
+        self.assertEqual(len(translations["Beta"]), 1)
+
     @http_mock.activate
     def test_async_translate(self) -> None:
         self.mock_response()
@@ -4000,11 +4311,29 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
     @http_mock.activate
     def test_batch_fetches_glossary_terms_once(self) -> None:
         """One query for a batch, not one per string of it."""
-        self.mock_response('["Ahoj", "Nazdar"]')
         units = [
             make_unit(code=self.SUPPORTED, source="Hello", target="target"),
             make_unit(code=self.SUPPORTED, source="Hi", target="target"),
         ]
+        machine = self.get_machine(use_cache=True)
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": translation}],
+                    }
+                    for item, translation in zip(
+                        json.loads(content)["strings"], ("Ahoj", "Nazdar"), strict=True
+                    )
+                ]
+            )
 
         def fetch(fetched: list[Unit], *, include_variants: bool) -> None:
             # What the real function does, and what lets every later user of the
@@ -4018,8 +4347,11 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 "weblate.machinery.llm.fetch_glossary_terms", side_effect=fetch
             ) as fetch_terms,
             patch("weblate.machinery.llm.get_glossary_terms", return_value=[]),
+            patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ),
         ):
-            self.get_machine(use_cache=True).batch_translate(units)
+            machine.batch_translate(units)
 
         fetch_terms.assert_called_once_with(units, include_variants=False)
 
@@ -4175,7 +4507,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertLess(self.MACHINE_CLS.batch_size, DummyTranslation.batch_size)
 
     def test_prompt_forbids_metadata_output(self) -> None:
-        self.assertIn('object containing only "parts"', PROMPT)
+        self.assertIn('object containing only "id" and "parts"', PROMPT)
         self.assertIn(
             "Do not emit empty extra strings, diagnostics, explanations, or metadata.",
             PROMPT,
@@ -4371,6 +4703,17 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         )
 
         self.assertNotEqual(original, changed)
+
+    def test_translation_cache_key_carries_the_batch_protocol_version(self) -> None:
+        machine = self.get_machine()
+        unit = make_unit(code="fr", source="Alpha")
+        arguments = (unit, "en", "fr", "Alpha", 75, [])
+
+        key = machine.get_translation_cache_key(*arguments)
+        with patch.object(llm, "LLM_BATCH_PROTOCOL_VERSION", 999):
+            bumped = machine.get_translation_cache_key(*arguments)
+
+        self.assertNotEqual(key, bumped)
 
     def test_translate_uses_neutral_previous_messages_without_czech(self) -> None:
         machine = self.get_machine()
@@ -5062,7 +5405,17 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 [item["secondary"]["text"] for item in strings],
                 ["Secondary text", "Secondary text"],
             )
-            return json.dumps(["Bonjour le monde!", "Salut le monde!"])
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": translation}],
+                    }
+                    for item, translation in zip(
+                        strings, ("Bonjour le monde!", "Salut le monde!"), strict=True
+                    )
+                ]
+            )
 
         with (
             patch.object(Unit, "unit_set", new=property(lambda _unit: unit_set)),
@@ -5180,7 +5533,14 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 [item["placeholders"] for item in strings],
                 [{"@@PH0@@": "%d"}, {"@@PH0@@": "%s"}],
             )
-            return json.dumps(["@@PH0@@ fichier", "@@PH0@@ fichiers"])
+            replies = []
+            for item, text in zip(strings, (" fichier", " fichiers"), strict=True):
+                parts = [part.copy() for part in item["parts"]]
+                text_parts = [part for part in parts if part["type"] == "text"]
+                self.assertEqual(len(text_parts), 1)
+                text_parts[0]["text"] = text
+                replies.append({"id": item["id"], "parts": parts})
+            return json.dumps(replies)
 
         with patch.object(
             machine, "fetch_llm_translations", side_effect=request_callback
@@ -5583,12 +5943,20 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             _previous_content: str,
             _previous_response: str,
         ) -> str:
-            batch = [item["source"] for item in json.loads(content)["strings"]]
-            requested.append(len(batch))
-            if len(batch) == len(sources):
+            strings = json.loads(content)["strings"]
+            requested.append(len(strings))
+            if len(strings) == len(sources):
                 # Truncated reply: fewer items than requested strings.
-                batch = batch[:-1]
-            return json.dumps([f"{text} (fr)" for text in batch])
+                strings = strings[:-1]
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
+                    }
+                    for item in strings
+                ]
+            )
 
         with patch.object(
             machine, "fetch_llm_translations", side_effect=request_callback
@@ -5614,11 +5982,19 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             _previous_content: str,
             _previous_response: str,
         ) -> str:
-            batch = [item["source"] for item in json.loads(content)["strings"]]
-            requested.append(len(batch))
-            if len(batch) == len(sources):
-                batch = batch[:-1]
-            return json.dumps([f"{text} (fr)" for text in batch])
+            strings = json.loads(content)["strings"]
+            requested.append(len(strings))
+            if len(strings) == len(sources):
+                strings = strings[:-1]
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
+                    }
+                    for item in strings
+                ]
+            )
 
         with patch.object(
             machine,
@@ -5645,11 +6021,19 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             _previous_content: str,
             _previous_response: str,
         ) -> str:
-            batch = [item["source"] for item in json.loads(content)["strings"]]
-            requested.append(len(batch))
+            strings = json.loads(content)["strings"]
+            requested.append(len(strings))
             # Every reply covers only half of what was asked, so continuing
             # would never terminate on its own.
-            return json.dumps([f"{text} (fr)" for text in batch[: len(batch) // 2]])
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
+                    }
+                    for item in strings[: len(strings) // 2]
+                ]
+            )
 
         with patch.object(
             machine, "fetch_llm_translations", side_effect=request_callback
@@ -5769,15 +6153,16 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
     @http_mock.activate
     def test_translate_repairs_truncated_structured_json_container(self) -> None:
         self.mock_response(
-            '[{"parts":[{"type":"text","text":"Genel Müdür"}]},'
-            '{"parts":[{"type":"text","text":"CEO\'dan beri"}]}'
+            '[{"id":"s0","parts":[{"type":"text","text":"Genel Müdür"}]},'
+            '{"id":"s1","parts":[{"type":"text","text":"CEO\'dan beri"}]}'
         )
 
-        translation = self.get_machine().download_multiple_translations(
-            "en",
-            "tr",
-            [("CEO", None), ("CEO Since", None)],
-        )
+        with self.patch_string_ids():
+            translation = self.get_machine().download_multiple_translations(
+                "en",
+                "tr",
+                [("CEO", None), ("CEO Since", None)],
+            )
 
         self.assertEqual(translation["CEO"][0]["text"], "Genel Müdür")
         self.assertEqual(translation["CEO Since"][0]["text"], "CEO'dan beri")
@@ -6058,7 +6443,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
         self.assertEqual(translation[0][0]["text"], "Utiliser __snake_case__.")
 
-    def test_translate_accepts_mixed_structured_and_legacy_reply(self) -> None:
+    def test_translate_accepts_structured_batch_reply(self) -> None:
         machine = self.get_machine()
         source = "Use :guilabel:`Save`."
         unit = make_unit(code="fr", source=source, flags="rst-text")
@@ -6071,10 +6456,10 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             _previous_content: str,
             _previous_response: str,
         ) -> str:
-            parts = json.loads(content)["strings"][0]["parts"]
+            strings = json.loads(content)["strings"]
             output_parts = []
             text_translations = iter(("Utiliser ", "."))
-            for part in parts:
+            for part in strings[0]["parts"]:
                 if part["type"] == "text":
                     output_parts.append(
                         {"type": "text", "text": next(text_translations)}
@@ -6083,7 +6468,15 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                     output_part = part.copy()
                     output_part["text"] = "Enregistrer"
                     output_parts.append(output_part)
-            return json.dumps([{"parts": output_parts}, "Bonjour le monde!"])
+            return json.dumps(
+                [
+                    {"id": strings[0]["id"], "parts": output_parts},
+                    {
+                        "id": strings[1]["id"],
+                        "parts": [{"type": "text", "text": "Bonjour le monde!"}],
+                    },
+                ]
+            )
 
         with patch.object(
             machine, "fetch_llm_translations", side_effect=request_callback

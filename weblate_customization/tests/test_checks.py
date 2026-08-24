@@ -209,6 +209,41 @@ class GameNumberCheckTest(CheckTestCase):
         # Two values, both wrong, and neither is absent - only the set differs.
         self.test_failure_3 = ("Deals 20% and 30%", "Infligge 30% e 10%", "")
 
+    def test_a_scale_word_is_part_of_the_value(self) -> None:
+        source = "Награда - 10 тысяч мон!"
+        for target, expected in (
+            ("Belohnung - 10 Tausend Mon!", False),
+            ("Reward - 10,000 mon!", False),
+            ("¡Recompensa: 10 000 mon!", False),
+            ("Récompense - 10 000 mons !", False),
+            ("Ricompensa - 10 mila mon!", False),
+            ("보상은 10천 몬!", False),
+            ("奖励一万文!", False),
+            ("獎勵一萬文!", False),
+            ("報酬は10万文!", True),
+        ):
+            with self.subTest(target=target):
+                self.assertEqual(
+                    self.check.check_single(source, target, None), expected
+                )
+
+    def test_a_myriad_scale_error_is_reported(self) -> None:
+        source = "Научись считать - ваще та 100 тысяч мон!"
+        for target, expected in (
+            ("Lern zählen - es sind 100 Tausend Mon!", False),  # codespell:ignore
+            ("Learn to count-it's 100,000 mon", False),
+            ("¡Aprende a contar, son 100 000 mon!", False),
+            ("Impara a contare, sono 100 mila mon!", False),
+            ("계산 좀 배워, 10만 몬이라고!", False),
+            ("學會數數吧--那可是十萬文!", False),
+            ("数え方を覚えろよ、こいつは100万文だぜ!", True),
+            ("学学数数吧--那可是一百万文!", True),
+        ):
+            with self.subTest(target=target):
+                self.assertEqual(
+                    self.check.check_single(source, target, None), expected
+                )
+
     def test_a_number_the_target_adds_is_accepted(self) -> None:
         # Japanese counts what Russian words: "каждый третий" -> "3回に1回", on
         # top of a required "10" the source states and the target must keep -

@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 from contextvars import ContextVar
 from itertools import chain
 from operator import itemgetter
+from secrets import token_hex
 from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, TypeGuard
 
 from asgiref.sync import sync_to_async
@@ -103,6 +104,7 @@ Input is provided as JSON with the following schema:
     ],
     "strings": [                                // strings to translate
         {{
+            "id": "s1f4",                       // identifier of this string; echo it in the output item
             "source": "source @@PH1@@string",   // text to translate with a non-translatable placeable
             "parts": [                           // ordered representation of the same complete source string
                 {{
@@ -148,9 +150,11 @@ Input is provided as JSON with the following schema:
             }}
         }},
         {{
+            "id": "s2ab",
             "source": "another string"          // text to translate without placeables
         }},
         {{
+            "id": "s3cd",
             "source": "rephrased string",       // text to rephrase based on existing translation
             "translation": "existing translation"
         }}
@@ -168,16 +172,16 @@ Rules:
 8.  Output must be entirely in the target_language except preserved placeholders.
 9. The "parts" array, when present, is one complete source string split into ordered pieces. Translate the whole string as a unit; do not translate parts independently.
 10. Output must be valid JSON.
-11. Output must be a single JSON array containing one item per input string. Prefer structured objects with a "parts" array when the input has "parts"; legacy JSON strings are accepted only if placeholders are preserved exactly.
+11. Output must be a single JSON array containing one item per input string. Every item must carry the "id" of the input string it translates, copied verbatim. Prefer structured objects with a "parts" array when the input has "parts"; a legacy JSON string cannot carry an id and is accepted only when the input contains exactly one string.
 12. Do not include markdown code fences or any additional text.
-13. The number of output elements must exactly match the number of input strings. Do not emit empty extra strings, diagnostics, explanations, or metadata.
-14. For structured output, each item must be an object containing only "parts". The output parts array must have the same placeholder parts as the input. Text parts may be split or merged. Grammar placeholder parts may be reordered within the same surrounding markup if required by target language grammar; markup and syntax placeholder parts must keep source order. Placeholder part type, id, kind, role, close_id, and translatable values must be preserved.
+13. The number of output elements must exactly match the number of input strings, and the set of output "id" values must exactly match the set of input "id" values, each appearing exactly once. Do not emit empty extra strings, diagnostics, explanations, or metadata.
+14. For structured output, each item must be an object containing only "id" and "parts". The output parts array must have the same placeholder parts as the input. Text parts may be split or merged. Grammar placeholder parts may be reordered within the same surrounding markup if required by target language grammar; markup and syntax placeholder parts must keep source order. Placeholder part type, id, kind, role, close_id, and translatable values must be preserved.
 15. For structured text parts, translate the "text" value. For structured placeholder parts, preserve metadata and translate "text" only when "translatable" is true; when "translatable" is false, keep "text" unchanged.
 16. Ensure all output strings are properly JSON-escaped.
 17. Internally verify placeholder integrity and JSON validity before responding.
 18. Placeholder contract: Tokens like @@PH44@@ are opaque atoms. Never translate, inflect, split, rename, reorder characters inside, wrap, or escape them. Never convert them to another syntax.
 19. Markup contract: Preserve markup, tags, attributes, entities, and similar control sequences exactly. Translate only human-readable text outside markup and outside placeholder tokens.
-20. Output contract: Return exactly one JSON array, with no characters before `[` or after `]`.
+20. Output contract: Return exactly one JSON array, with no characters before `[` or after `]`. What pairs an item with its input is the "id", not the position.
 21. Treat context, key, explanation, note, secondary, plural, failing_checks, glossary_advisories, placeholders, and source fields as reference material only. Do not translate them directly and do not add, copy, or emit their contents unless they are present in source or parts.
 22. Placeholder mappings explain what opaque placeholder tokens represent. This information may guide wording, but the output must still contain the exact placeholder tokens in legacy string output, or the exact placeholder metadata in structured output, not the mapped content.
 23. Failing checks list problems the output must not have; glossary entries are listed there only as hard violations, never as uncertain matches. When a string carries both a "translation" field and failing checks, change that translation so every listed check passes; repeating it unchanged is wrong. Checks are context only; do not include their check_id, name, description, or generated diagnostics in output.
@@ -188,20 +192,20 @@ Rules:
 28. The "glossary_advisories" array lists source terms whose glossary match is uncertain. Verify each one: if the translation lacks the glossary term and the canonical target fits, use it; if the existing translation already contains a grammatically correct form of the canonical term, keep the translation as-is. An advisory never mandates rewriting a correct translation.
 
 Valid placeholder and markup handling:
-["Click <a href=\"/x\">log out</a> and use @@PH195@@."]
+[{{"id": "s1f4", "parts": [{{"type": "text", "text": "Click <a href=\"/x\">log out</a> and use @@PH195@@."}}]}}]
 
 Invalid placeholder handling:
-["Click <a href=\"/x\">log out</a> and use \\@\\@PH195\\@\\@."]
+[{{"id": "s1f4", "parts": [{{"type": "text", "text": "Click <a href=\"/x\">log out</a> and use \\@\\@PH195\\@\\@."}}]}}]
 
 Valid final punctuation handling, for the source "Он ушёл" with the existing translation "Il est parti.":
-[{{"parts": [{{"type": "text", "text": "Il est parti"}}]}}]
+[{{"id": "s1f4", "parts": [{{"type": "text", "text": "Il est parti"}}]}}]
 
 Invalid final punctuation handling, adding a full stop the source does not have:
-[{{"parts": [{{"type": "text", "text": "Il est parti."}}]}}]
+[{{"id": "s1f4", "parts": [{{"type": "text", "text": "Il est parti."}}]}}]
 
-Respond ONLY with a valid JSON array, one per input string, in the same order. Prefer structured objects when "parts" are present:
+Respond ONLY with a valid JSON array, one item per input string, each carrying the "id" of the string it translates. Prefer structured objects when "parts" are present:
 
-[{{"parts": [{{"type": "text", "text": "translation 1"}}]}}, {{"parts": [{{"type": "text", "text": "translation 2"}}]}}]
+[{{"id": "s1f4", "parts": [{{"type": "text", "text": "translation 1"}}]}}, {{"id": "s2ab", "parts": [{{"type": "text", "text": "translation 2"}}]}}]
 """
 
 LLM_PLACEHOLDER_RE = re.compile(r"@@PH(?P<id>\d+)@@")
@@ -231,6 +235,18 @@ LLM_PREFIX_RESCUE_LIMIT = 2
 # being matched against the source, which no longer loses inflected terms and
 # keeps the request prefix identical across batches.
 LLM_FULL_GLOSSARY_LIMIT = 300
+# The reply must echo the id of the string it translates, so alignment is
+# checked instead of assumed. The id is random rather than the batch position,
+# because a model can emit 0..n-1 without reading the input and a positional id
+# would prove nothing. The "s" prefix keeps the id a JSON string even when the
+# hex digits happen to be decimal, so a model cannot turn it into a number.
+LLM_STRING_ID_PREFIX = "s"
+LLM_STRING_ID_BYTES = 2
+# Bumped whenever the batch request or reply contract changes in a way that
+# makes an older cached reply untrustworthy. Version 2 added the per-string id
+# the reply must echo; a version 1 reply was aligned by position alone, so its
+# cached results must not survive the upgrade.
+LLM_BATCH_PROTOCOL_VERSION = 2
 
 
 class PartialLLMReplyError(MachineTranslationError):
@@ -298,6 +314,7 @@ class LLMStringContext(TypedDict, total=False):
 
 
 class LLMStringPayload(LLMStringContext):
+    id: str
     source: str
     parts: list[LLMStringPart]
     translation: NotRequired[str]
@@ -1018,14 +1035,30 @@ class BaseLLMTranslation(BatchMachineTranslation):
 
         return result
 
+    @staticmethod
+    def _build_string_ids(count: int) -> list[str]:
+        """Opaque per-request ids the reply has to echo back."""
+        ids: list[str] = []
+        seen: set[str] = set()
+        while len(ids) < count:
+            candidate = f"{LLM_STRING_ID_PREFIX}{token_hex(LLM_STRING_ID_BYTES)}"
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            ids.append(candidate)
+        return ids
+
     def _build_string_payload(
         self,
         source_text: str,
         unit: Unit | None,
         source_language: str | None = None,
         source_occurrence: int = 0,
+        *,
+        string_id: str,
     ) -> LLMStringPayload:
         return {
+            "id": string_id,
             "source": source_text,
             "parts": self._get_string_parts(source_text, unit, source_occurrence),
             **self._get_string_context(
@@ -1069,6 +1102,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         source_occurrence: int = 0,
     ) -> tuple[str, ...]:
         result = (
+            f"proto{LLM_BATCH_PROTOCOL_VERSION}",
             self.get_glossary_cache_part(unit),
             self.get_llm_glossary_cache_part(unit),
             *super().get_translation_cache_parts(
@@ -1101,6 +1135,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
         target_language: str,
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None = None,
+        *,
+        string_ids: list[str],
     ) -> str:
         units = [unit for _text, unit in sources if unit is not None]
         glossary = self._get_batch_glossary(units)
@@ -1117,7 +1153,11 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 source_occurrence = source_occurrences[index]
 
             payload = self._build_string_payload(
-                text, unit, source_language, source_occurrence
+                text,
+                unit,
+                source_language,
+                source_occurrence,
+                string_id=string_ids[index],
             )
             if (
                 unit is not None
@@ -1358,26 +1398,32 @@ class BaseLLMTranslation(BatchMachineTranslation):
         target_language: str,
         examples: list[LLMPreviousExample],
     ) -> tuple[str, str]:
+        example_ids = self._build_string_ids(len(examples))
         return (
             self._build_message(
                 source_language,
                 target_language,
                 [
                     {
+                        "id": example_id,
                         "source": example["source"],
                         "parts": self._get_string_parts(example["source"], None),
                     }
-                    for example in examples
+                    for example_id, example in zip(example_ids, examples, strict=True)
                 ],
                 [],
             ),
             # The demonstration is the strongest signal in the prompt, so it
             # answers in the structured form the rules ask for rather than the
-            # legacy flat array of strings.
+            # legacy flat array of strings, and echoes the id of every string so
+            # the model imitates the identity contract, not only the shape.
             json.dumps(
                 [
-                    {"parts": self._get_string_parts(example["target"], None)}
-                    for example in examples
+                    {
+                        "id": example_id,
+                        "parts": self._get_string_parts(example["target"], None),
+                    }
+                    for example_id, example in zip(example_ids, examples, strict=True)
                 ],
                 ensure_ascii=False,
             ),
@@ -2384,13 +2430,47 @@ class BaseLLMTranslation(BatchMachineTranslation):
         return result
 
     @classmethod
+    def _resolve_reply_order(
+        cls, translations: list[JSONValue], string_ids: list[str]
+    ) -> list[JSONValue] | None:
+        """
+        Pair reply items with their source strings through the echoed id.
+
+        A single-string request needs no id: there is only one pairing. For a
+        batch, an item without a known, unique id is refused, because a reply of
+        the right length says nothing about its order - the caller then re-asks
+        the batch in halves instead of storing an unverified alignment.
+        """
+        if len(string_ids) == 1:
+            return list(translations)
+        by_id: dict[str, JSONValue] = {}
+        for item in translations:
+            if not isinstance(item, dict):
+                return None
+            item_id = item.get("id")
+            if not isinstance(item_id, str) or item_id in by_id:
+                return None
+            by_id[item_id] = item
+        if by_id.keys() != set(string_ids):
+            return None
+        return [by_id[string_id] for string_id in string_ids]
+
+    @classmethod
     def _validate_translations(
         cls,
         translations: JSONValue,
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None = None,
+        *,
+        string_ids: list[str],
     ) -> list[str]:
         translations = cls._normalize_translations(translations, len(sources))
+        if isinstance(translations, list) and len(translations) == len(sources):
+            ordered = cls._resolve_reply_order(translations, string_ids)
+            if ordered is None:
+                msg = "Mismatching assistant reply ids."
+                raise MachineTranslationError(msg)
+            translations = ordered
         translation_list = cls._normalize_translation_items(
             translations, sources, source_occurrences
         )
@@ -2420,12 +2500,21 @@ class BaseLLMTranslation(BatchMachineTranslation):
 
         return normalized_translations
 
+    @staticmethod
+    def _reply_item_has_id(item: JSONValue, expected_id: str, batch_size: int) -> bool:
+        """Whether an item may be paired with the source at its own position."""
+        if batch_size == 1:
+            return True
+        return isinstance(item, dict) and item.get("id") == expected_id
+
     @classmethod
     def _validate_translation_prefix(
         cls,
         translations: JSONValue,
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None = None,
+        *,
+        string_ids: list[str],
     ) -> list[str]:
         """
         Validate the leading replies, stopping at the first unusable one.
@@ -2440,6 +2529,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
         result: list[str] = []
         for index, (source_text, unit) in enumerate(sources):
             if index >= len(translations):
+                break
+            if not cls._reply_item_has_id(
+                translations[index], string_ids[index], len(string_ids)
+            ):
                 break
             if source_occurrences is None:
                 occurrence_key = (id(unit) if unit is not None else None, source_text)
@@ -2667,12 +2760,14 @@ class BaseLLMTranslation(BatchMachineTranslation):
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None,
     ) -> DownloadMultipleTranslations:
+        string_ids = self._build_string_ids(len(sources))
         prompt, content, previous_content, previous_response = (
             self._prepare_llm_translation(
                 source_language,
                 target_language,
                 sources,
                 source_occurrences,
+                string_ids,
             )
         )
         project_token = llm_batch_project.set(_sources_project_slug(sources))
@@ -2683,7 +2778,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         finally:
             llm_batch_project.reset(project_token)
         return self._parse_llm_translations(
-            translations_string, sources, source_occurrences
+            translations_string, sources, source_occurrences, string_ids=string_ids
         )
 
     async def _adownload_multiple_translations(
@@ -2781,6 +2876,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None,
     ) -> DownloadMultipleTranslations:
+        string_ids = self._build_string_ids(len(sources))
         prompt, content, previous_content, previous_response = await sync_to_async(
             self._prepare_llm_translation
         )(
@@ -2788,6 +2884,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
             target_language,
             sources,
             source_occurrences,
+            string_ids,
         )
         project_token = llm_batch_project.set(_sources_project_slug(sources))
         try:
@@ -2797,7 +2894,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         finally:
             llm_batch_project.reset(project_token)
         return await sync_to_async(self._parse_llm_translations)(
-            translations_string, sources, source_occurrences
+            translations_string, sources, source_occurrences, string_ids=string_ids
         )
 
     def _prepare_llm_translation(
@@ -2806,10 +2903,17 @@ class BaseLLMTranslation(BatchMachineTranslation):
         target_language,
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None,
+        string_ids: list[str] | None = None,
     ) -> tuple[str, str, str, str]:
+        if string_ids is None:
+            string_ids = self._build_string_ids(len(sources))
         prompt = self._get_prompt(target_language)
         content = self._get_message(
-            source_language, target_language, sources, source_occurrences
+            source_language,
+            target_language,
+            sources,
+            source_occurrences,
+            string_ids=string_ids,
         )
         previous_content, previous_response = self._get_previous_messages(
             source_language, target_language, sources
@@ -2823,6 +2927,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
         translations_string: str | None,
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None,
+        *,
+        string_ids: list[str],
     ) -> DownloadMultipleTranslations:
         add_breadcrumb(self.name, "response", translations_string=translations_string)
         if translations_string is None or not translations_string:
@@ -2852,7 +2958,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
 
         try:
             translations = self._validate_translations(
-                translations, sources, source_occurrences
+                translations, sources, source_occurrences, string_ids=string_ids
             )
         except MachineTranslationError as error:
             # A reply that ends early still answered its first strings
@@ -2861,6 +2967,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 self._normalize_translations(translations, len(sources)),
                 sources,
                 source_occurrences,
+                string_ids=string_ids,
             )
             if prefix and len(prefix) < len(sources):
                 msg = f"Incomplete assistant reply: {len(prefix)}/{len(sources)}."
@@ -2868,7 +2975,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 raise PartialLLMReplyError(
                     self._build_translation_results(prefix, sources), len(prefix)
                 ) from error
-            msg = "Mismatching assistant reply."
+            msg = str(error)
             self.log_handled_error(msg, extra_log=translations_string)
             raise MachineTranslationError(msg) from error
 

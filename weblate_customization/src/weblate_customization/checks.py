@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import unicodedata
 from collections import Counter
+from decimal import Decimal
 from itertools import pairwise
 
 import regex
@@ -52,6 +53,81 @@ ORDINAL = regex.compile(r"\b\d+(?:st|nd|rd|th)\b", regex.IGNORECASE)
 _GROUP = r"[ ,.\u00a0\u2009\u202f\u066c]"
 _GROUP_RE = regex.compile(_GROUP)
 THOUSANDS = regex.compile(rf"(?<![\d.,])\d{{1,3}}(?:{_GROUP}\d{{3}})+(?!\d)")
+# A scale word carries the zeros a digit would spell out, so "10 тысяч",
+# "10 Tausend" and "10천" are one quantity while "10万" is ten times more.
+# The tokens do not collide across languages, so one table serves every target
+# and the check stays usable without a language argument.
+WORD_SCALES: dict[str, int] = {
+    "тыс": 1_000,
+    "тысяча": 1_000,
+    "тысячи": 1_000,
+    "тысяч": 1_000,
+    "млн": 1_000_000,
+    "миллион": 1_000_000,
+    "миллиона": 1_000_000,
+    "миллионов": 1_000_000,
+    "thousand": 1_000,
+    "million": 1_000_000,
+    "tausend": 1_000,
+    "millionen": 1_000_000,
+    "mila": 1_000,
+    "milione": 1_000_000,
+    "milioni": 1_000_000,
+    "mil": 1_000,
+    "millon": 1_000_000,  # codespell:ignore
+    "millón": 1_000_000,
+    "millones": 1_000_000,
+    "mille": 1_000,
+    "millions": 1_000_000,
+}
+# Scale characters that follow a digit without a space: 10만, 10万, 10千.
+CHAR_SCALES: dict[str, int] = {
+    "천": 1_000,
+    "만": 10_000,
+    "억": 100_000_000,
+    "十": 10,
+    "百": 100,
+    "千": 1_000,
+    "万": 10_000,
+    "萬": 10_000,
+    "億": 100_000_000,
+    "亿": 100_000_000,
+}
+CJK_DIGITS: dict[str, int] = {
+    "〇": 0,
+    "零": 0,
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+}
+CJK_SMALL_SCALES: dict[str, int] = {"十": 10, "百": 100, "千": 1_000}
+CJK_BIG_SCALES: dict[str, int] = {
+    "万": 10_000,
+    "萬": 10_000,
+    "億": 100_000_000,
+    "亿": 100_000_000,
+}
+_WORD_SCALE_ALTERNATION = "|".join(
+    sorted((regex.escape(word) for word in WORD_SCALES), key=len, reverse=True)
+)
+WORD_SCALED_NUMBER = regex.compile(
+    rf"(?<!\d)(\d+(?:[.,]\d+)?)\s*({_WORD_SCALE_ALTERNATION})\b",
+    regex.IGNORECASE,
+)
+CHAR_SCALED_NUMBER = regex.compile(
+    rf"(?<!\d)(\d+(?:[.,]\d+)?)\s*([{''.join(CHAR_SCALES)}])"
+)
+# Two or more numeral characters, at least one of them a scale: 一万, 十萬,
+# 一百万. A lone 十 in prose is not a quantity.
+CJK_NUMBER = regex.compile(
+    rf"[{''.join(CJK_DIGITS)}{''.join(CJK_SMALL_SCALES)}{''.join(CJK_BIG_SCALES)}]{{2,}}"
+)
 
 # `$` is the engine's line separator, not a character. Whitespace beside one
 # renders as a stray indent; a lost one merges two lines.
@@ -279,13 +355,60 @@ def _collapse_grouping(text: str) -> str:
     return THOUSANDS.sub(lambda match: _GROUP_RE.sub("", match.group()), text)
 
 
+def _format_value(value: Decimal) -> str:
+    """Render a folded quantity the way the number tokenizer would see it."""
+    return format(value.normalize(), "f")
+
+
+def _cjk_value(run: str) -> Decimal | None:
+    """Value of a Chinese or Japanese numeral run, or None when it is not one."""
+    if not any(char in CJK_BIG_SCALES or char in CJK_SMALL_SCALES for char in run):
+        return None
+    total = 0
+    section = 0
+    digit = 0
+    for char in run:
+        if char in CJK_DIGITS:
+            digit = CJK_DIGITS[char]
+        elif char in CJK_SMALL_SCALES:
+            section += (digit or 1) * CJK_SMALL_SCALES[char]
+            digit = 0
+        elif char in CJK_BIG_SCALES:
+            total += (section + digit or 1) * CJK_BIG_SCALES[char]
+            section = 0
+            digit = 0
+        else:
+            return None
+    return Decimal(total + section + digit)
+
+
+def _fold_scales(text: str) -> str:
+    """Rewrite a quantity written with a scale word as the value it states."""
+
+    def word(match: regex.Match[str]) -> str:
+        multiplier = WORD_SCALES[match.group(2).casefold()]
+        return _format_value(Decimal(match.group(1).replace(",", ".")) * multiplier)
+
+    def char(match: regex.Match[str]) -> str:
+        multiplier = CHAR_SCALES[match.group(2)]
+        return _format_value(Decimal(match.group(1).replace(",", ".")) * multiplier)
+
+    def cjk(match: regex.Match[str]) -> str:
+        value = _cjk_value(match.group())
+        return match.group() if value is None else _format_value(value)
+
+    folded = WORD_SCALED_NUMBER.sub(word, text)
+    folded = CHAR_SCALED_NUMBER.sub(char, folded)
+    return CJK_NUMBER.sub(cjk, folded)
+
+
 def _numbers(text: str, *, drop_ordinals: bool = False) -> Counter[str]:
-    """Quantities outside markup, URLs and dates; digits and grouping folded."""
+    """Quantities outside markup, URLs and dates; digits, grouping and scale folded."""
     body = _fold_digits(URL.sub(" ", text))
     body = FULL_DATE.sub(" ", MARKUP.sub(" ", body))
     if drop_ordinals:
         body = ORDINAL.sub(" ", body)
-    body = _collapse_grouping(body)
+    body = _fold_scales(_collapse_grouping(body))
     return Counter(
         match.group().replace(",", ".").replace("\u066b", ".")
         for match in NUMBER.finditer(body)
@@ -293,7 +416,17 @@ def _numbers(text: str, *, drop_ordinals: bool = False) -> Counter[str]:
 
 
 class GameNumberCheck(TargetCheck):
-    """Every quantity the source states must survive into the translation."""
+    """
+    Every quantity the source states must survive into the translation.
+
+    Comparison is by value, not by digits: a scale word carries the zeros a
+    digit would spell out, so "10 тысяч" equals "10 Tausend" and "10,000" but
+    not "10万". Two limits: a figurative CJK quantity written without a digit,
+    such as 百万 for "millions", is read as the value it literally states; and
+    a quantity spelled out entirely in words ("десять тысяч") carries no
+    number on either side, so a worded source states nothing and a worded
+    target satisfies nothing - ignore-game-number remains the escape hatch.
+    """
 
     check_id = "game-number"
     name = gettext_lazy("Game number")
