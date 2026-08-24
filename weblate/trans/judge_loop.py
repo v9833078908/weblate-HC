@@ -29,6 +29,7 @@ from weblate.glossary.models import get_glossary_terms
 from weblate.machinery.models import MACHINERY
 from weblate.trans.forms import AutoForm
 from weblate.trans.judge import (
+    JUDGE_SEATS,
     OnBatch,
     JudgeRequest,
     request_verdicts,
@@ -361,9 +362,12 @@ def run_judge_batch(
     pending = list(units)
     verdicts: dict[int, JudgeVerdict] = {}
     attempts = settings.JUDGE_MAX_REPAIR_ATTEMPTS
-    seats = (
-        (1, settings.JUDGE_MODEL_SEAT_1),
-        (2, settings.JUDGE_MODEL_SEAT_2),
+    seats = tuple(
+        zip(
+            JUDGE_SEATS,
+            (settings.JUDGE_MODEL_SEAT_1, settings.JUDGE_MODEL_SEAT_2),
+            strict=True,
+        )
     )
 
     attempt = 0

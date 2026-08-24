@@ -37,6 +37,7 @@ from weblate.utils.requests import stream_validated_url
 
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 JUDGE_REQUEST_TIMEOUT = 120
+JUDGE_SEATS = (1, 2)
 # Measured category set (st2-zh-recalibration.py:59-68).
 CATEGORIES = (
     "terminology",

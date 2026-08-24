@@ -242,3 +242,42 @@ class JudgeAutoTranslateTest(ViewTestCase):
         ):
             auto.process_judge(engines=[], threshold=80)
         self.assertEqual(self.get_unit().target.strip(), "human changed target")
+
+    def test_judge_progress_never_goes_backwards_across_both_phases(self) -> None:
+        unit = self.get_unit()
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+        )
+        auto.progress_range = (20, 40)
+        reported: list[int] = []
+
+        def pretranslate(*_args, **_kwargs) -> None:
+            auto.progress_steps = 1
+            auto.set_progress(1)
+
+        def fake_judge(units, *, writable_ids, user, on_batch=None):
+            if on_batch is not None:
+                on_batch([object()], [object()])
+            return {}
+
+        with (
+            mock.patch("weblate.trans.autotranslate.current_task") as task,
+            mock.patch.object(auto, "process_mt", side_effect=pretranslate),
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch",
+                side_effect=fake_judge,
+            ),
+        ):
+            task.request.id = "test-task-id"
+            task.update_state.side_effect = lambda **kwargs: reported.append(
+                kwargs["meta"]["progress"]
+            )
+            auto.process_judge(engines=[], threshold=80)
+
+        self.assertEqual(reported, sorted(reported))
+        self.assertLessEqual(reported[0], 22)
+        self.assertTrue(any(22 < progress < 40 for progress in reported))
