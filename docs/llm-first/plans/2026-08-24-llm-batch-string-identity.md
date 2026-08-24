@@ -51,14 +51,23 @@ the two cases it was. It proves a content shift with one source translated twice
 does not prove that the same model, asked for ids, would have produced a mismatched label set. Do
 not write that this plan makes the measured defect impossible - it makes one class of it refusable.
 
-Two designs would actually guarantee no cross-string misattachment. Both are out of scope here and
-need a decision before anyone claims a guarantee:
+Exactly one design structurally prevents cross-string misattachment, and it is out of scope here:
 
-1. `batch_size = 1` for LLM services. Structural: with one source per request there is nothing to
-   misattach to. It costs roughly ten times the requests and contradicts the batch-size measurement
-   in `analysis/data/col4-batch-size-eval.json`, which chose 10.
-2. An independent content-level check over stored translations, which does not trust the protocol
-   at all. This is the only option that also finds the damage already written.
+- `batch_size = 1` for LLM services. With one source per request there is nothing to misattach to,
+  so the failure cannot be expressed. It costs roughly ten times the requests and contradicts the
+  batch-size measurement in `analysis/data/col4-batch-size-eval.json`, which chose 10. This is a
+  correctness-against-cost decision that someone has to make explicitly; the id echo is not a
+  substitute for it.
+
+Everything else is detection after the fact, and detection is not prevention. A content-level pass
+over stored translations - comparing the language-independent shape of a target (digits,
+placeholders, `$`, glossary names, final punctuation) against its own source and its neighbours,
+with cross-language consensus - is useful for triage and for estimating how much damage is already
+written, but it is incomplete in both directions and was measured to be so on this component: most
+of its candidates were benign, and it missed `zh_Hant` 372096/372097, where the shape survived and
+only the clause content moved across a segment boundary. Treat such a pass as a way to narrow 3564
+units to a few dozen for human review, never as a gate and never as proof that a component is
+clean.
 
 ---
 
