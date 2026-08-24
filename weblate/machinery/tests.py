@@ -45,7 +45,11 @@ from weblate.checks import flags as check_flags
 from weblate.checks import models as check_models
 from weblate.checks.utils import highlight_string
 from weblate.configuration.models import Setting, SettingCategory
-from weblate.glossary.models import render_glossary_units_tsv
+from weblate.glossary.models import (
+    build_glossary_prompt_entries,
+    build_glossary_prompt_entry,
+    render_glossary_units_tsv,
+)
 from weblate.lang.models import Language
 from weblate.machinery.alibaba import AlibabaTranslation
 from weblate.machinery.anthropic import AnthropicTranslation
@@ -4053,27 +4057,39 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
     def test_glossary_entry_includes_exact_and_forbidden_flags(self) -> None:
         """Задача 4: the payload explicitly lists exact and forbidden."""
-        machine = self.get_machine()
         exact_term = make_unit(code="fr", source="Ship", target="Vaisseau")
         exact_term.extra_flags = "exact"
         forbidden_term = make_unit(code="fr", source="Bad", target="Mauvais")
         forbidden_term.extra_flags = "forbidden"
 
-        # ruff: ignore[private-member-access]
-        entry_exact = machine._get_glossary_entry(cast("Unit", exact_term))
-        # ruff: ignore[private-member-access]
-        entry_forbidden = machine._get_glossary_entry(cast("Unit", forbidden_term))
+        entry_exact = build_glossary_prompt_entry(cast("Unit", exact_term))
+        entry_forbidden = build_glossary_prompt_entry(cast("Unit", forbidden_term))
 
         self.assertEqual(entry_exact["flags"], ["exact"])
         self.assertEqual(entry_forbidden["flags"], ["forbidden"])
 
     def test_glossary_entry_excludes_not_applicable(self) -> None:
         """Задача 1/4: not-applicable pairs never reach the prompt."""
-        machine = self.get_machine()
         term = make_unit(code="fr", source="Ship", target="Vaisseau")
         term.extra_flags = "not-applicable"
-        # ruff: ignore[private-member-access]
-        self.assertIsNone(machine._get_glossary_entry(cast("Unit", term)))
+        self.assertIsNone(build_glossary_prompt_entry(cast("Unit", term)))
+
+    def test_glossary_prompt_entry_cleans_read_only_source(self) -> None:
+        term = make_unit(code="fr", source="=Ship", target="Vaisseau")
+        term.extra_flags = "read-only"
+
+        self.assertEqual(
+            build_glossary_prompt_entry(cast("Unit", term)),
+            {"source": "Ship", "target": "Ship", "flags": ["read-only"]},
+        )
+
+    def test_glossary_prompt_entries_deduplicate_identical_entries(self) -> None:
+        term = cast("Unit", make_unit(code="fr", source="Ship", target="Vaisseau"))
+
+        self.assertEqual(
+            build_glossary_prompt_entries([term, term]),
+            [{"source": "Ship", "target": "Vaisseau"}],
+        )
 
     def test_glossary_cache_key_changes_with_exact_flag(self) -> None:
         """Задача 4: flag changes on a glossary term bust the LLM cache key."""

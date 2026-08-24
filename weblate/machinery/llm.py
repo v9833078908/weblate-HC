@@ -23,9 +23,9 @@ from django.utils.translation import override, pgettext
 from weblate.checks.glossary import GLOSSARY_CHECK_ID, evaluate_glossary_terms
 from weblate.checks.utils import highlight_string
 from weblate.glossary.models import (
-    cleanup_glossary_term,
+    GlossaryPromptEntry,
+    build_glossary_prompt_entries,
     fetch_glossary_terms,
-    get_glossary_term_modes,
     get_glossary_terms,
     prepare_glossary_units,
 )
@@ -60,8 +60,6 @@ def _sources_project_slug(sources: list[tuple[str, Unit | None]]) -> str:
 
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-
     from django_stubs_ext import StrOrPromise
 
     from weblate.checks.base import Highlight, HighlightKind
@@ -210,7 +208,6 @@ RECOVERABLE_LLM_PLACEHOLDER_RE = re.compile(r"@@PH(?P<id>\d+) *@ *@")
 ESCAPED_LLM_PLACEHOLDER_RE = re.compile(r"(?:\\@){2}PH(?P<id>\d+) *\\@ *\\@")
 LANGUAGE_CODE_PART_RE = re.compile(r"[-_@]")
 LLM_PREVIOUS_EXAMPLE_LIMIT = 4
-LLM_GLOSSARY_FLAGS = ("read-only", "terminology", "exact", "forbidden")
 LLM_CURATED_PREVIOUS_EXAMPLE_SOURCES = (
     pgettext_noop("LLM translation example", "Hello, @@PH1@@!"),
     pgettext_noop("LLM translation example", 'Click <a href="/x">Save</a>.'),
@@ -242,14 +239,6 @@ class PartialLLMReplyError(MachineTranslationError):
         super().__init__("Incomplete assistant reply.")
         self.translations = translations
         self.count = count
-
-
-class LLMGlossaryEntry(TypedDict, total=False):
-    source: str
-    target: str
-    source_explanation: str
-    target_explanation: str
-    flags: list[str]
 
 
 class LLMPreviousExample(TypedDict):
@@ -581,7 +570,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         source_language: str,
         target_language: str,
         texts: list[LLMStringPayload],
-        glossary: list[LLMGlossaryEntry],
+        glossary: list[GlossaryPromptEntry],
     ) -> str:
         result = {
             "source_language": source_language,
@@ -627,71 +616,6 @@ class BaseLLMTranslation(BatchMachineTranslation):
             return text
         return ""
 
-    @classmethod
-    def _get_glossary_entry(cls, unit: Unit) -> LLMGlossaryEntry | None:
-        modes = get_glossary_term_modes(unit)
-        # Pairs marked not applicable for this target language never reach
-        # the prompt
-        if "not-applicable" in modes:
-            return None
-
-        forbidden = "forbidden" in modes
-        if not forbidden and not unit.translated and "read-only" not in modes:
-            return None
-
-        source = cleanup_glossary_term(unit.source)
-        target = source if "read-only" in modes else cleanup_glossary_term(unit.target)
-        if not source or not target:
-            return None
-
-        entry: LLMGlossaryEntry = {
-            "source": source,
-            "target": target,
-        }
-
-        source_unit = getattr(unit, "source_unit", None)
-        if source_explanation := cls._normalize_context_text(
-            getattr(source_unit, "explanation", "")
-        ):
-            entry["source_explanation"] = source_explanation
-
-        if target_explanation := cls._normalize_context_text(
-            getattr(unit, "explanation", "")
-        ):
-            entry["target_explanation"] = target_explanation
-
-        # Inclusion above is decided by `modes`, so the advertised flags are
-        # derived from it too rather than from a second, wider source. Only
-        # `terminology` is outside it: it is a source-side bookkeeping flag,
-        # not a glossary mode.
-        effective_flags = set(modes)
-        if "terminology" in unit.all_flags:
-            effective_flags.add("terminology")
-        glossary_flags = [
-            flag for flag in LLM_GLOSSARY_FLAGS if flag in effective_flags
-        ]
-        if glossary_flags:
-            entry["flags"] = glossary_flags
-
-        return entry
-
-    @classmethod
-    def _get_glossary_entries(cls, terms: Iterable[Unit]) -> list[LLMGlossaryEntry]:
-        result: list[LLMGlossaryEntry] = []
-        included: set[str] = set()
-        for term in terms:
-            entry = cls._get_glossary_entry(term)
-            if entry is None:
-                continue
-
-            cache_key = json.dumps(entry, sort_keys=True)
-            if cache_key in included:
-                continue
-
-            included.add(cache_key)
-            result.append(entry)
-        return result
-
     def _get_full_glossary(self, unit: Unit) -> list[Unit] | None:
         """
         Return the whole term base, when it is small enough to always send.
@@ -716,19 +640,19 @@ class BaseLLMTranslation(BatchMachineTranslation):
             return None
         return terms
 
-    def _get_batch_glossary(self, units: list[Unit]) -> list[LLMGlossaryEntry]:
+    def _get_batch_glossary(self, units: list[Unit]) -> list[GlossaryPromptEntry]:
         """Glossary sent with a batch, and the one its cache key must match."""
         if not units:
             return []
         full = self._get_full_glossary(units[0])
         if full is not None:
-            return self._get_glossary_entries(full)
+            return build_glossary_prompt_entries(full)
         missing = [
             unit for unit in units if getattr(unit, "glossary_terms", None) is None
         ]
         if missing:
             fetch_glossary_terms(missing, include_variants=False)
-        return self._get_glossary_entries(
+        return build_glossary_prompt_entries(
             chain.from_iterable(
                 get_glossary_terms(unit, include_variants=False) for unit in units
             )

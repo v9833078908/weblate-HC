@@ -44,9 +44,9 @@ from translate.storage.pypo import pofile
 from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Permission, Role, User
 from weblate.formats.models import FILE_FORMATS
+from weblate.glossary.models import build_glossary_prompt_entry
 from weblate.glossary.tasks import sync_terminology
 from weblate.lang.models import Language
-from weblate.machinery.llm import BaseLLMTranslation
 from weblate.trans import loc_kit
 from weblate.trans.loc_kit import PREVIEW_WARNING_LIMIT
 from weblate.trans.models import Category, Component, Project, Translation
@@ -362,8 +362,7 @@ class LocKitGlossaryImportContractTest(ViewTestCase):
         unit.source_unit.save(update_fields=["explanation"])
         unit.refresh_from_db()
 
-        # ruff: ignore[private-member-access]
-        entry = BaseLLMTranslation._get_glossary_entry(unit)
+        entry = build_glossary_prompt_entry(unit)
 
         self.assertIsNotNone(entry)
         self.assertEqual(entry["source"], "Sage")
@@ -905,8 +904,7 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         component = Component.objects.get(slug=self.slug)
         translation = component.translation_set.get(language__code="fr")
         unit = translation.unit_set.get(source="Партия")
-        # ruff: ignore[private-member-access]
-        entry = BaseLLMTranslation._get_glossary_entry(unit)
+        entry = build_glossary_prompt_entry(unit)
         self.assertIsNotNone(entry)
         self.assertEqual(
             entry["source_explanation"],

@@ -1283,6 +1283,57 @@ class GlossaryStemMatcherTest(ViewTestCase):
         fetch_glossary_terms([unit])
         return {term.source for term in unit.glossary_terms}
 
+    def test_matched_prompt_entries_carry_context(self) -> None:
+        """The judge accessor returns the neutral prompt-entry contract."""
+        # ruff: ignore[import-outside-top-level]
+        from weblate.glossary.models import get_matched_glossary_prompt_entries
+
+        id_hash = calculate_hash("Захват", "")
+        source_unit = self.ru_glossary_component.source_translation.unit_set.create(
+            source="Захват",
+            target="Захват",
+            context="",
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+            explanation="Название игрового режима.",
+            extra_flags="terminology",
+        )
+        self.ru_glossary.unit_set.create(
+            source="Захват",
+            target="Assaut",
+            context="",
+            source_unit=source_unit,
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+            explanation="Nom français du mode.",
+        )
+        self.ru_glossary.invalidate_cache()
+
+        unit = Unit(
+            translation=self.ru_translation,
+            id_hash=1,
+            source="Захватите ключевые позиции врага",
+            target="",
+            context="",
+            position=1,
+            state=STATE_EMPTY,
+        )
+
+        self.assertEqual(
+            get_matched_glossary_prompt_entries(unit),
+            [
+                {
+                    "source": "Захват",
+                    "target": "Assaut",
+                    "source_explanation": "Название игрового режима.",
+                    "target_explanation": "Nom français du mode.",
+                    "flags": ["terminology"],
+                }
+            ],
+        )
+
     def test_stem_fallback_recovers_inflected_forms(self) -> None:
         for term in ("Гигахрущ", "ликвидатор", "ячейка", "блок", "община"):
             self.add_ru_term(term)

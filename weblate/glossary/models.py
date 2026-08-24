@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 import re
 from bisect import bisect_left
 from collections import OrderedDict, defaultdict
@@ -13,7 +14,7 @@ from copy import copy
 from functools import lru_cache
 from itertools import chain
 from threading import Lock
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
 import ahocorasick_rs
 from django.core.cache import cache
@@ -363,6 +364,79 @@ def get_glossary_terms(
     if unit.glossary_terms is None:
         fetch_glossary_terms([unit], full=full, include_variants=include_variants)
     return cast("list[Unit]", unit.glossary_terms)
+
+
+class GlossaryPromptEntry(TypedDict, total=False):
+    source: str
+    target: str
+    source_explanation: str
+    target_explanation: str
+    flags: list[str]
+
+
+GLOSSARY_PROMPT_FLAGS = ("read-only", "terminology", "exact", "forbidden")
+
+
+def _normalize_prompt_text(text: str | None) -> str:
+    return text.strip() if text is not None else ""
+
+
+def build_glossary_prompt_entry(unit: Unit) -> GlossaryPromptEntry | None:
+    """Serialize one glossary unit for an LLM prompt, or exclude it."""
+    modes = get_glossary_term_modes(unit)
+    if "not-applicable" in modes:
+        return None
+
+    forbidden = "forbidden" in modes
+    if not forbidden and not unit.translated and "read-only" not in modes:
+        return None
+
+    source = cleanup_glossary_term(unit.source)
+    target = source if "read-only" in modes else cleanup_glossary_term(unit.target)
+    if not source or not target:
+        return None
+
+    entry: GlossaryPromptEntry = {"source": source, "target": target}
+    source_unit = getattr(unit, "source_unit", None)
+    if source_explanation := _normalize_prompt_text(
+        getattr(source_unit, "explanation", "")
+    ):
+        entry["source_explanation"] = source_explanation
+    if target_explanation := _normalize_prompt_text(getattr(unit, "explanation", "")):
+        entry["target_explanation"] = target_explanation
+
+    effective_flags = set(modes)
+    if "terminology" in unit.all_flags:
+        effective_flags.add("terminology")
+    flags = [flag for flag in GLOSSARY_PROMPT_FLAGS if flag in effective_flags]
+    if flags:
+        entry["flags"] = flags
+    return entry
+
+
+def build_glossary_prompt_entries(
+    terms: Iterable[Unit],
+) -> list[GlossaryPromptEntry]:
+    """Serialize and deduplicate already-selected glossary units."""
+    result: list[GlossaryPromptEntry] = []
+    included: set[str] = set()
+    for term in terms:
+        entry = build_glossary_prompt_entry(term)
+        if entry is None:
+            continue
+        cache_key = json.dumps(entry, ensure_ascii=False, sort_keys=True)
+        if cache_key in included:
+            continue
+        included.add(cache_key)
+        result.append(entry)
+    return result
+
+
+def get_matched_glossary_prompt_entries(unit: Unit) -> list[GlossaryPromptEntry]:
+    """Return prompt entries matched against one unit for the judge."""
+    return build_glossary_prompt_entries(
+        get_glossary_terms(unit, full=True, include_variants=True)
+    )
 
 
 def fetch_glossary_terms(  # ruff: ignore[complex-structure]
