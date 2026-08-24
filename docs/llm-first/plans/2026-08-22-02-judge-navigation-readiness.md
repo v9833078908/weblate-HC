@@ -3,8 +3,9 @@
 > **For Claude:** REQUIRED SUB-SKILL: Use `executing-plans` to implement this plan task-by-task. Use `test-driven-development`, `frontend-design`, `lightpanda-browser`, `requesting-code-review`, and `verification-before-completion` where specified below.
 
 **Date:** 2026-08-22, updated 2026-08-24. **Status:** approved, implementation
-pending. Absorbs `docs/llm-first/plans/2026-08-24-judge-progress-reporting.md`
-(now a superseded stub); Task 6 owns judge progress reporting.
+pending. Absorbs the former judge progress reporting plan
+(`2026-08-24-judge-progress-reporting.md`, deleted; full text in git history);
+Task 6 owns judge progress reporting.
 
 **Goal:** Give a producer a component-first Weblate path from per-language release readiness to exact LLM-judge queues and a bounded, cost-aware judge run, without implying that a probabilistic verdict approves a release.
 
