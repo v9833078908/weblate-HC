@@ -57,7 +57,7 @@ end-whitespace`, включён в `AUTOFIX_LIST` по умолчанию) на 
 
 Прогон тех же чеков на проде по `.strip()`-версиям строк:
 
-```
+```text
 EN: показано 4  → на стрипнутых 33  → скрыто 29
 FR: показано 6  → на стрипнутых 78  → скрыто 72
 ```
@@ -77,7 +77,7 @@ FR: показано 6  → на стрипнутых 78  → скрыто 72
 Пробел при этом сохранён точно (0 расхождений по ведущим и хвостовым пробелам
 в обеих локалях), то есть это не тримминг, а невынесенный знак.
 
-```
+```text
 hub1_ramen_1_10   RU ЗАТКНИСЬ, СТАРЫЙ! Не приставай к ним!
                   EN SHUT UP, OLD MAN! Leave 'em alone!       ok
                   FR TAIS-TOI, VIEUX ! Ne les embête pas      потеря
@@ -93,7 +93,7 @@ hub1_overlook_1_3 RU Я никогда не видел такого большо
 
 ### `hub1_teahouse_2_8` — незакрытый плейсхолдер сценариста
 
-```
+```text
 RU  ...чайному дому НАЗВАНИЕ, то могу делать что захочу.
 EN  ...for the tea house NAME, I can do whatever I want.
 FR  ...au salon de thé NOM, je peux faire ce que je veux.
@@ -104,7 +104,7 @@ FR  ...au salon de thé NOM, je peux faire ce que je veux.
 
 ### `hub1_asuna_archive_1_15` — залипшая буква
 
-```
+```text
 RU  ...ты разгуливаешь без ошейника. Т
 EN  ...walkin' around without a collar. T
 FR  ...que tu te promènes sans collier. T
@@ -148,7 +148,7 @@ FR  ...que tu te promènes sans collier. T
 и `scrappy_1`/`scrappy_2`. **23 повторяющиеся строки исходника → 25 расхождений
 в переводе (FR 16, EN 9).**
 
-```
+```text
 RU  История всегда знает, когда подоспеть.
 FR  hub1_scrappy_1_20: L'Histoire sait toujours quand intervenir.
     hub1_scrappy_2_19: L'histoire sait toujours quand arriver.
@@ -476,3 +476,404 @@ hub-1 персонаж — `Ray`.
 
 Стоимость — часы на первый кит и минуты на каждый следующий. Отдача: класс
 дефектов, который здесь занял 83 юнита на двух языках, на десяти занял бы 400+.
+
+## 15. Три плана LLM-first против измеренного качества: судья, session-canon, git-гейт
+
+Датировано 2026-08-20. Оценка трёх незапущенных направлений с замерами на этом
+компоненте. Статус реализации проверен по коду и git:
+
+- **LLM-judge** (`docs/LLM-first/plans/2026-08-13-01-judge-verdict-core.md`) —
+  **реализован и слит в main** (merge 1615b6a): модель `JudgeVerdict`, коллегия
+  двух мест (`deepseek/deepseek-v4-pro` + `qwen/qwen3-235b-a22b-2507`), промпт
+  `weblate/trans/judge_prompts/verdict.txt`, 7 тестовых файлов. На проде выключен:
+  `JUDGE_ENABLED=False`, ключа и мест нет (`docker exec ... env | grep JUDGE` —
+  пусто).
+- **session-canon** (`docs/LLM-first/plans/2026-08-17-session-canon.md`) — не начат.
+- **git-гейт** (`docs/plans/2026-08-10-git-localization-quality-gate.md`) — не начат.
+
+### 15.1 Замер судьи на hub-1 (реальный промпт, реальные данные, OpenRouter)
+
+Прогнан точный продовый вход судьи (system-промпт с реальным `project_context`
+heart-abyss, сегменты с note-говорящим и матчингом глоссария, батч 5, strict
+JSON schema, оба места): 396 FR юнитов × 3 полных прогона коллегии + 396 EN × 1
+прогон. Стоимость: ~$2.25 суммарно, ~$1.4/1000 строк.
+
+**Порога 100% уверенности не существует** — ни у одного механизма этого класса.
+Ниже — измеренные границы.
+
+| Метрика | Значение на hub-1 |
+| --- | --- |
+| flag+reject за один прогон (FR) | 85-97 из 396 (21-24%) |
+| reject за один прогон (FR) | 13-20, разнится между прогонами |
+| Recall на 14 ручных дефектах (смысл+грамматика) | **4/14 → 6/14 → 9/14** между тремя идентичными прогонами |
+| Recall union 3 прогонов | 10/14 (71%) |
+| Стабильность вердикта (396 юнитов, 3 прогона) | 69% юнитов одинаков, **31% флапает** |
+| Флап reject↔pass | 20 юнитов, включая самую явную ошибку компонента (`hub1_first_1_3` «Недавно»→«Non»: pass/reject/reject) |
+| Терминология | 5 из 6 дрейфов затронуты terminology-флагом; 42 юнита с terminology-ошибкой хотя бы в одном прогоне |
+| EN (1 прогон) | 75/396 flag+reject (19%), recall 3/4 |
+
+Находки, которые не даёт ничего кроме судьи (подтверждены вручную):
+`Акито→Akira` в `hub1_first_1_8` (критичный факт сюжета), плейсхолдер
+`НАЗВАНИЕ→NOM` (`hub1_teahouse_2_8`, блокер раздела 3), `baigneur` как
+не-слово, тонкие искажения референтов (`teahouse_2_22`, `asuna_archive_1_9`).
+
+Union трёх прогонов так и не поймал 4 дефекта из 14: `собрат→frère`,
+`остановиться→arrêter`, `за мой счёт→pour ma pomme`, `коряга→souche`. Три из
+четырёх требуют контекста соседних реплик, которого во входе судьи нет
+(батч из 5 сегментов, диалоговая связность не передаётся).
+
+Вывод по судье: **единственный механизм, который вообще ловит смысловой класс**
+(детерминированные чеки — 0 из 19), но одиночный вердикт недостоверен
+(31% флапа), поэтому годен только как (а) мультипрогонный union с ручным
+разбором, (б) advisory, никогда — как релизный гейт. Это согласуется с
+внутренними замерами: шумовой пол коллегии 20-32%, R2 (severity-гейт) не пройден.
+
+### 15.2 Потолки session-canon и git-гейта на дефектах hub-1
+
+**Session-canon: 0 из 25 расхождений на дублях, 0 из 7 термин-групп.** Все 25
+расхождений — переформулировка целой фразы (`On peut y accéder` vs `Tu pourras
+y accéder`), не термин-уровень; канон терминов их не видит. И по конструкции
+canon — first-accepted-wins внутри ОДНОГО прогона автоперевода, а hub-1 писался
+в разных проходах (доказано апострофом: `scrappy_1` целиком `'`, `scrappy_2`
+целиком `’`). Межпрогонный дрейф — а это весь дрейф hub-1 — канон не лечит.
+План предотвращает будущий дрейф при LLM-прогонах, существующий не трогает.
+
+**Git-гейт: 0 детекции.** Гейт — механизм доставки (блокирует сборку при
+сработавших чеках), не детекции; его сила равна силе чеков под ним. Сегодня он
+заблокировал бы релиз на 148 newline-артефактах (§1.1) и пропустил бы все 19
+смысловых дефектов. Гейт на шумовых чеках — отключаемый гейт.
+
+### 15.3 Рейтинг влияния на качество (измеренный)
+
+| План | Вклад в дефекты hub-1 | Уверенность |
+| --- | --- | --- |
+| 1. Судья (включить на проде, режим audit, без overwrite) | смысл: 10/14 union, терминология 5/6; единственный источник ловли смысла | высокая — измерено на этом компоненте, 3 прогона |
+| 2. RepeatDrift + GlossaryCheck (план intra-component-consistency, не canon) | дубли: 25/25 без шума; терминология: 6/7 групп | максимум — детерминировано, 0% флапа, $0 |
+| 3. Session-canon | 0 на существующих; профилактика будущих LLM-прогонов | высокая — аналитический потолок 0 |
+| 4. Git-гейт | 0 на существующих; имеет смысл ТОЛЬКО после 1-2, на чистых чеках | высокая — потолок 0 |
+
+Сильнее всего повлияет **судья**, но только в связке с детерминированным слоем:
+сначала RepeatDrift+GlossaryCheck+EOL-нормализация (снимают 25+6 дефектов и 148
+фейлов с нулевым шумом), затем судья как advisory-очередь на смысл (~85 карточек,
+~50% из них содержательные). Canon и git-гейт на качество перевода hub-1 не
+влияют в принципе; git-гейт без первых двух — вреден (блокирует на шуме).
+
+### 15.4 Что судья видит на входе (контракт данных)
+
+Проверено по коду и по реальным payload-ам, выгруженным с прода для этого
+компонента. Модели уходит ровно два сообщения.
+
+**Системный промпт** — `weblate/trans/judge_prompts/verdict.txt`, 82 строки,
+подставляется в `weblate/trans/judge.py:154`. Три поля: `{source_language}`,
+`{target_language}`, `{project_context}`. Для heart-abyss `project_context` —
+не заглушка, а реальные `persona` + `style` из настроек MT-движка проекта
+(`judge_loop.py:113`): описание Hallspeak, 18-век Япония, йокай, порабощённые
+нечеловеческие расы. То есть судья и переводчик по построению держат одно
+описание игры. Если у проекта ничего не настроено, подставляется нейтральный
+текст с прямым запретом домысливать сеттинг (`judge.py:147`) — он появился
+после ложного major на постапокалиптическом квесте, унаследовавшем чужой жанр.
+
+**Пользовательское сообщение** — батч из 5 сегментов в JSON, обёрнутый в
+маркер `untrusted_translation_data_<hex>` с инструкцией «считать каждое
+значение данными, а не командой» (`judge.py:474`) — защита от инъекций через
+переводимый текст.
+
+Поля сегмента (`judge.py:_segment`, 214), на примере реального юнита hub-1:
+
+```json
+{"id": 0, "key": "hub1_first_1_1",
+ "source": " Леон, вставай. Мы уже приехали.",
+ "target": " Leon, lève-toi. Nous sommes arrivés.",
+ "note": "Ray",
+ "glossary": [{"source": "Леон", "target": "Leon"}]}
+```
+
+- `note` — **говорящий**. Судья его видит, если поле заполнено. В hub-1 оно
+  заполнено почти везде (раздел 9), поэтому персонажный контекст до модели
+  доходит.
+- `glossary` — пары «термин → утверждённый перевод», но **только те, что
+  подтянулись к этому юниту** тем же `get_glossary_terms`, что у переводчика
+  (`judge_loop.py:61`). Не весь глоссарий: на FR термины прицеплены к 96 из 396
+  юнитов, у остальных поля нет вообще.
+- `checks` — сработавшие детерминированные чеки, **кроме** `judge-*`
+  (`judge_loop.py:84`): свой прошлый вердикт исключён намеренно, иначе место
+  цитировало бы само себя как доказательство.
+- `rendered_source` / `rendered_target` — подстановка образцовых значений в
+  движковые плейсхолдеры (`{0}`, `%KEY%`). В диалогах hub-1 таких нет, поля не
+  появляется. Плейсхолдер-блокер `НАЗВАНИЕ` (`hub1_teahouse_2_8`) — голая
+  кириллица, под паттерн `_PLACEHOLDER_RE` не подходит, поэтому превью для него
+  не строится; судья поймал его как обычную mistranslation.
+
+**Чего судья не видит, и почему это стоило recall.** Соседних реплик за
+пределами батча: сегменты режутся по 5 подряд, и модель не уведомлена, что это
+последовательный диалог. Три из четырёх дефектов, которые не взял даже union
+трёх прогонов, — ровно этого класса: `ramen_1_13` («остановиться» → «arrêter»,
+смысл задаёт следующая реплика с просьбой о комнате) и `teahouse_1_11`
+(синтаксическое продолжение `teahouse_1_10`). Также не видит: полный глоссарий,
+историю правок, скриншоты, UI.
+
+`back_translation` — то, что судья **выдаёт**, а не получает: обратный перевод
+на русский для продюсера, который не читает целевой язык.
+
+## 16. Как этот класс дефектов решают в индустрии
+
+Внешнее исследование 2026-08-20: девять TMS/LQA-платформ, четыре отраслевых
+стандарта, исследовательская литература по обратному переводу, отдельно —
+практики игровой локализации. 165 первоисточников, преимущественно
+документация вендоров.
+
+### 16.1 Ландшафт механизмов
+
+| Механизм | Класс дефектов | Кто реализует | Зрелость |
+| --- | --- | --- | --- |
+| QE-скоринг сегмента 0-100, калиброванный на MQM | смысл (частично) | Phrase QPS, Smartling LQE, Lokalise Scoring | продакшн |
+| LLM-судья с настраиваемыми критериями | смысл, терминология | Phrase Quality Profiles + Rules, Crowdin AI QA, Smartling LQA Agent, Lokalise AI LQA, memoQ LLMQA (партнёрский) | продакшн, молодое |
+| Term base как enforcement: forbidden + морфология | терминология | memoQ, Trados/MultiTerm, XTM, Smartling, Verifika, Crowdin, Lokalise | стандарт де-факто |
+| Валидация самого глоссария на самопротиворечия | терминология | Lokalise Glossary Guard (open-source CLI) | редкая практика |
+| Консистентность повторов (target inconsistency) | дубли | Verifika, memoQ (Run QA), Crowdin, Trados | продакшн |
+| Дубликаты как объект менеджмента (master/duplicate) | дубли | Crowdin Duplicate Strings, XTM Repeats | продакшн |
+| ICE / 101% match с типом контекста | дубли (профилактика) | memoQ 101/102, Phrase, Crowdin, WorldServer | стандарт CAT |
+| Formality-параметр MT | регистр (профилактика) | DeepL, Amazon Translate, ModernMT; Google — нет | продакшн, ограниченные языки |
+| Style guide как исполнимый контекст | регистр, терминология | Phrase Rules → AI checks, Smartling, Lokalise | молодое |
+| Speaker/addressee метаданные | смысл, регистр | игровая практика (IGDA, Pangea), в TMS как продукта нет | практика, не продукт |
+| MQM-семплинг + скоркарта + арбитраж | все классы | Phrase LQA, Smartling LQA, memoQ LQA, ContentQuo | стандарт |
+| Обратный перевод как метрика | смысл | признан слабым (Somers 2005), частично реабилитирован для NMT | спорное |
+
+### 16.2 Автоматическая оценка смысла
+
+**Phrase QPS** — система оценки качества, предсказывающая балл, производный от
+MQM: на вход исходник и перевод, на выход 0-100 на сегмент, без эталона. Порог
+встроен в воркфлоу: выше — сегмент запирается, ниже — уходит человеку.
+Косвенное свидетельство калибровки, которое Phrase публикует сам: снижение
+порога QPS на 1 пункт стоит около 1 секунды правки на сегмент.
+
+Ограничения QPS вендор публикует прямым текстом, и они ровно про наши классы:
+«Phrase QPS is unaware of terminology», «QPS is unaware of specific style
+needs, if they are not encoded in the source text itself», плюс оценка идёт
+**на уровне отдельного сегмента**. Это тот же потолок, в который упёрся наш
+судья: 3 из 4 непойманных дефектов требуют соседней реплики.
+
+**Phrase Quality Profiles** — до трёх AI-проверок с критериями на естественном
+языке (пример из документации: «Translation must not use Yoda-style speech»),
+прогон один раз за задание при предпереводе; прошло — автозамок, не прошло —
+сегмент остаётся редактируемым и попадает в панель QA. Их же рекомендация:
+«Write criteria that can be evaluated at the segment level. Avoid rules that
+depend on context outside a single segment» — прямое признание того же
+ограничения.
+
+**Smartling** разделяет два продукта: LQE Agent (оценка MT, метки
+High/Medium/Low для маршрутизации) и LQA Agent (находит и записывает ошибки по
+типу и severity, помечает то, что требует человека). **Lokalise AI LQA**
+размечает по DQF-MQM с весами severity 0/1/5/25 и отдельно проверяет
+соответствие глоссарию. **Crowdin AI QA** принимает шаги оценки (Accuracy,
+Fluency, Terminology, Style, Locale Convention, Verity) и умеет подставлять в
+промпт `%siblingsStrings%` — **предыдущую и следующую строки**. Это
+единственный найденный вендор, который штатно решает нашу проблему нехватки
+диалогового контекста.
+
+### 16.3 Терминология как принуждение, а не справочник
+
+Здесь индустрия единодушна и зрела. Общий набор: термин имеет статус
+(утверждён / запрещён / отклонён), проверка ловит и неиспользование
+утверждённого перевода, и присутствие запрещённого, а матчинг делается с учётом
+морфологии.
+
+- **memoQ**: проверка терминологии в обе стороны, forbidden-термины ловятся даже
+  без эквивалента в исходнике; режимы матчинга 50% префикс / нечёткий 80% /
+  точный. Про нечёткий их документация честно предупреждает: «a lot of false
+  positives when checking terms during QA».
+- **Trados**: Terminology Verifier различает три уровня — возможное
+  неиспользование целевого термина (Warning), запрещённый термин (Error),
+  отсутствие эквивалента (Note).
+- **XTM**: четыре статуса термина (Forbidden, Not approved, Rejected, Valid) и
+  отдельные QA-правила под каждый.
+- **Smartling**: Glossary Compliance с лемматизацией, плюс Blocklist; для слов
+  короче шести символов принудительно точное совпадение — сознательная мера
+  против ложных срабатываний.
+- **Lokalise** формулирует то, что подтвердил наш аудит: «The glossary is meant
+  for reference, and there's no option to automatically apply it» — глоссарий
+  без принуждения мёртв. У нас 276 терминов и 0 пойманных дрейфов ровно по этой
+  причине.
+
+Отдельная редкая практика — **валидация самого глоссария**: Lokalise отдаёт
+open-source CLI Glossary Guard. Это прямой ответ на нашу запись
+`Акира → EN Akito` при существующем отдельном `Akito`: самопротиворечивый
+глоссарий не ловится ни одним чеком перевода, потому что чек сверяется с
+глоссарием как с истиной.
+
+### 16.4 Повторы: как отличают законную вариативность от ошибки
+
+Это был ключевой вопрос по нашему классу дублей, и ответ индустрии
+единообразен: **дискриминатор — контекст, а не семантика**.
+
+- **Phrase / memoQ**: 100% match — совпал текст; 101% (in-context) — совпал ещё
+  и контекст (ключ сегмента либо соседние сегменты); memoQ добавляет 102%
+  (двойной контекст). Один и тот же исходник с разными контекстами живёт в
+  памяти как две записи, и каждая получает 101% там, где её контекст повторился.
+  То есть расхождение перевода легитимно **по контексту** и остаётся видимым.
+- **Crowdin**: явный менеджмент дубликатов — master/duplicate, детекция
+  «regular» (только исходный текст) против «strict» (текст + ключ), и таблица
+  режимов совместного использования перевода. Собственное предупреждение
+  документации про автопростановку: «This can affect accuracy». Есть отдельная
+  настройка TM Match Context Type с режимом «Key and Context», рекомендованным
+  как раз для key-value форматов — наш случай.
+- **Verifika**: Check target inconsistency — «Different translations for the
+  same source segments», с опциями игнорировать регистр, пунктуацию и числа.
+  Это буквально та проверка, которой у нас нет, и её опции объясняют, почему из
+  наших 25 расхождений 3 косметические (только пунктуация) стоит гасить
+  отдельным флагом.
+- **memoQ** не гоняет проверку консистентности автоматически — только по
+  явному Run QA, потому что она тяжёлая.
+
+Второй ответ: **везде есть мягкий и жёсткий режим**. memoQ — warning против
+error; Smartling — Low/Medium/High, где High блокирует отправку; Crowdin,
+Lokalise, Trados — Warning против Error пер-чек; Verifika даёт «No error»
+правым кликом. Консенсус: повторы по умолчанию разделяют перевод
+(профилактика), а QA стоит бэкстопом (детекция).
+
+### 16.5 Человеческий контур и стандарты
+
+**MQM-Core** (themqm.org) — семь измерений, заменил разрозненные MQM и DQF,
+согласован с ISO 5060. Скоринг: четыре уровня severity с множителями штрафа
+**0-1-5-25**, балл считается от плотности ошибок на объём, критическая ошибка
+может давать автоматический провал. Наша шкала судьи (`none/minor/major/critical`
+в `weblate/trans/models/judge.py:81`) — это ровно MQM-овские четыре уровня.
+
+**Phrase LQA** и **Smartling LQA** реализуют это как продукт: категории с
+весами, штрафные баллы по severity, порог прохождения, обработка повторяющейся
+ошибки (считать один раз или каждый раз). **ContentQuo** добавляет то, чего нет
+ни у кого: случайная выборка по объёму слов, усреднение по 2-5 лингвистам,
+**процедура опротестования и арбитража**.
+
+Стандарты процесса: **ASTM F2575-25** описывает фазы и спецификации, но прямо
+оговаривает, что не задаёт конкретных метрик качества; **ISO 18587:2017**
+нормирует постредактирование машинного перевода.
+
+### 16.6 Игровая специфика
+
+Отличие от софтверной локализации в том, что здесь дефект — это разрушение
+характера персонажа, а не сломанная строка. Практики, которые повторяются у
+IGDA, Pangea и Terra:
+
+- **Идентичность говорящего обязана быть в ките.** Каноничный пример из
+  подготовки к локализации — корейская иерархия обращений: без знания, кто кому
+  говорит, строка непереводима. У нас поле speaker уже есть в данных и уже
+  доходит до судьи — это сильная позиция, которой у большинства нет.
+- **Lore bible и брифы персонажей** к каждой партии строк, отдельный документ
+  голосовой подачи.
+- **Глоссарий включает имена персонажей**, а память переводов держит
+  консистентность голоса.
+- **Terra** прямо перечисляет, что автоматика не судит: юмор, темп,
+  консистентность голоса персонажа.
+- **Loxily** публикует пятимерную схему AI-оценки с весами (accuracy 35,
+  terminology 20, register 20, format 15, compliance 10), жёсткими провалами и
+  протоколом калибровки: слепое ревью старшего лингвиста против корреляции с
+  ИИ. Это готовый шаблон того, чего нашему судье не хватает.
+
+### 16.7 Что переоценено
+
+- **Обратный перевод как метрика.** Somers 2005 («Round-Trip Translation: What
+  Is It Good For?») разбирает его как сомнительную технику; работа ACL Findings
+  2023 частично реабилитирует для NMT на системном уровне, объясняя старые
+  негативные результаты копирующим механизмом; WMT 2022 показывает, что QE через
+  обратный перевод хуже обученного QE и годится лишь как дополнение. Вывод: как
+  посегментный детектор не работает. У нас он и не детектор — `back_translation`
+  в вердикте служит уликой для продюсера, и это корректное применение.
+- **QE-скор как единственный гейт** — см. 16.2, вендор сам пишет, что QPS слеп к
+  терминологии и стилю.
+- **Нечёткий морфологический матчинг терминов** — документация memoQ сама
+  предупреждает о валe ложных срабатываний.
+- **Сплошное автораспространение по 100% совпадению без контекста** — Crowdin
+  предупреждает, что это бьёт по точности.
+- **AI-проверки «на смысл» общего назначения** вроде XTM Language Guard — они
+  про чувствительную лексику, а не про факты сюжета, и документация оговаривает
+  «Accuracy can vary».
+
+### 16.8 Что из этого применимо к нашему форку
+
+| Практика индустрии | Наш эквивалент | Статус |
+| --- | --- | --- |
+| LLM-судья по MQM с severity | реализован (`judge_verdict`, коллегия 2 мест) | выключен на проде |
+| Соседние строки в промпт (Crowdin `%siblingsStrings%`) | отсутствует | **закрывает 3 из 4 непойманных дефектов** |
+| Target inconsistency (Verifika) | RepeatDriftCheck — только в плане | не начат, 25/25 по замеру |
+| Опции «игнорировать пунктуацию/регистр» в проверке повторов | отсутствует | отделит 3 косметических расхождения от 22 содержательных |
+| Term base enforcement | `GlossaryCheck` есть, `default_disabled = True` | включить флагом |
+| Валидация глоссария на самопротиворечия | отсутствует | ловит `Акира → Akito` |
+| Мягкий/жёсткий режим чека | **есть, и глубже вендорских**: у судьи — четыре уровня MQM `none/minor/major/critical` (`JudgeSeverityOrdered`, `weblate/trans/models/judge.py:81-86, 249`) с обязательными `category`/`span`/`severity`/`description` на каждой ошибке, плюс гейт состояний: major → flag (state 20, отгружается), critical → reject (state 10, удержание из сборки через `WITHOUT_NEEDS_EDITING`); у детерминированных чеков — `enforced_checks` (провал → state 11, не отгружается) против advisory-режима по умолчанию | реализовано (`judge-native-ui-design.md` §3, «Гейт по severity выражается штатными настройками») |
+| Семплинг + арбитраж (ContentQuo) | отсутствует | процессная мера |
+| Протокол калибровки судьи слепым ревью (Loxily) | отсутствует | нужен: замер дал разброс recall 29-64% |
+
+Главный практический вывод исследования: **добавить соседние реплики во вход
+судьи**. Это единственный вендорский приём, который прямо бьёт в измеренный
+потолок нашего судьи, он дёшев (расширение `build_request`) и подтверждён тем,
+что Crowdin вынес его в штатный параметр промпта.
+
+### 16.9 Источники
+
+Phrase: [QPS Overview](https://support.phrase.com/hc/en-us/articles/5709672289180-Phrase-QPS-Overview),
+[MT Optimize (ограничения QPS)](https://support.phrase.com/hc/en-us/articles/20397396468508-MT-Optimize),
+[Quality Profiles](https://support.phrase.com/hc/en-us/articles/25865045974300-Quality-Profiles),
+[Rules](https://support.phrase.com/hc/en-us/articles/28818120405788-Rules),
+[LQA (TMS)](https://support.phrase.com/hc/en-us/articles/5709599557020-Language-Quality-Assessment-TMS),
+[TM Match Context](https://support.phrase.com/hc/en-us/articles/9386879839900-Translation-Memory-Match-Context-TMS),
+[Rethinking the 70% TM threshold](https://phrase.com/blog/posts/rethinking-tm-threshold/).
+
+Smartling: [LQE Agent](https://help.smartling.com/hc/en-us/articles/25058582212507-Language-Quality-Estimation-Agent-for-Machine-Translation),
+[LQA Agent](https://help.smartling.com/hc/en-us/articles/49428460628507-LQA-Agent-AI-Powered-Quality-Assurance),
+[Quality Checks](https://help.smartling.com/hc/en-us/articles/115003151014-Quality-Checks-Types-and-Configuration),
+[Blocklist](https://help.smartling.com/hc/en-us/articles/360057477613-Blocklist),
+[LQA Overview](https://help.smartling.com/hc/en-us/articles/1260806295070-LQA-Overview).
+
+memoQ: [QA settings](https://docs.memoq.com/current/en/Workspace/edit-qa-settings.html),
+[term base entry](https://docs.memoq.com/current/en/Workspace/edit-term-base-entry.html),
+[QA warnings](https://docs.memoq.com/current/en/Concepts/concepts-quality-assurance-qa-warnings.html),
+[Run QA](https://docs.memoq.com/current/en/Workspace/run-qa.html),
+[match rates](https://docs.memoq.com/current/en/Concepts/concepts-match-rates-from-translation-m.html),
+[LQA models](https://docs.memoq.com/current/en/Concepts/concepts-linguistic-quality-assurance.html).
+
+Trados: [Terminology Verifier](https://docs.rws.com/en-US/trados-studio-2024-1145319/specifying-settings-for-the-terminology-verifier-359769),
+[Verifying translations](https://docs.rws.com/en-US/trados-studio-2024-1145319/verifying-translations-359741).
+
+XTM: [QA profile checks](https://xtm-cloud.atlassian.net/wiki/spaces/EXKB/pages/4311023670/Description+of+checks+in+the+Quality+Assurance+QA+profile),
+[Repeated segments](https://help.xtm.ai/en/xtm-cloud/25.6/en/repeated-segments--repetitions-.html),
+[Forbidden terms](https://xtm-cloud.atlassian.net/wiki/spaces/EXKB/pages/3273496820/Highlighting+forbidden+terms+in+XTM+Workbench).
+
+Lokalise: [QA checks](https://docs.lokalise.com/en/articles/2564656-qa-checks),
+[Glossary](https://docs.lokalise.com/en/articles/1400629-glossary),
+[AI LQA](https://docs.lokalise.com/en/articles/7945761-ai-lqa),
+[Scoring translation quality](https://docs.lokalise.com/en/articles/11631905-scoring-translation-quality).
+
+Crowdin: [QA Check Settings](https://support.crowdin.com/project-settings/qa-checks/),
+[Crowdin AI](https://support.crowdin.com/crowdin-ai/),
+[Import / duplicate strings](https://support.crowdin.com/project-settings/import/),
+[TM settings](https://support.crowdin.com/project-settings/translation-memories/),
+[Custom QA checks](https://support.crowdin.com/enterprise/custom-qa-checks/).
+
+Verifika: [Checks in detail](https://e-verifika.com/checks_in_detail),
+[Consistency](https://e-verifika.com/help_consistency),
+[Terminology](https://e-verifika.com/help_terminology).
+
+ContentQuo: [Evaluate HT](https://www.contentquo.com/products/evaluate-ht),
+[Quality profiles](https://www.contentquo.com/blog/translation-quality-assessment-profiles-in-contentquo).
+
+Стандарты: [MQM-Core typology](https://themqm.org/the-mqm-typology/),
+[MQM scoring models](https://www.themqm.org/mqm-pillars/the-mqm-scoring-models/),
+[MQM history](https://themqm.org/mqm-history/),
+[Multi-range theory (arXiv)](https://arxiv.org/html/2405.16969),
+[ASTM F2575-25](https://store.astm.org/f2575-25.html),
+[ISO 18587:2017](https://www.iso.org/standard/62970.html).
+
+Обратный перевод: [Somers 2005](https://aclanthology.org/U05-1019.pdf),
+[Rethinking RTT, ACL Findings 2023](https://aclanthology.org/2023.findings-acl.22/),
+[QE via backtranslation, WMT 2022](https://aclanthology.org/2022.wmt-1.54/).
+
+Формальность: [DeepL formality](https://support.deepl.com/hc/en-us/articles/4406432463762-About-the-formality-feature),
+[DeepL API](https://developers.deepl.com/api-reference/translate/request-translation).
+
+Игровая локализация: [IGDA LQA best practices](https://igda.org/news-archive/how-to-get-the-most-from-lqa-what-it-is-and-best-practices/),
+[IGDA Help Loc Help You](https://igda.org/news-archive/high-quality-localization-help-loc-help-you/),
+[IGDA имена и голоса](https://igda.org/resources-archive/how-developers-localize-game-characters-names-voices-and-more-facts-finer-points/),
+[Game Developer: подготовка к локализации](https://www.gamedeveloper.com/design/what-needs-to-be-done-to-prepare-a-game-for-localization-),
+[Pangea: RPG narrative](https://www.pangea.global/blog/video-game-localization-for-rpg-narratives-story-guide/),
+[Loxily: AI LQA scoring framework](https://loxily.com/en/blog/ai-lqa-scoring-framework),
+[Terra: coordinated LQA](https://terralocalizations.com/2026/05/20/coordinated-approach-linguistic-qa/).
