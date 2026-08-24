@@ -25,7 +25,7 @@ from decimal import Decimal
 from importlib import resources
 from itertools import starmap
 from secrets import token_hex
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from django.conf import settings
 from django.utils.translation import gettext as _
@@ -34,9 +34,14 @@ from weblate.trans.models.judge import SEVERITY_RANK
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.requests import stream_validated_url
 
+if TYPE_CHECKING:
+    import httpx2
+
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 JUDGE_REQUEST_TIMEOUT = 120
 JUDGE_SEATS = (1, 2)
+# A verdict batch reply is kilobytes; this only bounds a broken peer.
+MAX_BATCH_RESPONSE_BYTES = 8 * 1024 * 1024
 # Measured category set (st2-zh-recalibration.py:59-68).
 CATEGORIES = (
     "terminology",
@@ -81,8 +86,8 @@ def judge_configuration_ready() -> bool:
     )
 
 
-def validate_judge_configuration() -> None:
-    """Fail before any paid request when the two-seat judge is incomplete."""
+def validate_request_settings() -> None:
+    """Fail before any paid request when a shared judge setting is unusable."""
     if not settings.JUDGE_ENABLED:
         raise JudgeError(_("The LLM judge is disabled."))
     if not (
@@ -91,15 +96,24 @@ def validate_judge_configuration() -> None:
     ):
         raise JudgeError(_("The LLM judge is not configured."))
     if not (
+        isinstance(settings.JUDGE_REQUEST_DEADLINE, (int, float))
+        and settings.JUDGE_REQUEST_DEADLINE > 0
+    ):
+        raise JudgeError(_("The LLM judge is not configured."))
+    if not isinstance(settings.JUDGE_BATCH_SIZE, int) or settings.JUDGE_BATCH_SIZE < 1:
+        # A zero step raises from range(); a negative one silently yields no
+        # batch at all, which would report a successful run that judged nothing.
+        raise JudgeError(_("The LLM judge is not configured."))
+
+
+def validate_judge_configuration() -> None:
+    """Fail before any paid request when the two-seat judge is incomplete."""
+    validate_request_settings()
+    if not (
         isinstance(settings.JUDGE_MODEL_SEAT_1, str)
         and settings.JUDGE_MODEL_SEAT_1.strip()
         and isinstance(settings.JUDGE_MODEL_SEAT_2, str)
         and settings.JUDGE_MODEL_SEAT_2.strip()
-    ):
-        raise JudgeError(_("The LLM judge is not configured."))
-    if not (
-        isinstance(settings.JUDGE_REQUEST_DEADLINE, (int, float))
-        and settings.JUDGE_REQUEST_DEADLINE > 0
     ):
         raise JudgeError(_("The LLM judge is not configured."))
 
@@ -385,8 +399,10 @@ def _parse_reply(payload: dict, size: int) -> list[JudgeResult] | None:
     return cast("list[JudgeResult]", results)
 
 
-def _read_batch_response(response, *, model: str, started: float) -> bytearray | None:
-    """Read a response body under the caller's absolute deadline."""
+def _read_batch_response(
+    response: httpx2.Response, *, model: str, started: float
+) -> bytearray | None:
+    """Read a response body under the caller's absolute deadline and size cap."""
     deadline = started + settings.JUDGE_REQUEST_DEADLINE
     buffer = bytearray()
     for chunk in response.iter_bytes():
@@ -395,6 +411,16 @@ def _read_batch_response(response, *, model: str, started: float) -> bytearray |
                 "judge batch deadline exceeded: model=%s elapsed=%dms",
                 model,
                 int((time.monotonic() - started) * 1000),
+            )
+            return None
+        if len(buffer) + len(chunk) > MAX_BATCH_RESPONSE_BYTES:
+            # A verdict batch is a few kilobytes. Anything larger is a broken
+            # or hostile peer, and the deadline alone would let it fill memory.
+            # Checked before the append so an oversized chunk is never stored.
+            LOGGER.warning(
+                "judge batch response too large: model=%s bytes=%d",
+                model,
+                len(buffer) + len(chunk),
             )
             return None
         buffer.extend(chunk)
@@ -444,25 +470,15 @@ def request_verdicts(
     """
     Judge every request; results in input order.
 
-    Gate failures (disabled, no key, no model) raise JudgeError before
-    any network call. Any batch failure (transport, HTTP >= 400,
-    unreadable JSON, length mismatch, unknown severity/category) marks
-    the whole batch unparsed — never a raise, never a default verdict.
+    Gate failures (disabled, no key, no model, an unusable deadline or batch
+    size) raise JudgeError before any network call. Any batch failure
+    (transport, HTTP >= 400, unreadable JSON, length mismatch, unknown
+    severity/category) marks the whole batch unparsed — never a raise, never
+    a default verdict.
     One retry per batch on 429/403 with a doubled sleep, no more.
     """
-    if not settings.JUDGE_ENABLED:
-        raise JudgeError(_("The LLM judge is disabled."))
-    if not (
-        isinstance(settings.JUDGE_OPENROUTER_KEY, str)
-        and settings.JUDGE_OPENROUTER_KEY.strip()
-    ):
-        raise JudgeError(_("The LLM judge is not configured."))
+    validate_request_settings()
     if not isinstance(model, str) or not model.strip():
-        raise JudgeError(_("The LLM judge is not configured."))
-    if not (
-        isinstance(settings.JUDGE_REQUEST_DEADLINE, (int, float))
-        and settings.JUDGE_REQUEST_DEADLINE > 0
-    ):
         raise JudgeError(_("The LLM judge is not configured."))
 
     batch_size = settings.JUDGE_BATCH_SIZE

@@ -32,6 +32,7 @@ from weblate.auth.results import PermissionResult
 from weblate.checks.models import CHECKS, get_display_checks
 from weblate.glossary.forms import TermForm
 from weblate.glossary.models import fetch_glossary_terms, get_glossary_terms
+from weblate.logger import LOGGER
 from weblate.screenshots.forms import ScreenshotForm
 from weblate.trans.actions import ActionEvents
 from weblate.trans.exceptions import (
@@ -1582,8 +1583,16 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
             translation_id=translation_id,
             user_id=request.user.id,
         )
-        queued_ahead = get_queue_length("translate")
-        if queued_ahead > 1:
+        try:
+            queued_ahead: int | None = get_queue_length("translate")
+        except Exception:
+            # The run is already queued; a broker hiccup must not fail the
+            # request, and must not claim progress nobody verified either.
+            LOGGER.exception("could not read the translate queue length")
+            queued_ahead = None
+        if queued_ahead is None:
+            message = gettext("Automatic translation queued. You can close this page.")
+        elif queued_ahead > 1:
             message = ngettext(
                 "Automatic translation queued: %d run is ahead of it. "
                 "You can close this page.",

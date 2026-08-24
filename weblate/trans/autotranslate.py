@@ -782,17 +782,13 @@ class AutoTranslate(BaseAutoTranslate):
                     saved_state,
                     saved_range,
                 )
-            units = list(
-                self.translation.unit_set.filter(pk__in=[unit.id for unit in units])
-                .prefetch()
-                .prefetch_source()
-            )
-        else:
-            units = list(
-                self.translation.unit_set.filter(pk__in=[unit.id for unit in units])
-                .prefetch()
-                .prefetch_source()
-            )
+        # Phase 1 may have written targets, so the judged instances are always
+        # reloaded, whether or not anything was writable.
+        units = list(
+            self.translation.unit_set.filter(pk__in=[unit.id for unit in units])
+            .prefetch()
+            .prefetch_source()
+        )
 
         # Phase 2: judge everything in q; the state is decided per verdict.
         judged = 0

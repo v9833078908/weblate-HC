@@ -431,7 +431,7 @@ def run_judge_batch(
         LOGGER.info(
             "judge run %s: %d strings, %d writable, %d cached",
             run_id,
-            len(units),
+            len(pending),
             len(writable_ids),
             len(cached_ids),
         )

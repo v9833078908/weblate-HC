@@ -18,6 +18,7 @@ from weblate.trans.judge import (
     JudgeRequest,
     render_preview,
     request_verdicts,
+    validate_judge_configuration,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.tests import http_mock
@@ -93,6 +94,41 @@ class JudgeClientGateTest(SimpleTestCase):
         with self.assertRaises(JudgeError):
             request_verdicts([REQ], model="vendor/model-a")
         self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=0,
+    )
+    @http_mock.activate
+    def test_zero_batch_size_makes_no_network_call(self) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=-5,
+    )
+    @http_mock.activate
+    def test_negative_batch_size_never_reports_an_empty_success(self) -> None:
+        # A negative step makes range() yield nothing, so an unguarded run
+        # would return no verdict at all and still look successful.
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+        JUDGE_BATCH_SIZE=0,
+    )
+    def test_run_gate_rejects_an_unusable_batch_size(self) -> None:
+        with self.assertRaises(JudgeError):
+            validate_judge_configuration()
 
 
 @override_settings(
@@ -452,6 +488,24 @@ class JudgeRequestDeadlineTest(TestCase):
         [result] = request_verdicts([REQ], model="vendor/model-a")
 
         self.assertFalse(result.unparsed)
+
+    @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_REQUEST_DEADLINE=30)
+    @mock.patch("weblate.trans.judge.MAX_BATCH_RESPONSE_BYTES", 32)
+    @http_mock.activate
+    def test_oversized_body_is_unparsed_without_being_buffered(self) -> None:
+        body = b"x" * 4096
+        http_mock.register_callback(
+            "POST",
+            CHAT_URL,
+            lambda _request: httpx2.Response(200, content=body),
+        )
+
+        with self.assertLogs("weblate.trans.judge", level="WARNING") as logs:
+            [result] = request_verdicts([REQ], model="vendor/model-a")
+
+        self.assertTrue(result.unparsed)
+        self.assertTrue(any("too large" in line for line in logs.output))
+        self.assertEqual(LLMUsageLog.objects.count(), 0)
 
 
 @override_settings(

@@ -1504,6 +1504,21 @@ class PersistentTaskProgressTest(ViewTestCase):
         messages = [str(message) for message in response.context["messages"]]
         self.assertTrue(any(queued in message for message in messages), messages)
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_unreadable_queue_neither_fails_nor_claims_progress(self) -> None:
+        with patch(
+            "weblate.trans.views.edit.get_queue_length",
+            side_effect=OSError("broker down"),
+        ):
+            response = self.start_auto_translation(self.translation.get_url_path())
+
+        self.assertEqual(response.status_code, 200)
+        messages = [str(message) for message in response.context["messages"]]
+        self.assertIn(
+            "Automatic translation queued. You can close this page.", messages
+        )
+        self.assertNotIn("Automatic translation in progress", messages)
+
     def test_project_language_task_is_authorized_and_kept(self) -> None:
         # This scope passes neither component_id nor translation_id, so the
         # task is only reachable through the user stored in its metadata.
@@ -1613,7 +1628,13 @@ class AutoTranslateDurabilityTest(SimpleTestCase):
     def test_visibility_timeout_covers_long_tasks(self) -> None:
         code = """
 from pathlib import Path
-Path.read_text = lambda *args, **kwargs: "test-secret"
+
+# settings_docker reads the secret from a container path this test host does
+# not have. Only that one read is intercepted; every other read is real.
+_read_text = Path.read_text
+Path.read_text = lambda self, *args, **kwargs: (
+    "test-secret" if self.name == "secret" else _read_text(self, *args, **kwargs)
+)
 import json
 from weblate import settings_docker
 print(json.dumps(
