@@ -748,6 +748,7 @@ weblate = [
   "locale/**/*.mo",
   "static/**/*",
   "templates/**/*",
+  "trans/judge_prompts/*.txt",
   "trans/prompts/*.txt"
 ]
 "weblate.fonts" = ["static/**/*"]
