@@ -26,7 +26,7 @@ judge progress reporting.
 5. Delivery and AI are independent:
    - Delivery: exact `PendingUnitChange` `eligible_for_commit` and `commit_policy_skipped` counts.
    - AI: parsed evidence for the exact current target.
-6. Copy: **Evaluated - no blocking concern**, **Advisory - ships**, **Held for decision**, **Not evaluated**, **Stale**, **Latest attempt incomplete**, **No blocking action**.
+6. Copy: **Evaluated - no blocking concern**, **Advisory - ships**, **Held for decision**, **Not evaluated**, **Stale**, **Latest attempt incomplete**, **No blocking action**. Every state the table can render also appears in a compact legend directly below the table: the exact copy above plus one plain-language sentence per state, rendered as visible text, never hover-only tooltips.
 7. Never render **Approved by AI**, **AI approved**, or **Ready for release**. A pass remains state 20 by default.
 8. Primary action priority:
    1. uncovered/stale -> **Evaluate N**;
@@ -34,7 +34,10 @@ judge progress reporting.
    3. commit-policy-held updates -> policy-aware native review/fix action;
    4. advisory -> **Inspect N**;
    5. otherwise -> **No blocking action**.
-9. AI counts open exact language-scoped Zen queues. Delivery counts are informational, not links: `detailed_count()` includes pending history/retry semantics that a current-state q cannot represent exactly. Its action opens a clearly labelled broader native pending queue.
+   Until Plan 03 lands, the held **Review N** action carries a short secondary
+   line stating that a decision is recorded only by editing the translation or
+   re-evaluating; Plan 02 offers no resolution control.
+9. AI counts open exact language-scoped Zen queues. Delivery counts are informational, not links: `detailed_count()` includes pending history/retry semantics that a current-state q cannot represent exactly. Its action opens a broader native pending queue and is labelled exactly **Open pending strings - broader than this count**, so the count/queue mismatch is stated, not implied.
 10. **Evaluate N** opens that language's existing Automatic translation tab with `mode=judge`, `q=NOT has:judge`, and a safe return URL. It never starts a paid call automatically.
 11. Reuse persistent task progress. It advances once for each completed judge
     seat batch, against the fixed worst-case repair budget for the capped
@@ -420,6 +423,23 @@ git commit -m "feat(judge): track observed per-unit costs"
 
 ## Task 6: Share preview scope, cap, and judge progress reporting
 
+> **Amended 2026-08-24 by the incident plan**
+> `docs/llm-first/plans/2026-08-24-auto-translate-queue-and-progress.md`.
+> Two changes, because that plan lands first and creates the same seam:
+>
+> 1. **The seam signature carries arguments.** This task specified
+>    `Callable[[], None]`. Per-batch verdict persistence needs the batch's
+>    requests and results, so the seam is now
+>    `OnBatch = Callable[[Sequence[JudgeRequest], Sequence[JudgeResult]], None]`.
+>    A progress tick ignores both arguments (`lambda *_: tick()`). Do not start
+>    this task against the old signature.
+> 2. **The seam, `progress_steps`, the 1/10 range split and the per-batch write
+>    already exist.** The incident plan ships them for the single-translation
+>    judge path. This task keeps what it alone owns: the shared preview scope,
+>    the global cap, cap-aware `progress_steps`, the completion summary, and
+>    the exact-count assertions below. Extend the landed plumbing; do not
+>    reintroduce it.
+
 **Files:**
 
 - Modify: `weblate/trans/judge.py`
@@ -444,8 +464,9 @@ For translation and component scopes assert:
 
 Add callback tests at the two judge seams:
 
-- `request_verdicts()` calls an optional `on_batch` exactly once after each
-  completed batch, whether that batch parses or becomes unparsed. A 403/429
+- `request_verdicts()` calls an optional `on_batch(requests, results)` exactly
+  once after each completed batch, whether that batch parses or becomes
+  unparsed. A 403/429
   retry remains one completed batch, not two ticks. For retry coverage,
   register a 429 response followed by a valid 200 response, mock its sleep,
   and assert two HTTP calls but one callback tick. Separately register
@@ -698,7 +719,12 @@ Assert:
 - AI URLs/q are exact;
 - Delivery numbers are plain text;
 - broader action uses `has:pending state:<translated` for `WITHOUT_NEEDS_EDITING`, `has:pending NOT state:approved` for `APPROVED_ONLY`;
-- priority order and **No blocking action** copy.
+- priority order and **No blocking action** copy;
+- legend renders below the table with the exact state copy and one sentence
+  per state, covering every state the rows can show;
+- held **Review N** includes the interim no-resolution secondary line;
+- Delivery broader action label is exactly **Open pending strings - broader
+  than this count**.
 
 ### Step 2: Prove RED
 
@@ -713,6 +739,10 @@ Reuse existing sorted translations; select real non-source targets; prefetch sta
 ### Step 4: Render native accessible table
 
 Use existing `card`, table, scroll-wrapper, link/button classes; semantic heading and `<th scope>`; text in addition to color; secondary stale/incomplete details. No score, chart, card grid, inline style, or raw verdict terms.
+
+Render the legend as visible help text under the table, for example a small
+definition list, one entry per state; do not rely on hover-only `title`
+tooltips, which fail keyboard and touch users.
 
 Include it immediately before current language-list include in `component.html`.
 
