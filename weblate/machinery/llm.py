@@ -2493,6 +2493,32 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 return None
             result.append(normalized)
         return result
+    @classmethod
+    def _resolve_reply_order(
+        cls, translations: list[JSONValue], string_ids: list[str]
+    ) -> list[JSONValue] | None:
+        """
+        Pair reply items with their source strings through the echoed id.
+
+        A single-string request needs no id: there is only one pairing. For a
+        batch, an item without a known, unique id is refused, because a reply of
+        the right length says nothing about its order - the caller then re-asks
+        the batch in halves instead of storing an unverified alignment.
+        """
+        if len(string_ids) == 1:
+            return list(translations)
+        by_id: dict[str, JSONValue] = {}
+        for item in translations:
+            if not isinstance(item, dict):
+                return None
+            item_id = item.get("id")
+            if not isinstance(item_id, str) or item_id in by_id:
+                return None
+            by_id[item_id] = item
+        if by_id.keys() != set(string_ids):
+            return None
+        return [by_id[string_id] for string_id in string_ids]
+
 
     @classmethod
     def _validate_translations(
@@ -2500,8 +2526,16 @@ class BaseLLMTranslation(BatchMachineTranslation):
         translations: JSONValue,
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None = None,
+        *,
+        string_ids: list[str],
     ) -> list[str]:
         translations = cls._normalize_translations(translations, len(sources))
+        if isinstance(translations, list) and len(translations) == len(sources):
+            ordered = cls._resolve_reply_order(translations, string_ids)
+            if ordered is None:
+                msg = "Mismatching assistant reply ids."
+                raise MachineTranslationError(msg)
+            translations = ordered
         translation_list = cls._normalize_translation_items(
             translations, sources, source_occurrences
         )
@@ -2796,7 +2830,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         finally:
             llm_batch_project.reset(project_token)
         return self._parse_llm_translations(
-            translations_string, sources, source_occurrences
+            translations_string, sources, source_occurrences, string_ids=string_ids
         )
 
     async def _adownload_multiple_translations(
@@ -2912,7 +2946,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         finally:
             llm_batch_project.reset(project_token)
         return await sync_to_async(self._parse_llm_translations)(
-            translations_string, sources, source_occurrences
+            translations_string, sources, source_occurrences, string_ids=string_ids
         )
 
     def _prepare_llm_translation(
@@ -2945,6 +2979,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
         translations_string: str | None,
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None,
+        *,
+        string_ids: list[str],
     ) -> DownloadMultipleTranslations:
         add_breadcrumb(self.name, "response", translations_string=translations_string)
         if translations_string is None or not translations_string:
@@ -2974,7 +3010,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
 
         try:
             translations = self._validate_translations(
-                translations, sources, source_occurrences
+                translations, sources, source_occurrences, string_ids=string_ids
             )
         except MachineTranslationError as error:
             # A reply that ends early still answered its first strings
@@ -2990,7 +3026,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 raise PartialLLMReplyError(
                     self._build_translation_results(prefix, sources), len(prefix)
                 ) from error
-            msg = "Mismatching assistant reply."
+            msg = str(error)
             self.log_handled_error(msg, extra_log=translations_string)
             raise MachineTranslationError(msg) from error
 

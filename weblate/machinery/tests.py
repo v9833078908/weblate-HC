@@ -3940,6 +3940,143 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
         self.assertNotIn('{"parts"', prompt)
         self.assertIn('"id"', prompt)
+    @http_mock.activate
+    def test_translate_refuses_a_batch_reply_with_shifted_ids(self) -> None:
+        machine = self.get_machine()
+        sources = ["Alpha", "Beta", "Gamma"]
+        batch_sizes: list[int] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            strings = json.loads(content)["strings"]
+            batch_sizes.append(len(strings))
+            if len(strings) == 1:
+                return json.dumps(
+                    [
+                        {
+                            "id": strings[0]["id"],
+                            "parts": [
+                                {
+                                    "type": "text",
+                                    "text": f"{strings[0]['source']} (fr)",
+                                }
+                            ],
+                        }
+                    ]
+                )
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
+                    }
+                    for item in strings[1:]
+                ]
+                + [
+                    {
+                        "id": "sffff",
+                        "parts": [{"type": "text", "text": "Epsilon (fr)"}],
+                    }
+                ]
+            )
+
+        with (
+            patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ),
+            patch.object(
+                machine, "log_handled_error", wraps=machine.log_handled_error
+            ) as handled,
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in sources]
+            )
+
+        self.assertEqual(
+            {text: translations[text][0]["text"] for text in sources},
+            {text: f"{text} (fr)" for text in sources},
+        )
+        self.assertEqual(batch_sizes[0], 3)
+        self.assertGreater(len(batch_sizes), 1)
+        self.assertTrue(
+            any(
+                call.args[0].startswith("Mismatching assistant reply ids")
+                for call in handled.call_args_list
+            )
+        )
+
+    @http_mock.activate
+    def test_translate_pairs_a_shuffled_batch_reply_by_id(self) -> None:
+        machine = self.get_machine()
+        sources = ["Alpha", "Beta", "Gamma"]
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            strings = json.loads(content)["strings"]
+            return json.dumps(
+                list(
+                    reversed(
+                        [
+                            {
+                                "id": item["id"],
+                                "parts": [
+                                    {
+                                        "type": "text",
+                                        "text": f"{item['source']} (fr)",
+                                    }
+                                ],
+                            }
+                            for item in strings
+                        ]
+                    )
+                )
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in sources]
+            )
+
+        self.assertEqual(
+            {text: translations[text][0]["text"] for text in sources},
+            {text: f"{text} (fr)" for text in sources},
+        )
+
+    @http_mock.activate
+    def test_translate_refuses_an_id_less_batch_reply(self) -> None:
+        machine = self.get_machine()
+        batch_sizes: list[int] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            strings = json.loads(content)["strings"]
+            batch_sizes.append(len(strings))
+            return json.dumps([f"{item['source']} (fr)" for item in strings])
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [("Alpha", None), ("Beta", None)]
+            )
+
+        self.assertEqual(batch_sizes, [2, 1, 1])
+        self.assertEqual(translations["Alpha"][0]["text"], "Alpha (fr)")
+        self.assertEqual(translations["Beta"][0]["text"], "Beta (fr)")
 
     @http_mock.activate
     def test_async_translate(self) -> None:
