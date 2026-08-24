@@ -6,8 +6,8 @@ from __future__ import annotations
 import re
 from collections import Counter, defaultdict
 
-from weblate.glossary.models import fetch_glossary_terms, get_glossary_term_modes
 from weblate.checks.morphology import get_text_stems, iter_word_spans
+from weblate.glossary.models import fetch_glossary_terms, get_glossary_term_modes
 from weblate.trans.models import Translation
 from weblate.utils.state import STATE_TRANSLATED
 

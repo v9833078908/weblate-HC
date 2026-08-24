@@ -55,7 +55,7 @@ for unit in units:
         if expected.lower() in tl:
             continue  # inflected form of the canonical term, acceptable in id
         loose_miss += 1
-        loose_miss_counts[(term.source, expected)] += 1
+        loose_miss_counts[term.source, expected] += 1
         if len(loose_samples) < 40:
             loose_samples.append(
                 (term.source, expected, unit.source[:80], target_text[:110])

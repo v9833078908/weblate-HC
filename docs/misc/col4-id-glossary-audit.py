@@ -15,7 +15,7 @@ from weblate.glossary.models import (
     get_glossary_term_modes,
     glossary_matcher_fingerprint,
 )
-from weblate.trans.models import Component, Translation
+from weblate.trans.models import Translation
 from weblate.utils.state import STATE_TRANSLATED
 
 CHUNK = 200
@@ -53,10 +53,10 @@ for start in range(0, len(units), CHUNK):
 units_with_terms = sum(1 for terms in matched.values() if terms)
 term_hits = sum(len(terms) for terms in matched.values())
 distinct_terms = {t.source for terms in matched.values() for t in terms}
+print(f"source-side: units with >=1 matched term: {units_with_terms}/{len(units)}")
 print(
-    f"source-side: units with >=1 matched term: {units_with_terms}/{len(units)}"
+    f"source-side: total term hits: {term_hits}, distinct terms: {len(distinct_terms)}"
 )
-print(f"source-side: total term hits: {term_hits}, distinct terms: {len(distinct_terms)}")
 
 term_unit_counts: Counter = Counter()
 for terms in matched.values():
@@ -84,11 +84,15 @@ for unit in units:
         if not re.search(
             rf"{boundary}{re.escape(expected)}{boundary}", target_text, re.IGNORECASE
         ):
-            term_miss_counts[(term.source, expected)] += 1
+            term_miss_counts[term.source, expected] += 1
             if len(misses) < 40:
-                misses.append((term.source, expected, unit.source[:80], target_text[:100]))
+                misses.append(
+                    (term.source, expected, unit.source[:80], target_text[:100])
+                )
 
-print(f"adherence: canonical-form misses: {sum(term_miss_counts.values())} term-hits across {len(term_miss_counts)} distinct terms")
+print(
+    f"adherence: canonical-form misses: {sum(term_miss_counts.values())} term-hits across {len(term_miss_counts)} distinct terms"
+)
 print()
 print("=== MISS FREQUENCY (term -> expected id form -> count) ===")
 for (src, tgt), count in term_miss_counts.most_common():

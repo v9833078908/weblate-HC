@@ -67,9 +67,9 @@ check_counts: Counter = Counter(
     .values_list("name", flat=True)
 )
 print("failing checks:", dict(check_counts.most_common()))
-for check in Check.objects.filter(
-    unit__translation=id_translation
-).exclude(dismissed=True)[:15]:
+for check in Check.objects.filter(unit__translation=id_translation).exclude(
+    dismissed=True
+)[:15]:
     print(
         f"  [{check.name}] unit={check.unit_id} SRC {check.unit.source[:60]!r} "
         f"TGT {check.unit.target[:60]!r}"

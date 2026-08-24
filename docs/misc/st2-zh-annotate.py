@@ -95,7 +95,8 @@ PRICES: dict[str, tuple[float, float]] = {}
 def load_prices() -> None:
     try:
         req = urllib.request.Request(
-            "https://openrouter.ai/api/v1/models", headers={"Accept": "application/json"}
+            "https://openrouter.ai/api/v1/models",
+            headers={"Accept": "application/json"},
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode())
@@ -112,7 +113,10 @@ def post(payload: dict[str, Any], api_key: str, timeout: int) -> dict[str, Any]:
     request = urllib.request.Request(
         API_URL,
         data=json.dumps(payload).encode(),
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -136,11 +140,15 @@ def glossary_for(source: str, terms: list[tuple[str, str]]) -> list[dict[str, st
     return [
         {"source": s, "target": t}
         for s, t in terms
-        if re.search(rf"(?<![\w\u0400-\u04ff]){re.escape(s.lower())}(?![\w\u0400-\u04ff])", low)
+        if re.search(
+            rf"(?<![\w\u0400-\u04ff]){re.escape(s.lower())}(?![\w\u0400-\u04ff])", low
+        )
     ]
 
 
-def segment(index: int, u: dict[str, Any], terms: list[tuple[str, str]]) -> dict[str, Any]:
+def segment(
+    index: int, u: dict[str, Any], terms: list[tuple[str, str]]
+) -> dict[str, Any]:
     seg: dict[str, Any] = {
         "id": index,
         "key": u.get("context", ""),
@@ -190,7 +198,9 @@ def annotate_batch(
         try:
             body = resp["choices"][0]["message"]
             content = body.get("parsed") or body.get("content")
-            segs = (json.loads(content) if isinstance(content, str) else content)["segments"]
+            segs = (json.loads(content) if isinstance(content, str) else content)[
+                "segments"
+            ]
         except (KeyError, IndexError, TypeError, json.JSONDecodeError):
             if attempt == 0:
                 continue
@@ -226,7 +236,9 @@ def main() -> None:
     result: dict[str, dict[str, str]] = {}
     total_cost = 0.0
     unparsed = 0
-    batches = [units[i : i + args.batch_size] for i in range(0, len(units), args.batch_size)]
+    batches = [
+        units[i : i + args.batch_size] for i in range(0, len(units), args.batch_size)
+    ]
     t0 = time.monotonic()
     for bi, batch in enumerate(batches):
         segs, cost = annotate_batch(args.model, batch, terms, api_key, args.timeout)
@@ -245,12 +257,16 @@ def main() -> None:
     print(file=sys.stderr)
 
     out = {"model": args.model, "unparsed": unparsed, "labels": result}
-    Path(args.out).write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+    Path(args.out).write_text(
+        json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
     from collections import Counter
 
     dist = Counter(v["severity"] for v in result.values())
     print(f"severity dist: {dict(dist)}")
-    print(f"unparsed: {unparsed}  cost: ${total_cost:.4f}  time: {time.monotonic() - t0:.1f}s")
+    print(
+        f"unparsed: {unparsed}  cost: ${total_cost:.4f}  time: {time.monotonic() - t0:.1f}s"
+    )
     print(f"saved {args.out}")
 
 

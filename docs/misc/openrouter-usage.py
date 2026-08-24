@@ -20,6 +20,15 @@ request = urllib.request.Request(
 with urllib.request.urlopen(request, timeout=30) as response:
     data = json.load(response)["data"]
 
-for field in ("label", "usage", "usage_daily", "usage_weekly", "usage_monthly", "limit", "is_free_tier", "rate_limit"):
+for field in (
+    "label",
+    "usage",
+    "usage_daily",
+    "usage_weekly",
+    "usage_monthly",
+    "limit",
+    "is_free_tier",
+    "rate_limit",
+):
     if field in data:
         print(f"{field}: {data[field]}")

@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 
 from weblate.checks.models import Check
-from weblate.glossary.models import fetch_glossary_terms, get_glossary_term_modes
 from weblate.checks.morphology import get_text_stems, iter_word_spans
+from weblate.glossary.models import fetch_glossary_terms, get_glossary_term_modes
 from weblate.trans.models import Translation
 from weblate.utils.state import STATE_TRANSLATED
 
@@ -49,11 +49,21 @@ def surfaces(term_source: str, text: str) -> list[str]:
 # Homograph surfaces verified by eye in the previous audit: the matched word
 # is NOT the glossary term. (term, surface.lower()) pairs.
 HOMOGRAPH = {
-    ("Вера", "верят"), ("Вера", "верю"), ("Вера", "верит"), ("Вера", "вере"),
-    ("Вера", "верил"), ("Вера", "верите"),
-    ("Чистые", "чистой"), ("Чистые", "чистить"), ("Чистые", "чисто"),
-    ("Чистые", "чист"), ("Чистые", "чистая"), ("Чистые", "чистыми"),
-    ("Партия", "парту"), ("Партия", "парты"), ("Партия", "партой"),
+    ("Вера", "верят"),
+    ("Вера", "верю"),
+    ("Вера", "верит"),
+    ("Вера", "вере"),
+    ("Вера", "верил"),
+    ("Вера", "верите"),
+    ("Чистые", "чистой"),
+    ("Чистые", "чистить"),
+    ("Чистые", "чисто"),
+    ("Чистые", "чист"),
+    ("Чистые", "чистая"),
+    ("Чистые", "чистыми"),
+    ("Партия", "парту"),
+    ("Партия", "парты"),
+    ("Партия", "партой"),
     ("Партия", "парте"),
     ("Устав", "устали"),
     ("Смена", "сменилась"),
@@ -88,10 +98,7 @@ for unit in units:
         ):
             continue
         defects += 1
-        print(
-            f"{unit.pk}\t{term.source}\t{term.target}\t"
-            f"{unit.source}\t{target_text}"
-        )
+        print(f"{unit.pk}\t{term.source}\t{term.target}\t{unit.source}\t{target_text}")
 print(f"total real defects: {defects}")
 print()
 print("=== CYRILLIC LEAK ===")

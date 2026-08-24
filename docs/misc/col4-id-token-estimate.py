@@ -23,8 +23,8 @@ n = len(units)
 PRICE_IN = 0.30
 PRICE_OUT = 2.50
 # rough tokens-per-byte for mixed Cyrillic source / Latin target JSON
-BYTES_PER_TOKEN_RU = 3.0   # Cyrillic ~2-3 bytes/token in UTF-8 cl100k
-BYTES_PER_TOKEN_EN = 4.0   # prompt scaffolding + id output
+BYTES_PER_TOKEN_RU = 3.0  # Cyrillic ~2-3 bytes/token in UTF-8 cl100k
+BYTES_PER_TOKEN_EN = 4.0  # prompt scaffolding + id output
 
 BATCH = 10  # batch_size default
 import math
@@ -37,9 +37,10 @@ tgt_bytes = sum(len(u.get_target_plurals()[0].encode("utf-8")) for u in units)
 avg_src = src_bytes / n
 
 # glossary volume (95 terms ru->id) sent with every batch
-gloss_tuples = list(get_glossary_tuples(units[:0]))  # noqa - need real units
+gloss_tuples = list(get_glossary_tuples(units[:0]))
 # get_glossary_tuples needs units with glossary_terms; approximate via pairs
 from weblate.trans.models import Unit
+
 gloss_pairs = Unit.objects.filter(
     translation__component__project__slug="col4",
     translation__component__is_glossary=True,
@@ -55,9 +56,14 @@ prompt_tokens = PROMPT_BYTES / BYTES_PER_TOKEN_EN
 
 # per-batch input = prompt + glossary + one previous-batch example + current batch
 prev_example_tokens = (avg_src * BATCH) / BYTES_PER_TOKEN_RU * 1.5  # src+tgt echo
-batch_input_tokens = prompt_tokens + gloss_tokens + prev_example_tokens + (avg_src * BATCH) / BYTES_PER_TOKEN_RU
+batch_input_tokens = (
+    prompt_tokens
+    + gloss_tokens
+    + prev_example_tokens
+    + (avg_src * BATCH) / BYTES_PER_TOKEN_RU
+)
 total_in_tokens = batch_input_tokens * batches
-total_out_tokens = (tgt_bytes / BYTES_PER_TOKEN_EN)
+total_out_tokens = tgt_bytes / BYTES_PER_TOKEN_EN
 
 print(f"units={n} batches={batches} (batch_size={BATCH})")
 print(f"source bytes={src_bytes} target bytes={tgt_bytes}")
@@ -67,6 +73,8 @@ print(f"total input tokens~{total_in_tokens:.0f}")
 print(f"total output tokens~{total_out_tokens:.0f}")
 cost_in = total_in_tokens / 1e6 * PRICE_IN
 cost_out = total_out_tokens / 1e6 * PRICE_OUT
-print(f"COST input  = {total_in_tokens/1e6:.3f}M tok * ${PRICE_IN} = ${cost_in:.4f}")
-print(f"COST output = {total_out_tokens/1e6:.3f}M tok * ${PRICE_OUT} = ${cost_out:.4f}")
+print(f"COST input  = {total_in_tokens / 1e6:.3f}M tok * ${PRICE_IN} = ${cost_in:.4f}")
+print(
+    f"COST output = {total_out_tokens / 1e6:.3f}M tok * ${PRICE_OUT} = ${cost_out:.4f}"
+)
 print(f"COST total  = ${cost_in + cost_out:.4f}")

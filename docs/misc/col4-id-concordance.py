@@ -6,8 +6,8 @@ from __future__ import annotations
 import re
 from collections import Counter, defaultdict
 
-from weblate.glossary.models import fetch_glossary_terms, get_glossary_term_modes
 from weblate.checks.morphology import get_text_stems, iter_word_spans
+from weblate.glossary.models import fetch_glossary_terms, get_glossary_term_modes
 from weblate.trans.models import Translation
 from weblate.utils.state import STATE_TRANSLATED
 
@@ -76,18 +76,31 @@ for unit in units:
 # Print only terms with >= 3 distinct surfaces across the whole corpus OR
 # known fragmentation risk: named entities and faction words.
 watch = [
-    "ГИГАХРУЩ", "САМОСБОР", "Ликвидатор", "Партия", "Чистые", "Ячейка",
-    "Община", "Плесень", "Настя", "Юля", "Комиссар", "Старейшина", "Курсант",
-    "Пионер", "Блок", "Смена", "Знамя", "Мутант", "Послушник", "Хриплый",
+    "ГИГАХРУЩ",
+    "САМОСБОР",
+    "Ликвидатор",
+    "Партия",
+    "Чистые",
+    "Ячейка",
+    "Община",
+    "Плесень",
+    "Настя",
+    "Юля",
+    "Комиссар",
+    "Старейшина",
+    "Курсант",
+    "Пионер",
+    "Блок",
+    "Смена",
+    "Знамя",
+    "Мутант",
+    "Послушник",
+    "Хриплый",
 ]
 for term_source in watch:
     # collect every target where the term matched, then count distinct word
     # forms within a window - too fuzzy; instead show canonical usage rate.
-    total = sum(
-        1
-        for u in units
-        if any(t.source == term_source for t in matched[u.pk])
-    )
+    total = sum(1 for u in units if any(t.source == term_source for t in matched[u.pk]))
     used = canonical_used[term_source]
     print(f"{term_source!r}: matched in {total} units, canonical id form in {used}")
 
@@ -102,8 +115,12 @@ for term_source, canonical in (("ГИГАХРУЩ", None), ("САМОСБОР", 
         # find likely renderings: uppercase words and words containing the stem
         for word in re.findall(r"[A-Za-z][A-Za-z-]+", target_text):
             wl = word.lower()
-            if term_source == "ГИГАХРУЩ" and ("giga" in wl or "khrushch" in wl or "gigakhr" in wl):
+            if term_source == "ГИГАХРУЩ" and (
+                "giga" in wl or "khrushch" in wl or "gigakhr" in wl
+            ):
                 forms[word] += 1
-            if term_source == "САМОСБОР" and ("swakit" in wl or "samosbor" in wl or "swa" in wl):
+            if term_source == "САМОСБОР" and (
+                "swakit" in wl or "samosbor" in wl or "swa" in wl
+            ):
                 forms[word] += 1
     print(f"{term_source!r}: {dict(forms.most_common())}")
