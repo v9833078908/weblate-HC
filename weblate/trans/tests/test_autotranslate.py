@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import re
 import threading
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
@@ -16,6 +17,7 @@ from django.core.cache import cache
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import SimpleTestCase
+from django.template.loader import render_to_string
 from django.test.utils import override_settings
 from django.urls import reverse
 
@@ -1555,3 +1557,34 @@ class PersistentTaskProgressTest(ViewTestCase):
             cache.set(key, tasks, 60)
 
             self.assertEqual(get_user_tasks(self.user.id), [])
+
+
+
+def max_form_depth(html: str) -> int:
+    depth = 0
+    peak = 0
+    for match in re.finditer(r"<(/?)form\b", html, re.IGNORECASE):
+        if match.group(1):
+            depth -= 1
+        else:
+            depth += 1
+            peak = max(peak, depth)
+    return peak
+
+
+class AutoFormRenderingTest(ViewTestCase):
+    def test_autoform_does_not_nest_forms(self) -> None:
+        html = render_to_string(
+            "snippets/autoform.html",
+            {
+                "autoform": AutoForm(self.component, self.user),
+                "object": self.translation,
+            },
+        )
+
+        self.assertIn('data-persist="auto-translation"', html)
+        self.assertLessEqual(
+            max_form_depth(html),
+            1,
+            "crispy rendered a nested <form>; the Apply button falls outside it",
+        )

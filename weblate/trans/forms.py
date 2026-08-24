@@ -1350,6 +1350,7 @@ class AutoForm(forms.Form):
         self.fields["mode"].choices = choices
 
         self.helper = FormHelper(self)
+        self.helper.form_tag = False
         self.helper.layout = Layout(
             Field("mode"),
             SearchField("q"),
