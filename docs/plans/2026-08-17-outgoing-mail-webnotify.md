@@ -1,4 +1,4 @@
-# План: исходящая почта прода через webnotify@herocraft.com
+# План: исходящая почта прода через <webnotify@herocraft.com>
 
 > **Статус:** выполнен 2026-08-17. Прод отправляет через
 > `smtp.yandex.ru:465` (`From: Hero Craft Localization
@@ -119,7 +119,7 @@ B64=$(base64 < /tmp/script.py | tr -d '\n')
 
 ### 1. Правка `/srv/hcgameloc/deploy/.env` (только на сервере, в git не входит)
 
-```
+```text
 WEBLATE_EMAIL_HOST=smtp.yandex.ru
 WEBLATE_EMAIL_PORT=465
 WEBLATE_EMAIL_USE_SSL=1

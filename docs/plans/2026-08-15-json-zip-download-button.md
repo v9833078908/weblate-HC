@@ -107,6 +107,6 @@ class DownloadMonoComponentTest(ViewTestCase):
 
 ## Коммит
 
-```
+```text
 feat(trans): offer JSON download in component Files menu
 ```

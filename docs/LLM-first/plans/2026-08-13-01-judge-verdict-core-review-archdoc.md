@@ -97,6 +97,7 @@ All citations are `path:line` with verbatim quotes.
 ### 1.4 Severity Scale and Verdict Semantics (UI design.md:3)
 
 18. **Severity-to-state mapping.** `2026-08-13-judge-native-ui-design.md:537-549`
+    >
     > | Вердикт | Состояние | Отгружается | Механизм |
     > |---|---|---|---|
     > | pass | 30 approved | да | авто-одобрение судьёй |
@@ -360,6 +361,7 @@ design, not the architecture, on these 8 points:
 > штатное «одобрено» с фактом «LLM-проверка пройдена».
 >
 > До реализации плана 1 нужно отдельно проверить и зафиксировать:
+>
 > 1. запускается ли первый тир с `translation_review=False`; если нет —
 >    каким механизмом убирается или заменяется штатная очередь
 >    `unapproved`;
@@ -456,6 +458,7 @@ doesn't define the character set.
 **Judge checks excluded from the `unit.all_checks` card.** `2026-08-13-judge-native-ui-design.md:342-348`
 > судейские `Check`-строки **исключаются из карточки «Things to
 > check»** и живут только как проекция для навигации. Точки касания:
+>
 > - `translate.html:619` — итерировать отфильтрованный список
 > - `translate.html:593` — условие показа карточки, иначе она
 >   отрендерится пустой при единственном судейском чеке
@@ -513,6 +516,7 @@ doesn't define the character set.
 ### 6.7 Release Readiness Banner
 
 **Exact layout specified.** `2026-08-13-judge-native-ui-design.md:466-481`
+>
 > ```text
 > ┌ Готовность к сборке ────────────────────────────────┐
 > │ 76 из 82 строк уйдут в сборку                       │

@@ -210,7 +210,7 @@ Every number carries `path:line` and verbatim source text.
 
 `docs/LLM-first/2026-08-18-severity-recalibration-measurements.md:107-116`
 
-```
+```text
 truth\judge   none  minor  major  crit
 none          315    13     62     25
 minor          57     2     15     11
@@ -273,7 +273,7 @@ critical        1     1      5     28
 
 `docs/LLM-first/2026-08-19-severity-recalibration-final.md:108-111`
 
-```
+```text
 A:  none 315/13/62/25   minor 57/2/15/11   major 29/1/32/23   crit 1/1/5/28
 B:  none 314/30/52/19   minor 56/2/17/10   major 24/6/38/17   crit 4/4/16/11
 C:  none 321/25/43/26   minor 58/1/20/6    major 21/3/32/29   crit 4/3/5/23
@@ -620,6 +620,7 @@ The `context_hash` mechanism (`judge-verdict-core.md:376-385`) is designed to in
 ### 5.2 Severity → Verdict Mapping (in Code)
 
 `docs/LLM-first/plans/2026-08-13-01-judge-verdict-core.md:613-619`:
+
 ```python
 _SEVERITY_VERDICT = {
     "none": JudgeVerdict.Verdict.PASS,
@@ -632,6 +633,7 @@ _SEVERITY_VERDICT = {
 ### 5.3 Verdict → State Mapping
 
 `docs/LLM-first/plans/2026-08-13-01-judge-verdict-core.md:636-649`:
+
 - PASS + enable_review → STATE_APPROVED (state 30)
 - PASS without review → STATE_TRANSLATED (state 20)
 - FLAG → STATE_TRANSLATED (state 20) — "строка всё равно отгружается"

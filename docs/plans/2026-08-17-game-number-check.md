@@ -77,6 +77,7 @@ export DJANGO_SETTINGS_MODULE=weblate.settings_test
 ## Task 1: The check
 
 **Files:**
+
 - Modify: `weblate_customization/src/weblate_customization/checks.py:12-25` (imports and shared regex)
 - Modify: `weblate_customization/src/weblate_customization/checks.py:71-78` (`_tokens` reads the hoisted constant)
 - Modify: `weblate_customization/src/weblate_customization/checks.py:146` (append the new class at end of file)
@@ -327,6 +328,7 @@ Unit tests prove the rule. This task proves the **rate**: that turning the
 check on does not bury the producer in false positives. Read-only, no writes.
 
 **Files:**
+
 - Create: `docs/misc/game-number-probe.py`
 
 ### Step 1: Write the probe
@@ -441,6 +443,7 @@ Registration is two text edits. It takes effect only when the container is
 recreated, which is Task 6.
 
 **Files:**
+
 - Modify: `dev-docker/docker-compose.yml:63`
 - Modify: `deploy/environment.example:94`
 
@@ -483,6 +486,7 @@ git commit -m "chore(checks): register GameNumberCheck in both environments"
 ## Task 4: Documentation
 
 **Files:**
+
 - Modify: `docs/changes.rst` (after line 26, inside the `2026.8.1` Improvements block)
 - Modify: `AGENTS.md:177-186` and `AGENTS.md:342-343`
 - Modify: `docs/specs/producer-guide.md:408` (add a table row)

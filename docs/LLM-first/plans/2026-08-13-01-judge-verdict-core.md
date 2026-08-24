@@ -2189,7 +2189,7 @@ Create `weblate/trans/tests/test_judge_views.py`. Точный URL автопе�
         self.assertContains(response, "id_auto_row_count")
 ```
 
-### Step 2: Прогнать — FAIL.
+### Step 2: Прогнать — FAIL
 
 ### Step 3: Пробросить режим и права
 
@@ -2218,7 +2218,7 @@ Create `weblate/trans/tests/test_judge_views.py`. Точный URL автопе�
 `approved` с широким `q` перезапишет одобренные судьёй строки. Фильтр `has:judge` появится
 в плане 2; здесь — текст, не механизм.
 
-### Step 5: Прогнать тесты — PASS.
+### Step 5: Прогнать тесты — PASS
 
 ### Step 6: Прогнать смежный суит
 
@@ -2285,7 +2285,7 @@ git commit -m "feat(judge): wire the judge mode through Celery, the view, and a 
 
 `make_reject` — хелпер: создать critical-вердикт и вызвать `unit.run_checks()`.
 
-### Step 2: Прогнать — FAIL на первом, четвёртом, пятом.
+### Step 2: Прогнать — FAIL на первом, четвёртом, пятом
 
 ### Step 3: Реализовать
 
@@ -2320,7 +2320,7 @@ git commit -m "feat(judge): wire the judge mode through Celery, the view, and a 
 `dismissed` инертен — `active_verdict`/`describe_latest_verdict` читают вердикты, не
 `Check.dismissed`, а карточка исключает судейские из цикла. Отдельного механизма не нужно.
 
-### Step 4: Прогнать — PASS.
+### Step 4: Прогнать — PASS
 
 ### Step 5: Убедиться, что тест на пустую карточку ловит баг
 
@@ -2389,7 +2389,7 @@ git commit -m "feat(judge): keep judge verdicts out of the deterministic card an
         self.assertNotContains(response, "id_judge_card")
 ```
 
-### Step 2: Прогнать — FAIL.
+### Step 2: Прогнать — FAIL
 
 ### Step 3: Реализовать
 
@@ -2410,7 +2410,7 @@ git commit -m "feat(judge): keep judge verdicts out of the deterministic card an
 Оформление: не переиспользуй красный `alert.svg`. По `ACCESSIBILITY.md` состояние не
 кодируется только цветом — рядом текст/иконка; карточка достижима с клавиатуры.
 
-### Step 4: Прогнать — PASS.
+### Step 4: Прогнать — PASS
 
 ### Step 5: Смоук в браузере
 
@@ -2470,7 +2470,7 @@ git commit -m "feat(judge): show the verdict card on the unit page"
         self.assertContains(response, "Visible anyway")
 ```
 
-### Step 2: Прогнать — FAIL.
+### Step 2: Прогнать — FAIL
 
 ### Step 3: Реализовать
 
@@ -2479,7 +2479,7 @@ git commit -m "feat(judge): show the verdict card on the unit page"
 `judge_verdict.back_translation` только когда вердикт активен (не протух) и текст непустой.
 Слот выглядит как сосед `secondary` — «та же строка в другом рендере для справки».
 
-### Step 4: Прогнать — PASS (4 теста).
+### Step 4: Прогнать — PASS (4 теста)
 
 ### Step 5: Коммит
 

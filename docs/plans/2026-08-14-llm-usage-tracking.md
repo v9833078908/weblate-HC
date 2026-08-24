@@ -17,9 +17,10 @@ RoutedLLM, тест `usage` без поля `cost`).
 
 ---
 
-### Task 1: Модель `LLMUsageLog`
+## Task 1: Модель `LLMUsageLog`
 
 **Files:**
+
 - Create: `weblate/trans/models/llm_usage.py`
 - Modify: `weblate/trans/models/__init__.py:34` (импорт после `loc_kit`, перед `pending`)
 - Create: `weblate/trans/migrations/0100_llmusagelog.py` (генерируется)
@@ -147,6 +148,7 @@ git commit -m "feat(trans): add LLMUsageLog model for token and cost accounting"
 Смысл: для site-wide конфигурации `settings["_project"]` нет; проект батча известен в `_fetch_llm_batch`/`_afetch_llm_batch`, где лежат `sources` с юнитами. `ContextVar` корректно изолирует конкурентные батчи (`batch_concurrency=2`). Прецедент в коде: `ContextVar` в `weblate_customization/machinery.py:11`.
 
 **Files:**
+
 - Modify: `weblate/machinery/llm.py:2715` (`_fetch_llm_batch`) и `:2825` (`_afetch_llm_batch`)
 
 **Step 1: Add the ContextVar and helper**
@@ -214,6 +216,7 @@ git commit -m "feat(machinery): expose current batch project via context var"
 ### Task 3: Захват `usage` в шве openai.py
 
 **Files:**
+
 - Modify: `weblate/machinery/openai.py:86-110` (`fetch_llm_translations`, `afetch_llm_translations`)
 - Test: `weblate/machinery/tests.py` (класс `OpenAITranslationTest`, после `test_async_translate`)
 
@@ -338,6 +341,7 @@ Expected: FAIL (`AttributeError: ... no attribute 'record_llm_usage'` нет, н
 **Step 3: Implement the seam**
 
 В `weblate/machinery/openai.py`:
+
 - импорты: `from decimal import Decimal`, `from typing import Any` (расширить `from typing import ClassVar`), `from asgiref.sync import sync_to_async`; в существующий `from .llm import BaseLLMTranslation` добавить `llm_batch_project`.
 - заменить оба метода и добавить новый:
 
@@ -441,6 +445,7 @@ git commit -m "feat(machinery): record OpenRouter token usage and cost per reque
 Смысл: `RoutedLLMTranslation` сегодня наследует `fetch_llm_translations` чисто (проверено grep - не переопределяет). Будущий рефакторинг с переопределением сломал бы учёт молча; тест фиксирует контракт.
 
 **Files:**
+
 - Modify: `weblate_customization/tests/test_machinery.py` (класс `RoutedDownloadTest`)
 
 **Step 1: Write the failing-then-passing test**
@@ -482,6 +487,7 @@ git commit -m "test(customization): pin usage recording through the inherited se
 ### Task 5: Команда `llm_usage_report`
 
 **Files:**
+
 - Create: `weblate/trans/management/commands/llm_usage_report.py`
 - Test: `weblate/trans/tests/test_llm_usage.py` (добавить класс)
 
@@ -666,6 +672,7 @@ git commit -m "feat(trans): add llm_usage_report management command"
 ### Task 6: Changelog, lint, типы, полный прогон
 
 **Files:**
+
 - Modify: `docs/changes.rst` (текущая нерелизнутая секция, верх файла)
 
 **Step 1: Changelog**

@@ -1,17 +1,18 @@
 # Conditional game DSL syntax protection implementation plan
 
 **Goal:** Prevent French punctuation spacing and machine-translation cleanup from
-altering Hero Craft conditional-DSL syntax, without treating the translated
-display text inside a conditional as an immutable placeholder.
+altering Hero Craft conditional-DSL syntax and confirmed placeholder separators,
+without treating the translated display text inside a conditional as an immutable
+placeholder.
 
 **Architecture:** Add a linear, Hero-Craft-specific conditional-DSL syntax scanner
 in ``weblate_customization.checks``. It emits only immutable syntax spans:
-conditional headers and operators, nested brace placeholders, and structural
-delimiters. Text rendered in a conditional branch remains outside every span and
-may be translated. ``GameMarkupCheck.check_highlight()`` exposes these spans as
-``syntax`` highlights, which makes the existing shared highlight consumers,
-including ``AddFrenchPunctuationSpacing`` and LLM cleanup, leave DSL syntax
-unchanged.
+conditional headers and operators, nested brace placeholders, structural
+delimiters, and a colon directly between two adjacent engine placeholders. Text
+rendered in a conditional branch remains outside every span and may be translated.
+``GameMarkupCheck.check_highlight()`` exposes these spans as ``syntax`` highlights,
+which makes the existing shared highlight consumers, including
+``AddFrenchPunctuationSpacing`` and LLM cleanup, leave DSL syntax unchanged.
 
 The generic ``weblate.trans.protected_tokens`` helpers keep their current flat
 placeholder contract. In particular, this work must not redefine
@@ -83,13 +84,17 @@ Assert all of the following:
 1. The scanner protects the conditional header, comparison, ``?``, ``|``,
    opening and closing structural braces, and every nested ``{...}``
    placeholder in ``AMOUNT_FORMATTED`` and ``TIMER``.
-2. It does **not** protect ``h.`` / ``m.`` / ``s.`` in ``HUMAN_TIMER_EN`` or
+2. It protects the ``:`` in the exact adjacent-placeholder form
+   ``{minutes:00}:{seconds:00}``, but does not treat arbitrary punctuation near
+   a placeholder as syntax.
+3. It does **not** protect ``h.`` / ``m.`` / ``s.`` in ``HUMAN_TIMER_EN`` or
    ``Std.`` / ``Min.`` / ``Sek.`` in ``HUMAN_TIMER_DE``.
-3. Concatenated conditionals remain separate and source ordered.
-4. A malformed or unclosed outer brace produces no partial conditional span
-   and completes in linear time. Test ``"{" * 100_000`` with a deliberately
-   generous one-second ceiling.
-5. Existing simple placeholders, Unity tags, percent keys, and printf tokens
+4. Concatenated conditionals remain separate and source ordered.
+5. A malformed, otherwise conditional-looking outer block with its closing
+   brace removed returns no partial conditional spans. ``"{" * 100_000`` also
+   returns no spans without recursion or a timing assertion that flakes on the
+   shared dev container.
+6. Existing simple placeholders, Unity tags, percent keys, and printf tokens
    retain their present ``GameMarkupCheck`` behavior. This helper is additive;
    it does not replace ``placeholder_sequence()`` or ``markup_tokens()``.
 
@@ -114,10 +119,13 @@ In ``weblate_customization/src/weblate_customization/checks.py``:
    ```text
    {identifier:cond:comparison?branch[|alternate]}
    ```
-
    ``identifier``, ``:cond:``, the comparison, ``?``, the optional ``|``, and
    structural braces are syntax. A nested ``{...}`` is an opaque syntax
    placeholder. Everything else in a branch is visible, translatable text.
+   Also recognise ``:`` only when it sits directly between two complete,
+   adjacent engine placeholders, as in ``{minutes:00}:{seconds:00}``.
+   Whitespace, arbitrary punctuation, and ordinary text next to a placeholder
+   are not syntax.
 3. Return only non-empty source ranges. The ranges may be adjacent but must
    not overlap. Do not emit a whole outer block.
 4. Return no conditional spans for malformed input. Leave existing generic
@@ -166,8 +174,9 @@ Add tests that exercise the registered highlight path, not only the scanner:
 
    The autofix may add ``U+00A0`` before the visible ``Montant:`` colon, but
    must leave every byte of ``AMOUNT_FORMATTED`` unchanged.
-5. Add a ``TIMER``-only target test. The autofix must make no change inside
-   its DSL punctuation.
+5. With both source and target equal to ``TIMER``, the autofix returns
+   ``([TIMER], False)``. It must not insert ``U+00A0`` before the literal
+   separator in ``{minutes:00}:{seconds:00}``.
 
 Run:
 
@@ -180,12 +189,18 @@ Expected: FAIL because ``GameMarkupCheck`` currently supplies no highlights.
 
 ### Step 2: Implement ``GameMarkupCheck.check_highlight``
 
-Import ``Highlight`` from ``weblate.checks.base`` and combine:
+Import ``Highlight`` from ``weblate.checks.base``.
+Scan the ``source`` argument passed to ``check_highlight()``, not
+``unit.source``. ``highlight_string(target, unit)`` passes the current target
+to the check during the French autofix, so its protected ranges must be indexed
+against that target string.
+Combine:
 
 - existing Unity markup spans as ``kind="markup"``;
 - existing simple brace, percent-key, and printf placeholders as
   ``kind="syntax"``;
-- ``conditional_dsl_syntax_spans(source)`` as ``kind="syntax"``.
+- ``conditional_dsl_syntax_spans(source)``, including a ``:`` directly between
+  two complete adjacent engine placeholders, as ``kind="syntax"``.
 
 Deduplicate and sort spans before constructing ``Highlight`` instances so the
 shared ``merge_highlight_spans()`` receives stable, non-overlapping intervals.
@@ -226,15 +241,19 @@ This locks down the essential boundary: spreadsheet validation continues to use
 the existing ``placeholder_sequence()`` comparison and does not reject
 translated conditional branch text.
 
-### Step 2: Add an LLM cleanup regression
+### Step 2: Add LLM cleanup regressions
 
-Using the existing deterministic LLM test machinery, create a unit containing
-``AMOUNT_FORMATTED`` alongside visible text. Assert that cleanup replaces every
-conditional syntax highlight with an opaque placeholder and restores the exact
-source after uncleanup. Assert that every emitted structured placeholder part
-is ``kind="syntax"`` and ``translatable=False``.
+Using the existing deterministic LLM test machinery, add two mocked round trips
+that make no network request:
 
-This test must not make a network request.
+1. A unit containing ``AMOUNT_FORMATTED`` alongside visible text. Assert that
+   every conditional syntax highlight becomes an opaque structured placeholder
+   with ``kind="syntax"`` and ``translatable=False``, and that the final output
+   restores the exact source syntax.
+2. ``HUMAN_TIMER_EN`` with a structured German response that changes only the
+   branch text to ``Std.``, ``Min.``, and ``Sek.``. Assert that the final target
+   is ``HUMAN_TIMER_DE``: syntax remains exact and ordered, while all three
+   branch strings travel as ordinary translatable text parts.
 
 ### Step 3: Run cross-subsystem tests
 
