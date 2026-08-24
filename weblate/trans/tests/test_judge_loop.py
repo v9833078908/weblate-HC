@@ -48,6 +48,17 @@ CRITICAL = result("critical", "reject")
 DEAD = JudgeResult("none", "", [], "", unparsed=True)
 
 
+def mock_request_verdicts(batches):
+    results = iter(batches)
+
+    def request(requests, *, on_batch, **kwargs):
+        batch_results = next(results)
+        on_batch(requests, batch_results)
+        return batch_results
+
+    return mock.Mock(side_effect=request)
+
+
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_OPENROUTER_KEY="sk-test",
@@ -58,7 +69,7 @@ DEAD = JudgeResult("none", "", [], "", unparsed=True)
 class JudgeLoopTest(ViewTestCase):
     def run_batch(self, seat_results, repair=None, writable=True):
         # seat_results: list of results, consumed in order, one per call.
-        client = mock.Mock(side_effect=[[r] for r in seat_results])
+        client = mock_request_verdicts([[result] for result in seat_results])
         unit = self.get_unit()
         writable_ids = {unit.id} if writable else set()
         with (
@@ -191,7 +202,7 @@ class JudgeLoopTest(ViewTestCase):
                     glossary_terms=old_request.glossary_terms,
                 ),
             )
-        client = mock.Mock(side_effect=[[DEAD], [DEAD]])
+        client = mock_request_verdicts([[DEAD], [DEAD]])
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
             mock.patch("weblate.trans.judge_loop._cached_verdict", return_value=None),
@@ -250,7 +261,7 @@ class JudgeLoopTest(ViewTestCase):
     def test_repair_is_rolled_back_when_it_adds_a_deterministic_check(self) -> None:
         unit = self.get_unit()
         original = unit.target
-        client = mock.Mock(side_effect=[[CRITICAL], [CRITICAL]])
+        client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
             mock.patch(
@@ -284,7 +295,9 @@ class JudgeLoopTest(ViewTestCase):
             seen.append({c.name for c in unit.all_checks})
             return ["fixed text"]
 
-        client = mock.Mock(side_effect=[[r] for r in (CRITICAL, CRITICAL, PASS, PASS)])
+        client = mock_request_verdicts(
+            [[result] for result in (CRITICAL, CRITICAL, PASS, PASS)]
+        )
         unit = self.get_unit()
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
@@ -331,3 +344,37 @@ class JudgeLoopTest(ViewTestCase):
         unit.clear_checks_cache()
         self.assertIn("judge-flag", unit.all_checks_names)
         self.assertNotIn("judge-flag", build_request(unit).failing_checks)
+
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class JudgeIncrementalPersistenceTest(ViewTestCase):
+    def test_completed_request_batches_survive_a_mid_seat_crash(self) -> None:
+        units = list(self.get_translation().unit_set.order_by("pk")[:2])
+        self.assertEqual(len(units), 2)
+
+        def crash(requests, *, on_batch=None, **kwargs):
+            if on_batch is not None:
+                on_batch(requests[:1], [PASS])
+                on_batch(requests[1:], [PASS])
+            raise RuntimeError("simulated worker loss")
+
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", side_effect=crash),
+            self.assertRaisesRegex(RuntimeError, "simulated worker loss"),
+        ):
+            run_judge_batch(
+                units,
+                writable_ids={unit.id for unit in units},
+                user=self.user,
+            )
+
+        self.assertEqual(
+            JudgeVerdict.objects.filter(unit__in=units, seat=1).count(),
+            2,
+        )

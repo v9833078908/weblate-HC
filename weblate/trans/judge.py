@@ -19,12 +19,13 @@ import json
 import logging
 import re
 import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from importlib import resources
 from itertools import starmap
 from secrets import token_hex
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from django.conf import settings
 from django.utils.translation import gettext as _
@@ -33,8 +34,6 @@ from weblate.trans.models.judge import SEVERITY_RANK
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.requests import stream_validated_url
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 JUDGE_REQUEST_TIMEOUT = 120
@@ -130,6 +129,8 @@ class JudgeResult:
 UNPARSED = JudgeResult(
     max_severity="none", model_verdict="", errors=[], back_translation="", unparsed=True
 )
+
+type OnBatch = Callable[[Sequence[JudgeRequest], Sequence[JudgeResult]], None]
 
 
 def render_preview(text: str) -> str | None:
@@ -430,6 +431,7 @@ def request_verdicts(
     model: str,
     project_slug: str = "",
     project_context: str = "",
+    on_batch: OnBatch | None = None,
 ) -> list[JudgeResult]:
     """
     Judge every request; results in input order.
@@ -545,7 +547,10 @@ def request_verdicts(
                 time.sleep(sleep * 2 + 1.0)
                 continue
             break
-        results.extend(parsed if parsed is not None else [UNPARSED] * len(batch))
+        batch_results = parsed if parsed is not None else [UNPARSED] * len(batch)
+        results.extend(batch_results)
+        if on_batch is not None:
+            on_batch(batch, batch_results)
         if position < len(batches) - 1 and sleep:
             time.sleep(sleep)
     return results

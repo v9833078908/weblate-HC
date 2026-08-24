@@ -30,7 +30,7 @@ from weblate.utils.state import FUZZY_STATES, STATE_FUZZY, STATE_TRANSLATED
 )
 class JudgeAutoTranslateTest(ViewTestCase):
     def perform(self, verdict_kind, *, severity="none", q="", overwrite=False):
-        def fake_batch(units, *, writable_ids, user):
+        def fake_batch(units, *, writable_ids, user, on_batch=None):
             out = {}
             for u in units:
                 request = build_request(u)
@@ -181,7 +181,14 @@ class JudgeAutoTranslateTest(ViewTestCase):
         )
         major = JudgeResult("major", "flag", [], "")
         passed = JudgeResult("none", "pass", [], "")
-        client = mock.Mock(side_effect=[[major], [major], [passed], [passed]])
+        results = iter([[major], [major], [passed], [passed]])
+
+        def request(requests, *, on_batch, **kwargs):
+            batch_results = next(results)
+            on_batch(requests, batch_results)
+            return batch_results
+
+        client = mock.Mock(side_effect=request)
         with (
             mock.patch.object(auto, "process_mt"),
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
@@ -210,7 +217,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             unit_ids=[unit.id],
         )
 
-        def fake_batch(units, *, writable_ids, user):
+        def fake_batch(units, *, writable_ids, user, on_batch=None):
             current = units[0]
             request = build_request(current)
             verdict = JudgeVerdict.objects.create(

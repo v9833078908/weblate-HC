@@ -29,6 +29,7 @@ from weblate.glossary.models import get_glossary_terms
 from weblate.machinery.models import MACHINERY
 from weblate.trans.forms import AutoForm
 from weblate.trans.judge import (
+    OnBatch,
     JudgeRequest,
     request_verdicts,
     validate_judge_configuration,
@@ -324,7 +325,11 @@ def _process_round_unit(
 
 
 def run_judge_batch(
-    units: list[Unit], *, writable_ids: set[int], user: User | None
+    units: list[Unit],
+    *,
+    writable_ids: set[int],
+    user: User | None,
+    on_batch: OnBatch | None = None,
 ) -> dict[int, JudgeVerdict]:
     """
     Judge every unit with both seats; repair writable defects.
@@ -394,17 +399,38 @@ def run_judge_batch(
             if not request_units:
                 continue
             requests = [round_requests[unit.id] for unit in request_units]
-            results = request_verdicts(
+            cursor = 0
+
+            def persist(batch_requests, batch_results) -> None:
+                nonlocal cursor
+                batch_units = request_units[cursor : cursor + len(batch_requests)]
+                cursor += len(batch_requests)
+                with transaction.atomic():
+                    for unit, request, result in zip(
+                        batch_units,
+                        batch_requests,
+                        batch_results,
+                        strict=True,
+                    ):
+                        _write_verdict(
+                            unit,
+                            request,
+                            seat,
+                            attempt,
+                            run_id,
+                            result,
+                            model,
+                        )
+                if on_batch is not None:
+                    on_batch(batch_requests, batch_results)
+
+            request_verdicts(
                 requests,
                 model=model,
                 project_slug=project_slug,
                 project_context=project_context,
+                on_batch=persist,
             )
-            with transaction.atomic():
-                for unit, request, result in zip(
-                    request_units, requests, results, strict=True
-                ):
-                    _write_verdict(unit, request, seat, attempt, run_id, result, model)
             LOGGER.info(
                 "judge run %s: seat %d done, %d strings judged with %s",
                 run_id,

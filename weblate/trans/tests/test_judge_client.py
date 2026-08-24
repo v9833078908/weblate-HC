@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import time
+from dataclasses import replace
 from typing import Any
 from unittest import mock
 
@@ -455,6 +456,86 @@ class JudgeRequestDeadlineTest(TestCase):
         [result] = request_verdicts([REQ], model="vendor/model-a")
 
         self.assertFalse(result.unparsed)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_REQUEST_SLEEP=0.0,
+)
+class JudgeOnBatchTest(SimpleTestCase):
+    @override_settings(JUDGE_BATCH_SIZE=1)
+    @http_mock.activate
+    def test_is_called_once_per_completed_batch_in_input_order(self) -> None:
+        requests = [replace(REQ, unit_key=str(index)) for index in range(3)]
+        for _ in requests:
+            http_mock.register(
+                "POST",
+                CHAT_URL,
+                json=_reply(
+                    [
+                        {
+                            "id": 0,
+                            "verdict": "pass",
+                            "errors": [],
+                            "back_translation": "",
+                        }
+                    ]
+                ),
+            )
+        seen: list[tuple[list[str], int]] = []
+
+        request_verdicts(
+            requests,
+            model="vendor/model-a",
+            on_batch=lambda batch_requests, batch_results: seen.append(
+                ([request.unit_key for request in batch_requests], len(batch_results))
+            ),
+        )
+
+        self.assertEqual(seen, [(["0"], 1), (["1"], 1), (["2"], 1)])
+
+    @override_settings(JUDGE_BATCH_SIZE=5)
+    @mock.patch("weblate.trans.judge.time.sleep")
+    @http_mock.activate
+    def test_retry_is_one_completed_batch(self, sleep) -> None:
+        http_mock.register("POST", CHAT_URL, status_code=429, json={})
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        seen: list[int] = []
+
+        request_verdicts(
+            [REQ],
+            model="vendor/model-a",
+            on_batch=lambda _requests, results: seen.append(len(results)),
+        )
+
+        self.assertEqual(len(http_mock.calls), 2)
+        self.assertEqual(seen, [1])
+        sleep.assert_called_once()
+
+    @override_settings(JUDGE_BATCH_SIZE=5)
+    @http_mock.activate
+    def test_unparsed_batch_still_calls_callback(self) -> None:
+        http_mock.register("POST", CHAT_URL, status_code=500, json={})
+        seen = []
+
+        request_verdicts(
+            [REQ],
+            model="vendor/model-a",
+            on_batch=lambda batch_requests, results: seen.append(
+                (batch_requests, results)
+            ),
+        )
+
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(seen[0][0], [REQ])
+        self.assertTrue(seen[0][1][0].unparsed)
 
 
 class JudgeUsageLogTest(TestCase):
