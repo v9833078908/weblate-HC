@@ -19,6 +19,7 @@ import json
 import logging
 import re
 import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from importlib import resources
@@ -31,13 +32,16 @@ from django.utils.translation import gettext as _
 
 from weblate.trans.models.judge import SEVERITY_RANK
 from weblate.trans.models.llm_usage import LLMUsageLog
-from weblate.utils.requests import fetch_validated_url
+from weblate.utils.requests import stream_validated_url
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    import httpx2
 
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 JUDGE_REQUEST_TIMEOUT = 120
+JUDGE_SEATS = (1, 2)
+# A verdict batch reply is kilobytes; this only bounds a broken peer.
+MAX_BATCH_RESPONSE_BYTES = 8 * 1024 * 1024
 # Measured category set (st2-zh-recalibration.py:59-68).
 CATEGORIES = (
     "terminology",
@@ -82,8 +86,8 @@ def judge_configuration_ready() -> bool:
     )
 
 
-def validate_judge_configuration() -> None:
-    """Fail before any paid request when the two-seat judge is incomplete."""
+def validate_request_settings() -> None:
+    """Fail before any paid request when a shared judge setting is unusable."""
     if not settings.JUDGE_ENABLED:
         raise JudgeError(_("The LLM judge is disabled."))
     if not (
@@ -91,6 +95,20 @@ def validate_judge_configuration() -> None:
         and settings.JUDGE_OPENROUTER_KEY.strip()
     ):
         raise JudgeError(_("The LLM judge is not configured."))
+    if not (
+        isinstance(settings.JUDGE_REQUEST_DEADLINE, (int, float))
+        and settings.JUDGE_REQUEST_DEADLINE > 0
+    ):
+        raise JudgeError(_("The LLM judge is not configured."))
+    if not isinstance(settings.JUDGE_BATCH_SIZE, int) or settings.JUDGE_BATCH_SIZE < 1:
+        # A zero step raises from range(); a negative one silently yields no
+        # batch at all, which would report a successful run that judged nothing.
+        raise JudgeError(_("The LLM judge is not configured."))
+
+
+def validate_judge_configuration() -> None:
+    """Fail before any paid request when the two-seat judge is incomplete."""
+    validate_request_settings()
     if not (
         isinstance(settings.JUDGE_MODEL_SEAT_1, str)
         and settings.JUDGE_MODEL_SEAT_1.strip()
@@ -125,6 +143,8 @@ class JudgeResult:
 UNPARSED = JudgeResult(
     max_severity="none", model_verdict="", errors=[], back_translation="", unparsed=True
 )
+
+type OnBatch = Callable[[Sequence[JudgeRequest], Sequence[JudgeResult]], None]
 
 
 def render_preview(text: str) -> str | None:
@@ -379,10 +399,39 @@ def _parse_reply(payload: dict, size: int) -> list[JudgeResult] | None:
     return cast("list[JudgeResult]", results)
 
 
+def _read_batch_response(
+    response: httpx2.Response, *, model: str, started: float
+) -> bytearray | None:
+    """Read a response body under the caller's absolute deadline and size cap."""
+    deadline = started + settings.JUDGE_REQUEST_DEADLINE
+    buffer = bytearray()
+    for chunk in response.iter_bytes():
+        if time.monotonic() > deadline:
+            LOGGER.warning(
+                "judge batch deadline exceeded: model=%s elapsed=%dms",
+                model,
+                int((time.monotonic() - started) * 1000),
+            )
+            return None
+        if len(buffer) + len(chunk) > MAX_BATCH_RESPONSE_BYTES:
+            # A verdict batch is a few kilobytes. Anything larger is a broken
+            # or hostile peer, and the deadline alone would let it fill memory.
+            # Checked before the append so an oversized chunk is never stored.
+            LOGGER.warning(
+                "judge batch response too large: model=%s bytes=%d",
+                model,
+                len(buffer) + len(chunk),
+            )
+            return None
+        buffer.extend(chunk)
+    return buffer
+
+
 def _post_batch(payload: dict, model: str) -> _BatchResponse:
     """One POST, preserving HTTP status for retry decisions."""
+    started = time.monotonic()
     try:
-        response = fetch_validated_url(
+        with stream_validated_url(
             "POST",
             OPENROUTER_CHAT_COMPLETIONS_URL,
             # Built inline so the bearer token is never bound to a frame
@@ -393,13 +442,15 @@ def _post_batch(payload: dict, model: str) -> _BatchResponse:
             },
             json=payload,
             timeout=JUDGE_REQUEST_TIMEOUT,
-            raise_for_status=False,
             follow_redirects=False,
-        )
+        ) as response:
+            buffer = _read_batch_response(response, model=model, started=started)
     except Exception:
         return _BatchResponse(None, None)
+    if buffer is None:
+        return _BatchResponse(None, None)
     try:
-        body = response.json()
+        body = json.loads(buffer)
     except Exception:
         body = None
     return _BatchResponse(
@@ -414,23 +465,19 @@ def request_verdicts(
     model: str,
     project_slug: str = "",
     project_context: str = "",
+    on_batch: OnBatch | None = None,
 ) -> list[JudgeResult]:
     """
     Judge every request; results in input order.
 
-    Gate failures (disabled, no key, no model) raise JudgeError before
-    any network call. Any batch failure (transport, HTTP >= 400,
-    unreadable JSON, length mismatch, unknown severity/category) marks
-    the whole batch unparsed — never a raise, never a default verdict.
+    Gate failures (disabled, no key, no model, an unusable deadline or batch
+    size) raise JudgeError before any network call. Any batch failure
+    (transport, HTTP >= 400, unreadable JSON, length mismatch, unknown
+    severity/category) marks the whole batch unparsed — never a raise, never
+    a default verdict.
     One retry per batch on 429/403 with a doubled sleep, no more.
     """
-    if not settings.JUDGE_ENABLED:
-        raise JudgeError(_("The LLM judge is disabled."))
-    if not (
-        isinstance(settings.JUDGE_OPENROUTER_KEY, str)
-        and settings.JUDGE_OPENROUTER_KEY.strip()
-    ):
-        raise JudgeError(_("The LLM judge is not configured."))
+    validate_request_settings()
     if not isinstance(model, str) or not model.strip():
         raise JudgeError(_("The LLM judge is not configured."))
 
@@ -489,7 +536,29 @@ def request_verdicts(
             payload["reasoning"] = {"effort": effort.strip(), "exclude": True}
         parsed = None
         for attempt in range(2):
+            started = time.monotonic()
             response = _post_batch(payload, model)
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            if response.payload is None or (
+                response.status_code is not None and response.status_code >= 400
+            ):
+                LOGGER.warning(
+                    "judge batch %d/%d failed: model=%s status=%s elapsed=%dms",
+                    position + 1,
+                    len(batches),
+                    model,
+                    response.status_code,
+                    elapsed_ms,
+                )
+            else:
+                LOGGER.info(
+                    "judge batch %d/%d ok: model=%s strings=%d elapsed=%dms",
+                    position + 1,
+                    len(batches),
+                    model,
+                    len(batch),
+                    elapsed_ms,
+                )
             if response.payload is not None:
                 _record_usage(response.payload, model, project_slug)
             if response.payload is not None and (
@@ -502,7 +571,10 @@ def request_verdicts(
                 time.sleep(sleep * 2 + 1.0)
                 continue
             break
-        results.extend(parsed if parsed is not None else [UNPARSED] * len(batch))
+        batch_results = parsed if parsed is not None else [UNPARSED] * len(batch)
+        results.extend(batch_results)
+        if on_batch is not None:
+            on_batch(batch, batch_results)
         if position < len(batches) - 1 and sleep:
             time.sleep(sleep)
     return results

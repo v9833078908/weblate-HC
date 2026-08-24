@@ -1865,6 +1865,22 @@ strings are marked unparsed.
    * :setting:`JUDGE_ENABLED`
    * :setting:`JUDGE_BATCH_SIZE`
 
+.. setting:: JUDGE_REQUEST_DEADLINE
+
+JUDGE_REQUEST_DEADLINE
+----------------------
+
+.. versionadded:: 2026.8.1
+
+Maximum wall-clock seconds for one judge batch request. Defaults to 300. A
+batch exceeding the deadline is recorded unparsed instead of holding a worker
+indefinitely.
+
+.. seealso::
+
+   * :setting:`JUDGE_ENABLED`
+   * :setting:`JUDGE_BATCH_SIZE`
+
 .. setting:: JUDGE_MAY_APPROVE
 
 JUDGE_MAY_APPROVE

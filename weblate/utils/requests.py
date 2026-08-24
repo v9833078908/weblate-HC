@@ -822,6 +822,35 @@ def fetch_validated_url(
     return response
 
 
+@contextmanager
+def stream_validated_url(
+    method: str,
+    url: str,
+    *,
+    follow_redirects: bool = True,
+    allow_private_targets: bool = False,
+    private_allowlist: list[str] | tuple[str, ...] = (),
+    **kwargs,
+) -> Generator[httpx2.Response, None, None]:
+    """
+    Yield an unread response using the runtime outbound validation policy.
+
+    A caller enforcing its own body-read deadline must disable redirects:
+    each redirect hop is sent before control returns to the caller.
+    """
+    with _open_url(
+        method,
+        url,
+        validators=RuntimeRedirectValidators(
+            allow_private_targets=allow_private_targets,
+            private_allowlist=private_allowlist,
+        ),
+        follow_redirects=follow_redirects,
+        **kwargs,
+    ) as response:
+        yield response
+
+
 async def async_fetch_validated_url(
     method: str,
     url: str,

@@ -5,9 +5,12 @@
 from __future__ import annotations
 
 import json
+import time
+from dataclasses import replace
 from typing import Any
 from unittest import mock
 
+import httpx2
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from weblate.trans.judge import (
@@ -15,6 +18,7 @@ from weblate.trans.judge import (
     JudgeRequest,
     render_preview,
     request_verdicts,
+    validate_judge_configuration,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.tests import http_mock
@@ -31,6 +35,17 @@ REQ = JudgeRequest(
     glossary_terms=[("ГЕРМОДВЕРЬ", "porte blindée")],
     failing_checks=[],
 )
+
+
+class DrippingStream(httpx2.SyncByteStream):
+    def __init__(self, content: bytes, delay: float) -> None:
+        self.content = content
+        self.delay = delay
+
+    def __iter__(self):
+        for chunk in self.content:
+            time.sleep(self.delay)
+            yield bytes([chunk])
 
 
 def _reply(segments: list[dict]) -> dict:
@@ -68,6 +83,52 @@ class JudgeClientGateTest(SimpleTestCase):
         ):
             request_verdicts([REQ], model="")
         self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_REQUEST_DEADLINE=0,
+    )
+    @http_mock.activate
+    def test_nonpositive_deadline_makes_no_network_call(self) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=0,
+    )
+    @http_mock.activate
+    def test_zero_batch_size_makes_no_network_call(self) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=-5,
+    )
+    @http_mock.activate
+    def test_negative_batch_size_never_reports_an_empty_success(self) -> None:
+        # A negative step makes range() yield nothing, so an unguarded run
+        # would return no verdict at all and still look successful.
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+        JUDGE_BATCH_SIZE=0,
+    )
+    def test_run_gate_rejects_an_unusable_batch_size(self) -> None:
+        with self.assertRaises(JudgeError):
+            validate_judge_configuration()
 
 
 @override_settings(
@@ -325,6 +386,206 @@ class JudgeClientTest(SimpleTestCase):
             with self.assertRaises(JudgeError) as ctx:
                 request_verdicts([REQ], model="vendor/model-a")
             self.assertNotIn("sk-test", str(ctx.exception))
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_BATCH_SIZE=5,
+    JUDGE_REQUEST_SLEEP=0.0,
+)
+class JudgeRequestLoggingTest(SimpleTestCase):
+    @http_mock.activate
+    def test_batch_outcome_is_logged_with_elapsed_time(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        with self.assertLogs("weblate.trans.judge", level="INFO") as logs:
+            request_verdicts([REQ], model="vendor/model-a")
+        joined = "\n".join(logs.output)
+        self.assertIn("batch", joined)
+        self.assertIn("ms", joined)
+
+    @http_mock.activate
+    def test_failed_batch_is_logged_at_warning(self) -> None:
+        http_mock.register("POST", CHAT_URL, status_code=500, json={})
+        with self.assertLogs("weblate.trans.judge", level="WARNING") as logs:
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(any("500" in line for line in logs.output))
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_REQUEST_SLEEP=0.0,
+)
+class JudgeRequestDeadlineTest(TestCase):
+    def _dripping_response(self) -> httpx2.Response:
+        body = json.dumps(
+            _reply([{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}])
+        ).encode()
+        return httpx2.Response(200, stream=DrippingStream(body, 0.01))
+
+    @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_REQUEST_DEADLINE=0.1)
+    @http_mock.activate
+    def test_deadline_marks_a_dripping_batch_unparsed_without_usage_or_retry(
+        self,
+    ) -> None:
+        http_mock.register_callback(
+            "POST",
+            CHAT_URL,
+            lambda _request: self._dripping_response(),
+        )
+        started = time.monotonic()
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        elapsed = time.monotonic() - started
+
+        self.assertTrue(result.unparsed)
+        self.assertLess(elapsed, 1)
+        self.assertEqual(LLMUsageLog.objects.count(), 0)
+        self.assertEqual(len(http_mock.calls), 1)
+
+    @override_settings(JUDGE_BATCH_SIZE=1, JUDGE_REQUEST_DEADLINE=0.1)
+    @http_mock.activate
+    def test_deadline_marks_only_the_dripping_batch_unparsed(self) -> None:
+        http_mock.register_callback(
+            "POST",
+            CHAT_URL,
+            lambda _request: self._dripping_response(),
+        )
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+
+        first, second = request_verdicts([REQ, REQ], model="vendor/model-a")
+
+        self.assertTrue(first.unparsed)
+        self.assertFalse(second.unparsed)
+
+    @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_REQUEST_DEADLINE=3)
+    @http_mock.activate
+    def test_chunked_body_inside_deadline_parses_normally(self) -> None:
+        body = json.dumps(
+            _reply([{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}])
+        ).encode()
+        http_mock.register_callback(
+            "POST",
+            CHAT_URL,
+            lambda _request: httpx2.Response(
+                200,
+                stream=DrippingStream(body, 0.01),
+            ),
+        )
+
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+
+        self.assertFalse(result.unparsed)
+
+    @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_REQUEST_DEADLINE=30)
+    @mock.patch("weblate.trans.judge.MAX_BATCH_RESPONSE_BYTES", 32)
+    @http_mock.activate
+    def test_oversized_body_is_unparsed_without_being_buffered(self) -> None:
+        body = b"x" * 4096
+        http_mock.register_callback(
+            "POST",
+            CHAT_URL,
+            lambda _request: httpx2.Response(200, content=body),
+        )
+
+        with self.assertLogs("weblate.trans.judge", level="WARNING") as logs:
+            [result] = request_verdicts([REQ], model="vendor/model-a")
+
+        self.assertTrue(result.unparsed)
+        self.assertTrue(any("too large" in line for line in logs.output))
+        self.assertEqual(LLMUsageLog.objects.count(), 0)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_REQUEST_SLEEP=0.0,
+)
+class JudgeOnBatchTest(SimpleTestCase):
+    @override_settings(JUDGE_BATCH_SIZE=1)
+    @http_mock.activate
+    def test_is_called_once_per_completed_batch_in_input_order(self) -> None:
+        requests = [replace(REQ, unit_key=str(index)) for index in range(3)]
+        for _ in requests:
+            http_mock.register(
+                "POST",
+                CHAT_URL,
+                json=_reply(
+                    [
+                        {
+                            "id": 0,
+                            "verdict": "pass",
+                            "errors": [],
+                            "back_translation": "",
+                        }
+                    ]
+                ),
+            )
+        seen: list[tuple[list[str], int]] = []
+
+        request_verdicts(
+            requests,
+            model="vendor/model-a",
+            on_batch=lambda batch_requests, batch_results: seen.append(
+                ([request.unit_key for request in batch_requests], len(batch_results))
+            ),
+        )
+
+        self.assertEqual(seen, [(["0"], 1), (["1"], 1), (["2"], 1)])
+
+    @override_settings(JUDGE_BATCH_SIZE=5)
+    @mock.patch("weblate.trans.judge.time.sleep")
+    @http_mock.activate
+    def test_retry_is_one_completed_batch(self, sleep) -> None:
+        http_mock.register("POST", CHAT_URL, status_code=429, json={})
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        seen: list[int] = []
+
+        request_verdicts(
+            [REQ],
+            model="vendor/model-a",
+            on_batch=lambda _requests, results: seen.append(len(results)),
+        )
+
+        self.assertEqual(len(http_mock.calls), 2)
+        self.assertEqual(seen, [1])
+        sleep.assert_called_once()
+
+    @override_settings(JUDGE_BATCH_SIZE=5)
+    @http_mock.activate
+    def test_unparsed_batch_still_calls_callback(self) -> None:
+        http_mock.register("POST", CHAT_URL, status_code=500, json={})
+        seen = []
+
+        request_verdicts(
+            [REQ],
+            model="vendor/model-a",
+            on_batch=lambda batch_requests, results: seen.append(
+                (batch_requests, results)
+            ),
+        )
+
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(seen[0][0], [REQ])
+        self.assertTrue(seen[0][1][0].unparsed)
 
 
 class JudgeUsageLogTest(TestCase):

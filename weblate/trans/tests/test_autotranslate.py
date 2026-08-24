@@ -6,6 +6,11 @@
 
 from __future__ import annotations
 
+import json
+import os
+import re
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
+import sys
 import threading
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
@@ -15,6 +20,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.template.loader import render_to_string
 from django.test import SimpleTestCase
 from django.test.utils import override_settings
 from django.urls import reverse
@@ -1489,6 +1495,30 @@ class PersistentTaskProgressTest(ViewTestCase):
                 follow=True,
             )
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_queued_behind_another_task_says_so(self) -> None:
+        with patch("weblate.trans.views.edit.get_queue_length", return_value=3):
+            response = self.start_auto_translation(self.translation.get_url_path())
+
+        queued = "Automatic translation queued: 2 runs are ahead of it."
+        messages = [str(message) for message in response.context["messages"]]
+        self.assertTrue(any(queued in message for message in messages), messages)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_unreadable_queue_neither_fails_nor_claims_progress(self) -> None:
+        with patch(
+            "weblate.trans.views.edit.get_queue_length",
+            side_effect=OSError("broker down"),
+        ):
+            response = self.start_auto_translation(self.translation.get_url_path())
+
+        self.assertEqual(response.status_code, 200)
+        messages = [str(message) for message in response.context["messages"]]
+        self.assertIn(
+            "Automatic translation queued. You can close this page.", messages
+        )
+        self.assertNotIn("Automatic translation in progress", messages)
+
     def test_project_language_task_is_authorized_and_kept(self) -> None:
         # This scope passes neither component_id nor translation_id, so the
         # task is only reachable through the user stored in its metadata.
@@ -1508,7 +1538,9 @@ class PersistentTaskProgressTest(ViewTestCase):
         stored = cache.get(get_user_tasks_key(self.user.id))
         self.assertEqual(len(stored), 1)
         self.assertEqual(stored[0]["id"], self.task_id)
-        self.assertEqual(stored[0]["text"], "Automatic translation in progress")
+        self.assertEqual(
+            stored[0]["text"], "Automatic translation queued. You can close this page."
+        )
         self.assertEqual(stored[0]["label"], str(project_language))
         self.assertEqual(stored[0]["url"], project_language.get_absolute_url())
 
@@ -1529,7 +1561,7 @@ class PersistentTaskProgressTest(ViewTestCase):
         task_url = reverse("api:task-detail", kwargs={"pk": self.task_id})
         self.assertContains(response, f'data-task="{task_url}"')
         self.assertEqual(response.content.count(b"data-task="), 1)
-        self.assertContains(response, "Automatic translation in progress")
+        self.assertContains(response, "Automatic translation queued.")
 
     def test_finished_task_is_forgotten(self) -> None:
         add_user_task(self.user.id, self.task_id, text="Work", label="Here", url="/")
@@ -1555,3 +1587,79 @@ class PersistentTaskProgressTest(ViewTestCase):
             cache.set(key, tasks, 60)
 
             self.assertEqual(get_user_tasks(self.user.id), [])
+
+
+def max_form_depth(html: str) -> int:
+    depth = 0
+    peak = 0
+    for match in re.finditer(r"<(/?)form\b", html, re.IGNORECASE):
+        if match.group(1):
+            depth -= 1
+        else:
+            depth += 1
+            peak = max(peak, depth)
+    return peak
+
+
+class AutoFormRenderingTest(ViewTestCase):
+    def test_autoform_does_not_nest_forms(self) -> None:
+        html = render_to_string(
+            "snippets/autoform.html",
+            {
+                "autoform": AutoForm(self.component, self.user),
+                "object": self.translation,
+            },
+        )
+
+        self.assertIn('data-persist="auto-translation"', html)
+        self.assertLessEqual(
+            max_form_depth(html),
+            1,
+            "crispy rendered a nested <form>; the Apply button falls outside it",
+        )
+
+
+class AutoTranslateDurabilityTest(SimpleTestCase):
+    def test_auto_translate_acks_late(self) -> None:
+        for task in (auto_translate, auto_translate_component):
+            self.assertTrue(task.acks_late, f"{task.name} acks early")
+            self.assertTrue(
+                task.reject_on_worker_lost, f"{task.name} is lost on worker death"
+            )
+
+    def test_visibility_timeout_covers_long_tasks(self) -> None:
+        code = """
+from pathlib import Path
+
+# settings_docker reads the secret from a container path this test host does
+# not have. Only that one read is intercepted; every other read is real.
+_read_text = Path.read_text
+Path.read_text = lambda self, *args, **kwargs: (
+    "test-secret" if self.name == "secret" else _read_text(self, *args, **kwargs)
+)
+import json
+from weblate import settings_docker
+print(json.dumps(
+    [
+        settings_docker.CELERY_BROKER_TRANSPORT_OPTIONS,
+        settings_docker.CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS,
+        settings_docker.CELERY_VISIBILITY_TIMEOUT,
+    ]
+))
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            check=False,
+            env=os.environ
+            | {
+                "WEBLATE_DATABASES": "0",
+                "WEBLATE_SITE_DOMAIN": "example.com",
+            },
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        options, result_options, visibility_timeout = json.loads(result.stdout)
+        self.assertGreaterEqual(options.get("visibility_timeout", 0), 4 * 3600)
+        self.assertEqual(result_options, options)
+        self.assertEqual(visibility_timeout, options["visibility_timeout"])

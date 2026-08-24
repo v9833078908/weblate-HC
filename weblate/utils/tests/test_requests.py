@@ -24,6 +24,7 @@ from weblate.utils.requests import (
     fetch_validated_url,
     get_uri_error,
     open_restricted_asset_url,
+    stream_validated_url,
 )
 from weblate.utils.tests import http_mock
 
@@ -209,6 +210,43 @@ class FetchURLTest(SimpleTestCase):
             used_proxy=False,
         )
         validators.validate_request_url.assert_not_called()
+
+
+class StreamValidatedURLTest(SimpleTestCase):
+    def test_yields_an_unread_response_without_following_redirects(self) -> None:
+        events: list[str] = []
+
+        def handle_request(_request):
+            return httpx2.Response(
+                302,
+                headers={"Location": "/final"},
+                stream=TrackedRedirectSyncStream(events),
+            )
+
+        with (
+            patch(
+                "weblate.utils.requests._TEST_TRANSPORT.transport",
+                httpx2.MockTransport(handle_request),
+            ),
+            patch(
+                "weblate.utils.requests.RuntimeRedirectValidators.validate_request_url",
+                return_value=(),
+            ) as validate,
+            stream_validated_url(
+                "get",
+                "https://example.com/redirect",
+                allow_private_targets=True,
+                follow_redirects=False,
+            ) as response,
+        ):
+            self.assertEqual(response.status_code, 302)
+            self.assertFalse(response.is_stream_consumed)
+
+        validate.assert_called_once_with(
+            "https://example.com/redirect",
+            used_proxy=False,
+        )
+        self.assertEqual(events, ["close"])
 
 
 class OpenRestrictedAssetURLBehaviorTest(SimpleTestCase):

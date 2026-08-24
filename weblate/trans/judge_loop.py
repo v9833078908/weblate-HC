@@ -16,6 +16,7 @@ is judged, never rewritten.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -28,7 +29,9 @@ from weblate.glossary.models import get_glossary_terms
 from weblate.machinery.models import MACHINERY
 from weblate.trans.forms import AutoForm
 from weblate.trans.judge import (
+    JUDGE_SEATS,
     JudgeRequest,
+    OnBatch,
     request_verdicts,
     validate_judge_configuration,
 )
@@ -55,6 +58,8 @@ _NON_REPAIRABLE_VERDICTS = frozenset(
         JudgeVerdict.Verdict.UNPARSED,
     }
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _glossary_pairs(unit: Unit) -> list[tuple[str, str]]:
@@ -320,8 +325,49 @@ def _process_round_unit(
     )
 
 
+def _persist_verdict_batches(
+    request_units: list[Unit],
+    *,
+    seat: int,
+    attempt: int,
+    run_id: uuid.UUID,
+    model: str,
+    on_batch: OnBatch | None,
+) -> OnBatch:
+    cursor = 0
+
+    def persist(batch_requests, batch_results) -> None:
+        nonlocal cursor
+        batch_units = request_units[cursor : cursor + len(batch_requests)]
+        cursor += len(batch_requests)
+        with transaction.atomic():
+            for unit, request, result in zip(
+                batch_units,
+                batch_requests,
+                batch_results,
+                strict=True,
+            ):
+                _write_verdict(
+                    unit,
+                    request,
+                    seat,
+                    attempt,
+                    run_id,
+                    result,
+                    model,
+                )
+        if on_batch is not None:
+            on_batch(batch_requests, batch_results)
+
+    return persist
+
+
 def run_judge_batch(
-    units: list[Unit], *, writable_ids: set[int], user: User | None
+    units: list[Unit],
+    *,
+    writable_ids: set[int],
+    user: User | None,
+    on_batch: OnBatch | None = None,
 ) -> dict[int, JudgeVerdict]:
     """
     Judge every unit with both seats; repair writable defects.
@@ -353,9 +399,12 @@ def run_judge_batch(
     pending = list(units)
     verdicts: dict[int, JudgeVerdict] = {}
     attempts = settings.JUDGE_MAX_REPAIR_ATTEMPTS
-    seats = (
-        (1, settings.JUDGE_MODEL_SEAT_1),
-        (2, settings.JUDGE_MODEL_SEAT_2),
+    seats = tuple(
+        zip(
+            JUDGE_SEATS,
+            (settings.JUDGE_MODEL_SEAT_1, settings.JUDGE_MODEL_SEAT_2),
+            strict=True,
+        )
     )
 
     attempt = 0
@@ -379,22 +428,41 @@ def run_judge_batch(
             if cached is not None:
                 cached_ids.add(unit.id)
                 verdicts[unit.id] = cached
+        LOGGER.info(
+            "judge run %s: %d strings, %d writable, %d cached",
+            run_id,
+            len(pending),
+            len(writable_ids),
+            len(cached_ids),
+        )
         for seat, model in seats:
             request_units = [unit for unit in pending if unit.id not in cached_ids]
             if not request_units:
                 continue
             requests = [round_requests[unit.id] for unit in request_units]
-            results = request_verdicts(
+            persist = _persist_verdict_batches(
+                request_units,
+                seat=seat,
+                attempt=attempt,
+                run_id=run_id,
+                model=model,
+                on_batch=on_batch,
+            )
+
+            request_verdicts(
                 requests,
                 model=model,
                 project_slug=project_slug,
                 project_context=project_context,
+                on_batch=persist,
             )
-            with transaction.atomic():
-                for unit, request, result in zip(
-                    request_units, requests, results, strict=True
-                ):
-                    _write_verdict(unit, request, seat, attempt, run_id, result, model)
+            LOGGER.info(
+                "judge run %s: seat %d done, %d strings judged with %s",
+                run_id,
+                seat,
+                len(request_units),
+                model,
+            )
 
         next_pending = []
         for unit in pending:
@@ -422,4 +490,5 @@ def run_judge_batch(
         attempt += 1
         if attempt > attempts:
             break
+        LOGGER.info("judge run %s: starting repair attempt %d", run_id, attempt)
     return verdicts
