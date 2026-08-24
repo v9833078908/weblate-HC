@@ -3899,6 +3899,42 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(len(set(ids)), 3)
         self.assertNotEqual(ids, [str(index) for index in range(3)])
         self.assertTrue(all(string_id.startswith("s") for string_id in ids))
+    @http_mock.activate
+    def test_previous_messages_demonstrate_the_id_contract(self) -> None:
+        machine = self.get_machine()
+        observed: list[tuple[list[str], list[str]]] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            previous_content: str,
+            previous_response: str,
+        ) -> str:
+            observed.append(
+                (
+                    [item["id"] for item in json.loads(previous_content)["strings"]],
+                    [item["id"] for item in json.loads(previous_response)],
+                )
+            )
+            strings = json.loads(content)["strings"]
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": "Ahoj"}],
+                    }
+                    for item in strings
+                ]
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            machine.download_multiple_translations("en", "cs", [("Hello", None)])
+
+        demo_request_ids, demo_reply_ids = observed[0]
+        self.assertTrue(demo_request_ids)
+        self.assertEqual(demo_reply_ids, demo_request_ids)
 
     @http_mock.activate
     def test_async_translate(self) -> None:

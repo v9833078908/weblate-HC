@@ -1460,26 +1460,32 @@ class BaseLLMTranslation(BatchMachineTranslation):
         target_language: str,
         examples: list[LLMPreviousExample],
     ) -> tuple[str, str]:
+        example_ids = self._build_string_ids(len(examples))
         return (
             self._build_message(
                 source_language,
                 target_language,
                 [
                     {
+                        "id": example_id,
                         "source": example["source"],
                         "parts": self._get_string_parts(example["source"], None),
                     }
-                    for example in examples
+                    for example_id, example in zip(example_ids, examples, strict=True)
                 ],
                 [],
             ),
             # The demonstration is the strongest signal in the prompt, so it
             # answers in the structured form the rules ask for rather than the
-            # legacy flat array of strings.
+            # legacy flat array of strings, and echoes the id of every string so
+            # the model imitates the identity contract, not only the shape.
             json.dumps(
                 [
-                    {"parts": self._get_string_parts(example["target"], None)}
-                    for example in examples
+                    {
+                        "id": example_id,
+                        "parts": self._get_string_parts(example["target"], None),
+                    }
+                    for example_id, example in zip(example_ids, examples, strict=True)
                 ],
                 ensure_ascii=False,
             ),
