@@ -140,3 +140,6 @@ WEBLATE_VCS_ALLOW_HOSTS=192.168.0.3
 # stack, so cap the workers instead of auto-scaling.
 WEBLATE_WORKERS=2
 WEB_WORKERS=2
+# Automatic translation runs on the "translate" queue. A judge run occupies a
+# slot for tens of minutes, so a single slot lets one project block all others.
+CELERY_TRANSLATE_OPTIONS=--concurrency 2 --prefetch-multiplier 1

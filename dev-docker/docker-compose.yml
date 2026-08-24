@@ -56,6 +56,7 @@ services:
       WEBLATE_EMAIL_USE_TLS: 0
       WEBLATE_EMAIL_USE_SSL: 0
       WEB_WORKERS: 1
+      CELERY_TRANSLATE_OPTIONS: --concurrency 2 --prefetch-multiplier 1
       WEBLATE_VCS_ALLOW_SCHEMES: https,ssh,git,file,http
       WEBLATE_VCS_ALLOW_HOSTS: 192.168.0.3,corp.herocraft.com,83.219.159.2
       GRANIAN_ARGS: --reload --reload-paths /app/src/weblate
