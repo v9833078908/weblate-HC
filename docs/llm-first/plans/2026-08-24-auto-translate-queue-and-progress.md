@@ -4,7 +4,7 @@
 > plan task-by-task. Use `test-driven-development` and
 > `verification-before-completion` where specified below.
 
-**Status:** implemented and verified in the isolated worktree. Dev-stack rebuild and production rollout remain explicitly deferred pending their separate approvals. Amended after the 2026-08-24 review round: Redis `visibility_timeout` added to Task 8, redelivery-cost claims made honest in Task 8, `JUDGE_SEATS` placement fixed in Task 4, judge copy fixed in Task 10, verification extended.
+**Status:** implemented, merged to `main`, deployed to production 2026-08-24 (rollout steps 1-2). Post-deploy confirmation on the running container and the first real-run log reading (rollout steps 3-5) are still open. Amended after the 2026-08-24 review round: Redis `visibility_timeout` added to Task 8, redelivery-cost claims made honest in Task 8, `JUDGE_SEATS` placement fixed in Task 4, judge copy fixed in Task 10, verification extended.
 
 **Goal:** A judge batch request always ends. A judge run that ends early keeps the verdicts it already paid for. One judge run never starves automatic translation in other projects. The UI says whether a run is queued, running, how far along it is, and whether it survived a restart.
 
