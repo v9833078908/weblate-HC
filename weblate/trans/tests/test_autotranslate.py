@@ -1538,7 +1538,9 @@ class PersistentTaskProgressTest(ViewTestCase):
         stored = cache.get(get_user_tasks_key(self.user.id))
         self.assertEqual(len(stored), 1)
         self.assertEqual(stored[0]["id"], self.task_id)
-        self.assertEqual(stored[0]["text"], "Automatic translation in progress")
+        self.assertEqual(
+            stored[0]["text"], "Automatic translation queued. You can close this page."
+        )
         self.assertEqual(stored[0]["label"], str(project_language))
         self.assertEqual(stored[0]["url"], project_language.get_absolute_url())
 
@@ -1559,7 +1561,7 @@ class PersistentTaskProgressTest(ViewTestCase):
         task_url = reverse("api:task-detail", kwargs={"pk": self.task_id})
         self.assertContains(response, f'data-task="{task_url}"')
         self.assertEqual(response.content.count(b"data-task="), 1)
-        self.assertContains(response, "Automatic translation in progress")
+        self.assertContains(response, "Automatic translation queued.")
 
     def test_finished_task_is_forgotten(self) -> None:
         add_user_task(self.user.id, self.task_id, text="Work", label="Here", url="/")

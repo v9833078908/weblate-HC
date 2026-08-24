@@ -1584,15 +1584,13 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
             user_id=request.user.id,
         )
         try:
-            queued_ahead: int | None = get_queue_length("translate")
+            queued_ahead = get_queue_length("translate")
         except Exception:
             # The run is already queued; a broker hiccup must not fail the
-            # request, and must not claim progress nobody verified either.
+            # request over the wording of its confirmation message.
             LOGGER.exception("could not read the translate queue length")
-            queued_ahead = None
-        if queued_ahead is None:
-            message = gettext("Automatic translation queued. You can close this page.")
-        elif queued_ahead > 1:
+            queued_ahead = 0
+        if queued_ahead > 1:
             message = ngettext(
                 "Automatic translation queued: %d run is ahead of it. "
                 "You can close this page.",
@@ -1601,7 +1599,9 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
                 queued_ahead - 1,
             ) % (queued_ahead - 1)
         else:
-            message = gettext("Automatic translation in progress")
+            # The task is queued, not started: a free worker is not observable
+            # from here, so the message never claims the run is running.
+            message = gettext("Automatic translation queued. You can close this page.")
         add_user_task(
             request.user.id,
             task.id,
