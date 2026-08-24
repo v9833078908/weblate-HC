@@ -10,8 +10,8 @@ SPDX-License-Identifier: GPL-3.0-or-later
 > plan task-by-task. Use `test-driven-development` for Tasks 1-3 and
 > `verification-before-completion` for Task 5.
 
-**Date:** 2026-08-24. **Status:** implemented and verified against the clean
-baseline.
+**Date:** 2026-08-24. **Status:** implemented; Task 5 full verification remains
+blocked by pre-existing loc-kit VCS failures outside this plan's scope.
 
 **Verification (2026-08-24):**
 
