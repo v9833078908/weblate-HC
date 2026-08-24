@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Make the LLM batch protocol verify which source string each reply item belongs to, so a reply of the correct length can no longer be stored against the wrong strings.
+**Goal:** Make the LLM batch protocol check which source string each reply item claims to belong to, so a mislabelled or incomplete reply is refused instead of stored. This is a mitigation, not a guarantee: read "What this fix does and does not catch" before reporting it as a fix.
 
-**Architecture:** Every string in a batch request carries an opaque, request-scoped `id`. The reply must echo it, and the reply is paired with its sources through that id instead of the list position. A batch reply without usable ids is refused and re-asked in halves by the machinery that already exists, down to single-string requests where position is unambiguous. Part B is independent: it makes the `game-number` check compare numeric *values* instead of digit multisets, so the same defect class becomes detectable at all.
+**Architecture:** Every string in a batch request carries an opaque, request-scoped `id`. The reply must echo it, and the reply is paired with its sources through that id instead of the list position. A batch reply without usable ids is refused and re-asked in halves by the machinery that already exists, down to single-string requests where position is unambiguous. What this verifies is the *label set* of a reply, not the binding between a label and the content next to it. Part B is independent: it makes the `game-number` check compare numeric *values* instead of digit multisets, so the same defect class becomes detectable at all.
 
 **Tech Stack:** Python 3.13, Django, `weblate/machinery/llm.py` (`BaseLLMTranslation`, shared by OpenAI, Azure OpenAI, Mistral and the fork's `RoutedLLMTranslation`), `weblate_customization/` checks, pytest inside the `dev-docker` container.
 
@@ -36,13 +36,29 @@ evidence of correct alignment.
 
 ### What this fix does and does not catch
 
-Caught: a model that skips an input and shifts the rest up. It drops that input's id along with it,
-so the set of echoed ids no longer matches the set that was sent, and the reply is refused. This is
-the shape measured on production.
+**Read this before reporting Part A as a fix.** It bounds what may be claimed afterwards.
 
-Not caught: a model that deliberately writes the translation of input *i+1* next to the id of input
-*i*. No protocol can detect a reply that lies about its own labels. State this limit; do not claim
-the alignment is proven.
+Verified by the id echo: the *label set* of a reply. Every requested id is present exactly once and
+no unknown id appears. That catches a reply that answered a different set of strings than the one
+it was given - a dropped input, a duplicated one, an item pulled in from beyond the batch.
+
+Not verified: that the content sitting next to a label is the translation of that label's source. A
+model may echo all requested ids, in order, with shifted content, and nothing in this plan detects
+it. No protocol can detect a reply that lies about its own labels.
+
+**The production reply carried no ids at all**, so the measurement in §3 cannot tell us which of
+the two cases it was. It proves a content shift with one source translated twice and one lost; it
+does not prove that the same model, asked for ids, would have produced a mismatched label set. Do
+not write that this plan makes the measured defect impossible - it makes one class of it refusable.
+
+Two designs would actually guarantee no cross-string misattachment. Both are out of scope here and
+need a decision before anyone claims a guarantee:
+
+1. `batch_size = 1` for LLM services. Structural: with one source per request there is nothing to
+   misattach to. It costs roughly ten times the requests and contradicts the batch-size measurement
+   in `analysis/data/col4-batch-size-eval.json`, which chose 10.
+2. An independent content-level check over stored translations, which does not trust the protocol
+   at all. This is the only option that also finds the damage already written.
 
 ---
 
@@ -556,9 +572,10 @@ paired correctly, and an id-less batch reply must degrade instead of being accep
                         }
                     ]
                 )
-            # The production shape: the model skipped the first input and
-            # shifted the rest up, pulling one more in from beyond the batch.
-            # The length still matches and there is no placeholder to catch it.
+            # A reply whose labels track what it actually translated: it
+            # skipped the first input, so that id is missing and one it was
+            # never given takes its place. The length still matches and there
+            # is no placeholder to catch it.
             return json.dumps(
                 [
                     {
@@ -1182,7 +1199,7 @@ Re-read the range before editing; the line numbers shift with every other change
 same section.
 
 ```rst
-* Large language model machine translation now pairs each translated string in a batch reply with its source through an identifier the reply must echo, instead of trusting the reply's order. A model that skips a string and shifts the rest produced a reply of the correct length whose translations were stored against the wrong strings, which no placeholder or length check could detect; such a reply is now refused and re-asked in smaller batches. Suggestions cached by the previous protocol are no longer reused.
+* Large language model machine translation now pairs each translated string in a batch reply with its source through an identifier the reply must echo, instead of trusting the reply's order. A reply that answers a different set of strings than it was given - dropping one, repeating one, or adding one from beyond the batch - previously matched on length alone and was stored against the wrong strings; it is now refused and re-asked in smaller batches. Suggestions cached by the previous protocol are no longer reused.
 ```
 
 **Step 2:** Verify the changelog builds
