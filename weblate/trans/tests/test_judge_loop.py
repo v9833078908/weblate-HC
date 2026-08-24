@@ -346,7 +346,6 @@ class JudgeLoopTest(ViewTestCase):
         self.assertNotIn("judge-flag", build_request(unit).failing_checks)
 
 
-
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_OPENROUTER_KEY="sk-test",
@@ -362,7 +361,8 @@ class JudgeIncrementalPersistenceTest(ViewTestCase):
             if on_batch is not None:
                 on_batch(requests[:1], [PASS])
                 on_batch(requests[1:], [PASS])
-            raise RuntimeError("simulated worker loss")
+            msg = "simulated worker loss"
+            raise RuntimeError(msg)
 
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", side_effect=crash),

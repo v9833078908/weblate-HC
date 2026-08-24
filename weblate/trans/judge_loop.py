@@ -30,8 +30,8 @@ from weblate.machinery.models import MACHINERY
 from weblate.trans.forms import AutoForm
 from weblate.trans.judge import (
     JUDGE_SEATS,
-    OnBatch,
     JudgeRequest,
+    OnBatch,
     request_verdicts,
     validate_judge_configuration,
 )
@@ -325,6 +325,43 @@ def _process_round_unit(
     )
 
 
+def _persist_verdict_batches(
+    request_units: list[Unit],
+    *,
+    seat: int,
+    attempt: int,
+    run_id: uuid.UUID,
+    model: str,
+    on_batch: OnBatch | None,
+) -> OnBatch:
+    cursor = 0
+
+    def persist(batch_requests, batch_results) -> None:
+        nonlocal cursor
+        batch_units = request_units[cursor : cursor + len(batch_requests)]
+        cursor += len(batch_requests)
+        with transaction.atomic():
+            for unit, request, result in zip(
+                batch_units,
+                batch_requests,
+                batch_results,
+                strict=True,
+            ):
+                _write_verdict(
+                    unit,
+                    request,
+                    seat,
+                    attempt,
+                    run_id,
+                    result,
+                    model,
+                )
+        if on_batch is not None:
+            on_batch(batch_requests, batch_results)
+
+    return persist
+
+
 def run_judge_batch(
     units: list[Unit],
     *,
@@ -403,30 +440,14 @@ def run_judge_batch(
             if not request_units:
                 continue
             requests = [round_requests[unit.id] for unit in request_units]
-            cursor = 0
-
-            def persist(batch_requests, batch_results) -> None:
-                nonlocal cursor
-                batch_units = request_units[cursor : cursor + len(batch_requests)]
-                cursor += len(batch_requests)
-                with transaction.atomic():
-                    for unit, request, result in zip(
-                        batch_units,
-                        batch_requests,
-                        batch_results,
-                        strict=True,
-                    ):
-                        _write_verdict(
-                            unit,
-                            request,
-                            seat,
-                            attempt,
-                            run_id,
-                            result,
-                            model,
-                        )
-                if on_batch is not None:
-                    on_batch(batch_requests, batch_results)
+            persist = _persist_verdict_batches(
+                request_units,
+                seat=seat,
+                attempt=attempt,
+                run_id=run_id,
+                model=model,
+                on_batch=on_batch,
+            )
 
             request_verdicts(
                 requests,

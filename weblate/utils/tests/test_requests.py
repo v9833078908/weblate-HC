@@ -212,7 +212,6 @@ class FetchURLTest(SimpleTestCase):
         validators.validate_request_url.assert_not_called()
 
 
-
 class StreamValidatedURLTest(SimpleTestCase):
     def test_yields_an_unread_response_without_following_redirects(self) -> None:
         events: list[str] = []

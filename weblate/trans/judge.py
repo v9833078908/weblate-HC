@@ -34,7 +34,6 @@ from weblate.trans.models.judge import SEVERITY_RANK
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.requests import stream_validated_url
 
-
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 JUDGE_REQUEST_TIMEOUT = 120
 JUDGE_SEATS = (1, 2)
@@ -386,6 +385,22 @@ def _parse_reply(payload: dict, size: int) -> list[JudgeResult] | None:
     return cast("list[JudgeResult]", results)
 
 
+def _read_batch_response(response, *, model: str, started: float) -> bytearray | None:
+    """Read a response body under the caller's absolute deadline."""
+    deadline = started + settings.JUDGE_REQUEST_DEADLINE
+    buffer = bytearray()
+    for chunk in response.iter_bytes():
+        if time.monotonic() > deadline:
+            LOGGER.warning(
+                "judge batch deadline exceeded: model=%s elapsed=%dms",
+                model,
+                int((time.monotonic() - started) * 1000),
+            )
+            return None
+        buffer.extend(chunk)
+    return buffer
+
+
 def _post_batch(payload: dict, model: str) -> _BatchResponse:
     """One POST, preserving HTTP status for retry decisions."""
     started = time.monotonic()
@@ -403,18 +418,10 @@ def _post_batch(payload: dict, model: str) -> _BatchResponse:
             timeout=JUDGE_REQUEST_TIMEOUT,
             follow_redirects=False,
         ) as response:
-            deadline = started + settings.JUDGE_REQUEST_DEADLINE
-            buffer = bytearray()
-            for chunk in response.iter_bytes():
-                if time.monotonic() > deadline:
-                    LOGGER.warning(
-                        "judge batch deadline exceeded: model=%s elapsed=%dms",
-                        model,
-                        int((time.monotonic() - started) * 1000),
-                    )
-                    return _BatchResponse(None, None)
-                buffer.extend(chunk)
+            buffer = _read_batch_response(response, model=model, started=started)
     except Exception:
+        return _BatchResponse(None, None)
+    if buffer is None:
         return _BatchResponse(None, None)
     try:
         body = json.loads(buffer)

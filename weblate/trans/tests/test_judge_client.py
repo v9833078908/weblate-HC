@@ -11,7 +11,6 @@ from typing import Any
 from unittest import mock
 
 import httpx2
-
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from weblate.trans.judge import (
@@ -35,6 +34,7 @@ REQ = JudgeRequest(
     glossary_terms=[("ГЕРМОДВЕРЬ", "porte blindée")],
     failing_checks=[],
 )
+
 
 class DrippingStream(httpx2.SyncByteStream):
     def __init__(self, content: bytes, delay: float) -> None:
@@ -390,9 +390,7 @@ class JudgeRequestLoggingTest(SimpleTestCase):
 class JudgeRequestDeadlineTest(TestCase):
     def _dripping_response(self) -> httpx2.Response:
         body = json.dumps(
-            _reply(
-                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
-            )
+            _reply([{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}])
         ).encode()
         return httpx2.Response(200, stream=DrippingStream(body, 0.01))
 
@@ -440,9 +438,7 @@ class JudgeRequestDeadlineTest(TestCase):
     @http_mock.activate
     def test_chunked_body_inside_deadline_parses_normally(self) -> None:
         body = json.dumps(
-            _reply(
-                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
-            )
+            _reply([{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}])
         ).encode()
         http_mock.register_callback(
             "POST",

@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
+import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 import threading
 from types import SimpleNamespace
@@ -20,8 +20,8 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import SimpleTestCase
 from django.template.loader import render_to_string
+from django.test import SimpleTestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
@@ -1497,9 +1497,7 @@ class PersistentTaskProgressTest(ViewTestCase):
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
     def test_queued_behind_another_task_says_so(self) -> None:
-        with patch(
-            "weblate.trans.views.edit.get_queue_length", return_value=3
-        ):
+        with patch("weblate.trans.views.edit.get_queue_length", return_value=3):
             response = self.start_auto_translation(self.translation.get_url_path())
 
         queued = "Automatic translation queued: 2 runs are ahead of it."
@@ -1572,7 +1570,6 @@ class PersistentTaskProgressTest(ViewTestCase):
             cache.set(key, tasks, 60)
 
             self.assertEqual(get_user_tasks(self.user.id), [])
-
 
 
 def max_form_depth(html: str) -> int:

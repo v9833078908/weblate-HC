@@ -114,8 +114,8 @@ Scope and intended use
    * - LLM judge
      - :ref:`automatic translation <auto-translation>` in judge mode;
        :setting:`JUDGE_ENABLED` gates the outbound review request
-     - Database (verdicts), bounded outbound OpenRouter request per batch
-       when enabled
+     - Database (verdicts), outbound OpenRouter request per batch bounded by
+       :setting:`JUDGE_REQUEST_DEADLINE` when enabled
      - In scope. The outbound request is a fixed-host, site-wide-credentialed
        review only; provider behavior is out of scope. *(documented)*
        (source: :ref:`llm-judge`, :doc:`/admin/config`)
@@ -245,10 +245,10 @@ repository state, background tasks, outbound requests, and rendered UI.
        strings' source, target, glossary terms, and failing check names to
        the fixed provider host under separate site-wide credentials; users
        cannot supply an endpoint, key, or model. The provider response is
-       untrusted input parsed against a strict schema; an unparsed or
-       malformed batch is recorded as unparsed and never treated as a
-       favorable verdict. *(documented)* (source: :ref:`llm-judge`,
-       :doc:`/admin/config`)
+       untrusted input parsed against a strict schema; a batch that exceeds
+       :setting:`JUDGE_REQUEST_DEADLINE`, or is malformed, is recorded as
+       unparsed and never treated as a favorable verdict. *(documented)*
+       (source: :ref:`llm-judge`, :doc:`/admin/config`)
    * - Project backup archives and Weblate filesystem
      - Uploaded ZIP members and metadata become restored project state;
        generated project backups are written to and read from local backup
