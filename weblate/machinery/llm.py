@@ -27,6 +27,7 @@ from weblate.glossary.models import (
     build_glossary_prompt_entries,
     fetch_glossary_terms,
     get_glossary_terms,
+    glossary_selection_is_cached,
     prepare_glossary_units,
 )
 from weblate.lang.models import Language, PluralMapper
@@ -424,7 +425,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
         """
         units: dict[int, Unit] = {}
         for _text, unit in sources:
-            if unit is not None and unit.glossary_terms is None:
+            if unit is not None and not glossary_selection_is_cached(
+                unit, include_variants=False
+            ):
                 units.setdefault(id(unit), unit)
         if units:
             fetch_glossary_terms(list(units.values()), include_variants=False)
@@ -648,7 +651,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
         if full is not None:
             return build_glossary_prompt_entries(full)
         missing = [
-            unit for unit in units if getattr(unit, "glossary_terms", None) is None
+            unit
+            for unit in units
+            if not glossary_selection_is_cached(unit, include_variants=False)
         ]
         if missing:
             fetch_glossary_terms(missing, include_variants=False)

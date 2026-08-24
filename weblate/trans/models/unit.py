@@ -782,8 +782,12 @@ class Unit(models.Model, LoggerMixin):
         self.machinery: UnitMemoryResultDict = {}
         # PluralMapper integration
         self.plural_map: list[str] = []
-        # Data for glossary integration
+        # Data for glossary integration. The selection records what
+        # `fetch_glossary_terms` was asked for, so a caller wanting a different
+        # one refetches instead of inheriting this list. It stays `None` when
+        # the list was supplied from outside, which serves any caller.
         self.glossary_terms: list[Unit] | None = None
+        self.glossary_terms_selection: tuple[bool, bool] | None = None
         self.glossary_positions: tuple[tuple[int, int], ...] = ()
         # Project backup integration
         self.import_data: dict[str, Any] = {}

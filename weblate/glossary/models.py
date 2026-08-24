@@ -357,11 +357,34 @@ def prepare_glossary_units(project, source_language, language, *, full: bool = F
     )
 
 
+def glossary_selection_is_cached(
+    unit: Unit, *, full: bool = False, include_variants: bool = True
+) -> bool:
+    """
+    Report whether the cached term list answers this selection.
+
+    ``include_variants`` decides membership, so it must match exactly: a list
+    fetched without variants is not a subset a wider caller may extend, and a
+    list fetched with them holds terms a narrower caller excluded on purpose.
+    ``full`` only decides prefetch depth, so a deeper list serves a shallower
+    caller. A list with no recorded selection came from outside and is the
+    answer for everyone.
+    """
+    if unit.glossary_terms is None:
+        return False
+    if unit.glossary_terms_selection is None:
+        return True
+    cached_full, cached_variants = unit.glossary_terms_selection
+    return cached_variants == include_variants and (cached_full or not full)
+
+
 def get_glossary_terms(
     unit: Unit, *, full: bool = False, include_variants: bool = True
 ) -> list[Unit]:
     """Return list of term pairs for an unit."""
-    if unit.glossary_terms is None:
+    if not glossary_selection_is_cached(
+        unit, full=full, include_variants=include_variants
+    ):
         fetch_glossary_terms([unit], full=full, include_variants=include_variants)
     return cast("list[Unit]", unit.glossary_terms)
 
@@ -442,20 +465,14 @@ def get_matched_glossary_prompt_entries(unit: Unit) -> list[GlossaryPromptEntry]
     """
     Return prompt entries matched against one unit for the judge.
 
-    ``get_glossary_terms`` serves whatever is already cached on the unit and
-    ignores its own selection arguments. A narrower selection cached by a
-    check would otherwise decide what the judge is told and make a stored
-    verdict unreachable, and the judge's own wider selection left behind would
-    just as silently feed a later check terms it excluded. So the judge
-    resolves its selection in isolation and restores the exact prior state.
+    The selection is the judge's own: a narrower one cached by a check would
+    decide what the judge is told and make a stored verdict unreachable. The
+    cache records what it was filled for, so asking here can neither inherit
+    another consumer's selection nor impose this one on the next.
     """
-    cached = unit.glossary_terms
-    unit.glossary_terms = None
-    try:
-        terms = get_glossary_terms(unit, full=True, include_variants=True)
-    finally:
-        unit.glossary_terms = cached
-    return build_glossary_prompt_entries(terms)
+    return build_glossary_prompt_entries(
+        get_glossary_terms(unit, full=True, include_variants=True)
+    )
 
 
 def fetch_glossary_terms(  # ruff: ignore[complex-structure]
@@ -471,8 +488,10 @@ def fetch_glossary_terms(  # ruff: ignore[complex-structure]
     for unit in units:
         translations[unit.translation.id] = unit.translation
         translation_units[unit.translation.id].append(unit)
-        # Initialize glossary terms
+        # Initialize glossary terms and record what they were selected for,
+        # including units that end up with no match at all
         unit.glossary_terms = []
+        unit.glossary_terms_selection = (full, include_variants)
 
     for translation_id, translation in translations.items():
         language = translation.language

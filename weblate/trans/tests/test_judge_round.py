@@ -314,9 +314,10 @@ class JudgeGlossaryContextTest(ViewTestCase):
         self.assertEqual(len(narrow), 1)
 
         self.assertEqual(len(current_round(reread)), 1)
-        self.assertEqual(reread.glossary_terms, narrow)
+        # The check keeps its own answer afterwards, whatever the judge asked.
+        self.assertEqual(len(get_glossary_terms(reread, include_variants=False)), 1)
 
-    def test_matched_entries_leave_an_unfetched_unit_unfetched(self) -> None:
+    def test_matched_entries_do_not_decide_a_later_check(self) -> None:
         """The judge's wider selection must not become a later check's answer."""
         self.add_term()
         self.add_variant_sibling()
@@ -325,5 +326,5 @@ class JudgeGlossaryContextTest(ViewTestCase):
 
         self.assertEqual(len(get_matched_glossary_prompt_entries(unit)), 2)
 
-        self.assertIsNone(unit.glossary_terms)
+        # No restore is needed: the cache knows which selection filled it.
         self.assertEqual(len(get_glossary_terms(unit, include_variants=False)), 1)

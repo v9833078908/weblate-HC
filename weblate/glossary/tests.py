@@ -33,7 +33,7 @@ from weblate.glossary.tasks import (
 )
 from weblate.lang.models import Language
 from weblate.trans.alerts.registry import update_alerts
-from weblate.trans.models import PendingUnitChange, Unit
+from weblate.trans.models import PendingUnitChange, Unit, Variant
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.tests.utils import get_test_file
 from weblate.utils.hash import calculate_hash
@@ -1483,3 +1483,73 @@ class GlossaryStemMatcherTest(ViewTestCase):
         )
         fetch_glossary_terms([unit])
         self.assertEqual({term.source for term in unit.glossary_terms}, set())
+
+
+class GlossarySelectionCacheTest(ViewTestCase):
+    """The cached term list must answer the selection its caller asked for."""
+
+    CREATE_GLOSSARIES: bool = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.glossary_component = self.project.glossaries[0]
+        self.glossary = self.glossary_component.translation_set.get(
+            language=self.get_translation().language
+        )
+        self.add_grouped_terms()
+
+    def add_grouped_terms(self) -> None:
+        """Add a matched term plus a sibling only the wide selection reaches."""
+        variant = Variant.objects.create(
+            component=self.glossary_component, variant_regex="", key="greeting"
+        )
+        for position, (source, target) in enumerate(
+            (("Hello", "Ahoj"), ("Greeting", "Zdravím")), start=1
+        ):
+            id_hash = calculate_hash(source, "")
+            source_unit = self.glossary_component.source_translation.unit_set.create(
+                source=source,
+                target=source,
+                context="",
+                id_hash=id_hash,
+                position=position,
+                state=STATE_TRANSLATED,
+            )
+            self.glossary.unit_set.create(
+                source=source,
+                target=target,
+                context="",
+                source_unit=source_unit,
+                id_hash=id_hash,
+                position=position,
+                state=STATE_TRANSLATED,
+                variant=variant,
+            )
+        self.glossary.invalidate_cache()
+
+    def test_narrow_after_wide_excludes_the_variant(self) -> None:
+        """A caller excluding variants must not inherit a wider selection."""
+        unit = self.get_unit()
+        self.assertEqual(len(get_glossary_terms(unit, include_variants=True)), 2)
+        self.assertEqual(len(get_glossary_terms(unit, include_variants=False)), 1)
+
+    def test_wide_after_narrow_includes_the_variant(self) -> None:
+        """A caller wanting variants must not inherit a check's selection."""
+        unit = self.get_unit()
+        self.assertEqual(len(get_glossary_terms(unit, include_variants=False)), 1)
+        self.assertEqual(len(get_glossary_terms(unit, include_variants=True)), 2)
+
+    def test_assigned_terms_are_served_to_every_selection(self) -> None:
+        """A list supplied from outside is the answer: matching is off."""
+        unit = self.get_unit()
+        unit.glossary_terms = []
+        self.assertEqual(get_glossary_terms(unit, include_variants=False), [])
+        self.assertEqual(get_glossary_terms(unit, include_variants=True), [])
+
+    def test_full_upgrades_and_then_serves_a_shallow_caller(self) -> None:
+        """``full`` is prefetch depth: upgrade refetches, downgrade reuses."""
+        unit = self.get_unit()
+        shallow = get_glossary_terms(unit, full=False)
+        upgraded = get_glossary_terms(unit, full=True)
+        self.assertIsNot(upgraded[0], shallow[0])
+        self.assertIs(get_glossary_terms(unit, full=False)[0], upgraded[0])
