@@ -1491,6 +1491,17 @@ class PersistentTaskProgressTest(ViewTestCase):
                 follow=True,
             )
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_queued_behind_another_task_says_so(self) -> None:
+        with patch(
+            "weblate.trans.views.edit.get_queue_length", return_value=3
+        ):
+            response = self.start_auto_translation(self.translation.get_url_path())
+
+        queued = "Automatic translation queued: 2 runs are ahead of it."
+        messages = [str(message) for message in response.context["messages"]]
+        self.assertTrue(any(queued in message for message in messages), messages)
+
     def test_project_language_task_is_authorized_and_kept(self) -> None:
         # This scope passes neither component_id nor translation_id, so the
         # task is only reachable through the user stored in its metadata.
