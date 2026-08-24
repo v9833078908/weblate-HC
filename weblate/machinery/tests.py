@@ -4153,7 +4153,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(advisories, [])
 
     def test_batch_size(self) -> None:
-        # Measured, see docs/misc/col4-batch-size-eval.json: the generic 20 wasted
+        # Measured, see analysis/data/col4-batch-size-eval.json: the generic 20 wasted
         # replies on truncation and the content filter, and answered no faster.
         self.assertEqual(self.MACHINE_CLS.batch_size, 10)
         self.assertLess(self.MACHINE_CLS.batch_size, DummyTranslation.batch_size)

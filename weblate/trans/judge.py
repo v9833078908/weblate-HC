@@ -143,7 +143,7 @@ def render_preview(text: str) -> str | None:
 
 # What a project that configured no description gets. Never a genre: an
 # inherited setting is what produced a false major on a post-apocalyptic
-# quest during the first dev run (docs/misc/judge-first-dev-run-2026-08-20.md).
+# quest during the first dev run (docs/llm-first/measurements/2026-08-20-judge-first-dev-run.md).
 NEUTRAL_PROJECT_CONTEXT = (
     "The game's setting, genre, platform and register are not specified here. "
     "Do not\nassume any: judge the target against the source, the note and the "
@@ -156,7 +156,7 @@ def _load_prompt(source_language: str, target_language: str, context: str = "") 
     Load the verdict prompt with the languages and the project filled in.
 
     The text is the one measured as arm E on the sealed S&T2 corpus
-    (docs/misc/st2-zh-recalibration.py). The genre lives in the project
+    (analysis/probes/st2-zh-recalibration.py). The genre lives in the project
     context so no project inherits another one's setting.
     """
     template = (

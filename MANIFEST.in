@@ -26,6 +26,7 @@ prune .clusterfuzzlite
 prune .github
 prune .reuse
 prune .well-known
+prune analysis
 prune ci
 prune client
 prune data*

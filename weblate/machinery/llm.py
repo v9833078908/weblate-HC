@@ -318,7 +318,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
     max_score = 90
     request_timeout = 120
     # Measured against production, 150 strings, three rounds each
-    # (docs/misc/col4-batch-size-eval.json): 20 strings per request wasted two
+    # (analysis/data/col4-batch-size-eval.json): 20 strings per request wasted two
     # replies of ten on truncation and had one blocked by the model's content
     # filter, while 10 per request wasted none and answered no slower, because a
     # reply is generated token by token. Fewer than 10 costs the prompt's

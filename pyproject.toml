@@ -320,6 +320,9 @@ ignore = [
   ".well-known/*",
   ".yamllint.yml",
   "AGENTS.md",
+  "analysis/*",
+  "analysis/*/*",
+  "analysis/*/*/*",
   "ci/*",
   "ci/migrate-scripts/*",
   "CLAUDE.md",
@@ -404,7 +407,7 @@ dictionary = "scripts/codespell.txt,-"
 # clitic literals in the COL4 mutation generator; sanity-check is used
 # across this codebase
 ignore-words-list = "assertIn,Vai,master,bloc,mis,nd,ons,te,sanity-check"
-skip = '*.po,*.pot,*.json,*.jsonl,*.tmx,*.tbx,*.csv,*.tsv,*/vendor/*,weblate/trans/specialchars.py,weblate/trans/tests/data/known_hosts,docs/changes/contributors/*.rst,docs/misc/col4-judge-annotation.md,misc/heart-abyss-hub-1-translation-qa.md'
+skip = '*.po,*.pot,*.json,*.jsonl,*.tmx,*.tbx,*.csv,*.tsv,*/vendor/*,weblate/trans/specialchars.py,weblate/trans/tests/data/known_hosts,docs/changes/contributors/*.rst,docs/llm-first/measurements/2026-08-12-col4-judge-annotation.md,docs/operations/audits/2026-08-20-heart-abyss-hub-1-translation-qa.md'
 
 [tool.coverage.paths]
 source = [
@@ -689,12 +692,12 @@ notice-rgx = "(?i)Copyright\\s+©\\s+"
 max-complexity = 16  # TODO: should be lower
 
 [tool.ruff.lint.per-file-ignores]
+# One-off operator scripts piped into `weblate shell`, not importable modules
+"analysis/probes/*.py" = ["C901", "INP001", "PLR0914", "T201"]
 "ci/migrate-scripts/*.py" = ["INP001", "S101"]
 "docs/_ext/*.py" = ["INP001"]
 "docs/_ext/test_*.py" = ["S101"]
 "docs/conf.py" = ["ERA001", "INP001"]
-# One-off operator scripts piped into `weblate shell`, not importable modules
-"docs/misc/*.py" = ["C901", "INP001", "PLR0914", "T201"]
 "fuzzing/targets.py" = ["PLC0415"]
 "scripts/*" = ["T201", "T203"]
 "weblate/*/migrations/*.py" = ["RUF012"]
@@ -824,11 +827,11 @@ extend-exclude = [
   "**.map",
   "**.po",
   "**.pot",
+  "analysis/data/autofix-backfill-*.json",
+  "analysis/data/col4-*.json",
+  "analysis/data/col4-*.jsonl",
   "docs/changes/contributors",
-  "docs/misc/autofix-backfill-*.json",
-  "docs/misc/col4-*.json",
-  "docs/misc/col4-*.jsonl",
-  "docs/misc/col4-judge-annotation.md",
+  "docs/llm-first/measurements/2026-08-12-col4-judge-annotation.md",
   "docs/specs",
   "scripts/codespell.txt",
   "scripts/spdx-license-list",

@@ -13,8 +13,9 @@ inherited from the original codebase.
 - Start every task with a plan and wait for approval. Before editing any file,
   state what will change, in which files, how it will be verified, and what is
   deliberately out of scope. Do not implement until the user approves it. For
-  multi-step work, put the plan in `docs/plans/` following the existing files
-  there. Answering questions, reading code, and research need no plan.
+  multi-step work, put the plan in the matching `docs/<area>/plans/` directory
+  (see "Documentation layout" below) following the existing files there.
+  Answering questions, reading code, and research need no plan.
 - Implement only what the approved plan covers. When the work turns out to
   need something the plan does not mention, stop and get that increment
   approved instead of widening the change silently.
@@ -211,10 +212,13 @@ Repository-specific parts:
 - `weblate-mcp/` (gitignored, its own git repo) - vendored `@mmntm/weblate-mcp`,
   a NestJS MCP server that talks to the local Weblate REST API. Its `.env` points
   at `http://localhost:3001/api/`.
-- `docs/plans/`, `docs/specs/` - planning and design docs (in Russian) for
-  game-localization workflows; the LLM-first pipeline docs (research,
-  architecture, judge plans, measurements) live in `docs/LLM-first/`,
-  e.g. `docs/LLM-first/plans/llm-judge-external-pipeline.md`.
+- `docs/llm-first/`, `docs/product/`, `docs/operations/`, `docs/guides/` -
+  fork documentation (mostly in Russian) for game-localization workflows; see
+  "Documentation layout" below for the rule that decides where a file goes.
+- `analysis/probes/`, `analysis/data/` - one-off measurement scripts and the
+  corpora, golden sets and run outputs they read and write. Not documentation:
+  nothing here is part of the product, and both directories are excluded from
+  packaging and from the `typos`/`codespell` hooks.
 - `loc_kit_ingest/` (tracked) - standalone loc-kit importer package (no Django
   imports): `reader.py` (CSV/TSV/XLSX), `infer.py` (derives a strict profile
   from the kit's own header row), `profile.py` (closed schema with two
@@ -230,7 +234,7 @@ Repository-specific parts:
   discovery skipped) as well as ZIP. When :guilabel:`Use as glossary` is
   checked, a CSV/TSV/XLSX table instead enters the glossary workflow (sheet
   selection, deterministic inference first, optional OpenRouter fallback,
-  local validation, TBX component) documented in `docs/specs/loc-kit-ingest.md`
+  local validation, TBX component) documented in `docs/guides/loc-kit-ingest.md`
   and the plan.
   Standalone tests: `cd loc_kit_ingest && uv run pytest` (no DB).
   Weblate-level tests: `weblate/trans/tests/test_loc_kit_ingest_contract.py`.
@@ -278,6 +282,44 @@ Repository-specific parts:
 Local modifications to `dev-docker/docker-compose.yml`: Postgres published on
 `5434` (5433 is taken by another project) and `WEBLATE_VCS_ALLOW_SCHEMES` extended
 with `file` so local git repos can be used as translation sources.
+
+## Documentation layout
+
+Every fork document lives at `docs/<area>/<genre>/<YYYY-MM-DD>-<slug>.md`. The
+area answers "whose document is this", the genre answers "what kind". Both
+vocabularies are closed; if a document does not fit, discuss it rather than
+inventing a directory.
+
+| Area | What belongs there |
+| --- | --- |
+| `docs/llm-first/` | the LLM-first TMS: anything that changes or executes a phase of the roadmap in `docs/llm-first/vision/llm-first-product-architecture.md` - judge, MT machinery, autofix layer, quality gates |
+| `docs/product/` | features of the Weblate fork itself that the roadmap does not own - loc-kit intake, glossary UI, checks, exports, dev-environment work |
+| `docs/operations/` | work bound to a live instance or one game - production tasks, LQA audits, reports, team meetings |
+| `docs/guides/` | evergreen contracts and instructions read from outside; updated in place, never dated |
+
+| Genre | What belongs there |
+| --- | --- |
+| `plans/` | an approved implementation plan, task by task, carrying a status |
+| `designs/` | a design decision without a task list |
+| `measurements/` | numbers from a run: reproducible, dated |
+| `research/` | a synthesis of external sources or of another system |
+| `reviews/` | a review of a plan, design or change |
+| `audits/` | an LQA audit of a live component |
+| `reports/` | a status or summary written for a human |
+| `meetings/` | material from a meeting with a game team |
+| `archive/` | superseded, kept for history |
+| `vision/` | vision and roadmap (only under `docs/llm-first/`) |
+
+Naming: directories are lowercase and hyphenated; a dated snapshot always
+carries its date first (`2026-08-24-slug.md`), a living document carries none;
+several documents from one day are numbered `YYYY-MM-DD-NN-slug.md`. Reference
+another document by its full repository-relative path, never a path relative to
+the referring file - documents move, and relative links silently rot.
+
+`docs/specs/` holds upstream API artifacts only (`openapi.yaml` and
+`schemas/*.json`, wired into the Sphinx build, two GitHub workflows and
+`REUSE.toml`). Do not put fork documents there. Fork markdown is not part of
+the Sphinx build - `myst_parser` is not enabled.
 
 ## Development environment
 

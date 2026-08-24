@@ -1230,7 +1230,7 @@ class GlossaryStemMatcherTest(ViewTestCase):
     Uses a dedicated Russian-source project (the default ViewTestCase
     component/glossary are English-source) so the matcher can recover
     inflected Russian source forms per
-    docs/plans/2026-08-11-glossary-morphological-enforcement.md.
+    docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md.
     """
 
     CREATE_GLOSSARIES: bool = True
@@ -1360,7 +1360,7 @@ class GlossaryStemMatcherTest(ViewTestCase):
 
     def test_matcher_fingerprint_contract(self) -> None:
         """
-        Задача 5: the probes in docs/misc read these keys by name.
+        Задача 5: the probes in analysis/probes read these keys by name.
 
         Probe scripts are not exercised by CI, so the key set and the value
         types are pinned here: renaming a field must fail this test rather

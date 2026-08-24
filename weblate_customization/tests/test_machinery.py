@@ -186,7 +186,7 @@ class RoutedReplyFormatTest(SimpleTestCase):
     Non-strict and array-rooted, applied unconditionally to every chat
     payload; a hardening pass to ``strict`` mode plus an object envelope is
     tracked separately and deliberately out of scope here (see
-    ``docs/LLM-first/plans/2026-08-12-phase0-implementation.md``, task 1).
+    ``docs/llm-first/plans/2026-08-12-phase0-implementation.md``, task 1).
     """
 
     def machine(self) -> RoutedLLMTranslation:
