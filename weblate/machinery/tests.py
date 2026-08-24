@@ -3935,6 +3935,11 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         demo_request_ids, demo_reply_ids = observed[0]
         self.assertTrue(demo_request_ids)
         self.assertEqual(demo_reply_ids, demo_request_ids)
+    def test_prompt_examples_never_show_an_id_less_structured_item(self) -> None:
+        prompt = self.get_machine()._get_prompt("cs")
+
+        self.assertNotIn('{"parts"', prompt)
+        self.assertIn('"id"', prompt)
 
     @http_mock.activate
     def test_async_translate(self) -> None:
