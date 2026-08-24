@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from unittest import mock
 
+from django.conf import settings
 from django.test import override_settings
 
 from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
@@ -281,3 +282,43 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertEqual(reported, sorted(reported))
         self.assertLessEqual(reported[0], 22)
         self.assertTrue(any(22 < progress < 40 for progress in reported))
+
+    @override_settings(JUDGE_MAX_REPAIR_ATTEMPTS=1)
+    def test_judge_progress_keeps_moving_through_a_repair_round(self) -> None:
+        unit = self.get_unit()
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+        )
+        auto.progress_range = (0, 100)
+        reported: list[int] = []
+
+        def fake_judge(units, *, writable_ids, user, on_batch=None):
+            # One string, two seats, one repair attempt: four batches, which a
+            # denominator sized to a single round would clamp into a plateau.
+            for _ in range(2 * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)):
+                on_batch([object()], [object()])
+            return {}
+
+        with (
+            mock.patch("weblate.trans.autotranslate.current_task") as task,
+            mock.patch.object(auto, "process_mt"),
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch",
+                side_effect=fake_judge,
+            ),
+        ):
+            task.request.id = "test-task-id"
+            task.update_state.side_effect = lambda **kwargs: reported.append(
+                kwargs["meta"]["progress"]
+            )
+            auto.process_judge(engines=[], threshold=80)
+
+        # Four distinct rising values, not one plateau at the phase maximum:
+        # a denominator of one round reports 55, 100, 100, 100 instead.
+        self.assertEqual(len(reported), 4)
+        self.assertEqual(reported, sorted(set(reported)))
+        self.assertEqual(reported[-1], 100)

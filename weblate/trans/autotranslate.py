@@ -799,7 +799,12 @@ class AutoTranslate(BaseAutoTranslate):
             self.set_progress(min(judged, self.progress_steps))
 
         self.progress_range = (split, base_high)
-        self.progress_steps = len(units) * len(JUDGE_SEATS)
+        # A defect is re-judged by both seats once per repair attempt, so the
+        # denominator is the worst case. Sizing it to one round would clamp the
+        # bar at the phase maximum and freeze it for the whole repair loop.
+        self.progress_steps = (
+            len(units) * len(JUDGE_SEATS) * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)
+        )
         try:
             verdicts = run_judge_batch(
                 units,
