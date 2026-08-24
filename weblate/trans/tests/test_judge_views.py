@@ -80,6 +80,11 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
         # Worst case: strings x 2 seats x (1 + repair attempts).
         self.assertContains(response, "id_auto_request_estimate")
 
+    def test_form_explains_judge_duration_contention(self) -> None:
+        response = self.client.get(self.translation_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "id_auto_duration_estimate")
+
     def test_overwrite_warning_shown_when_judge_verdicts_exist(self) -> None:
         self.make_reject(self.get_unit())
         response = self.client.get(self.translation_url)
