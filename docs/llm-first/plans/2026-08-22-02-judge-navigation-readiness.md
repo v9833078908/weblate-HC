@@ -4,7 +4,7 @@
 
 **Goal:** Give a producer a component-first Weblate path from per-language release readiness to exact LLM-judge queues and a bounded, cost-aware judge run, without implying that a probabilistic verdict approves a release.
 
-**Architecture:** Keep `JudgeVerdict` as immutable evidence and add one database-queryable fingerprint of the exact stored target. One shared annotation contract drives search and lazy cached translation statistics. Render a separate readiness table above the existing component language table. Its primary action deep-links to the existing language-scoped automatic-translation form. Preview and execution share scope, ordering, permissions, and cap. Delivery remains a separate axis based only on `PendingUnitChange` commit-policy accounting.
+**Architecture:** Keep `JudgeVerdict` as immutable evidence and add one database-queryable fingerprint of the exact stored target. One shared annotation contract drives search and lazy cached translation statistics. Render a separate readiness table above the existing component language table. Its primary action deep-links to the existing language-scoped automatic-translation form. Preview and execution share scope, ordering, permissions, cap, and numeric in-flight task progress. Delivery remains a separate axis based only on `PendingUnitChange` commit-policy accounting.
 
 **Tech Stack:** Django, PostgreSQL, Celery, existing Weblate stats cache, Django templates, Bootstrap, vanilla JavaScript, pytest.
 
@@ -31,7 +31,11 @@
    5. otherwise -> **No blocking action**.
 9. AI counts open exact language-scoped Zen queues. Delivery counts are informational, not links: `detailed_count()` includes pending history/retry semantics that a current-state q cannot represent exactly. Its action opens a clearly labelled broader native pending queue.
 10. **Evaluate N** opens that language's existing Automatic translation tab with `mode=judge`, `q=NOT has:judge`, and a safe return URL. It never starts a paid call automatically.
-11. Reuse persistent task progress. Completion reports evaluated/pass/advisory/held/incomplete/cap remainder and links back to readiness.
+11. Reuse persistent task progress. It advances once for each completed judge
+    seat batch, against the fixed worst-case repair budget for the capped
+    execution scope. Completion reports evaluated/pass/advisory/held/incomplete/cap
+    remainder and links back to readiness. Do not add a second live status channel
+    or readiness polling.
 
 ### Verdict semantics
 
@@ -76,6 +80,7 @@
 ## Task 1: Persist the queryable target fingerprint
 
 **Files:**
+
 - Modify: `weblate/trans/models/judge.py`
 - Create: `weblate/trans/migrations/0103_judge_target_storage_hash.py`
 - Create: `weblate/trans/tests/test_judge_migration.py`
@@ -164,6 +169,7 @@ git commit -m "feat(judge): persist queryable target fingerprints"
 ## Task 2: Add target-fresh verdict annotations
 
 **Files:**
+
 - Modify: `weblate/trans/models/judge.py`
 - Modify: `weblate/trans/tests/test_judge_round.py`
 
@@ -224,6 +230,7 @@ git commit -m "feat(judge): add target-fresh verdict queries"
 ## Task 3: Add exact judge search filters
 
 **Files:**
+
 - Modify: `weblate/utils/search.py`
 - Modify: `weblate/trans/filter.py`
 - Modify: `weblate/trans/tests/test_search.py`
@@ -267,6 +274,7 @@ If the established filter test has another filename, use it instead of creating 
 ## Task 4: Add cached AI stats and batched Delivery counts
 
 **Files:**
+
 - Modify: `weblate/utils/stats.py`
 - Modify: `weblate/trans/tests/test_stats.py`
 - Modify: `weblate/trans/models/pending.py`
@@ -330,6 +338,7 @@ git commit -m "feat(judge): cache readiness statistics"
 ## Task 5: Record operation-aware usage and observed cost ranges
 
 **Files:**
+
 - Create: `weblate/trans/migrations/0104_llm_usage_operation.py`
 - Modify: `weblate/trans/models/llm_usage.py`
 - Modify: `weblate/trans/judge.py`
@@ -393,15 +402,20 @@ git commit -m "feat(judge): track observed per-unit costs"
 
 ---
 
-## Task 6: Share preview scope with capped execution
+## Task 6: Share preview scope, cap, and judge progress reporting
 
 **Files:**
+
+- Modify: `weblate/trans/judge.py`
+- Modify: `weblate/trans/judge_loop.py`
 - Modify: `weblate/trans/autotranslate.py`
 - Modify: `weblate/trans/tasks.py`
+- Modify: `weblate/trans/tests/test_judge_client.py`
+- Modify: `weblate/trans/tests/test_judge_loop.py`
 - Modify: `weblate/trans/tests/test_judge_autotranslate.py`
 - Modify: `weblate/trans/tests/test_autotranslate.py`
 
-### Step 1: Write failing cap tests
+### Step 1: Write failing scope, cap, and progress tests
 
 For translation and component scopes assert:
 
@@ -412,10 +426,53 @@ For translation and component scopes assert:
 - preview/execution matched/processed/remaining/writable counts agree;
 - the old above-cap refusal disappears.
 
+Add callback tests at the two judge seams:
+
+- `request_verdicts()` calls an optional `on_batch` exactly once after each
+  completed batch, whether that batch parses or becomes unparsed. A 403/429
+  retry remains one completed batch, not two ticks. For retry coverage,
+  register a 429 response followed by a valid 200 response, mock its sleep,
+  and assert two HTTP calls but one callback tick. Separately register
+  `status_code=500` for unparsed-batch coverage. Use the local
+  `http_mock.register("POST", CHAT_URL, ...)` API; do not use a hypothetical
+  `http_mock.add()` API.
+- `run_judge_batch()` forwards the optional callback to both seat calls.
+  Cached units make no judge client call and therefore no tick.
+- Update every patched `run_judge_batch` fake in
+  `test_judge_autotranslate.py` to accept `on_batch=None`, then retain the
+  existing behavior assertions. This change must not break unrelated judge
+  autotranslate tests.
+
+Add exact progress assertions for a known capped scope. For example, six
+processed units with `JUDGE_BATCH_SIZE=5` and one permitted repair attempt
+have eight worst-case steps:
+
+```text
+ceil(6 / 5) * 2 * (1 + 1) == 8
+```
+
+Assert the four no-repair seat-batch ticks land inside the judge range and
+the final completion reaches its high endpoint. Also set a child instance's
+range to `(20, 40)` and assert that MT receives `(20, 22)` while judge
+progress stays in `(22, 40)`. Test an empty capped scope through
+`BatchAutoTranslate` and assert outer task completion without MT or judge
+callbacks.
+
+Add settings-validation cases before relying on the formulas: reject
+`JUDGE_BATCH_SIZE <= 0`, `JUDGE_MAX_REPAIR_ATTEMPTS < 0`, and
+`JUDGE_MAX_UNITS_PER_RUN < 0` through `validate_judge_configuration()`. Define
+zero `JUDGE_MAX_UNITS_PER_RUN` as a zero cap, producing an empty `K`, rather
+than as unlimited execution.
+
 ### Step 2: Prove RED
 
 ```bash
-./rundev.sh test weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_autotranslate.py -k judge
+./rundev.sh test \
+  weblate/trans/tests/test_judge_client.py \
+  weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_judge_autotranslate.py \
+  weblate/trans/tests/test_autotranslate.py \
+  -p no:randomly --no-cov -q
 ```
 
 ### Step 3: Add a small immutable preview result
@@ -435,9 +492,47 @@ class JudgeScopePreview:
 
 `BatchAutoTranslate.preview_judge_scope()` follows the exact ordered, permission-filtered execution scope. Cost lookup remains separate.
 
-### Step 4: Slice instead of refuse
+### Step 4: Slice instead of refuse, then report completed batches
 
-`AutoTranslate.process_judge()` counts, orders, slices to remaining cap, and processes only K. Preserve snapshot/race checks and repair. Aggregate actual verdict buckets and global remainder in `BatchAutoTranslate`.
+First extend `validate_judge_configuration()` so preview and execution reject
+`JUDGE_BATCH_SIZE <= 0`, `JUDGE_MAX_REPAIR_ATTEMPTS < 0`, and
+`JUDGE_MAX_UNITS_PER_RUN < 0` before they calculate calls, costs, or progress.
+Treat `JUDGE_MAX_UNITS_PER_RUN == 0` as an empty capped scope.
+
+Thread an optional `Callable[[], None]` from `request_verdicts()` through
+`run_judge_batch()` to `AutoTranslate.process_judge()`. Call it after a
+batch's parsed or `UNPARSED` results have been appended, before an
+inter-batch sleep. It is independent of, and must not be suppressed by,
+non-fatal usage accounting. The callback measures completed **seat batches**,
+not HTTP attempts or individual requests.
+
+`AutoTranslate.process_judge()` obtains the ordered, permission-filtered,
+cap-sliced execution scope once and processes only that stable `K`. It must
+not independently re-evaluate the query or count the uncapped `N`.
+Preserve snapshot/race checks and repair. Aggregate actual verdict buckets and
+global remainder in `BatchAutoTranslate`.
+
+Split the instance's existing progress range into the first tenth for
+pre-translation and the remaining nine tenths for judging. Restore the judge
+range in `finally` after MT. Before judging, set:
+
+```text
+progress_steps =
+  ceil(K / JUDGE_BATCH_SIZE) * 2 * (JUDGE_MAX_REPAIR_ATTEMPTS + 1)
+```
+
+Increment the progress counter through the callback and finish the range when
+`run_judge_batch()` returns. This is a fixed upper bound: both seats judge
+every uncached selected string, and repaired strings are a subset of `K`.
+Cached verdict reuse or a run without repairs may therefore finish with a
+final jump. Do not count repair-MT calls. A direct empty scope has zero
+steps and emits no child progress; the enclosing batch task still reports its
+completion normally.
+
+Do not write transient judge text into `task-log-<id>`, modify
+`message.html`, or add task-detail rendering in `loader-bootstrap.js`.
+`task-log-<id>` is the shared component log, and the task completion summary
+below is the sole producer-facing status contract.
 
 ### Step 5: Add judge completion summary
 
@@ -452,9 +547,19 @@ Generic modes retain generic messages.
 ### Step 6: Verify and commit
 
 ```bash
-./rundev.sh test weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_autotranslate.py
-git add weblate/trans/autotranslate.py weblate/trans/tasks.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_autotranslate.py
-git commit -m "feat(judge): preview and cap judge batches"
+./rundev.sh test \
+  weblate/trans/tests/test_judge_client.py \
+  weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_judge_autotranslate.py \
+  weblate/trans/tests/test_autotranslate.py \
+  -p no:randomly --no-cov -q
+git add weblate/trans/judge.py weblate/trans/judge_loop.py \
+  weblate/trans/autotranslate.py weblate/trans/tasks.py \
+  weblate/trans/tests/test_judge_client.py \
+  weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_judge_autotranslate.py \
+  weblate/trans/tests/test_autotranslate.py
+git commit -m "feat(judge): cap and report judge batch progress"
 ```
 
 ---
@@ -462,6 +567,7 @@ git commit -m "feat(judge): preview and cap judge batches"
 ## Task 7: Add secured live preview and mode-aware form
 
 **Files:**
+
 - Modify: `weblate/trans/forms.py`
 - Modify: `weblate/trans/views/edit.py`
 - Modify: `weblate/urls.py`
@@ -553,6 +659,7 @@ git commit -m "feat(judge): add bounded run preview"
 ## Task 8: Render component-first readiness
 
 **Files:**
+
 - Modify: `weblate/trans/views/basic.py`
 - Modify: `weblate/templates/component.html`
 - Create: `weblate/templates/snippets/judge-readiness.html`
@@ -606,6 +713,7 @@ git commit -m "feat(judge): add component release readiness"
 ## Task 9: Document and verify Plan 02 end to end
 
 **Files:**
+
 - Modify: `docs/user/translating.rst`
 - Modify: `docs/admin/checks.rst`
 - Modify: `docs/changes.rst`
@@ -615,7 +723,7 @@ git commit -m "feat(judge): add component release readiness"
 
 Extend, do not duplicate:
 
-- `docs/user/translating.rst`: readiness location, separate axes, stale/incomplete, exact queues, capped preview, observed-cost disclaimer, no approval implication.
+- `docs/user/translating.rst`: readiness location, separate axes, stale/incomplete, exact queues, capped preview, observed-cost disclaimer, numeric judge-batch progress (including a possible final no-repair jump), and no approval implication.
 - `docs/admin/checks.rst`: unavailable state, permissions, no configuration leakage, context-only warning semantics.
 - top unreleased `docs/changes.rst`: concise linked entry.
 
