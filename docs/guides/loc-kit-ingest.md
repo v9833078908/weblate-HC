@@ -602,8 +602,8 @@ out/
 
 TBX хранит source explanation в `<descrip>`, target explanation в
 `<note from="translator">`. Это ровно то, что читает `TBXUnit` и передаёт
-`weblate.machinery.llm._get_glossary_entry` как `source_explanation` и
-`target_explanation`.
+`weblate.glossary.models.build_glossary_prompt_entry` как
+`source_explanation` и `target_explanation`.
 
 Weblate glossary component для Terms:
 

@@ -152,6 +152,18 @@ can never lower what the other seat found. Each seat's opinion, and any
 disagreement between them, is shown on the ``judge`` checks card of the
 string.
 
+Both seats receive the glossary entries matched against each string, including
+their source and target explanations and effective flags. Each entry uses the
+same cleanup, filtering and serialization contract as LLM-based automatic
+suggestion services. Selection remains consumer-specific: the judge uses
+per-string matches, while an automatic suggestion service can use a full small
+glossary or a batch-wide union.
+
+Explanations scope an entry to the concept it names. For example, an entry that
+names a game mode does not require the same target word for a verb derived from
+that mode name. The ``exact``, ``read-only`` and ``forbidden`` flags retain their
+glossary meanings. See :ref:`glossary` for maintaining terms and explanations.
+
 The verdict maps to the checks ``judge-flag`` and ``judge-reject``, which
 behave like any other check for navigation, search, and the API (for example
 ``check:judge-reject``), but never appear in the :guilabel:`Things to check`
