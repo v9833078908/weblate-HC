@@ -36,6 +36,8 @@ from weblate.utils.requests import fetch_validated_url
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from weblate.glossary.models import GlossaryPromptEntry
+
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 JUDGE_REQUEST_TIMEOUT = 120
 # Measured category set (st2-zh-recalibration.py:59-68).
@@ -108,7 +110,7 @@ class JudgeRequest:
     source_language: str
     target_language: str
     note: str
-    glossary_terms: Sequence[tuple[str, str]]
+    glossary_terms: Sequence[GlossaryPromptEntry]
     failing_checks: Sequence[str] = field(default_factory=tuple)
     target_plurals: Sequence[str] = field(default_factory=tuple)
 
@@ -227,10 +229,7 @@ def _segment(index: int, req: JudgeRequest) -> dict:
     if req.note:
         segment["note"] = req.note
     if req.glossary_terms:
-        segment["glossary"] = [
-            {"source": source, "target": target}
-            for source, target in req.glossary_terms
-        ]
+        segment["glossary"] = [dict(entry) for entry in req.glossary_terms]
     if req.failing_checks:
         segment["checks"] = list(req.failing_checks)
     return segment

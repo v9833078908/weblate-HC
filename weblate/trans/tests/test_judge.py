@@ -112,16 +112,45 @@ class JudgeHashTest(SimpleTestCase):
         self.assertNotEqual(
             base,
             compute_context_hash(
-                source="Door", note="", glossary_terms=[("Door", "Porte")]
+                source="Door",
+                note="",
+                glossary_terms=[{"source": "Door", "target": "Porte"}],
             ),
         )
 
-    def test_context_hash_ignores_glossary_order(self) -> None:
+    def test_context_hash_reacts_to_glossary_target(self) -> None:
+        first = {"source": "Door", "target": "Porte"}
+        second = {"source": "Door", "target": "Portail"}
+        self.assertNotEqual(
+            compute_context_hash(source="Door", note="", glossary_terms=[first]),
+            compute_context_hash(source="Door", note="", glossary_terms=[second]),
+        )
+
+    def test_context_hash_reacts_to_glossary_explanations_and_flags(self) -> None:
+        plain = {"source": "Door", "target": "Porte"}
+        variants = (
+            {**plain, "source_explanation": "A game-mode name."},
+            {**plain, "target_explanation": "Use on the battle screen."},
+            {**plain, "flags": ["exact"]},
+        )
+        baseline = compute_context_hash(source="Door", note="", glossary_terms=[plain])
+        for entry in variants:
+            with self.subTest(entry=entry):
+                self.assertNotEqual(
+                    baseline,
+                    compute_context_hash(
+                        source="Door", note="", glossary_terms=[entry]
+                    ),
+                )
+
+    def test_context_hash_ignores_only_glossary_order(self) -> None:
+        first = {"source": "a", "target": "b"}
+        second = {"source": "c", "target": "d"}
         self.assertEqual(
             compute_context_hash(
-                source="Door", note="", glossary_terms=[("a", "b"), ("c", "d")]
+                source="Door", note="", glossary_terms=[first, second]
             ),
             compute_context_hash(
-                source="Door", note="", glossary_terms=[("c", "d"), ("a", "b")]
+                source="Door", note="", glossary_terms=[second, first]
             ),
         )

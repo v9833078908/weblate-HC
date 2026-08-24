@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from typing import Any
 from unittest import mock
 
@@ -28,7 +29,14 @@ REQ = JudgeRequest(
     source_language="ru",
     target_language="fr",
     note="",
-    glossary_terms=[("ГЕРМОДВЕРЬ", "porte blindée")],
+    glossary_terms=[
+        {
+            "source": "ГЕРМОДВЕРЬ",
+            "target": "porte blindée",
+            "source_explanation": "Бронированная герметичная дверь.",
+            "flags": ["terminology"],
+        }
+    ],
     failing_checks=[],
 )
 
@@ -43,6 +51,16 @@ def _request_segments(body: dict) -> list[dict]:
     payload = content.split(">\n", 1)[1]
     payload = payload.rsplit("\n</", 1)[0]
     return json.loads(payload)["segments"]
+
+
+class SegmentGlossaryTest(SimpleTestCase):
+    def test_segment_carries_the_complete_glossary_entry(self) -> None:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.judge import _segment
+
+        request = replace(REQ, glossary_terms=list(REQ.glossary_terms))
+
+        self.assertEqual(_segment(0, request)["glossary"], list(request.glossary_terms))
 
 
 class JudgeClientGateTest(SimpleTestCase):

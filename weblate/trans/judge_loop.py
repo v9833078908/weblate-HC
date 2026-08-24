@@ -24,7 +24,7 @@ from django.conf import settings
 from django.db import transaction
 
 from weblate.checks.judge import JUDGE_CHECKS
-from weblate.glossary.models import get_glossary_terms
+from weblate.glossary.models import get_matched_glossary_prompt_entries
 from weblate.machinery.models import MACHINERY
 from weblate.trans.forms import AutoForm
 from weblate.trans.judge import (
@@ -57,15 +57,6 @@ _NON_REPAIRABLE_VERDICTS = frozenset(
 )
 
 
-def _glossary_pairs(unit: Unit) -> list[tuple[str, str]]:
-    """Source/target text of the glossary terms attached to the unit."""
-    return [
-        (term.source, term.target)
-        for term in get_glossary_terms(unit, full=True)
-        if term.target
-    ]
-
-
 def build_request(unit: Unit) -> JudgeRequest:
     """Collect everything the judge is told about one unit."""
     translation = unit.translation
@@ -76,7 +67,7 @@ def build_request(unit: Unit) -> JudgeRequest:
         source_language=translation.component.source_language.code,
         target_language=translation.language.code,
         note=unit.source_unit.note,
-        glossary_terms=_glossary_pairs(unit),
+        glossary_terms=get_matched_glossary_prompt_entries(unit),
         # The judge's own projection is not evidence: a judge-* row is the
         # previous round's opinion, and feeding it back lets a seat cite
         # itself as proof ("the judge-flag check indicates ...").
@@ -251,7 +242,7 @@ def _apply_repair(
             or compute_context_hash(
                 source=locked.source,
                 note=locked.source_unit.note,
-                glossary_terms=_glossary_pairs(locked),
+                glossary_terms=get_matched_glossary_prompt_entries(locked),
             )
             != compute_context_hash(
                 source=request.source,

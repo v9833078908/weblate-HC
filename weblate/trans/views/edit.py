@@ -31,7 +31,11 @@ from django.views.decorators.http import require_POST
 from weblate.auth.results import PermissionResult
 from weblate.checks.models import CHECKS, get_display_checks
 from weblate.glossary.forms import TermForm
-from weblate.glossary.models import fetch_glossary_terms, get_glossary_terms
+from weblate.glossary.models import (
+    fetch_glossary_terms,
+    get_glossary_terms,
+    get_matched_glossary_prompt_entries,
+)
 from weblate.screenshots.forms import ScreenshotForm
 from weblate.trans.actions import ActionEvents
 from weblate.trans.exceptions import (
@@ -1299,11 +1303,7 @@ def _judge_view_context(unit: Unit) -> dict[str, Any]:
         != compute_context_hash(
             source=unit.source,
             note=unit.source_unit.note,
-            glossary_terms=[
-                (term.source, term.target)
-                for term in get_glossary_terms(unit, full=True)
-                if term.target
-            ],
+            glossary_terms=get_matched_glossary_prompt_entries(unit),
         )
     )
     return {

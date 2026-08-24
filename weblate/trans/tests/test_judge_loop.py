@@ -17,6 +17,7 @@ from weblate.trans.models.judge import (
     compute_target_hash,
 )
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.hash import calculate_hash
 from weblate.utils.state import STATE_TRANSLATED
 
 
@@ -324,3 +325,62 @@ class JudgeLoopTest(ViewTestCase):
         unit.clear_checks_cache()
         self.assertIn("judge-flag", unit.all_checks_names)
         self.assertNotIn("judge-flag", build_request(unit).failing_checks)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
+class JudgeGlossaryRepairLockTest(ViewTestCase):
+    CREATE_GLOSSARIES = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        glossary_component = self.project.glossaries[0]
+        glossary = glossary_component.translation_set.get(
+            language=self.translation.language
+        )
+        id_hash = calculate_hash("Hello", "")
+        self.source_term = glossary_component.source_translation.unit_set.create(
+            source="Hello",
+            target="Hello",
+            context="",
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+            explanation="A greeting, not a character name.",
+        )
+        glossary.unit_set.create(
+            source="Hello",
+            target="Ahoj",
+            context="",
+            source_unit=self.source_term,
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+        )
+        glossary.invalidate_cache()
+
+    def test_glossary_explanation_change_aborts_repair(self) -> None:
+        unit = self.get_unit()
+        original = unit.target
+        client = mock.Mock(side_effect=[[MAJOR], [MAJOR]])
+
+        def change_context(_unit, _user):
+            self.source_term.explanation = "Changed while the judge was running."
+            self.source_term.save(update_fields=["explanation"])
+            return ["must not be applied"]
+
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.repair_target", side_effect=change_context
+            ),
+        ):
+            verdicts = run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
+
+        self.assertNotIn(unit.id, verdicts)
+        self.assertEqual(self.get_unit().target, original)

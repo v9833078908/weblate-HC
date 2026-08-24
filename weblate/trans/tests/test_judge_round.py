@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import uuid
 
+from weblate.trans.judge_loop import build_request
 from weblate.trans.models.judge import (
     JudgeVerdict,
     active_round,
@@ -18,6 +19,8 @@ from weblate.trans.models.judge import (
     latest_round,
 )
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.hash import calculate_hash
+from weblate.utils.state import STATE_TRANSLATED
 
 
 class JudgeRoundTest(ViewTestCase):
@@ -180,3 +183,72 @@ class JudgeRoundTest(ViewTestCase):
         description = describe_latest_verdict(unit)
         self.assertIn("color=#FF0000", description)  # not eaten by strip_tags
         self.assertIn(" | ", description)  # explicit separator
+
+
+class JudgeGlossaryContextTest(ViewTestCase):
+    CREATE_GLOSSARIES = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.glossary_component = self.project.glossaries[0]
+        self.glossary = self.glossary_component.translation_set.get(
+            language=self.translation.language
+        )
+
+    def add_term(self) -> None:
+        id_hash = calculate_hash("Hello", "")
+        source_unit = self.glossary_component.source_translation.unit_set.create(
+            source="Hello",
+            target="Hello",
+            context="",
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+            explanation="A greeting, not a character name.",
+        )
+        self.glossary.unit_set.create(
+            source="Hello",
+            target="Ahoj",
+            context="",
+            source_unit=source_unit,
+            id_hash=id_hash,
+            position=1,
+            state=STATE_TRANSLATED,
+        )
+        self.glossary.invalidate_cache()
+
+    def test_fresh_verdict_matches_round_and_view_context(self) -> None:
+        self.add_term()
+        unit = self.get_unit()
+        unit.glossary_terms = None
+        request = build_request(unit)
+        self.assertEqual(
+            request.glossary_terms,
+            [
+                {
+                    "source": "Hello",
+                    "target": "Ahoj",
+                    "source_explanation": "A greeting, not a character name.",
+                }
+            ],
+        )
+        context_hash = compute_context_hash(
+            source=request.source,
+            note=request.note,
+            glossary_terms=request.glossary_terms,
+        )
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="major",
+            model_verdict="flag",
+            judge_model="vendor/model-a",
+            seat=1,
+            run_id=uuid.uuid4(),
+            target_hash=compute_target_hash(request.target_plurals or [request.target]),
+            context_hash=context_hash,
+        )
+        unit.glossary_terms = None
+        self.assertEqual(len(current_round(unit)), 1)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "context changed")

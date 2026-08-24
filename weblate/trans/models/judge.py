@@ -23,8 +23,9 @@ from weblate.utils.state import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
+    from weblate.glossary.models import GlossaryPromptEntry
     from weblate.trans.models.unit import Unit
 
 JUDGE_ERROR_SEPARATOR = " | "
@@ -47,15 +48,18 @@ def compute_target_hash(target: Sequence[str]) -> str:
 
 
 def compute_context_hash(
-    *, source: str, note: str, glossary_terms: Iterable[tuple[str, str]]
+    *, source: str, note: str, glossary_terms: Iterable[Mapping[str, object]]
 ) -> str:
-    """
-    Hash what the judge was told besides the target.
-
-    Glossary order is not context, so terms are sorted; a reordered
-    glossary must not invalidate a verdict.
-    """
-    terms = sorted(f"{term}\x1f{translation}" for term, translation in glossary_terms)
+    """Hash source, note and every prompt-visible glossary-entry field."""
+    terms = sorted(
+        json.dumps(
+            dict(entry),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        for entry in glossary_terms
+    )
     return _digest([source, note, *terms])
 
 
@@ -242,9 +246,7 @@ def current_round(unit: Unit) -> list[JudgeVerdict]:
     context_hash = compute_context_hash(
         source=unit.source,
         note=unit.source_unit.note,
-        glossary_terms=[
-            (term.source, term.target) for term in _glossary_terms(unit) if term.target
-        ],
+        glossary_terms=_glossary_prompt_entries(unit),
     )
     newest = (
         unit.judge_verdicts.filter(target_hash=target_hash, context_hash=context_hash)
@@ -263,13 +265,12 @@ def current_round(unit: Unit) -> list[JudgeVerdict]:
     )
 
 
-def _glossary_terms(unit: Unit) -> list[Unit]:
-    # Keep the context identity identical to the request sent to the judge.
+def _glossary_prompt_entries(unit: Unit) -> list[GlossaryPromptEntry]:
     from weblate.glossary.models import (  # ruff: ignore[import-outside-top-level]
-        get_glossary_terms,
+        get_matched_glossary_prompt_entries,
     )
 
-    return get_glossary_terms(unit, full=True)
+    return get_matched_glossary_prompt_entries(unit)
 
 
 def active_round(unit: Unit) -> list[JudgeVerdict]:
