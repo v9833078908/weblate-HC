@@ -8,7 +8,7 @@
 
 FROM alpine:3.22
 
-RUN apk add --no-cache openvpn dante-server bash
+RUN apk add --no-cache openvpn dante-server bash && mkdir /vpn
 
 COPY --chmod=0755 entrypoint.sh /entrypoint.sh
 

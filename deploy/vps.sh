@@ -64,15 +64,17 @@ gateway_running() {
 
 gateway_up() {
     if gateway_running; then
-        # Re-apply in case the container was restarted by Docker: the MTU set
-        # below is runtime state and does not survive a restart.
-        docker exec "$CONTAINER" ip link set dev tun0 mtu "$TUN_MTU"
-        echo "Gateway already running (SOCKS5 on 127.0.0.1:$SOCKS_PORT, tun0 MTU $TUN_MTU)."
+        echo "Gateway already running (SOCKS5 on 127.0.0.1:$SOCKS_PORT)."
         return 0
     fi
 
     docker build -q -t "$IMAGE" vpn-gateway > /dev/null
 
+    # Secrets are copied INTO the container's own filesystem instead of being
+    # bind-mounted from $TMPDIR: macOS cleans /var/folders/.../T out from
+    # under a long-lived container, which used to leave `--restart
+    # unless-stopped` crash-looping on an empty mount. Inside the container
+    # they survive every restart, and the host copy lives only for seconds.
     rm -rf "$SECRETS_DIR"
     mkdir -p "$SECRETS_DIR"
     chmod 700 "$SECRETS_DIR"
@@ -82,23 +84,20 @@ gateway_up() {
     chmod 600 "$SECRETS_DIR"/*
 
     docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
-    docker run -d \
+    docker create \
         --name "$CONTAINER" \
         --restart unless-stopped \
         --cap-add NET_ADMIN \
         --device /dev/net/tun \
         -p "127.0.0.1:$SOCKS_PORT:1080" \
-        -v "$SECRETS_DIR":/vpn:ro \
+        -e "TUN_MTU=$TUN_MTU" \
         "$IMAGE" > /dev/null
+    docker cp -q "$SECRETS_DIR/." "$CONTAINER:/vpn"
+    rm -rf "$SECRETS_DIR"
+    docker start "$CONTAINER" > /dev/null
 
     for _ in $(seq 1 45); do
         if docker logs "$CONTAINER" 2>&1 | grep -q "SOCKS5 listening"; then
-            # The office VPN server hands out tun0 with MTU 1500 while the real
-            # path is smaller, and it neither fragments nor returns ICMP. Packets
-            # above ~1100 bytes leaving the tunnel are dropped silently, which
-            # breaks SSH: the key exchange has to send a ~1.2 KB packet and stalls
-            # forever at SSH2_MSG_KEX_ECDH_REPLY while small requests keep working.
-            docker exec "$CONTAINER" ip link set dev tun0 mtu "$TUN_MTU"
             echo "Gateway up: SOCKS5 on 127.0.0.1:$SOCKS_PORT (tun0 MTU $TUN_MTU)"
             return 0
         fi
@@ -314,7 +313,13 @@ down)
     ;;
 status)
     if gateway_running; then
-        echo "Gateway: running (SOCKS5 127.0.0.1:$SOCKS_PORT)"
+        mtu=$(docker exec "$CONTAINER" cat /sys/class/net/tun0/mtu 2> /dev/null || echo "?")
+        echo "Gateway: running (SOCKS5 127.0.0.1:$SOCKS_PORT, tun0 MTU $mtu)"
+        if nc -X 5 -x "127.0.0.1:$SOCKS_PORT" -z -w 5 "$VPS_HOST" "$VPS_SSH_PORT" > /dev/null 2>&1; then
+            echo "VPS: $VPS_HOST:$VPS_SSH_PORT reachable through the tunnel"
+        else
+            echo "VPS: $VPS_HOST:$VPS_SSH_PORT NOT reachable through the tunnel"
+        fi
     else
         echo "Gateway: stopped"
     fi

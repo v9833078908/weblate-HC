@@ -298,3 +298,12 @@ Credentials come from `deploy/.env.local` (gitignored).
 ./deploy/vps.sh forward 8081  # publish the Weblate port on the Mac
 ./deploy/vps.sh down          # stop the gateway
 ```
+
+The container is self-healing: the secrets (`profile.ovpn`, `auth`,
+`askpass`) are copied into the container filesystem at creation time (never
+bind-mounted from the ephemeral `$TMPDIR`), the entrypoint sets the tun0 MTU
+on every start, and OpenVPN runs with `--ping-exit` so a dead peer terminates
+the container. Together with `--restart unless-stopped` this means Docker
+recovers from macOS temp cleanups, Docker Desktop restarts, reboots and dead
+tunnels without running `vps.sh` again. `status` verifies the whole path: it
+reports the tun0 MTU and probes the VPS SSH port through the SOCKS proxy.
