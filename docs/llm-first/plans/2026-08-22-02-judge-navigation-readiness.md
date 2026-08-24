@@ -2,6 +2,10 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use `executing-plans` to implement this plan task-by-task. Use `test-driven-development`, `frontend-design`, `lightpanda-browser`, `requesting-code-review`, and `verification-before-completion` where specified below.
 
+**Date:** 2026-08-22, updated 2026-08-24. **Status:** approved, implementation
+pending. Absorbs `docs/llm-first/plans/2026-08-24-judge-progress-reporting.md`
+(now a superseded stub); Task 6 owns judge progress reporting.
+
 **Goal:** Give a producer a component-first Weblate path from per-language release readiness to exact LLM-judge queues and a bounded, cost-aware judge run, without implying that a probabilistic verdict approves a release.
 
 **Architecture:** Keep `JudgeVerdict` as immutable evidence and add one database-queryable fingerprint of the exact stored target. One shared annotation contract drives search and lazy cached translation statistics. Render a separate readiness table above the existing component language table. Its primary action deep-links to the existing language-scoped automatic-translation form. Preview and execution share scope, ordering, permissions, cap, and numeric in-flight task progress. Delivery remains a separate axis based only on `PendingUnitChange` commit-policy accounting.
@@ -92,9 +96,14 @@
 
 Add tests for `compute_target_storage_hash(target: str)`:
 
-- stable for Unicode;
-- hashes the exact serialized plural target, including `\x1e\x1e`;
-- changes when one plural changes;
+- takes the raw stored `Unit.target` string exactly as the column stores it,
+  including the `\x1e\x1e` plural separator;
+- is never fed a join of `get_target_plurals()`: that helper pads or
+  truncates forms to the language plural count, so its join is not
+  guaranteed to equal the stored column and would silently break the
+  PostgreSQL `MD5(Unit.target)` comparison in Task 2;
+- stable for Unicode (UTF-8 on both the Python and PostgreSQL side);
+- changes when one plural form changes;
 - leaves existing SHA-256 `compute_target_hash()` unchanged.
 
 Expected implementation contract:
@@ -139,8 +148,10 @@ Declare nullable indexed
 `JudgeVerdict.target_storage_hash(max_length=32)`. The data migration must:
 
 - iterate only units with verdicts in bounded chunks;
-- locally reproduce SHA-256 plural hashing with
-  `target.split("\x1e\x1e")` and the exact JSON serialization;
+- locally reproduce SHA-256 plural hashing: split the stored target with
+  `target.split("\x1e\x1e")` and digest exactly
+  `json.dumps(list(parts), ensure_ascii=False, sort_keys=False)` - the
+  frozen equivalent of today's `_digest()`;
 - update only rows whose old `target_hash` matches the current target;
 - leave all other rows null;
 - not import current runtime model helpers.
@@ -151,7 +162,9 @@ the runtime model and migration state remain aligned after every task.
 ### Step 6: Test and update the verdict-write seam
 
 Add a failing assertion that `_write_verdict` stores both the existing audit
-SHA-256 and the new storage MD5. Populate the new field in `judge_loop.py`.
+SHA-256 and the new storage MD5 of `JudgeRequest.target` - the raw stored
+`unit.target` string, never a join of `request.target_plurals`. Populate the
+new field in `judge_loop.py`.
 After evidence is persisted, invalidate affected translation stats through
 existing `Translation.invalidate_cache()` without making invalidation failure
 able to erase evidence.
@@ -233,8 +246,8 @@ git commit -m "feat(judge): add target-fresh verdict queries"
 
 - Modify: `weblate/utils/search.py`
 - Modify: `weblate/trans/filter.py`
-- Modify: `weblate/trans/tests/test_search.py`
-- Modify: existing filter-choice test file found from current `FILTERS` tests
+- Modify: `weblate/utils/tests/test_search.py` (parser fixture suite around `parse_query`)
+- Modify: `weblate/trans/tests/test_widgets.py` (existing `FILTERS` choice tests)
 
 ### Step 1: Write failing fixture-backed tests
 
@@ -250,7 +263,7 @@ Pin result sets for:
 ### Step 2: Prove RED
 
 ```bash
-./rundev.sh test weblate/trans/tests/test_search.py -k judge
+./rundev.sh test weblate/utils/tests/test_search.py -k judge
 ```
 
 ### Step 3: Implement through parser annotations
@@ -262,12 +275,10 @@ Dropdown choices now: Not evaluated, Advisory - ships, Held for decision, Stale,
 ### Step 4: Verify and commit
 
 ```bash
-./rundev.sh test weblate/trans/tests/test_search.py weblate/trans/tests/test_filter.py
-git add weblate/utils/search.py weblate/trans/filter.py weblate/trans/tests/test_search.py weblate/trans/tests/test_filter.py
+./rundev.sh test weblate/utils/tests/test_search.py weblate/trans/tests/test_widgets.py
+git add weblate/utils/search.py weblate/trans/filter.py weblate/utils/tests/test_search.py weblate/trans/tests/test_widgets.py
 git commit -m "feat(judge): add current-verdict search filters"
 ```
-
-If the established filter test has another filename, use it instead of creating a duplicate convention.
 
 ---
 
@@ -276,9 +287,9 @@ If the established filter test has another filename, use it instead of creating 
 **Files:**
 
 - Modify: `weblate/utils/stats.py`
-- Modify: `weblate/trans/tests/test_stats.py`
+- Modify: `weblate/utils/tests/test_stats.py`
 - Modify: `weblate/trans/models/pending.py`
-- Modify: `weblate/trans/tests/test_pending.py`
+- Modify: `weblate/trans/tests/test_remote.py` (existing `detailed_count()` coverage lives here)
 
 ### Step 1: Write failing stats tests
 
@@ -302,7 +313,7 @@ Pin invariants:
 ### Step 2: Prove RED
 
 ```bash
-./rundev.sh test weblate/trans/tests/test_stats.py -k judge
+./rundev.sh test weblate/utils/tests/test_stats.py -k judge
 ```
 
 ### Step 3: Implement one-pass lazy judge stats
@@ -321,6 +332,10 @@ For multiple target translations and both commit policies, assert new `detailed_
 - older eligible plus newer held;
 - retry-ineligible blocking history.
 
+Extend `weblate/trans/tests/test_remote.py`, next to the existing
+`detailed_count()` cases; do not introduce a new `test_pending.py`
+convention.
+
 ### Step 5: Implement batched aggregation
 
 Run component-level retry/blocking logic once, then group distinct units per translation before retry, after retry, and after policy. Zero-fill translations without pending rows. Do not change `detailed_count()` semantics.
@@ -328,8 +343,8 @@ Run component-level retry/blocking logic once, then group distinct units per tra
 ### Step 6: Verify and commit
 
 ```bash
-./rundev.sh test weblate/trans/tests/test_stats.py weblate/trans/tests/test_pending.py
-git add weblate/utils/stats.py weblate/trans/tests/test_stats.py weblate/trans/models/pending.py weblate/trans/tests/test_pending.py
+./rundev.sh test weblate/utils/tests/test_stats.py weblate/trans/tests/test_remote.py
+git add weblate/utils/stats.py weblate/utils/tests/test_stats.py weblate/trans/models/pending.py weblate/trans/tests/test_remote.py
 git commit -m "feat(judge): cache readiness statistics"
 ```
 
@@ -742,9 +757,10 @@ Do not rewrite the approved Russian design document.
   weblate/trans/tests/test_judge_form.py \
   weblate/trans/tests/test_judge_views.py \
   weblate/trans/tests/test_llm_usage.py \
-  weblate/trans/tests/test_search.py \
-  weblate/trans/tests/test_stats.py \
-  weblate/trans/tests/test_pending.py
+  weblate/utils/tests/test_search.py \
+  weblate/utils/tests/test_stats.py \
+  weblate/trans/tests/test_widgets.py \
+  weblate/trans/tests/test_remote.py
 ```
 
 Expected: all selected tests pass.
@@ -787,7 +803,10 @@ Use the running dev instance and real controls. Do not rebuild/restart the share
 4. **Evaluate N** opens chosen language Auto tab with judge/default q/return link.
 5. Custom q survives mode changes.
 6. Invalid and zero q disable Apply.
-7. Valid q shows cap/calls and separate cost legs in live region.
+7. Valid q shows cap/calls and separate cost legs in live region. On a dev
+   instance without at least 5 priced samples per project/model/operation
+   leg, a leg must read as unavailable instead of showing numbers - that is
+   the correct rendering, not a failure.
 8. Keyboard focus and labels work without color.
 9. View-only account sees aggregates, not Evaluate/configure.
 10. Glossary component has no card.
