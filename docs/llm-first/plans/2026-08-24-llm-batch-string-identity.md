@@ -51,19 +51,30 @@ the two cases it was. It proves a content shift with one source translated twice
 does not prove that the same model, asked for ids, would have produced a mismatched label set. Do
 not write that this plan makes the measured defect impossible - it makes one class of it refusable.
 
-Exactly one design structurally prevents cross-string misattachment, and it is out of scope here:
+One design structurally prevents cross-string misattachment, and the measurement already in this
+repository argues against it:
 
 - `batch_size = 1` for LLM services. With one source per request there is nothing to misattach to,
-  so the failure cannot be expressed. What is measured is the request count: ten times as many,
-  against the batch size of 10 chosen in `analysis/data/col4-batch-size-eval.json`. What is **not**
-  measured is the price. Every request repeats the whole system prompt, the few-shot demonstration
-  and the glossary, which travels in full below `LLM_FULL_GLOSSARY_LIMIT = 300` terms, so input
-  tokens per string grow by that repeated overhead rather than by the request count, and prompt
-  caching may or may not absorb it. Latency and rate-limit headroom depend on how many requests run
-  concurrently and can move either way. Anyone proposing this must first measure tokens per string
-  and wall-clock time at both batch sizes - `analysis/data/col4-cost-samples.log` and the
-  `llm_usage_report` management command already record what is needed. The id echo is not a
-  substitute for this decision, and this decision is not made by this plan.
+  so the failure cannot be expressed. Shrinking the batch, however, is already known to cost
+  translation quality. `analysis/data/col4-batch-size-eval.json` ran the same 150-string COL4
+  ru->fr sample through three batch sizes back to back, twice: `end_stop` defects go 18 of 150 at
+  batch 20, 28 at batch 10, and **63 at batch 5**, reproducing exactly twenty minutes apart. For
+  scale, deleting the punctuation rule from the prompt altogether measured 58-71, so at batch 5 the
+  model honours that rule about as well as if it were not there. Cost and latency are not the
+  obstacle: prompt caching holds four times the requests to 10-25% more spend, and batch 5 at
+  concurrency 4 finished faster than batch 10 at concurrency 2. Batch 20 loses the other way - one
+  reply in ten hit the content filter and two were unparsable - so 10 sits at the bottom of a
+  U-shaped curve rather than being a compromise. Batch sizes below 5 are **unmeasured**, and the
+  trend runs against them. Anyone proposing `batch_size = 1` must first run
+  `EVAL_BATCH_SIZE=1 analysis/probes/col4-eval-harness.py` against that same fingerprinted sample
+  and show the defect counts; the id echo is not a substitute for that measurement, and this plan
+  does not make the decision.
+
+Batch size would not have prevented the defect that prompted this plan in any case. The German
+rotation in `docs/llm-first/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` §5.1 spans four
+consecutive units, which fits inside a batch of five, and the Indonesian content loss in
+`2026-08-24-batch-misalignment-radius-scan.md` §4.1 spans two. The batch-size lever is already at
+its measured optimum, so this defect has to be addressed in the protocol.
 
 Operational visibility: a model that never echoes ids does not fail loudly - every n-string batch
 degrades into n single-string requests that all succeed, and the only symptom is the OpenRouter
@@ -773,9 +784,9 @@ Add the resolver next to `_normalize_translation_items`:
 ```
 
 Use it in `_validate_translations`, which gains a required keyword-only `string_ids`. The
-resolution happens here rather than inside `_normalize_translation_items` - which stays unchanged
-- so the id failure carries its own error message: the generic mismatch and the id mismatch are
-different operational events and must be distinguishable in the logs.
+resolution happens here rather than inside `_normalize_translation_items`, which stays unchanged,
+so that the id failure carries its own error message: the generic mismatch and the id mismatch
+are different operational events and must be distinguishable in the logs.
 
 ```python
     @classmethod
