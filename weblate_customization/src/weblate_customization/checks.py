@@ -353,6 +353,8 @@ def _fold_digits(text: str) -> str:
 def _collapse_grouping(text: str) -> str:
     """Fold locale digit grouping so 1,900,000 == 1 900 000 == 1.900.000 == 30.000."""
     return THOUSANDS.sub(lambda match: _GROUP_RE.sub("", match.group()), text)
+
+
 def _format_value(value: Decimal) -> str:
     """Render a folded quantity the way the number tokenizer would see it."""
     return format(value.normalize(), "f")
@@ -400,8 +402,6 @@ def _fold_scales(text: str) -> str:
     return CJK_NUMBER.sub(cjk, folded)
 
 
-
-
 def _numbers(text: str, *, drop_ordinals: bool = False) -> Counter[str]:
     """Quantities outside markup, URLs and dates; digits, grouping and scale folded."""
     body = _fold_digits(URL.sub(" ", text))
@@ -416,7 +416,17 @@ def _numbers(text: str, *, drop_ordinals: bool = False) -> Counter[str]:
 
 
 class GameNumberCheck(TargetCheck):
-    """Every quantity the source states must survive into the translation."""
+    """
+    Every quantity the source states must survive into the translation.
+
+    Comparison is by value, not by digits: a scale word carries the zeros a
+    digit would spell out, so "10 тысяч" equals "10 Tausend" and "10,000" but
+    not "10万". Two limits: a figurative CJK quantity written without a digit,
+    such as 百万 for "millions", is read as the value it literally states; and
+    a quantity spelled out entirely in words ("десять тысяч") carries no
+    number on either side, so a worded source states nothing and a worded
+    target satisfies nothing - ignore-game-number remains the escape hatch.
+    """
 
     check_id = "game-number"
     name = gettext_lazy("Game number")
