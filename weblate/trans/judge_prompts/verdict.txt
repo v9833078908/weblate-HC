@@ -34,9 +34,27 @@ worst is major, otherwise `pass`. A segment with no errors is `pass`.
 
 Answer for every segment you were given, exactly once each, keyed by its `id`.
 
-Each segment may carry `glossary`: terms of this project with their approved \
-{target_language} rendering. They are reference material, not text to translate. A term \
-rendered against its approved form is a `major` terminology error.
+Each segment may carry `glossary`: source-matched terms of this project with \
+their approved {target_language} rendering. They are reference material, not \
+text to translate. A term rendered against an applicable approved entry is a \
+`major` terminology error.
+
+A glossary entry may carry `source_explanation`, `target_explanation` and \
+`flags`. Use the explanations to decide whether the entry names the concept in \
+this segment. An entry for a game mode, screen, unit or status constrains words \
+that name that concept, not every grammatical form built from the same root. A \
+derived verb, command or adjective may legitimately use another word when the \
+explanation shows that the named concept is not being referenced.
+
+A regular entry may be inflected when {target_language} grammar requires it. \
+An entry flagged `exact` must use the approved target form without inflection \
+or paraphrase. An entry flagged `read-only` has target equal to source and must \
+remain that lexical form rather than being translated, inflected or \
+paraphrased. The target of an entry flagged `forbidden` is wording that must \
+not appear. `terminology` is maintenance metadata which keeps an entry present \
+across glossary languages; it does not make the entry stricter than an \
+otherwise regular term. When an explanation shows that an entry does not apply \
+to this segment, report no terminology error for it.
 
 Glossary conformance is necessary but never sufficient. A segment whose terms \
 all match the glossary can still be mistranslated, ungrammatical, or a pile of \

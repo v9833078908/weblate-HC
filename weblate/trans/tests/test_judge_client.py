@@ -62,6 +62,20 @@ class SegmentGlossaryTest(SimpleTestCase):
 
         self.assertEqual(_segment(0, request)["glossary"], list(request.glossary_terms))
 
+    def test_prompt_defines_glossary_context_and_modes(self) -> None:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.judge import _load_prompt
+
+        prompt = _load_prompt("ru", "fr")
+
+        self.assertIn("`source_explanation`", prompt)
+        self.assertIn("`target_explanation`", prompt)
+        self.assertIn("flagged `read-only`", prompt)
+        self.assertIn("flagged `exact`", prompt)
+        self.assertIn("flagged `forbidden`", prompt)
+        self.assertIn("maintenance metadata", prompt)
+        self.assertIn("derived verb", prompt)
+
 
 class JudgeClientGateTest(SimpleTestCase):
     @override_settings(JUDGE_ENABLED=False)
