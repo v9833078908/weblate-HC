@@ -6,93 +6,202 @@
 
 **Goal:** Make `game-markup` reject parser-breaking changes to Hero Craft conditional DSL while continuing to allow localized branch text.
 
-**Architecture:** Refactor the conditional recognition already used by `conditional_dsl_syntax_spans()` into one linear structural parser that returns both highlight spans and ordered immutable signatures. `GameMarkupCheck.check_single()` will compare those signatures only when the source contains a recognized conditional, alongside its existing markup and placeholder comparisons; text inside branches remains outside the signature and may be translated.
+**Architecture:** Refactor the conditional recognition already used by `conditional_dsl_syntax_spans()` into one linear parser that returns both highlight spans and ordered immutable signatures, without narrowing the grammar it recognizes. `GameMarkupCheck.check_single()` compares those signatures after its existing markup and placeholder comparisons, and only for a source that actually contains a recognized conditional; branch text stays outside the signature and remains translatable.
 
-**Tech Stack:** Python, `regex`, Django/Weblate `TargetCheck`, `unittest` assertions executed by pytest in the existing dev Docker stack.
+**Tech Stack:** Python, `regex`, Django/Weblate `TargetCheck`, `unittest` assertions executed by pytest in the shared dev Docker stack.
 
 ---
 
-## Context and fixed contract
+## Context
 
 The source defect is recorded in
-`docs/operations/audits/2026-08-24-need-for-greed-multilingual-lqa.md`:
+`docs/operations/audits/2026-08-24-need-for-greed-multilingual-lqa.md:163-172`:
 
-- French `ui/amountFormatted` inserted NBSP and narrow NBSP inside
-  `{value:cond:...}` and was caught only because nested placeholders also
-  changed.
-- French `ui/humanTimer` inserted the same spaces inside each conditional
-  header but kept the nested sequence `{hours}`, `{minutes}`, `{seconds}`, so
-  the current check did not fire.
+- French `ui/amountFormatted` (Unit 359515) inserted `U+00A0` before each `:`
+  and `U+202F` before each `?`, and was reported only because the nested
+  placeholders changed too (`{value:amount()}` became `{value\u00a0:amount()}`).
+- French `ui/humanTimer` (Unit 359527) took the same damage but kept
+  `{hours}`, `{minutes}`, `{seconds}` intact, so nothing reported it.
 
-`weblate_customization/src/weblate_customization/checks.py:134-180` already has
-`conditional_dsl_syntax_spans()`. It recognizes balanced outer conditionals,
-protects their immutable spans, and leaves branch text unprotected.
+`weblate_customization/src/weblate_customization/checks.py:134-180` already
+recognizes conditionals and protects their immutable spans;
 `GameMarkupCheck.check_single()` at lines 195-200 still compares only markup
-multisets and the ordered generic placeholder sequence.
+multisets and the generic placeholder sequence.
+`docs/product/plans/2026-08-22-nested-game-placeholder-protection.md`
+deliberately left validation out of scope. This is the narrow follow-up, and it
+must reuse that scanner rather than introduce a second grammar.
 
-`docs/product/plans/2026-08-22-nested-game-placeholder-protection.md` deliberately
-left conditional validation out of scope. This plan is the narrow follow-up; it
-must reuse that scanner contract rather than introduce a second grammar.
+### Baseline evidence, measured 2026-08-24
 
-The implementation contract is fixed as follows:
+Measured by calling the installed `GameMarkupCheck.check_single()` inside the
+running dev container. `True` means reported today.
 
-1. A recognized source conditional defines the validation contract.
-2. The complete ordered source and target conditional signature sequences must
-   match. An additional target conditional therefore fails.
-3. Immutable elements are the outer braces, identifier, exact `:cond:` marker,
-   operator, operand, `?`, each top-level `|`, and each nested placeholder in
-   source order.
-4. Branch text is excluded. `h.` may become `Std.`, `godz.`, `sa.`, `dk.`, or
-   other locale text.
-5. No whitespace normalization is allowed inside immutable syntax. ASCII space,
-   NBSP (`U+00A0`), and narrow NBSP (`U+202F`) all remain significant.
-6. The observed operator grammar is limited to `<`, `<=`, `>`, and `>=`.
-   Undocumented operators require an engine-backed fixture and are out of
-   scope.
-7. A source with no recognized question-mark conditional gets no new
-   conditional validation. Existing forms such as `{value:cond:1}` retain
-   their current behavior.
-8. Empty targets retain the current non-failing behavior.
-9. The existing markup and placeholder comparisons remain unchanged.
+|Target change against its source|Today|Meaning for this plan|
+|---|---|---|
+|audited French `amountFormatted`|True|already reported, keep it reported|
+|audited French `humanTimer`|**False**|the defect this plan exists for|
+|ASCII space before `:cond:`|**False**|must flip|
+|space inside the comparison, `cond: >0 ?`|**False**|must flip|
+|`\|` lost, added, or moved|**False**|must flip|
+|`hours` to `hour`|**False**|must flip|
+|`>0` to `>=0`, `>0` to `>1`, `<=99999` to `<99999`|**False**|must flip|
+|final `}` truncated|**False**|must flip|
+|nested placeholder lost or swapped|True|already covered by `placeholder_sequence`|
+|extra conditional appended to the target|True|already covered by `placeholder_sequence`|
+|German or Turkish branch text|False|must stay `False`|
+|`{value:cond:1}` unchanged|False|must stay `False`|
+
+Two more measurements shape the design:
+
+- `_CONDITIONAL_HEADER.match("hours:cond: >0 ?")` succeeds today, so whitespace
+  inside the comparison is currently recognized and therefore protected.
+- `conditional_dsl_syntax_spans("{a:cond:>0?{b:cond:>0?x|}y|}")` currently
+  returns overlapping spans, because the nested conditional is recorded both as
+  a child of its parent and as a conditional of its own. The sorted,
+  non-overlapping span contract is already broken for that shape.
+- The dev corpus has 36 sources containing `:cond:` and zero nested
+  conditionals.
+
+### Fixed contract
+
+1. Recognition stays exactly what `_CONDITIONAL_HEADER` accepts today. The
+   grammar is **not** narrowed, because the same recognition feeds the
+   protected ranges used by `AddFrenchPunctuationSpacing`
+   (`weblate_customization/src/weblate_customization/autofixes.py:173-183`) and
+   by LLM placeholder protection (`weblate/machinery/llm.py:1780`). A narrower
+   header would silently unprotect forms those two subsystems must not touch.
+2. A recognized conditional in the source defines the contract for the target.
+3. The complete ordered sequence of signatures must match. An added or removed
+   conditional therefore fails.
+4. One signature is the exact header text, then, in source order, every
+   immediate nested placeholder verbatim and every top-level `|`.
+5. Branch text is not in the signature. `h.` may become `Std.`, `godz.`, `sa.`,
+   or `dk.`.
+6. Nothing is normalized. ASCII space, `U+00A0`, and `U+202F` are significant:
+   whitespace inside a header either changes the exact header text or makes the
+   header unrecognized, and both fail.
+7. Only the outermost recognized conditional is a record. A nested one travels
+   verbatim inside its parent's signature, which keeps spans non-overlapping
+   and keeps every branch interior walked exactly once. The deliberate
+   consequence is that branch text inside a nested conditional is immutable.
+   The dev corpus contains no nested conditional, and over-protection is the
+   safe direction for a string the engine parses.
+8. A source without `:cond:`, or with no recognized conditional, gets no new
+   failure. `{value:cond:1}` keeps its current behavior.
+9. An empty target keeps its current behavior and never fails.
+10. The existing markup and placeholder comparisons are unchanged and are
+    evaluated first, so nothing new is computed for a string that already
+    fails.
 
 ### Implementation boundaries
 
-- Work against the existing checkout and shared `dev-docker` stack. Do not
-  create or start a second stack; the ports and Compose project are shared.
-- The running container imports `weblate_customization` from
-  `dev-docker/data/python/`. Copy the package there after changing it; never add
-  that ignored copy to Git.
-- Do not modify `weblate.trans.protected_tokens`, autofixes, machinery,
+- Work in the existing checkout and the shared `dev-docker` stack. Do not
+  create a second stack or a worktree: `dev-docker` publishes fixed host ports
+  and its Compose project name comes from the directory, so a copy collides
+  instead of isolating.
+- The container imports `weblate_customization` from `dev-docker/data/python/`.
+  Copy the package there after every edit. That copy is ignored by Git and is
+  never staged.
+- Prefer node IDs over `-k` in every verification command. A mistyped `-k`
+  expression deselects everything and still reports success; a mistyped node ID
+  fails loudly. Read the reported test count after each run.
+- Do not touch `weblate.trans.protected_tokens`, the autofixes, machinery,
   spreadsheet validation, check registration, deployment configuration, stored
   translations, or the LQA audit.
-- Do not modify `docs/changes.rst`: its current unreleased Bug fixes entry,
-  "French punctuation spacing and automatic translation no longer modify
-  syntax in Hero Craft conditional game placeholders," already covers this
-  follow-up and must not be duplicated.
-- Use @superpowers:test-driven-development for Tasks 1-3 and
-  @superpowers:verification-before-completion for Task 4.
+- Do not run anything against production. Counting nested conditionals in the
+  live corpus is a separate operational task that needs its own approval; the
+  dev-corpus measurement above is the evidence this plan relies on.
+- Use @superpowers:test-driven-development for Tasks 1 to 4 and
+  @superpowers:verification-before-completion for Task 5.
 
 ---
 
-### Task 1: Add failing `GameMarkupCheck` regressions
+### Task 1: Make the scanner contract tests run at all
+
+`ConditionalDslSyntaxSpansTest` is never collected. `CheckTestCase`
+(`weblate/checks/tests/test_checks.py:26`) is `SimpleTestCase, ABC` with an
+abstract `check`, and the scanner class defines no `check`, so the class stays
+abstract and pytest collects none of its methods. Both existing span tests are
+dead, which is exactly the safety net Task 3 needs.
 
 **Files:**
 
-- Modify: `weblate_customization/tests/test_checks.py:24-140`
-- Test: `weblate_customization/tests/test_checks.py`
+- Modify: `weblate_customization/tests/test_checks.py:9-21`, `:40`
 
-#### Step 1: Add the audited malformed-target fixtures
+#### Step 1: Prove the class is dead
 
-Place these beside `AMOUNT_FORMATTED`, `HUMAN_TIMER_EN`, and
-`HUMAN_TIMER_DE`. Use escapes for invisible spaces so review does not depend on
-font rendering:
+Run:
+
+```bash
+WEBLATE_PORT=3001 ./rundev.sh test \
+  weblate_customization/tests/test_checks.py::ConditionalDslSyntaxSpansTest \
+  -n 0 -q
+```
+
+Expected: an error, not a pass. pytest reports
+`ERROR: not found: .../test_checks.py::ConditionalDslSyntaxSpansTest`.
+
+#### Step 2: Base the scanner tests on `SimpleTestCase`
+
+The sibling module already does this
+(`weblate_customization/tests/test_autofixes.py:9,26`), so follow it exactly.
+Add the import in the same group and position:
 
 ```python
-AMOUNT_FORMATTED_FR_BROKEN = (
+from django.test import SimpleTestCase
+from weblate_customization.checks import (
+```
+
+Then change the class statement only:
+
+```python
+class ConditionalDslSyntaxSpansTest(SimpleTestCase):
+```
+
+Leave `CheckTestCase` imported: `GameMarkupCheckTest` and the other check
+classes still use it.
+
+#### Step 3: Run the now-live tests
+
+Run:
+
+```bash
+WEBLATE_PORT=3001 ./rundev.sh test \
+  weblate_customization/tests/test_checks.py::ConditionalDslSyntaxSpansTest \
+  -n 0 -q
+```
+
+Expected: `2 passed`. Both assertions were verified against the current
+implementation before this plan was written, so a failure here means the import
+or class change is wrong, not that the scanner regressed.
+
+#### Step 4: Commit
+
+```bash
+git add weblate_customization/tests/test_checks.py
+git commit -m "test(checks): collect the conditional scanner contract tests"
+```
+
+---
+
+### Task 2: Add the failing regressions
+
+**Files:**
+
+- Modify: `weblate_customization/tests/test_checks.py:24-37`, `:40-73`, `:76-140`
+
+#### Step 1: Add the audited and nested fixtures
+
+Place these after `HUMAN_TIMER_DE`. The invisible spaces are written as escapes
+so a reviewer does not have to trust font rendering; they are byte-for-byte the
+audited targets:
+
+```python
+AMOUNT_FORMATTED_FR = (
     "{value\u00a0:cond\u00a0:>99999\u202f?{value\u00a0:amount()}|}"
     "{value\u00a0:cond\u00a0:<=99999\u202f?{value\u00a0:N0}|}"
 )
-HUMAN_TIMER_FR_BROKEN = (
+HUMAN_TIMER_FR = (
     "{hours\u00a0:cond\u00a0:>0\u202f?{hours}h. |}"
     "{minutes\u00a0:cond\u00a0:>0\u202f?{minutes}m. |}"
     "{seconds\u00a0:cond\u00a0:>=0\u202f?{seconds}s.|}"
@@ -102,235 +211,211 @@ HUMAN_TIMER_TR = (
     "{minutes:cond:>0?{minutes} dk. |}"
     "{seconds:cond:>=0?{seconds} sn.|}"
 )
+NESTED_CONDITIONAL = "{a:cond:>0?{b:cond:>0?x|}y|}"
 ```
 
-#### Step 2: Add one regression for the exact French failures
+The audited strings also carry one trailing space after the last `|}`, which
+`HUMAN_TIMER_EN` does not. Do not add it: it is branch-external text that no
+part of this contract inspects, and keeping the existing constant keeps the
+existing tests honest.
 
-Add this method to `GameMarkupCheckTest`:
+#### Step 2: Add the nested span regression
+
+Add to `ConditionalDslSyntaxSpansTest`:
 
 ```python
-def test_rejects_whitespace_inside_conditional_syntax(self) -> None:
-    for source, target in (
-        (AMOUNT_FORMATTED, AMOUNT_FORMATTED_FR_BROKEN),
-        (HUMAN_TIMER_EN, HUMAN_TIMER_FR_BROKEN),
-        (
-            HUMAN_TIMER_EN,
-            HUMAN_TIMER_EN.replace("hours:cond", "hours :cond", 1),
-        ),
-    ):
-        with self.subTest(target=target):
-            self.assertTrue(self.check.check_single(source, target, None))
+    def test_a_nested_conditional_is_one_outermost_record(self) -> None:
+        spans = conditional_dsl_syntax_spans(NESTED_CONDITIONAL)
+        inner = NESTED_CONDITIONAL.index("{b")
+        inner_block = "{b:cond:>0?x|}"
+
+        self.assertEqual(spans, sorted(spans))
+        self.assertTrue(all(left[1] <= right[0] for left, right in pairwise(spans)))
+        # The nested conditional travels as one child span, not as a second
+        # record whose own header span overlaps its parent's child span.
+        self.assertIn((inner, inner + len(inner_block)), spans)
+        self.assertNotIn((inner + 1, inner + 1 + len("b:cond:>0?")), spans)
 ```
 
-The `humanTimer` row is the essential regression: its nested generic
-placeholder sequence is unchanged, so the current implementation returns
-`False`.
+#### Step 3: Add the check regressions
 
-#### Step 3: Add separator-order regressions
+Add to `GameMarkupCheckTest`. Every row returns `False` today, and therefore
+fails before Task 4, except the first: the audited `amountFormatted` pair
+already returns `True` because its nested placeholders changed as well. It is
+kept so both audited defects are pinned by name, not because it is new
+coverage.
 
 ```python
-def test_rejects_changed_conditional_separators(self) -> None:
-    for target in (
-        HUMAN_TIMER_EN.replace("h. |}", "h. }", 1),
-        HUMAN_TIMER_EN.replace("h. |}", "h. ||}", 1),
-        HUMAN_TIMER_EN.replace("{hours}h. |", "|{hours}h. ", 1),
-    ):
-        with self.subTest(target=target):
-            self.assertTrue(
-                self.check.check_single(HUMAN_TIMER_EN, target, None)
+    def test_rejects_whitespace_inside_conditional_syntax(self) -> None:
+        for source, target in (
+            # Already reported today through the nested placeholders.
+            (AMOUNT_FORMATTED, AMOUNT_FORMATTED_FR),
+            (HUMAN_TIMER_EN, HUMAN_TIMER_FR),
+            (HUMAN_TIMER_EN, HUMAN_TIMER_EN.replace("hours:cond", "hours :cond", 1)),
+            (HUMAN_TIMER_EN, HUMAN_TIMER_EN.replace("cond:>0?", "cond: >0 ?", 1)),
+        ):
+            with self.subTest(target=target):
+                self.assertTrue(self.check.check_single(source, target, None))
+
+    def test_rejects_changed_conditional_separators(self) -> None:
+        for target in (
+            HUMAN_TIMER_EN.replace("h. |}", "h. }", 1),
+            HUMAN_TIMER_EN.replace("h. |}", "h. ||}", 1),
+            HUMAN_TIMER_EN.replace("{hours}h. |", "|{hours}h. ", 1),
+        ):
+            with self.subTest(target=target):
+                self.assertTrue(self.check.check_single(HUMAN_TIMER_EN, target, None))
+
+    def test_rejects_changed_conditional_headers(self) -> None:
+        for source, target in (
+            (HUMAN_TIMER_EN, HUMAN_TIMER_EN.replace("hours:cond", "hour:cond", 1)),
+            (
+                HUMAN_TIMER_EN,
+                HUMAN_TIMER_EN.replace("hours:cond:>0?", "hours:cond:>=0?", 1),
+            ),
+            (
+                HUMAN_TIMER_EN,
+                HUMAN_TIMER_EN.replace("hours:cond:>0?", "hours:cond:>1?", 1),
+            ),
+            (AMOUNT_FORMATTED, AMOUNT_FORMATTED.replace(":<=99999?", ":<99999?", 1)),
+        ):
+            with self.subTest(target=target):
+                self.assertTrue(self.check.check_single(source, target, None))
+
+    def test_rejects_a_malformed_conditional_target(self) -> None:
+        self.assertTrue(
+            self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_EN[:-1], None)
+        )
+
+    def test_a_nested_conditional_branch_is_immutable(self) -> None:
+        # Documented consequence of recording only the outermost conditional.
+        self.assertTrue(
+            self.check.check_single(
+                NESTED_CONDITIONAL, NESTED_CONDITIONAL.replace("?x|", "?z|", 1), None
             )
-```
-
-These cases cover a lost, added, and moved top-level `|`. The moved case also
-proves that the signature interleaves separators with nested placeholders
-instead of comparing only independent counters.
-
-#### Step 4: Add identifier, operator, and operand regressions
-
-```python
-def test_rejects_changed_conditional_headers(self) -> None:
-    for target in (
-        HUMAN_TIMER_EN.replace("hours:cond", "hour:cond", 1),
-        HUMAN_TIMER_EN.replace("hours:cond:>0?", "hours:cond:>=0?", 1),
-        HUMAN_TIMER_EN.replace("hours:cond:>0?", "hours:cond:>1?", 1),
-        AMOUNT_FORMATTED.replace(":<=99999?", ":<99999?", 1),
-    ):
-        with self.subTest(target=target):
-            self.assertTrue(
-                self.check.check_single(HUMAN_TIMER_EN, target, None)
-                if target != AMOUNT_FORMATTED.replace(":<=99999?", ":<99999?", 1)
-                else self.check.check_single(AMOUNT_FORMATTED, target, None)
+        )
+        self.assertFalse(
+            self.check.check_single(
+                NESTED_CONDITIONAL, NESTED_CONDITIONAL.replace("|}y|", "|}z|", 1), None
             )
+        )
+
+    def test_allows_localized_conditional_branch_text(self) -> None:
+        self.assertFalse(self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_TR, None))
+
+    def test_unrecognized_source_conditional_adds_no_failure(self) -> None:
+        for text in ("{value:cond:1}", "Text {value:00}: text"):
+            with self.subTest(text=text):
+                self.assertFalse(self.check.check_single(text, text, None))
 ```
 
-Keep the implementation simple when writing the actual test: if the conditional
-expression in the assertion is harder to read than two short loops, use two
-short loops. Do not introduce a test helper used once.
+Do not add a German row to `test_allows_localized_conditional_branch_text`:
+`test_conditional_dsl_highlights_leave_branch_text_translatable`
+(`weblate_customization/tests/test_checks.py:140`) already asserts
+`check_single(HUMAN_TIMER_EN, HUMAN_TIMER_DE, unit)` is `False`. Turkish adds a
+second abbreviation shape, German would only duplicate.
 
-#### Step 5: Add nested-placeholder and full-sequence regressions
+Do not add rows for a lost, swapped, or added nested placeholder. They pass
+today through `placeholder_sequence`, so they would prove nothing about this
+change; `test_rejects_a_malformed_conditional_target` is the boundary guard that
+does not overlap.
 
-```python
-def test_rejects_changed_conditional_structure(self) -> None:
-    targets = (
-        HUMAN_TIMER_EN.replace("{hours}h.", "h.", 1),
-        HUMAN_TIMER_EN.replace("{hours}h.", "{minutes}h.", 1),
-        HUMAN_TIMER_EN[:-1],
-        HUMAN_TIMER_EN + "{value:cond:>0?visible|}",
-    )
-
-    for target in targets:
-        with self.subTest(target=target):
-            self.assertTrue(
-                self.check.check_single(HUMAN_TIMER_EN, target, None)
-            )
-```
-
-This covers a lost placeholder, changed placeholder, malformed final block, and
-an additional target conditional.
-
-#### Step 6: Lock down the translatable branch and source-gating boundary
-
-```python
-def test_allows_localized_conditional_branch_text(self) -> None:
-    for target in (HUMAN_TIMER_DE, HUMAN_TIMER_TR):
-        with self.subTest(target=target):
-            self.assertFalse(
-                self.check.check_single(HUMAN_TIMER_EN, target, None)
-            )
-
-
-def test_unrecognized_source_conditional_adds_no_failure(self) -> None:
-    source = "{value:cond:1}"
-
-    self.assertFalse(self.check.check_single(source, source, None))
-```
-
-Keep the existing empty-target assertion in
-`test_placeholder_order_and_printf_tokens_are_preserved()` unchanged.
-
-#### Step 7: Run the focused test and prove it fails before implementation
-
-Run:
+#### Step 4: Run the new tests and confirm they fail
 
 ```bash
-./rundev.sh test \
-  weblate_customization/tests/test_checks.py \
-  -k "conditional_dsl or conditional_syntax or conditional_separators or conditional_headers or conditional_structure" \
-  -n 0
+cp -r \
+  weblate_customization/src/weblate_customization \
+  dev-docker/data/python/
+WEBLATE_PORT=3001 ./rundev.sh test \
+  weblate_customization/tests/test_checks.py::ConditionalDslSyntaxSpansTest \
+  weblate_customization/tests/test_checks.py::GameMarkupCheckTest \
+  -n 0 -q
 ```
 
-Expected: FAIL. At minimum, the exact broken French `humanTimer`, changed outer
-identifier, changed comparison, and changed `|` structure currently pass
-`GameMarkupCheck` and make their new assertions fail.
+Expected collection: `32 tests`, that is 3 in `ConditionalDslSyntaxSpansTest`
+(2 pre-existing plus the nested one) and 29 in `GameMarkupCheckTest` (22
+pre-existing plus the 7 added here). A smaller number means a method landed in
+the wrong class or a class name is misspelled.
 
-Do not weaken or delete a failing row to obtain green output. Record any row
-that unexpectedly passes under an existing generic placeholder comparison, but
-retain it as a public-contract regression if it represents required behavior.
+Expected: failures in
+`test_a_nested_conditional_is_one_outermost_record`,
+`test_rejects_whitespace_inside_conditional_syntax`,
+`test_rejects_changed_conditional_separators`,
+`test_rejects_changed_conditional_headers`,
+`test_rejects_a_malformed_conditional_target`, and the first assertion of
+`test_a_nested_conditional_branch_is_immutable`.
+
+`test_allows_localized_conditional_branch_text` and
+`test_unrecognized_source_conditional_adds_no_failure` must pass already. They
+are the guards against a fix that reports everything.
+
+Never delete or weaken a row to reach green output.
 
 ---
 
-### Task 2: Refactor conditional parsing into spans and signatures
+### Task 3: Return spans and signatures from one linear parser
 
 **Files:**
 
-- Modify: `weblate_customization/src/weblate_customization/checks.py:111-180`
-- Test: `weblate_customization/tests/test_checks.py:40-73`
+- Modify: `weblate_customization/src/weblate_customization/checks.py:134-180`
 
-#### Step 1: Split the supported header into immutable fields
+Leave `_CONDITIONAL_HEADER` (line 111) exactly as it is. Narrowing it would
+shrink the protected ranges that the French spacing autofix and the LLM cleanup
+read out of `check_highlight()`, which is a regression in the opposite
+direction from this plan's goal.
 
-Replace `_CONDITIONAL_HEADER` with a narrow pattern for the observed grammar:
+The code below was executed against the installed `_balanced_brace_blocks()`
+and `_CONDITIONAL_HEADER` inside the dev container before this plan was
+written. Over 80 texts, the fixtures of this plan plus every dev-corpus source
+and target containing `:cond:`, it returns spans identical to the installed
+scanner in all but one case: the synthetic nested fixture, where it removes the
+overlap. Highlighting therefore does not change for any real string.
 
-```python
-_CONDITIONAL_HEADER = regex.compile(
-    r"(?P<identifier>[A-Za-z_][A-Za-z0-9_]*)"
-    r":cond:"
-    r"(?P<operator>[<>]=?)"
-    r"(?P<operand>[^\s{}?|]+)"
-    r"\?"
-)
-```
+#### Step 1: Add the parser
 
-This deliberately rejects whitespace, `|`, braces, and `?` inside the operand.
-It recognizes `<`, `<=`, `>`, and `>=` only. Do not add equality, boolean, or
-text operators without an engine-backed source fixture.
-
-#### Step 2: Add one private parser result helper
-
-Keep allocation bounded to the syntax that must be returned. Do not add a class
-hierarchy or a general DSL AST. Add a private helper with this contract:
-
-```python
-ConditionalSignature = tuple[str, ...]
-
-
-def _parse_conditional_dsl(
-    text: str,
-) -> tuple[list[tuple[int, int]], tuple[ConditionalSignature, ...]]:
-    """Return immutable syntax spans and ordered conditional signatures."""
-```
-
-Implement it by reusing `_balanced_brace_blocks(text)`:
-
-1. Iterate balanced blocks.
-2. Match `_CONDITIONAL_HEADER` immediately after each opening brace and before
-   its matching closing brace.
-3. Skip blocks without a matching header.
-4. Start the signature with:
-
-   ```python
-   [
-       "{",
-       header.group("identifier"),
-       ":cond:",
-       header.group("operator"),
-       header.group("operand"),
-       "?",
-   ]
-   ```
-
-5. Index the block's immediate `children` by start offset.
-6. Walk from `header.end()` to the outer closing brace:
-   - when the current position starts a child, append the exact
-     `text[child_start:child_end]` and jump to `child_end`;
-   - when the current character is a top-level `|`, append `"|"` and advance
-     one character;
-   - otherwise advance one character without appending branch text.
-7. Append `"}"`.
-8. Retain the existing span contract: outer braces, the complete header, every
-   immediate nested placeholder, and every top-level `|` are syntax spans.
-9. Sort recognized conditionals by outer start offset before returning their
-   signatures. Sort and deduplicate spans before returning them.
-
-The core should remain equivalent to this shape:
+Insert `_parse_conditional_dsl()` directly above
+`conditional_dsl_syntax_spans()`:
 
 ```python
 def _parse_conditional_dsl(
     text: str,
-) -> tuple[list[tuple[int, int]], tuple[ConditionalSignature, ...]]:
-    parsed: list[tuple[int, list[tuple[int, int]], ConditionalSignature]] = []
+) -> tuple[list[tuple[int, int]], tuple[tuple[str, ...], ...]]:
+    """
+    Return immutable conditional spans and the ordered conditional signatures.
 
-    for start, end, children in _balanced_brace_blocks(text):
+    A signature holds the exact header, every immediate nested placeholder and
+    every top-level delimiter, in source order, and no branch text. Only the
+    outermost recognized conditional is a record: a nested one travels verbatim
+    inside its parent, which keeps spans non-overlapping and walks every branch
+    interior once.
+    """
+    spans: list[tuple[int, int]] = []
+    signatures: list[tuple[str, ...]] = []
+    recognized_end = 0
+
+    for start, end, children in sorted(
+        _balanced_brace_blocks(text), key=lambda block: block[0]
+    ):
+        if start < recognized_end:
+            continue
         header = _CONDITIONAL_HEADER.match(text, start + 1, end - 1)
         if header is None:
             continue
 
-        spans = [
-            (start, start + 1),
-            (start + 1, header.end()),
-            (end - 1, end),
-            *children,
-        ]
-        signature = [
-            "{",
-            header.group("identifier"),
-            ":cond:",
-            header.group("operator"),
-            header.group("operand"),
-            "?",
-        ]
+        # The header's comparison cannot cross a nested placeholder. The
+        # matching outer brace proved every nested placeholder is complete.
+        spans.extend(
+            (
+                (start, start + 1),
+                (start + 1, header.end()),
+                (end - 1, end),
+            )
+        )
+        spans.extend(children)
+
+        signature = [text[start + 1 : header.end()]]
         children_by_start = dict(children)
         position = header.end()
-
         while position < end - 1:
             child_end = children_by_start.get(position)
             if child_end is not None:
@@ -343,138 +428,132 @@ def _parse_conditional_dsl(
             else:
                 position += 1
 
-        signature.append("}")
-        parsed.append((start, spans, tuple(signature)))
+        signatures.append(tuple(signature))
+        recognized_end = end
 
-    parsed.sort(key=lambda item: item[0])
-    all_spans = sorted({span for _, spans, _ in parsed for span in spans})
-    signatures = tuple(signature for _, _, signature in parsed)
-    return all_spans, signatures
+    return spans, tuple(signatures)
 ```
 
-Before copying this shape verbatim, preserve the existing invariant that spans
-are non-overlapping. If a recognized conditional can also appear as a child of
-another recognized conditional, skip nested recognized conditionals as
-independent records or merge their spans deliberately; do not allow duplicate
-or overlapping highlights. The audited grammar contains nested placeholders,
-not nested conditionals, so no speculative nested-conditional semantics are
-required.
+Three details are load-bearing:
 
-#### Step 3: Make `conditional_dsl_syntax_spans()` consume the shared parser
+- `_balanced_brace_blocks()` returns a block when its closing brace is read, so
+  a nested block precedes its parent. Sorting by start is what makes
+  "outermost wins" and the signature order correct.
+- `recognized_end` is updated only for a recognized conditional, so a
+  conditional nested inside an ordinary brace group is still recorded.
+- The signature holds no constant brace characters. Every recognized block has
+  them, so they would carry no information.
 
-Replace its embedded conditional walk with:
+#### Step 2: Make the public scanner consume the parser
+
+Replace the body of `conditional_dsl_syntax_spans()` down to the
+`simple_placeholders` list with one call, and keep everything from
+`simple_placeholders` onwards byte-for-byte:
 
 ```python
 def conditional_dsl_syntax_spans(text: str) -> list[tuple[int, int]]:
+    """
+    Return immutable spans in the documented Hero Craft conditional DSL.
+
+    Branch text remains unprotected so it can be translated. Nested brace
+    placeholders, delimiters, and a directly adjacent placeholder separator
+    are syntax rather than rendered text.
+    """
     spans, _signatures = _parse_conditional_dsl(text)
 ```
 
-Then retain the current adjacent-placeholder colon scan at lines 171-178 and
-return the sorted, deduplicated union. Do not move that colon into conditional
-signatures: it is a separate highlighting rule for forms such as
-`{minutes:00}:{seconds:00}`.
+The adjacent-placeholder colon scan at lines 171-178 stays a separate rule and
+never enters a signature: it protects the `:` in `{minutes:00}:{seconds:00}`,
+which is not part of any conditional. The final
+`return sorted({span for span in spans if span[0] < span[1]})` is unchanged and
+is what deduplicates the raw list the parser returns.
 
-#### Step 4: Run the existing scanner contract tests
-
-Run:
+#### Step 3: Run the scanner tests
 
 ```bash
 cp -r \
   weblate_customization/src/weblate_customization \
   dev-docker/data/python/
-./rundev.sh test \
-  weblate_customization/tests/test_checks.py \
-  -k "ConditionalDslSyntaxSpansTest" \
-  -n 0
+WEBLATE_PORT=3001 ./rundev.sh test \
+  weblate_customization/tests/test_checks.py::ConditionalDslSyntaxSpansTest \
+  -n 0 -q
 ```
 
-Expected: PASS. Syntax spans remain ordered and non-overlapping, malformed input
-returns no conditional spans, nested placeholders remain protected, and German
-branch text remains unprotected.
+Expected: `3 passed`. The nested regression from Task 2 now passes, and the two
+pre-existing contract tests still do.
 
-The new `GameMarkupCheck` tests should still fail because `check_single()` has
-not consumed signatures yet.
+The `GameMarkupCheckTest` regressions must still fail: nothing consumes the
+signatures yet.
 
 ---
 
-### Task 3: Compare conditional signatures in `GameMarkupCheck`
+### Task 4: Compare signatures in `GameMarkupCheck`
 
 **Files:**
 
-- Modify: `weblate_customization/src/weblate_customization/checks.py:183-217`
-- Test: `weblate_customization/tests/test_checks.py:76-170`
+- Modify: `weblate_customization/src/weblate_customization/checks.py:195-200`
 
-#### Step 1: Add the minimal signature comparison
-
-Preserve the empty-target early return. Parse the source once, and parse the
-target only when the source has at least one recognized signature:
+#### Step 1: Replace `check_single()`
 
 ```python
-def check_single(self, source: str, target: str, unit) -> bool:
-    if not target:
-        return False
+    def check_single(self, source: str, target: str, unit) -> bool:
+        if not target:
+            return False
+        if Counter(markup_tokens(source)) != Counter(markup_tokens(target)):
+            return True
+        if placeholder_sequence(source) != placeholder_sequence(target):
+            return True
+        if ":cond:" not in source:
+            return False
 
-    _source_spans, source_conditionals = _parse_conditional_dsl(source)
-    conditional_mismatch = bool(source_conditionals) and (
-        source_conditionals != _parse_conditional_dsl(target)[1]
-    )
-
-    return (
-        Counter(markup_tokens(source)) != Counter(markup_tokens(target))
-        or placeholder_sequence(source) != placeholder_sequence(target)
-        or conditional_mismatch
-    )
+        source_conditionals = _parse_conditional_dsl(source)[1]
+        return bool(source_conditionals) and (
+            source_conditionals != _parse_conditional_dsl(target)[1]
+        )
 ```
 
-Do not normalize signatures, compare branch text, compare only counters, or add
-special cases for the audited French strings. The structural sequence is the
-contract.
+The order matters for cost, not only for style. `check_single()` runs for every
+unit of every check pass, `_balanced_brace_blocks()` is a per-character Python
+loop, and almost no string contains `:cond:`. The substring test is a C-level
+scan that skips the parser entirely, and the two early returns keep a string
+that already fails from paying for it.
 
-#### Step 2: Keep highlight behavior on the same parser
+Do not normalize a signature, compare branch text, compare counters instead of
+sequences, or special-case the audited French strings.
 
-`check_highlight()` must continue calling `conditional_dsl_syntax_spans()`.
-Do not parse `unit.source`; the method's `source` argument is the text whose
-coordinates the returned highlights describe.
+#### Step 2: Leave `check_highlight()` alone
 
-#### Step 3: Recopy the package and run all focused regressions
+It must keep calling `conditional_dsl_syntax_spans()` on its `source` argument,
+which is the text whose coordinates the returned highlights describe. Do not
+switch it to `unit.source`, and do not have it call the parser directly.
 
-Run:
+#### Step 3: Run every regression
 
 ```bash
 cp -r \
   weblate_customization/src/weblate_customization \
   dev-docker/data/python/
-./rundev.sh test \
-  weblate_customization/tests/test_checks.py \
-  -k "conditional_dsl or conditional_syntax or conditional_separators or conditional_headers or conditional_structure" \
-  -n 0
+WEBLATE_PORT=3001 ./rundev.sh test \
+  weblate_customization/tests/test_checks.py::ConditionalDslSyntaxSpansTest \
+  weblate_customization/tests/test_checks.py::GameMarkupCheckTest \
+  -n 0 -q
 ```
 
-Expected: PASS.
+Expected: `32 passed`, the same 32 that were collected in Task 2.
 
-Confirm specifically from the passing test output:
-
-- both audited French targets fail the check;
-- lost, added, and moved `|` fail;
-- changed identifier, operator, and operand fail;
-- malformed or extra target conditionals fail when the source is recognized;
-- German and Turkish branch translations pass;
-- `{value:cond:1}` remains outside the new contract.
-
-#### Step 4: Run the complete custom-check test module
-
-Run:
+#### Step 4: Run the whole custom check module
 
 ```bash
-./rundev.sh test weblate_customization/tests/test_checks.py -n 0
+WEBLATE_PORT=3001 ./rundev.sh test \
+  weblate_customization/tests/test_checks.py -n 0 -q
 ```
 
-Expected: PASS. Existing Unity markup, ordered placeholders, line separators,
-numbers, game tokens, Cyrillic leakage, and length checks retain their behavior.
+Expected: `156 passed`, that is the 146 collected before this work, plus the 2
+scanner tests Task 1 brought back to life, plus the nested span test, plus the
+7 check regressions. Unity markup, ordered placeholders, line separators,
+numbers, game tokens, Cyrillic leakage, and length checks keep their behavior.
 
-#### Step 5: Commit the implementation slice
-
-Run:
+#### Step 5: Commit
 
 ```bash
 git add \
@@ -483,161 +562,179 @@ git add \
 git commit -m "fix(checks): validate conditional game DSL"
 ```
 
-Do not stage unrelated untracked plans or the ignored container copy.
+Stage nothing else. `dev-docker/data/python/` is ignored, and unrelated
+untracked documents stay untracked.
 
 ---
 
-### Task 4: Verify cross-subsystem contracts
+### Task 5: Verify the neighbouring subsystems and record the change
 
 **Files:**
 
 - Verify: `weblate_customization/tests/test_autofixes.py`
-- Verify: `weblate/trans/tests/test_multilingual_spreadsheet.py`
-- Verify: `weblate/machinery/tests.py`
-- Modify after all checks pass: `docs/product/plans/2026-08-24-05-conditional-dsl-validation.md`
+- Verify: `weblate/trans/tests/test_multilingual_spreadsheet.py:111`
+- Verify: `weblate/machinery/tests.py:7640`
+- Modify: `docs/changes.rst:47`
 
-#### Step 1: Run custom autofix integration tests
-
-Run:
+#### Step 1: Run the custom autofixes
 
 ```bash
-./rundev.sh test \
-  weblate_customization/tests/test_checks.py \
-  weblate_customization/tests/test_autofixes.py \
-  -n 0
+WEBLATE_PORT=3001 ./rundev.sh test \
+  weblate_customization/tests/test_autofixes.py -n 0 -q
 ```
 
-Expected: PASS. French visible punctuation can still be localized while
-conditional syntax highlights remain immutable.
+Expected: all pass. `AddFrenchPunctuationSpacing` reads protected ranges from
+`highlight_string()`, so this is the test that would catch a shrunken
+recognition surface.
 
-#### Step 2: Run the existing spreadsheet and LLM conditional regressions
-
-Run:
+#### Step 2: Run the spreadsheet and LLM conditional contracts by node ID
 
 ```bash
-./rundev.sh test \
-  weblate/trans/tests/test_multilingual_spreadsheet.py \
-  weblate/machinery/tests.py \
-  -k "conditional_dsl or placeholder" \
-  -n 0
+WEBLATE_PORT=3001 ./rundev.sh test \
+  "weblate/trans/tests/test_multilingual_spreadsheet.py::MultilingualSpreadsheetExportTest::test_preview_accepts_translated_conditional_branches" \
+  "weblate/machinery/tests.py::ConditionalDslLLMTranslationTest::test_translate_preserves_conditional_dsl_syntax" \
+  -n 0 -q
 ```
 
-Expected: PASS. Spreadsheet validation still accepts localized `humanTimer`
-branch text, and LLM cleanup still restores syntax spans without translating
-them.
+Expected: `2 passed`. Node IDs are mandatory here. A `-k` expression such as
+`conditional_dsl or placeholder` matches the machinery test but not
+`test_preview_accepts_translated_conditional_branches`, so it would deselect the
+spreadsheet contract and still print a green summary.
 
-Do not add new spreadsheet or machinery tests unless an existing contract
-actually fails. The implementation changes only the custom check parser and its
-boolean validation result.
+Add no new tests in these two files unless one of them actually fails. This
+change touches the custom parser and one boolean result, nothing they own.
 
-#### Step 3: Run the repository's configured checks
+#### Step 3: Add the changelog entry
 
-Run:
+A check that starts reporting strings it used to pass is user-visible, and every
+check change in this release carries its own bullet
+(`docs/changes.rst:30,31,45,46,47`). The existing conditional-DSL entry on line
+51 is about the autofix and machine translation not modifying syntax, not about
+the check reporting it, so it is not a substitute.
+
+Append one bullet as the last entry of the `.. rubric:: Improvements` section,
+directly after the `game-length` bullet on line 47:
+
+```rst
+* The ``game-markup`` check now also compares the syntax of Hero Craft conditional placeholders such as ``{hours:cond:>0?{hours}h. |}``: a space inserted inside a conditional header, a lost, added or moved ``|``, and a changed identifier, comparison or nested placeholder are reported, while the text of a conditional branch stays translatable.
+```
+
+Keep it on one line, keep the closing stop, and do not edit any released
+section.
+
+#### Step 4: Run the configured hooks
+
+Name the hooks and the files. `prek` is the entry point; a bare `ruff`
+invocation is not guaranteed to exist in this environment.
 
 ```bash
-uv run prek run --all-files
+uv run prek run ruff-check ruff-format --files \
+  weblate_customization/src/weblate_customization/checks.py \
+  weblate_customization/tests/test_checks.py
+uv run prek run trailing-whitespace end-of-file-fixer rst-double-space \
+  sphinx-lint codespell --files docs/changes.rst
 ```
 
-Expected: PASS. Use the repository's configured `prek` hooks rather than a bare
-`ruff` command.
+Expected: pass, with the formatter free to reflow the code it owns.
 
-If a hook changes a file outside this plan, stop and inspect before staging.
-Never include unrelated fixes in this implementation.
+Do **not** treat `uv run prek run --all-files` as the gate here. Two hooks
+ignore a `--files` restriction and scan or fix the whole tree: `typos`
+(`pass_filenames: false`) currently reports about 130 pre-existing findings in
+`analysis/data/`, the LQA audits, and unrelated plans, and `ruff-check --fix`
+rewrites files outside the given set. The open cleanup for those findings is
+`docs/product/plans/2026-08-23-prek-full-pass-remaining-hooks.md`; do not fold
+it into this change. If a hook rewrites a file this plan does not name, restore
+it before staging.
 
-#### Step 4: Perform the required smoke check through the real check entry point
+`rst-bullet-stop` is deliberately absent from the second command: it already
+fails on the pre-existing multi-line bullet at `docs/changes.rst:33-36`, whose
+first line cannot end with a stop. Keep the new entry on one line ending with a
+stop, which is what that hook wants, and do not reformat line 33 to make the
+hook green.
 
-Use the focused pytest regression as the smoke path: it constructs the real
-`GameMarkupCheck`, passes the exact audited source and target strings through
-`check_single()`, and observes the boolean failure result. Do not substitute a
-source-text assertion or a regex-only unit test.
+#### Step 5: Smoke test through the real entry point
 
-Run once more:
+The proof is the audited pair travelling through the constructed check, not a
+regex assertion:
 
 ```bash
-./rundev.sh test \
-  weblate_customization/tests/test_checks.py::GameMarkupCheckTest::test_rejects_whitespace_inside_conditional_syntax \
-  -n 0
+WEBLATE_PORT=3001 ./rundev.sh test \
+  "weblate_customization/tests/test_checks.py::GameMarkupCheckTest::test_rejects_whitespace_inside_conditional_syntax" \
+  -n 0 -q
 ```
 
-Expected: PASS.
+Expected: `1 passed`.
 
-#### Step 5: Mark the plan completed
-
-Change the status at the top of this file from:
-
-```text
-Awaiting implementation approval.
-```
-
-to:
-
-```text
-Completed and verified on 2026-08-24.
-```
-
-Do not change `docs/changes.rst`; the existing release note is sufficient.
-
-#### Step 6: Commit the verified plan status
-
-Run:
+#### Step 6: Commit
 
 ```bash
-git add docs/product/plans/2026-08-24-05-conditional-dsl-validation.md
-git commit -m "docs(product): complete conditional DSL validation plan"
+git add docs/changes.rst
+git commit -m "docs(changes): note conditional DSL syntax validation"
 ```
 
 ---
 
-### Task 5: Push without deployment
+### Task 6: Close the plan and push
 
 **Files:**
 
-- Verify only: the two commits created in Tasks 3 and 4
+- Modify: `docs/product/plans/2026-08-24-05-conditional-dsl-validation.md:5`
 
-#### Step 1: Confirm only planned tracked files were committed
+#### Step 1: Mark the plan completed
 
-Inspect the two commits before pushing. They must contain only:
+Replace the status line with:
 
-- `weblate_customization/src/weblate_customization/checks.py`;
+```text
+**Status:** Completed and verified on 2026-08-24.
+```
+
+#### Step 2: Confirm the commit contents
+
+The branch must carry exactly four commits from this plan, touching only:
+
 - `weblate_customization/tests/test_checks.py`;
-- `docs/product/plans/2026-08-24-05-conditional-dsl-validation.md` status.
+- `weblate_customization/src/weblate_customization/checks.py`;
+- `docs/changes.rst`;
+- this plan file.
 
-The unrelated untracked documents that may exist in the checkout must remain
-untracked and uncommitted.
-
-#### Step 2: Push the current branch
-
-Run:
+#### Step 3: Commit and push
 
 ```bash
+git add docs/product/plans/2026-08-24-05-conditional-dsl-validation.md
+git commit -m "docs(product): complete conditional DSL validation plan"
 git push origin HEAD
 ```
 
-Expected: the push succeeds.
+#### Step 4: Stop before deployment
 
-#### Step 3: Stop before deployment
-
-Do not run `deploy/vps.sh`, restart or rebuild shared containers, execute a
-production management command, or rewrite stored translations. Deployment and
-production repair require separate explicit approval.
+Do not run `deploy/vps.sh`, restart or rebuild the shared containers, run a
+management command against production, or rewrite stored translations. The
+French units 359515 and 359527 will now report `game-markup` until the separate
+correction plan repairs them, and the audit explicitly forbids silencing them
+with `ignore-game-markup`.
 
 ---
 
 ## Acceptance criteria
 
-1. The exact broken French `amountFormatted` and `humanTimer` targets from
-   `docs/operations/audits/2026-08-24-need-for-greed-multilingual-lqa.md`
-   return `True` from `GameMarkupCheck.check_single()`.
-2. Lost, added, or moved top-level `|` separators return `True`.
-3. Changed identifiers, operators, operands, or nested placeholders return
-   `True`.
-4. An additional target conditional returns `True` when the source contains a
-   recognized conditional.
-5. Localized branch text with unchanged syntax returns `False`.
-6. A source without a recognized question-mark conditional receives no new
-   conditional failure.
-7. Existing empty-target, markup, placeholder, highlighting, autofix,
-   spreadsheet, and LLM cleanup contracts pass unchanged.
-8. `uv run prek run --all-files` passes.
-9. Only the planned implementation and test files are committed and pushed.
-10. No deployment or production data mutation occurs.
+1. Both audited French targets return `True` from
+   `GameMarkupCheck.check_single()`.
+2. A space inside a conditional header, in any of ASCII, `U+00A0`, or `U+202F`,
+   returns `True`.
+3. A lost, added, or moved top-level `|` returns `True`.
+4. A changed identifier, comparison, or nested placeholder returns `True`.
+5. A malformed target conditional returns `True` while the source is
+   recognized.
+6. Localized branch text with unchanged syntax returns `False`, including the
+   German row already asserted at `weblate_customization/tests/test_checks.py:140`.
+7. A source without a recognized conditional gains no failure, and no string
+   without `:cond:` reaches the parser.
+8. `conditional_dsl_syntax_spans()` returns sorted, non-overlapping spans for a
+   nested conditional, which it does not do today.
+9. `_CONDITIONAL_HEADER` still accepts everything it accepts today, so the
+   autofix and LLM protection surface does not shrink.
+10. `weblate_customization/tests/test_checks.py` reports 156 passing tests, and
+    both named cross-subsystem node IDs pass.
+11. The named hooks pass for the three changed files, and no unrelated file is
+    left modified.
+12. Only the four files named in Task 6 are committed, and nothing is deployed.
