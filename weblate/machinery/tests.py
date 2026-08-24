@@ -3865,6 +3865,40 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
                 },
             },
         )
+    @http_mock.activate
+    def test_request_string_ids_are_unique_and_not_positional(self) -> None:
+        machine = self.get_machine()
+        observed: list[list[str]] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            strings = json.loads(content)["strings"]
+            observed.append([item["id"] for item in strings])
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
+                    }
+                    for item in strings
+                ]
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in ("Alpha", "Beta", "Gamma")]
+            )
+
+        ids = observed[0]
+        self.assertEqual(len(set(ids)), 3)
+        self.assertNotEqual(ids, [str(index) for index in range(3)])
+        self.assertTrue(all(string_id.startswith("s") for string_id in ids))
 
     @http_mock.activate
     def test_async_translate(self) -> None:

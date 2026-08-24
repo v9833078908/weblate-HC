@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 from contextvars import ContextVar
 from itertools import chain
 from operator import itemgetter
+from secrets import token_hex
 from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, TypeGuard
 
 from asgiref.sync import sync_to_async
@@ -233,6 +234,13 @@ LLM_PREFIX_RESCUE_LIMIT = 2
 # being matched against the source, which no longer loses inflected terms and
 # keeps the request prefix identical across batches.
 LLM_FULL_GLOSSARY_LIMIT = 300
+# The reply must echo the id of the string it translates, so alignment is
+# checked instead of assumed. The id is random rather than the batch position,
+# because a model can emit 0..n-1 without reading the input and a positional id
+# would prove nothing. The "s" prefix keeps the id a JSON string even when the
+# hex digits happen to be decimal, so a model cannot turn it into a number.
+LLM_STRING_ID_PREFIX = "s"
+LLM_STRING_ID_BYTES = 2
 
 
 class PartialLLMReplyError(MachineTranslationError):
@@ -308,6 +316,7 @@ class LLMStringContext(TypedDict, total=False):
 
 
 class LLMStringPayload(LLMStringContext):
+    id: str
     source: str
     parts: list[LLMStringPart]
     translation: NotRequired[str]
@@ -1089,14 +1098,30 @@ class BaseLLMTranslation(BatchMachineTranslation):
 
         return result
 
+    @staticmethod
+    def _build_string_ids(count: int) -> list[str]:
+        """Opaque per-request ids the reply has to echo back."""
+        ids: list[str] = []
+        seen: set[str] = set()
+        while len(ids) < count:
+            candidate = f"{LLM_STRING_ID_PREFIX}{token_hex(LLM_STRING_ID_BYTES)}"
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            ids.append(candidate)
+        return ids
+
     def _build_string_payload(
         self,
         source_text: str,
         unit: Unit | None,
         source_language: str | None = None,
         source_occurrence: int = 0,
+        *,
+        string_id: str,
     ) -> LLMStringPayload:
         return {
+            "id": string_id,
             "source": source_text,
             "parts": self._get_string_parts(source_text, unit, source_occurrence),
             **self._get_string_context(
@@ -1172,6 +1197,8 @@ class BaseLLMTranslation(BatchMachineTranslation):
         target_language: str,
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None = None,
+        *,
+        string_ids: list[str],
     ) -> str:
         units = [unit for _text, unit in sources if unit is not None]
         glossary = self._get_batch_glossary(units)
@@ -1188,7 +1215,11 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 source_occurrence = source_occurrences[index]
 
             payload = self._build_string_payload(
-                text, unit, source_language, source_occurrence
+                text,
+                unit,
+                source_language,
+                source_occurrence,
+                string_id=string_ids[index],
             )
             if (
                 unit is not None
@@ -2738,12 +2769,14 @@ class BaseLLMTranslation(BatchMachineTranslation):
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None,
     ) -> DownloadMultipleTranslations:
+        string_ids = self._build_string_ids(len(sources))
         prompt, content, previous_content, previous_response = (
             self._prepare_llm_translation(
                 source_language,
                 target_language,
                 sources,
                 source_occurrences,
+                string_ids,
             )
         )
         project_token = llm_batch_project.set(_sources_project_slug(sources))
@@ -2852,6 +2885,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None,
     ) -> DownloadMultipleTranslations:
+        string_ids = self._build_string_ids(len(sources))
         prompt, content, previous_content, previous_response = await sync_to_async(
             self._prepare_llm_translation
         )(
@@ -2859,6 +2893,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
             target_language,
             sources,
             source_occurrences,
+            string_ids,
         )
         project_token = llm_batch_project.set(_sources_project_slug(sources))
         try:
@@ -2877,10 +2912,17 @@ class BaseLLMTranslation(BatchMachineTranslation):
         target_language,
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None,
+        string_ids: list[str] | None = None,
     ) -> tuple[str, str, str, str]:
+        if string_ids is None:
+            string_ids = self._build_string_ids(len(sources))
         prompt = self._get_prompt(target_language)
         content = self._get_message(
-            source_language, target_language, sources, source_occurrences
+            source_language,
+            target_language,
+            sources,
+            source_occurrences,
+            string_ids=string_ids,
         )
         previous_content, previous_response = self._get_previous_messages(
             source_language, target_language, sources
