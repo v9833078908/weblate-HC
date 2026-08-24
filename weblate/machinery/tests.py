@@ -4077,6 +4077,93 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(batch_sizes, [2, 1, 1])
         self.assertEqual(translations["Alpha"][0]["text"], "Alpha (fr)")
         self.assertEqual(translations["Beta"][0]["text"], "Beta (fr)")
+    @http_mock.activate
+    def test_translate_rescues_only_the_prefix_that_kept_its_ids(self) -> None:
+        machine = self.get_machine()
+        sources = ["Alpha", "Beta", "Gamma"]
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            strings = json.loads(content)["strings"]
+            if len(strings) == 1:
+                answered = strings
+            else:
+                answered = strings[:1]
+            return json.dumps(
+                [
+                    {
+                        "id": item["id"],
+                        "parts": [{"type": "text", "text": f"{item['source']} (fr)"}],
+                    }
+                    for item in answered
+                ]
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [(text, None) for text in sources]
+            )
+
+        self.assertEqual(
+            {text: translations[text][0]["text"] for text in sources},
+            {text: f"{text} (fr)" for text in sources},
+        )
+
+    @http_mock.activate
+    def test_translate_rescues_nothing_from_a_reply_with_wrong_ids(self) -> None:
+        machine = self.get_machine()
+        batch_sizes: list[int] = []
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            strings = json.loads(content)["strings"]
+            batch_sizes.append(len(strings))
+            if len(strings) == 1:
+                return json.dumps(
+                    [
+                        {
+                            "id": strings[0]["id"],
+                            "parts": [
+                                {
+                                    "type": "text",
+                                    "text": f"{strings[0]['source']} (fr)",
+                                }
+                            ],
+                        }
+                    ]
+                )
+            return json.dumps(
+                [
+                    {
+                        "id": strings[1]["id"],
+                        "parts": [
+                            {"type": "text", "text": f"{strings[0]['source']} (fr)"}
+                        ],
+                    }
+                ]
+            )
+
+        with patch.object(
+            machine, "fetch_llm_translations", side_effect=request_callback
+        ):
+            translations = machine.download_multiple_translations(
+                "en", "fr", [("Alpha", None), ("Beta", None)]
+            )
+
+        self.assertEqual(batch_sizes, [2, 1, 1])
+        self.assertEqual(translations["Alpha"][0]["text"], "Alpha (fr)")
+        self.assertEqual(translations["Beta"][0]["text"], "Beta (fr)")
+        self.assertEqual(len(translations["Beta"]), 1)
 
     @http_mock.activate
     def test_async_translate(self) -> None:

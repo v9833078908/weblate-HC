@@ -2565,12 +2565,21 @@ class BaseLLMTranslation(BatchMachineTranslation):
 
         return normalized_translations
 
+    @staticmethod
+    def _reply_item_has_id(item: JSONValue, expected_id: str, batch_size: int) -> bool:
+        """Whether an item may be paired with the source at its own position."""
+        if batch_size == 1:
+            return True
+        return isinstance(item, dict) and item.get("id") == expected_id
+
     @classmethod
     def _validate_translation_prefix(
         cls,
         translations: JSONValue,
         sources: list[tuple[str, Unit | None]],
         source_occurrences: list[int] | None = None,
+        *,
+        string_ids: list[str],
     ) -> list[str]:
         """
         Validate the leading replies, stopping at the first unusable one.
@@ -2585,6 +2594,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
         result: list[str] = []
         for index, (source_text, unit) in enumerate(sources):
             if index >= len(translations):
+                break
+            if not cls._reply_item_has_id(
+                translations[index], string_ids[index], len(string_ids)
+            ):
                 break
             if source_occurrences is None:
                 occurrence_key = (id(unit) if unit is not None else None, source_text)
@@ -3019,6 +3032,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 self._normalize_translations(translations, len(sources)),
                 sources,
                 source_occurrences,
+                string_ids=string_ids,
             )
             if prefix and len(prefix) < len(sources):
                 msg = f"Incomplete assistant reply: {len(prefix)}/{len(sources)}."
