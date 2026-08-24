@@ -1,7 +1,7 @@
 *.pyproj
 *.pyc
 *.sw[pon]
-/.coverage*
+**/.coverage*
 /weblate/locale/*/*/*.mo
 /docs/locales/*/*/*.mo
 weblate-*.tar.*
