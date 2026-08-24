@@ -76,6 +76,7 @@ from weblate.machinery.libretranslate import (
     LibreTranslateTranslation,
     LTEngineTranslation,
 )
+from weblate.machinery import llm
 from weblate.machinery.llm import (
     LLM_CURATED_PREVIOUS_EXAMPLE_SOURCES,
     LLM_NEUTRAL_PREVIOUS_EXAMPLE_SOURCES,
@@ -4682,6 +4683,16 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         )
 
         self.assertNotEqual(original, changed)
+    def test_translation_cache_key_carries_the_batch_protocol_version(self) -> None:
+        machine = self.get_machine()
+        unit = make_unit(code="fr", source="Alpha")
+        arguments = (unit, "en", "fr", "Alpha", 75, [])
+
+        key = machine.get_translation_cache_key(*arguments)
+        with patch.object(llm, "LLM_BATCH_PROTOCOL_VERSION", 999):
+            bumped = machine.get_translation_cache_key(*arguments)
+
+        self.assertNotEqual(key, bumped)
 
     def test_translate_uses_neutral_previous_messages_without_czech(self) -> None:
         machine = self.get_machine()

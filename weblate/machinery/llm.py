@@ -244,6 +244,11 @@ LLM_FULL_GLOSSARY_LIMIT = 300
 # hex digits happen to be decimal, so a model cannot turn it into a number.
 LLM_STRING_ID_PREFIX = "s"
 LLM_STRING_ID_BYTES = 2
+# Bumped whenever the batch request or reply contract changes in a way that
+# makes an older cached reply untrustworthy. Version 2 added the per-string id
+# the reply must echo; a version 1 reply was aligned by position alone, so its
+# cached results must not survive the upgrade.
+LLM_BATCH_PROTOCOL_VERSION = 2
 
 
 class PartialLLMReplyError(MachineTranslationError):
@@ -1168,6 +1173,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         source_occurrence: int = 0,
     ) -> tuple[str, ...]:
         result = (
+            f"proto{LLM_BATCH_PROTOCOL_VERSION}",
             self.get_glossary_cache_part(unit),
             self.get_llm_glossary_cache_part(unit),
             *super().get_translation_cache_parts(
