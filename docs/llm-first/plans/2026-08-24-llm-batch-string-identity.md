@@ -54,10 +54,16 @@ not write that this plan makes the measured defect impossible - it makes one cla
 Exactly one design structurally prevents cross-string misattachment, and it is out of scope here:
 
 - `batch_size = 1` for LLM services. With one source per request there is nothing to misattach to,
-  so the failure cannot be expressed. It costs roughly ten times the requests and contradicts the
-  batch-size measurement in `analysis/data/col4-batch-size-eval.json`, which chose 10. This is a
-  correctness-against-cost decision that someone has to make explicitly; the id echo is not a
-  substitute for it.
+  so the failure cannot be expressed. What is measured is the request count: ten times as many,
+  against the batch size of 10 chosen in `analysis/data/col4-batch-size-eval.json`. What is **not**
+  measured is the price. Every request repeats the whole system prompt, the few-shot demonstration
+  and the glossary, which travels in full below `LLM_FULL_GLOSSARY_LIMIT = 300` terms, so input
+  tokens per string grow by that repeated overhead rather than by the request count, and prompt
+  caching may or may not absorb it. Latency and rate-limit headroom depend on how many requests run
+  concurrently and can move either way. Anyone proposing this must first measure tokens per string
+  and wall-clock time at both batch sizes - `analysis/data/col4-cost-samples.log` and the
+  `llm_usage_report` management command already record what is needed. The id echo is not a
+  substitute for this decision, and this decision is not made by this plan.
 
 Everything else is detection after the fact, and detection is not prevention. A content-level pass
 over stored translations - comparing the language-independent shape of a target (digits,
