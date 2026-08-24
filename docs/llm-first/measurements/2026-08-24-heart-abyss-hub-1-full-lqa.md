@@ -99,8 +99,8 @@ Japanese writes 100 000 as `10万`, whose digits `[1,0]` match the source's `10`
 The check is blind precisely where myriad-scale errors occur, and noisy where values are
 correct. Of the 11 firings: **10 false positives**, **1 true positive** (zh_Hans 371763,
 and only because CJK numerals carry no ASCII digits at all), plus **2 false negatives**
-that never fire (ja 370970 and 370971, the only two genuine numeric errors in the
-component).
+that never fire (ja 370970 and 370971). The component holds three genuine numeric errors
+and the check sees one of them.
 
 ## 4. Scorecards (full coverage)
 
