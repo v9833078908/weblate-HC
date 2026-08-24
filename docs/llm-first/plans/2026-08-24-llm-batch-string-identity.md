@@ -4,7 +4,7 @@
 
 **Goal:** Make the LLM batch protocol check which source string each reply item claims to belong to, so a mislabelled or incomplete reply is refused instead of stored. This is a mitigation, not a guarantee: read "What this fix does and does not catch" before reporting it as a fix.
 
-**Architecture:** Every string in a batch request carries an opaque, request-scoped `id`. The reply must echo it, and the reply is paired with its sources through that id instead of the list position. A batch reply without usable ids is refused and re-asked in halves by the machinery that already exists, down to single-string requests where position is unambiguous. What this verifies is the *label set* of a reply, not the binding between a label and the content next to it. Part B is independent: it makes the `game-number` check compare numeric *values* instead of digit multisets, so the same defect class becomes detectable at all.
+**Architecture:** Every string in a batch request carries an opaque, request-scoped `id`. The reply must echo it, and the reply is paired with its sources through that id instead of the list position. A batch reply without usable ids is refused under its own log message (`Mismatching assistant reply ids.`) and re-asked in halves by the machinery that already exists, down to single-string requests where position is unambiguous. What this verifies is the *label set* of a reply, not the binding between a label and the content next to it. Part B is independent: it makes the `game-number` check compare numeric *values* instead of the number tokens it extracts today, so the same defect class becomes detectable at all.
 
 **Tech Stack:** Python 3.13, Django, `weblate/machinery/llm.py` (`BaseLLMTranslation`, shared by OpenAI, Azure OpenAI, Mistral and the fork's `RoutedLLMTranslation`), `weblate_customization/` checks, pytest inside the `dev-docker` container.
 
@@ -64,6 +64,23 @@ Exactly one design structurally prevents cross-string misattachment, and it is o
   and wall-clock time at both batch sizes - `analysis/data/col4-cost-samples.log` and the
   `llm_usage_report` management command already record what is needed. The id echo is not a
   substitute for this decision, and this decision is not made by this plan.
+
+Operational visibility: a model that never echoes ids does not fail loudly - every n-string batch
+degrades into n single-string requests that all succeed, and the only symptom is the OpenRouter
+bill. Task A4 therefore refuses with a distinct, stable message, `Mismatching assistant reply
+ids.`, which `log_handled_error` writes to the log; a mass degradation is a grep away, and the
+`llm_usage_report` management command shows the request-count growth. Watch both after deploying,
+per target language: the routing map sends different languages to different models, so one model
+may honour the contract while another silently degrades.
+
+Server-side structured outputs were considered and deferred: OpenRouter and OpenAI can enforce a
+JSON Schema on the reply (`response_format`, with `provider.require_parameters: true`, as the
+fork's loc-kit profile client already does), which would guarantee the *shape* - an `id` field on
+every item - at the API instead of the prompt. It would not change what is verifiable: a schema
+cannot make the id next to a translation truthful, so the label-set check in Task A4 is needed
+either way, and the batch path is shared with Azure OpenAI and Mistral, whose schema support
+differs. A follow-up may add `response_format` for `RoutedLLMTranslation` only, on top of this
+protocol, never instead of it.
 
 Everything else is detection after the fact, and detection is not prevention. A content-level pass
 over stored translations - comparing the language-independent shape of a target (digits,
@@ -548,9 +565,10 @@ This is the task that closes the hole. Everything before it only set up the inpu
 
 **Files:**
 
-- Modify: `weblate/machinery/llm.py` — `_normalize_translation_items` (2429-2455),
-  `_validate_translations` (2457-2492), `_parse_llm_translations` (2892-2946),
-  `_fetch_llm_batch` (2734-2758), `_afetch_llm_batch` (2848-2872)
+- Modify: `weblate/machinery/llm.py` — `_validate_translations` (2457-2492),
+  `_parse_llm_translations` (2892-2946), `_fetch_llm_batch` (2734-2758), `_afetch_llm_batch`
+  (2848-2872). `_resolve_reply_order` is new, added next to `_normalize_translation_items`
+  (2429-2455), which itself stays unchanged.
 - Test: `weblate/machinery/tests.py`
 
 **Step 1:** Write the failing tests
@@ -607,8 +625,13 @@ paired correctly, and an id-less batch reply must degrade instead of being accep
                 ]
             )
 
-        with patch.object(
-            machine, "fetch_llm_translations", side_effect=request_callback
+        with (
+            patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ),
+            patch.object(
+                machine, "log_handled_error", wraps=machine.log_handled_error
+            ) as handled,
         ):
             translations = machine.download_multiple_translations(
                 "en", "fr", [(text, None) for text in sources]
@@ -623,6 +646,15 @@ paired correctly, and an id-less batch reply must degrade instead of being accep
         )
         self.assertEqual(batch_sizes[0], 3)
         self.assertGreater(len(batch_sizes), 1)
+        # The refusal is the degradation signal: a model that keeps ignoring
+        # the contract turns every batch into single-string requests, and this
+        # message is the only thing that makes that visible in the logs.
+        self.assertTrue(
+            any(
+                call.args[0].startswith("Mismatching assistant reply ids")
+                for call in handled.call_args_list
+            )
+        )
 
     @http_mock.activate
     def test_translate_pairs_a_shuffled_batch_reply_by_id(self) -> None:
@@ -740,35 +772,10 @@ Add the resolver next to `_normalize_translation_items`:
         return [by_id[string_id] for string_id in string_ids]
 ```
 
-Use it in `_normalize_translation_items`, which gains a required keyword-only `string_ids`:
-
-```python
-    @classmethod
-    def _normalize_translation_items(
-        cls,
-        translations: JSONValue,
-        sources: list[tuple[str, Unit | None]],
-        source_occurrences: list[int] | None = None,
-        *,
-        string_ids: list[str],
-    ) -> list[str] | None:
-        if not isinstance(translations, list) or len(translations) != len(sources):
-            return None
-
-        ordered = cls._resolve_reply_order(translations, string_ids)
-        if ordered is None:
-            return None
-```
-
-and read from `ordered` instead of `translations`:
-
-```python
-            normalized = cls._normalize_translation_item(
-                ordered[index], source_text, unit, source_occurrence
-            )
-```
-
-Thread the ids through `_validate_translations`:
+Use it in `_validate_translations`, which gains a required keyword-only `string_ids`. The
+resolution happens here rather than inside `_normalize_translation_items` - which stays unchanged
+- so the id failure carries its own error message: the generic mismatch and the id mismatch are
+different operational events and must be distinguishable in the logs.
 
 ```python
     @classmethod
@@ -781,13 +788,25 @@ Thread the ids through `_validate_translations`:
         string_ids: list[str],
     ) -> list[str]:
         translations = cls._normalize_translations(translations, len(sources))
+        if isinstance(translations, list) and len(translations) == len(sources):
+            ordered = cls._resolve_reply_order(translations, string_ids)
+            if ordered is None:
+                # Distinct from the generic mismatch below: this message is the
+                # signal that batches are degrading to halving. Keep it stable
+                # and greppable.
+                msg = "Mismatching assistant reply ids."
+                raise MachineTranslationError(msg)
+            translations = ordered
         translation_list = cls._normalize_translation_items(
-            translations, sources, source_occurrences, string_ids=string_ids
+            translations, sources, source_occurrences
         )
 ```
 
-and through `_parse_llm_translations`, where the keyword is required so no caller can silently opt
-out of the check:
+The rest of `_validate_translations` is unchanged. A reply that is not a list of the right length
+skips the resolution and fails in `_normalize_translation_items` exactly as today.
+
+Thread the ids through `_parse_llm_translations`, where the keyword is required so no caller can
+silently opt out of the check:
 
 ```python
     def _parse_llm_translations(
@@ -804,6 +823,17 @@ out of the check:
             translations = self._validate_translations(
                 translations, sources, source_occurrences, string_ids=string_ids
             )
+```
+
+In the same `except MachineTranslationError` branch of `_parse_llm_translations`, where the prefix
+rescue does not apply, the re-raise currently replaces the cause with a hardcoded generic message
+(`llm.py:2942-2944`). Preserve the original message instead, so the id refusal stays
+distinguishable in the log line `log_handled_error` writes:
+
+```python
+            msg = str(error)
+            self.log_handled_error(msg, extra_log=translations_string)
+            raise MachineTranslationError(msg) from error
 ```
 
 Leave the `_validate_translation_prefix` call inside `_parse_llm_translations` untouched here;
@@ -1285,13 +1315,16 @@ false negatives**. The component holds three genuine numeric errors; the check s
 and only because Chinese numerals carry no ASCII digits for it to compare against.
 
 The cause is that `_numbers` (`weblate_customization/src/weblate_customization/checks.py:282-292`)
-compares digit multisets. Japanese writes 100 000 as `10万`, whose digits `[1, 0]` match the
-source's `10` exactly, so a tenfold error is invisible; and `10 000` written as `10,000` looks
-different from `10 тысяч`, so a correct translation is flagged.
+compares the multiset of number *tokens* it extracts (Unicode digits folded to ASCII, grouping
+collapsed), not the values those tokens state. Japanese writes 100 000 as `10万`; the scale
+character is not part of the token, so the extracted `10` matches the source's `10` exactly and a
+tenfold error is invisible. In the other direction, the source `10 тысяч` contributes only the
+token `10` while a correct target `10,000` collapses to the token `10000`, so a correct
+translation is flagged.
 
 The implementation below was run against the fork's own number regexes (`NUMBER`, `FULL_DATE`,
 `URL`, `ORDINAL`, `THOUSANDS`, `_fold_digits`, `_collapse_grouping`) before this plan was written:
-all 18 rows of the two matrices in Task B1 come out as stated, and the 15 cases already in
+all 17 rows of the two matrices in Task B1 come out as stated, and the 15 cases already in
 `GameNumberCheckTest` keep their current verdicts. The expected values in the tests are measured,
 not guessed - if a row disagrees during execution, the implementation was mistyped, not the
 expectation.
@@ -1555,9 +1588,13 @@ git commit -m "fix(checks): compare stated values in game-number instead of digi
 
 **Step 1:** Note the limit next to the code
 
-Folding a figurative CJK quantity is possible: a source that writes `百万` for "millions"
-without a digit now states 1 000 000, and a target that spells it out in words carries no number,
-so the check reports it. Say so where a maintainer will read it, in the class docstring:
+Two limits are worth recording. Folding a figurative CJK quantity: a source that writes `百万` for
+"millions" without a digit now states 1 000 000, and a target that spells it out in words carries
+no number, so the check reports it. And a quantity spelled out entirely in words: the folding
+anchors on a digit, so `десять тысяч` contributes no number token on either side - a worded
+source states nothing, and a target that renders `10 тысяч` in words alone still fails the check,
+which is the pre-existing behavior with `ignore-game-number` as the escape hatch. Say so where a
+maintainer will read it, in the class docstring:
 
 ```python
 class GameNumberCheck(TargetCheck):
@@ -1566,8 +1603,11 @@ class GameNumberCheck(TargetCheck):
 
     Comparison is by value, not by digits: a scale word carries the zeros a
     digit would spell out, so "10 тысяч" equals "10 Tausend" and "10,000" but
-    not "10万". A figurative CJK quantity written without a digit, such as
-    百万 for "millions", is read as the value it literally states.
+    not "10万". Two limits: a figurative CJK quantity written without a digit,
+    such as 百万 for "millions", is read as the value it literally states; and
+    a quantity spelled out entirely in words ("десять тысяч") carries no
+    number on either side, so a worded source states nothing and a worded
+    target satisfies nothing - ignore-game-number remains the escape hatch.
     """
 ```
 
@@ -1613,18 +1653,20 @@ cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
 
 Expected: green. `weblate/checks` is included because `CHECK_LIST` loads the fork's checks.
 
-**Step 2:** Replay the check over the real component
+**Step 2:** Replay the check over the measured production data
 
 The report's evidence is a production component, and the Check table only reflects the check code
-that ran the last time a unit was touched. Re-run the check locally over the same kit rather than
-reading stale rows: load the nine `heart-abyss/hub-1` targets of `hub1_guard_1_3` and
-`hub1_guard_1_4` and confirm exactly three firings - `ja` on both strings and `zh_Hans` on
-`hub1_guard_1_4` - and no others. Two of the three are invisible to the check today.
+that ran the last time a unit was touched - so do not read stale rows, and no production access is
+needed. The replay data is already in this plan: the two matrices in Task B1 are the per-language
+targets of `hub1_guard_1_3` and `hub1_guard_1_4`, copied verbatim from the measurement's §3.1
+tables, so the `GameNumberCheckTest` run *is* the replay. Confirm that the rows expecting `True`
+are exactly three - `ja` on both strings and `zh_Hans` on `hub1_guard_1_4` - and that every other
+row expects `False`. Two of the three are invisible to the check today.
 
 **Step 3:** Commit nothing, report
 
-Part B is verified when the two bounty strings produce exactly the two Japanese firings and the
-existing check tests are green.
+Part B is verified when the two bounty strings produce exactly the three expected firings - `ja`
+on both, `zh_Hans` on `hub1_guard_1_4` - and the existing check tests are green.
 
 ---
 
