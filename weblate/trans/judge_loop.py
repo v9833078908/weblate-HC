@@ -181,9 +181,6 @@ def _repair_targets_per_unit(
     return repairs
 
 
-def repair_target(unit: Unit, user: User | None) -> list[str] | None:
-    """Single-unit repair until run_judge_batch() batches its round."""
-    return repair_targets([unit], user).get(unit.id)
 
 
 def judge_project_context(project: Project) -> str:
@@ -294,6 +291,17 @@ def _round_verdict(unit: Unit) -> JudgeVerdict | None:
 class _RepairOutcome:
     unit: Unit | None
     changed: bool = False
+@dataclass(frozen=True)
+class _PreparedRound:
+    unit: Unit
+    request: JudgeRequest
+    verdict: JudgeVerdict
+    needs_repair: bool
+    before_target: list[str]
+    before_checks: set[str]
+    before_state: int
+
+
 
 
 def _apply_repair(
@@ -346,20 +354,19 @@ def _apply_repair(
     return _RepairOutcome(locked, changed=True)
 
 
-def _process_round_unit(
+def _prepare_round_unit(
     unit: Unit,
     request: JudgeRequest,
     round_state,
     *,
     writable_ids: set[int],
-    user: User | None,
     attempt: int,
     attempts: int,
-) -> tuple[JudgeVerdict | None, _RepairOutcome]:
-    """Project a round and optionally prepare its next repair attempt."""
+) -> _PreparedRound | None:
+    """Project a round and describe its repair inputs without fetching them."""
     current = _refresh_unit(unit)
     if current.state != round_state:
-        return None, _RepairOutcome(None)
+        return None
     current.invalidate_checks_cache()
     current.clear_checks_cache()
     current.run_checks()
@@ -367,29 +374,20 @@ def _process_round_unit(
     if verdict is None:
         # A changed target/context or an all-unparsed round must not fall
         # back to an older opinion for repair or finalization.
-        return None, _RepairOutcome(None)
-    if verdict.verdict in _NON_REPAIRABLE_VERDICTS:
-        return verdict, _RepairOutcome(current)
-    if attempt >= attempts or unit.id not in writable_ids:
-        return verdict, _RepairOutcome(current)
-
-    before_target = current.get_target_plurals()
-    before_checks = _deterministic_checks(current)
-    before_state = current.state
-    try:
-        new_target = repair_target(current, user)
-    except MachineTranslationError:
-        new_target = None
-    if new_target is None:
-        return verdict, _RepairOutcome(current)
-    return verdict, _apply_repair(
-        current,
-        request,
-        before_target,
-        before_checks,
-        before_state,
-        new_target,
-        user,
+        return None
+    needs_repair = (
+        verdict.verdict not in _NON_REPAIRABLE_VERDICTS
+        and attempt < attempts
+        and unit.id in writable_ids
+    )
+    return _PreparedRound(
+        unit=current,
+        request=request,
+        verdict=verdict,
+        needs_repair=needs_repair,
+        before_target=current.get_target_plurals(),
+        before_checks=_deterministic_checks(current),
+        before_state=current.state,
     )
 
 
@@ -532,26 +530,47 @@ def run_judge_batch(
                 model,
             )
 
-        next_pending = []
-        for unit in pending:
-            verdict, outcome = _process_round_unit(
+        prepared = [
+            _prepare_round_unit(
                 unit,
                 round_requests[unit.id],
                 round_states[unit.id],
                 writable_ids=writable_ids,
-                user=user,
                 attempt=attempt,
                 attempts=attempts,
+            )
+            for unit in pending
+        ]
+        repairable_units = [
+            item.unit for item in prepared if item is not None and item.needs_repair
+        ]
+        repairs = repair_targets(repairable_units, user) if repairable_units else {}
+        next_pending = []
+        for unit, item in zip(pending, prepared, strict=True):
+            if item is None:
+                verdicts.pop(unit.id, None)
+                continue
+            verdicts[unit.id] = item.verdict
+            new_target = repairs.get(unit.id) if item.needs_repair else None
+            if new_target is None:
+                record_final_snapshot(item.unit)
+                continue
+            outcome = _apply_repair(
+                item.unit,
+                item.request,
+                item.before_target,
+                item.before_checks,
+                item.before_state,
+                new_target,
+                user,
             )
             if outcome.unit is None:
                 verdicts.pop(unit.id, None)
                 continue
-            if verdict is not None:
-                verdicts[unit.id] = verdict
-            if verdict is not None and not outcome.changed:
-                record_final_snapshot(outcome.unit)
             if outcome.changed:
                 next_pending.append(outcome.unit)
+            else:
+                record_final_snapshot(outcome.unit)
         pending = next_pending
         if not pending:
             break
