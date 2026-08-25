@@ -113,12 +113,20 @@ Scope and intended use
        (source: :ref:`uploading-glossary-tables`, :doc:`/admin/config`)
    * - LLM judge
      - :ref:`automatic translation <auto-translation>` in judge mode;
-       :setting:`JUDGE_ENABLED` gates the outbound review request
-     - Database (verdicts), outbound OpenRouter request per batch bounded by
-       :setting:`JUDGE_REQUEST_DEADLINE` when enabled
+       :setting:`JUDGE_ENABLED` gates the outbound review request. Recording
+       a decision on a held or escalated verdict is a separate,
+       CSRF-protected POST gated by the same :guilabel:`unit.review`
+       permission; it makes no outbound request and is refused against
+       stale, superseded, or already-resolved evidence
+     - Database (verdicts; each resolution transition permanently appends
+       its own history entry, though the verdict's current resolution can
+       move again through an allowed transition), outbound OpenRouter
+       request per batch bounded by :setting:`JUDGE_REQUEST_DEADLINE` when
+       enabled
      - In scope. The outbound request is a fixed-host, site-wide-credentialed
-       review only; provider behavior is out of scope. *(documented)*
-       (source: :ref:`llm-judge`, :doc:`/admin/config`)
+       review only; provider behavior is out of scope. Decision recording is
+       a local, permissioned, audited mutation with no outbound leg.
+       *(documented)* (source: :ref:`llm-judge`, :doc:`/admin/config`)
    * - Machine translation and outbound integrations
      - Machine translation, avatars, status reporting, telemetry, error
        reporting, VCS hosts, GitHub App connections, CDN add-on, Fedora

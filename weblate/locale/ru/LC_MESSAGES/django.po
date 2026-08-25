@@ -25478,6 +25478,30 @@ msgstr "Принято как есть"
 msgid "Record decision"
 msgstr "Зафиксировать решение"
 
+#: weblate/templates/snippets/judge-readiness.html:6
+msgid "AI judge"
+msgstr "ИИ-судья"
+
+#: weblate/templates/snippets/judge-readiness.html:12
+msgid "needs a human"
+msgstr "ждут решения человека"
+
+#: weblate/templates/snippets/judge-readiness.html:15
+msgid "not reviewed"
+msgstr "не проверено"
+
+#: weblate/templates/snippets/judge-readiness.html:18
+msgid "last attempt returned nothing"
+msgstr "последняя попытка ничего не вернула"
+
+#: weblate/templates/snippets/judge-readiness.html:22
+msgid "Breakdown by check"
+msgstr "Разбивка по проверкам"
+
+#: weblate/templates/snippets/judge-readiness.html:23
+msgid "Run the judge"
+msgstr "Запустить судью"
+
 #: weblate/trans/models/judge.py:503
 msgid "A reason is required."
 msgstr "Необходимо указать причину."
