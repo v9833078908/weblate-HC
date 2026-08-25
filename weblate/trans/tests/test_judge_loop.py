@@ -9,6 +9,7 @@ from unittest import mock
 
 from django.test import override_settings
 
+from weblate.machinery.base import MachineTranslationError
 from weblate.trans.judge import JudgeResult
 from weblate.trans.judge_loop import build_request, repair_target, run_judge_batch
 from weblate.trans.models.judge import (
@@ -68,14 +69,18 @@ def mock_request_verdicts(batches):
     JUDGE_MAX_REPAIR_ATTEMPTS=1,
 )
 class JudgeLoopTest(ViewTestCase):
-    def run_batch(self, seat_results, repair=None, writable=True):
+    def run_batch(self, seat_results, repair=None, writable=True, repair_error=None):
         # seat_results: list of results, consumed in order, one per call.
         client = mock_request_verdicts([[result] for result in seat_results])
         unit = self.get_unit()
         writable_ids = {unit.id} if writable else set()
+        if repair_error is not None:
+            repair_mock = mock.Mock(side_effect=repair_error)
+        else:
+            repair_mock = mock.Mock(return_value=repair)
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
-            mock.patch("weblate.trans.judge_loop.repair_target", return_value=repair),
+            mock.patch("weblate.trans.judge_loop.repair_target", repair_mock),
         ):
             verdicts = run_judge_batch(
                 [unit], writable_ids=writable_ids, user=self.user
@@ -137,6 +142,67 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
         self.assertEqual(verdict.attempt, 1)
         self.assertEqual(client.call_count, 4)
+
+    def test_repair_target_machinery_error_does_not_crash_the_batch(self) -> None:
+        # 2026-08-25 judge-repair-loop measurement: repair_target raising
+        # MachineTranslationError (an OpenRouter batch refusing to answer
+        # in plain text) used to propagate out of run_judge_batch
+        # uncaught, losing every verdict collected in the same call.
+        original_target = self.get_unit().target
+        unit, verdict, client = self.run_batch(
+            [MAJOR, MAJOR], repair_error=MachineTranslationError("boom")
+        )
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+        self.assertEqual(client.call_count, 2)
+        self.assertEqual(self.get_unit().target, original_target)
+        self.assertEqual(unit.judge_verdicts.count(), 2)
+
+    def test_repair_target_error_on_one_unit_lets_others_continue(self) -> None:
+        # 2026-08-25 judge-repair-loop measurement: in production, one
+        # unit's repair_target raising MachineTranslationError aborted
+        # run_judge_batch for the whole request, so every OTHER pending
+        # repair candidate in the same batch was abandoned too (24 of 26
+        # candidates never reached a verdict). A sibling unit in the same
+        # batch must still repair and reach a final verdict.
+        unit_a = self.get_unit()
+        unit_b = self.get_unit(source="Thank you for using Weblate.")
+        original_a_target = unit_a.target
+
+        def repair(unit, _user):
+            if unit.id == unit_a.id:
+                msg = "boom"
+                raise MachineTranslationError(msg)
+            return ["fixed text."]
+
+        client = mock_request_verdicts(
+            [
+                [MAJOR, MAJOR],  # seat 1, round 1: both units flagged
+                [MAJOR, MAJOR],  # seat 2, round 1
+                [PASS],  # seat 1, round 2: only unit_b is still pending
+                [PASS],  # seat 2, round 2
+            ]
+        )
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.repair_target",
+                mock.Mock(side_effect=repair),
+            ),
+        ):
+            verdicts = run_judge_batch(
+                [unit_a, unit_b],
+                writable_ids={unit_a.id, unit_b.id},
+                user=self.user,
+            )
+
+        self.assertEqual(verdicts[unit_a.id].verdict, JudgeVerdict.Verdict.FLAG)
+        self.assertEqual(verdicts[unit_b.id].verdict, JudgeVerdict.Verdict.PASS)
+        self.assertEqual(client.call_count, 4)
+        self.assertEqual(self.get_unit().target, original_a_target)
+        self.assertEqual(
+            self.get_unit(source="Thank you for using Weblate.").target.strip(),
+            "fixed text.",
+        )
 
     def test_each_seat_uses_its_configured_model(self) -> None:
         _, _, client = self.run_batch([PASS, PASS])

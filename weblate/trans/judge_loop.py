@@ -26,6 +26,7 @@ from django.db import transaction
 
 from weblate.checks.judge import JUDGE_CHECKS
 from weblate.glossary.models import get_matched_glossary_prompt_entries
+from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.models import MACHINERY
 from weblate.trans.forms import AutoForm
 from weblate.trans.judge import (
@@ -302,7 +303,10 @@ def _process_round_unit(
     before_target = current.get_target_plurals()
     before_checks = _deterministic_checks(current)
     before_state = current.state
-    new_target = repair_target(current, user)
+    try:
+        new_target = repair_target(current, user)
+    except MachineTranslationError:
+        new_target = None
     if new_target is None:
         return verdict, _RepairOutcome(current)
     return verdict, _apply_repair(
