@@ -611,10 +611,12 @@ A bare `PYTHONPATH=... python3 ...` fails with `No module named 'weblate.setting
 
 Create `analysis/probes/game-number-replay.py` with the repository copyright and SPDX header. It
 reads `analysis/data/heart-abyss-hub-1-units.tsv` as `ru -> en,fr`,
-`analysis/data/st2-zh-units.jsonl` as `ru -> zh_Hans` and
-`analysis/data/col4-b0-annotations.jsonl` as `ru -> fr`, and asserts three things:
+`analysis/data/st2-zh-units.jsonl` as `ru -> zh_Hans`,
+`analysis/data/col4-b0-annotations.jsonl` as `ru -> fr` and
+`analysis/data/heart-abyss-hub-1-units-9lang.tsv`, the Task 5 nine-language live replay snapshot,
+as `ru ->` its nine target columns, and asserts three things:
 
-1. The firing keys per corpus are exactly `{}`, `{}` and `{"EVENT_516_RESULT_977"}`.
+1. The firing keys per corpus are exactly `{}`, `{}`, `{"EVENT_516_RESULT_977"}` and `{}`.
 2. The invariant: no pair fires under the new rule while the old digit-multiset rule is silent,
    unless the target holds a parsed CJK run. Keep the old rule inline in the script, five lines over
    `NUMBER`, rather than reviving `_numbers` in the product module.
@@ -628,8 +630,9 @@ heart-abyss/hub-1 ru->en,fr: 0 firings / 792 pairs
 st2 ru->zh_Hans: 0 firings / 124 pairs
 col4 b0 ru->fr: 1 firing / 260 pairs
   EVENT_516_RESULT_977
-invariant violations: 0 / 1176 pairs
-targets with a parsed CJK run: 0
+heart-abyss/hub-1 9lang ru->de,en,es,fr,it,ja,ko,zh_Hans,zh_Hant: 0 firings / 3564 pairs
+invariant violations: 0 / 4740 pairs
+targets with a parsed CJK run: 12
 ```
 
 The retained Col4 key holds `_x000b_` in the source, whose `000` fragments read as numbers. That is
