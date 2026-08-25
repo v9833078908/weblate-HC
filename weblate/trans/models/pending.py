@@ -314,9 +314,7 @@ class PendingChangeQuerySet(models.QuerySet["PendingUnitChange", "PendingUnitCha
         """Count distinct units in a PendingUnitChange queryset."""
         return qs.distinct("unit_id").count()
 
-    def _group_units_by_translation(
-        self, qs: PendingChangeQuerySet
-    ) -> dict[int, int]:
+    def _group_units_by_translation(self, qs: PendingChangeQuerySet) -> dict[int, int]:
         """Distinct pending unit count per translation ID."""
         counts: dict[int, int] = defaultdict(int)
         for translation_id, _unit_id in qs.values_list(
