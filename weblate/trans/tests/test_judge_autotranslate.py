@@ -375,6 +375,12 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertEqual(auto.judge_summary.minor_noted, 1)
         self.assertIn("minor noted", auto.get_message())
 
+    def test_judge_summary_counts_unparsed_strings(self) -> None:
+        unit = self.get_unit()
+        auto = self.perform(JudgeVerdict.Verdict.UNPARSED, unit_ids=[unit.id])
+        self.assertEqual(auto.judge_summary.unparsed, 1)
+        self.assertIn("1 unparsed", auto.get_message())
+
     def test_judge_summary_counts_repaired_and_rejudged_strings(self) -> None:
         unit = self.get_unit()
         auto = self.perform(JudgeVerdict.Verdict.PASS, attempt=1, unit_ids=[unit.id])

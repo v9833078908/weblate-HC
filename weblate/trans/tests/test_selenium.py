@@ -1291,6 +1291,308 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
         self.assertNotIn("Error in parameter component", body)
         self.assertNotIn("Could not process form!", body)
 
+    def test_judge_task_phase_polling_shows_live_phases(self) -> None:
+        """
+        Drive a judge run's task-status poller through its real phases.
+
+        The Celery task itself is stubbed out (no LLM calls); only the
+        client-side poller in loader-bootstrap.js is exercised, against a
+        scripted sequence of /api/tasks/<id>/ responses that includes one
+        genuine transient 500 produced by the live server.
+        """
+        task_id = "judge-phase-smoke-task"
+        malicious_current = "1<b>MARK</b>"
+        sequence: list[SimpleNamespace | Literal["FAIL"]] = [
+            SimpleNamespace(
+                id=task_id,
+                ready=lambda: False,
+                state="PROGRESS",
+                result={
+                    "progress": 10,
+                    "phase": "judging",
+                    "phase_current": malicious_current,
+                    "phase_total": 3,
+                },
+            ),
+            "FAIL",
+            SimpleNamespace(
+                id=task_id,
+                ready=lambda: False,
+                state="PROGRESS",
+                result={
+                    "progress": 40,
+                    "phase": "judging",
+                    "phase_current": 2,
+                    "phase_total": 3,
+                },
+            ),
+            SimpleNamespace(
+                id=task_id,
+                ready=lambda: False,
+                state="PROGRESS",
+                result={
+                    "progress": 65,
+                    "phase": "repairing",
+                    "phase_current": 1,
+                    "phase_total": 2,
+                },
+            ),
+            SimpleNamespace(
+                id=task_id,
+                ready=lambda: False,
+                state="PROGRESS",
+                result={
+                    "progress": 90,
+                    "phase": "repairing",
+                    "phase_current": 2,
+                    "phase_total": 2,
+                },
+            ),
+            SimpleNamespace(
+                id=task_id,
+                ready=lambda: True,
+                state="SUCCESS",
+                result={
+                    "message": (
+                        "6 evaluated: 4 with no blocking concern, 1 minor "
+                        "noted, 1 major not fixed, 0 critical held, 0 unparsed."
+                    ),
+                    "warnings": [],
+                    "url": None,
+                },
+            ),
+        ]
+        calls = 0
+
+        def fake_async_result(pk: str) -> SimpleNamespace:
+            nonlocal calls
+            index = min(calls, len(sequence) - 1)
+            calls += 1
+            step = sequence[index]
+            if isinstance(step, str):
+                msg = "transient result backend hiccup"
+                raise ConnectionError(msg)
+            return step
+
+        self.do_login(superuser=True)
+        project = self.create_component()
+        component = project.component_set.get(slug="django")
+        # "judge" mode is only offered when the user can review, which in
+        # turn requires reviews to be enabled on the project.
+        project.translation_review = True
+        project.save(update_fields=["translation_review"])
+
+        phase_selector = "[data-task] .task-phase"
+        bar_selector = "[data-task] .progress-bar"
+        message_selector = "[data-task] .task-message"
+
+        def snapshot() -> dict | None:
+            """
+            Read phase text, its raw HTML, its child count, and bar width.
+
+            All four are read inside a single execute_script call so they
+            describe exactly the same poll tick; separate WebDriver round
+            trips are slow enough for the next 1s tick to have already
+            landed in between them.
+            """
+            return self.driver.execute_script(
+                """
+                const phase = document.querySelector(arguments[0]);
+                const bar = document.querySelector(arguments[1]);
+                const message = document.querySelector(arguments[2]);
+                if (!phase || !bar) { return null; }
+                return {
+                    text: phase.textContent,
+                    innerHTML: phase.innerHTML,
+                    childCount: phase.children.length,
+                    width: bar.style.width,
+                    message: message ? message.textContent : null,
+                };
+                """,
+                phase_selector,
+                bar_selector,
+                message_selector,
+            )
+
+        def bar_percent(snap: dict) -> int:
+            return int((snap["width"] or "0%").rstrip("%") or 0)
+
+        def wait_for_phase(expected: str, timeout: float = 20) -> dict:
+            box: dict[str, dict] = {}
+
+            def check(_driver: object) -> bool:
+                snap = snapshot()
+                if snap is not None and snap["text"] == expected:
+                    box["snap"] = snap
+                    return True
+                return False
+
+            WebDriverWait(self.driver, timeout).until(check)
+            return box["snap"]
+
+        def sample_until(
+            expected: str, allowed_interim_texts: set[str], timeout: float = 20
+        ) -> dict:
+            """Poll and prove no unexpected phase text ever appeared en route."""
+            deadline = time.monotonic() + timeout
+            seen_texts: set[str] = set()
+            while time.monotonic() < deadline:
+                snap = snapshot()
+                if snap is not None:
+                    seen_texts.add(snap["text"])
+                    if snap["text"] == expected:
+                        unexpected = seen_texts - allowed_interim_texts - {expected}
+                        self.assertFalse(
+                            unexpected,
+                            f"phase text was corrupted mid-poll: {unexpected}",
+                        )
+                        return snap
+                time.sleep(0.05)
+            msg = f"timed out waiting for {expected!r}, saw {seen_texts}"
+            raise AssertionError(msg)
+
+        with (
+            override_settings(
+                CELERY_TASK_ALWAYS_EAGER=False,
+                JUDGE_ENABLED=True,
+                JUDGE_OPENROUTER_KEY="sk-test",
+                JUDGE_MODEL_SEAT_1="vendor-a/model",
+                JUDGE_MODEL_SEAT_2="vendor-b/model",
+            ),
+            patch(
+                "weblate.trans.views.edit.auto_translate.delay",
+                return_value=SimpleNamespace(id=task_id),
+            ),
+            patch("weblate.api.views.AsyncResult", side_effect=fake_async_result),
+        ):
+            self.open_component(component=component, project=project)
+            self.click("Operations")
+            self.click("Batch automatic translation")
+            Select(self.driver.find_element(By.ID, "id_auto_mode")).select_by_value(
+                "judge"
+            )
+            # A debounced, unrelated judge-cost preview fetch may disable the
+            # apply button asynchronously; force-enable and click atomically
+            # so that race can never block this poller-focused test.
+            with self.wait_for_page_load():
+                self.driver.execute_script(
+                    'const btn = document.getElementById("id_auto_apply");'
+                    "btn.disabled = false;"
+                    "btn.click();"
+                )
+
+            first_phase = f"Judging {malicious_current} of 3 strings"
+            first_snap = wait_for_phase(first_phase)
+            readings = [bar_percent(first_snap)]
+
+            # The malicious phase_current must land as a literal text node:
+            # no <b> child element was parsed out of it, and the serialized
+            # innerHTML shows it HTML-escaped, proving textContent was used.
+            self.assertEqual(
+                first_snap["childCount"],
+                0,
+                "task-phase must contain a text node only, not parsed HTML",
+            )
+            self.assertNotIn("<b>", first_snap["innerHTML"])
+            self.assertIn("&lt;b&gt;", first_snap["innerHTML"])
+
+            # The transient 500 (sequence index 1) must not clear or corrupt
+            # what is displayed, and the poller must keep going afterwards.
+            snap = sample_until(
+                "Judging 2 of 3 strings", allowed_interim_texts={first_phase}
+            )
+            readings.append(bar_percent(snap))
+
+            snap = wait_for_phase("Repairing 1 of 2 strings")
+            readings.append(bar_percent(snap))
+
+            snap = wait_for_phase("Repairing 2 of 2 strings")
+            readings.append(bar_percent(snap))
+
+            snap = wait_for_phase("")
+            readings.append(bar_percent(snap))
+            message = snap["message"]
+
+        self.assertEqual(readings, sorted(readings))
+        self.assertEqual(readings[-1], 100)
+        self.assertIn("6 evaluated", message)
+
+    def test_non_judge_task_never_shows_a_phase(self) -> None:
+        """A non-judge automatic translation run never populates .task-phase."""
+        task_id = "non-judge-phase-smoke-task"
+        sequence = [
+            SimpleNamespace(
+                id=task_id,
+                ready=lambda: False,
+                state="PROGRESS",
+                result={"progress": 25},
+            ),
+            SimpleNamespace(
+                id=task_id,
+                ready=lambda: False,
+                state="PROGRESS",
+                result={"progress": 70},
+            ),
+            SimpleNamespace(
+                id=task_id,
+                ready=lambda: True,
+                state="SUCCESS",
+                result={
+                    "message": "3 strings were updated.",
+                    "warnings": [],
+                    "url": None,
+                },
+            ),
+        ]
+        calls = 0
+
+        def fake_async_result(pk: str) -> SimpleNamespace:
+            nonlocal calls
+            index = min(calls, len(sequence) - 1)
+            calls += 1
+            return sequence[index]
+
+        self.do_login(superuser=True)
+        project = self.create_component()
+        component = project.component_set.get(slug="django")
+
+        def phase_text() -> str:
+            return self.driver.find_element(
+                By.CSS_SELECTOR, "[data-task] .task-phase"
+            ).text
+
+        def bar_width() -> int:
+            style = self.driver.find_element(
+                By.CSS_SELECTOR, "[data-task] .progress-bar"
+            ).get_attribute("style")
+            assert style is not None
+            return int(style.split("width:")[1].split("%")[0].strip())
+
+        with (
+            override_settings(CELERY_TASK_ALWAYS_EAGER=False),
+            patch(
+                "weblate.trans.views.edit.auto_translate.delay",
+                return_value=SimpleNamespace(id=task_id),
+            ),
+            patch("weblate.api.views.AsyncResult", side_effect=fake_async_result),
+        ):
+            self.open_component(component=component, project=project)
+            self.click("Operations")
+            self.click("Batch automatic translation")
+            with self.wait_for_page_load():
+                self.click(htmlid="id_auto_apply")
+
+            seen_phases: set[str] = set()
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline and bar_width() < 100:
+                seen_phases.add(phase_text())
+                time.sleep(0.15)
+            seen_phases.add(phase_text())
+            final_width = bar_width()
+
+        self.assertEqual(seen_phases, {""})
+        self.assertEqual(final_width, 100)
+
     def test_login(self) -> None:
         # Do proper login with new user
         self.do_login()
