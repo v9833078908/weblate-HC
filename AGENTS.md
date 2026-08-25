@@ -201,14 +201,22 @@ Repository-specific parts:
   `ignore-game-line-break` flag. `machinery.py` ships `RoutedLLMTranslation`,
   an OpenRouter-backed automatic suggestion service (display name and service
   slug: `OpenRouter` / `openrouter`) that resolves the model ID per target
-  language from a `routing` JSON map. It uses one OpenRouter key; a
+  language from a `routing` JSON map, and `RoutedLiteLLMTranslation`, the same
+  routing model against the corporate LiteLLM proxy (`LiteLLM` / `litellm`,
+  default base URL `https://hcbifrost.herocraft.com/litellm/v1`, no
+  OpenRouter-only `provider` field). Each service uses its own key; a
   project-level configuration overrides the global one field by field, so a
   project stores only what it changes (persona, style,
   `language_instructions`) and inherits `key`, `base_url` and `routing`.
-  `AutoForm.DEFAULT_ENGINE` (`weblate/trans/forms.py`) preselects this service
-  and the "Machine translation" source in the automatic translation form. See
-  "Deploying custom checks and machinery" below for how these modules reach
-  the dev container.
+  `weblate/trans/forms.py` resolves which routed engine a project uses
+  through `ROUTED_ENGINES = ("openrouter", "litellm")` and the
+  `configured_routed_engine`/`available_routed_engine` helpers: the first
+  entry with usable project configuration wins project-wide (`openrouter`
+  when both are configured), never a per-language fallback to the other one;
+  `AutoForm` uses the same helpers to preselect the "Machine translation"
+  source, and `judge_loop.py`/`judge_workflow.py` use them for the judge's
+  repair engine and project context. See "Deploying custom checks and
+  machinery" below for how these modules reach the dev container.
 - `weblate-mcp/` (gitignored, its own git repo) - vendored `@mmntm/weblate-mcp`,
   a NestJS MCP server that talks to the local Weblate REST API. Its `.env` points
   at `http://localhost:3001/api/`.
@@ -405,10 +413,12 @@ and (as `WEBLATE_ADD_CHECK=` / `WEBLATE_ADD_AUTOFIX=`) in
 `deploy/environment.example`; `settings_docker.py` folds `WEBLATE_ADD_CHECK` /
 `WEBLATE_REMOVE_CHECK` into `CHECK_LIST`, and `WEBLATE_ADD_AUTOFIX` /
 `WEBLATE_REMOVE_AUTOFIX` into `AUTOFIX_LIST`, through `modify_env_list`
-(`weblate/utils/environment.py:182`). `RoutedLLMTranslation` is registered the
-same way through `WEBLATE_ADD_MACHINERY:
-weblate_customization.machinery.RoutedLLMTranslation`, already present in
-`dev-docker/docker-compose.yml`. The same mechanism exists for
+(`weblate/utils/environment.py:182`). `RoutedLLMTranslation` and
+`RoutedLiteLLMTranslation` are registered the same way through
+`WEBLATE_ADD_MACHINERY:
+weblate_customization.machinery.RoutedLLMTranslation,weblate_customization.machinery.RoutedLiteLLMTranslation`,
+already present in `dev-docker/docker-compose.yml`. The same mechanism
+exists for
 `WEBLATE_ADD_ADDONS`, `WEBLATE_ADD_APPS`, etc. A restart after editing
 `dev-docker/docker-compose.yml` needs a full `./rundev.sh` (rebuild + start),
 not just a container restart, because the environment block is baked in at

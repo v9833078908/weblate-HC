@@ -1683,16 +1683,19 @@ LOC_KIT_IMPORT_DRAFT_EXPIRY = trans_defaults.clamp_loc_kit_import_draft_expiry(
     )
 )
 
-# LLM judge (off by default). The judge sends component strings to
-# OpenRouter; see docs/security/threat-model.rst. The API base URL is
-# fixed and not configurable here.
+# LLM judge (off by default). The judge sends component strings to the
+# configured provider; see docs/security/threat-model.rst.
 JUDGE_ENABLED = get_env_bool(
     "WEBLATE_JUDGE_ENABLED",
     trans_defaults.DEFAULT_JUDGE_ENABLED,
 )
-JUDGE_OPENROUTER_KEY = get_env_str(
-    "WEBLATE_JUDGE_OPENROUTER_KEY",
-    trans_defaults.DEFAULT_JUDGE_OPENROUTER_KEY,
+JUDGE_API_KEY = get_env_str(
+    "WEBLATE_JUDGE_API_KEY",
+    trans_defaults.DEFAULT_JUDGE_API_KEY,
+)
+JUDGE_BASE_URL = get_env_str(
+    "WEBLATE_JUDGE_BASE_URL",
+    trans_defaults.DEFAULT_JUDGE_BASE_URL,
 )
 JUDGE_MODEL_SEAT_1 = get_env_str(
     "WEBLATE_JUDGE_MODEL_SEAT_1",

@@ -27,7 +27,7 @@ from django.db import transaction
 from weblate.checks.judge import JUDGE_CHECKS
 from weblate.glossary.models import get_matched_glossary_prompt_entries
 from weblate.machinery.models import MACHINERY
-from weblate.trans.forms import AutoForm
+from weblate.trans.forms import configured_routed_engine
 from weblate.trans.judge import (
     JUDGE_SEATS,
     JudgeRequest,
@@ -91,10 +91,10 @@ def repair_target(unit: Unit, user: User | None) -> list[str] | None:
     into the translator prompt. Callers MUST run_checks() first.
     """
     settings_map = unit.translation.component.project.get_machinery_settings()
-    engine_id = AutoForm.DEFAULT_ENGINE
-    setting = settings_map.get(engine_id)
-    if setting is None or engine_id not in MACHINERY:
+    engine_id = configured_routed_engine(settings_map)
+    if engine_id is None or engine_id not in MACHINERY:
         return None
+    setting = settings_map[engine_id]
     results = MACHINERY[engine_id](setting).translate(unit, user)
     if not results or len(results) != len(unit.get_target_plurals()):
         return None
@@ -122,9 +122,11 @@ def judge_project_context(project: Project) -> str:
     configured yields an empty string, and the client then falls back to
     a neutral context instead of another project's setting.
     """
-    setting = project.get_machinery_settings().get(AutoForm.DEFAULT_ENGINE)
-    if not setting:
+    settings_map = project.get_machinery_settings()
+    engine_id = configured_routed_engine(settings_map)
+    if engine_id is None:
         return ""
+    setting = settings_map[engine_id]
     parts = [
         str(setting.get(field, "") or "").strip() for field in ("persona", "style")
     ]

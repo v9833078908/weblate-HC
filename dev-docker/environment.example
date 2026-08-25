@@ -8,4 +8,4 @@ WEBLATE_HOST=localhost
 WEBLATE_PORT=3001
 
 # Keep this development-only credential out of Git.
-WEBLATE_JUDGE_OPENROUTER_KEY=
+WEBLATE_JUDGE_API_KEY=

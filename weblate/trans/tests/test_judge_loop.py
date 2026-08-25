@@ -10,7 +10,11 @@ from unittest import mock
 from django.test import override_settings
 
 from weblate.trans.judge import JudgeResult
-from weblate.trans.judge_loop import build_request, repair_target, run_judge_batch
+from weblate.trans.judge_loop import (
+    build_request,
+    repair_target,
+    run_judge_batch,
+)
 from weblate.trans.models.judge import (
     JudgeVerdict,
     compute_context_hash,
@@ -62,7 +66,7 @@ def mock_request_verdicts(batches):
 
 @override_settings(
     JUDGE_ENABLED=True,
-    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_API_KEY="sk-test",
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_MAX_REPAIR_ATTEMPTS=1,
@@ -108,6 +112,36 @@ class JudgeLoopTest(ViewTestCase):
         self.component.project.save(update_fields=["machinery_settings"])
         with mock.patch("weblate.trans.judge_loop.MACHINERY", {"openrouter": engine}):
             self.assertEqual(repair_target(unit, self.user), ["fixed text"])
+
+    def test_repair_target_uses_litellm_when_only_litellm_is_configured(self) -> None:
+        unit = self.get_unit()
+        engine = mock.Mock()
+        engine.return_value.translate.return_value = [
+            [{"text": "litellm fix", "quality": 100}]
+        ]
+        self.component.project.machinery_settings = {"litellm": {"key": "ll-key"}}
+        self.component.project.save(update_fields=["machinery_settings"])
+        with mock.patch("weblate.trans.judge_loop.MACHINERY", {"litellm": engine}):
+            self.assertEqual(repair_target(unit, self.user), ["litellm fix"])
+
+    def test_repair_target_prefers_openrouter_when_both_are_configured(self) -> None:
+        unit = self.get_unit()
+        openrouter_engine = mock.Mock()
+        openrouter_engine.return_value.translate.return_value = [
+            [{"text": "openrouter fix", "quality": 100}]
+        ]
+        litellm_engine = mock.Mock()
+        self.component.project.machinery_settings = {
+            "openrouter": {"key": "or-key"},
+            "litellm": {"key": "ll-key"},
+        }
+        self.component.project.save(update_fields=["machinery_settings"])
+        with mock.patch(
+            "weblate.trans.judge_loop.MACHINERY",
+            {"openrouter": openrouter_engine, "litellm": litellm_engine},
+        ):
+            self.assertEqual(repair_target(unit, self.user), ["openrouter fix"])
+        litellm_engine.assert_not_called()
 
     def test_no_seat_may_lower_the_other(self) -> None:
         _, verdict, _ = self.run_batch([MAJOR, PASS])
@@ -166,6 +200,30 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(
             contexts, {"You judge a dark fantasy game.\n\nPreserve profanity."}
         )
+
+    def test_litellm_only_project_still_gets_its_own_context(self) -> None:
+        project = self.component.project
+        project.machinery_settings = {
+            "litellm": {
+                "persona": "You judge a sci-fi game.",
+                "style": "Keep it terse.",
+            }
+        }
+        project.save(update_fields=["machinery_settings"])
+        _, _, client = self.run_batch([PASS, PASS])
+        contexts = {c.kwargs["project_context"] for c in client.call_args_list}
+        self.assertEqual(contexts, {"You judge a sci-fi game.\n\nKeep it terse."})
+
+    def test_openrouter_context_wins_when_both_engines_are_configured(self) -> None:
+        project = self.component.project
+        project.machinery_settings = {
+            "openrouter": {"persona": "OpenRouter persona."},
+            "litellm": {"persona": "LiteLLM persona."},
+        }
+        project.save(update_fields=["machinery_settings"])
+        _, _, client = self.run_batch([PASS, PASS])
+        contexts = {c.kwargs["project_context"] for c in client.call_args_list}
+        self.assertEqual(contexts, {"OpenRouter persona."})
 
     def test_an_unconfigured_project_sends_no_context(self) -> None:
         _, _, client = self.run_batch([PASS, PASS])
@@ -349,7 +407,7 @@ class JudgeLoopTest(ViewTestCase):
 
 @override_settings(
     JUDGE_ENABLED=True,
-    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_API_KEY="sk-test",
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_MAX_REPAIR_ATTEMPTS=1,
@@ -408,7 +466,7 @@ class JudgeGlossaryRepairLockTest(ViewTestCase):
 
 @override_settings(
     JUDGE_ENABLED=True,
-    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_API_KEY="sk-test",
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
 )

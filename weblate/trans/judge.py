@@ -3,12 +3,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-OpenRouter client for the LLM judge (measured arm D).
+LLM judge client for an operator-configured chat-completions endpoint (measured arm D).
 
 Separate from RoutedLLMTranslation on purpose: the judge is not a machine
 translation service. Mirrors the loc-kit profile client
-(weblate/trans/loc_kit.py): fixed host, strict schema, one exception
-type, no user-supplied endpoint/key/model. Requests are batched
+(weblate/trans/loc_kit.py): an operator-configured host, strict schema, one
+exception type, no user-supplied endpoint/key/model. Requests are batched
 (JUDGE_BATCH_SIZE segments per HTTP call) exactly as the measurement was
 run — the measured noise/precision/recall/cost numbers assume batching.
 """
@@ -26,6 +26,7 @@ from importlib import resources
 from itertools import starmap
 from secrets import token_hex
 from typing import TYPE_CHECKING, cast
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.utils.translation import gettext as _
@@ -39,7 +40,8 @@ if TYPE_CHECKING:
 
     from weblate.glossary.models import GlossaryPromptEntry
 
-OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
+_OPENROUTER_HOST = "openrouter.ai"
+_LITELLM_HOST = "hcbifrost.herocraft.com"
 JUDGE_REQUEST_TIMEOUT = 120
 JUDGE_SEATS = (1, 2)
 # A verdict batch reply is kilobytes; this only bounds a broken peer.
@@ -75,12 +77,49 @@ class JudgeError(Exception):
     """
 
 
+def get_judge_base_url() -> str:
+    """Validate ``JUDGE_BASE_URL`` and return it; raise before any network call."""
+    base_url = settings.JUDGE_BASE_URL
+    if not isinstance(base_url, str) or not base_url.strip():
+        raise JudgeError(_("The LLM judge is not configured."))
+    parsed = urlsplit(base_url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise JudgeError(_("The LLM judge is not configured."))
+    return base_url
+
+
+def get_judge_chat_completions_url() -> str:
+    """``{JUDGE_BASE_URL}/chat/completions``, with the base URL validated."""
+    return f"{get_judge_base_url().rstrip('/')}/chat/completions"
+
+
+def _judge_provider(base_url: str) -> str:
+    """Resolve the provider identity from the parsed hostname, never a URL substring."""
+    hostname = urlsplit(base_url).hostname or ""
+    if hostname == _OPENROUTER_HOST or hostname.endswith(f".{_OPENROUTER_HOST}"):
+        return "openrouter"
+    if hostname == _LITELLM_HOST or hostname.endswith(f".{_LITELLM_HOST}"):
+        return "litellm"
+    return "unknown"
+
+
+def _judge_provider_profile(base_url: str) -> dict:
+    """OpenRouter-only request fields; empty for every other provider."""
+    if _judge_provider(base_url) == "openrouter":
+        return {"provider": {"require_parameters": True}}
+    return {}
+
+
 def judge_configuration_ready() -> bool:
     """Whether the complete two-seat judge configuration is usable."""
+    try:
+        get_judge_base_url()
+    except JudgeError:
+        return False
     return bool(
         settings.JUDGE_ENABLED
-        and isinstance(settings.JUDGE_OPENROUTER_KEY, str)
-        and settings.JUDGE_OPENROUTER_KEY.strip()
+        and isinstance(settings.JUDGE_API_KEY, str)
+        and settings.JUDGE_API_KEY.strip()
         and isinstance(settings.JUDGE_MODEL_SEAT_1, str)
         and settings.JUDGE_MODEL_SEAT_1.strip()
         and isinstance(settings.JUDGE_MODEL_SEAT_2, str)
@@ -92,9 +131,13 @@ def validate_request_settings() -> None:
     """Fail before any paid request when a shared judge setting is unusable."""
     if not settings.JUDGE_ENABLED:
         raise JudgeError(_("The LLM judge is disabled."))
-    if not (
-        isinstance(settings.JUDGE_OPENROUTER_KEY, str)
-        and settings.JUDGE_OPENROUTER_KEY.strip()
+    if not (isinstance(settings.JUDGE_API_KEY, str) and settings.JUDGE_API_KEY.strip()):
+        raise JudgeError(_("The LLM judge is not configured."))
+    base_url = get_judge_base_url()
+    if (
+        _judge_provider(base_url) == "litellm"
+        and isinstance(settings.JUDGE_REASONING_EFFORT, str)
+        and settings.JUDGE_REASONING_EFFORT.strip()
     ):
         raise JudgeError(_("The LLM judge is not configured."))
     if not (
@@ -432,11 +475,11 @@ def _post_batch(payload: dict, model: str) -> _BatchResponse:
     try:
         with stream_validated_url(
             "POST",
-            OPENROUTER_CHAT_COMPLETIONS_URL,
+            get_judge_chat_completions_url(),
             # Built inline so the bearer token is never bound to a frame
             # local that an error reporter could serialize.
             headers={
-                "Authorization": f"Bearer {settings.JUDGE_OPENROUTER_KEY}",
+                "Authorization": f"Bearer {settings.JUDGE_API_KEY}",
                 "Content-Type": "application/json",
             },
             json=payload,
@@ -479,6 +522,7 @@ def request_verdicts(
     validate_request_settings()
     if not isinstance(model, str) or not model.strip():
         raise JudgeError(_("The LLM judge is not configured."))
+    base_url = get_judge_base_url()
 
     batch_size = settings.JUDGE_BATCH_SIZE
     sleep = settings.JUDGE_REQUEST_SLEEP
@@ -504,8 +548,6 @@ def request_verdicts(
                     "schema": _response_schema(),
                 },
             },
-            "provider": {"require_parameters": True},
-            "usage": {"include": True},
             "messages": [
                 {
                     "role": "system",
@@ -528,6 +570,7 @@ def request_verdicts(
                 },
             ],
         }
+        payload.update(_judge_provider_profile(base_url))
         effort = settings.JUDGE_REASONING_EFFORT
         if isinstance(effort, str) and effort.strip():
             # exclude: nothing reads the trace, so paying to ship it back

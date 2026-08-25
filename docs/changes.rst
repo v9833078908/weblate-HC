@@ -9,6 +9,7 @@ Weblate 2026.8.1
 * Major LLM-judge verdicts are now repaired once when possible and otherwise held in :guilabel:`Needs checking`, so they are excluded from guarded commits instead of shipping automatically.
 * Added guarded ``check_judge_repair_routes`` and ``enable_review_workflow`` management commands for the LLM judge rollout.
 * Components can now exchange all language targets through one multilingual CSV or XLSX spreadsheet, with previewed imports that protect keys and placeholders.
+* Added an optional **LiteLLM** :ref:`automatic suggestion <machine-translation-setup>` service for the corporate LiteLLM proxy, alongside the existing OpenRouter service, and made the LLM judge endpoint configurable via :setting:`JUDGE_BASE_URL` (default OpenRouter).
 
 .. rubric:: Improvements
 

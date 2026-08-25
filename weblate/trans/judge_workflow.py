@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from django.core.management.base import CommandError
 
 from weblate.machinery.models import MACHINERY
-from weblate.trans.forms import AutoForm
+from weblate.trans.forms import configured_routed_engine
 
 if TYPE_CHECKING:
     from weblate.trans.models.project import Project
@@ -32,14 +32,18 @@ TARGET_PROJECT_SLUGS = (
 def repair_route(translation: Translation) -> str:
     """Validate and return the configured repair model for a translation."""
     project: Project = translation.component.project
-    engine_id = AutoForm.DEFAULT_ENGINE
+    settings_map = project.get_machinery_settings()
+    engine_id = configured_routed_engine(settings_map)
+    if engine_id is None:
+        msg = f"Project {project.slug!r} has no configured repair engine."
+        raise CommandError(msg)
     try:
         machinery = MACHINERY[engine_id]
     except KeyError as error:
         msg = f"Repair engine {engine_id!r} is not registered."
         raise CommandError(msg) from error
-    setting = project.get_machinery_settings().get(engine_id)
-    if not setting or not setting.get("key"):
+    setting = settings_map[engine_id]
+    if not setting.get("key"):
         msg = f"Project {project.slug!r} has no usable {engine_id!r} repair key."
         raise CommandError(msg)
     engine = machinery(setting)
