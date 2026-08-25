@@ -1229,6 +1229,7 @@ class AutoForm(forms.Form):
         min_value=1,
         max_value=100,
     )
+    next = forms.CharField(required=False, widget=forms.HiddenInput)
     overwrite_existing = forms.BooleanField(
         label=gettext_lazy("Overwrite the existing translation"),
         required=False,
@@ -1348,6 +1349,9 @@ class AutoForm(forms.Form):
                     ("judge", gettext("Add as translation with an LLM judge"))
                 )
         self.fields["mode"].choices = choices
+        allowed_modes = {choice[0] for choice in choices}
+        if self.initial.get("mode") not in allowed_modes:
+            self.initial.pop("mode", None)
 
         self.helper = FormHelper(self)
         self.helper.form_tag = False

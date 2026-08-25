@@ -215,6 +215,11 @@ real_patterns = [
         name="new-unit",
     ),
     path(
+        "auto-translate-preview/<object_path:path>/",
+        weblate.trans.views.edit.auto_translation_preview,
+        name="auto_translation_preview",
+    ),
+    path(
         "auto-translate/<object_path:path>/",
         weblate.trans.views.edit.auto_translation,
         name="auto_translation",

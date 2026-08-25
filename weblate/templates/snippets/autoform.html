@@ -5,7 +5,8 @@
 <form action="{% url 'auto_translation' path=object.get_url_path %}"
       method="post"
       enctype="multipart/form-data"
-      data-persist="auto-translation">
+      data-persist="auto-translation"
+      data-judge-preview-url="{% url 'auto_translation_preview' path=object.get_url_path %}">
   <div class="card">
     <div class="card-header">
       <h4 class="card-title">
@@ -51,10 +52,12 @@
           {% translate "This translation already has judge verdicts. Running translate or approved modes with a broad filter will overwrite judge-approved strings." %}
         </div>
       {% endif %}
+      <p class="d-none" id="id_auto_judge_preview" aria-live="polite"></p>
       {% crispy autoform %}
+      {{ autoform.next }}
     </div>
     <div class="card-footer">
-      <input type="submit" value="{% translate "Apply" %}" class="btn btn-primary" />
+      <input id="id_auto_apply" type="submit" value="{% translate "Apply" %}" class="btn btn-primary" />
     </div>
   </div>
 </form>

@@ -1288,6 +1288,94 @@ onReady(() => {
     updateAutoSource();
   }
 
+  document.querySelectorAll("form[data-judge-preview-url]").forEach((form) => {
+    const mode = form.querySelector('[name="mode"]');
+    const query = form.querySelector('[name="q"]');
+    const preview = form.querySelector("#id_auto_judge_preview");
+    const apply = form.querySelector("#id_auto_apply");
+    if (mode === null || query === null || preview === null || apply === null) {
+      return;
+    }
+    let timer;
+    let controller;
+    const updateJudgePreview = () => {
+      if (mode.value !== "judge") {
+        hide(preview);
+        apply.disabled = false;
+        return;
+      }
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        controller?.abort();
+        controller = new AbortController();
+        const params = new URLSearchParams(new FormData(form));
+        fetch(`${form.dataset.judgePreviewUrl}?${params}`, {
+          signal: controller.signal,
+        })
+          .then((response) => {
+            if (response.status === 400) {
+              return response.json().then(() => {
+                const error = new Error("Invalid judge preview");
+                error.invalid = true;
+                throw error;
+              });
+            }
+            if (!response.ok) {
+              throw new Error("Judge preview failed");
+            }
+            return response.json();
+          })
+          .then((data) => {
+            const judgeCost = data.judge_cost.available
+              ? interpolate(
+                  gettext("Observed judge cost: %(min)s to %(max)s USD."),
+                  data.judge_cost,
+                  true,
+                )
+              : gettext("Observed judge cost is unavailable.");
+            preview.textContent = interpolate(
+              gettext(
+                "%(matched)s matching strings: %(processed)s will be judge-evaluated, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap. %(initial)s initial and %(worst)s worst-case LLM requests. %(cost)s",
+              ),
+              {
+                matched: data.matched,
+                processed: data.processed,
+                writable: data.writable,
+                remaining: data.remaining,
+                initial: data.judge_calls_initial,
+                worst: data.judge_calls_worst_case,
+                cost: judgeCost,
+              },
+              true,
+            );
+            show(preview);
+            apply.disabled = data.processed === 0;
+          })
+          .catch((error) => {
+            if (error.name === "AbortError") {
+              return;
+            }
+            if (error.invalid) {
+              preview.textContent = gettext(
+                "Judge preview input is invalid.",
+              );
+              show(preview);
+              apply.disabled = true;
+              return;
+            }
+            preview.textContent = gettext(
+              "Judge preview is unavailable. You can still apply this run.",
+            );
+            show(preview);
+            apply.disabled = false;
+          });
+      }, 250);
+    };
+    mode.addEventListener("change", updateJudgePreview);
+    query.addEventListener("input", updateJudgePreview);
+    updateJudgePreview();
+  });
+
   const findElements = (root, selector) => {
     const elements = [];
     if (root instanceof Element && root.matches(selector)) {

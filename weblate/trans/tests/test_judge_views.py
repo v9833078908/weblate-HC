@@ -15,6 +15,7 @@ from weblate.trans.models.judge import (
     compute_context_hash,
     compute_target_hash,
 )
+from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.state import STATE_TRANSLATED
 
@@ -68,6 +69,67 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
         # Refused at the permission gate: 403, no run started.
         self.assertEqual(response.status_code, 403)
         self.assertEqual(JudgeVerdict.objects.count(), 0)
+
+    @override_settings(
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_preview_reports_the_capped_execution_scope(self) -> None:
+        response = self.client.get(
+            reverse("auto_translation_preview", kwargs=self.kw_translation),
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "threshold": 80,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            set(response.json()),
+            {
+                "matched",
+                "processed",
+                "remaining",
+                "writable",
+                "judge_calls_initial",
+                "judge_calls_worst_case",
+                "judge_cost",
+                "pretranslation_cost",
+            },
+        )
+
+    @override_settings(
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_preview_uses_observed_judge_costs(self) -> None:
+        for model, cost in (("vendor-a/model", "0.01"), ("vendor-b/model", "0.02")):
+            for _ in range(5):
+                LLMUsageLog.objects.create(
+                    model=model,
+                    project_slug=self.component.project.slug,
+                    operation=LLMUsageLog.Operation.JUDGE,
+                    cost_usd=cost,
+                    unit_count=1,
+                )
+        response = self.client.get(
+            reverse("auto_translation_preview", kwargs=self.kw_translation),
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "threshold": 80,
+            },
+        )
+
+        cost = response.json()["judge_cost"]
+        self.assertTrue(cost["available"])
+        self.assertEqual(cost["min"], "0.12")
+        self.assertEqual(cost["max"], "0.24")
 
     def test_form_shows_how_many_strings_a_run_would_touch(self) -> None:
         response = self.client.get(self.translation_url)

@@ -884,6 +884,14 @@ def show_translation(
                 obj,
                 obj=component,
                 user=user,
+                initial={
+                    **{
+                        key: request.GET[key]
+                        for key in ("mode", "q")
+                        if request.GET.get(key)
+                    },
+                    "next": request.GET.get("next", ""),
+                },
             ),
             "search_form": search_form,
             "replace_form": optional_form(ReplaceForm, user, "unit.edit", obj, obj=obj),
