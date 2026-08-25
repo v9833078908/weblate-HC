@@ -9,3 +9,4 @@ WEBLATE_PORT=3001
 
 # Keep this development-only credential out of Git.
 WEBLATE_JUDGE_API_KEY=
+WEBLATE_JUDGE_BASE_URL=https://openrouter.ai/api/v1
