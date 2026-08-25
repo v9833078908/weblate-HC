@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Status:** awaiting approval
+**Status:** complete
 
 **Goal:** Read the scale notation the measured languages actually use, so that `10 тысяч` matches
 `10,000`, `10 Tausend`, `10 mila`, `10천` and `一万` while `10万` does not, and so that no target
