@@ -50,6 +50,7 @@ from weblate.trans.forms import (
     get_new_unit_form,
     get_upload_form,
 )
+from weblate.trans.judge import judge_configuration_ready
 from weblate.trans.models import (
     Category,
     Change,
@@ -64,6 +65,7 @@ from weblate.trans.models.component import (
     prefetch_tasks,
     translation_prefetch_tasks,
 )
+from weblate.trans.models.pending import PendingUnitChange
 from weblate.trans.models.project import prefetch_project_flags
 from weblate.trans.models.translation import GhostTranslation
 from weblate.trans.util import render, sort_unicode, translation_percent
@@ -698,6 +700,38 @@ def show_component(request: AuthenticatedHttpRequest, obj: Component) -> HttpRes
     translations = sort_unicode(
         translations, user.profile.get_translation_orderer(request)
     )
+
+    judge_readiness = []
+    if not obj.is_glossary:
+        pending_counts = PendingUnitChange.objects.detailed_count_by_translation(obj)
+        judge_ready = judge_configuration_ready()
+        for translation in translations:
+            if not isinstance(translation, Translation) or translation.is_source:
+                continue
+            stats = translation.stats
+            can_evaluate = (
+                judge_ready
+                and user.has_perm("translation.auto", translation)
+                and user.has_perm("unit.review", translation)
+            )
+            judge_readiness.append(
+                {
+                    "translation": translation,
+                    "pending": pending_counts[translation.pk],
+                    "total": stats.judge_total,
+                    "evaluated": stats.judge_evaluated,
+                    "unevaluated": stats.judge_total - stats.judge_evaluated,
+                    "pass": stats.judge_pass,
+                    "flag": stats.judge_flag,
+                    "reject": stats.judge_reject,
+                    "unparsed": stats.judge_unparsed,
+                    "available": judge_ready,
+                    "can_evaluate": can_evaluate,
+                    "evaluate_url": (
+                        f"{translation.get_absolute_url()}?mode=judge&q=NOT+has%3Ajudge"
+                    ),
+                }
+            )
 
     return render(
         request,
