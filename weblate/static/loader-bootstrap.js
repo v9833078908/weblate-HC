@@ -1333,9 +1333,16 @@ onReady(() => {
                   true,
                 )
               : gettext("Observed judge cost is unavailable.");
+            const pretranslationCost = data.pretranslation_cost.available
+              ? interpolate(
+                  gettext("Observed pretranslation cost: %(min)s to %(max)s USD."),
+                  data.pretranslation_cost,
+                  true,
+                )
+              : gettext("Observed pretranslation cost is unavailable.");
             preview.textContent = interpolate(
               gettext(
-                "%(matched)s matching strings: %(processed)s will be judge-evaluated, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap. %(initial)s initial and %(worst)s worst-case LLM requests. %(cost)s",
+                "%(matched)s matching strings: %(processed)s will be judge-evaluated, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap. %(initial)s initial and %(worst)s worst-case LLM requests. %(judgeCost)s %(pretranslationCost)s",
               ),
               {
                 matched: data.matched,
@@ -1344,7 +1351,8 @@ onReady(() => {
                 remaining: data.remaining,
                 initial: data.judge_calls_initial,
                 worst: data.judge_calls_worst_case,
-                cost: judgeCost,
+                judgeCost,
+                pretranslationCost,
               },
               true,
             );

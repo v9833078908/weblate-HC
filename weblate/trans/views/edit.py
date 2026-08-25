@@ -37,6 +37,7 @@ from weblate.glossary.models import (
     get_matched_glossary_prompt_entries,
 )
 from weblate.logger import LOGGER
+from weblate.machinery.models import MACHINERY
 from weblate.screenshots.forms import ScreenshotForm
 from weblate.trans.actions import ActionEvents
 from weblate.trans.autotranslate import BatchAutoTranslate
@@ -1523,6 +1524,31 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
                     "f",
                 ),
             }
+    pretranslation_cost: dict[str, str | bool] = {"available": False}
+    if len(batch.translations) == 1 and len(autoform.cleaned_data["engines"]) == 1:
+        translation = batch.translations[0]
+        engine_id = autoform.cleaned_data["engines"][0]
+        configuration = translation.component.project.get_machinery_settings().get(
+            engine_id
+        )
+        if configuration is not None and engine_id in MACHINERY:
+            machine = MACHINERY[engine_id](configuration)
+            resolve_model = getattr(machine, "resolve_model", None)
+            if callable(resolve_model):
+                model = resolve_model(translation.language.code)
+                if isinstance(model, str):
+                    cost_range = recent_cost_range(
+                        translation.component.project.slug,
+                        model,
+                        LLMUsageLog.Operation.TRANSLATION,
+                    )
+                    if cost_range is not None:
+                        low, high = cost_range
+                        pretranslation_cost = {
+                            "available": True,
+                            "min": format((low * preview.writable).normalize(), "f"),
+                            "max": format((high * preview.writable).normalize(), "f"),
+                        }
     return JsonResponse(
         {
             "matched": preview.matched,
@@ -1532,7 +1558,7 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
             "judge_calls_initial": preview.initial_calls,
             "judge_calls_worst_case": preview.worst_case_calls,
             "judge_cost": judge_cost,
-            "pretranslation_cost": {"available": False},
+            "pretranslation_cost": pretranslation_cost,
         }
     )
 
