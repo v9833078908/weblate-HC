@@ -10,7 +10,8 @@ import uuid
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.db import models
+from django.core.exceptions import PermissionDenied
+from django.db import models, transaction
 from django.db.models import (
     BooleanField,
     Case,
@@ -23,12 +24,16 @@ from django.db.models import (
     When,
 )
 from django.db.models.functions import MD5
+from django.utils import timezone
 from django.utils.html import escape
-from django.utils.translation import gettext_lazy
+from django.utils.translation import gettext, gettext_lazy
 
+from weblate.trans.actions import ActionEvents
+from weblate.trans.models.unit import Unit
 from weblate.utils.state import (
     STATE_APPROVED,
     STATE_FUZZY,
+    STATE_NEEDS_CHECKING,
     STATE_TRANSLATED,
     StringState,
 )
@@ -36,8 +41,8 @@ from weblate.utils.state import (
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
 
+    from weblate.auth.models import User
     from weblate.glossary.models import GlossaryPromptEntry
-    from weblate.trans.models.unit import Unit
 
 JUDGE_ERROR_SEPARATOR = " | "
 
@@ -402,6 +407,12 @@ def judge_status_annotations() -> dict[str, models.Expression]:
             .values("max_severity")[:1],
             output_field=CharField(),
         ),
+        "judge_active_resolution": Subquery(  # type: ignore[dict-item]
+            current_parsed_round.annotate(severity_rank=severity_rank)
+            .order_by("-severity_rank", "seat")
+            .values("resolution")[:1],
+            output_field=CharField(),
+        ),
         "judge_has_parsed_history": Exists(
             JudgeVerdict.objects.filter(unit_id=OuterRef("pk"), unparsed=False)
         ),
@@ -423,6 +434,168 @@ def judge_status_annotations() -> dict[str, models.Expression]:
 def current_verdict(unit: Unit) -> JudgeVerdict | None:
     """Return only the verdict from the newest current-context round."""
     return collegium_verdict(current_round(unit))
+
+
+class JudgeResolutionError(Exception):
+    """A producer's judge verdict resolution request could not be applied."""
+
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        super().__init__(message)
+
+
+# (representative verdict, current resolution, requested resolution). "" is
+# unresolved. sent_back is never a requested resolution (D: not exposed).
+# A terminal accepted_as_is, or a re-request of the current resolution,
+# is deliberately absent - both read as an invalid/duplicate transition.
+ALLOWED_RESOLUTION_TRANSITIONS = {
+    (
+        JudgeVerdict.Verdict.REJECT,
+        "",
+        JudgeVerdict.Resolution.ESCALATED,
+    ),
+    (
+        JudgeVerdict.Verdict.REJECT,
+        "",
+        JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+    ),
+    (
+        JudgeVerdict.Verdict.REJECT,
+        JudgeVerdict.Resolution.ESCALATED,
+        JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+    ),
+    (
+        JudgeVerdict.Verdict.FLAG,
+        "",
+        JudgeVerdict.Resolution.ESCALATED,
+    ),
+    (
+        JudgeVerdict.Verdict.FLAG,
+        JudgeVerdict.Resolution.ESCALATED,
+        JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+    ),
+}
+
+
+def resolve_verdict(
+    *,
+    unit: Unit,
+    expected_verdict_id: int,
+    actor: User,
+    resolution: str,
+    reason: str,
+) -> JudgeVerdict:
+    """
+    Record a producer decision on the representative verdict of a unit.
+
+    One transaction: locks the Unit, then the representative JudgeVerdict;
+    rejects a missing, stale, or invalid transition; updates the current
+    resolution without touching severity/errors; writes one immutable
+    Change (verdict id, old/new resolution, reason - old/new state comes
+    for free from Unit.generate_change()); applies state through
+    Unit.translate() reusing the same Unit lock. A critical escalation
+    does not change state, so it writes its Change directly instead of
+    going through translate(), which would otherwise skip writing
+    anything when neither state nor target changed.
+    """
+    if not reason or not reason.strip():
+        msg = "blank_reason"
+        raise JudgeResolutionError(msg, gettext("A reason is required."))
+    if resolution not in {
+        JudgeVerdict.Resolution.ESCALATED,
+        JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+    }:
+        msg = "invalid_transition"
+        raise JudgeResolutionError(msg, gettext("That decision is not available."))
+    if not actor.has_perm("unit.review", unit):
+        raise PermissionDenied
+
+    with transaction.atomic():
+        locked_unit = Unit.objects.select_for_update().get(pk=unit.pk)
+        representative = current_verdict(locked_unit)
+        stale_message = gettext(
+            "This verdict no longer matches the current text or context; "
+            "reload and try again."
+        )
+        if representative is None:
+            # Something was judged before but no round matches the current
+            # target/context (a stale round) is a different situation from
+            # nothing having been judged at all (a missing round).
+            if locked_unit.judge_verdicts.exists():
+                msg = "stale"
+                raise JudgeResolutionError(msg, stale_message)
+            msg = "missing"
+            raise JudgeResolutionError(
+                msg,
+                gettext("No current judge verdict was found for this string."),
+            )
+        if representative.pk != expected_verdict_id:
+            msg = "stale"
+            raise JudgeResolutionError(msg, stale_message)
+        representative = JudgeVerdict.objects.select_for_update().get(
+            pk=representative.pk
+        )
+        old_resolution = representative.resolution
+        verdict = representative.verdict
+        old_state = locked_unit.state
+
+        if (verdict, old_resolution, resolution) not in ALLOWED_RESOLUTION_TRANSITIONS:
+            msg = "invalid_transition"
+            raise JudgeResolutionError(
+                msg,
+                gettext("That decision does not apply to this verdict."),
+            )
+        if resolution == JudgeVerdict.Resolution.ESCALATED:
+            # A major is held for the first time. A critical is forced
+            # back to fuzzy rather than left at whatever old_state
+            # happens to be: escalating a critical must never leave it
+            # shipping, even if something else changed its state since
+            # the verdict without invalidating the round (target unchanged).
+            new_state = (
+                STATE_NEEDS_CHECKING
+                if verdict == JudgeVerdict.Verdict.FLAG
+                else STATE_FUZZY
+            )
+        else:
+            new_state = STATE_TRANSLATED
+
+        representative.resolution = resolution
+        representative.resolution_reason = reason
+        representative.resolved_by = actor
+        representative.resolved_at = timezone.now()
+        representative.save(
+            update_fields=[
+                "resolution",
+                "resolution_reason",
+                "resolved_by",
+                "resolved_at",
+            ]
+        )
+
+        change_details = {
+            "judge_verdict_id": representative.pk,
+            "old_resolution": old_resolution,
+            "new_resolution": resolution,
+            "reason": reason,
+        }
+        if new_state == old_state:
+            locked_unit.generate_change(
+                actor,
+                actor,
+                ActionEvents.JUDGE_RESOLUTION,
+                change_details=change_details,
+            )
+        else:
+            locked_unit.translate(
+                actor,
+                locked_unit.get_target_plurals(),
+                new_state,
+                change_action=ActionEvents.JUDGE_RESOLUTION,
+                change_details=change_details,
+                propagate=False,
+                select_for_update=False,
+            )
+    return representative
 
 
 def describe_latest_verdict(unit: Unit) -> str:

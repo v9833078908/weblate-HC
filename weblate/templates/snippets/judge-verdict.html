@@ -1,4 +1,4 @@
-{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed' in context #}
+{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed', 'judge_current_verdict', 'judge_can_resolve', 'judge_resolution_form', 'this_unit_url' in context #}
 
 {% load humanize i18n icons %}
 
@@ -108,6 +108,41 @@
               {% endfor %}
             {% endfor %}
           {% endif %}
+        </div>
+      {% endif %}
+      {% if judge_current_verdict.resolution %}
+        <div class="list-group-item check">
+          <p class="list-group-item-text">
+            {% if judge_current_verdict.resolution == "escalated" %}
+              <span class="badge text-bg-info">{% translate "Escalated for review" %}</span>
+            {% elif judge_current_verdict.resolution == "accepted_as_is" %}
+              <span class="badge text-bg-success">{% translate "Accepted as-is" %}</span>
+            {% endif %}
+            {% if judge_current_verdict.resolution_reason %}
+              - {{ judge_current_verdict.resolution_reason }}
+            {% endif %}
+          </p>
+        </div>
+      {% endif %}
+      {% if judge_can_resolve %}
+        <div class="list-group-item check">
+          <form method="post"
+                action="{% url 'resolve-judge-verdict' pk=judge_current_verdict.pk %}"
+                id="id_judge_resolution_form">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ this_unit_url }}" />
+            <div class="form-group">
+              {{ judge_resolution_form.resolution.label_tag }}
+              {{ judge_resolution_form.resolution }}
+              {{ judge_resolution_form.resolution.errors }}
+            </div>
+            <div class="form-group">
+              {{ judge_resolution_form.reason.label_tag }}
+              {{ judge_resolution_form.reason }}
+              {{ judge_resolution_form.reason.errors }}
+            </div>
+            <button type="submit" class="btn btn-warning">{% translate "Record decision" %}</button>
+          </form>
         </div>
       {% endif %}
     </div>

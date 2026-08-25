@@ -207,6 +207,20 @@ class JudgeStatsTest(ViewTestCase):
         self.assertEqual(stats.judge_stale, 1)
         self.assertEqual(stats.judge_unparsed, 1)
 
+    def test_translation_judge_resolution_stats(self) -> None:
+        unit = self.get_unit()
+        verdict = self.add_verdict(unit, "critical")
+        verdict.resolution = "escalated"
+        verdict.save(update_fields=["resolution"])
+        self.refresh_stats()
+        self.assertEqual(self.translation.stats.judge_escalated, 1)
+        self.assertEqual(self.translation.stats.judge_resolved, 0)
+        verdict.resolution = "accepted_as_is"
+        verdict.save(update_fields=["resolution"])
+        self.refresh_stats()
+        self.assertEqual(self.translation.stats.judge_resolved, 1)
+        self.assertEqual(self.translation.stats.judge_escalated, 0)
+
     def test_target_edit_stales_and_new_verdict_restores_coverage(self) -> None:
         unit = self.get_unit()
         self.add_verdict(unit, "major")

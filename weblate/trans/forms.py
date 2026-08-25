@@ -86,6 +86,7 @@ from weblate.trans.models import (
     Change,
     CommitPolicyChoices,
     Component,
+    JudgeVerdict,
     Label,
     Project,
     Unit,
@@ -1411,6 +1412,28 @@ class AutoForm(forms.Form):
                 )
             )
         return result.pk
+
+
+class JudgeResolutionForm(forms.Form):
+    """Record a producer decision on a judge verdict."""
+
+    resolution = forms.ChoiceField(
+        label=gettext_lazy("Decision"),
+        choices=(
+            (
+                JudgeVerdict.Resolution.ESCALATED,
+                gettext_lazy("Escalate for review"),
+            ),
+            (
+                JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+                gettext_lazy("Accept as-is"),
+            ),
+        ),
+    )
+    reason = forms.CharField(
+        label=gettext_lazy("Reason"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )
 
 
 class CommentForm(forms.Form):

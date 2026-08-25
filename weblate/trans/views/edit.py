@@ -51,6 +51,7 @@ from weblate.trans.forms import (
     ChecksumForm,
     CommentForm,
     ContextForm,
+    JudgeResolutionForm,
     MergeForm,
     PositionSearchForm,
     RevertForm,
@@ -62,6 +63,7 @@ from weblate.trans.models import (
     Category,
     Comment,
     Component,
+    JudgeVerdict,
     Suggestion,
     SuggestionAddResult,
     Translation,
@@ -69,11 +71,15 @@ from weblate.trans.models import (
     Vote,
 )
 from weblate.trans.models.judge import (
+    ALLOWED_RESOLUTION_TRANSITIONS,
+    JudgeResolutionError,
     active_round,
     active_verdict,
     compute_context_hash,
     current_round,
+    current_verdict,
     latest_round,
+    resolve_verdict,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
 from weblate.trans.models.unit import fill_in_source_translation
@@ -1289,7 +1295,9 @@ def get_translate_unit(
     return TranslateUnitResult(search_result, num_results, offset, unit)
 
 
-def _judge_view_context(unit: Unit) -> dict[str, Any]:
+def _judge_view_context(
+    request: AuthenticatedHttpRequest, unit: Unit
+) -> dict[str, Any]:
     """Judge-verdict context for the unit page: round, verdict, staleness."""
     judge_round = latest_round(unit)
     judge_current_round = current_round(unit)
@@ -1310,6 +1318,28 @@ def _judge_view_context(unit: Unit) -> dict[str, Any]:
             glossary_terms=get_matched_glossary_prompt_entries(unit),
         )
     )
+    # Only the strictly current (target+context fresh) round is eligible
+    # for resolution - the same freshness resolve_verdict() itself checks.
+    judge_current_verdict = current_verdict(unit)
+    judge_resolution_choices: set[str] = set()
+    if judge_current_verdict is not None and not judge_context_changed:
+        judge_resolution_choices = {
+            resolution
+            for verdict, old_resolution, resolution in ALLOWED_RESOLUTION_TRANSITIONS
+            if verdict == judge_current_verdict.verdict
+            and old_resolution == judge_current_verdict.resolution
+        }
+    judge_can_resolve = bool(judge_resolution_choices) and request.user.has_perm(
+        "unit.review", unit
+    )
+    judge_resolution_form = None
+    if judge_can_resolve:
+        judge_resolution_form = JudgeResolutionForm()
+        judge_resolution_form.fields["resolution"].choices = [
+            choice
+            for choice in judge_resolution_form.fields["resolution"].choices
+            if choice[0] in judge_resolution_choices
+        ]
     return {
         "judge_round": judge_round,
         "judge_verdict": judge_verdict,
@@ -1317,6 +1347,9 @@ def _judge_view_context(unit: Unit) -> dict[str, Any]:
         "judge_stale": judge_stale,
         "judge_unparsed": judge_unparsed,
         "judge_context_changed": judge_context_changed,
+        "judge_current_verdict": judge_current_verdict,
+        "judge_can_resolve": judge_can_resolve,
+        "judge_resolution_form": judge_resolution_form,
     }
 
 
@@ -1399,7 +1432,7 @@ def translate(request: AuthenticatedHttpRequest, path: list[str]) -> HttpRespons
     other_languages_count = max(unit.source_unit.unit_set.count() - 1, 0)
     prepare_glossary_terms([unit], project, full=True)
 
-    judge_context = _judge_view_context(unit)
+    judge_context = _judge_view_context(request, unit)
 
     return render(
         request,
@@ -1775,6 +1808,41 @@ def resolve_comment(request: AuthenticatedHttpRequest, pk):
     comment_obj.resolve(user=request.user)
     messages.info(request, gettext("Comment has been resolved."))
 
+    return redirect_next(request.POST.get("next"), fallback_url)
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def resolve_judge_verdict(request: AuthenticatedHttpRequest, pk):
+    """Record a producer decision on a judge verdict."""
+    verdict_obj = get_object_or_404(
+        JudgeVerdict.objects.filter(
+            unit__in=Unit.objects.filter_access(request.user)
+        ).select_related("unit"),
+        pk=pk,
+    )
+    unit = verdict_obj.unit
+    fallback_url = unit.get_absolute_url()
+
+    form = JudgeResolutionForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, gettext("Could not record the decision."))
+        return redirect_next(request.POST.get("next"), fallback_url)
+
+    try:
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=pk,
+            actor=request.user,
+            resolution=form.cleaned_data["resolution"],
+            reason=form.cleaned_data["reason"],
+        )
+    except JudgeResolutionError as error:
+        messages.error(request, str(error))
+        return redirect_next(request.POST.get("next"), fallback_url)
+
+    messages.info(request, gettext("The decision has been recorded."))
     return redirect_next(request.POST.get("next"), fallback_url)
 
 

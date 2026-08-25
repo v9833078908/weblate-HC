@@ -823,6 +823,8 @@ class UnitTermExpr(BaseTermExpr):
                 judge_active_severity__isnull=True, judge_has_parsed_history=True
             ),
             "unparsed": Q(judge_latest_incomplete=True),
+            "resolved": Q(judge_active_resolution="accepted_as_is"),
+            "escalated": Q(judge_active_resolution="escalated"),
         }
         try:
             return statuses[text]

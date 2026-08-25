@@ -648,6 +648,12 @@ class ActionEvents(IntegerChoices):
         gettext_lazy("A component alert was reopened after its context changed."),
         gettext_lazy("Alert reopened"),
     )
+    # Translators: Name and description of event in the history
+    JUDGE_RESOLUTION = (
+        105,
+        gettext_lazy("A producer recorded a decision on a judge verdict."),
+        gettext_lazy("Judge verdict resolved"),
+    )
 
 
 # Actions which are logged

@@ -105,6 +105,8 @@ JUDGE_KEYS = frozenset(
         "judge_reject",
         "judge_stale",
         "judge_unparsed",
+        "judge_resolved",
+        "judge_escalated",
     }
 )
 SOURCE_KEYS = frozenset(
@@ -953,6 +955,12 @@ class TranslationStats(BaseStats):
                     ),
                 ),
                 judge_unparsed=Count("pk", filter=Q(judge_latest_incomplete=True)),
+                judge_resolved=Count(
+                    "pk", filter=Q(judge_active_resolution="accepted_as_is")
+                ),
+                judge_escalated=Count(
+                    "pk", filter=Q(judge_active_resolution="escalated")
+                ),
             )
         )
         for key in JUDGE_KEYS:

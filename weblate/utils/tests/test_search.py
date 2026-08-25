@@ -1071,6 +1071,16 @@ class JudgeSearchTest(ViewTestCase):
         self.assertFalse(self.matches("judge:flag", unit))
         self.assertFalse(self.matches("judge:reject", unit))
 
+    def test_judge_resolved_and_escalated_filters(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        JudgeVerdict.objects.filter(unit=unit).update(resolution="escalated")
+        self.assertTrue(self.matches("judge:escalated", unit))
+        self.assertFalse(self.matches("judge:resolved", unit))
+        JudgeVerdict.objects.filter(unit=unit).update(resolution="accepted_as_is")
+        self.assertTrue(self.matches("judge:resolved", unit))
+        self.assertFalse(self.matches("judge:escalated", unit))
+
     def test_every_preset_query_selects_its_exact_severity_set(self) -> None:
         unit = self.get_unit()
         expectations = {

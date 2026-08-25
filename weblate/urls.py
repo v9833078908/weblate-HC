@@ -465,6 +465,12 @@ real_patterns = [
         weblate.trans.views.edit.resolve_comment,
         name="resolve-comment",
     ),
+    # Judge verdicts
+    path(
+        "judge-verdict/<int:pk>/resolve/",
+        weblate.trans.views.edit.resolve_judge_verdict,
+        name="resolve-judge-verdict",
+    ),
     # VCS manipulation - commit
     path(
         "commit/<object_path:path>/",

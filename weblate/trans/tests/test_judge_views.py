@@ -17,7 +17,7 @@ from weblate.trans.models.judge import (
 )
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.tests.test_views import ViewTestCase
-from weblate.utils.state import STATE_TRANSLATED
+from weblate.utils.state import STATE_FUZZY, STATE_NEEDS_CHECKING, STATE_TRANSLATED
 
 
 def judge_context_hash(unit) -> str:
@@ -451,3 +451,122 @@ class JudgeBackTranslationTest(ViewTestCase):
         self.make_flag(unit, back_translation="")
         response = self.client.get(unit.get_absolute_url())
         self.assertNotContains(response, "Approximate reconstruction")
+
+
+class JudgeResolutionViewTest(ViewTestCase):
+    def enable_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        return verdict
+
+    def resolve_url(self, verdict) -> str:
+        return reverse("resolve-judge-verdict", kwargs={"pk": verdict.pk})
+
+    def test_escalating_a_critical_keeps_it_held(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "needs a second look"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_FUZZY)
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.resolution, "escalated")
+
+    def test_accepting_a_held_verdict_ships_it(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "accepted_as_is", "reason": "acceptable in context"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+
+    def test_escalating_a_major_holds_it_for_review(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "wants a second opinion"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_NEEDS_CHECKING)
+
+    def test_resolve_requires_review_permission(self) -> None:
+        # PermissionDenied is converted to a real 403 by Django's own
+        # exception handling before it would ever reach the test client
+        # as a raised exception (same pattern as ignore_check_source's
+        # own permission test in test_edit.py).
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "needs a look"},
+        )
+        self.assertEqual(response.status_code, 403)
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.resolution, "")
+
+    def test_invalid_transition_shows_an_error_without_a_crash(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "accepted_as_is", "reason": "already ships"},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "does not apply")
+
+    def test_card_offers_the_resolution_form_when_reviewer(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "id_judge_resolution_form")
+        self.assertContains(response, self.resolve_url(verdict))
+
+    def test_card_hides_the_resolution_form_without_permission(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "id_judge_resolution_form")
+
+    def test_card_shows_the_recorded_decision(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "flagged for a human"},
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Escalated for review")
+        self.assertContains(response, "flagged for a human")

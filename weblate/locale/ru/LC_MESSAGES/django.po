@@ -25417,6 +25417,91 @@ msgstr "Судья — незначительно (ничего не блоки�
 msgid "Judge - nothing blocking"
 msgstr "Судья — ничего не блокирует"
 
+#: weblate/trans/actions.py:654
+msgid "A producer recorded a decision on a judge verdict."
+msgstr "Продюсер зафиксировал решение по вердикту судьи."
+
+#: weblate/trans/actions.py:655
+msgid "Judge verdict resolved"
+msgstr "Решение по вердикту судьи"
+
+#: weblate/trans/change_display.py:449
+msgid "unresolved"
+msgstr "не разрешено"
+
+#: weblate/trans/change_display.py:450
+msgid "escalated"
+msgstr "эскалировано"
+
+#: weblate/trans/change_display.py:451
+msgid "accepted as-is"
+msgstr "принято как есть"
+
+#: weblate/trans/change_display.py:463
+#, python-format
+msgid "%(old)s -> %(new)s: %(reason)s"
+msgstr "%(old)s -> %(new)s: %(reason)s"
+
+#: weblate/trans/forms.py:1421
+msgid "Decision"
+msgstr "Решение"
+
+#: weblate/trans/forms.py:1425
+msgid "Escalate for review"
+msgstr "Эскалировать на проверку"
+
+#: weblate/trans/forms.py:1429
+msgid "Accept as-is"
+msgstr "Принять как есть"
+
+#: weblate/trans/forms.py:1434
+msgid "Reason"
+msgstr "Причина"
+
+#: weblate/trans/views/edit.py:1830
+msgid "Could not record the decision."
+msgstr "Не удалось зафиксировать решение."
+
+#: weblate/trans/views/edit.py:1845
+msgid "The decision has been recorded."
+msgstr "Решение зафиксировано."
+
+#: weblate/templates/snippets/judge-verdict.html:117
+msgid "Escalated for review"
+msgstr "Эскалировано на проверку"
+
+#: weblate/templates/snippets/judge-verdict.html:119
+msgid "Accepted as-is"
+msgstr "Принято как есть"
+
+#: weblate/templates/snippets/judge-verdict.html:144
+msgid "Record decision"
+msgstr "Зафиксировать решение"
+
+#: weblate/trans/models/judge.py:503
+msgid "A reason is required."
+msgstr "Необходимо указать причину."
+
+#: weblate/trans/models/judge.py:509
+msgid "That decision is not available."
+msgstr "Это решение недоступно."
+
+#: weblate/trans/models/judge.py:516
+msgid ""
+"This verdict no longer matches the current text or context; "
+"reload and try again."
+msgstr ""
+"Этот вердикт больше не соответствует текущему тексту или контексту; "
+"обновите страницу и попробуйте снова."
+
+#: weblate/trans/models/judge.py:530
+msgid "No current judge verdict was found for this string."
+msgstr "Для этой строки не найден актуальный вердикт судьи."
+
+#: weblate/trans/models/judge.py:546
+msgid "That decision does not apply to this verdict."
+msgstr "Это решение неприменимо к данному вердикту."
+
 #~ msgid "Could not open a ticket, please try again later."
 #~ msgstr "Не удалось открыть заявку, попробуйте позже."
 
