@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from functools import partial
+from math import ceil
 from typing import TYPE_CHECKING, Any, Literal
 
 from celery import current_task
@@ -61,6 +63,16 @@ if TYPE_CHECKING:
 # rather than dropping their strings, but never hold a run for a long one.
 RATE_LIMIT_WAIT = 90
 RATE_LIMIT_POLL = 5
+
+
+@dataclass(frozen=True, slots=True)
+class JudgeScopePreview:
+    matched: int
+    processed: int
+    remaining: int
+    writable: int
+    initial_calls: int
+    worst_case_calls: int
 
 
 def _fetch_machinery_batch(
@@ -377,7 +389,10 @@ class AutoTranslate(BaseAutoTranslate):
         self.target_state = STATE_TRANSLATED
         self.overwrite_existing = overwrite_existing
         self.judge_limit = judge_limit
+        self.judge_units_matched = 0
         self.judge_units_processed = 0
+        self.judge_units_remaining = 0
+        self.judge_summary: dict[str, int] | None = None
         # D2/fail-safe: a judge translation never starts shippable; the
         # verdict decides the final state per string.
         self.fresh_translation_state = STATE_FUZZY
@@ -396,6 +411,26 @@ class AutoTranslate(BaseAutoTranslate):
 
     def get_task_meta(self) -> dict[str, Any]:
         return {"translation": self.translation.pk}
+
+    def get_message(self) -> str:
+        if self.mode != "judge" or self.judge_summary is None:
+            return super().get_message()
+        message = (
+            gettext(
+                "%(evaluated)d evaluated: %(passed)d with no blocking concern, "
+                "%(advisory)d advisory, %(held)d held for decision, "
+                "%(incomplete)d incomplete."
+            )
+            % self.judge_summary
+        )
+        if self.judge_units_remaining:
+            message += " " + (
+                gettext(
+                    "%(remaining)d matching strings remain because of the per-run cap."
+                )
+                % {"remaining": self.judge_units_remaining}
+            )
+        return message
 
     def update(
         self, unit: Unit, state: StringState, target: list[str], user=None
@@ -734,37 +769,54 @@ class AutoTranslate(BaseAutoTranslate):
         self.written.update(translations)
         self.set_progress(self.progress_base + len(self.written))
 
-    def process_judge(self, *, engines: list[str], threshold: int) -> None:
+    def preview_judge_scope(self) -> tuple[JudgeScopePreview, list[Unit]]:
+        """Return the ordered, capped judge scope used by execution."""
         validate_judge_configuration()
-        units = list(self.get_units().select_related("source_unit"))
-        judge_limit = (
+        limit = (
             settings.JUDGE_MAX_UNITS_PER_RUN
             if self.judge_limit is None
             else self.judge_limit
         )
-        if len(units) > judge_limit:
-            warning = ngettext(
-                "Judge run refused: %(n)d string exceeds the per-run cap of %(cap)d.",
-                "Judge run refused: %(n)d strings exceed the per-run cap of %(cap)d.",
-                len(units),
-            ) % {"n": len(units), "cap": judge_limit}
-            self.failure_message = warning
-            self.add_warning(warning)
+        units = (
+            self.get_units().select_related("source_unit").order_by("position", "pk")
+        )
+        matched = units.count()
+        selected = list(units[:limit])
+        processed = len(selected)
+        writable = sum(
+            not unit.translated or self.overwrite_existing for unit in selected
+        )
+        batches = ceil(processed / settings.JUDGE_BATCH_SIZE)
+        return (
+            JudgeScopePreview(
+                matched=matched,
+                processed=processed,
+                remaining=matched - processed,
+                writable=writable,
+                initial_calls=batches * len(JUDGE_SEATS),
+                worst_case_calls=(
+                    batches
+                    * len(JUDGE_SEATS)
+                    * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)
+                ),
+            ),
+            selected,
+        )
+
+    def process_judge(self, *, engines: list[str], threshold: int) -> None:
+        preview, units = self.preview_judge_scope()
+        self.judge_units_matched = preview.matched
+        self.judge_units_processed = preview.processed
+        self.judge_units_remaining = preview.remaining
+        if not units:
             return
         writable_ids = {
-            unit.id
-            for unit in units
-            if (not unit.translated or self.overwrite_existing)
+            unit.id for unit in units if not unit.translated or self.overwrite_existing
         }
 
-        # Phase 1: pre-translate the writable strings via the native MT
-        # path, scoped by unit_ids, written at needs-editing. Reuses
-        # process_mt / fetch_mt / store_results / update — no second
-        # write path (plan mechanism 5).
+        # Phase 1: pre-translate writable strings through the native MT path.
         base_low, base_high = self.progress_range
         split = base_low + (base_high - base_low) // 10
-        # set_progress has no clamp. Phase 2 restarts its counter, so the
-        # phases use disjoint ranges to keep task progress monotonic.
         if writable_ids:
             saved_ids, saved_state, saved_range = (
                 self.unit_ids,
@@ -782,29 +834,28 @@ class AutoTranslate(BaseAutoTranslate):
                     saved_state,
                     saved_range,
                 )
-        # Phase 1 may have written targets, so the judged instances are always
-        # reloaded, whether or not anything was writable.
+
+        order = Case(
+            *[When(pk=unit.pk, then=index) for index, unit in enumerate(units)],
+            output_field=IntegerField(),
+        )
         units = list(
-            self.translation.unit_set.filter(pk__in=[unit.id for unit in units])
+            self.translation.unit_set.filter(pk__in=[unit.pk for unit in units])
+            .annotate(scope_order=order)
+            .order_by("scope_order")
             .prefetch()
             .prefetch_source()
         )
 
-        # Phase 2: judge everything in q; the state is decided per verdict.
-        judged = 0
+        completed_batches = 0
 
-        def tick(_requests, results) -> None:
-            nonlocal judged
-            judged += len(results)
-            self.set_progress(min(judged, self.progress_steps))
+        def tick(_requests, _results) -> None:
+            nonlocal completed_batches
+            completed_batches += 1
+            self.set_progress(min(completed_batches, self.progress_steps))
 
         self.progress_range = (split, base_high)
-        # A defect is re-judged by both seats once per repair attempt, so the
-        # denominator is the worst case. Sizing it to one round would clamp the
-        # bar at the phase maximum and freeze it for the whole repair loop.
-        self.progress_steps = (
-            len(units) * len(JUDGE_SEATS) * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)
-        )
+        self.progress_steps = preview.worst_case_calls
         try:
             verdicts = run_judge_batch(
                 units,
@@ -812,9 +863,29 @@ class AutoTranslate(BaseAutoTranslate):
                 user=self.user,
                 on_batch=tick,
             )
+            if completed_batches < self.progress_steps:
+                self.set_progress(self.progress_steps)
         finally:
             self.progress_range = (base_low, base_high)
-        self.judge_units_processed = len(units)
+        self.judge_summary = {
+            "evaluated": len(verdicts),
+            "passed": sum(
+                verdict.verdict == JudgeVerdict.Verdict.PASS
+                for verdict in verdicts.values()
+            ),
+            "advisory": sum(
+                verdict.verdict == JudgeVerdict.Verdict.FLAG
+                for verdict in verdicts.values()
+            ),
+            "held": sum(
+                verdict.verdict == JudgeVerdict.Verdict.REJECT
+                for verdict in verdicts.values()
+            ),
+            "incomplete": sum(
+                verdict.verdict == JudgeVerdict.Verdict.UNPARSED
+                for verdict in verdicts.values()
+            ),
+        }
         final_snapshots = {
             unit.id: (unit.target, unit.state) for unit in units if unit.id in verdicts
         }
@@ -840,9 +911,6 @@ class AutoTranslate(BaseAutoTranslate):
                     or current.pk != verdict.pk
                     or (locked.target, locked.state) != final_snapshots[unit.id]
                 ):
-                    # The target or glossary context changed while requests
-                    # were in flight. Never apply a verdict to a different
-                    # version.
                     continue
                 if verdict.verdict == JudgeVerdict.Verdict.UNPARSED:
                     unparsed += 1
@@ -853,7 +921,7 @@ class AutoTranslate(BaseAutoTranslate):
                 )
                 if state is not None and locked.state != state:
                     self.update(locked, state, locked.get_target_plurals())
-        if unparsed:  # D5: never a silent no-op on money spent
+        if unparsed:
             self.add_warning(
                 ngettext(
                     "%d string was left unjudged (the judge did not answer).",
@@ -997,6 +1065,43 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 raise ValueError(msg)
         self._preload_workflow_settings()
         self.progress_steps = len(self.translations)
+
+    def preview_judge_scope(self) -> JudgeScopePreview:
+        """Aggregate the same permission-filtered, globally capped judge scope."""
+        validate_judge_configuration()
+        remaining = settings.JUDGE_MAX_UNITS_PER_RUN
+        matched = processed = writable = initial_calls = worst_case_calls = 0
+        for translation in self.translations:
+            if not self._can_process_translation(translation):
+                continue
+            auto_translate = AutoTranslate(
+                user=self.user,
+                translation=translation,
+                q=self.q,
+                mode="judge",
+                component_wide=self.component_wide,
+                unit_ids=self.unit_ids,
+                allow_non_shared_tm_source_components=(
+                    self.allow_non_shared_tm_source_components
+                ),
+                overwrite_existing=self.overwrite_existing,
+                judge_limit=remaining,
+            )
+            preview, _units = auto_translate.preview_judge_scope()
+            matched += preview.matched
+            processed += preview.processed
+            writable += preview.writable
+            initial_calls += preview.initial_calls
+            worst_case_calls += preview.worst_case_calls
+            remaining -= preview.processed
+        return JudgeScopePreview(
+            matched=matched,
+            processed=processed,
+            remaining=matched - processed,
+            writable=writable,
+            initial_calls=initial_calls,
+            worst_case_calls=worst_case_calls,
+        )
 
     def _preload_workflow_settings(self) -> None:
         self.translations = list(self.translations)

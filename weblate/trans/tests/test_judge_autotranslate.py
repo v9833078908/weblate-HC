@@ -99,10 +99,17 @@ class JudgeAutoTranslateTest(ViewTestCase):
         )
         self.assertEqual(auto.fresh_translation_state, STATE_FUZZY)
 
-    def test_a_run_over_the_cap_is_refused(self) -> None:
+    def test_a_zero_cap_processes_no_strings(self) -> None:
         with override_settings(JUDGE_MAX_UNITS_PER_RUN=0):
             auto = self.perform(JudgeVerdict.Verdict.PASS)
-        self.assertIsNotNone(auto.failure_message)
+        self.assertIsNone(auto.failure_message)
+        self.assertEqual(auto.judge_units_processed, 0)
+
+    def test_judge_summary_reports_verdict_buckets(self) -> None:
+        auto = self.perform(JudgeVerdict.Verdict.PASS)
+
+        self.assertIn("evaluated", auto.get_message())
+        self.assertIn("no blocking concern", auto.get_message())
 
     def test_unparsed_is_counted_in_the_warnings(self) -> None:
         auto = self.perform(JudgeVerdict.Verdict.UNPARSED)
