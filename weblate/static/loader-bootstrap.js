@@ -523,6 +523,28 @@ function interpolate(fmt, obj, named) {
   return fmt.replace(/%s/g, () => String(obj.shift()));
 }
 
+/* Judge run phase text for the task progress poller, textContent-only. */
+function describeJudgePhase(result) {
+  if (result === null || typeof result !== "object") {
+    return "";
+  }
+  if (result.phase === "judging") {
+    return interpolate(
+      gettext("Judging %(current)s of %(total)s strings"),
+      { current: result.phase_current, total: result.phase_total },
+      true,
+    );
+  }
+  if (result.phase === "repairing") {
+    return interpolate(
+      gettext("Repairing %(current)s of %(total)s strings"),
+      { current: result.phase_current, total: result.phase_total },
+      true,
+    );
+  }
+  return "";
+}
+
 function loadMatrix() {
   const loadingNext = document.getElementById("loading-next");
   const loader = document.getElementById("matrix-load");
@@ -1713,6 +1735,7 @@ onReady(() => {
     const bar = message.querySelector(".progress-bar");
     const messageText = message.querySelector(".task-message");
     const warnings = message.querySelector(".task-warnings");
+    const phase = message.querySelector(".task-phase");
     if (bar !== null) {
       bar.setAttribute("data-completed", "0");
     }
@@ -1749,6 +1772,11 @@ onReady(() => {
           const data = await response.json();
           if (bar !== null) {
             bar.style.width = `${data.progress}%`;
+          }
+          if (phase !== null) {
+            phase.textContent = data.completed
+              ? ""
+              : describeJudgePhase(data.result);
           }
           if (data.completed) {
             const result = data.result ?? {};

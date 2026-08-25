@@ -75,6 +75,110 @@ class JudgeScopePreview:
     worst_case_calls: int
 
 
+@dataclass(frozen=True, slots=True)
+class JudgeSummary:
+    """
+    Producer-facing tally of one judge run's outcomes.
+
+    ``repaired`` counts verdicts whose retained round has ``attempt > 0``:
+    a repair-then-rejudge cycle happened, not that the severity improved.
+    """
+
+    evaluated: int = 0
+    nothing_blocking: int = 0
+    minor_noted: int = 0
+    major_not_fixed: int = 0
+    critical_held: int = 0
+    unparsed: int = 0
+    repaired: int = 0
+    cap_remainder: int = 0
+
+    def __add__(self, other: JudgeSummary) -> JudgeSummary:
+        if not isinstance(other, JudgeSummary):
+            return NotImplemented
+        return JudgeSummary(
+            evaluated=self.evaluated + other.evaluated,
+            nothing_blocking=self.nothing_blocking + other.nothing_blocking,
+            minor_noted=self.minor_noted + other.minor_noted,
+            major_not_fixed=self.major_not_fixed + other.major_not_fixed,
+            critical_held=self.critical_held + other.critical_held,
+            unparsed=self.unparsed + other.unparsed,
+            repaired=self.repaired + other.repaired,
+            cap_remainder=self.cap_remainder + other.cap_remainder,
+        )
+
+
+def format_judge_summary(summary: JudgeSummary) -> str:
+    """Build the one producer-facing completion message for a judge run."""
+    message = gettext(
+        "%(evaluated)d evaluated: %(nothing_blocking)d with no blocking concern, "
+        "%(minor_noted)d minor noted, %(major_not_fixed)d major not fixed, "
+        "%(critical_held)d critical held, %(unparsed)d unparsed."
+    ) % {
+        "evaluated": summary.evaluated,
+        "nothing_blocking": summary.nothing_blocking,
+        "minor_noted": summary.minor_noted,
+        "major_not_fixed": summary.major_not_fixed,
+        "critical_held": summary.critical_held,
+        "unparsed": summary.unparsed,
+    }
+    if summary.repaired:
+        message += " " + ngettext(
+            "%(repaired)d string was repaired and re-judged.",
+            "%(repaired)d strings were repaired and re-judged.",
+            summary.repaired,
+        ) % {"repaired": summary.repaired}
+    if summary.cap_remainder:
+        message += " " + gettext(
+            "%(remaining)d matching strings remain because of the per-run cap."
+        ) % {"remaining": summary.cap_remainder}
+    return message
+
+
+def _summarize_verdicts(
+    verdicts: dict[int, JudgeVerdict], *, cap_remainder: int
+) -> JudgeSummary:
+    """Tally one judge run's retained verdicts into producer-facing buckets."""
+    nothing_blocking = minor_noted = major_not_fixed = critical_held = 0
+    unparsed = repaired = 0
+    for verdict in verdicts.values():
+        if verdict.unparsed:
+            unparsed += 1
+        elif verdict.max_severity == JudgeVerdict.Severity.CRITICAL:
+            critical_held += 1
+        elif verdict.max_severity == JudgeVerdict.Severity.MAJOR:
+            major_not_fixed += 1
+        elif verdict.max_severity == JudgeVerdict.Severity.MINOR:
+            minor_noted += 1
+        else:
+            nothing_blocking += 1
+        if verdict.attempt > 0:
+            repaired += 1
+    return JudgeSummary(
+        evaluated=len(verdicts),
+        nothing_blocking=nothing_blocking,
+        minor_noted=minor_noted,
+        major_not_fixed=major_not_fixed,
+        critical_held=critical_held,
+        unparsed=unparsed,
+        repaired=repaired,
+        cap_remainder=cap_remainder,
+    )
+
+
+def _judge_phase(
+    completed_batches: int, *, initial_calls: int, worst_case_calls: int
+) -> tuple[str, int, int]:
+    """Split a judge run's batch count into its judging/repairing phase."""
+    if completed_batches <= initial_calls:
+        return "judging", completed_batches, initial_calls
+    return (
+        "repairing",
+        completed_batches - initial_calls,
+        worst_case_calls - initial_calls,
+    )
+
+
 def _fetch_machinery_batch(
     *,
     service: BatchMachineTranslation,
@@ -323,8 +427,11 @@ class BaseAutoTranslate:
         )
         self.failure_message: str | None = None
         self.warnings: list[str] = []
+        self.judge_summary: JudgeSummary | None = None
 
     def get_message(self) -> str:
+        if self.mode == "judge" and self.judge_summary is not None:
+            return format_judge_summary(self.judge_summary)
         if self.updated == 0:
             return gettext("Automatic translation completed, no strings were updated.")
         message = ngettext(
@@ -348,14 +455,24 @@ class BaseAutoTranslate:
     def get_warnings(self) -> list[str]:
         return self.warnings
 
-    def set_progress(self, current: int) -> None:
+    def set_progress(
+        self,
+        current: int,
+        *,
+        phase: str | None = None,
+        phase_current: int | None = None,
+        phase_total: int | None = None,
+    ) -> None:
         if current_task and current_task.request.id and self.progress_steps:
             low, high = self.progress_range
-            current_task.update_state(
-                state="PROGRESS",
-                meta=self.get_task_meta()
-                | {"progress": low + (high - low) * current // self.progress_steps},
-            )
+            meta = self.get_task_meta() | {
+                "progress": low + (high - low) * current // self.progress_steps,
+            }
+            if phase is not None:
+                meta["phase"] = phase
+                meta["phase_current"] = phase_current
+                meta["phase_total"] = phase_total
+            current_task.update_state(state="PROGRESS", meta=meta)
 
 
 class AutoTranslate(BaseAutoTranslate):
@@ -392,7 +509,6 @@ class AutoTranslate(BaseAutoTranslate):
         self.judge_units_matched = 0
         self.judge_units_processed = 0
         self.judge_units_remaining = 0
-        self.judge_summary: dict[str, int] | None = None
         # D2/fail-safe: a judge translation never starts shippable; the
         # verdict decides the final state per string.
         self.fresh_translation_state = STATE_FUZZY
@@ -411,26 +527,6 @@ class AutoTranslate(BaseAutoTranslate):
 
     def get_task_meta(self) -> dict[str, Any]:
         return {"translation": self.translation.pk}
-
-    def get_message(self) -> str:
-        if self.mode != "judge" or self.judge_summary is None:
-            return super().get_message()
-        message = (
-            gettext(
-                "%(evaluated)d evaluated: %(passed)d with no blocking concern, "
-                "%(advisory)d advisory, %(held)d held for decision, "
-                "%(incomplete)d incomplete."
-            )
-            % self.judge_summary
-        )
-        if self.judge_units_remaining:
-            message += " " + (
-                gettext(
-                    "%(remaining)d matching strings remain because of the per-run cap."
-                )
-                % {"remaining": self.judge_units_remaining}
-            )
-        return message
 
     def update(
         self, unit: Unit, state: StringState, target: list[str], user=None
@@ -809,6 +905,8 @@ class AutoTranslate(BaseAutoTranslate):
         self.judge_units_processed = preview.processed
         self.judge_units_remaining = preview.remaining
         if not units:
+            if preview.remaining:
+                self.judge_summary = JudgeSummary(cap_remainder=preview.remaining)
             return
         writable_ids = {
             unit.id for unit in units if not unit.translated or self.overwrite_existing
@@ -848,11 +946,22 @@ class AutoTranslate(BaseAutoTranslate):
         )
 
         completed_batches = 0
+        initial_calls = preview.initial_calls
 
         def tick(_requests, _results) -> None:
             nonlocal completed_batches
             completed_batches += 1
-            self.set_progress(min(completed_batches, self.progress_steps))
+            phase, phase_current, phase_total = _judge_phase(
+                completed_batches,
+                initial_calls=initial_calls,
+                worst_case_calls=preview.worst_case_calls,
+            )
+            self.set_progress(
+                min(completed_batches, self.progress_steps),
+                phase=phase,
+                phase_current=phase_current,
+                phase_total=phase_total,
+            )
 
         self.progress_range = (split, base_high)
         self.progress_steps = preview.worst_case_calls
@@ -867,25 +976,9 @@ class AutoTranslate(BaseAutoTranslate):
                 self.set_progress(self.progress_steps)
         finally:
             self.progress_range = (base_low, base_high)
-        self.judge_summary = {
-            "evaluated": len(verdicts),
-            "passed": sum(
-                verdict.verdict == JudgeVerdict.Verdict.PASS
-                for verdict in verdicts.values()
-            ),
-            "advisory": sum(
-                verdict.verdict == JudgeVerdict.Verdict.FLAG
-                for verdict in verdicts.values()
-            ),
-            "held": sum(
-                verdict.verdict == JudgeVerdict.Verdict.REJECT
-                for verdict in verdicts.values()
-            ),
-            "incomplete": sum(
-                verdict.verdict == JudgeVerdict.Verdict.UNPARSED
-                for verdict in verdicts.values()
-            ),
-        }
+        self.judge_summary = _summarize_verdicts(
+            verdicts, cap_remainder=preview.remaining
+        )
         final_snapshots = {
             unit.id: (unit.target, unit.state) for unit in units if unit.id in verdicts
         }
@@ -1152,6 +1245,12 @@ class BatchAutoTranslate(BaseAutoTranslate):
         self.updated += auto_translate.updated
         for warning in auto_translate.get_warnings():
             self.add_warning(warning)
+        if auto_translate.judge_summary is not None:
+            self.judge_summary = (
+                auto_translate.judge_summary
+                if self.judge_summary is None
+                else self.judge_summary + auto_translate.judge_summary
+            )
         return judge_remaining
 
     def perform(
