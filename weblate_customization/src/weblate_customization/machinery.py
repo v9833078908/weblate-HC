@@ -270,6 +270,14 @@ class RoutedLLMTranslation(OpenAITranslation):
         the dominant failure mode, and no prompt rule enforces the length.
         Part fields stay optional because only placeholders carry them, and a
         text part is rejected downstream unless it holds exactly type and text.
+
+        The outer ``id`` is required because
+        ``BaseLLMTranslation._resolve_reply_order`` pairs a batch reply with its
+        sources through it and refuses a batch whose items carry no usable id.
+        Declaring it in the prompt alone is not enough: a structured reply
+        follows the schema, so an undeclared id is simply absent, every batch
+        larger than one string is refused, and the run degrades into
+        single-string requests that each re-pay the whole prompt prefix.
         """
         return {
             "type": "json_schema",
@@ -282,6 +290,7 @@ class RoutedLLMTranslation(OpenAITranslation):
                     "items": {
                         "type": "object",
                         "properties": {
+                            "id": {"type": "string"},
                             "parts": {
                                 "type": "array",
                                 "minItems": 1,
@@ -301,9 +310,9 @@ class RoutedLLMTranslation(OpenAITranslation):
                                     },
                                     "required": ["type", "text"],
                                 },
-                            }
+                            },
                         },
-                        "required": ["parts"],
+                        "required": ["id", "parts"],
                     },
                 },
             },
