@@ -157,6 +157,17 @@ uv run prek run ruff-check ruff-format codespell trailing-whitespace end-of-file
 
 ### Step 3: Record completion and push
 
-Set this plan's status to `complete`, commit only its files with a Conventional Commit message, and push `fix/game-number-value-comparison`.
+Set this plan's status to `complete`, commit only its files with a Conventional Commit message, and push `fix/game-number-review-high`.
+
+## Merge plan
+
+**Status:** approved
+
+1. Start an integration worktree from current `origin/main`.
+2. Merge `fix/game-number-review-high` without changing the existing main checkout.
+3. Run the two focused test modules, the replay gate and scoped `prek` against the merge result.
+4. Push `main` only after all verification commands succeed.
+
+Out of scope: deployment and modification of unrelated judge work.
 
 NO UNRESOLVED DECISIONS
