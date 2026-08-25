@@ -30,6 +30,8 @@
               <td>
                 {% if row.available %}
                   {{ row.evaluated }}/{{ row.total }} {% translate "evaluated" %}
+                  {% if row.stale %}<span class="text-muted">{{ row.stale }} {% translate "stale" %}</span>{% endif %}
+                  {% if row.unparsed %}<span class="text-muted">{{ row.unparsed }} {% translate "latest attempt incomplete" %}</span>{% endif %}
                 {% else %}
                   {% translate "Unavailable" %}
                 {% endif %}

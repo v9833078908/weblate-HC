@@ -725,6 +725,7 @@ def show_component(request: AuthenticatedHttpRequest, obj: Component) -> HttpRes
                     "flag": stats.judge_flag,
                     "reject": stats.judge_reject,
                     "unparsed": stats.judge_unparsed,
+                    "stale": stats.judge_stale,
                     "available": judge_ready,
                     "can_evaluate": can_evaluate,
                     "evaluate_url": (
