@@ -32,6 +32,8 @@ weblate-*.tar.*
 /weblate-*.pid
 /dev-docker/.env
 /dev-docker/environment
+/dev-docker/environment.*
+!/dev-docker/environment.example
 /dev-docker/docker-compose.override.yml
 /dev-docker/data/
 /dev-docker/weblate-dev/requirements.txt
