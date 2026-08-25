@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from django.test import SimpleTestCase, override_settings
 
 from weblate.trans.models.judge import (
@@ -11,6 +13,7 @@ from weblate.trans.models.judge import (
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
+    compute_target_storage_hash,
     state_for_verdict,
     verdict_for_severity,
 )
@@ -102,6 +105,19 @@ class JudgeHashTest(SimpleTestCase):
         self.assertNotEqual(
             compute_target_hash(["a\nb"]),
             compute_target_hash(["a", "b"]),
+        )
+
+    def test_target_storage_hash_uses_exact_raw_storage(self) -> None:
+        target = "Одна дверь\x1e\x1eДве двери"
+        self.assertEqual(
+            compute_target_storage_hash(target),
+            hashlib.md5(target.encode(), usedforsecurity=False).hexdigest(),
+        )
+
+    def test_target_storage_hash_tracks_raw_plural_changes(self) -> None:
+        self.assertNotEqual(
+            compute_target_storage_hash("Одна дверь\x1e\x1eДве двери"),
+            compute_target_storage_hash("Одна дверь\x1e\x1eТри двери"),
         )
 
     def test_context_hash_reacts_to_glossary_and_note(self) -> None:

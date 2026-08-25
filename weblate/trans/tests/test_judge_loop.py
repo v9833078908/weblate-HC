@@ -15,6 +15,7 @@ from weblate.trans.models.judge import (
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
+    compute_target_storage_hash,
 )
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.hash import calculate_hash
@@ -86,6 +87,19 @@ class JudgeLoopTest(ViewTestCase):
         unit, verdict, client = self.run_batch([PASS, PASS])
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
         self.assertEqual(client.call_count, 2)
+        self.assertEqual(unit.judge_verdicts.count(), 2)
+        self.assertEqual(
+            unit.judge_verdicts.first().target_storage_hash,
+            compute_target_storage_hash(unit.target),
+        )
+
+    def test_cache_invalidation_failure_does_not_erase_verdicts(self) -> None:
+        unit = self.get_unit()
+        with mock.patch(
+            "weblate.trans.models.translation.Translation.invalidate_cache",
+            side_effect=RuntimeError("cache unavailable"),
+        ):
+            self.run_batch([PASS, PASS])
         self.assertEqual(unit.judge_verdicts.count(), 2)
 
     def test_run_and_seat_are_logged(self) -> None:

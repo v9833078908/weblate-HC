@@ -47,6 +47,10 @@ def compute_target_hash(target: Sequence[str]) -> str:
     return _digest(target)
 
 
+def compute_target_storage_hash(target: str) -> str:
+    return hashlib.md5(target.encode(), usedforsecurity=False).hexdigest()
+
+
 def compute_context_hash(
     *, source: str, note: str, glossary_terms: Iterable[Mapping[str, object]]
 ) -> str:
@@ -120,6 +124,9 @@ class JudgeVerdict(models.Model):
     seat = models.SmallIntegerField()
     attempt = models.SmallIntegerField(default=0)
     target_hash = models.CharField(max_length=64)
+    target_storage_hash = models.CharField(  # ruff: ignore[django-nullable-model-string-field]
+        max_length=32, null=True, db_index=True
+    )
     context_hash = models.CharField(max_length=64)
     run_id = models.UUIDField(default=uuid.uuid4)
     timestamp = models.DateTimeField(auto_now_add=True)
