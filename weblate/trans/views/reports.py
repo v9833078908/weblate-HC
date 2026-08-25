@@ -25,7 +25,7 @@ from django.views.decorators.http import require_POST
 from weblate.lang.models import Language
 from weblate.memory.machine import WeblateMemory
 from weblate.trans.actions import ActionEvents
-from weblate.trans.autotranslate import fetch_machinery_matches
+from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.forms import (
     CostEstimateReportsForm,
     CountsReportsForm,

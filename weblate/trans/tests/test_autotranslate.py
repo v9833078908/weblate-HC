@@ -38,11 +38,8 @@ from weblate.machinery.base import (
 )
 from weblate.machinery.dummy import DummyTranslation
 from weblate.trans.actions import ActionEvents
-from weblate.trans.autotranslate import (
-    AutoTranslate,
-    BatchAutoTranslate,
-    fetch_machinery_matches,
-)
+from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
+from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.forms import AutoForm
 from weblate.trans.models import (
     Change,

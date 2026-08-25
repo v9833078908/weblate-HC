@@ -37,7 +37,7 @@ from collections import Counter
 from weblate.checks.models import CHECKS
 from weblate.glossary.models import get_glossary_terms
 from weblate.machinery.models import MACHINERY
-from weblate.trans.autotranslate import fetch_machinery_matches
+from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models import Project, Translation
 from weblate.utils.state import STATE_EMPTY, STATE_TRANSLATED
 
