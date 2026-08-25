@@ -11,6 +11,18 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
+from django.db.models import (
+    BooleanField,
+    Case,
+    CharField,
+    Exists,
+    IntegerField,
+    OuterRef,
+    Subquery,
+    Value,
+    When,
+)
+from django.db.models.functions import MD5
 from django.utils.html import escape
 from django.utils.translation import gettext_lazy
 
@@ -342,6 +354,68 @@ def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
 def active_verdict(unit: Unit) -> JudgeVerdict | None:
     """Return the collegium verdict that still describes the stored text."""
     return collegium_verdict(active_round(unit))
+
+
+def judge_status_annotations() -> dict[str, models.Expression]:
+    """Annotate a Unit queryset with target-fresh judge evidence."""
+    newest_parsed = JudgeVerdict.objects.filter(
+        unit_id=OuterRef(OuterRef("pk")),
+        target_storage_hash=MD5(OuterRef(OuterRef("target"))),
+        unparsed=False,
+    ).order_by("-timestamp", "-pk")
+    current_parsed_round = JudgeVerdict.objects.filter(
+        unit_id=OuterRef("pk"),
+        target_storage_hash=MD5(OuterRef("target")),
+        run_id=Subquery(newest_parsed.values("run_id")[:1]),
+        attempt=Subquery(newest_parsed.values("attempt")[:1]),
+        unparsed=False,
+    )
+    severity_rank = Case(
+        *(
+            When(max_severity=severity, then=Value(rank))
+            for severity, rank in SEVERITY_RANK.items()
+        ),
+        output_field=IntegerField(),
+    )
+    latest_current = JudgeVerdict.objects.filter(
+        unit_id=OuterRef("pk"),
+        target_storage_hash=MD5(OuterRef("target")),
+    ).order_by("-timestamp", "-pk")
+    newest_current = JudgeVerdict.objects.filter(
+        unit_id=OuterRef(OuterRef("pk")),
+        target_storage_hash=MD5(OuterRef(OuterRef("target"))),
+    ).order_by("-timestamp", "-pk")
+    latest_current_parsed = JudgeVerdict.objects.filter(
+        unit_id=OuterRef("pk"),
+        target_storage_hash=MD5(OuterRef("target")),
+        run_id=Subquery(newest_current.values("run_id")[:1]),
+        attempt=Subquery(newest_current.values("attempt")[:1]),
+        unparsed=False,
+    )
+
+    return {
+        "judge_active_severity": Subquery(
+            current_parsed_round.annotate(severity_rank=severity_rank)
+            .order_by("-severity_rank", "seat")
+            .values("max_severity")[:1],
+            output_field=CharField(),
+        ),
+        "judge_has_parsed_history": Exists(
+            JudgeVerdict.objects.filter(unit_id=OuterRef("pk"), unparsed=False)
+        ),
+        "judge_latest_incomplete": Case(
+            When(
+                Exists(latest_current),
+                then=Case(
+                    When(Exists(latest_current_parsed), then=Value(False)),
+                    default=Value(True),
+                    output_field=BooleanField(),
+                ),
+            ),
+            default=Value(False),
+            output_field=BooleanField(),
+        ),
+    }
 
 
 def current_verdict(unit: Unit) -> JudgeVerdict | None:
