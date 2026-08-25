@@ -989,7 +989,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
 
     def __init__(
         self,
-        obj: Translation | Component | Category | ProjectLanguage | Workspace,
+        obj: Translation | Component | Category | Project | ProjectLanguage | Workspace,
         *,
         user: User | None,
         q: str,
@@ -1031,6 +1031,13 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     .exclude_source()
                 )
                 self._task_meta = {"category": obj.pk}
+            case Project():
+                self.translations = (
+                    Translation.objects.filter(component__project=obj)
+                    .select_related("language", "component", "component__project")
+                    .exclude_source()
+                )
+                self._task_meta = {"project": obj.pk}
             case ProjectLanguage():
                 self.translations = list(
                     obj.action_translation_set.select_related("language")

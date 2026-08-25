@@ -221,6 +221,42 @@ class JudgeStatsTest(ViewTestCase):
         self.assertEqual(self.translation.stats.judge_resolved, 1)
         self.assertEqual(self.translation.stats.judge_escalated, 0)
 
+    def test_translation_judge_needs_human_stats(self) -> None:
+        units = list(self.translation.unit_set.order_by("pk")[:5])
+        while len(units) < 5:
+            seed = units[0]
+            units.append(
+                type(seed).objects.create(
+                    translation=self.translation,
+                    source_unit=seed.source_unit,
+                    source=f"Extra {len(units)}",
+                    target="",
+                    context=f"extra-{len(units)}",
+                    id_hash=seed.id_hash + len(units),
+                    position=100 + len(units),
+                    state=STATE_TRANSLATED,
+                )
+            )
+        # Unresolved critical: needs a human.
+        self.add_verdict(units[0], "critical")
+        # Accepted critical: no longer needs a human.
+        accepted = self.add_verdict(units[1], "critical")
+        accepted.resolution = "accepted_as_is"
+        accepted.save(update_fields=["resolution"])
+        # Escalated major: needs a human even though it is not critical.
+        escalated_major = self.add_verdict(units[2], "major")
+        escalated_major.resolution = "escalated"
+        escalated_major.save(update_fields=["resolution"])
+        # Escalated critical: needs a human (matches both OR clauses once).
+        escalated_critical = self.add_verdict(units[3], "critical")
+        escalated_critical.resolution = "escalated"
+        escalated_critical.save(update_fields=["resolution"])
+        # Unresolved major, never escalated: does not need a human.
+        self.add_verdict(units[4], "major")
+        self.refresh_stats()
+
+        self.assertEqual(self.translation.stats.judge_needs_human, 3)
+
     def test_target_edit_stales_and_new_verdict_restores_coverage(self) -> None:
         unit = self.get_unit()
         self.add_verdict(unit, "major")

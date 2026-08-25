@@ -30,6 +30,18 @@ from weblate.utils.state import FUZZY_STATES, STATE_FUZZY, STATE_TRANSLATED
     JUDGE_MAY_APPROVE=False,
 )
 class JudgeAutoTranslateTest(ViewTestCase):
+    def test_batch_scope_accepts_a_project(self) -> None:
+        batch = BatchAutoTranslate(
+            self.project,
+            user=self.user,
+            q="",
+            mode="judge",
+        )
+
+        translations = list(batch.translations)
+        self.assertIn(self.get_translation(), translations)
+        self.assertTrue(all(not t.is_source for t in translations))
+
     def perform(self, verdict_kind, *, severity="none", q="", overwrite=False):
         def fake_batch(units, *, writable_ids, user, on_batch=None):
             out = {}

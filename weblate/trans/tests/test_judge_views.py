@@ -14,10 +14,18 @@ from weblate.trans.models.judge import (
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
+    compute_target_storage_hash,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.models.unit import Unit
 from weblate.trans.tests.test_views import ViewTestCase
-from weblate.utils.state import STATE_FUZZY, STATE_NEEDS_CHECKING, STATE_TRANSLATED
+from weblate.utils.state import (
+    STATE_FUZZY,
+    STATE_NEEDS_CHECKING,
+    STATE_READONLY,
+    STATE_TRANSLATED,
+)
+from weblate.workspaces.models import Workspace
 
 
 def judge_context_hash(unit) -> str:
@@ -70,14 +78,41 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(JudgeVerdict.objects.count(), 0)
 
-    def test_component_shows_readiness_before_language_list(self) -> None:
+    def test_old_readiness_card_is_absent(self) -> None:
         response = self.client.get(self.component.get_absolute_url())
 
-        self.assertContains(response, "Release readiness")
-        self.assertLess(
-            response.content.index(b"Release readiness"),
-            response.content.index(b"table-listing"),
+        self.assertNotContains(response, "Release readiness")
+        self.assertNotContains(response, "Delivery")
+        self.assertNotContains(response, "Primary action")
+        self.assertNotContains(response, "No blocking action")
+
+    @override_settings(
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_preview_accepts_a_project_scope(self) -> None:
+        url = reverse(
+            "auto_translation_preview", kwargs={"path": self.project.get_url_path()}
         )
+        response = self.client.get(
+            f"{url}?mode=judge&q=state%3Aempty&auto_source=mt&threshold=80"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("matched", response.json())
+
+    def test_post_accepts_a_project_scope_and_queues_a_run(self) -> None:
+        response = self.client.post(
+            reverse("auto_translation", kwargs={"path": self.project.get_url_path()}),
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "engines": [],
+                "threshold": 80,
+            },
+        )
+        self.assertRedirects(response, self.project.get_absolute_url())
 
     @override_settings(
         JUDGE_OPENROUTER_KEY="sk-test",
@@ -570,3 +605,269 @@ class JudgeResolutionViewTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "Escalated for review")
         self.assertContains(response, "flagged for a human")
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class JudgeQueueStripViewTest(ViewTestCase):
+    """The producer queue strip on component/project pages (Task 4)."""
+
+    def enable_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault(
+            "target_storage_hash", compute_target_storage_hash(unit.target)
+        )
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        kwargs.setdefault("run_id", uuid.uuid4())
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        self.refresh_stats(unit.translation)
+        return verdict
+
+    def resolve_url(self, verdict) -> str:
+        return reverse("resolve-judge-verdict", kwargs={"pk": verdict.pk})
+
+    def refresh_stats(self, translation) -> None:
+        with self.captureOnCommitCallbacks(execute=True):
+            translation.invalidate_cache()
+
+    # -- Visibility gates --------------------------------------------------
+
+    @override_settings(JUDGE_ENABLED=False)
+    def test_strip_hidden_when_configuration_incomplete(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    def test_strip_hidden_without_permission(self) -> None:
+        # Default test user has no translation.auto/unit.review grant.
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    def test_strip_hidden_for_glossary(self) -> None:
+        self.enable_review()
+        self.component.create_glossary()
+        glossary = self.project.component_set.get(is_glossary=True)
+        response = self.client.get(glossary.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    def test_strip_visible_when_ready(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(response, 'id="judge-queue-heading"')
+
+    # -- Counts --------------------------------------------------------
+
+    def test_unresolved_critical_counts_as_needs_a_human(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 1)
+        self.assertContains(response, "needs a human")
+
+    def test_accepted_as_is_removes_critical_from_needs_a_human(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 1)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                self.resolve_url(verdict),
+                {"resolution": "accepted_as_is", "reason": "acceptable in context"},
+            )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 0)
+
+    def test_escalated_major_counts_as_needs_a_human(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 0)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                self.resolve_url(verdict),
+                {"resolution": "escalated", "reason": "wants a second opinion"},
+            )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 1)
+
+    def test_rejudging_drops_a_stale_resolution_from_needs_a_human(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                self.resolve_url(verdict),
+                {"resolution": "escalated", "reason": "wants a second opinion"},
+            )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 1)
+
+        # A fresh round supersedes the escalated round; the new verdict is
+        # unresolved and not critical, so it no longer needs a human.
+        unit = self.get_unit()
+        self.make_verdict(
+            unit,
+            "none",
+            run_id=uuid.uuid4(),
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 0)
+
+    def test_unparsed_attempt_counts_separately(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        self.make_verdict(unit, "none", unparsed=True)
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+        self.assertEqual(counts["unparsed"], 1)
+
+    def test_source_unit_is_excluded_from_counts(self) -> None:
+        self.enable_review()
+        source_translation = self.component.source_translation
+        source_unit = source_translation.unit_set.get(
+            source__startswith="Hello, world!"
+        )
+        self.make_verdict(source_unit, "critical", context_hash="source-context")
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+        self.assertEqual(counts["needs_human"], 0)
+
+    def test_every_number_matches_its_direct_query_count(self) -> None:
+        self.enable_review()
+        units = list(
+            self.get_translation().unit_set.order_by("pk").exclude(state=STATE_READONLY)
+        )
+        # Unresolved critical.
+        self.make_verdict(units[0], "critical")
+        # Escalated major.
+        escalated = self.make_verdict(units[1], "major")
+        escalated.resolution = "escalated"
+        escalated.save(update_fields=["resolution"])
+        # Unparsed attempt.
+        self.make_verdict(units[2], "none", unparsed=True)
+        # Left untouched: still "not reviewed".
+
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+
+        component_units = Unit.objects.filter(
+            translation__component=self.component
+        ).exclude(translation=self.component.source_translation)
+
+        self.assertEqual(
+            counts["needs_human"],
+            component_units.search(
+                "(judge:reject AND NOT judge:resolved) OR judge:escalated"
+            ).count(),
+        )
+        self.assertEqual(
+            counts["not_reviewed"],
+            component_units.search("NOT has:judge AND NOT state:read-only").count(),
+        )
+        self.assertEqual(
+            counts["unparsed"],
+            component_units.search("judge:unparsed").count(),
+        )
+
+    # -- Project scope: controls only -----------------------------------
+
+    def test_project_shows_controls_without_counts(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertContains(response, 'id="judge-queue-heading"')
+        self.assertIsNone(response.context["judge_queue"]["counts"])
+        self.assertNotContains(response, "needs a human")
+
+    # -- Workspace scope: controls only -----------------------------------
+
+    def attach_workspace(self) -> Workspace:
+        workspace = Workspace.objects.create(name="Judge queue workspace")
+        self.project.workspace = workspace
+        self.project.save(update_fields=["workspace"])
+        return workspace
+
+    def test_workspace_shows_controls_without_counts(self) -> None:
+        self.enable_review()
+        workspace = self.attach_workspace()
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(workspace.get_absolute_url())
+        self.assertContains(response, 'id="judge-queue-heading"')
+        self.assertIsNone(response.context["judge_queue"]["counts"])
+        self.assertNotContains(response, "needs a human")
+
+    def test_workspace_strip_hidden_without_permission(self) -> None:
+        # Default test user has no translation.auto/unit.review grant on any
+        # project in the workspace.
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+        workspace = self.attach_workspace()
+        response = self.client.get(workspace.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    @override_settings(JUDGE_ENABLED=False)
+    def test_workspace_strip_hidden_when_configuration_incomplete(self) -> None:
+        self.enable_review()
+        workspace = self.attach_workspace()
+        response = self.client.get(workspace.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    # -- Prefilled launchers ------------------------------------------
+
+    def test_component_binds_prefilled_judge_mode(self) -> None:
+        self.enable_review()
+        response = self.client.get(
+            self.component.get_absolute_url(), {"mode": "judge", "q": "NOT has:judge"}
+        )
+        self.assertEqual(response.context["autoform"].initial.get("mode"), "judge")
+        self.assertEqual(response.context["autoform"].initial.get("q"), "NOT has:judge")
+
+    def test_project_binds_prefilled_judge_mode(self) -> None:
+        self.enable_review()
+        response = self.client.get(
+            self.project.get_absolute_url(), {"mode": "judge", "q": "NOT has:judge"}
+        )
+        self.assertEqual(response.context["autoform"].initial.get("mode"), "judge")
+
+    def test_workspace_binds_prefilled_judge_mode(self) -> None:
+        self.enable_review()
+        workspace = self.attach_workspace()
+        response = self.client.get(
+            workspace.get_absolute_url(), {"mode": "judge", "q": "NOT has:judge"}
+        )
+        self.assertEqual(response.context["autoform"].initial.get("mode"), "judge")
+        self.assertEqual(response.context["autoform"].initial.get("q"), "NOT has:judge")
+
+    def test_run_url_targets_the_not_reviewed_queue(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        run_url = response.context["judge_queue"]["run_url"]
+        self.assertIn("mode=judge", run_url)
+        self.assertIn("q=NOT+has%3Ajudge", run_url)

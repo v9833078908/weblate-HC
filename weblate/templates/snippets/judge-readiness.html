@@ -1,81 +1,26 @@
 {% load i18n %}
 
-{% if judge_readiness %}
-  <section class="card mb-3" aria-labelledby="judge-readiness-heading">
+{% if judge_queue %}
+  <section class="card mb-3" aria-labelledby="judge-queue-heading">
     <div class="card-header">
-      <h2 class="card-title" id="judge-readiness-heading">{% translate "Release readiness" %}</h2>
+      <h2 class="card-title" id="judge-queue-heading">{% translate "AI judge" %}</h2>
     </div>
-    <div class="table-responsive">
-      <table class="table table-striped mb-0">
-        <thead>
-          <tr>
-            <th scope="col">{% translate "Language" %}</th>
-            <th scope="col">{% translate "Delivery" %}</th>
-            <th scope="col">{% translate "AI coverage" %}</th>
-            <th scope="col">{% translate "Advisory" %}</th>
-            <th scope="col">{% translate "Held for decision" %}</th>
-            <th scope="col">{% translate "Primary action" %}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in judge_readiness %}
-            <tr>
-              <th scope="row"><a href="{{ row.translation.get_absolute_url }}">{{ row.translation.language }}</a></th>
-              <td>
-                {{ row.pending.eligible_for_commit }} {% translate "ready to deliver" %}
-                {% if row.pending.total != row.pending.eligible_for_commit %}
-                  <span class="text-muted">({{ row.pending.total }} {% translate "pending" %})</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if row.available %}
-                  {{ row.evaluated }}/{{ row.total }} {% translate "evaluated" %}
-                  {% if row.stale %}<span class="text-muted">{{ row.stale }} {% translate "stale" %}</span>{% endif %}
-                  {% if row.unparsed %}<span class="text-muted">{{ row.unparsed }} {% translate "latest attempt incomplete" %}</span>{% endif %}
-                {% else %}
-                  {% translate "Unavailable" %}
-                {% endif %}
-              </td>
-              <td>{% if row.flag %}{{ row.flag }}{% else %}-{% endif %}</td>
-              <td>
-                {% if row.reject %}
-                  {{ row.reject }}
-                  <span class="text-muted">{% translate "No release decision is made automatically." %}</span>
-                {% else %}
-                  -
-                {% endif %}
-              </td>
-              <td>
-                {% if row.can_evaluate and row.unevaluated %}
-                  <a class="btn btn-sm btn-outline-primary" href="{{ row.evaluate_url }}">{% blocktranslate with count=row.unevaluated %}Evaluate {{ count }}{% endblocktranslate %}</a>
-                {% elif row.reject %}
-                  <a class="btn btn-sm btn-outline-primary" href="{{ row.translation.get_absolute_url }}">{% blocktranslate with count=row.reject %}Review {{ count }}{% endblocktranslate %}</a>
-                {% elif row.pending.eligible_for_commit %}
-                  <a class="btn btn-sm btn-outline-primary" href="{{ row.translation.get_absolute_url }}?q=has%3Apending">{% translate "Open pending strings - broader than this count" %}</a>
-                {% else %}
-                  {% translate "No blocking action" %}
-                {% endif %}
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <div class="card-footer text-muted">
-      <dl class="mb-0">
-        <dt>{% translate "Evaluated - no blocking concern" %}</dt>
-        <dd>{% translate "Current judge evidence has no blocking concern. It does not approve a release." %}</dd>
-        <dt>{% translate "Advisory - ships" %}</dt>
-        <dd>{% translate "A judge found a concern that needs attention but does not hold delivery." %}</dd>
-        <dt>{% translate "Not evaluated" %}</dt>
-        <dd>{% translate "No current judge evidence exists for this string." %}</dd>
-        <dt>{% translate "Stale" %}</dt>
-        <dd>{% translate "Judge evidence exists for an earlier target or context version." %}</dd>
-        <dt>{% translate "Latest attempt incomplete" %}</dt>
-        <dd>{% translate "The latest judge attempt did not produce a complete answer." %}</dd>
-        <dt>{% translate "No blocking action" %}</dt>
-        <dd>{% translate "Delivery and AI evaluation are separate axes. Review held strings before deciding a release." %}</dd>
-      </dl>
+    <div class="card-body">
+      {% if judge_queue.counts %}
+        <ul class="list-inline mb-3">
+          <li class="list-inline-item">
+            <strong>{{ judge_queue.counts.needs_human }}</strong> {% translate "needs a human" %}
+          </li>
+          <li class="list-inline-item">
+            <strong>{{ judge_queue.counts.not_reviewed }}</strong> {% translate "not reviewed" %}
+          </li>
+          <li class="list-inline-item">
+            <strong>{{ judge_queue.counts.unparsed }}</strong> {% translate "last attempt returned nothing" %}
+          </li>
+        </ul>
+      {% endif %}
+      <a class="btn btn-sm btn-outline-secondary" href="{{ judge_queue.breakdown_url }}">{% translate "Breakdown by check" %}</a>
+      <a class="btn btn-sm btn-outline-primary" href="{{ judge_queue.run_url }}">{% translate "Run the judge" %}</a>
     </div>
   </section>
 {% endif %}

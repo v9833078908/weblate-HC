@@ -107,6 +107,7 @@ JUDGE_KEYS = frozenset(
         "judge_unparsed",
         "judge_resolved",
         "judge_escalated",
+        "judge_needs_human",
     }
 )
 SOURCE_KEYS = frozenset(
@@ -960,6 +961,18 @@ class TranslationStats(BaseStats):
                 ),
                 judge_escalated=Count(
                     "pk", filter=Q(judge_active_resolution="escalated")
+                ),
+                # Needs a human: an unresolved (not accepted-as-is) current
+                # critical, unioned with any current escalated verdict
+                # (critical or major). One Count with the OR built in, so a
+                # critical that is *also* escalated is never double-counted.
+                judge_needs_human=Count(
+                    "pk",
+                    filter=(
+                        Q(judge_active_severity="critical")
+                        & ~Q(judge_active_resolution="accepted_as_is")
+                    )
+                    | Q(judge_active_resolution="escalated"),
                 ),
             )
         )

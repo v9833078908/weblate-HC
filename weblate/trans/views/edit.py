@@ -64,6 +64,7 @@ from weblate.trans.models import (
     Comment,
     Component,
     JudgeVerdict,
+    Project,
     Suggestion,
     SuggestionAddResult,
     Translation,
@@ -112,9 +113,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from weblate.auth.models import AuthenticatedHttpRequest
-    from weblate.trans.models import (
-        Project,
-    )
     from weblate.trans.models.unit import UnitQuerySet
 
 SESSION_SEARCH_CACHE_TTL = 1800
@@ -1507,7 +1505,9 @@ def translate(request: AuthenticatedHttpRequest, path: list[str]) -> HttpRespons
 @login_required
 def auto_translation_preview(request: AuthenticatedHttpRequest, path):
     obj = parse_path(
-        request, path, (Translation, Component, Category, ProjectLanguage, Workspace)
+        request,
+        path,
+        (Translation, Component, Category, Project, ProjectLanguage, Workspace),
     )
     if not request.user.has_perm("translation.auto", obj):
         raise PermissionDenied
@@ -1600,7 +1600,9 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
 @login_required
 def auto_translation(request: AuthenticatedHttpRequest, path):
     obj = parse_path(
-        request, path, (Translation, Component, Category, ProjectLanguage, Workspace)
+        request,
+        path,
+        (Translation, Component, Category, Project, ProjectLanguage, Workspace),
     )
     update_locked = False
     translation_id: int | None = None
@@ -1629,6 +1631,11 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
             autoform = AutoForm(category.project, request.user, request.POST)
             update_locked = category.component_set.filter(locked=True).exists()
             category_id = category.id
+        case Project():
+            project = obj
+            autoform = AutoForm(project, request.user, request.POST)
+            update_locked = project.locked
+            project_id = project.id
         case ProjectLanguage():
             project = obj.project
             autoform = AutoForm(project, request.user, request.POST)

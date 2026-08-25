@@ -5,7 +5,15 @@ from __future__ import annotations
 
 from collections import Counter
 from contextlib import suppress
-from typing import TYPE_CHECKING, NotRequired, Protocol, TypedDict, Unpack, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    NotRequired,
+    Protocol,
+    TypedDict,
+    Unpack,
+    overload,
+)
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_not_required, login_required
@@ -65,7 +73,6 @@ from weblate.trans.models.component import (
     prefetch_tasks,
     translation_prefetch_tasks,
 )
-from weblate.trans.models.pending import PendingUnitChange
 from weblate.trans.models.project import prefetch_project_flags
 from weblate.trans.models.translation import GhostTranslation
 from weblate.trans.util import render, sort_unicode, translation_percent
@@ -94,6 +101,7 @@ from weblate.utils.views import (
 if TYPE_CHECKING:
     from weblate.auth.models import AuthenticatedHttpRequest, User
     from weblate.trans.models.component import ComponentQuerySet
+    from weblate.workspaces.models import Workspace
 
 
 class LanguageChangeKwargs(TypedDict):
@@ -513,6 +521,8 @@ def show_project(request: AuthenticatedHttpRequest, obj: Project) -> HttpRespons
 
     components = prefetch_tasks(all_components)
 
+    judge_queue = judge_queue_strip_context(user, obj)
+
     return render(
         request,
         "project.html",
@@ -529,6 +539,23 @@ def show_project(request: AuthenticatedHttpRequest, obj: Project) -> HttpRespons
                 else {}
             ),
             "language_stats": language_objects,
+            "judge_queue": judge_queue,
+            "autoform": optional_form(
+                AutoForm,
+                user,
+                "translation.auto",
+                obj,
+                obj=obj,
+                user=user,
+                initial={
+                    **{
+                        key: request.GET[key]
+                        for key in ("mode", "q")
+                        if request.GET.get(key)
+                    },
+                    "next": request.GET.get("next", ""),
+                },
+            ),
             "search_form": SearchForm(
                 request=request,
                 initial=SearchForm.get_initial(request),
@@ -670,6 +697,63 @@ def show_category(request: AuthenticatedHttpRequest, obj: Category) -> HttpRespo
     )
 
 
+def judge_queue_strip_context(
+    user: User,
+    obj: Component | Project | Workspace,
+    *,
+    translations: list[Translation] | None = None,
+) -> dict[str, Any] | None:
+    """
+    Compute the producer queue strip: judge counts and controls to act on them.
+
+    ``translations`` supplies the already-fetched, already-stats-prefetched
+    per-language list for a component page. Project and workspace pages omit
+    it: a scope spanning several source languages has no single arithmetic
+    expression that stays exact for every one of them, so those pages render
+    the controls without the three counts.
+
+    The plan's "Linked queue" column names the query each count is *defined*
+    by (verified directly against ``Unit.objects.filter(parse_query(...))``
+    in tests), not a per-number hyperlink target: no existing view lists
+    units across every language of a component filtered by an arbitrary
+    query with an exact row count (``CheckList`` filters by one fixed
+    ``check_id``; ``browse``/``translate`` never accept ``Component``).
+    Building one is outside this task's file list. The two real, exactly
+    corresponding links are ``breakdown_url`` and ``run_url`` below.
+    """
+    if isinstance(obj, Component) and obj.is_glossary:
+        return None
+    judge_ready = judge_configuration_ready()
+    can_run = (
+        judge_ready
+        and user.has_perm("translation.auto", obj)
+        and user.has_perm("unit.review", obj)
+    )
+    if not can_run:
+        return None
+    counts = None
+    if translations is not None:
+        needs_human = not_reviewed = unparsed = 0
+        for translation in translations:
+            if not isinstance(translation, Translation) or translation.is_source:
+                continue
+            stats = translation.stats
+            needs_human += stats.judge_needs_human
+            not_reviewed += stats.judge_total - stats.judge_evaluated
+            unparsed += stats.judge_unparsed
+        counts = {
+            "needs_human": needs_human,
+            "not_reviewed": not_reviewed,
+            "unparsed": unparsed,
+        }
+    run_query = urlencode({"mode": "judge", "q": "NOT has:judge"})
+    return {
+        "breakdown_url": reverse("checks", kwargs={"path": obj.get_url_path()}),
+        "run_url": f"{obj.get_absolute_url()}?{run_query}#auto",
+        "counts": counts,
+    }
+
+
 def show_component(request: AuthenticatedHttpRequest, obj: Component) -> HttpResponse:
     user = request.user
 
@@ -701,38 +785,7 @@ def show_component(request: AuthenticatedHttpRequest, obj: Component) -> HttpRes
         translations, user.profile.get_translation_orderer(request)
     )
 
-    judge_readiness = []
-    if not obj.is_glossary:
-        pending_counts = PendingUnitChange.objects.detailed_count_by_translation(obj)
-        judge_ready = judge_configuration_ready()
-        for translation in translations:
-            if not isinstance(translation, Translation) or translation.is_source:
-                continue
-            stats = translation.stats
-            can_evaluate = (
-                judge_ready
-                and user.has_perm("translation.auto", translation)
-                and user.has_perm("unit.review", translation)
-            )
-            judge_readiness.append(
-                {
-                    "translation": translation,
-                    "pending": pending_counts[translation.pk],
-                    "total": stats.judge_total,
-                    "evaluated": stats.judge_evaluated,
-                    "unevaluated": stats.judge_total - stats.judge_evaluated,
-                    "pass": stats.judge_pass,
-                    "flag": stats.judge_flag,
-                    "reject": stats.judge_reject,
-                    "unparsed": stats.judge_unparsed,
-                    "stale": stats.judge_stale,
-                    "available": judge_ready,
-                    "can_evaluate": can_evaluate,
-                    "evaluate_url": (
-                        f"{translation.get_absolute_url()}?mode=judge&q=NOT+has%3Ajudge"
-                    ),
-                }
-            )
+    judge_queue = judge_queue_strip_context(user, obj, translations=translations)
 
     return render(
         request,
@@ -744,7 +797,7 @@ def show_component(request: AuthenticatedHttpRequest, obj: Component) -> HttpRes
             "project": obj.project,
             "component": obj,
             "translations": translations,
-            "judge_readiness": judge_readiness,
+            "judge_queue": judge_queue,
             **(
                 get_reports_context(request, obj)
                 if request.user.is_authenticated
@@ -782,6 +835,14 @@ def show_component(request: AuthenticatedHttpRequest, obj: Component) -> HttpRes
                 obj,
                 obj=obj,
                 user=user,
+                initial={
+                    **{
+                        key: request.GET[key]
+                        for key in ("mode", "q")
+                        if request.GET.get(key)
+                    },
+                    "next": request.GET.get("next", ""),
+                },
             ),
             "search_form": SearchForm(
                 request=request,
