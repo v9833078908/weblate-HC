@@ -17,6 +17,71 @@ with one queue strip above the language table, adds no judge column to the
 language table, and closes the `Delivery` open question by dropping the
 column. The measurements that decided it are stated in Task 4.
 
+**Decided on 2026-08-25 in a flow-validation interview** (answers 5-16 of the
+producer's walkthrough), adding Tasks 9-13:
+
+| # | Decision | Task |
+| --- | --- | --- |
+| 5, 7 | The run's completion alert carries a button to the run result; the three edits it needs (task result carries the URL, `message.html` gains a slot, the JS renders an anchor) are accepted | 10 |
+| 6 | A judge run that changed nothing says so, instead of reporting "0 strings updated" | 10 |
+| 8 | The report is addressed by `run_id` (variant D of the interview), not a live queue and not a generated document | 9 |
+| 9 | The project page links to the native check browser; it grows no judge table of its own | 4 |
+| 14 | The `resolution` fields stop being dead schema: a producer's decision on a verdict is recorded | 11 |
+| 15 | A held `critical` can be shipped deliberately, by a producer or an admin, and only on the record | 12 |
+| 16 | The judge repairs automatically; what reaches a human is `critical` plus what a human escalated, and everything else is a line in the report | 13 |
+
+**Superseded by answer 16, and stated here because it reverses a recorded
+decision.** The office-hours session earlier the same day made the strip's
+primary number the union `check:judge-flag OR check:judge-reject` and called
+it the queue of strings that need a human. Answer 16 defines that queue
+differently: what reaches a human is `critical` plus what a human escalated,
+while an unrepaired `major` and every `minor` are report lines. Both
+statements come from the same producer, hours apart, and the later one is more
+specific, so it governs:
+
+- The strip's primary number becomes **needs a human** = `critical` +
+  escalated. Task 4 carries the change; Task 11 adds the escalation key it
+  needs.
+- `judge-flag` and `judge-note` keep their checks, their named filters and
+  their place in the run report. They are evidence a producer can search, and
+  the material of "noted, not fixed" - they are not a queue asking for work.
+- Nothing about the release gate moves: `critical` was already the only
+  severity that holds a string.
+
+Veto this by saying so before Task 4 Step 1; the tests assert the number, so
+it cannot be changed quietly afterwards.
+
+**Decided on 2026-08-25 (interview answers 1 and 4):**
+
+*Answer 1:* a run starts at the level its launcher lives on - from the
+project page it judges the project, from a component the component, from a
+language the language. The scope the page already scopes is the scope the
+judge judges. Task 4 adds the project-page launcher: a "Run the judge" button
+on `/projects/<slug>/` (and on a workspace page the workspace), rendered by
+the same strip include, POSTing to the existing `auto_translation` endpoint
+with `project_id` / `workspace_id` set (`views/edit.py:1568-1618` already
+accepts them; `BatchAutoTranslate` at `autotranslate.py:1130` already walks
+the whole project). The strip on the component page and the per-language run
+stay as they are.
+
+*Answer 4:* the task alert says what it is doing, in the same alert, as text
+above the bar - "Judging 120 of 448", then "Repairing 12 of 18", then
+"Done: evaluated N, repaired K, held M". Not a second channel: the
+percent-only bar remains underneath, and the phase line is the `progress`
+field the existing `get_task_progress`/`TaskSerializer`/poller chain already
+carries, extended with the phase and the counts the caller knows
+(`judge_loop.py` knows the phase; `BatchAutoTranslate.get_task_meta` at
+`autotranslate.py:1130` is where it is written). What it must never do is
+restate the phase from a guess: if the caller does not know the phase yet,
+the line says "Queued" or nothing, never a placeholder.
+
+**Still open, and not implemented by this plan:** the default filter of a
+run, whether the report states actual cost (see Task 9 - `LLMUsageLog`
+carries no run id today), and whether advisory and note counts appear beside
+the primary number at all or live only in the report and the filter list.
+These are interview questions 2, 3 and the remainder of 12; they are recorded
+here so the next session does not mistake silence for a decision.
+
 **Goal:** A false judge flag costs the producer attention, not a blocked
 delivery. Every producer-facing surface says the same thing about the same
 verdict. A producer who starts one run can read, afterwards, what was
@@ -31,6 +96,43 @@ existing `WITHOUT_NEEDS_EDITING` commit policy. Producer legibility is built
 from evidence already persisted - `JudgeVerdict` rows per
 `(unit, run_id, attempt, seat)` and the judge statistics added by Plan 02 -
 not from a new live channel.
+
+**Two UX constraints, stated by the producer on 2026-08-25 and binding on
+every task below.**
+
+*There are no translators.* This installation is LLM-first: a machine
+translates, two machines judge, a machine repairs, and the only human in the
+loop is the producer. So no surface may offer a hand-off that has no
+recipient, and the four outcomes of a held string are named exactly:
+
+1. **ship it** - `accepted_as_is`, Task 12, and it leaves the queue;
+2. **fix it here** - an ordinary edit in the editor, which produces new text
+   and makes the old verdict stale by itself;
+3. **run again** - re-judge or re-translate the string;
+4. **escalate** - `escalated`, the one hand-off that does have a recipient:
+   a person outside this pipeline, a game team or a native speaker, whom the
+   producer cannot replace. It is the only outcome that keeps a string in
+   "needs a human", because it is a human saying a human is required. It also
+   applies to a `major` the producer refuses to let ship.
+
+`JudgeVerdict.Resolution.SENT_BACK` (`models/judge.py:115-118`) is the one
+that dies: it names a translator queue, and there is no translator. Task 11
+does not offer it, and every "review" wording that implies such a queue is
+rewritten to address the producer directly.
+
+*The card must not get crowded.* The verdict card is the one screen where the
+producer decides, so it is the one screen that must stay readable. Tasks 3,
+8, 11 and 12 all land on it, and their combined budget is: one severity line,
+the error list, the existing back-translation, one repair block that appears
+only when a repair happened, and **one** action row. No task may add a second
+action row, a second panel, or a permanently visible explanation. The
+instruction the judge sends the fixer is machinery and stays off this card
+entirely (Task 13).
+
+One consequence for copy everywhere: `judge:pass` selects `none` **and**
+`minor` (`utils/stats.py:940-941`, and Task 8 keeps it that way), so no label
+on it may say "no findings". It says "nothing blocking", which is what it
+counts.
 
 **Tech Stack:** Django, PostgreSQL, Celery, Django templates, Bootstrap,
 pytest, Ruff.
@@ -179,19 +281,54 @@ git commit -m "fix(judge): let an advisory verdict ship instead of holding it"
 ## Task 2: One vocabulary on every producer surface
 
 Four surfaces describe the same three outcomes today, and they do not agree
-with each other. Plan 02's approved copy list is the vocabulary; this task
-makes every surface use it.
+with each other. The vocabulary is the judge's own severity - `critical`,
+`major`, `minor` - decided with the producer on 2026-08-25 and detailed
+below; this task makes every surface use it.
 
 | Surface | Now | After |
 | --- | --- | --- |
-| `weblate/trans/filter.py:79-88` | "Advisory - ships" = `judge:pass`; "Held for decision" = `judge:flag OR judge:reject` | "Evaluated - no blocking concern" = `judge:pass`; "Advisory - ships" = `judge:flag`; "Held for decision" = `judge:reject` |
-| `weblate/templates/snippets/judge-readiness.html:36-44,66-67` | Advisory column = flag, Held = reject, legend claims delivery is not held | content replaced by Task 4's strip: one union number for flag plus reject, the split kept in the native check browser, the vocabulary in `docs/admin/checks.rst` |
-| `weblate/trans/autotranslate.py:415-431` | `advisory` = FLAG, `held` = REJECT | unchanged, now true |
-| `weblate/templates/snippets/judge-verdict.html:62-80` | flag card "Questionable", no delivery badge | flag card gains a badge stating it ships with a concern |
+| `weblate/trans/filter.py:79-88` | "Advisory - ships" = `judge:pass`; "Held for decision" = `judge:flag OR judge:reject` | "Judge - critical (held)" = `judge:reject`; "Judge - major (ships)" = `judge:flag`; "Judge - minor (nothing to do)" = `judge:minor`; "Judge - nothing blocking" = `judge:pass` |
+| `weblate/templates/snippets/judge-readiness.html:36-44,66-67` | Advisory column = flag, Held = reject, legend claims delivery is not held | content replaced by Task 4's strip, whose primary number is "needs a human"; the per-severity split stays in the native check browser |
+| `weblate/trans/autotranslate.py:415-431` | `advisory` = FLAG, `held` = REJECT | the run summary names severities and adds `repaired` (Task 10) |
+| `weblate/templates/snippets/judge-verdict.html:62-80` | flag card "Questionable", no delivery badge | the card states the severity and, in one line, whether the string ships |
+
+### The check names themselves (producer's decision, 2026-08-25)
+
+Asked what `Judge: questionable` and `Judge: rejected` mean, the producer had
+to ask - which is the answer. They are the two check names met most often,
+they are translated from the verdict enum rather than from anything a reader
+knows, and one of them is now factually wrong: `JudgeFlagCheck.description`
+still reads "The string is held for review" (`checks/judge.py:95-97`) while
+Task 1 makes that string ship.
+
+**Decided: name them by severity, exactly as the judge reports it.** The
+severity is the one word that never drifts - it is what the model returns,
+what `max_severity` stores, what the strip counts and what the report groups
+by. Consequences belong in the description, where they can change without
+renaming a check.
+
+| `check_id` | Now | After | Description after |
+| --- | --- | --- | --- |
+| `judge-reject` | Judge: rejected | **Judge - critical** | The judge found a critical problem and the automatic repair did not fix it. The string does not ship until you decide. |
+| `judge-flag` | Judge: questionable | **Judge - major** | The judge found a major problem and the automatic repair did not fix it. The string ships; read it when you can. |
+| `judge-note` (Task 8) | - | **Judge - minor** | The judge noted something minor. No repair was attempted and nothing is expected of you. |
+
+`check_id` values do not change: they are in URLs, in `enforced_checks`
+configuration, in `CHECK_LIST` and in every existing `?q=check:judge-flag`
+link. Only `name` and `description` move.
+
+The named filters take the same three words plus the consequence, so the
+dropdown and the check list cannot disagree: "Judge - critical (held)",
+"Judge - major (ships)", "Judge - minor (nothing to do)". All nine strings are
+registered in `weblate/locale/ru/LC_MESSAGES/django.po` in this commit - today
+none of them are, so the producer reads English check names in a Russian
+interface.
 
 **Files:**
 
 - Modify: `weblate/trans/filter.py`
+- Modify: `weblate/checks/judge.py` (the two `name`/`description` pairs),
+  `weblate/locale/ru/LC_MESSAGES/django.po`
 - Modify: `weblate/templates/snippets/judge-verdict.html`
 - Modify: `weblate/templates/snippets/judge-readiness.html` (only if Task 4
   landed first; otherwise this surface arrives with Task 4)
@@ -331,42 +468,107 @@ is non-zero, each a link to the queue it was counted from:
 
 | Label | Query behind the number | Measured |
 | --- | --- | --- |
-| Needs attention | `check:judge-flag OR check:judge-reject` | 4 |
+| Needs a human | `(judge:reject AND NOT judge:resolved) OR judge:escalated` | `judge:reject` 1; both resolution keys arrive with Task 11 |
 | Not reviewed | `NOT has:judge AND NOT language:<source code> AND NOT state:read-only` | 10 |
 | Last attempt returned nothing | `judge:unparsed` | filter parses; 0 in this component |
+
+**A resolved `critical` must leave this number, or the count becomes a
+monument.** Task 12 ships a held string by recording `accepted_as_is` and
+moving the state; it deliberately does not touch `max_severity`, because the
+verdict is immutable evidence. So a bare `critical` predicate would keep every
+deliberate override in the producer's queue forever. The predicate therefore
+reads the resolution, not only the severity: an unresolved current `critical`
+counts, any resolution removes it, and `escalated` puts it back - that is
+exactly the "escalated by a human" half of answer 16. One verification step
+below watches an override disappear from the count.
 
 and two controls that always render:
 
 - **Breakdown by check** -> `/checks/-/<project>/<component>/`. This is where
-  advisory and held split apart again, per language, with links to the string
-  and with dismissal. The strip merges them into one number on purpose: asked
-  what he does in the first sixty seconds after a run, the producer answered
-  "work through the queue of strings that need a human", which is a size, not
-  a taxonomy.
+  every judge finding is listed per language, with links to the string and
+  with dismissal: the advisory strings that ship, the notes, and the held
+  ones. It is the strip's answer to "show me everything the judge said",
+  while the strip itself only counts what still needs a person.
 - **Run the judge** -> `?mode=judge&q=NOT+has%3Ajudge#auto`, the component's
   own automatic-translation tab, which already offers `mode=judge`
   (`forms.py:1347-1350`) and already carries the estimate block Task 5
   extends. The per-language run stays where it is, on the translation page.
 
+Why the primary number is no longer the flag/reject union: answer 16 put an
+unrepaired `major` in the report rather than in a person's queue, and the
+header records that supersession. The union query itself survives as Task 2's
+named filters and in the check browser, so nothing becomes unsearchable - only
+the headline count changes meaning, from "findings that exist" to "strings a
+person must still decide".
+
 Vocabulary: Task 2's named filters keep their own names ("Advisory - ships",
-"Held for decision"). The strip adds exactly one union label, and its `title`
-names both halves, so the filter dropdown, the check browser and the strip
-cannot drift apart.
+"Held for decision"). The strip's own label is the only place the words "needs
+a human" appear, and its `title` states what it counts and what leaves it, so
+the filter dropdown, the check browser and the strip cannot drift apart.
+
+### The project page (interview answers 9 and 1)
+
+A producer with several loc-kit components works from
+`/projects/need-for-greed/`, so that page must reach the judge without
+visiting each component. It gets **one strip, no table**, and the strip is
+the launcher only: **Run the judge** and **Breakdown by check**, with the
+three count cells absent. This is not a template-side omission, it is a
+correctness constraint: `ProjectStats` does not expose judge keys
+(`AggregatingStats` at `utils/stats.py:1011+` carries `basic_keys =
+SOURCE_KEYS` and no judge branch), and a project-level "Not reviewed" number
+has no query that reproduces it, because `NOT language:<source code>` must
+exclude each component's own source language and a project may mix them.
+The include therefore gains an explicit flag, `show_judge_counts`, and the
+project render passes `False`. From the project page the judge judges the
+project - `auto_translation` with `project_id` set, which is exactly what
+`BatchAutoTranslate` already walks (`autotranslate.py:1130`). No scope
+picker: the page the producer started from is the scope.
+
+That link is already a complete per-project judge surface, and it is
+localized: `CheckList` accepts a `Project` path and lists every check name in
+the project with total, dismissed and active counts
+(`checks/views.py:122-125,148-159`), and `/checks/judge-flag/<project>/`
+breaks one check down to a row per component (`:171-180`), while
+`/checks/judge-flag/<project>/-/<code>/` does it per component for a single
+language (`:227-238`). Because `judge-flag`, `judge-reject` and Task 8's
+`judge-note` are ordinary checks, all of that exists the moment they fire.
+
+No judge numbers are aggregated to the project, and this is a correctness
+decision rather than a cost one. Judge statistics exist only on
+`TranslationStats` (`utils/stats.py:98-107,916-954`); `AggregatingStats`
+carries `basic_keys = SOURCE_KEYS` and no judge branch (`:1011+`), so
+`project.stats.judge_total` raises `Unsupported stats` today. Adding the
+aggregation would produce a number no query can reproduce: the strip's
+"Not reviewed" link must exclude the component's own source language
+(`NOT language:<source code>`), and a project's components may each have a
+different source language, so one project-level `q` cannot express the
+exclusion that the number was counted with. A count whose queue disagrees
+with it is the exact defect this plan is removing from the readiness card.
+The two absence-based numbers therefore stay per component, where they are
+exact.
 
 ### Where the numbers come from
 
 All of them from the `prefetch_stats()` pass the language table already makes
 (`views/basic.py:687`), summed over the same non-source, non-ghost
-translations the card iterated (`:708-710`). No new query.
+translations the card iterated (`:708-710`). No extra pass over the database,
+but the judge aggregate does gain one branch and one annotation, described
+below.
 
-- Needs attention: `getattr(stats, "check:judge-flag")` plus
-  `getattr(stats, "check:judge-reject")`. **Not** `judge_flag + judge_reject`.
-  `calculate_checks` counts with `check__dismissed=False`
-  (`utils/stats.py:961`) while `calculate_judge` counts severities
-  (`:940-941`), so after the first dismissal a severity sum would no longer
-  equal the queue it links to. `BaseStats.__getattr__` routes the colon key
-  through `calculate_by_name` (`:398-401`, `:918-919`), so this is as lazy and
-  as cached as every other key.
+- Needs a human: a new `judge_needs_human` key in the same
+  `calculate_judge()` aggregate (`utils/stats.py:940-941`), counting units
+  whose current verdict is `critical` with no resolution, plus units whose
+  current verdict carries `resolution="escalated"`. This needs the current
+  verdict's resolution as an annotation beside the existing ones in
+  `judge_status_annotations()` (`models/judge.py:359-402`), which is one more
+  correlated subquery in a query that already runs three. Task 11 owns both,
+  because the field it reads is the field Task 11 starts writing.
+
+  **Deliberately not `check:judge-reject`.** A dismissed check disappears from
+  `calculate_checks` (`utils/stats.py:961`) while the severity stays, so a
+  check-based count would let a dismissal hide a held string that still blocks
+  delivery. Dismissal is the right tool for an advisory and the wrong tool for
+  a hold, and the release gate reads state, not check rows.
 - Not reviewed: `judge_total - judge_evaluated`. `judge_stale` is a subset of
   it (`utils/stats.py:942-948` requires a null active severity), so staleness
   becomes a clause in the `title` when non-zero rather than a fourth number.
@@ -418,6 +620,11 @@ untranslated does not fix what the producer complained about.
   list (`:704-735`) with one aggregate plus `judge_run_ready`, and mirror the
   auto-form `initial` block.
 - Modify: `weblate/locale/ru/LC_MESSAGES/django.po`.
+- Modify: `weblate/templates/project.html` - the same strip include, rendered
+  only when the judge is configured for the project and the user may see its
+  components, with `show_judge_counts=False`; the run button POSTs to
+  `auto_translation` with `project_id`, and the breakdown link goes to
+  `/checks/-/<project>/`.
 - Test: `weblate/trans/tests/test_judge_views.py`.
 - Do **not** touch `weblate/templates/snippets/list-objects.html` or
   `weblate/trans/templatetags/translations.py`. The `title` kwarg on
@@ -447,6 +654,10 @@ untranslated does not fix what the producer complained about.
   form's `initial`; assert the bound form, not only the href.
 - Negative assertions on the deleted surface: no `judge-readiness-heading`, no
   `Delivery` cell, no `Primary action` cell, no `<dl>` legend.
+- On `/projects/<slug>/` the strip renders with `show_judge_counts=False`:
+  the run button and the breakdown link are present, and the three count
+  cells are absent. Assert the absence, not just the flag, so a template
+  refactor that forgets the flag fails the test.
 
 ### Step 2: Render and verify
 
@@ -635,7 +846,8 @@ being asked for.
 
 Decision taken with the product owner on 2026-08-25: surface it as a third
 judge check, so it appears in the component's failing-check list where a
-producer already looks, next to `Judge: questionable` and `Judge: rejected`.
+producer already looks, beside `Judge - critical` and `Judge - major`. Its
+name is `Judge - minor`, from the same severity vocabulary Task 2 sets.
 
 **Stated side effect, accepted:** strings carrying only a note will be
 counted in :guilabel:`Strings with any failing checks` on the component and
@@ -643,6 +855,13 @@ translation pages. That number will grow and it will include non-blocking
 notes. The alternative - a counter visible only in the language table - was
 rejected because the screen a producer actually reads is the failing-check
 list.
+
+**And it stays out of the producer's queue.** Answer 16 puts a note in the
+report, not in a person's work list, so `judge-note` is searchable and
+visible as a failing check while the strip's "needs a human" number never
+counts it. The two statements are consistent because they answer different
+questions: the check list says what the judge observed, the strip says what
+is still waiting on a decision.
 
 **Files:**
 
@@ -666,7 +885,7 @@ list.
   `judge:pass` keeps selecting `none` and `minor` both.
 - A `pass` verdict with `minor` severity renders its error list on the card;
   a `pass` verdict with `none` renders no error list.
-- The note appears as a `Judge: note` row in the component's failing-check
+- The note appears as a `Judge - minor` row in the component's failing-check
   list; no language-table column is added.
 
 ### Step 2: The check
@@ -694,7 +913,7 @@ and let `check_target_unit` prefer it:
 ```
 
 Then `JudgeNoteCheck` with `check_id = "judge-note"`,
-`judge_severity = "minor"`, name `Judge: note`, and a description saying the
+`judge_severity = "minor"`, name `Judge - minor`, and a description saying the
 judge reported a minor problem that does not hold the string.
 
 **Add it to `JUDGE_CHECKS`** (`checks/judge.py:109`). That one line buys all
@@ -743,6 +962,408 @@ git commit -m "feat(judge): surface minor findings as a note check"
 
 ---
 
+## Task 9: A run has a report, addressed by its `run_id`
+
+**Decided 2026-08-25 (interview answer 8, variant D).** The producer's first
+question after a run is not "which strings are flagged" - that is the strip -
+but "what did this run do". No surface answers it today.
+
+The identity already exists and is stable: `run_id` is generated once per run
+(`judge_loop.py:387`) and carried into every row it writes (`:140-161`,
+`:329-352`, `:443-444`); rows are unique per `(unit, run_id, attempt, seat)`
+(`models/judge.py:176-178`) and `run_id` is indexed (`:169`). So the three
+counts the producer asked for are derivable from persisted evidence, with no
+new fields and no new writes:
+
+| Report line | Derivation from `JudgeVerdict` rows of one `run_id` |
+| --- | --- |
+| checked | distinct units with an `attempt=0` row |
+| repaired | units whose collegium severity at the final attempt is lower than at `attempt=0` |
+| noted, not fixed | units whose final severity is `minor`, plus units whose `major` survived the repair budget |
+| held for a human | units whose final severity is `critical` |
+| no answer | units whose final rows are all `unparsed` |
+
+`request_verdicts()` returns only `verdicts` (`judge_loop.py:491`), so the run
+id never reaches its caller. Return it, or the completion alert of Task 10 has
+nothing to link to.
+
+**Cost is deliberately absent.** `LLMUsageLog` (`models/llm_usage.py:31-46`)
+has no run id: rows are written at the machinery seam
+(`BaseOpenAITranslation.fetch_llm_translations`), and the judge's requests
+arrive there indistinguishable from each other beyond `operation="judge"` and
+`project_slug`. Attributing rows to a run by timestamp and model would be a
+guess printed as an invoice. Actual per-run cost therefore needs `run_id` on
+`LLMUsageLog` threaded from the loop to that seam - a separate, still-open
+decision (interview question 3). Until then the report states scope, counts
+and duration only, and the pre-run estimate keeps owning money.
+
+Not a generated document. Weblate's report subsystem
+(`templates/snippets/reports.html`, `credits`/`counts`/`costs`, persisted
+downloads via `api:report-json|html|rst`) exists for periodic exports a human
+asks for by date range. A run report is a view of rows that already exist and
+is addressed by an id, so it is a page, not an artifact to generate and store.
+
+**Files:**
+
+- Modify: `weblate/trans/judge_loop.py` - return the run id alongside the
+  verdicts.
+- Modify: `weblate/trans/autotranslate.py` - keep the run id on the judge
+  summary.
+- Add: `weblate/trans/views/judge.py` - the report view, permission-gated by
+  the same access check the component page uses.
+- Add: `weblate/templates/judge-run.html`.
+- Modify: `weblate/urls.py`.
+- Modify: `weblate/templates/snippets/judge-readiness.html` - the strip gains
+  a "Last run" link when the component has at least one run.
+- Test: `weblate/trans/tests/test_judge_views.py`.
+
+### Step 1: Failing tests
+
+- A run whose rows exist renders every count above, and each count that has a
+  queue links to it.
+- A repaired unit is counted as repaired exactly once, not once per attempt.
+- A unit judged in an earlier run and re-judged in this one is counted in this
+  run only.
+- A user without access to the component gets 404, not 403 with the counts in
+  the body.
+- The report renders with no cost figure anywhere.
+
+### Step 2: Build it, then verify
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_views.py -p no:randomly --no-cov -q
+git commit -m "feat(judge): report one run by its id"
+```
+
+---
+
+## Task 10: The completion alert links to the report
+
+**Decided 2026-08-25 (interview answers 5, 6, 7).**
+
+The alert in the producer's screenshot is a Django message tagged
+`task:<id>` (`views/edit.py:1708`) rendered by `message.html`, whose
+`.task-message` text is replaced on completion by the JS poller
+(`static/loader-bootstrap.js:1753-1763`) from the task's JSON
+(`api/serializers.py:4150-4153`). The poller writes with `textContent`, so a
+link inside the message string is escaped, not rendered. The three accepted
+edits are therefore the only way:
+
+1. the judge task result carries `report_url` beside `message`;
+2. `message.html` gains an actions slot next to `.task-warnings`;
+3. the poller renders an anchor into that slot when `result.report_url` is
+   present, and nothing when it is not.
+
+The same alert is re-rendered on every page while the run lives, from the
+persistent list (`utils/celery.py:96-113`, `trans/context_processors.py:136-144`,
+`base.html:478`). That registry already stores a per-task `url` and `label`
+which the template never renders; render the label as a link to it, so a
+producer who navigated away can get back to the object as well as forward to
+the report.
+
+**Answer 6, and a defect the producer caught while reading this plan:** the
+judge summary never states how many strings the judge *fixed*. It counts
+`evaluated`, `passed`, `advisory`, `held` and `incomplete`
+(`autotranslate.py:418-433`) - a repair that succeeded is invisible, because
+the repaired string ends up inside `passed`. A producer who is told "the judge
+sends its findings to the translator and it fixes them" then reads a line that
+never mentions a fix.
+
+So the completion line gains the count Task 9 already derives: **repaired**.
+It reads, in this order: evaluated, repaired, noted but not fixed, held for a
+human, no answer. "Changed nothing" is then a statement the run earns only
+when it truly found nothing - not the default the wording falls into. The
+`updated` counter of plain automatic translation stays out of judge mode: it
+counts machine-translation writes, and a repair is not one of them.
+
+A judge run on a clean component therefore says it evaluated N strings and
+found nothing to fix, and a run that repaired 12 of 40 findings says exactly
+that. Neither ever says "0 strings updated".
+
+**Files:**
+
+- Modify: `weblate/trans/autotranslate.py`, `weblate/trans/tasks.py`
+- Modify: `weblate/templates/message.html`,
+  `weblate/static/loader-bootstrap.js`
+- Modify: `weblate/locale/ru/LC_MESSAGES/django.po`
+- Test: `weblate/trans/tests/test_judge_autotranslate.py`,
+  `weblate/trans/tests/test_autotranslate.py`
+
+### Step 1: Failing tests
+
+- A judge task result carries a `report_url` that resolves to Task 9's view.
+- A non-judge run carries no `report_url`, and the alert renders no button.
+- A judge run that repaired strings states the repaired count, and the number
+  equals the report's `repaired` bucket for the same run.
+- A judge run that found nothing says so, and never reports "0 strings
+  updated".
+
+### Step 2: Build it, then verify
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_autotranslate.py \
+  weblate/trans/tests/test_autotranslate.py -p no:randomly --no-cov -q
+git commit -m "feat(judge): link the finished run to its report"
+```
+
+---
+
+## Task 11: Record the producer's decision on a verdict
+
+**Decided 2026-08-25 (interview answer 14): close the hole.**
+`JudgeVerdict.resolution`, `resolution_reason`, `resolved_by` and
+`resolved_at` exist (`models/judge.py:146-155`) and **nothing writes them** -
+not the loop, not any view. So today a producer who disagrees with the judge
+can only dismiss a check, which removes the row from `check:judge-*` while the
+severity count keeps it (`utils/stats.py:961` against `:940-941`), and leaves
+no record of *why*. That is also why the judge's live precision cannot be
+measured from production work.
+
+The verdict card (`templates/snippets/judge-verdict.html`, rendered in the
+string editor at `templates/translate.html:601`, context built at
+`views/edit.py:1295-1319`) gains **one action row and nothing else**, per the
+card budget in the header. Two buttons, and only when the actor may act:
+
+- **Ship it** - writes `accepted_as_is`, and for a held string also moves the
+  state (that is Task 12, same row, same commit as far as the card is
+  concerned: the producer sees one button, not two).
+- **Needs a person** - writes `escalated`.
+
+A reason is required for both, in one field that appears with the row rather
+than above it. `sent_back` is not offered. No third button: fixing the text
+and re-running are already the editor's own controls, and duplicating them
+here would spend the card budget on things the page already has.
+
+The verdict row itself stays immutable evidence - a resolution is a separate
+column on it, never an edit of `max_severity` or `errors`.
+
+**This task also owns the query surface Task 4's primary number needs.** A
+resolution that only a card can show would leave the strip counting resolved
+holds forever, so the same commit adds, beside the existing judge keys:
+
+- `judge:resolved` - the current verdict carries any resolution;
+- `judge:escalated` - the current verdict carries `escalated`;
+- the current verdict's resolution as an annotation in
+  `judge_status_annotations()` (`models/judge.py:359-402`), and a
+  `judge_needs_human` branch in `calculate_judge()` reading it
+  (`utils/stats.py:940-941`).
+
+Both keys describe the newest current-context round, exactly like
+`judge_active_severity`, so a resolution recorded against text that has since
+changed stops counting on its own.
+
+**Files:**
+
+- Modify: `weblate/trans/models/judge.py` (a helper that writes the four
+  fields under `select_for_update`), `weblate/trans/views/edit.py`,
+  `weblate/trans/forms.py`
+- Modify: `weblate/utils/search.py` (`judge:resolved`, `judge:escalated`),
+  `weblate/utils/stats.py` (`judge_needs_human`)
+- Modify: `weblate/templates/snippets/judge-verdict.html`
+- Modify: `weblate/locale/ru/LC_MESSAGES/django.po`
+- Test: `weblate/trans/tests/test_judge_views.py`,
+  `weblate/utils/tests/test_search.py`, `weblate/utils/tests/test_stats.py`
+
+### Step 1: Failing tests
+
+- Recording a resolution writes all four fields, including the actor and the
+  timestamp, and leaves `max_severity` and `errors` untouched.
+- A user without review permission cannot record one.
+- A resolution on a stale verdict is refused: the text it judged is gone.
+- Task 9's report counts resolutions by kind.
+- `judge:resolved` and `judge:escalated` parse, and their row counts equal
+  `judge_needs_human` when combined as Task 4 combines them.
+- An `accepted_as_is` on a `critical` removes that unit from
+  `judge_needs_human`; an `escalated` on a `major` adds one.
+- Editing the target after a resolution drops the unit out of both keys,
+  because the round is no longer current.
+
+### Step 2: Build it, then verify
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_views.py -p no:randomly --no-cov -q
+git commit -m "feat(judge): record the producer's decision on a verdict"
+```
+
+---
+
+## Task 12: Ship a held string deliberately, on the record
+
+**Decided 2026-08-25 (interview answer 15): producer and admin.** A `critical`
+verdict holds a string at `STATE_FUZZY`, and the project's
+`WITHOUT_NEEDS_EDITING` commit policy keeps it out of the build. The only ways
+out today are editing the text or re-running the judge; there is no way to say
+"the judge is wrong, ship it".
+
+Build it as Task 11's `accepted_as_is` resolution plus the state change, in
+one action, never as a separate bypass: the string moves to translated *and*
+carries a row saying who overrode which verdict and why. Gate it on the
+permission that already lets a user move a unit's state on review
+(`unit.review`), so no new permission vocabulary enters the project, and the
+action is absent - not merely disabled - for anyone else.
+
+The release gate's certification (`critical` holds a string) is unchanged: it
+describes what the judge does, and this task adds a human who can answer it
+with an audit trail. Task 9's report counts these overrides, which is the
+number that tells whether the judge's `critical` threshold is calibrated.
+
+**Files:**
+
+- Modify: `weblate/trans/views/edit.py`, `weblate/trans/forms.py`
+- Modify: `weblate/templates/snippets/judge-verdict.html`
+- Modify: `weblate/locale/ru/LC_MESSAGES/django.po`
+- Test: `weblate/trans/tests/test_judge_views.py`
+
+### Step 1: Failing tests
+
+- The override moves the unit out of `FUZZY_STATES` and writes an
+  `accepted_as_is` resolution with a reason in one transaction.
+- Without `unit.review` the control is absent and the POST is refused.
+- A string with no `critical` verdict has no override control.
+
+### Step 2: Build it, then verify
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_views.py \
+  weblate/trans/tests/test_judge.py -p no:randomly --no-cov -q
+git commit -m "feat(judge): let a reviewer ship a held string on the record"
+```
+
+---
+
+## Task 13: The repair carries the judge's instruction, and the report states what it left
+
+**Decided 2026-08-25 (interview answer 16):** if the judge has remarks it
+writes instructions and sends them to the main model automatically, so that
+what reaches a human is `critical` plus what a human escalated, and everything
+else is a line in the report - so many checked, so many fixed, this was noted
+and not fixed.
+
+Most of this is already the code, and one gap is real.
+
+What exists: `_process_round_unit` sends a verdict back through the project's
+own MT engine (`judge_loop.py:303-306`), the fixer's prompt receives the
+judge's own findings because `machinery/llm.py` calls `get_description()` on
+every failing check and `BaseJudgeCheck.get_description()` renders the active
+verdict's errors (`checks/judge.py:77-88`), the budget is
+`JUDGE_MAX_REPAIR_ATTEMPTS` (`defaults.py:58`, production 1), and a repair
+whose checks come back worse is rolled back to the exact previous
+target/state.
+
+### Decided: repair stays on `major` and `critical`
+
+**Producer's answer, 2026-08-25:** repair `major` and `critical` only. That is
+what the code already does - `_NON_REPAIRABLE_VERDICTS` holds `PASS` and
+`UNPARSED` (`judge_loop.py:56-59`) and `minor` maps to `pass`
+(`models/judge.py:203-208`) - so the predicate does not change, no severity
+floor is introduced, and no setting is invented. A note is never sent to the
+fixer and never costs a paid request.
+
+Two consequences to carry, not to rediscover:
+
+- The report's "noted, not fixed" line is now two populations with one
+  meaning: every `minor` (never attempted) and every `major` that survived the
+  budget. Task 9 derives both from the same rows, so no field is added.
+- Task 8 is **not** a prerequisite of this task. Notes never reach the fixer,
+  so the instruction only has to ride the rails that already exist:
+  `JudgeFlagCheck` and `JudgeRejectCheck` project rows for exactly the two
+  severities that are repaired (`checks/judge.py:91-109`), and
+  `BaseJudgeCheck.get_description()` already feeds them to the translator
+  prompt (`:77-88`). `judge-note` remains Task 8's own business.
+
+### The gap: the judge does not author an instruction
+
+Today the fixer receives the judge's MQM error list - `span`, `category`,
+`severity`, `description` per error (`judge.py:218`). That is evidence about
+what is wrong, not an instruction about what to do, and the requirement asks
+for the instruction.
+
+Add one output field, `instruction`, to the judge's response schema
+(`judge.py:206-237`): a short, imperative repair instruction for the whole
+segment, required whenever `errors` is non-empty and empty otherwise. Three
+places move with it, and all three are strict by design, so none can be
+skipped: the schema properties and its `required` list, the parser's exact
+key-set equality (`judge.py:374`), and the `JudgeResult` dataclass
+(`:144-146`). Persist it on `JudgeVerdict` next to `errors`, and append it to
+`describe_latest_verdict` so it rides the check rail that `judge-flag` and
+`judge-reject` already project.
+
+**It is not rendered to the producer, by decision of 2026-08-25.** The
+instruction is machinery talking to machinery; the producer judges the result,
+not the prompt. So it is stored (the fixer needs it, and an unexplained repair
+must be explainable in an audit) and it appears in no producer surface - not
+the verdict card, not the run report. A developer reads it through the admin
+or the database. Should it ever be needed for a defect hunt, the surface to
+add it to is the run report, never the editor.
+
+**The cost, stated:** the schema docstring already records that
+`back_translation` is "the single deliberate deviation from the measured
+schema (an extra output field, unmeasured; minimal metric risk)"
+(`judge.py:206-208`). This makes it the second. Judge output tokens per string
+grow, and the calibration measurements were taken without this field. The
+honest mitigation is in the verification below: the first run after this task
+is compared against the previous run on the same component, and if verdict
+distribution moves, the field is the first suspect.
+
+### What the report then says
+
+Task 9's buckets become the producer's sentence with no new fields: `checked`
+from `attempt=0` rows, `repaired` where the final severity is lower than the
+first, `held` for `critical`, and `noted, not fixed` for every `minor` plus
+every `major` that survived the budget.
+
+**Files:**
+
+- Modify: `weblate/trans/judge.py` (schema, parser, dataclass),
+  `weblate/trans/models/judge.py` (persist `instruction`, extend
+  `describe_latest_verdict`), plus a migration
+- Modify: `weblate/checks/judge.py` (the instruction joins the rendered
+  description)
+- Do **not** modify `weblate/templates/snippets/judge-verdict.html`: the
+  instruction stays out of the editor.
+- Modify: `docs/admin/checks.rst` (the repair contract: what is repaired, what
+  is not, the budget, and that the judge writes the instruction)
+- Test: `weblate/trans/tests/test_judge_loop.py`,
+  `weblate/trans/tests/test_judge.py`,
+  `weblate/trans/tests/test_judge_views.py`
+
+### Step 1: Failing tests
+
+- A `minor` verdict triggers **no** repair request, and a `none` and an
+  `unparsed` round trigger none either; a `major` and a `critical` each
+  trigger exactly one within the budget.
+- A reply whose `errors` is non-empty and whose `instruction` is missing is
+  rejected by the parser as unparsed, not silently accepted.
+- The persisted instruction appears in `describe_latest_verdict`, and
+  therefore in the failing-check description the fixer receives.
+- **The rail is pinned, not assumed:** repairing a `major` unit sends the
+  fixer a prompt that contains the judge's instruction. Assert on what
+  `repair_target()` hands the engine, so the test fails if the flag check
+  stops being projected or if the prompt stops reading check descriptions.
+- A `major` repaired into a `pass` is reported as repaired; a `major` that
+  survives is reported as noted, not fixed; every `minor` is reported as
+  noted, not fixed without a repair attempt; a `critical` that survives stays
+  held and is never counted as repaired.
+- The rollback path still restores the exact previous target and state when a
+  repair regresses another check.
+
+### Step 2: Build it, then verify
+
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_judge.py \
+  weblate/trans/tests/test_judge_views.py -p no:randomly --no-cov -q
+uv run prek run rumdl --files docs/admin/checks.rst
+git commit -m "feat(judge): send the judge's repair instruction to the fixer"
+```
+
+Then, on the dev stack, run the same component twice - once before this task
+and once after - and compare verdict distribution and repair count. Record
+both in `docs/llm-first/measurements/` with the date. If the distribution
+moved, the new output field is the first suspect and the measurement says so.
+
+---
+
 ## Verification
 
 ```bash
@@ -771,17 +1392,43 @@ Then drive it once on the dev stack, clicking the real controls:
    **and the text before the repair next to the text now**. This is the
    producer's acceptance test for "what did the judge actually change".
 4. A string whose worst finding is `minor` stays translated, shows its notes
-   on the card, and appears under the `Judge: note` failing check on the
-   component page.
+   on the card, appears under the `Judge - minor` failing check on the component
+   page, and is **absent** from the strip's "needs a human" number.
 5. Every number in the strip opens a queue whose row count equals the number,
-   including after a judge check is dismissed, and a component with no judge
-   evidence renders no numbers at all - only the run control.
+   and a component with no judge evidence renders no numbers at all - only the
+   run control. An advisory string appears in the check browser and in the
+   named filter, and never in "needs a human".
 6. On a string with a parsed verdict plus a newer failed attempt, the strip
    counts it under "Last attempt returned nothing" while it stays outside
    "Not reviewed".
 7. Run `judge_release_advisory_holds` without `--write` on the dev stack and
    confirm the needs-review bucket is non-empty when a unit's 12 came from an
    add-on rather than the judge.
+8. Start a judge run, wait for the alert to turn green, and **click the button
+   in it**. It must land on the report for that run, and the report's
+   `checked` count must equal the number the alert stated.
+9. Navigate away mid-run, then load an unrelated page: the persistent alert is
+   there, its label is a link back to the object, and when the run finishes it
+   grows the same report button.
+10. Run the judge on a component where nothing needs changing. The alert says
+    it evaluated the strings and changed none; it never says "0 strings
+    updated".
+11. Open a `critical` string, record "the judge is wrong" with a reason, and
+    confirm: the string leaves the fuzzy state, the verdict row is unchanged,
+    the resolution row names the actor and the reason, and the report counts
+    the override.
+12. Repeat 11 as a user without `unit.review`: the control is absent and a
+    hand-made POST is refused.
+13. On a string whose worst finding is a `major`, confirm from the run report
+    that a repair was attempted and that the fixer's prompt carried the
+    judge's instruction (dev log or the stored verdict row - the editor must
+    not show it). On a
+    `minor`, confirm no repair request was made at all.
+14. Record `accepted_as_is` on a held `critical` and watch the strip's "needs
+    a human" number fall by one; record `escalated` on an advisory string and
+    watch it rise by one.
+15. From `/projects/<project>/`, reach the judge with one click and confirm the
+    check browser lists every component that has judge findings.
 
 If the suites return mass setup errors, check `docker stats --no-stream`
 first (`AGENTS.md`).
