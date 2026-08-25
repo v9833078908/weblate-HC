@@ -21,7 +21,6 @@ from weblate.utils.state import (
     FUZZY_STATES,
     STATE_APPROVED,
     STATE_FUZZY,
-    STATE_NEEDS_CHECKING,
     STATE_TRANSLATED,
 )
 
@@ -65,12 +64,26 @@ class JudgeSeverityGateTest(SimpleTestCase):
             STATE_TRANSLATED,
         )
 
-    def test_flag_lands_on_a_state_that_does_not_ship(self) -> None:
+    def test_flag_ships_as_translated(self) -> None:
         state = state_for_verdict(
             JudgeVerdict.Verdict.FLAG, enable_review=True, may_approve=True
         )
-        self.assertEqual(state, STATE_NEEDS_CHECKING)
-        self.assertIn(state, FUZZY_STATES)
+        self.assertEqual(state, STATE_TRANSLATED)
+        self.assertNotIn(state, FUZZY_STATES)
+
+    def test_flag_state_clears_the_without_needs_editing_commit_gate(self) -> None:
+        # WITHOUT_NEEDS_EDITING excludes FUZZY_STATES from VCS commit/export
+        # (weblate/trans/models/pending.py). An unresolved major must ship
+        # with judge-flag evidence, while an unresolved critical is still
+        # held back.
+        major_state = state_for_verdict(
+            JudgeVerdict.Verdict.FLAG, enable_review=True, may_approve=True
+        )
+        critical_state = state_for_verdict(
+            JudgeVerdict.Verdict.REJECT, enable_review=True, may_approve=True
+        )
+        self.assertNotIn(major_state, FUZZY_STATES)
+        self.assertIn(critical_state, FUZZY_STATES)
 
     def test_reject_lands_on_a_state_that_does_not_ship(self) -> None:
         state = state_for_verdict(

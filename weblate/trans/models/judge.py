@@ -29,7 +29,6 @@ from django.utils.translation import gettext_lazy
 from weblate.utils.state import (
     STATE_APPROVED,
     STATE_FUZZY,
-    STATE_NEEDS_CHECKING,
     STATE_TRANSLATED,
     StringState,
 )
@@ -224,20 +223,23 @@ def state_for_verdict(
     """
     Target state for a verdict, or None when the state must not move.
 
-    ``major`` lands on STATE_NEEDS_CHECKING and ``critical`` lands on
-    STATE_FUZZY, which the project-level
-    ``WITHOUT_NEEDS_EDITING`` commit policy already excludes from export.
-    ``pass`` stops at STATE_TRANSLATED unless the site opts into judge
-    approval (JUDGE_MAY_APPROVE) AND the project has review: measurement
-    shows pass misses real critical defects, so the judge does not hand out the
-    top trust state by default (review D2).
+    ``critical`` lands on STATE_FUZZY, which the project-level
+    ``WITHOUT_NEEDS_EDITING`` commit policy already excludes from export
+    (FUZZY_STATES): an unresolved critical is held back from shipping.
+    ``major`` stops at STATE_TRANSLATED instead: measurement shows most
+    ``major`` findings are false positives or matters of taste, so the
+    cost of blocking every one of them (holding back real, shippable
+    strings while a human works through the queue) outweighs the cost of
+    an occasional unresolved major shipping with judge-flag evidence
+    attached (review D1). ``pass`` stops at STATE_TRANSLATED unless the
+    site opts into judge approval (JUDGE_MAY_APPROVE) AND the project has
+    review: measurement shows pass misses real critical defects, so the
+    judge does not hand out the top trust state by default (review D2).
     """
     if verdict == JudgeVerdict.Verdict.UNPARSED:
         return None
     if verdict == JudgeVerdict.Verdict.REJECT:
         return STATE_FUZZY
-    if verdict == JudgeVerdict.Verdict.FLAG:
-        return STATE_NEEDS_CHECKING
     if verdict == JudgeVerdict.Verdict.PASS and enable_review and may_approve:
         return STATE_APPROVED
     return STATE_TRANSLATED

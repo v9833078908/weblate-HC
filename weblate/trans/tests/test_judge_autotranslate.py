@@ -70,11 +70,12 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.perform(JudgeVerdict.Verdict.REJECT, severity="critical")
         self.assertIn(self.get_unit().state, FUZZY_STATES)
 
-    def test_flag_lands_on_a_state_that_does_not_ship(self) -> None:
+    def test_flag_ships_as_translated(self) -> None:
         unit = self.get_unit()
         unit.translate(self.user, ["some target"], STATE_TRANSLATED)
         self.perform(JudgeVerdict.Verdict.FLAG, severity="major")
-        self.assertIn(self.get_unit().state, FUZZY_STATES)
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
+        self.assertNotIn(self.get_unit().state, FUZZY_STATES)
 
     def test_unparsed_leaves_the_state_untouched(self) -> None:
         unit = self.get_unit()
