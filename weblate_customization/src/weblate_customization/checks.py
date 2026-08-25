@@ -15,6 +15,7 @@ from __future__ import annotations
 import unicodedata
 from collections import Counter
 from decimal import Decimal, InvalidOperation
+from functools import cache
 from itertools import pairwise
 from typing import NamedTuple
 
@@ -117,6 +118,13 @@ class Quantity(NamedTuple):
 
     value: Decimal
     fallback: tuple[Decimal, ...]
+
+
+class TargetQuantity(NamedTuple):
+    """A target quantity and the literal tokens an open scale expression contains."""
+
+    value: Decimal
+    literals: tuple[Decimal, ...]
 
 
 # `$` is the engine's line separator, not a character. Whitespace beside one
@@ -510,15 +518,92 @@ def _quantities(
     return quantities
 
 
-def _readings(text: str, language: str | None) -> Counter[Decimal]:
-    """Every value the text can be read as. A closed run replaces its digits."""
+def _readings(text: str, language: str | None) -> list[TargetQuantity]:
+    """Target quantities whose value and literal readings share one occurrence."""
     body = _prepare(text, drop_ordinals=False)
     closed = _closed_spans(body, language)
     open_spans = _open_spans(body, language, closed)
-    readings = Counter(value for _, _, value, _ in closed)
-    readings.update(value for _, _, value, _ in open_spans)
-    readings.update(_number_tokens(body, closed))
+    readings = [TargetQuantity(value, ()) for _, _, value, _ in closed]
+    readings.extend(
+        TargetQuantity(value, literals) for _, _, value, literals in open_spans
+    )
+    readings.extend(
+        TargetQuantity(value, ())
+        for value in _number_tokens(body, [*closed, *open_spans])
+    )
     return readings
+
+
+def _consume_options(
+    readings: list[TargetQuantity],
+    literal_bits: tuple[tuple[Decimal, int, int], ...],
+    span_literal_masks: tuple[int, ...],
+    needed: tuple[Decimal, ...],
+    value_mask: int,
+    literal_mask: int,
+) -> set[tuple[int, int]]:
+    """Return every way to consume `needed` without reusing a target occurrence."""
+    options = {(value_mask, literal_mask)}
+    for value in needed:
+        next_options = set()
+        for used_values, used_literals in options:
+            for index, reading in enumerate(readings):
+                value_bit = 1 << index
+                if (
+                    reading.value == value
+                    and not used_values & value_bit
+                    and not used_literals & span_literal_masks[index]
+                ):
+                    next_options.add((used_values | value_bit, used_literals))
+            for literal, index, literal_bit in literal_bits:
+                if (
+                    literal == value
+                    and not used_literals & literal_bit
+                    and not used_values & (1 << index)
+                ):
+                    next_options.add(
+                        (used_values, used_literals | span_literal_masks[index])
+                    )
+        options = next_options
+        if not options:
+            break
+    return options
+
+
+def _matches(stated: list[Quantity], readings: list[TargetQuantity]) -> bool:
+    """Whether every source quantity has a complete, non-conflicting target match."""
+    literal_bits: list[tuple[Decimal, int, int]] = []
+    span_literal_masks = []
+    for index, reading in enumerate(readings):
+        span_mask = 0
+        for literal in reading.literals:
+            literal_bit = 1 << len(literal_bits)
+            literal_bits.append((literal, index, literal_bit))
+            span_mask |= literal_bit
+        span_literal_masks.append(span_mask)
+
+    @cache
+    def match(source_index: int, value_mask: int, literal_mask: int) -> bool:
+        if source_index == len(stated):
+            return True
+        quantity = stated[source_index]
+        needs = ((quantity.value,),) + (
+            (quantity.fallback,) if quantity.fallback else ()
+        )
+        for needed in needs:
+            for next_value_mask, next_literal_mask in _consume_options(
+                readings,
+                tuple(literal_bits),
+                tuple(span_literal_masks),
+                needed,
+                value_mask,
+                literal_mask,
+            ):
+                if match(source_index + 1, next_value_mask, next_literal_mask):
+                    return True
+        return False
+
+    return match(0, 0, 0)
 
 
 def _base_language(code: str | None) -> str | None:
@@ -537,24 +622,11 @@ def game_number_fails(
 ) -> bool:
     """Whether a quantity the source states is missing from the translation."""
     stated = _quantities(source, _base_language(source_language), drop_ordinals=True)
-    if not stated or not target:
-        return False
-    available = _readings(target, _base_language(target_language))
-    pending = []
-    for quantity in stated:
-        if available[quantity.value]:
-            available[quantity.value] -= 1
-        else:
-            pending.append(quantity)
-    for quantity in pending:
-        if not quantity.fallback:
-            return True
-        needed = Counter(quantity.fallback)
-        if any(available[value] < count for value, count in needed.items()):
-            return True
-        for value in quantity.fallback:
-            available[value] -= 1
-    return False
+    return bool(
+        stated
+        and target
+        and not _matches(stated, _readings(target, _base_language(target_language)))
+    )
 
 
 class GameNumberCheck(TargetCheck):

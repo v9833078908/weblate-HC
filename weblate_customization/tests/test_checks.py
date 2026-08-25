@@ -373,6 +373,40 @@ class GameNumberCheckTest(CheckTestCase):
                     expected,
                 )
 
+    def test_one_open_target_quantity_cannot_cover_two_source_quantities(
+        self,
+    ) -> None:
+        self.assertTrue(
+            fails(
+                "10 thousand + 10 thousand",
+                "10 thousand",
+                source_code="en",
+                target_code="en",
+            )
+        )
+
+    def test_matching_uses_open_quantity_fallback_when_needed(self) -> None:
+        self.assertFalse(
+            fails(
+                "10 thousand and 10000",
+                "10000 and 10",
+                source_code="en",
+                target_code="en",
+            )
+        )
+
+    def test_one_open_target_compound_cannot_cover_separate_source_numbers(
+        self,
+    ) -> None:
+        self.assertTrue(
+            fails(
+                "1 + 500",
+                "1 million 500 thousand",
+                source_code="en",
+                target_code="en",
+            )
+        )
+
     def test_a_number_the_target_adds_is_accepted(self) -> None:
         # Japanese counts what Russian words: "каждый третий" -> "3回に1回", on
         # top of a required "10" the source states and the target must keep -
