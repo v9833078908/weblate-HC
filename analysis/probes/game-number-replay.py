@@ -56,6 +56,23 @@ def _heart_abyss_pairs() -> list[tuple[str, str, str, str]]:
     ]
 
 
+def _heart_abyss_9lang_pairs() -> list[tuple[str, str, str, str]]:
+    """
+    Return the nine-language live replay's pairs: the only corpus with real CJK notation.
+
+    Recorded in docs/product/measurements/2026-08-25-game-number-nine-language-replay.md.
+    """
+    path = DATA / "heart-abyss-hub-1-units-9lang.tsv"
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle, delimiter="\t"))
+    target_languages = [name for name in rows[0] if name not in {"context", "ru"}]
+    return [
+        (row["context"], row["ru"], row[target_language], target_language)
+        for row in rows
+        for target_language in target_languages
+    ]
+
+
 def _st2_pairs() -> list[tuple[str, str, str, str]]:
     path = DATA / "st2-zh-units.jsonl"
     with path.open(encoding="utf-8") as handle:
@@ -109,6 +126,7 @@ def _report(
 heart_abyss_pairs = _heart_abyss_pairs()
 st2_pairs = _st2_pairs()
 col4_pairs = _col4_pairs()
+heart_abyss_9lang_pairs = _heart_abyss_9lang_pairs()
 
 heart_abyss_count, heart_abyss_violations, heart_abyss_cjk, heart_abyss_mismatch = (
     _report("heart-abyss/hub-1 ru->en,fr", heart_abyss_pairs, set())
@@ -119,11 +137,28 @@ st2_count, st2_violations, st2_cjk, st2_mismatch = _report(
 col4_count, col4_violations, col4_cjk, col4_mismatch = _report(
     "col4 b0 ru->fr", col4_pairs, {"EVENT_516_RESULT_977"}
 )
+(
+    heart_abyss_9lang_count,
+    heart_abyss_9lang_violations,
+    heart_abyss_9lang_cjk,
+    heart_abyss_9lang_mismatch,
+) = _report(
+    "heart-abyss/hub-1 9lang ru->de,en,es,fr,it,ja,ko,zh_Hans,zh_Hant",
+    heart_abyss_9lang_pairs,
+    set(),
+)
 
-total_pairs = heart_abyss_count + st2_count + col4_count
-total_violations = heart_abyss_violations + st2_violations + col4_violations
-total_cjk = heart_abyss_cjk + st2_cjk + col4_cjk
-any_mismatch = heart_abyss_mismatch or st2_mismatch or col4_mismatch
+total_pairs = heart_abyss_count + st2_count + col4_count + heart_abyss_9lang_count
+total_violations = (
+    heart_abyss_violations
+    + st2_violations
+    + col4_violations
+    + heart_abyss_9lang_violations
+)
+total_cjk = heart_abyss_cjk + st2_cjk + col4_cjk + heart_abyss_9lang_cjk
+any_mismatch = (
+    heart_abyss_mismatch or st2_mismatch or col4_mismatch or heart_abyss_9lang_mismatch
+)
 
 print(f"invariant violations: {total_violations} / {total_pairs} pairs")
 print(f"targets with a parsed CJK run: {total_cjk}")
