@@ -1349,7 +1349,7 @@ def _judge_view_context(
         "judge_current_verdict": judge_current_verdict,
         "judge_can_resolve": judge_can_resolve,
         "judge_resolution_form": judge_resolution_form,
-        "judge_repair_evidence": repair_evidence(unit),
+        "judge_repair_evidence": repair_evidence(unit, active=judge_verdict),
     }
 
 

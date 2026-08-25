@@ -515,6 +515,21 @@ class JudgeRepairEvidenceTest(ViewTestCase):
         self.assertContains(response, "original objection")
         self.assertContains(response, "Text before the repair:")
         self.assertContains(response, "Broken")
+        # Regression: value/diff must not be swapped, or the comparison
+        # shows the fixed wording as removed and the broken wording as
+        # added - exactly backwards from what a producer needs to trust.
+        # A plain substring assertion on "Broken" alone would pass either
+        # way (the unit's own change-history section elsewhere on the same
+        # page independently renders the identical Broken->Fixed diff the
+        # correct way round, which would make an unscoped assertion pass
+        # even if THIS block's tags were swapped) - so this locates the
+        # "Text before the repair:" block specifically and only inspects
+        # the few hundred bytes right after it.
+        label = b"Text before the repair:"
+        idx = response.content.index(label)
+        evidence_html = response.content[idx : idx + len(label) + 300]
+        self.assertIn(b"<del>Broken", evidence_html)
+        self.assertIn(b"<ins>Fixed", evidence_html)
 
     def test_missing_change_omits_the_comparison(self) -> None:
         unit = self.get_unit()

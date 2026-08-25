@@ -132,7 +132,7 @@
             <p class="list-group-item-text text-muted">
               {% translate "Text before the repair:" %}
             </p>
-            {% format_unit_target unit value=judge_repair_evidence.previous_target diff=unit.target %}
+            {% format_unit_target unit value=unit.target diff=judge_repair_evidence.previous_target %}
           {% endif %}
         </div>
       {% endif %}

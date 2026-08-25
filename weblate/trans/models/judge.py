@@ -375,7 +375,9 @@ class RepairEvidence:
     previous_target: str | None
 
 
-def repair_evidence(unit: Unit) -> RepairEvidence | None:
+def repair_evidence(
+    unit: Unit, *, active: JudgeVerdict | None = None
+) -> RepairEvidence | None:
     """
     Evidence for the repair the active round has already been through.
 
@@ -387,8 +389,18 @@ def repair_evidence(unit: Unit) -> RepairEvidence | None:
         last attempt-0 timestamp
           < Change.timestamp with Change.target == repaired target
           < first attempt-1 timestamp
+
+    ``active`` lets a caller that already computed ``active_verdict(unit)``
+    (for example ``_judge_view_context``) pass it in, avoiding a second
+    ``active_round`` query on a hot per-unit-view path. Always compares
+    attempt 0 against attempt 1, which assumes
+    ``JUDGE_MAX_REPAIR_ATTEMPTS <= 1`` (today's only supported value; see
+    ``docs/llm-first/plans/2026-08-25-01-judge-producer-ux-and-delivery.md``
+    Task 5). A unit repaired more than once would still compare 0 against
+    1, not the pair that actually produced its current text.
     """
-    active = active_verdict(unit)
+    if active is None:
+        active = active_verdict(unit)
     if active is None or active.attempt == 0:
         return None
     original_seats = list(
