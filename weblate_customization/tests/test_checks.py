@@ -16,10 +16,11 @@ from weblate_customization.checks import (
     GameNumberCheck,
     GameTokenCheck,
     conditional_dsl_syntax_spans,
+    game_number_fails,
 )
 
 from weblate.checks.tests.test_checks import CheckTestCase
-from weblate.trans.tests.factories import make_unit
+from weblate.trans.tests.factories import make_language, make_unit
 
 AMOUNT_FORMATTED = (
     "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
@@ -186,6 +187,22 @@ class CyrillicLeakCheckTest(CheckTestCase):
         self.assertFalse(self.check.check_single("Самосбор", "", None))
 
 
+def fails(
+    source: str, target: str, *, source_code: str = "en", target_code: str = "cs"
+) -> bool:
+    """Return the verdict for one pair, with both languages stated."""
+    return game_number_fails(
+        source, target, source_language=source_code, target_language=target_code
+    )
+
+
+def make_number_unit(source: str, target: str, *, source_code: str, target_code: str):
+    """Build a unit whose component source language is not the factory default."""
+    unit = make_unit(source=source, target=target, code=target_code)
+    unit.translation.component.source_language = make_language(source_code)
+    return unit
+
+
 class GameNumberCheckTest(CheckTestCase):
     check = GameNumberCheck()
 
@@ -209,39 +226,151 @@ class GameNumberCheckTest(CheckTestCase):
         # Two values, both wrong, and neither is absent - only the set differs.
         self.test_failure_3 = ("Deals 20% and 30%", "Infligge 30% e 10%", "")
 
-    def test_a_scale_word_is_part_of_the_value(self) -> None:
-        source = "Награда - 10 тысяч мон!"
-        for target, expected in (
-            ("Belohnung - 10 Tausend Mon!", False),
-            ("Reward - 10,000 mon!", False),
-            ("¡Recompensa: 10 000 mon!", False),
-            ("Récompense - 10 000 mons !", False),
-            ("Ricompensa - 10 mila mon!", False),
-            ("보상은 10천 몬!", False),
-            ("奖励一万文!", False),
-            ("獎勵一萬文!", False),
-            ("報酬は10万文!", True),
+    def test_the_check_reads_both_languages_from_the_unit(self) -> None:
+        source = "10 тысяч мон!"
+        for target, target_code, expected in (
+            ("報酬は10万文!", "ja", True),
+            ("Reward - 10,000 mon!", "en", False),
         ):
-            with self.subTest(target=target):
+            with self.subTest(target_code=target_code):
+                unit = make_number_unit(
+                    source, target, source_code="ru", target_code=target_code
+                )
                 self.assertEqual(
-                    self.check.check_single(source, target, None), expected
+                    self.check.check_single(source, target, unit), expected
                 )
 
-    def test_a_myriad_scale_error_is_reported(self) -> None:
-        source = "Научись считать - ваще та 100 тысяч мон!"
-        for target, expected in (
-            ("Lern zählen - es sind 100 Tausend Mon!", False),  # codespell:ignore
-            ("Learn to count-it's 100,000 mon", False),
-            ("¡Aprende a contar, son 100 000 mon!", False),
-            ("Impara a contare, sono 100 mila mon!", False),
-            ("계산 좀 배워, 10만 몬이라고!", False),
-            ("學會數數吧--那可是十萬文!", False),
-            ("数え方を覚えろよ、こいつは100万文だぜ!", True),
-            ("学学数数吧--那可是一百万文!", True),
-        ):
-            with self.subTest(target=target):
+    def test_scale_values_match_the_measured_matrix(self) -> None:
+        source_10k = "10 тысяч мон!"
+        source_100k = "Научись считать - ваще та 100 тысяч мон!"
+        rows = (
+            (source_10k, "Belohnung - 10 Tausend Mon!", "de", False),
+            (source_10k, "Reward - 10,000 mon!", "en", False),
+            (source_10k, "¡Recompensa: 10 000 mon!", "es", False),
+            (source_10k, "Récompense - 10\u202f000 mons\u202f!", "fr", False),
+            (source_10k, "Ricompensa - 10 mila mon!", "it", False),
+            (source_10k, "보상은 10천 몬!", "ko", False),
+            (source_10k, "奖励一万文!", "zh_Hans", False),
+            (source_10k, "獎勵一萬文!", "zh_Hant", False),
+            (source_10k, "報酬は10万文!", "ja", True),
+            (
+                source_100k,
+                "Lern zählen - es sind 100 Tausend Mon!",  # codespell:ignore
+                "de",
+                False,
+            ),
+            (
+                source_100k,
+                "Learn to count, ya dumbass - it's 100,000 mon",
+                "en",
+                False,
+            ),
+            (source_100k, "¡Aprende a contar, son 100 000 mon!", "es", False),
+            (source_100k, "Apprends à compter, c'est 100 000 mons", "fr", False),
+            (source_100k, "Impara a contare, sono 100 mila mon!", "it", False),
+            (source_100k, "계산 좀 배워, 10만 몬이라고!", "ko", False),
+            (source_100k, "學會數數吧--那可是十萬文!", "zh_Hant", False),
+            (source_100k, "数え方を覚えろよ、こいつは100万文だぜ!", "ja", True),
+            (source_100k, "学学数数吧--那可是一百万文!", "zh_Hans", True),
+        )
+        for source, target, target_code, expected in rows:
+            with self.subTest(target_code=target_code, target=target):
                 self.assertEqual(
-                    self.check.check_single(source, target, None), expected
+                    fails(source, target, source_code="ru", target_code=target_code),
+                    expected,
+                )
+
+    def test_scale_notation_edge_cases(self) -> None:
+        rows = (
+            ("10 тысяч мон", "ru", "Belohnung 10 Tsd. Mon", "de", False),
+            ("5 миллионов мон", "ru", "5 Mio. Mon", "de", False),
+            ("10 тысяч мон", "ru", "10 Tausende Mon", "de", False),
+            ("5 миллионов мон", "ru", "5 mln di mon", "it", False),
+            ("5 миллионов мон", "ru", "5 M de mons", "fr", False),
+            ("2 миллиарда мон", "ru", "2 mil millones de mon", "es", False),
+            ("10 тысяч мон", "ru", "Reward 10k mon", "en", False),
+            ("10 тысяч мон", "ru", "Reward 10 K mon", "en", False),
+            ("2 млрд мон", "ru", "2,000,000,000 mon", "en", False),
+            ("в 10 тысячах мон", "ru", "in 10,000 mon", "en", False),
+            ("10 тысяч мон", "ru", "報酬は10k文", "ja", False),
+            ("10 тысяч мон", "ru", "千万不要忘记，奖励10k文", "zh_Hans", False),
+            ("10 тысяч мон!", "ru", "Ödül mon!", "tr", True),
+            ("10 тысяч мон!", "ru", "Ödül 20 bin mon!", "tr", True),
+            ("5 миллионов мон", "ru", "Nagroda 7 milionów mon", "pl", True),
+            ("100 тысяч мон", "ru", "10 Tausend Mon", "de", True),
+            ("100 тысяч мон", "ru", "10 Tsd. Mon", "de", True),
+            ("Reward 100000", "en", "Награда 10 тысяч мон", "ru", True),
+            ("уровень 3, награда 10 тысяч", "ru", "レベル3、報酬10万文", "ja", True),
+            (
+                "Reward 1 million 500 thousand",
+                "en",
+                "Reward 1 million",
+                "en",
+                True,
+            ),
+            ("Reward 0", "en", "報酬は0万文", "ja", False),
+            ("Reward 1.2.3", "en", "報酬は1.2.3万文", "ja", False),
+            ("Reward 10000", "en", "報酬は1万.以上", "ja", False),
+            ("Reward 1000", "en", "Reward 1000.0", "en", False),
+            (
+                "Reward 1 million 500 thousand",
+                "en",
+                "Reward 1,500,000",
+                "en",
+                False,
+            ),
+            ("Reward 1 thousand 2 million", "en", "Reward 2001000", "en", True),
+            ("Reward 1,000,000,000", "en", "Reward 10億", "ja", False),
+            ("Reward 1 trillion", "en", "報酬は1兆文", "ja", False),
+            ("Reward 15000000", "en", "報酬は1,500万文", "ja", False),
+            ("Reward 100000", "en", "報酬は１０万文", "ja", False),
+            (
+                "Every third repair heals 10 HP",
+                "en",
+                "三回に一回の修理は10回復します",
+                "ja",
+                False,
+            ),
+            (
+                "Never do that, 5 times",
+                "en",
+                "千万不要那样做，5次",
+                "zh_Hans",
+                False,
+            ),
+            ("10 thousand + 10 thousand", "en", "10000", "en", True),
+            (
+                "Reward 10000",
+                "en",
+                "Награда 10 тысяч мон",
+                "ru",
+                False,
+            ),
+            (
+                "Награда 10 ТЫСЯЧ мон!",
+                "ru",
+                "Reward - 10,000 mon!",
+                "en",
+                False,
+            ),
+            (
+                "Reward 1 million 1 thousand",
+                "en",
+                "Reward 1",
+                "en",
+                True,
+            ),
+        )
+        for source, source_code, target, target_code, expected in rows:
+            with self.subTest(source=source, target=target, target_code=target_code):
+                self.assertEqual(
+                    fails(
+                        source,
+                        target,
+                        source_code=source_code,
+                        target_code=target_code,
+                    ),
+                    expected,
                 )
 
     def test_a_number_the_target_adds_is_accepted(self) -> None:
@@ -251,123 +380,81 @@ class GameNumberCheckTest(CheckTestCase):
         # guard hide a regression to symmetric comparison instead of proving
         # containment actually accepts the added counter digits.
         self.assertFalse(
-            self.check.check_single(
-                "Every third repair heals 10 HP",
-                "3回に1回の修理は10回復します",
-                None,
-            )
+            fails("Every third repair heals 10 HP", "3回に1回の修理は10回復します")
         )
 
     def test_a_full_date_is_not_a_quantity(self) -> None:
-        self.assertFalse(
-            self.check.check_single(
-                "Starts on 14.04.2025", "Beginnt am 14. April 2025", None
-            )
-        )
+        self.assertFalse(fails("Starts on 14.04.2025", "Beginnt am 14. April 2025"))
 
     def test_a_placeholder_is_not_a_number(self) -> None:
-        self.assertFalse(self.check.check_single("Value {0}", "Wert {0}", None))
+        self.assertFalse(fails("Value {0}", "Wert {0}"))
 
     def test_a_lost_placeholder_is_not_this_checks_business(self) -> None:
         # game-markup owns placeholder integrity; two checks reporting one
         # defect would double every failing-check count.
-        self.assertFalse(self.check.check_single("Value {0}", "Wert", None))
+        self.assertFalse(fails("Value {0}", "Wert"))
 
     def test_a_number_inside_markup_is_not_counted(self) -> None:
-        self.assertFalse(
-            self.check.check_single(
-                "<size=14>Text</size>", "<size=14>Texte</size>", None
-            )
-        )
+        self.assertFalse(fails("<size=14>Text</size>", "<size=14>Texte</size>"))
 
     def test_a_source_without_numbers_passes(self) -> None:
-        self.assertFalse(self.check.check_single("Plain text", "Texte 42", None))
+        self.assertFalse(fails("Plain text", "Texte 42"))
 
     def test_an_empty_target_passes(self) -> None:
-        self.assertFalse(self.check.check_single("Damage 200", "", None))
+        self.assertFalse(fails("Damage 200", ""))
 
     def test_thousands_grouping_is_a_locale_choice(self) -> None:
         # English groups with commas, other locales with spaces or dots; the
         # grouped value is one number, not a different one.
-        self.assertFalse(
-            self.check.check_single(
-                "Costs 1,900,000 credits", "Coûte 1 900 000 crédits", None
-            )
-        )
+        self.assertFalse(fails("Costs 1,900,000 credits", "Coûte 1 900 000 crédits"))
 
     def test_dotted_thousands_match_spaced(self) -> None:
-        self.assertFalse(
-            self.check.check_single("Reward 1.900.000 ISK", "Award 1 900 000 ISK", None)
-        )
+        self.assertFalse(fails("Reward 1.900.000 ISK", "Award 1 900 000 ISK"))
 
     def test_a_grouped_value_with_a_wrong_amount_still_fails(self) -> None:
         # Folding the grouping must not fold away a genuinely wrong amount.
-        self.assertTrue(
-            self.check.check_single("Costs 1,900,000 credits", "Coûte 1 000", None)
-        )
+        self.assertTrue(fails("Costs 1,900,000 credits", "Coûte 1 000"))
 
     def test_a_slash_date_is_not_a_quantity(self) -> None:
-        self.assertFalse(
-            self.check.check_single("Limit from 01/12/2022", "Лимит с 01.12.2022", None)
-        )
+        self.assertFalse(fails("Limit from 01/12/2022", "Лимит с 01.12.2022"))
 
     def test_digits_in_a_url_are_not_quantities(self) -> None:
-        self.assertFalse(
-            self.check.check_single("Survey https://forms.gle/aB4cd5", "Опрос", None)
-        )
+        self.assertFalse(fails("Survey https://forms.gle/aB4cd5", "Опрос"))
 
     def test_an_english_ordinal_label_need_not_survive(self) -> None:
         # "1st" is spelled out per language ("первую покупку"); its digit is a
         # label, not a quantity the target must carry.
-        self.assertFalse(
-            self.check.check_single(
-                "SALE BONUS FOR 1ST BUY", "БОНУС ЗА ПЕРВУЮ ПОКУПКУ", None
-            )
-        )
+        self.assertFalse(fails("SALE BONUS FOR 1ST BUY", "БОНУС ЗА ПЕРВУЮ ПОКУПКУ"))
 
     def test_an_ordinal_does_not_hide_a_dropped_quantity(self) -> None:
         # Removing the ordinal label must not silence a real number beside it.
-        self.assertTrue(self.check.check_single("1st prize is 500 gold", "Приз", None))
+        self.assertTrue(fails("1st prize is 500 gold", "Приз"))
 
     def test_a_dropped_bare_number_still_fails(self) -> None:
         # A plain number the target omits is a real signal, grouping aside.
-        self.assertTrue(
-            self.check.check_single("Update 3.6 is out", "Встречайте!", None)
-        )
+        self.assertTrue(fails("Update 3.6 is out", "Встречайте!"))
 
     def test_european_single_dot_group_is_thousands(self) -> None:
         # "30.000" in German is 30000, not a decimal; it matches "30,000".
-        self.assertFalse(
-            self.check.check_single("30,000 for victory", "30.000 für den Sieg", None)
-        )
+        self.assertFalse(fails("30,000 for victory", "30.000 für den Sieg"))
 
     def test_native_digit_scripts_are_the_same_number(self) -> None:
         # Arabic-Indic and Devanagari digits are the source number, restated.
-        self.assertFalse(
-            self.check.check_single("30,000 for victory", "۳۰٬۰۰۰ برای پیروزی", None)
-        )
-        self.assertFalse(
-            self.check.check_single("15,000 for victory", "१५,००० जीत के लिए", None)
-        )
+        self.assertFalse(fails("30,000 for victory", "۳۰٬۰۰۰ برای پیروزی"))
+        self.assertFalse(fails("15,000 for victory", "१५,००० जीत के लिए"))
 
     def test_a_wrong_value_across_locales_still_fails(self) -> None:
         # Folding scripts and grouping must not fold away a different amount.
-        self.assertTrue(
-            self.check.check_single("30,000 for victory", "20.000 für Sieg", None)
-        )
+        self.assertTrue(fails("30,000 for victory", "20.000 für Sieg"))
 
     def test_an_ordinal_in_the_target_keeps_the_source_number(self) -> None:
         # English renders the plain "24 декабря" as "December 24th". Dropping the
         # target's ordinal would report the source's own 24 as missing.
-        self.assertFalse(
-            self.check.check_single("Начнутся 24 декабря", "Begins December 24th", None)
-        )
+        self.assertFalse(fails("Начнутся 24 декабря", "Begins December 24th"))
 
     def test_an_ordinal_in_the_target_does_not_hide_a_dropped_number(self) -> None:
         self.assertTrue(
-            self.check.check_single(
-                "Начнутся 24 декабря, уровень 11", "Begins December 24th", None
-            )
+            fails("Начнутся 24 декабря, уровень 11", "Begins December 24th")
         )
 
 
