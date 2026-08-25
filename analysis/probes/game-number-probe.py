@@ -3,8 +3,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 # Report game-number firings for a live component, per language and per key.
-# Read-only. Usage:
-#   PYTHONPATH=weblate_customization/src python3 analysis/probes/game-number-probe.py
+# Read-only. Usage: with DJANGO_SETTINGS_MODULE=weblate.settings_test and
+# PYTHONPATH=weblate_customization/src set, run
+# python3 analysis/probes/game-number-probe.py.
 from __future__ import annotations
 
 import collections
@@ -12,7 +13,7 @@ import json
 import os
 import urllib.request
 
-from weblate_customization.checks import _numbers
+from weblate_customization.checks import game_number_fails
 
 DOMAIN = os.environ["PROBE_DOMAIN"]
 TOKEN = os.environ["PROBE_TOKEN"]
@@ -41,7 +42,12 @@ for language, strings in files.items():
         if not target:
             continue
         pairs += 1
-        if _numbers(source_file.get(key, "")) - _numbers(target):
+        if game_number_fails(
+            source_file.get(key, ""),
+            target,
+            source_language=SOURCE,
+            target_language=language,
+        ):
             per_language[language] += 1
             per_key[key] += 1
 
