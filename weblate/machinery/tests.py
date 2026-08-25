@@ -4277,6 +4277,23 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         )
         self.assertEqual(LLMUsageLog.objects.count(), 1)
 
+    @http_mock.activate
+    def test_usage_records_outcome_on_the_async_path(self) -> None:
+        """
+        The async path writes and resolves the row in two thread hops.
+
+        The row id travels between them in a context variable, so this asserts
+        the outcome is attached there too and not only on the sync path.
+        """
+        LLMUsageLog.objects.all().delete()
+        self.mock_response_priced()
+        self.assert_async_translate(
+            self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN
+        )
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.batch_size, 1)
+        self.assertEqual(log.outcome, "applied")
+
     def mock_chat_reply_per_batch(self) -> None:
         """Answer a singleton correctly and a wider batch with a wrong id."""
         http_mock.register(
