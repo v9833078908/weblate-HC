@@ -42,6 +42,24 @@ if TYPE_CHECKING:
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 JUDGE_REQUEST_TIMEOUT = 120
 JUDGE_SEATS = (1, 2)
+
+
+def judge_request_upper_bound(strings: int) -> int | None:
+    """
+    Requests one judge run plans for a number of strings.
+
+    Batches, not strings: request_verdicts() sends JUDGE_BATCH_SIZE segments
+    per call. A repair round re-judges only the strings that were repaired, so
+    this is a ceiling for the run; it is not absolute because a refused batch
+    is retried once. None means the configured batch size cannot be read.
+    """
+    batch_size = settings.JUDGE_BATCH_SIZE
+    if not isinstance(batch_size, int) or batch_size < 1:
+        return None
+    if strings < 1:
+        return 0
+    batches = (strings + batch_size - 1) // batch_size
+    return batches * len(JUDGE_SEATS) * (1 + settings.JUDGE_MAX_REPAIR_ATTEMPTS)
 # A verdict batch reply is kilobytes; this only bounds a broken peer.
 MAX_BATCH_RESPONSE_BYTES = 8 * 1024 * 1024
 # Measured category set (st2-zh-recalibration.py:59-68).
