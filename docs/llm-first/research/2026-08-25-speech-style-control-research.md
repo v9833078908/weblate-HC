@@ -84,7 +84,9 @@ collegium precision 0.51-0.56 and recall 0.67-0.75
 
 Run against `analysis/data/heart-abyss-hub-1-units.tsv` (396 units, `ru` source with
 `en` and `fr` targets), offline, no model call. The lexicon is reproduced verbatim
-below so the numbers can be recomputed; it is applied with `re.I` and a leading `\b`.
+below, applied with `re.I` and a leading `\b`, so the numbers can be recomputed from
+the committed TSV. No probe script ships with this document; a reusable one under
+`analysis/probes/` would be a separate, separately approved item.
 
 ```
 ru: бля\w*|хуй\w*|хуё\w*|хер(?:ов|ня|ню|ни)\w*|хрен\w*|пизд\w*|[её]б\w*|заеб\w*
@@ -287,8 +289,10 @@ Detection stays a later, separately gated safeguard, never part of this step:
    canon is the producer's call.
 3. **Obscenity-fidelity policy per market**, as a `language_instructions` entry rather
    than a character attribute.
-4. **Whether V3 becomes a plan.** V0-V2 need no code and no plan; V3 onwards do, under
-   `docs/llm-first/plans/`.
+4. **Which of V0-V5 becomes a plan.** None of them is plan-free: under the working
+   agreement in `AGENTS.md` every edit needs an approved plan first, and that includes
+   rewriting a project's `persona` on a live instance or changing kit data, not only
+   code. V0-V2 are cheap and reversible, not exempt.
 
 ## 9. Roadmap placement
 
