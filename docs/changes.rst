@@ -16,6 +16,7 @@ Weblate 2026.8.1
 * Project-level :ref:`automatic suggestion <machine-translation-setup>` configuration now overrides the site-wide one field by field, so a project can set its own translator persona, style, and language-specific instructions without restating credentials.
 * LLM machine translation now records per-request token usage and cost, reportable via the ``llm_usage_report`` management command.
 * Large language model machine translation services now receive the note left by developers for a string, see :ref:`llm-translation-context`.
+* LLM judge runs now show capped scope and observed-cost previews, record per-unit judge usage, and add a component release-readiness table that keeps delivery state separate from advisory AI evidence.
 * Added optional :ref:`TBX glossary import from CSV, TSV, and XLSX tables <uploading-glossary-tables>`, with a locally validated profile proposal path.
 * Glossary tables with only language columns are now mapped deterministically without contacting the automatic analyzer, and the sheet-selection step is skipped for single-sheet uploads, see :ref:`uploading-glossary-tables`.
 * Glossary tables where a term is followed by its description on the next row are now recognised deterministically: descriptions become explanations, section captions become sections, and the detected layout can be switched from the import preview, see :ref:`uploading-glossary-tables`.

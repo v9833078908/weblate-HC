@@ -202,6 +202,17 @@ instructed not to assume a genre; describing the project is therefore worth
 doing before a large run, because an unstated register is reported as a style
 error less often than a wrongly assumed one.
 
+The component :guilabel:`Release readiness` table separates pending changes
+ready for delivery from current judge coverage. It displays stale and
+incomplete attempts as evidence that needs attention, never as a release
+decision. Only users with automatic translation and review permissions see
+evaluation actions; machinery configuration remains restricted to its
+management permission.
+
+Judge previews use observed, project- and model-specific request costs only
+after at least five priced requests. The range is an estimate, not a provider
+quote, and an unavailable range must not be treated as zero.
+
 .. seealso::
 
    * :ref:`auto-translation`

@@ -70,6 +70,15 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(JudgeVerdict.objects.count(), 0)
 
+    def test_component_shows_readiness_before_language_list(self) -> None:
+        response = self.client.get(self.component.get_absolute_url())
+
+        self.assertContains(response, "Release readiness")
+        self.assertLess(
+            response.content.index(b"Release readiness"),
+            response.content.index(b"table-listing"),
+        )
+
     @override_settings(
         JUDGE_OPENROUTER_KEY="sk-test",
         JUDGE_MODEL_SEAT_1="vendor-a/model",

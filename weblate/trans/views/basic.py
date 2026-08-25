@@ -743,6 +743,7 @@ def show_component(request: AuthenticatedHttpRequest, obj: Component) -> HttpRes
             "project": obj.project,
             "component": obj,
             "translations": translations,
+            "judge_readiness": judge_readiness,
             **(
                 get_reports_context(request, obj)
                 if request.user.is_authenticated

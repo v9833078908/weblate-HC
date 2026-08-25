@@ -483,6 +483,19 @@ A started run continues in the background. Its progress is shown at the top of
 every page you open until it finishes, so leaving the page or reloading it does
 not hide the status.
 
+For a judge run, the preview reports the matching scope, the part selected by
+the per-run cap, writable strings, initial and worst-case request counts, and
+observed cost ranges when enough recent priced requests exist. A missing cost
+range is not a zero-cost estimate. Progress counts completed judge batches and
+can jump to completion when cached verdicts or skipped repair rounds reduce
+the actual work.
+
+The component language page also shows delivery readiness separately from AI
+evaluation. Current, stale, and incomplete judge evidence are review signals,
+not release approval. Users need automatic translation and review permissions
+to start an evaluation; configuration and provider identifiers remain hidden
+from users without the corresponding management permission.
+
 .. seealso::
 
     :ref:`translation-consistency`
