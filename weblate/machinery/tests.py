@@ -4267,6 +4267,59 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(log.response_id, "chatcmpl-123")
         self.assertEqual(log.cached_tokens, 4)
         self.assertEqual(log.project_slug, "mock")
+        self.assertEqual(log.operation, LLMUsageLog.Operation.TRANSLATION)
+        self.assertEqual(log.unit_count, 1)
+
+    @http_mock.activate
+    def test_usage_unit_count_reflects_split_recovery(self) -> None:
+        LLMUsageLog.objects.all().delete()
+
+        def chat_callback(request: httpx2.Request) -> httpx2.Response:
+            payload = load_request_json(request)
+            content = payload["messages"][3]["content"]
+            strings = json.loads(content)["strings"]
+            message_content = None if len(strings) > 1 else '["Ahoj svete"]'
+            return httpx2.Response(
+                200,
+                headers={},
+                json={
+                    "id": "resp-split",
+                    "choices": [
+                        {
+                            "message": {"content": message_content},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {
+                        "prompt_tokens": 9,
+                        "completion_tokens": 12,
+                        "total_tokens": 21,
+                        "cost": 0.001,
+                    },
+                },
+            )
+
+        machine = self.get_machine()
+        http_mock.register(
+            "GET",
+            re.compile(r"/models$"),
+            json={
+                "object": "list",
+                "data": [{"id": self.TRACE_MODEL, "object": "model"}],
+            },
+        )
+        http_mock.register_callback(
+            "POST", re.compile(r"chat/completions"), chat_callback
+        )
+        machine.download_multiple_translations(
+            "en", "fr", [("Alpha", None), ("Beta", None)]
+        )
+
+        rows = list(LLMUsageLog.objects.order_by("id"))
+        self.assertEqual([row.unit_count for row in rows], [2, 1, 1])
+        self.assertTrue(
+            all(row.operation == LLMUsageLog.Operation.TRANSLATION for row in rows)
+        )
 
     @http_mock.activate
     def test_usage_recorded_async(self) -> None:

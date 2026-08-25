@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import ClassVar
 
 from django.db import models
@@ -21,6 +22,10 @@ class LLMUsageLog(models.Model):
     reconstructed from the OpenRouter price list later.
     """
 
+    class Operation(models.TextChoices):
+        TRANSLATION = "translation"
+        JUDGE = "judge"
+
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     model = models.CharField(max_length=200, db_index=True)
     project_slug = models.CharField(max_length=200, blank=True)
@@ -33,9 +38,40 @@ class LLMUsageLog(models.Model):
     response_id = models.CharField(max_length=255, blank=True)
     cached_tokens = models.IntegerField(default=0)
     reasoning_tokens = models.IntegerField(default=0)
+    operation = models.CharField(
+        max_length=20, choices=Operation, blank=True, db_index=True
+    )
+    unit_count = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         ordering: ClassVar[list[str]] = ["-created_at"]
 
     def __str__(self) -> str:
         return f"{self.model} {self.total_tokens} tokens ${self.cost_usd}"
+
+
+def recent_cost_range(
+    project_slug: str, model: str, operation: str
+) -> tuple[Decimal, Decimal] | None:
+    """
+    Observed per-unit cost range for the newest priced requests.
+
+    Exact project/model/operation match, newest 20 rows with a stored cost
+    and a positive unit count. Below 5 samples returns None so a thin
+    history never implies a precision the data does not support.
+    """
+    per_unit = [
+        cost / unit_count
+        for cost, unit_count in LLMUsageLog.objects.filter(
+            project_slug=project_slug,
+            model=model,
+            operation=operation,
+            cost_usd__isnull=False,
+            unit_count__gt=0,
+        )
+        .order_by("-created_at", "-pk")[:20]
+        .values_list("cost_usd", "unit_count")
+    ]
+    if len(per_unit) < 5:
+        return None
+    return min(per_unit), max(per_unit)

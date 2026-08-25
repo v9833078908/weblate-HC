@@ -340,6 +340,8 @@ class RoutedDownloadTest(TestCase):
         self.assertEqual(log.completion_tokens, 2)
         self.assertIsNone(log.cost_usd)
         self.assertEqual(log.project_slug, "")
+        self.assertEqual(log.operation, LLMUsageLog.Operation.TRANSLATION)
+        self.assertEqual(log.unit_count, 1)
 
     @http_mock.activate
     def test_route_context_is_reset_after_success(self) -> None:

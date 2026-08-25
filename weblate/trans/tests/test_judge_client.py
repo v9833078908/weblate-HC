@@ -11,6 +11,7 @@ from typing import Any
 from unittest import mock
 
 import httpx2
+from django.db import DatabaseError
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from weblate.trans.judge import (
@@ -708,6 +709,82 @@ class JudgeUsageLogTest(TestCase):
         row = LLMUsageLog.objects.get(model="vendor/model-a")
         self.assertEqual(row.prompt_tokens, 11)
         self.assertEqual(row.completion_tokens, 7)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_operation_and_unit_count(self) -> None:
+        reqs = [REQ, replace(REQ, unit_key="MENU_DOOR_2")]
+        payload = _reply(
+            [
+                {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""},
+                {"id": 1, "verdict": "pass", "errors": [], "back_translation": ""},
+            ]
+        )
+        payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
+        http_mock.register("POST", CHAT_URL, json=payload)
+        request_verdicts(reqs, model="vendor/model-a")
+        row = LLMUsageLog.objects.get(model="vendor/model-a")
+        self.assertEqual(row.operation, LLMUsageLog.Operation.JUDGE)
+        self.assertEqual(row.unit_count, 2)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @mock.patch("weblate.trans.judge.time.sleep")
+    @http_mock.activate
+    def test_billed_retry_logs_actual_batch_size(self, sleep) -> None:
+        reqs = [REQ, replace(REQ, unit_key="MENU_DOOR_2")]
+        usage = {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0.002}
+        http_mock.register("POST", CHAT_URL, status_code=429, json={"usage": usage})
+        retry_payload = _reply(
+            [
+                {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""},
+                {"id": 1, "verdict": "pass", "errors": [], "back_translation": ""},
+            ]
+        )
+        retry_payload["usage"] = usage
+        http_mock.register("POST", CHAT_URL, json=retry_payload)
+
+        request_verdicts(reqs, model="vendor/model-a")
+
+        rows = list(LLMUsageLog.objects.order_by("id"))
+        self.assertEqual(len(rows), 2)
+        self.assertEqual([row.unit_count for row in rows], [2, 2])
+        self.assertTrue(
+            all(row.operation == LLMUsageLog.Operation.JUDGE for row in rows)
+        )
+        sleep.assert_called_once()
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_accounting_failure_does_not_break_judging(self) -> None:
+        payload = _reply(
+            [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+        )
+        payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
+        http_mock.register("POST", CHAT_URL, json=payload)
+        with mock.patch.object(
+            LLMUsageLog._default_manager,  # ruff: ignore[private-member-access]
+            "create",
+            side_effect=DatabaseError("boom"),
+        ):
+            results = request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].model_verdict, "pass")
+        self.assertEqual(LLMUsageLog.objects.count(), 0)
 
 
 class JudgeReasoningBudgetTest(TestCase):

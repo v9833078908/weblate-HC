@@ -10,7 +10,7 @@ from io import StringIO
 from django.core.management import call_command
 from django.test import TestCase
 
-from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
 
 
 class LLMUsageLogModelTest(TestCase):
@@ -34,6 +34,21 @@ class LLMUsageLogModelTest(TestCase):
         self.assertIsNone(log.cost_usd)
         self.assertEqual(log.project_slug, "")
         self.assertEqual(log.completion_tokens, 0)
+
+    def test_create_with_operation_and_unit_count(self) -> None:
+        log = LLMUsageLog.objects.create(
+            model="google/gemini-2.5-flash",
+            operation=LLMUsageLog.Operation.JUDGE,
+            unit_count=5,
+            prompt_tokens=9,
+        )
+        self.assertEqual(log.operation, LLMUsageLog.Operation.JUDGE)
+        self.assertEqual(log.unit_count, 5)
+
+    def test_operation_and_unit_count_default_blank(self) -> None:
+        log = LLMUsageLog.objects.create(model="gpt-5.4-nano", prompt_tokens=5)
+        self.assertEqual(log.operation, "")
+        self.assertIsNone(log.unit_count)
 
 
 class LLMUsageReportTest(TestCase):
@@ -93,3 +108,79 @@ class LLMUsageReportTest(TestCase):
         text = out.getvalue()
         self.assertNotIn("m1", text)
         self.assertIn("st2", text)
+
+
+class RecentCostRangeTest(TestCase):
+    def _create(
+        self,
+        *,
+        cost,
+        unit_count,
+        model="m1",
+        project_slug="col4",
+        operation=LLMUsageLog.Operation.TRANSLATION,
+    ) -> None:
+        LLMUsageLog.objects.create(
+            model=model,
+            project_slug=project_slug,
+            operation=operation,
+            unit_count=unit_count,
+            cost_usd=cost,
+            prompt_tokens=1,
+        )
+
+    def test_returns_none_below_five_samples(self) -> None:
+        for _ in range(4):
+            self._create(cost=Decimal("0.001"), unit_count=1)
+        self.assertIsNone(
+            recent_cost_range("col4", "m1", LLMUsageLog.Operation.TRANSLATION)
+        )
+
+    def test_returns_min_max_per_unit_at_five_samples(self) -> None:
+        costs = [
+            Decimal("0.001"),
+            Decimal("0.002"),
+            Decimal("0.003"),
+            Decimal("0.004"),
+            Decimal("0.010"),
+        ]
+        for cost in costs:
+            self._create(cost=cost, unit_count=2)
+        low, high = recent_cost_range("col4", "m1", LLMUsageLog.Operation.TRANSLATION)
+        self.assertEqual(low, Decimal("0.0005"))
+        self.assertEqual(high, Decimal("0.005"))
+
+    def test_ignores_null_cost_and_zero_or_null_unit_count(self) -> None:
+        for _ in range(5):
+            self._create(cost=Decimal("0.001"), unit_count=1)
+        self._create(cost=None, unit_count=3)
+        self._create(cost=Decimal("0.5"), unit_count=0)
+        self._create(cost=Decimal("0.5"), unit_count=None)
+        low, high = recent_cost_range("col4", "m1", LLMUsageLog.Operation.TRANSLATION)
+        self.assertEqual(low, Decimal("0.001"))
+        self.assertEqual(high, Decimal("0.001"))
+
+    def test_uses_only_newest_twenty_rows(self) -> None:
+        self._create(cost=Decimal("50.000"), unit_count=1)
+        for _ in range(20):
+            self._create(cost=Decimal("0.001"), unit_count=1)
+        low, high = recent_cost_range("col4", "m1", LLMUsageLog.Operation.TRANSLATION)
+        self.assertEqual(low, Decimal("0.001"))
+        self.assertEqual(high, Decimal("0.001"))
+
+    def test_never_mixes_operation_model_or_project(self) -> None:
+        for _ in range(5):
+            self._create(cost=Decimal("0.001"), unit_count=1)
+        for _ in range(5):
+            self._create(
+                cost=Decimal("9.000"),
+                unit_count=1,
+                operation=LLMUsageLog.Operation.JUDGE,
+            )
+        for _ in range(5):
+            self._create(cost=Decimal("9.000"), unit_count=1, model="m2")
+        for _ in range(5):
+            self._create(cost=Decimal("9.000"), unit_count=1, project_slug="st2")
+        low, high = recent_cost_range("col4", "m1", LLMUsageLog.Operation.TRANSLATION)
+        self.assertEqual(low, Decimal("0.001"))
+        self.assertEqual(high, Decimal("0.001"))

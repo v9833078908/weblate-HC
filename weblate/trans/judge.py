@@ -116,6 +116,10 @@ def validate_judge_configuration() -> None:
         and settings.JUDGE_MODEL_SEAT_1.strip()
         and isinstance(settings.JUDGE_MODEL_SEAT_2, str)
         and settings.JUDGE_MODEL_SEAT_2.strip()
+        and isinstance(settings.JUDGE_MAX_REPAIR_ATTEMPTS, int)
+        and settings.JUDGE_MAX_REPAIR_ATTEMPTS >= 0
+        and isinstance(settings.JUDGE_MAX_UNITS_PER_RUN, int)
+        and settings.JUDGE_MAX_UNITS_PER_RUN >= 0
     ):
         raise JudgeError(_("The LLM judge is not configured."))
 
@@ -274,7 +278,9 @@ class _BatchResponse:
     payload: dict | None
 
 
-def _write_llm_usage(payload: dict, model: str, project_slug: str) -> None:
+def _write_llm_usage(
+    payload: dict, model: str, project_slug: str, unit_count: int
+) -> None:
     usage = payload.get("usage")
     if not isinstance(usage, dict):
         return
@@ -296,10 +302,14 @@ def _write_llm_usage(payload: dict, model: str, project_slug: str) -> None:
         response_id=str(payload.get("id") or ""),
         cached_tokens=prompt_details.get("cached_tokens") or 0,
         reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
+        operation=LLMUsageLog.Operation.JUDGE,
+        unit_count=unit_count,
     )
 
 
-def _record_usage(payload: dict, model: str, project_slug: str) -> None:
+def _record_usage(
+    payload: dict, model: str, project_slug: str, unit_count: int
+) -> None:
     """
     Mirror machinery's record_llm_usage (never raises).
 
@@ -308,7 +318,7 @@ def _record_usage(payload: dict, model: str, project_slug: str) -> None:
     mechanism, so accounting must be symmetric.
     """
     try:
-        _write_llm_usage(payload, model, project_slug)
+        _write_llm_usage(payload, model, project_slug, unit_count)
     except Exception:
         LOGGER.exception("Failed to record LLM usage")
 
@@ -559,7 +569,7 @@ def request_verdicts(
                     elapsed_ms,
                 )
             if response.payload is not None:
-                _record_usage(response.payload, model, project_slug)
+                _record_usage(response.payload, model, project_slug, len(batch))
             if response.payload is not None and (
                 response.status_code is None or response.status_code < 400
             ):

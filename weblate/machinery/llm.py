@@ -46,6 +46,10 @@ from weblate.utils.translation import pgettext_noop
 #: Project slug of the batch currently fetching, for usage accounting at the
 #: HTTP seam, which does not receive the batch units.
 llm_batch_project: ContextVar[str] = ContextVar("llm_batch_project", default="")
+#: Source batch size of the request currently fetching, set/reset at the same
+#: seam as llm_batch_project. Reflects the exact batch sent over HTTP,
+#: including split-recovery sub-batches, not the original caller's batch.
+llm_batch_unit_count: ContextVar[int] = ContextVar("llm_batch_unit_count", default=0)
 
 
 def _sources_project_slug(sources: list[tuple[str, Unit | None]]) -> str:
@@ -2771,11 +2775,13 @@ class BaseLLMTranslation(BatchMachineTranslation):
             )
         )
         project_token = llm_batch_project.set(_sources_project_slug(sources))
+        unit_count_token = llm_batch_unit_count.set(len(sources))
         try:
             translations_string = self.fetch_llm_translations(
                 prompt, content, previous_content, previous_response
             )
         finally:
+            llm_batch_unit_count.reset(unit_count_token)
             llm_batch_project.reset(project_token)
         return self._parse_llm_translations(
             translations_string, sources, source_occurrences, string_ids=string_ids
@@ -2887,11 +2893,13 @@ class BaseLLMTranslation(BatchMachineTranslation):
             string_ids,
         )
         project_token = llm_batch_project.set(_sources_project_slug(sources))
+        unit_count_token = llm_batch_unit_count.set(len(sources))
         try:
             translations_string = await self.afetch_llm_translations(
                 prompt, content, previous_content, previous_response
             )
         finally:
+            llm_batch_unit_count.reset(unit_count_token)
             llm_batch_project.reset(project_token)
         return await sync_to_async(self._parse_llm_translations)(
             translations_string, sources, source_occurrences, string_ids=string_ids
