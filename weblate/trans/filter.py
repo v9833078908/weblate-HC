@@ -78,13 +78,23 @@ class FilterRegistry:
             ),
             (
                 "judge-advisory",
-                gettext_lazy("Advisory - ships"),
-                "judge:pass",
+                gettext_lazy("Judge - major (ships)"),
+                "judge:flag",
             ),
             (
                 "judge-held",
-                gettext_lazy("Held for decision"),
-                "judge:flag OR judge:reject",
+                gettext_lazy("Judge - critical (held)"),
+                "judge:reject",
+            ),
+            (
+                "judge-minor",
+                gettext_lazy("Judge - minor (nothing blocking)"),
+                "judge:minor",
+            ),
+            (
+                "judge-pass",
+                gettext_lazy("Judge - nothing blocking"),
+                "judge:pass",
             ),
             ("judge-stale", gettext_lazy("Stale"), "judge:stale"),
             (

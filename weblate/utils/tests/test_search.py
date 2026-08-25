@@ -1063,6 +1063,53 @@ class JudgeSearchTest(ViewTestCase):
         self.assertTrue(self.matches("NOT has:judge", unit))
         self.assertTrue(self.matches("judge:stale", unit))
 
+    def test_judge_minor_filter_matches_only_minor(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "minor")
+        self.assertTrue(self.matches("judge:minor", unit))
+        self.assertTrue(self.matches("judge:pass", unit))
+        self.assertFalse(self.matches("judge:flag", unit))
+        self.assertFalse(self.matches("judge:reject", unit))
+
+    def test_every_preset_query_selects_its_exact_severity_set(self) -> None:
+        unit = self.get_unit()
+        expectations = {
+            "none": {
+                "judge:pass": True,
+                "judge:minor": False,
+                "judge:flag": False,
+                "judge:reject": False,
+            },
+            "minor": {
+                "judge:pass": True,
+                "judge:minor": True,
+                "judge:flag": False,
+                "judge:reject": False,
+            },
+            "major": {
+                "judge:pass": False,
+                "judge:minor": False,
+                "judge:flag": True,
+                "judge:reject": False,
+            },
+            "critical": {
+                "judge:pass": False,
+                "judge:minor": False,
+                "judge:flag": False,
+                "judge:reject": True,
+            },
+        }
+        for severity, per_query in expectations.items():
+            # A newer verdict is the active one for the same unit (task 1/2
+            # regression coverage), so this walks every severity in turn.
+            self.make_verdict(unit, severity)
+            for query, expected in per_query.items():
+                self.assertIs(
+                    self.matches(query, unit),
+                    expected,
+                    f"severity={severity!r} query={query!r}",
+                )
+
     def test_unsupported_judge_filter_raises_search_error(self) -> None:
         with self.assertRaises(SearchQueryError):
             parse_query("judge:override")

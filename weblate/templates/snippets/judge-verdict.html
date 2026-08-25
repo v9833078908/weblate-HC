@@ -63,6 +63,7 @@
           <h5 class="list-group-item-heading">
             {% icon "flag.svg" %}
             {% translate "Questionable" %}
+            <span class="badge text-bg-warning">{% translate "Ships with evidence" %}</span>
           </h5>
           <p class="list-group-item-text text-muted">
             {% blocktranslate with model=judge_verdict.judge_model when=judge_verdict.timestamp|naturaltime %}{{ model }} · {{ when }}{% endblocktranslate %}
@@ -95,6 +96,17 @@
             <p class="list-group-item-text">
               {% translate "The context changed (glossary or note updated) since this verdict was recorded." %}
             </p>
+          {% endif %}
+          {% if judge_verdict.max_severity == "minor" %}
+            {% for seat in judge_seats %}
+              {% for error in seat.errors %}
+                <p class="list-group-item-text">
+                  <strong>{{ error.category }}/{{ error.severity }}</strong>
+                  ({% blocktranslate with model=seat.judge_model %}seat {{ model }}{% endblocktranslate %}):
+                  {{ error.description }}
+                </p>
+              {% endfor %}
+            {% endfor %}
           {% endif %}
         </div>
       {% endif %}

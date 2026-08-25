@@ -816,6 +816,7 @@ class UnitTermExpr(BaseTermExpr):
     def judge_field(self, text: str, context: dict) -> Q:
         statuses = {
             "pass": Q(judge_active_severity__in={"none", "minor"}),
+            "minor": Q(judge_active_severity="minor"),
             "flag": Q(judge_active_severity="major"),
             "reject": Q(judge_active_severity="critical"),
             "stale": Q(

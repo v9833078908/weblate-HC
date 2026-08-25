@@ -100,6 +100,7 @@ JUDGE_KEYS = frozenset(
         "judge_total",
         "judge_evaluated",
         "judge_pass",
+        "judge_minor",
         "judge_flag",
         "judge_reject",
         "judge_stale",
@@ -934,9 +935,14 @@ class TranslationStats(BaseStats):
                 judge_evaluated=Count(
                     "pk", filter=Q(judge_active_severity__isnull=False)
                 ),
+                # judge_pass mirrors the judge:pass query (none OR minor:
+                # neither blocks). judge_minor is a breakdown *within*
+                # judge_pass, not a disjoint bucket - pass+flag+reject
+                # stays the exhaustive partition of judge_evaluated.
                 judge_pass=Count(
                     "pk", filter=Q(judge_active_severity__in={"none", "minor"})
                 ),
+                judge_minor=Count("pk", filter=Q(judge_active_severity="minor")),
                 judge_flag=Count("pk", filter=Q(judge_active_severity="major")),
                 judge_reject=Count("pk", filter=Q(judge_active_severity="critical")),
                 judge_stale=Count(

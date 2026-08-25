@@ -168,8 +168,8 @@ class JudgeStatsTest(ViewTestCase):
         self.assertEqual(self.translation.stats.judge_reject, 0)
 
     def test_translation_judge_stats_cover_all_statuses(self) -> None:
-        units = list(self.translation.unit_set.order_by("pk")[:6])
-        while len(units) < 6:
+        units = list(self.translation.unit_set.order_by("pk")[:7])
+        while len(units) < 7:
             seed = units[0]
             units.append(
                 type(seed).objects.create(
@@ -190,15 +190,20 @@ class JudgeStatsTest(ViewTestCase):
         self.add_verdict(units[4], "none", unparsed=True)
         type(units[5]).objects.filter(pk=units[5].pk).update(state=STATE_READONLY)
         self.add_verdict(units[5], "critical")
+        self.add_verdict(units[6], "minor")
         self.refresh_stats()
 
         stats = self.translation.stats
         self.assertEqual(stats.judge_total, stats.all - stats.readonly)
-        self.assertEqual(stats.judge_evaluated, 3)
-        self.assertEqual(stats.judge_pass, 1)
+        self.assertEqual(stats.judge_evaluated, 4)
+        self.assertEqual(stats.judge_pass, 2)
+        self.assertEqual(stats.judge_minor, 1)
         self.assertEqual(stats.judge_flag, 1)
         self.assertEqual(stats.judge_reject, 1)
-        self.assertEqual(stats.judge_pass + stats.judge_flag + stats.judge_reject, 3)
+        self.assertEqual(
+            stats.judge_pass + stats.judge_flag + stats.judge_reject,
+            stats.judge_evaluated,
+        )
         self.assertEqual(stats.judge_stale, 1)
         self.assertEqual(stats.judge_unparsed, 1)
 

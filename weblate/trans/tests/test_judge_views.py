@@ -352,6 +352,54 @@ class JudgeVerdictCardTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "context changed")
 
+    def test_major_card_shows_a_ships_badge(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Ships with evidence")
+
+    def test_critical_card_shows_a_will_not_ship_badge(self) -> None:
+        unit = self.get_unit()
+        self.make_reject(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Will not ship")
+        self.assertNotContains(response, "Ships with evidence")
+
+    def test_pass_card_renders_minor_errors(self) -> None:
+        unit = self.get_unit()
+        self.make(
+            unit,
+            "minor",
+            errors=[
+                {
+                    "span": "x",
+                    "category": "fluency",
+                    "severity": "minor",
+                    "description": "a minor style note",
+                }
+            ],
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "a minor style note")
+
+    def test_pass_card_omits_error_list_for_none(self) -> None:
+        unit = self.get_unit()
+        self.make(
+            unit,
+            "none",
+            errors=[
+                {
+                    "span": "x",
+                    "category": "fluency",
+                    "severity": "none",
+                    "description": "should never render",
+                }
+            ],
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "id_judge_card")
+        self.assertNotContains(response, "should never render")
+
 
 class JudgeBackTranslationTest(ViewTestCase):
     def make_flag(self, unit, *, back_translation, **kwargs):

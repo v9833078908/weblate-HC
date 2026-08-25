@@ -11,6 +11,7 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils.translation import gettext
 
+from weblate.checks.judge import JUDGE_CHECKS
 from weblate.formats.base import BilingualUpdateMixin
 from weblate.lang.models import Language
 from weblate.trans.models import (
@@ -438,7 +439,7 @@ def check_delete_own(
 def check_ignore_check(
     user: User, permission: str, check: Check
 ) -> bool | PermissionResult:
-    if check.is_enforced():
+    if check.name in JUDGE_CHECKS or check.is_enforced():
         return False
     return check_permission(user, permission, check.unit.translation)
 

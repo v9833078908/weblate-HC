@@ -40,8 +40,8 @@ class BaseJudgeCheck(TargetCheck):
     # A verdict exists for any judged text, an empty target included:
     # this is a verdict reader, not a linguistic check.
     ignore_untranslated = False
-    # The verdict this subclass renders as a failing check.
-    judge_verdict: str = ""
+    # The severity this subclass renders as a failing check.
+    judge_severity: str = ""
 
     def _active_verdict(self, unit: Unit):
         # Not cached in unit.check_cache: that dict survives a
@@ -57,7 +57,7 @@ class BaseJudgeCheck(TargetCheck):
 
     def check_target_unit(self, sources, targets, unit) -> bool:
         verdict = self._active_verdict(unit)
-        return verdict is not None and verdict.verdict == self.judge_verdict
+        return verdict is not None and verdict.max_severity == self.judge_severity
 
     def check_target_with_flags(self, sources, targets, unit, all_flags) -> bool:
         # Deliberately not cached per check id: a newer verdict must
@@ -90,20 +90,34 @@ class BaseJudgeCheck(TargetCheck):
 
 class JudgeFlagCheck(BaseJudgeCheck):
     check_id = "judge-flag"
-    judge_verdict = "flag"
-    name = gettext_lazy("Judge: questionable")
+    judge_severity = "major"
+    name = gettext_lazy("Judge - major")
     description = gettext_lazy(
-        "An LLM judge reported a major problem. The string is held for review."
+        "An LLM judge reported a major problem. The string ships with this "
+        "evidence attached."
     )
 
 
 class JudgeRejectCheck(BaseJudgeCheck):
     check_id = "judge-reject"
-    judge_verdict = "reject"
-    name = gettext_lazy("Judge: rejected")
+    judge_severity = "critical"
+    name = gettext_lazy("Judge - critical")
     description = gettext_lazy(
-        "An LLM judge reported a critical problem. The string does not ship."
+        "An LLM judge reported a critical problem. The string is held "
+        "automatically until an authorized override."
     )
 
 
-JUDGE_CHECKS = frozenset({JudgeFlagCheck.check_id, JudgeRejectCheck.check_id})
+class JudgeNoteCheck(BaseJudgeCheck):
+    check_id = "judge-note"
+    judge_severity = "minor"
+    name = gettext_lazy("Judge - minor")
+    description = gettext_lazy(
+        "An LLM judge reported a minor problem. The string ships; no "
+        "action is expected."
+    )
+
+
+JUDGE_CHECKS = frozenset(
+    {JudgeFlagCheck.check_id, JudgeRejectCheck.check_id, JudgeNoteCheck.check_id}
+)

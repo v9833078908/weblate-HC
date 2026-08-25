@@ -25361,6 +25361,62 @@ msgstr "Рабочее пространство нельзя удалить, т�
 msgid "The workspace has been removed."
 msgstr "Рабочее пространство удалено."
 
+#: weblate/checks/judge.py:94
+msgid "Judge - major"
+msgstr "Судья — серьёзно"
+
+#: weblate/checks/judge.py:95
+msgid ""
+"An LLM judge reported a major problem. The string ships with this "
+"evidence attached."
+msgstr ""
+"ИИ-судья сообщил о серьёзной проблеме. Строка публикуется с этим "
+"замечанием в качестве свидетельства."
+
+#: weblate/checks/judge.py:104
+msgid "Judge - critical"
+msgstr "Судья — критично"
+
+#: weblate/checks/judge.py:105
+msgid ""
+"An LLM judge reported a critical problem. The string is held "
+"automatically until an authorized override."
+msgstr ""
+"ИИ-судья сообщил о критической проблеме. Строка автоматически "
+"удерживается до авторизованного решения."
+
+#: weblate/checks/judge.py:114
+msgid "Judge - minor"
+msgstr "Судья — незначительно"
+
+#: weblate/checks/judge.py:115
+msgid ""
+"An LLM judge reported a minor problem. The string ships; no action is "
+"expected."
+msgstr ""
+"ИИ-судья сообщил о незначительной проблеме. Строка публикуется; "
+"никаких действий не требуется."
+
+#: weblate/templates/snippets/judge-verdict.html:66
+msgid "Ships with evidence"
+msgstr "Публикуется с замечанием"
+
+#: weblate/trans/filter.py:81
+msgid "Judge - major (ships)"
+msgstr "Судья — серьёзно (публикуется)"
+
+#: weblate/trans/filter.py:86
+msgid "Judge - critical (held)"
+msgstr "Судья — критично (удерживается)"
+
+#: weblate/trans/filter.py:91
+msgid "Judge - minor (nothing blocking)"
+msgstr "Судья — незначительно (ничего не блокирует)"
+
+#: weblate/trans/filter.py:96
+msgid "Judge - nothing blocking"
+msgstr "Судья — ничего не блокирует"
+
 #~ msgid "Could not open a ticket, please try again later."
 #~ msgstr "Не удалось открыть заявку, попробуйте позже."
 
