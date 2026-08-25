@@ -9,9 +9,17 @@ from unittest import mock
 
 from django.test import override_settings
 
-from weblate.machinery.base import MachineTranslationError
+from weblate.machinery.base import (
+    MACHINERY_DEFAULT_THRESHOLD,
+    MachineTranslationError,
+)
 from weblate.trans.judge import JudgeResult
-from weblate.trans.judge_loop import build_request, repair_target, run_judge_batch
+from weblate.trans.judge_loop import (
+    _select_repair_texts,
+    build_request,
+    repair_targets,
+    run_judge_batch,
+)
 from weblate.trans.models.judge import (
     JudgeVerdict,
     compute_context_hash,
@@ -100,19 +108,110 @@ class JudgeLoopTest(ViewTestCase):
         self.assertIn("judge run", joined)
         self.assertIn("seat", joined)
 
-    def test_repair_target_selects_a_candidate_per_plural_form(self) -> None:
-        unit = self.get_unit()
-        engine = mock.Mock()
-        engine.return_value.translate.return_value = [
-            [
-                {"text": "lower quality", "quality": 50},
-                {"text": "fixed text", "quality": 100},
-            ]
-        ]
+    def make_openrouter(self, engine):
         self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
         self.component.project.save(update_fields=["machinery_settings"])
-        with mock.patch("weblate.trans.judge_loop.MACHINERY", {"openrouter": engine}):
-            self.assertEqual(repair_target(unit, self.user), ["fixed text"])
+        return mock.patch("weblate.trans.judge_loop.MACHINERY", {"openrouter": engine})
+
+    def test_selection_takes_the_best_candidate_per_plural_form(self) -> None:
+        unit = self.get_unit()
+        self.assertEqual(
+            _select_repair_texts(
+                unit,
+                [
+                    [
+                        {"text": "lower quality", "quality": 50},
+                        {"text": "fixed text", "quality": 100},
+                    ]
+                ],
+            ),
+            ["fixed text"],
+        )
+
+    def test_repair_targets_asks_a_batch_engine_once(self) -> None:
+        unit = self.get_unit()
+        engine = mock.Mock()
+        engine.return_value.batch_size = 10
+        fetch = mock.Mock(
+            return_value={
+                unit.id: {
+                    "translation": ["fixed text"],
+                    "quality": [90],
+                    "origin": [None],
+                }
+            }
+        )
+        with (
+            self.make_openrouter(engine),
+            mock.patch("weblate.trans.judge_loop.fetch_machinery_matches", fetch),
+        ):
+            self.assertEqual(
+                repair_targets([unit], self.user), {unit.id: ["fixed text"]}
+            )
+        fetch.assert_called_once()
+        self.assertEqual(fetch.call_args.kwargs["units"], [unit])
+        self.assertEqual(
+            fetch.call_args.kwargs["threshold"], MACHINERY_DEFAULT_THRESHOLD
+        )
+        engine.return_value.translate.assert_not_called()
+
+    def test_repair_targets_skips_a_unit_without_a_usable_candidate(self) -> None:
+        unit = self.get_unit()
+        engine = mock.Mock()
+        engine.return_value.batch_size = 10
+        fetch = mock.Mock(
+            return_value={
+                unit.id: {
+                    "translation": [""],
+                    "quality": [90],
+                    "origin": [None],
+                }
+            }
+        )
+        with (
+            self.make_openrouter(engine),
+            mock.patch("weblate.trans.judge_loop.fetch_machinery_matches", fetch),
+        ):
+            self.assertEqual(repair_targets([unit], self.user), {})
+
+    def test_repair_targets_skips_a_result_whose_lists_disagree(self) -> None:
+        unit = self.get_unit()
+        engine = mock.Mock()
+        engine.return_value.batch_size = 10
+        fetch = mock.Mock(
+            return_value={
+                unit.id: {
+                    "translation": ["fixed text", "extra form"],
+                    "quality": [90],
+                    "origin": [None],
+                }
+            }
+        )
+        with (
+            self.make_openrouter(engine),
+            mock.patch("weblate.trans.judge_loop.fetch_machinery_matches", fetch),
+        ):
+            self.assertEqual(repair_targets([unit], self.user), {})
+
+    def test_repair_targets_keeps_one_request_per_unit_for_a_single_string_engine(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        engine = mock.Mock()
+        engine.return_value.batch_size = 1
+        engine.return_value.translate.return_value = [
+            [{"text": "fixed text", "quality": 100}]
+        ]
+        fetch = mock.Mock()
+        with (
+            self.make_openrouter(engine),
+            mock.patch("weblate.trans.judge_loop.fetch_machinery_matches", fetch),
+        ):
+            self.assertEqual(
+                repair_targets([unit], self.user), {unit.id: ["fixed text"]}
+            )
+        fetch.assert_not_called()
+        engine.return_value.translate.assert_called_once()
 
     def test_no_seat_may_lower_the_other(self) -> None:
         _, verdict, _ = self.run_batch([MAJOR, PASS])

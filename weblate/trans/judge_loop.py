@@ -26,7 +26,7 @@ from django.db import transaction
 
 from weblate.checks.judge import JUDGE_CHECKS
 from weblate.glossary.models import get_matched_glossary_prompt_entries
-from weblate.machinery.base import MachineTranslationError
+from weblate.machinery.base import MACHINERY_DEFAULT_THRESHOLD, MachineTranslationError
 from weblate.machinery.models import MACHINERY
 from weblate.trans.forms import AutoForm
 from weblate.trans.judge import (
@@ -36,6 +36,7 @@ from weblate.trans.judge import (
     request_verdicts,
     validate_judge_configuration,
 )
+from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models.judge import (
     JudgeVerdict,
     collegium_verdict,
@@ -49,6 +50,7 @@ if TYPE_CHECKING:
     from weblate.auth.models import User
     from weblate.trans.models.project import Project
     from weblate.trans.models.unit import Unit
+    from weblate.machinery.base import BatchMachineTranslation, UnitMemoryResultDict
 
 # A round is left alone (no repair attempt) when it did not confirm a
 # defect: PASS needs no fix, UNPARSED is a transport failure, not an
@@ -82,25 +84,14 @@ def build_request(unit: Unit) -> JudgeRequest:
     )
 
 
-def repair_target(unit: Unit, user: User | None) -> list[str] | None:
-    """
-    Re-translate the unit through the project MT engine, or None.
-
-    Judge evidence reaches the repair prompt for free: run_checks() has
-    already projected the round's judge-* Check row, and
-    weblate/machinery/llm.py feeds failing_checks with get_description()
-    into the translator prompt. Callers MUST run_checks() first.
-    """
-    settings_map = unit.translation.component.project.get_machinery_settings()
-    engine_id = AutoForm.DEFAULT_ENGINE
-    setting = settings_map.get(engine_id)
-    if setting is None or engine_id not in MACHINERY:
-        return None
-    results = MACHINERY[engine_id](setting).translate(unit, user)
-    if not results or len(results) != len(unit.get_target_plurals()):
+def _select_repair_texts(
+    unit: Unit, plural_candidates: list[list[dict]]
+) -> list[str] | None:
+    """Pick one usable text per plural form, or None."""
+    if len(plural_candidates) != len(unit.get_target_plurals()):
         return None
     texts: list[str] = []
-    for candidates in results:
+    for candidates in plural_candidates:
         if not candidates:
             return None
         best = max(candidates, key=lambda item: item.get("quality", 0))
@@ -111,6 +102,88 @@ def repair_target(unit: Unit, user: User | None) -> list[str] | None:
     if texts == unit.get_target_plurals():
         return None
     return texts
+
+
+def _machinery_candidates(
+    unit: Unit, result: UnitMemoryResultDict
+) -> list[list[dict]] | None:
+    """Present one batch result the way translate() presents its own."""
+    texts = result.get("translation", ())
+    qualities = result.get("quality", ())
+    if len(texts) != len(qualities):
+        unit.translation.log_error(
+            "judge repair: unusable machinery result for unit %d", unit.id
+        )
+        return None
+    return [
+        [{"text": text, "quality": quality}] for text, quality in zip(texts, qualities)
+    ]
+
+
+def repair_targets(units: list[Unit], user: User | None) -> dict[int, list[str]]:
+    """
+    Return usable repair targets keyed by unit id, writing nothing.
+
+    Judge evidence reaches the repair prompt for free: the caller has already
+    run run_checks(), so the round's judge-* Check row exists and
+    weblate/machinery/llm.py feeds failing_checks into the prompt of every
+    string in the batch. Callers MUST run_checks() first.
+    """
+    if not units:
+        return {}
+    translation = units[0].translation
+    settings_map = translation.component.project.get_machinery_settings()
+    engine_id = AutoForm.DEFAULT_ENGINE
+    setting = settings_map.get(engine_id)
+    if setting is None or engine_id not in MACHINERY:
+        return {}
+    engine = MACHINERY[engine_id](setting)
+    if engine.batch_size == 1:
+        return _repair_targets_per_unit(engine, units, user)
+    try:
+        matches = fetch_machinery_matches(
+            units=units,
+            user=user,
+            services=[engine],
+            threshold=MACHINERY_DEFAULT_THRESHOLD,
+            log_translation=translation,
+        )
+    except MachineTranslationError as error:
+        translation.log_error("failed judge repair: %s", error)
+        return {}
+    repairs: dict[int, list[str]] = {}
+    for unit in units:
+        result = matches.get(unit.id)
+        if result is None:
+            continue
+        candidates = _machinery_candidates(unit, result)
+        if candidates is None:
+            continue
+        texts = _select_repair_texts(unit, candidates)
+        if texts is not None:
+            repairs[unit.id] = texts
+    return repairs
+
+
+def _repair_targets_per_unit(
+    engine: BatchMachineTranslation, units: list[Unit], user: User | None
+) -> dict[int, list[str]]:
+    repairs: dict[int, list[str]] = {}
+    for unit in units:
+        try:
+            candidates = engine.translate(unit, user)
+        except MachineTranslationError as error:
+            unit.translation.log_error("failed judge repair: %s", error)
+            continue
+        texts = _select_repair_texts(unit, candidates)
+        if texts is not None:
+            repairs[unit.id] = texts
+    return repairs
+
+
+def repair_target(unit: Unit, user: User | None) -> list[str] | None:
+    """Single-unit repair until run_judge_batch() batches its round."""
+    return repair_targets([unit], user).get(unit.id)
 
 
 def judge_project_context(project: Project) -> str:
