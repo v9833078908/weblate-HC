@@ -1,6 +1,6 @@
-{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed', 'judge_current_verdict', 'judge_can_resolve', 'judge_resolution_form', 'this_unit_url' in context #}
+{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed', 'judge_current_verdict', 'judge_can_resolve', 'judge_resolution_form', 'judge_repair_evidence', 'this_unit_url' in context #}
 
-{% load humanize i18n icons %}
+{% load humanize i18n icons translations %}
 
 {% if judge_verdict or judge_stale or judge_unparsed %}
   <div class="card" id="id_judge_card">
@@ -107,6 +107,32 @@
                 </p>
               {% endfor %}
             {% endfor %}
+          {% endif %}
+        </div>
+      {% endif %}
+      {% if judge_repair_evidence %}
+        <div class="list-group-item check">
+          <h5 class="list-group-item-heading">
+            {% icon "wrench.svg" %}
+            {% translate "Repaired since the original verdict" %}
+          </h5>
+          <p class="list-group-item-text text-muted">
+            {% translate "What the judge originally flagged:" %}
+          </p>
+          {% for seat in judge_repair_evidence.original_seats %}
+            {% for error in seat.errors %}
+              <p class="list-group-item-text">
+                <strong>{{ error.category }}/{{ error.severity }}</strong>
+                ({% blocktranslate with model=seat.judge_model %}seat {{ model }}{% endblocktranslate %}):
+                {{ error.description }}
+              </p>
+            {% endfor %}
+          {% endfor %}
+          {% if judge_repair_evidence.previous_target %}
+            <p class="list-group-item-text text-muted">
+              {% translate "Text before the repair:" %}
+            </p>
+            {% format_unit_target unit value=judge_repair_evidence.previous_target diff=unit.target %}
           {% endif %}
         </div>
       {% endif %}

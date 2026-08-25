@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from django.conf import settings
@@ -361,6 +362,60 @@ def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
 def active_verdict(unit: Unit) -> JudgeVerdict | None:
     """Return the collegium verdict that still describes the stored text."""
     return collegium_verdict(active_round(unit))
+
+
+@dataclass(frozen=True)
+class RepairEvidence:
+    """Bounded evidence for a round that already went through a repair."""
+
+    # Every seat of the attempt-0 round: what the judge originally flagged.
+    original_seats: list[JudgeVerdict]
+    # The joined-plural text a unique Change proves stood before the
+    # repair, or None when the window below matched zero or several rows.
+    previous_target: str | None
+
+
+def repair_evidence(unit: Unit) -> RepairEvidence | None:
+    """
+    Evidence for the repair the active round has already been through.
+
+    None unless the active round's own attempt is greater than zero.
+    Attempt-0 errors always accompany a repaired round; the previous
+    text is added only when exactly one ``Change`` unambiguously sits in
+    this window (never guess):
+
+        last attempt-0 timestamp
+          < Change.timestamp with Change.target == repaired target
+          < first attempt-1 timestamp
+    """
+    active = active_verdict(unit)
+    if active is None or active.attempt == 0:
+        return None
+    original_seats = list(
+        unit.judge_verdicts.filter(run_id=active.run_id, attempt=0).order_by("seat")
+    )
+    if not original_seats:
+        return None
+    repaired_seats = list(
+        unit.judge_verdicts.filter(run_id=active.run_id, attempt=1).order_by(
+            "timestamp"
+        )
+    )
+    if not repaired_seats:
+        return None
+    window_start = max(row.timestamp for row in original_seats)
+    window_end = repaired_seats[0].timestamp
+    candidates = list(
+        unit.change_set.filter(
+            target=unit.target,
+            timestamp__gt=window_start,
+            timestamp__lt=window_end,
+        )
+    )
+    previous_target = candidates[0].old if len(candidates) == 1 else None
+    return RepairEvidence(
+        original_seats=original_seats, previous_target=previous_target
+    )
 
 
 def judge_status_annotations() -> dict[str, models.Expression]:

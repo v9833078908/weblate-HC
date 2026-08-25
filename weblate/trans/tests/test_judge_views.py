@@ -5,11 +5,15 @@
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
+from weblate.trans.actions import ActionEvents
 from weblate.trans.judge_loop import build_request
+from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
     JudgeVerdict,
     compute_context_hash,
@@ -434,6 +438,289 @@ class JudgeVerdictCardTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "id_judge_card")
         self.assertNotContains(response, "should never render")
+
+
+class JudgeRepairEvidenceTest(ViewTestCase):
+    def make_round(self, unit, *, run_id, attempt, severity, when, tag):
+        """Judge the CURRENT stored text with both seats."""
+        target_hash = compute_target_hash(unit.get_target_plurals())
+        errors = (
+            []
+            if severity == "none"
+            else [
+                {
+                    "span": "x",
+                    "category": "terminology",
+                    "severity": severity,
+                    "description": f"{tag} objection",
+                }
+            ]
+        )
+        rows = [
+            JudgeVerdict.objects.create(
+                unit=unit,
+                max_severity=severity,
+                seat=seat,
+                run_id=run_id,
+                attempt=attempt,
+                errors=errors,
+                judge_model=f"vendor/model-{seat}",
+                target_hash=target_hash,
+                context_hash="c",
+            )
+            for seat in (1, 2)
+        ]
+        JudgeVerdict.objects.filter(pk__in=[row.pk for row in rows]).update(
+            timestamp=when
+        )
+        unit.run_checks()
+        return rows
+
+    def make_change(self, unit, *, old, target, when):
+        change = Change.objects.create(
+            unit=unit,
+            action=ActionEvents.CHANGE,
+            user=self.user,
+            author=self.user,
+            old=old,
+            target=target,
+        )
+        Change.objects.filter(pk=change.pk).update(timestamp=when)
+        return change
+
+    def test_exact_match_renders_the_comparison(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        unit.translate(self.user, ["Fixed sentence"], STATE_FUZZY)
+        unit = self.get_unit()
+        change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=change.pk).update(timestamp=now + timedelta(seconds=1))
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertContains(response, "original objection")
+        self.assertContains(response, "Text before the repair:")
+        self.assertContains(response, "Broken")
+
+    def test_missing_change_omits_the_comparison(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        # The repair happened without going through translate(), so no
+        # Change row exists in the window at all.
+        Unit.objects.filter(pk=unit.pk).update(target="Fixed sentence")
+        unit = self.get_unit()
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertContains(response, "original objection")
+        self.assertNotContains(response, "Text before the repair:")
+
+    def test_purged_change_omits_the_comparison(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        # A Change matched "Fixed sentence" inside the window once, but a
+        # later edit (outside this narrative's window) moved the current
+        # text on to "Fixed sentence v2" - the earlier Change no longer
+        # describes the text that is actually current.
+        self.make_change(
+            unit,
+            old="Broken sentence",
+            target="Fixed sentence",
+            when=now + timedelta(seconds=1),
+        )
+        Unit.objects.filter(pk=unit.pk).update(target="Fixed sentence v2")
+        unit = self.get_unit()
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertNotContains(response, "Text before the repair:")
+
+    def test_ambiguous_changes_omit_the_comparison(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        # Two Change rows both land in the window with the repaired
+        # target: neither may be trusted as THE previous text.
+        self.make_change(
+            unit,
+            old="Broken sentence",
+            target="Fixed sentence",
+            when=now + timedelta(seconds=1),
+        )
+        self.make_change(
+            unit,
+            old="Broken sentence take two",
+            target="Fixed sentence",
+            when=now + timedelta(seconds=1, milliseconds=500),
+        )
+        Unit.objects.filter(pk=unit.pk).update(target="Fixed sentence")
+        unit = self.get_unit()
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertNotContains(response, "Text before the repair:")
+
+    def test_plural_unit_shows_every_form(self) -> None:
+        unit = self.get_unit("Orangutan")
+        unit.translate(
+            self.user,
+            ["Puvodni jedna", "Puvodni dva", "Puvodni pet"],
+            STATE_TRANSLATED,
+        )
+        unit = self.get_unit("Orangutan")
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        unit.translate(
+            self.user,
+            ["Opraveno jedna", "Opraveno dva", "Opraveno pet"],
+            STATE_FUZZY,
+        )
+        unit = self.get_unit("Orangutan")
+        change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=change.pk).update(timestamp=now + timedelta(seconds=1))
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Text before the repair:")
+        self.assertContains(response, "Puvodni jedna")
+        self.assertContains(response, "Puvodni dva")
+        self.assertContains(response, "Puvodni pet")
+
+    def test_unresolved_repair_still_shows_evidence(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=0,
+            severity="critical",
+            when=now,
+            tag="original",
+        )
+        unit.translate(self.user, ["Still broken sentence"], STATE_FUZZY)
+        unit = self.get_unit()
+        change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=change.pk).update(timestamp=now + timedelta(seconds=1))
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="critical",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Will not ship")
+        self.assertContains(response, "Text before the repair:")
+        self.assertContains(response, "Broken sentence")
+
+    def test_first_pass_renders_nothing(self) -> None:
+        unit = self.get_unit()
+        self.make_round(
+            unit,
+            run_id=uuid.uuid4(),
+            attempt=0,
+            severity="major",
+            when=timezone.now(),
+            tag="original",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Repaired since the original verdict")
+        self.assertNotContains(response, "Text before the repair:")
+
+    def test_stale_active_round_renders_nothing(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        unit.translate(self.user, ["Fixed sentence"], STATE_FUZZY)
+        unit = self.get_unit()
+        change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=change.pk).update(timestamp=now + timedelta(seconds=1))
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        # A further manual edit invalidates every recorded round.
+        Unit.objects.filter(pk=unit.pk).update(target="Edited again by a human")
+        unit = self.get_unit()
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "previous version")
+        self.assertNotContains(response, "Repaired since the original verdict")
+        self.assertNotContains(response, "Text before the repair:")
 
 
 class JudgeBackTranslationTest(ViewTestCase):

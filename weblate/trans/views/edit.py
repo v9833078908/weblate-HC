@@ -80,6 +80,7 @@ from weblate.trans.models.judge import (
     current_round,
     current_verdict,
     latest_round,
+    repair_evidence,
     resolve_verdict,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
@@ -1348,6 +1349,7 @@ def _judge_view_context(
         "judge_current_verdict": judge_current_verdict,
         "judge_can_resolve": judge_can_resolve,
         "judge_resolution_form": judge_resolution_form,
+        "judge_repair_evidence": repair_evidence(unit),
     }
 
 
