@@ -744,7 +744,7 @@ class UnitTermExpr(BaseTermExpr):
 
         return super().is_field(text, context)
 
-    # ruff: ignore[complex-structure]
+    # ruff: ignore[complex-structure,too-many-return-statements]
     def has_field(self, text: str, context: dict) -> Q:
         if text == "plural":
             return Q(source__trgm_search=PLURAL_SEPARATOR)
@@ -808,7 +808,29 @@ class UnitTermExpr(BaseTermExpr):
                 )
             )
 
+        if text == "judge":
+            return Q(judge_active_severity__isnull=False)
+
         return super().has_field(text, context)
+
+    def judge_field(self, text: str, context: dict) -> Q:
+        statuses = {
+            "pass": Q(judge_active_severity__in={"none", "minor"}),
+            "flag": Q(judge_active_severity="major"),
+            "reject": Q(judge_active_severity="critical"),
+            "stale": Q(
+                judge_active_severity__isnull=True, judge_has_parsed_history=True
+            ),
+            "unparsed": Q(judge_latest_incomplete=True),
+        }
+        try:
+            return statuses[text]
+        except KeyError as error:
+            raise SearchQueryError(
+                gettext("Unsupported lookup for {field}: {value}").format(
+                    field="judge", value=text
+                )
+            ) from error
 
     def convert_source_state(self, text: str) -> int | None:
         return self.convert_state(text)
@@ -980,6 +1002,11 @@ class UnitTermExpr(BaseTermExpr):
     def get_annotations(self, context: dict) -> dict[str, Expression]:
         if self.field == "labels_count":
             return {"labels_count": Count("source_unit__labels")}
+        if self.field == "judge" or (self.field == "has" and self.match == "judge"):
+            # ruff: ignore[import-outside-top-level]
+            from weblate.trans.models.judge import judge_status_annotations
+
+            return judge_status_annotations()
         return super().get_annotations(context)
 
 

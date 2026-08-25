@@ -71,6 +71,27 @@ class FilterRegistry:
             ),
             ("unlabeled", gettext_lazy("Strings without a label"), "NOT has:label"),
             ("pluralized", gettext_lazy("Pluralized string"), "has:plural"),
+            (
+                "judge-uncovered",
+                gettext_lazy("Not evaluated"),
+                "NOT has:judge",
+            ),
+            (
+                "judge-advisory",
+                gettext_lazy("Advisory - ships"),
+                "judge:pass",
+            ),
+            (
+                "judge-held",
+                gettext_lazy("Held for decision"),
+                "judge:flag OR judge:reject",
+            ),
+            ("judge-stale", gettext_lazy("Stale"), "judge:stale"),
+            (
+                "judge-incomplete",
+                gettext_lazy("Latest attempt incomplete"),
+                "judge:unparsed",
+            ),
         ]
         result.extend(
             (
