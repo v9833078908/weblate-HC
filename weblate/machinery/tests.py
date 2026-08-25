@@ -4277,6 +4277,108 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         )
         self.assertEqual(LLMUsageLog.objects.count(), 1)
 
+    def mock_chat_reply_per_batch(self) -> None:
+        """Answer a singleton correctly and a wider batch with a wrong id."""
+        http_mock.register(
+            "GET",
+            re.compile(r"/models$"),
+            json={
+                "object": "list",
+                "data": [
+                    {
+                        "id": self.TRACE_MODEL,
+                        "object": "model",
+                        "created": 1686935002,
+                        "owned_by": "test",
+                    }
+                ],
+            },
+        )
+
+        def chat_callback(request):
+            payload = json.loads(request.content)
+            strings = json.loads(payload["messages"][-1]["content"])["strings"]
+            if len(strings) == 1:
+                items = [
+                    {
+                        "id": strings[0]["id"],
+                        "parts": [
+                            {"type": "text", "text": f"{strings[0]['source']} (fr)"}
+                        ],
+                    }
+                ]
+            else:
+                items = [
+                    {
+                        "id": f"bogus{index}",
+                        "parts": [{"type": "text", "text": item["source"]}],
+                    }
+                    for index, item in enumerate(strings)
+                ]
+            return httpx2.Response(
+                200,
+                headers={},
+                json={
+                    "id": "chatcmpl-123",
+                    "object": "chat.completion",
+                    "created": 1677652288,
+                    "model": self.TRACE_MODEL,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": json.dumps(items),
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {
+                        "prompt_tokens": 9,
+                        "completion_tokens": 12,
+                        "total_tokens": 21,
+                        "cost": 0.00001234,
+                    },
+                },
+            )
+
+        http_mock.register_callback(
+            "POST", re.compile(r"chat/completions"), chat_callback
+        )
+
+    @http_mock.activate
+    def test_usage_records_batch_size_and_outcome(self) -> None:
+        """
+        A refused batch is billed and must be visible as such.
+
+        The halving retry answers a refusal with more requests that each re-pay
+        the prompt prefix, so the run is only readable when the row carries
+        both how many strings were asked for and whether the reply was usable.
+        """
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_reply_per_batch()
+        machine = self.get_machine()
+
+        machine.download_multiple_translations(
+            "en", "fr", [("Alpha", None), ("Beta", None)]
+        )
+
+        self.assertEqual(
+            sorted(
+                LLMUsageLog.objects.values_list("batch_size", "outcome"),
+            ),
+            [(1, "applied"), (1, "applied"), (2, "refused")],
+        )
+
+    @http_mock.activate
+    def test_usage_records_applied_outcome_for_a_single_string(self) -> None:
+        LLMUsageLog.objects.all().delete()
+        self.mock_response_priced()
+        self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.batch_size, 1)
+        self.assertEqual(log.outcome, "applied")
+
     @http_mock.activate
     def test_usage_cost_zero_is_unpriced(self) -> None:
         LLMUsageLog.objects.all().delete()
