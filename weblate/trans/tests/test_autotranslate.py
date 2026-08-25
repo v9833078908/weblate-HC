@@ -38,12 +38,9 @@ from weblate.machinery.base import (
 )
 from weblate.machinery.dummy import DummyTranslation
 from weblate.trans.actions import ActionEvents
-from weblate.trans.autotranslate import (
-    AutoTranslate,
-    BatchAutoTranslate,
-    fetch_machinery_matches,
-)
+from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
 from weblate.trans.forms import AutoForm
+from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models import (
     Change,
     Component,
@@ -1432,6 +1429,16 @@ class MachineryBatchFetchTest(SimpleTestCase):
         result, progress = self.fetch(service, self.make_units(6))
 
         self.assertEqual(sorted(result), [0, 1, 4, 5])
+        self.assertEqual(progress, [2, 4, 6])
+
+    def test_a_malformed_reply_only_loses_its_own_batch(self) -> None:
+        # LLM parsing normalizes a non-text batch reply to
+        # MachineTranslationError before the shared scheduler sees it.
+        service = RecordingTranslation(failing_ids=frozenset({2}))
+        result, progress = self.fetch(service, self.make_units(6))
+
+        self.assertEqual(sorted(result), [0, 1, 4, 5])
+        self.assertEqual(service.batches, [[0, 1], [2, 3], [4, 5]])
         self.assertEqual(progress, [2, 4, 6])
 
     def test_concurrency_limited_to_batch_count(self) -> None:

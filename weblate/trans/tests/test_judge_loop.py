@@ -9,10 +9,15 @@ from unittest import mock
 
 from django.test import override_settings
 
+from weblate.machinery.base import (
+    MACHINERY_DEFAULT_THRESHOLD,
+    MachineTranslationError,
+)
 from weblate.trans.judge import JudgeResult
 from weblate.trans.judge_loop import (
+    _select_repair_texts,
     build_request,
-    repair_target,
+    repair_targets,
     run_judge_batch,
 )
 from weblate.trans.models.judge import (
@@ -77,9 +82,12 @@ class JudgeLoopTest(ViewTestCase):
         client = mock_request_verdicts([[result] for result in seat_results])
         unit = self.get_unit()
         writable_ids = {unit.id} if writable else set()
+        repair_mock = mock.Mock(
+            return_value={} if repair is None else {unit.id: repair}
+        )
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
-            mock.patch("weblate.trans.judge_loop.repair_target", return_value=repair),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
         ):
             verdicts = run_judge_batch(
                 [unit], writable_ids=writable_ids, user=self.user
@@ -99,34 +107,133 @@ class JudgeLoopTest(ViewTestCase):
         self.assertIn("judge run", joined)
         self.assertIn("seat", joined)
 
-    def test_repair_target_selects_a_candidate_per_plural_form(self) -> None:
-        unit = self.get_unit()
-        engine = mock.Mock()
-        engine.return_value.translate.return_value = [
-            [
-                {"text": "lower quality", "quality": 50},
-                {"text": "fixed text", "quality": 100},
-            ]
-        ]
+    def make_openrouter(self, engine):
         self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
         self.component.project.save(update_fields=["machinery_settings"])
-        with mock.patch("weblate.trans.judge_loop.MACHINERY", {"openrouter": engine}):
-            self.assertEqual(repair_target(unit, self.user), ["fixed text"])
+        return mock.patch("weblate.trans.judge_loop.MACHINERY", {"openrouter": engine})
 
-    def test_repair_target_uses_litellm_when_only_litellm_is_configured(self) -> None:
+    def test_selection_takes_the_best_candidate_per_plural_form(self) -> None:
+        unit = self.get_unit()
+        self.assertEqual(
+            _select_repair_texts(
+                unit,
+                [
+                    [
+                        {"text": "lower quality", "quality": 50},
+                        {"text": "fixed text", "quality": 100},
+                    ]
+                ],
+            ),
+            ["fixed text"],
+        )
+
+    def test_repair_targets_asks_a_batch_engine_once(self) -> None:
         unit = self.get_unit()
         engine = mock.Mock()
+        engine.return_value.batch_size = 10
+        fetch = mock.Mock(
+            return_value={
+                unit.id: {
+                    "translation": ["fixed text"],
+                    "quality": [90],
+                    "origin": [None],
+                }
+            }
+        )
+        with (
+            self.make_openrouter(engine),
+            mock.patch("weblate.trans.judge_loop.fetch_machinery_matches", fetch),
+        ):
+            self.assertEqual(
+                repair_targets([unit], self.user), {unit.id: ["fixed text"]}
+            )
+        fetch.assert_called_once()
+        self.assertEqual(fetch.call_args.kwargs["units"], [unit])
+        self.assertEqual(
+            fetch.call_args.kwargs["threshold"], MACHINERY_DEFAULT_THRESHOLD
+        )
+        engine.return_value.translate.assert_not_called()
+
+    def test_repair_targets_skips_a_unit_without_a_usable_candidate(self) -> None:
+        unit = self.get_unit()
+        engine = mock.Mock()
+        engine.return_value.batch_size = 10
+        fetch = mock.Mock(
+            return_value={
+                unit.id: {
+                    "translation": [""],
+                    "quality": [90],
+                    "origin": [None],
+                }
+            }
+        )
+        with (
+            self.make_openrouter(engine),
+            mock.patch("weblate.trans.judge_loop.fetch_machinery_matches", fetch),
+        ):
+            self.assertEqual(repair_targets([unit], self.user), {})
+
+    def test_repair_targets_skips_a_result_whose_lists_disagree(self) -> None:
+        unit = self.get_unit()
+        engine = mock.Mock()
+        engine.return_value.batch_size = 10
+        fetch = mock.Mock(
+            return_value={
+                unit.id: {
+                    "translation": ["fixed text", "extra form"],
+                    "quality": [90],
+                    "origin": [None],
+                }
+            }
+        )
+        with (
+            self.make_openrouter(engine),
+            mock.patch("weblate.trans.judge_loop.fetch_machinery_matches", fetch),
+        ):
+            self.assertEqual(repair_targets([unit], self.user), {})
+
+    def test_repair_targets_keeps_one_request_per_unit_for_a_single_string_engine(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        engine = mock.Mock()
+        engine.return_value.batch_size = 1
+        engine.return_value.translate.return_value = [
+            [{"text": "fixed text", "quality": 100}]
+        ]
+        fetch = mock.Mock()
+        with (
+            self.make_openrouter(engine),
+            mock.patch("weblate.trans.judge_loop.fetch_machinery_matches", fetch),
+        ):
+            self.assertEqual(
+                repair_targets([unit], self.user), {unit.id: ["fixed text"]}
+            )
+        fetch.assert_not_called()
+        engine.return_value.translate.assert_called_once()
+
+    def test_repair_targets_uses_litellm_when_only_litellm_is_configured(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        engine = mock.Mock()
+        engine.return_value.batch_size = 1
         engine.return_value.translate.return_value = [
             [{"text": "litellm fix", "quality": 100}]
         ]
         self.component.project.machinery_settings = {"litellm": {"key": "ll-key"}}
         self.component.project.save(update_fields=["machinery_settings"])
         with mock.patch("weblate.trans.judge_loop.MACHINERY", {"litellm": engine}):
-            self.assertEqual(repair_target(unit, self.user), ["litellm fix"])
+            self.assertEqual(
+                repair_targets([unit], self.user), {unit.id: ["litellm fix"]}
+            )
 
-    def test_repair_target_prefers_openrouter_when_both_are_configured(self) -> None:
+    def test_repair_targets_prefers_openrouter_when_both_are_configured(
+        self,
+    ) -> None:
         unit = self.get_unit()
         openrouter_engine = mock.Mock()
+        openrouter_engine.return_value.batch_size = 1
         openrouter_engine.return_value.translate.return_value = [
             [{"text": "openrouter fix", "quality": 100}]
         ]
@@ -140,7 +247,10 @@ class JudgeLoopTest(ViewTestCase):
             "weblate.trans.judge_loop.MACHINERY",
             {"openrouter": openrouter_engine, "litellm": litellm_engine},
         ):
-            self.assertEqual(repair_target(unit, self.user), ["openrouter fix"])
+            self.assertEqual(
+                repair_targets([unit], self.user),
+                {unit.id: ["openrouter fix"]},
+            )
         litellm_engine.assert_not_called()
 
     def test_no_seat_may_lower_the_other(self) -> None:
@@ -171,6 +281,172 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
         self.assertEqual(verdict.attempt, 1)
         self.assertEqual(client.call_count, 4)
+
+    def test_repair_fetch_failure_does_not_crash_the_batch(self) -> None:
+        # 2026-08-25 judge-repair-loop measurement: a malformed producer reply
+        # must not lose the verdicts that both seats already wrote.
+        unit = self.get_unit()
+        original_target = unit.target
+        engine = mock.Mock()
+        engine.return_value.batch_size = 10
+        client = mock_request_verdicts([[MAJOR], [MAJOR]])
+        with (
+            self.make_openrouter(engine),
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.fetch_machinery_matches",
+                side_effect=MachineTranslationError("boom"),
+            ),
+        ):
+            verdicts = run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
+        self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.FLAG)
+        self.assertEqual(client.call_count, 2)
+        self.assertEqual(self.get_unit().target, original_target)
+        self.assertEqual(unit.judge_verdicts.count(), 2)
+
+    def test_a_negative_round_fetches_every_repair_in_one_call(self) -> None:
+        first = self.get_unit()
+        second = self.get_unit(source="Thank you for using Weblate.")
+        second.translate(self.user, ["second original target"], STATE_TRANSLATED)
+        repair_mock = mock.Mock(
+            return_value={
+                first.id: ["first repaired target"],
+                second.id: ["second repaired target"],
+            }
+        )
+        round_results = iter((MAJOR, MAJOR, PASS, PASS))
+
+        def request(requests, *, on_batch, **kwargs):
+            batch_results = [next(round_results)] * len(requests)
+            on_batch(requests, batch_results)
+            return batch_results
+
+        client = mock.Mock(side_effect=request)
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+        ):
+            run_judge_batch(
+                [first, second],
+                writable_ids={first.id, second.id},
+                user=self.user,
+            )
+        repair_mock.assert_called_once()
+        self.assertEqual(
+            [unit.id for unit in repair_mock.call_args.args[0]],
+            [first.id, second.id],
+        )
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.target.strip(), "first repaired target")
+        self.assertEqual(second.target, "second repaired target")
+        self.assertEqual(client.call_count, 4)
+
+    def test_a_partial_repair_result_leaves_its_sibling_final(self) -> None:
+        first = self.get_unit()
+        second = self.get_unit(source="Thank you for using Weblate.")
+        second.translate(self.user, ["second original target"], STATE_TRANSLATED)
+        original_second_target = second.target
+        repair_mock = mock.Mock(return_value={first.id: ["first repaired target"]})
+        round_results = iter((MAJOR, MAJOR, PASS, PASS))
+
+        def request(requests, *, on_batch, **kwargs):
+            batch_results = [next(round_results)] * len(requests)
+            on_batch(requests, batch_results)
+            return batch_results
+
+        client = mock.Mock(side_effect=request)
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+        ):
+            verdicts = run_judge_batch(
+                [first, second],
+                writable_ids={first.id, second.id},
+                user=self.user,
+            )
+        repair_mock.assert_called_once()
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.target.strip(), "first repaired target")
+        self.assertEqual(second.target, original_second_target)
+        self.assertEqual(verdicts[second.id].verdict, JudgeVerdict.Verdict.FLAG)
+        self.assertEqual(second.judge_verdicts.count(), 2)
+
+    def test_a_failed_repair_batch_leaves_every_unit_final(self) -> None:
+        first = self.get_unit()
+        second = self.get_unit(source="Thank you for using Weblate.")
+        second.translate(self.user, ["second original target"], STATE_TRANSLATED)
+        originals = {first.id: first.target, second.id: second.target}
+        engine = mock.Mock()
+        engine.return_value.batch_size = 10
+        fetch = mock.Mock(side_effect=MachineTranslationError("not text"))
+        client = mock_request_verdicts([[MAJOR, MAJOR], [MAJOR, MAJOR]])
+        with (
+            self.make_openrouter(engine),
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.fetch_machinery_matches", fetch),
+        ):
+            verdicts = run_judge_batch(
+                [first, second],
+                writable_ids={first.id, second.id},
+                user=self.user,
+            )
+        fetch.assert_called_once()
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.target, originals[first.id])
+        self.assertEqual(second.target, originals[second.id])
+        self.assertEqual(
+            {verdicts[first.id].verdict, verdicts[second.id].verdict},
+            {JudgeVerdict.Verdict.FLAG},
+        )
+        self.assertEqual(first.judge_verdicts.count(), 2)
+        self.assertEqual(second.judge_verdicts.count(), 2)
+
+    def test_a_partial_repair_batch_rejudges_only_answered_units(self) -> None:
+        first = self.get_unit()
+        second = self.get_unit(source="Thank you for using Weblate.")
+        second.translate(self.user, ["second original target"], STATE_TRANSLATED)
+        original_second_target = second.target
+        engine = mock.Mock()
+        engine.return_value.batch_size = 10
+        fetch = mock.Mock(
+            return_value={
+                first.id: {
+                    "translation": ["first repaired target"],
+                    "quality": [90],
+                    "origin": [None],
+                }
+            }
+        )
+        round_results = iter((MAJOR, MAJOR, PASS, PASS))
+
+        def request(requests, *, on_batch, **kwargs):
+            batch_results = [next(round_results)] * len(requests)
+            on_batch(requests, batch_results)
+            return batch_results
+
+        client = mock.Mock(side_effect=request)
+        with (
+            self.make_openrouter(engine),
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.fetch_machinery_matches", fetch),
+        ):
+            verdicts = run_judge_batch(
+                [first, second],
+                writable_ids={first.id, second.id},
+                user=self.user,
+            )
+        fetch.assert_called_once()
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.target.strip(), "first repaired target")
+        self.assertEqual(second.target, original_second_target)
+        self.assertEqual(verdicts[first.id].verdict, JudgeVerdict.Verdict.PASS)
+        self.assertEqual(verdicts[second.id].verdict, JudgeVerdict.Verdict.FLAG)
+        self.assertEqual(first.judge_verdicts.count(), 4)
+        self.assertEqual(second.judge_verdicts.count(), 2)
 
     def test_each_seat_uses_its_configured_model(self) -> None:
         _, _, client = self.run_batch([PASS, PASS])
@@ -266,8 +542,8 @@ class JudgeLoopTest(ViewTestCase):
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
             mock.patch("weblate.trans.judge_loop._cached_verdict", return_value=None),
             mock.patch(
-                "weblate.trans.judge_loop.repair_target",
-                return_value=["must not be used"],
+                "weblate.trans.judge_loop.repair_targets",
+                return_value={},
             ) as repair,
         ):
             verdicts = run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
@@ -324,8 +600,8 @@ class JudgeLoopTest(ViewTestCase):
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
             mock.patch(
-                "weblate.trans.judge_loop.repair_target",
-                return_value=["new but invalid"],
+                "weblate.trans.judge_loop.repair_targets",
+                return_value={unit.id: ["new but invalid"]},
             ),
             mock.patch(
                 "weblate.trans.judge_loop._deterministic_checks",
@@ -346,13 +622,13 @@ class JudgeLoopTest(ViewTestCase):
         self.assertNotEqual(self.get_unit().target, "MACHINE OVERWRITE")
 
     def test_repair_sees_the_round_verdict_projected(self) -> None:
-        # Ordering guard: run_checks() projects the round's Check row
-        # before repair_target builds its prompt from failing_checks.
+        # Ordering guard: run_checks() projects the round's Check row before
+        # repair_targets builds its prompt from failing_checks.
         seen = []
 
-        def spy(unit, user):
-            seen.append({c.name for c in unit.all_checks})
-            return ["fixed text"]
+        def spy(units, _user):
+            seen.extend({check.name for check in unit.all_checks} for unit in units)
+            return {unit.id: ["fixed text"] for unit in units}
 
         client = mock_request_verdicts(
             [[result] for result in (CRITICAL, CRITICAL, PASS, PASS)]
@@ -360,7 +636,7 @@ class JudgeLoopTest(ViewTestCase):
         unit = self.get_unit()
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
-            mock.patch("weblate.trans.judge_loop.repair_target", side_effect=spy),
+            mock.patch("weblate.trans.judge_loop.repair_targets", side_effect=spy),
         ):
             run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
         self.assertEqual(seen, [{"judge-reject"}])
@@ -447,15 +723,15 @@ class JudgeGlossaryRepairLockTest(ViewTestCase):
         original = unit.target
         client = mock.Mock(side_effect=[[MAJOR], [MAJOR]])
 
-        def change_context(_unit, _user):
+        def change_context(units, _user):
             self.source_term.explanation = "Changed while the judge was running."
             self.source_term.save(update_fields=["explanation"])
-            return ["must not be applied"]
+            return {unit.id: ["must not be applied"] for unit in units}
 
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
             mock.patch(
-                "weblate.trans.judge_loop.repair_target", side_effect=change_context
+                "weblate.trans.judge_loop.repair_targets", side_effect=change_context
             ),
         ):
             verdicts = run_judge_batch([unit], writable_ids={unit.id}, user=self.user)

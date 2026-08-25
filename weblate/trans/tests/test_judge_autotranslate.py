@@ -194,8 +194,8 @@ class JudgeAutoTranslateTest(ViewTestCase):
             mock.patch.object(auto, "process_mt"),
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
             mock.patch(
-                "weblate.trans.judge_loop.repair_target",
-                return_value=["repaired translation"],
+                "weblate.trans.judge_loop.repair_targets",
+                return_value={unit.id: ["repaired translation"]},
             ),
         ):
             auto.process_judge(engines=[], threshold=80)

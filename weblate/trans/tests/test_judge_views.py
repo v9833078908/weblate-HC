@@ -74,11 +74,21 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "id_auto_row_count")
 
-    def test_form_shows_the_honest_request_estimate(self) -> None:
-        response = self.client.get(self.translation_url)
+    def test_form_estimates_requests_from_batches_not_strings(self) -> None:
+        with override_settings(JUDGE_BATCH_SIZE=2):
+            response = self.client.get(self.translation_url)
         self.assertEqual(response.status_code, 200)
-        # Worst case: strings x 2 seats x (1 + repair attempts).
-        self.assertContains(response, "id_auto_request_estimate")
+        rows = response.context["judge_row_count"]
+        self.assertGreater(rows, 2)
+        batched = ((rows + 1) // 2) * 2 * 2
+        per_string = rows * 2 * 2
+        self.assertContains(response, f"plans up to {batched} LLM requests")
+        self.assertNotContains(response, f"plans up to {per_string} LLM requests")
+
+    def test_form_estimate_never_floors_a_partial_batch_to_zero(self) -> None:
+        with override_settings(JUDGE_BATCH_SIZE=1000):
+            response = self.client.get(self.translation_url)
+        self.assertContains(response, "plans up to 4 LLM requests")
 
     def test_form_explains_judge_duration_contention(self) -> None:
         response = self.client.get(self.translation_url)

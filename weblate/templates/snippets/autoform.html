@@ -37,11 +37,13 @@
             The current filter matches {{ counter }} strings.
           {% endblocktranslate %}
         </p>
-        <p class="text-muted" id="id_auto_request_estimate">
-          {% translate "A judge run costs in the worst case up to" %}
-          {{ judge_request_estimate }}
-          {% translate "LLM requests (strings × 2 judges × attempts), plus machine translation for empty strings." %}
-        </p>
+        {% if judge_request_estimate is not None %}
+          <p class="text-muted" id="id_auto_request_estimate">
+            {% blocktranslate with requests=judge_request_estimate trimmed %}
+              A judge run plans up to {{ requests }} LLM requests (batches × judges × rounds); a refused batch is retried once. Empty strings additionally cost machine translation.
+            {% endblocktranslate %}
+          </p>
+        {% endif %}
         <p class="text-muted" id="id_auto_duration_estimate">
           {% translate "A judge run holds an automatic translation slot for tens of minutes per few hundred strings, so other projects may wait." %}
         </p>

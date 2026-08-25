@@ -26,6 +26,7 @@ from django.db import transaction
 
 from weblate.checks.judge import JUDGE_CHECKS
 from weblate.glossary.models import get_matched_glossary_prompt_entries
+from weblate.machinery.base import MACHINERY_DEFAULT_THRESHOLD, MachineTranslationError
 from weblate.machinery.models import MACHINERY
 from weblate.trans.forms import configured_routed_engine
 from weblate.trans.judge import (
@@ -35,6 +36,7 @@ from weblate.trans.judge import (
     request_verdicts,
     validate_judge_configuration,
 )
+from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models.judge import (
     JudgeVerdict,
     collegium_verdict,
@@ -46,6 +48,7 @@ from weblate.utils.state import STATE_FUZZY
 
 if TYPE_CHECKING:
     from weblate.auth.models import User
+    from weblate.machinery.base import BatchMachineTranslation, UnitMemoryResultDict
     from weblate.trans.models.project import Project
     from weblate.trans.models.unit import Unit
 
@@ -81,25 +84,14 @@ def build_request(unit: Unit) -> JudgeRequest:
     )
 
 
-def repair_target(unit: Unit, user: User | None) -> list[str] | None:
-    """
-    Re-translate the unit through the project MT engine, or None.
-
-    Judge evidence reaches the repair prompt for free: run_checks() has
-    already projected the round's judge-* Check row, and
-    weblate/machinery/llm.py feeds failing_checks with get_description()
-    into the translator prompt. Callers MUST run_checks() first.
-    """
-    settings_map = unit.translation.component.project.get_machinery_settings()
-    engine_id = configured_routed_engine(settings_map)
-    if engine_id is None or engine_id not in MACHINERY:
-        return None
-    setting = settings_map[engine_id]
-    results = MACHINERY[engine_id](setting).translate(unit, user)
-    if not results or len(results) != len(unit.get_target_plurals()):
+def _select_repair_texts(
+    unit: Unit, plural_candidates: list[list[dict]]
+) -> list[str] | None:
+    """Pick one usable text per plural form, or None."""
+    if len(plural_candidates) != len(unit.get_target_plurals()):
         return None
     texts: list[str] = []
-    for candidates in results:
+    for candidates in plural_candidates:
         if not candidates:
             return None
         best = max(candidates, key=lambda item: item.get("quality", 0))
@@ -110,6 +102,84 @@ def repair_target(unit: Unit, user: User | None) -> list[str] | None:
     if texts == unit.get_target_plurals():
         return None
     return texts
+
+
+def _machinery_candidates(
+    unit: Unit, result: UnitMemoryResultDict
+) -> list[list[dict]] | None:
+    """Present one batch result the way translate() presents its own."""
+    texts = result.get("translation", ())
+    qualities = result.get("quality", ())
+    if len(texts) != len(qualities):
+        unit.translation.log_error(
+            "judge repair: unusable machinery result for unit %d", unit.id
+        )
+        return None
+    return [
+        [{"text": text, "quality": quality}]
+        for text, quality in zip(texts, qualities, strict=True)
+    ]
+
+
+def repair_targets(units: list[Unit], user: User | None) -> dict[int, list[str]]:
+    """
+    Return usable repair targets keyed by unit id, writing nothing.
+
+    Judge evidence reaches the repair prompt for free: the caller has already
+    run run_checks(), so the round's judge-* Check row exists and
+    weblate/machinery/llm.py feeds failing_checks into the prompt of every
+    string in the batch. Callers MUST run_checks() first.
+    """
+    if not units:
+        return {}
+    translation = units[0].translation
+    settings_map = translation.component.project.get_machinery_settings()
+    engine_id = configured_routed_engine(settings_map)
+    if engine_id is None or engine_id not in MACHINERY:
+        return {}
+    setting = settings_map[engine_id]
+    engine = MACHINERY[engine_id](setting)
+    if engine.batch_size == 1:
+        return _repair_targets_per_unit(engine, units, user)
+    try:
+        matches = fetch_machinery_matches(
+            units=units,
+            user=user,
+            services=[engine],
+            threshold=MACHINERY_DEFAULT_THRESHOLD,
+            log_translation=translation,
+        )
+    except MachineTranslationError as error:
+        translation.log_error("failed judge repair: %s", error)
+        return {}
+    repairs: dict[int, list[str]] = {}
+    for unit in units:
+        result = matches.get(unit.id)
+        if result is None:
+            continue
+        candidates = _machinery_candidates(unit, result)
+        if candidates is None:
+            continue
+        texts = _select_repair_texts(unit, candidates)
+        if texts is not None:
+            repairs[unit.id] = texts
+    return repairs
+
+
+def _repair_targets_per_unit(
+    engine: BatchMachineTranslation, units: list[Unit], user: User | None
+) -> dict[int, list[str]]:
+    repairs: dict[int, list[str]] = {}
+    for unit in units:
+        try:
+            candidates = engine.translate(unit, user)
+        except MachineTranslationError as error:
+            unit.translation.log_error("failed judge repair: %s", error)
+            continue
+        texts = _select_repair_texts(unit, candidates)
+        if texts is not None:
+            repairs[unit.id] = texts
+    return repairs
 
 
 def judge_project_context(project: Project) -> str:
@@ -224,6 +294,17 @@ class _RepairOutcome:
     changed: bool = False
 
 
+@dataclass(frozen=True)
+class _PreparedRound:
+    unit: Unit
+    request: JudgeRequest
+    verdict: JudgeVerdict
+    needs_repair: bool
+    before_target: list[str]
+    before_checks: set[str]
+    before_state: int
+
+
 def _apply_repair(
     unit: Unit,
     request: JudgeRequest,
@@ -274,20 +355,19 @@ def _apply_repair(
     return _RepairOutcome(locked, changed=True)
 
 
-def _process_round_unit(
+def _prepare_round_unit(
     unit: Unit,
     request: JudgeRequest,
     round_state,
     *,
     writable_ids: set[int],
-    user: User | None,
     attempt: int,
     attempts: int,
-) -> tuple[JudgeVerdict | None, _RepairOutcome]:
-    """Project a round and optionally prepare its next repair attempt."""
+) -> _PreparedRound | None:
+    """Project a round and describe its repair inputs without fetching them."""
     current = _refresh_unit(unit)
     if current.state != round_state:
-        return None, _RepairOutcome(None)
+        return None
     current.invalidate_checks_cache()
     current.clear_checks_cache()
     current.run_checks()
@@ -295,26 +375,20 @@ def _process_round_unit(
     if verdict is None:
         # A changed target/context or an all-unparsed round must not fall
         # back to an older opinion for repair or finalization.
-        return None, _RepairOutcome(None)
-    if verdict.verdict in _NON_REPAIRABLE_VERDICTS:
-        return verdict, _RepairOutcome(current)
-    if attempt >= attempts or unit.id not in writable_ids:
-        return verdict, _RepairOutcome(current)
-
-    before_target = current.get_target_plurals()
-    before_checks = _deterministic_checks(current)
-    before_state = current.state
-    new_target = repair_target(current, user)
-    if new_target is None:
-        return verdict, _RepairOutcome(current)
-    return verdict, _apply_repair(
-        current,
-        request,
-        before_target,
-        before_checks,
-        before_state,
-        new_target,
-        user,
+        return None
+    needs_repair = (
+        verdict.verdict not in _NON_REPAIRABLE_VERDICTS
+        and attempt < attempts
+        and unit.id in writable_ids
+    )
+    return _PreparedRound(
+        unit=current,
+        request=request,
+        verdict=verdict,
+        needs_repair=needs_repair,
+        before_target=current.get_target_plurals(),
+        before_checks=_deterministic_checks(current),
+        before_state=current.state,
     )
 
 
@@ -384,11 +458,10 @@ def run_judge_batch(
     # Accounting must be symmetric with machinery, which attributes every
     # paid request to a project (machinery/openai.py:147). All units of a
     # run share one translation, so the slug is read once.
-    project = units[0].translation.component.project
-    project_slug = project.slug
+    project_slug = units[0].translation.component.project.slug
     # Read once per run: every unit of a run shares one project, and the
     # value goes into the system message of every batch.
-    project_context = judge_project_context(project)
+    project_context = judge_project_context(units[0].translation.component.project)
     pending = list(units)
     verdicts: dict[int, JudgeVerdict] = {}
     attempts = settings.JUDGE_MAX_REPAIR_ATTEMPTS
@@ -457,26 +530,47 @@ def run_judge_batch(
                 model,
             )
 
-        next_pending = []
-        for unit in pending:
-            verdict, outcome = _process_round_unit(
+        prepared = [
+            _prepare_round_unit(
                 unit,
                 round_requests[unit.id],
                 round_states[unit.id],
                 writable_ids=writable_ids,
-                user=user,
                 attempt=attempt,
                 attempts=attempts,
+            )
+            for unit in pending
+        ]
+        repairable_units = [
+            item.unit for item in prepared if item is not None and item.needs_repair
+        ]
+        repairs = repair_targets(repairable_units, user) if repairable_units else {}
+        next_pending = []
+        for unit, item in zip(pending, prepared, strict=True):
+            if item is None:
+                verdicts.pop(unit.id, None)
+                continue
+            verdicts[unit.id] = item.verdict
+            new_target = repairs.get(unit.id) if item.needs_repair else None
+            if new_target is None:
+                record_final_snapshot(item.unit)
+                continue
+            outcome = _apply_repair(
+                item.unit,
+                item.request,
+                item.before_target,
+                item.before_checks,
+                item.before_state,
+                new_target,
+                user,
             )
             if outcome.unit is None:
                 verdicts.pop(unit.id, None)
                 continue
-            if verdict is not None:
-                verdicts[unit.id] = verdict
-            if verdict is not None and not outcome.changed:
-                record_final_snapshot(outcome.unit)
             if outcome.changed:
                 next_pending.append(outcome.unit)
+            else:
+                record_final_snapshot(outcome.unit)
         pending = next_pending
         if not pending:
             break
