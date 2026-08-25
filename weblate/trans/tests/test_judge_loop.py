@@ -257,9 +257,7 @@ class JudgeLoopTest(ViewTestCase):
                 side_effect=MachineTranslationError("boom"),
             ),
         ):
-            verdicts = run_judge_batch(
-                [unit], writable_ids={unit.id}, user=self.user
-            )
+            verdicts = run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
         self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.FLAG)
         self.assertEqual(client.call_count, 2)
         self.assertEqual(self.get_unit().target, original_target)

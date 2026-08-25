@@ -53,8 +53,6 @@ if TYPE_CHECKING:
     from weblate.utils.state import StringState
 
 
-
-
 def check_auto_translate_permission(
     user: User | None, translation: Translation, mode: str
 ) -> bool | PermissionResult:

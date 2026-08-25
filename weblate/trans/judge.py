@@ -46,7 +46,7 @@ JUDGE_SEATS = (1, 2)
 
 def judge_request_upper_bound(strings: int) -> int | None:
     """
-    Requests one judge run plans for a number of strings.
+    Estimate the requests one judge run plans for a number of strings.
 
     Batches, not strings: request_verdicts() sends JUDGE_BATCH_SIZE segments
     per call. A repair round re-judges only the strings that were repaired, so
@@ -60,6 +60,8 @@ def judge_request_upper_bound(strings: int) -> int | None:
         return 0
     batches = (strings + batch_size - 1) // batch_size
     return batches * len(JUDGE_SEATS) * (1 + settings.JUDGE_MAX_REPAIR_ATTEMPTS)
+
+
 # A verdict batch reply is kilobytes; this only bounds a broken peer.
 MAX_BATCH_RESPONSE_BYTES = 8 * 1024 * 1024
 # Measured category set (st2-zh-recalibration.py:59-68).

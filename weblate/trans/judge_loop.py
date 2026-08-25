@@ -48,9 +48,9 @@ from weblate.utils.state import STATE_FUZZY
 
 if TYPE_CHECKING:
     from weblate.auth.models import User
+    from weblate.machinery.base import BatchMachineTranslation, UnitMemoryResultDict
     from weblate.trans.models.project import Project
     from weblate.trans.models.unit import Unit
-    from weblate.machinery.base import BatchMachineTranslation, UnitMemoryResultDict
 
 # A round is left alone (no repair attempt) when it did not confirm a
 # defect: PASS needs no fix, UNPARSED is a transport failure, not an
@@ -116,7 +116,8 @@ def _machinery_candidates(
         )
         return None
     return [
-        [{"text": text, "quality": quality}] for text, quality in zip(texts, qualities)
+        [{"text": text, "quality": quality}]
+        for text, quality in zip(texts, qualities, strict=True)
     ]
 
 
@@ -179,8 +180,6 @@ def _repair_targets_per_unit(
         if texts is not None:
             repairs[unit.id] = texts
     return repairs
-
-
 
 
 def judge_project_context(project: Project) -> str:
@@ -291,6 +290,8 @@ def _round_verdict(unit: Unit) -> JudgeVerdict | None:
 class _RepairOutcome:
     unit: Unit | None
     changed: bool = False
+
+
 @dataclass(frozen=True)
 class _PreparedRound:
     unit: Unit
@@ -300,8 +301,6 @@ class _PreparedRound:
     before_target: list[str]
     before_checks: set[str]
     before_state: int
-
-
 
 
 def _apply_repair(
@@ -457,11 +456,10 @@ def run_judge_batch(
     # Accounting must be symmetric with machinery, which attributes every
     # paid request to a project (machinery/openai.py:147). All units of a
     # run share one translation, so the slug is read once.
-    project = units[0].translation.component.project
-    project_slug = project.slug
+    project_slug = units[0].translation.component.project.slug
     # Read once per run: every unit of a run shares one project, and the
     # value goes into the system message of every batch.
-    project_context = judge_project_context(project)
+    project_context = judge_project_context(units[0].translation.component.project)
     pending = list(units)
     verdicts: dict[int, JudgeVerdict] = {}
     attempts = settings.JUDGE_MAX_REPAIR_ATTEMPTS

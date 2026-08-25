@@ -5,8 +5,8 @@
 from __future__ import annotations
 
 from django.test import SimpleTestCase, override_settings
-from weblate.trans.judge import judge_request_upper_bound
 
+from weblate.trans.judge import judge_request_upper_bound
 from weblate.trans.models.judge import (
     SEVERITY_RANK,
     JudgeVerdict,

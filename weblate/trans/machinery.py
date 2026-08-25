@@ -13,13 +13,13 @@ from django.db import connections
 
 from weblate.logger import LOGGER
 from weblate.machinery.base import MachineTranslationError
-from weblate.trans.models import Translation, Unit
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
     from weblate.auth.models import User
     from weblate.machinery.base import BatchMachineTranslation, UnitMemoryResultDict
+    from weblate.trans.models import Translation, Unit
 
 
 # A refusal that outlived the request retries stops the service for everyone, so
