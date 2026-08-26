@@ -347,9 +347,9 @@ check uses the conservative longest branch of every conditional block.
 
 When a source intentionally fills a fixed slot, add
 `ignore-source-max-length` only to that unit; otherwise the source check keeps
-useful localization headroom. In judge mode, a translation that fails
-`max-length` is retried with its exact budget. If attempts are exhausted, the
-unit remains in Needs editing rather than being published.
+useful localization headroom. Currently, an automatic candidate that exceeds
+`max-length` becomes a suggestion. Do not rely on an unattended workflow to
+repair it until the judge-mode repair change is deployed.
 
 Одна строка стабильно переводится неверно из-за неоднозначности исходника -
 пишем пояснение и перезапускаем автоперевод только по ней.
