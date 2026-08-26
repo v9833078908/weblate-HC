@@ -10,11 +10,17 @@ from unittest import mock
 from django.test import override_settings
 
 from weblate.trans.judge import JudgeResult
-from weblate.trans.judge_loop import build_request, repair_target, run_judge_batch
+from weblate.trans.judge_loop import (
+    _write_verdict,
+    build_request,
+    repair_target,
+    run_judge_batch,
+)
 from weblate.trans.models.judge import (
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
+    compute_target_storage_hash,
 )
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.hash import calculate_hash
@@ -87,6 +93,34 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
         self.assertEqual(client.call_count, 2)
         self.assertEqual(unit.judge_verdicts.count(), 2)
+
+    def test_verdict_stores_raw_target_hash(self) -> None:
+        unit, _, _ = self.run_batch([PASS, PASS])
+        expected = compute_target_storage_hash(unit.target)
+        self.assertTrue(
+            all(
+                verdict.target_storage_hash == expected
+                for verdict in unit.judge_verdicts.all()
+            )
+        )
+
+    def test_verdict_hashes_request_target_snapshot(self) -> None:
+        unit = self.get_unit()
+        request = build_request(unit)
+        unit.target = "newer target"
+        _write_verdict(
+            unit,
+            request,
+            seat=1,
+            attempt=0,
+            run_id=uuid.uuid4(),
+            result=PASS,
+            model="vendor-a/model",
+        )
+        self.assertEqual(
+            unit.judge_verdicts.get().target_storage_hash,
+            compute_target_storage_hash(request.target),
+        )
 
     def test_run_and_seat_are_logged(self) -> None:
         with self.assertLogs("weblate.trans.judge_loop", level="INFO") as logs:

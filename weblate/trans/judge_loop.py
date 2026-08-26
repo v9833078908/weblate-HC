@@ -40,6 +40,7 @@ from weblate.trans.models.judge import (
     collegium_verdict,
     compute_context_hash,
     compute_target_hash,
+    compute_target_storage_hash,
     current_round,
 )
 from weblate.utils.state import STATE_FUZZY
@@ -151,6 +152,7 @@ def _write_verdict(
         seat=seat,
         attempt=attempt,
         target_hash=compute_target_hash(request.target_plurals or [request.target]),
+        target_storage_hash=compute_target_storage_hash(request.target),
         context_hash=compute_context_hash(
             source=request.source,
             note=request.note,

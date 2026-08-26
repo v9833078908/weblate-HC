@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from django.test import SimpleTestCase, override_settings
 
 from weblate.trans.models.judge import (
@@ -11,6 +13,7 @@ from weblate.trans.models.judge import (
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
+    compute_target_storage_hash,
     state_for_verdict,
     verdict_for_severity,
 )
@@ -18,7 +21,6 @@ from weblate.utils.state import (
     FUZZY_STATES,
     STATE_APPROVED,
     STATE_FUZZY,
-    STATE_NEEDS_CHECKING,
     STATE_TRANSLATED,
 )
 
@@ -62,12 +64,26 @@ class JudgeSeverityGateTest(SimpleTestCase):
             STATE_TRANSLATED,
         )
 
-    def test_flag_lands_on_a_state_that_does_not_ship(self) -> None:
+    def test_flag_ships_as_translated(self) -> None:
         state = state_for_verdict(
             JudgeVerdict.Verdict.FLAG, enable_review=True, may_approve=True
         )
-        self.assertEqual(state, STATE_NEEDS_CHECKING)
-        self.assertIn(state, FUZZY_STATES)
+        self.assertEqual(state, STATE_TRANSLATED)
+        self.assertNotIn(state, FUZZY_STATES)
+
+    def test_flag_state_clears_the_without_needs_editing_commit_gate(self) -> None:
+        # WITHOUT_NEEDS_EDITING excludes FUZZY_STATES from VCS commit/export
+        # (weblate/trans/models/pending.py). An unresolved major must ship
+        # with judge-flag evidence, while an unresolved critical is still
+        # held back.
+        major_state = state_for_verdict(
+            JudgeVerdict.Verdict.FLAG, enable_review=True, may_approve=True
+        )
+        critical_state = state_for_verdict(
+            JudgeVerdict.Verdict.REJECT, enable_review=True, may_approve=True
+        )
+        self.assertNotIn(major_state, FUZZY_STATES)
+        self.assertIn(critical_state, FUZZY_STATES)
 
     def test_reject_lands_on_a_state_that_does_not_ship(self) -> None:
         state = state_for_verdict(
@@ -102,6 +118,19 @@ class JudgeHashTest(SimpleTestCase):
         self.assertNotEqual(
             compute_target_hash(["a\nb"]),
             compute_target_hash(["a", "b"]),
+        )
+
+    def test_target_storage_hash_uses_exact_raw_storage(self) -> None:
+        target = "Одна дверь\x1e\x1eДве двери"
+        self.assertEqual(
+            compute_target_storage_hash(target),
+            hashlib.md5(target.encode(), usedforsecurity=False).hexdigest(),
+        )
+
+    def test_target_storage_hash_tracks_raw_plural_changes(self) -> None:
+        self.assertNotEqual(
+            compute_target_storage_hash("Одна дверь\x1e\x1eДве двери"),
+            compute_target_storage_hash("Одна дверь\x1e\x1eТри двери"),
         )
 
     def test_context_hash_reacts_to_glossary_and_note(self) -> None:

@@ -11,13 +11,24 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
+from django.db.models import (
+    BooleanField,
+    Case,
+    CharField,
+    Exists,
+    IntegerField,
+    OuterRef,
+    Subquery,
+    Value,
+    When,
+)
+from django.db.models.functions import MD5
 from django.utils.html import escape
 from django.utils.translation import gettext_lazy
 
 from weblate.utils.state import (
     STATE_APPROVED,
     STATE_FUZZY,
-    STATE_NEEDS_CHECKING,
     STATE_TRANSLATED,
     StringState,
 )
@@ -45,6 +56,10 @@ def _digest(parts: Sequence[str]) -> str:
 def compute_target_hash(target: Sequence[str]) -> str:
     """Hash every plural form of a target."""
     return _digest(target)
+
+
+def compute_target_storage_hash(target: str) -> str:
+    return hashlib.md5(target.encode(), usedforsecurity=False).hexdigest()
 
 
 def compute_context_hash(
@@ -120,6 +135,9 @@ class JudgeVerdict(models.Model):
     seat = models.SmallIntegerField()
     attempt = models.SmallIntegerField(default=0)
     target_hash = models.CharField(max_length=64)
+    target_storage_hash = models.CharField(  # ruff: ignore[django-nullable-model-string-field]
+        max_length=32, null=True, db_index=True
+    )
     context_hash = models.CharField(max_length=64)
     run_id = models.UUIDField(default=uuid.uuid4)
     timestamp = models.DateTimeField(auto_now_add=True)
@@ -205,20 +223,23 @@ def state_for_verdict(
     """
     Target state for a verdict, or None when the state must not move.
 
-    ``major`` lands on STATE_NEEDS_CHECKING and ``critical`` lands on
-    STATE_FUZZY, which the project-level
-    ``WITHOUT_NEEDS_EDITING`` commit policy already excludes from export.
-    ``pass`` stops at STATE_TRANSLATED unless the site opts into judge
-    approval (JUDGE_MAY_APPROVE) AND the project has review: measurement
-    shows pass misses real critical defects, so the judge does not hand out the
-    top trust state by default (review D2).
+    ``critical`` lands on STATE_FUZZY, which the project-level
+    ``WITHOUT_NEEDS_EDITING`` commit policy already excludes from export
+    (FUZZY_STATES): an unresolved critical is held back from shipping.
+    ``major`` stops at STATE_TRANSLATED instead: measurement shows most
+    ``major`` findings are false positives or matters of taste, so the
+    cost of blocking every one of them (holding back real, shippable
+    strings while a human works through the queue) outweighs the cost of
+    an occasional unresolved major shipping with judge-flag evidence
+    attached (review D1). ``pass`` stops at STATE_TRANSLATED unless the
+    site opts into judge approval (JUDGE_MAY_APPROVE) AND the project has
+    review: measurement shows pass misses real critical defects, so the
+    judge does not hand out the top trust state by default (review D2).
     """
     if verdict == JudgeVerdict.Verdict.UNPARSED:
         return None
     if verdict == JudgeVerdict.Verdict.REJECT:
         return STATE_FUZZY
-    if verdict == JudgeVerdict.Verdict.FLAG:
-        return STATE_NEEDS_CHECKING
     if verdict == JudgeVerdict.Verdict.PASS and enable_review and may_approve:
         return STATE_APPROVED
     return STATE_TRANSLATED
@@ -335,6 +356,68 @@ def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
 def active_verdict(unit: Unit) -> JudgeVerdict | None:
     """Return the collegium verdict that still describes the stored text."""
     return collegium_verdict(active_round(unit))
+
+
+def judge_status_annotations() -> dict[str, models.Expression]:
+    """Annotate a Unit queryset with target-fresh judge evidence."""
+    newest_parsed = JudgeVerdict.objects.filter(
+        unit_id=OuterRef(OuterRef("pk")),
+        target_storage_hash=MD5(OuterRef(OuterRef("target"))),
+        unparsed=False,
+    ).order_by("-timestamp", "-pk")
+    current_parsed_round = JudgeVerdict.objects.filter(
+        unit_id=OuterRef("pk"),
+        target_storage_hash=MD5(OuterRef("target")),
+        run_id=Subquery(newest_parsed.values("run_id")[:1]),
+        attempt=Subquery(newest_parsed.values("attempt")[:1]),
+        unparsed=False,
+    )
+    severity_rank = Case(
+        *(
+            When(max_severity=severity, then=Value(rank))
+            for severity, rank in SEVERITY_RANK.items()
+        ),
+        output_field=IntegerField(),
+    )
+    latest_current = JudgeVerdict.objects.filter(
+        unit_id=OuterRef("pk"),
+        target_storage_hash=MD5(OuterRef("target")),
+    ).order_by("-timestamp", "-pk")
+    newest_current = JudgeVerdict.objects.filter(
+        unit_id=OuterRef(OuterRef("pk")),
+        target_storage_hash=MD5(OuterRef(OuterRef("target"))),
+    ).order_by("-timestamp", "-pk")
+    latest_current_parsed = JudgeVerdict.objects.filter(
+        unit_id=OuterRef("pk"),
+        target_storage_hash=MD5(OuterRef("target")),
+        run_id=Subquery(newest_current.values("run_id")[:1]),
+        attempt=Subquery(newest_current.values("attempt")[:1]),
+        unparsed=False,
+    )
+
+    return {
+        "judge_active_severity": Subquery(
+            current_parsed_round.annotate(severity_rank=severity_rank)
+            .order_by("-severity_rank", "seat")
+            .values("max_severity")[:1],
+            output_field=CharField(),
+        ),
+        "judge_has_parsed_history": Exists(
+            JudgeVerdict.objects.filter(unit_id=OuterRef("pk"), unparsed=False)
+        ),
+        "judge_latest_incomplete": Case(
+            When(
+                Exists(latest_current),
+                then=Case(
+                    When(Exists(latest_current_parsed), then=Value(False)),
+                    default=Value(True),
+                    output_field=BooleanField(),
+                ),
+            ),
+            default=Value(False),
+            output_field=BooleanField(),
+        ),
+    }
 
 
 def current_verdict(unit: Unit) -> JudgeVerdict | None:
