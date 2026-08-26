@@ -38,12 +38,9 @@ from weblate.machinery.base import (
 )
 from weblate.machinery.dummy import DummyTranslation
 from weblate.trans.actions import ActionEvents
-from weblate.trans.autotranslate import (
-    AutoTranslate,
-    BatchAutoTranslate,
-    fetch_machinery_matches,
-)
+from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
 from weblate.trans.forms import AutoForm
+from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models import (
     Change,
     Component,
@@ -1110,6 +1107,28 @@ class AutoTranslationCrossProjectTest(AutoTranslationTest):
         return super().create_second_component(project=project)
 
 
+class _FakeOpenRouterMachinery:
+    name = "OpenRouter"
+
+    def __init__(self, settings) -> None:
+        pass
+
+    @classmethod
+    def get_identifier(cls) -> str:
+        return "openrouter"
+
+
+class _FakeLiteLLMMachinery:
+    name = "LiteLLM"
+
+    def __init__(self, settings) -> None:
+        pass
+
+    @classmethod
+    def get_identifier(cls) -> str:
+        return "litellm"
+
+
 class AutoTranslationMtTest(ViewTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -1171,6 +1190,58 @@ class AutoTranslationMtTest(ViewTestCase):
         form = AutoForm(self.component3, self.user)
 
         self.assertEqual(form.fields["engines"].initial, ["weblate"])
+
+    def test_form_preselects_openrouter_when_only_openrouter_is_configured(
+        self,
+    ) -> None:
+        self.project.machinery_settings = {
+            "openrouter": {"key": "or-key", "routing": {"*": "vendor/model"}}
+        }
+        self.project.save(update_fields=["machinery_settings"])
+        with patch(
+            "weblate.trans.forms.MACHINERY",
+            {
+                "openrouter": _FakeOpenRouterMachinery,
+                "litellm": _FakeLiteLLMMachinery,
+            },
+        ):
+            form = AutoForm(self.component3, self.user)
+        self.assertEqual(form.fields["engines"].initial, ["openrouter"])
+        self.assertEqual(form.fields["auto_source"].initial, "mt")
+
+    def test_form_preselects_litellm_when_only_litellm_is_configured(self) -> None:
+        self.project.machinery_settings = {
+            "litellm": {"key": "ll-key", "routing": {"*": "vendor/model"}}
+        }
+        self.project.save(update_fields=["machinery_settings"])
+        with patch(
+            "weblate.trans.forms.MACHINERY",
+            {
+                "openrouter": _FakeOpenRouterMachinery,
+                "litellm": _FakeLiteLLMMachinery,
+            },
+        ):
+            form = AutoForm(self.component3, self.user)
+        self.assertEqual(form.fields["engines"].initial, ["litellm"])
+        self.assertEqual(form.fields["auto_source"].initial, "mt")
+
+    def test_form_preselects_openrouter_over_litellm_when_both_are_configured(
+        self,
+    ) -> None:
+        self.project.machinery_settings = {
+            "openrouter": {"key": "or-key", "routing": {"*": "vendor/model"}},
+            "litellm": {"key": "ll-key", "routing": {"*": "vendor/model"}},
+        }
+        self.project.save(update_fields=["machinery_settings"])
+        with patch(
+            "weblate.trans.forms.MACHINERY",
+            {
+                "openrouter": _FakeOpenRouterMachinery,
+                "litellm": _FakeLiteLLMMachinery,
+            },
+        ):
+            form = AutoForm(self.component3, self.user)
+        self.assertEqual(form.fields["engines"].initial, ["openrouter"])
 
     def test_form_ignores_component_in_machine_translation_mode(self) -> None:
         form = AutoForm(
@@ -1397,6 +1468,16 @@ class MachineryBatchFetchTest(SimpleTestCase):
         result, progress = self.fetch(service, self.make_units(6))
 
         self.assertEqual(sorted(result), [0, 1, 4, 5])
+        self.assertEqual(progress, [2, 4, 6])
+
+    def test_a_malformed_reply_only_loses_its_own_batch(self) -> None:
+        # LLM parsing normalizes a non-text batch reply to
+        # MachineTranslationError before the shared scheduler sees it.
+        service = RecordingTranslation(failing_ids=frozenset({2}))
+        result, progress = self.fetch(service, self.make_units(6))
+
+        self.assertEqual(sorted(result), [0, 1, 4, 5])
+        self.assertEqual(service.batches, [[0, 1], [2, 3], [4, 5]])
         self.assertEqual(progress, [2, 4, 6])
 
     def test_concurrency_limited_to_batch_count(self) -> None:

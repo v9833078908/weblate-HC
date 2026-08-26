@@ -1756,27 +1756,49 @@ anything.
 
 .. seealso::
 
-   * :setting:`JUDGE_OPENROUTER_KEY`
+   * :setting:`JUDGE_API_KEY`
+   * :setting:`JUDGE_BASE_URL`
    * :setting:`JUDGE_MODEL_SEAT_1`
    * :setting:`JUDGE_MODEL_SEAT_2`
    * :setting:`JUDGE_MAY_APPROVE`
 
-.. setting:: JUDGE_OPENROUTER_KEY
+.. setting:: JUDGE_API_KEY
 
-JUDGE_OPENROUTER_KEY
----------------------
+JUDGE_API_KEY
+-------------
 
 .. versionadded:: 2026.8.1
 
-Site-wide OpenRouter API key used for the LLM judge. Leave empty to keep the
-judge disabled even when :setting:`JUDGE_ENABLED` is ``True``. This key is
-separate from any machine-translation provider configuration and from
+Site-wide API key used for the LLM judge, sent to the provider configured by
+:setting:`JUDGE_BASE_URL`. Leave empty to keep the judge disabled even when
+:setting:`JUDGE_ENABLED` is ``True``. This key is separate from any
+machine-translation provider configuration and from
 :setting:`LOC_KIT_PROFILE_OPENROUTER_KEY`; it is never exposed per-project or
 per-user, and it never appears in an error message.
 
 .. seealso::
 
    * :setting:`JUDGE_ENABLED`
+   * :setting:`JUDGE_BASE_URL`
+
+.. setting:: JUDGE_BASE_URL
+
+JUDGE_BASE_URL
+--------------
+
+.. versionadded:: 2026.8.1
+
+Base URL of the OpenAI-compatible chat-completions API the LLM judge sends
+requests to. Defaults to ``https://openrouter.ai/api/v1``. Set it to the
+corporate LiteLLM proxy, or another OpenAI-compatible endpoint, to move the
+judge off OpenRouter; this is operator configuration, never exposed
+per-project or per-user. OpenRouter-specific request fields are sent only
+when the configured host resolves to OpenRouter.
+
+.. seealso::
+
+   * :setting:`JUDGE_ENABLED`
+   * :setting:`JUDGE_API_KEY`
 
 .. setting:: JUDGE_MODEL_SEAT_1
 .. setting:: JUDGE_MODEL_SEAT_2
@@ -1790,7 +1812,7 @@ OpenRouter model identifiers for the two seats of the judge collegium. Both
 seats judge every string independently; the string's verdict is the
 strictest of the two, so a seat can never lower what the other seat found.
 Configuring the same model on both seats is a valid configuration, not an
-error. Both fields must be set, together with :setting:`JUDGE_OPENROUTER_KEY`,
+error. Both fields must be set, together with :setting:`JUDGE_API_KEY`,
 for :setting:`JUDGE_ENABLED` to have an effect.
 
 .. seealso::

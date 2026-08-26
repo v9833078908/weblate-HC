@@ -140,7 +140,7 @@ LLM judge
 The LLM judge is an :ref:`automatic translation <auto-translation>` mode,
 :guilabel:`Add as translation with an LLM judge`, that has two independently
 configured language models review every string a filter selects. Turn it on
-with :setting:`JUDGE_ENABLED` and the related :setting:`JUDGE_OPENROUTER_KEY`,
+with :setting:`JUDGE_ENABLED` and the related :setting:`JUDGE_API_KEY`,
 :setting:`JUDGE_MODEL_SEAT_1`, and :setting:`JUDGE_MODEL_SEAT_2` settings; the
 mode is off site-wide until all four are configured, and it requires the
 :guilabel:`Review strings` permission the same way

@@ -332,6 +332,25 @@ Source "Он ушёл" with existing translation "Il est parti." must produce "I
 - Заметка разработчика из файла (если она там была) тоже уходит в запрос;
   модель использует её для выбора рода, регистра и тона.
 
+### Interface limits
+
+`max-length:N` defines a static character budget for one string. Set it at
+project or component scope only when the same limit fits every string; use a
+source-file or unit flag for a specific UI slot. A narrower flag overrides a
+broader one.
+
+`replacements:` defines a placeholder width scenario before the check runs. For
+a timer formula, use the maximum values for that scenario, for example
+`replacements:{hours}:9:{minutes}:9`. Use the complete `{hours}` placeholder,
+not the `hours:cond:` condition header. This does not run the game engine: the
+check uses the conservative longest branch of every conditional block.
+
+When a source intentionally fills a fixed slot, add
+`ignore-source-max-length` only to that unit; otherwise the source check keeps
+useful localization headroom. Currently, an automatic candidate that exceeds
+`max-length` becomes a suggestion. Do not rely on an unattended workflow to
+repair it until the judge-mode repair change is deployed.
+
 Одна строка стабильно переводится неверно из-за неоднозначности исходника -
 пишем пояснение и перезапускаем автоперевод только по ней.
 
@@ -394,7 +413,7 @@ Source "Он ушёл" with existing translation "Il est parti." must produce "I
 | `reused` | Один и тот же перевод у разных исходников |
 | `same` | Перевод совпал с исходником |
 | `game-line-break` | В строке с разделителем `$` в исходнике он потерян, добавлен или рядом с ним появился пробел |
-| `game-number` | В переводе нет числа, которое есть в исходнике: другой урон, радиус или длительность |
+| `game-number` | В переводе нет числа, которое есть в исходнике: другой урон, радиус или длительность. Значение сравнивается с учётом масштаба: `10 тысяч`, `10,000`, `10 Tausend`, `10천` и `一万` равны, а `10万` в десять раз больше |
 
 Алгоритм лечения:
 

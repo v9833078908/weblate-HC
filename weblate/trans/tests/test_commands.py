@@ -498,6 +498,106 @@ class JudgeWorkflowCommandTest(ComponentTestCase):
         with self.assertRaises(CommandError):
             call_command("check_judge_repair_routes", "--project", self.project.slug)
 
+    def test_check_judge_repair_routes_uses_litellm_only_project(self) -> None:
+        self.project.machinery_settings = {"litellm": {"key": "ll-key"}}
+        self.project.save(update_fields=["machinery_settings"])
+        engine = Mock()
+        engine.return_value.resolve_model.return_value = "vendor/model"
+        output = StringIO()
+        with patch("weblate.trans.judge_workflow.MACHINERY", {"litellm": engine}):
+            call_command(
+                "check_judge_repair_routes",
+                "--project",
+                self.project.slug,
+                stdout=output,
+            )
+        self.assertIn(f"{self.project.slug}/", output.getvalue())
+
+    def test_check_judge_repair_routes_prefers_openrouter_over_litellm(self) -> None:
+        self.project.machinery_settings = {
+            "openrouter": {"key": "or-key"},
+            "litellm": {"key": "ll-key"},
+        }
+        self.project.save(update_fields=["machinery_settings"])
+        openrouter_engine = Mock()
+        openrouter_engine.return_value.resolve_model.return_value = "openrouter/model"
+        litellm_engine = Mock()
+        litellm_engine.return_value.resolve_model.return_value = "litellm/model"
+        output = StringIO()
+        with patch(
+            "weblate.trans.judge_workflow.MACHINERY",
+            {"openrouter": openrouter_engine, "litellm": litellm_engine},
+        ):
+            call_command(
+                "check_judge_repair_routes",
+                "--project",
+                self.project.slug,
+                stdout=output,
+            )
+        self.assertIn("openrouter/model", output.getvalue())
+        litellm_engine.assert_not_called()
+
+    def test_check_judge_repair_routes_missing_key_does_not_fall_through(
+        self,
+    ) -> None:
+        self.project.machinery_settings = {
+            "openrouter": {"routing": {"*": "vendor/model"}},
+            "litellm": {"key": "ll-key"},
+        }
+        self.project.save(update_fields=["machinery_settings"])
+        litellm_engine = Mock()
+        litellm_engine.return_value.resolve_model.return_value = "vendor/model"
+        with (
+            patch(
+                "weblate.trans.judge_workflow.MACHINERY",
+                {"openrouter": Mock(), "litellm": litellm_engine},
+            ),
+            self.assertRaises(CommandError),
+        ):
+            call_command("check_judge_repair_routes", "--project", self.project.slug)
+        litellm_engine.assert_not_called()
+
+    def test_check_judge_repair_routes_missing_route_does_not_fall_through(
+        self,
+    ) -> None:
+        self.project.machinery_settings = {
+            "openrouter": {"key": "or-key"},
+            "litellm": {"key": "ll-key"},
+        }
+        self.project.save(update_fields=["machinery_settings"])
+        openrouter_engine = Mock()
+        openrouter_engine.return_value.resolve_model.return_value = None
+        litellm_engine = Mock()
+        litellm_engine.return_value.resolve_model.return_value = "vendor/model"
+        with (
+            patch(
+                "weblate.trans.judge_workflow.MACHINERY",
+                {"openrouter": openrouter_engine, "litellm": litellm_engine},
+            ),
+            self.assertRaises(CommandError),
+        ):
+            call_command("check_judge_repair_routes", "--project", self.project.slug)
+        litellm_engine.assert_not_called()
+
+    def test_check_judge_repair_routes_unregistered_engine_does_not_fall_through(
+        self,
+    ) -> None:
+        self.project.machinery_settings = {
+            "openrouter": {"key": "or-key"},
+            "litellm": {"key": "ll-key"},
+        }
+        self.project.save(update_fields=["machinery_settings"])
+        litellm_engine = Mock()
+        litellm_engine.return_value.resolve_model.return_value = "vendor/model"
+        with (
+            patch(
+                "weblate.trans.judge_workflow.MACHINERY", {"litellm": litellm_engine}
+            ),
+            self.assertRaises(CommandError),
+        ):
+            call_command("check_judge_repair_routes", "--project", self.project.slug)
+        litellm_engine.assert_not_called()
+
 
 class WeblateComponentCommandMixin:
     """Base class for handling tests of WeblateComponentCommand based commands."""

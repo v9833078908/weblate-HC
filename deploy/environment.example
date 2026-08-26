@@ -93,7 +93,7 @@ WEBLATE_SERVER_EMAIL=webnotify@herocraft.com
 WEBLATE_DEFAULT_FROM_EMAIL=webnotify@herocraft.com
 
 # --- Hero Craft customizations -----------------------------------------
-WEBLATE_ADD_MACHINERY=weblate_customization.machinery.RoutedLLMTranslation
+WEBLATE_ADD_MACHINERY=weblate_customization.machinery.RoutedLLMTranslation,weblate_customization.machinery.RoutedLiteLLMTranslation
 WEBLATE_ADD_CHECK=weblate_customization.checks.GameMarkupCheck,weblate_customization.checks.GameLineBreakCheck,weblate_customization.checks.CyrillicLeakCheck,weblate_customization.checks.GameNumberCheck,weblate_customization.checks.GameTokenCheck,weblate_customization.checks.GameLengthCheck
 WEBLATE_ADD_AUTOFIX=weblate_customization.autofixes.LineSeparatorSpacing,weblate_customization.autofixes.RemoveAddedFinalStop,weblate_customization.autofixes.AddFrenchPunctuationSpacing
 
@@ -106,13 +106,15 @@ WEBLATE_LOC_KIT_PROFILE_ANALYSIS_ENABLED=0
 WEBLATE_LOC_KIT_PROFILE_OPENROUTER_KEY=
 WEBLATE_LOC_KIT_PROFILE_OPENROUTER_MODEL=google/gemini-2.5-flash
 
-# LLM judge (separate OpenRouter configuration, unrelated to both the
-# OpenRouter machinery configured in the web UI and the loc-kit profile
-# analysis above). Two seats judge every string independently; the same
-# model on both seats is a valid configuration. Fill the key and both
-# models, then switch the feature on.
+# LLM judge (separate LLM configuration, unrelated to both the OpenRouter
+# machinery configured in the web UI and the loc-kit profile analysis
+# above). Endpoint set by WEBLATE_JUDGE_BASE_URL (default OpenRouter; the
+# corporate LiteLLM proxy is also supported). Two seats judge every string
+# independently; the same model on both seats is a valid configuration.
+# Fill the key and both models, then switch the feature on.
 WEBLATE_JUDGE_ENABLED=0
-WEBLATE_JUDGE_OPENROUTER_KEY=
+WEBLATE_JUDGE_API_KEY=
+WEBLATE_JUDGE_BASE_URL=https://openrouter.ai/api/v1
 WEBLATE_JUDGE_MODEL_SEAT_1=deepseek/deepseek-v4-pro
 WEBLATE_JUDGE_MODEL_SEAT_2=qwen/qwen3-235b-a22b-2507
 WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS=1
@@ -121,7 +123,8 @@ WEBLATE_JUDGE_MAX_UNITS_PER_RUN=2000
 WEBLATE_JUDGE_REQUEST_SLEEP=0.0
 WEBLATE_JUDGE_MAY_APPROVE=0
 # Empty sends no reasoning parameter at all; minimal/low/medium/high caps
-# the reasoning spend of a model that supports it.
+# the reasoning spend of a model that supports it. Must stay empty when
+# WEBLATE_JUDGE_BASE_URL points at the LiteLLM proxy.
 #WEBLATE_JUDGE_REASONING_EFFORT=
 
 # --- VCS ----------------------------------------------------------------

@@ -32,6 +32,7 @@ from weblate.glossary.models import (
     prepare_glossary_units,
 )
 from weblate.lang.models import Language, PluralMapper
+from weblate.logger import LOGGER
 from weblate.machinery.base import (
     MACHINERY_DEFAULT_THRESHOLD,
     BatchMachineTranslation,
@@ -50,6 +51,17 @@ llm_batch_project: ContextVar[str] = ContextVar("llm_batch_project", default="")
 #: seam as llm_batch_project. Reflects the exact batch sent over HTTP,
 #: including split-recovery sub-batches, not the original caller's batch.
 llm_batch_unit_count: ContextVar[int] = ContextVar("llm_batch_unit_count", default=0)
+
+#: Primary key of the usage row written for the request currently being
+#: parsed. The cost of a request is measured at the HTTP seam, while whether
+#: the reply could be used is only known after validation; this carries the
+#: first to the second so both live on one row.
+llm_usage_record: ContextVar[int | None] = ContextVar("llm_usage_record", default=None)
+
+#: How a measured request was resolved, mirroring ``LLMUsageLog.Outcome``.
+#: Spelled out here because importing the model at module level would close
+#: an import cycle through ``weblate.trans``.
+type LLMUsageOutcome = Literal["applied", "partial", "refused"]
 
 
 def _sources_project_slug(sources: list[tuple[str, Unit | None]]) -> str:
@@ -2776,16 +2788,23 @@ class BaseLLMTranslation(BatchMachineTranslation):
         )
         project_token = llm_batch_project.set(_sources_project_slug(sources))
         unit_count_token = llm_batch_unit_count.set(len(sources))
+        # Scoped per attempt: a halved retry must not resolve the previous
+        # attempt's row, and a reply billed without usable usage leaves the
+        # variable at None so nothing is marked at all.
+        usage_token = llm_usage_record.set(None)
         try:
-            translations_string = self.fetch_llm_translations(
-                prompt, content, previous_content, previous_response
+            try:
+                translations_string = self.fetch_llm_translations(
+                    prompt, content, previous_content, previous_response
+                )
+            finally:
+                llm_batch_project.reset(project_token)
+            return self._parse_llm_translations(
+                translations_string, sources, source_occurrences, string_ids=string_ids
             )
         finally:
             llm_batch_unit_count.reset(unit_count_token)
-            llm_batch_project.reset(project_token)
-        return self._parse_llm_translations(
-            translations_string, sources, source_occurrences, string_ids=string_ids
-        )
+            llm_usage_record.reset(usage_token)
 
     async def _adownload_multiple_translations(
         self,
@@ -2894,16 +2913,20 @@ class BaseLLMTranslation(BatchMachineTranslation):
         )
         project_token = llm_batch_project.set(_sources_project_slug(sources))
         unit_count_token = llm_batch_unit_count.set(len(sources))
+        usage_token = llm_usage_record.set(None)
         try:
-            translations_string = await self.afetch_llm_translations(
-                prompt, content, previous_content, previous_response
+            try:
+                translations_string = await self.afetch_llm_translations(
+                    prompt, content, previous_content, previous_response
+                )
+            finally:
+                llm_batch_project.reset(project_token)
+            return await sync_to_async(self._parse_llm_translations)(
+                translations_string, sources, source_occurrences, string_ids=string_ids
             )
         finally:
             llm_batch_unit_count.reset(unit_count_token)
-            llm_batch_project.reset(project_token)
-        return await sync_to_async(self._parse_llm_translations)(
-            translations_string, sources, source_occurrences, string_ids=string_ids
-        )
+            llm_usage_record.reset(usage_token)
 
     def _prepare_llm_translation(
         self,
@@ -2930,6 +2953,24 @@ class BaseLLMTranslation(BatchMachineTranslation):
         add_breadcrumb(self.name, "chat", content=content)
         return prompt, content, previous_content, previous_response
 
+    @staticmethod
+    def _record_llm_outcome(outcome: LLMUsageOutcome) -> None:
+        """
+        Mark how the reply of the request just measured was resolved.
+
+        Never raises: a broken accounting write must not break a translation.
+        """
+        record_id = llm_usage_record.get()
+        if record_id is None:
+            return
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.llm_usage import LLMUsageLog
+
+        try:
+            LLMUsageLog.objects.filter(pk=record_id).update(outcome=outcome)
+        except Exception:
+            LOGGER.exception("Failed to record LLM outcome")
+
     def _parse_llm_translations(
         self,
         translations_string: str | None,
@@ -2942,6 +2983,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
         if translations_string is None or not translations_string:
             msg = "Blank assistant reply"
             self.log_handled_error(msg, extra_log=translations_string)
+            self._record_llm_outcome("refused")
             raise MachineTranslationError(msg)
 
         try:
@@ -2953,6 +2995,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
             if repaired_translations_string is None:
                 msg = "Could not parse assistant reply as JSON."
                 self.log_handled_error(msg, extra_log=translations_string)
+                self._record_llm_outcome("refused")
                 raise MachineTranslationError(msg) from error
 
             try:
@@ -2960,6 +3003,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
             except json.JSONDecodeError as repaired_error:
                 msg = "Could not parse assistant reply as JSON."
                 self.log_handled_error(msg, extra_log=translations_string)
+                self._record_llm_outcome("refused")
                 raise MachineTranslationError(msg) from repaired_error
 
             add_breadcrumb(self.name, "response-repaired")
@@ -2980,13 +3024,16 @@ class BaseLLMTranslation(BatchMachineTranslation):
             if prefix and len(prefix) < len(sources):
                 msg = f"Incomplete assistant reply: {len(prefix)}/{len(sources)}."
                 self.log_handled_error(msg, extra_log=translations_string)
+                self._record_llm_outcome("partial")
                 raise PartialLLMReplyError(
                     self._build_translation_results(prefix, sources), len(prefix)
                 ) from error
             msg = str(error)
             self.log_handled_error(msg, extra_log=translations_string)
+            self._record_llm_outcome("refused")
             raise MachineTranslationError(msg) from error
 
+        self._record_llm_outcome("applied")
         return self._build_translation_results(translations, sources)
 
     def _build_translation_results(

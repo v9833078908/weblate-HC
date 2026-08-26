@@ -58,7 +58,7 @@ from weblate.trans.forms import (
     get_new_unit_form,
     get_upload_form,
 )
-from weblate.trans.judge import judge_configuration_ready
+from weblate.trans.judge import judge_configuration_ready, judge_request_upper_bound
 from weblate.trans.models import (
     Category,
     Change,
@@ -904,9 +904,7 @@ def show_translation(
             .search("state:empty", parser="unit")
             .count()
         )
-        judge_request_estimate = (
-            judge_row_count * 2 * (1 + settings.JUDGE_MAX_REPAIR_ATTEMPTS)
-        )
+        judge_request_estimate = judge_request_upper_bound(judge_row_count)
     judge_verdicts_exist = JudgeVerdict.objects.filter(unit__translation=obj).exists()
     form = get_upload_form(user, obj)
 

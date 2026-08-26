@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, cast
 from asgiref.sync import async_to_sync
 from django.test import SimpleTestCase, TestCase
 from weblate_customization.machinery import (
+    LITELLM_DEFAULT_BASE_URL,
+    RoutedLiteLLMTranslation,
     RoutedLLMMachineryForm,
     RoutedLLMTranslation,
 )
@@ -30,6 +32,16 @@ GEMINI = "google/gemini-2.5-flash"
 CONFIGURATION: dict[str, object] = {
     "key": "test-key",
     "base_url": "https://openrouter.ai/api/v1",
+    "routing": {"ja": DEEPSEEK, "ko": DEEPSEEK, "zh": DEEPSEEK, "*": GEMINI},
+    "persona": "",
+    "style": "",
+    "language_instructions": {},
+}
+
+
+LITELLM_CONFIGURATION: dict[str, object] = {
+    "key": "test-key",
+    "base_url": "https://hcbifrost.herocraft.com/litellm/v1",
     "routing": {"ja": DEEPSEEK, "ko": DEEPSEEK, "zh": DEEPSEEK, "*": GEMINI},
     "persona": "",
     "style": "",
@@ -82,6 +94,45 @@ def sent_models() -> list[str]:
         for payload in sent_payloads()
         if isinstance(model := payload.get("model"), str)
     ]
+
+
+LITELLM_CHAT_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/completions"
+
+
+def mock_litellm_chat(content: str = '["テスト"]') -> None:
+    http_mock.register(
+        "POST",
+        LITELLM_CHAT_URL,
+        json={
+            "id": "chatcmpl-1",
+            "object": "chat.completion",
+            "created": 1677652288,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 9,
+                "completion_tokens": 2,
+                "total_tokens": 11,
+            },
+        },
+    )
+
+
+def litellm_sent_models() -> list[str]:
+    models: list[str] = []
+    for call in http_mock.calls:
+        if str(call.request.url) != LITELLM_CHAT_URL:
+            continue
+        payload = json.loads(call.request.content)
+        if isinstance(payload, dict) and isinstance(model := payload.get("model"), str):
+            models.append(model)
+    return models
 
 
 def as_settings(value: dict[str, object]) -> SettingsDict:
@@ -215,6 +266,63 @@ class RoutedReplyFormatTest(SimpleTestCase):
         payload = self.payload(batch_content(2))
 
         self.assertIs(cast("dict", payload["provider"])["require_parameters"], True)
+
+    @staticmethod
+    def reply_from_schema(string_ids: list[str]) -> list[dict[str, object]]:
+        """
+        Build a reply carrying exactly the fields the schema makes mandatory.
+
+        A structured reply follows the schema, so anything the schema does not
+        require may be absent from it. Deriving the reply from the schema
+        instead of hand-writing it keeps the two halves of the contract tied:
+        dropping a field from ``required`` drops it here too.
+        """
+        # ruff: ignore[private-member-access]
+        schema = cast(
+            "dict", RoutedLLMTranslation._reply_format(len(string_ids))["json_schema"]
+        )["schema"]
+        required = schema["items"]["required"]
+        reply: list[dict[str, object]] = []
+        for string_id in string_ids:
+            item: dict[str, object] = {}
+            if "id" in required:
+                item["id"] = string_id
+            if "parts" in required:
+                item["parts"] = [{"type": "text", "text": f"t-{string_id}"}]
+            reply.append(item)
+        return reply
+
+    def test_schema_requires_the_echoed_id(self) -> None:
+        schema = cast("dict", self.payload(batch_content(3))["response_format"])[
+            "json_schema"
+        ]["schema"]
+
+        self.assertIn("id", schema["items"]["properties"])
+        self.assertIn("id", schema["items"]["required"])
+
+    def test_schema_shaped_reply_pairs_with_its_sources(self) -> None:
+        """A reply the schema allows must satisfy the batch order validator."""
+        string_ids = ["a1b2", "c3d4", "e5f6"]
+        reply = self.reply_from_schema(string_ids)
+
+        # ruff: ignore[private-member-access]
+        ordered = RoutedLLMTranslation._resolve_reply_order(
+            list(reversed(cast("list", reply))), string_ids
+        )
+
+        self.assertIsNotNone(ordered)
+        self.assertEqual(
+            [cast("dict", item)["id"] for item in cast("list", ordered)], string_ids
+        )
+
+    def test_reply_without_the_echoed_id_is_refused(self) -> None:
+        string_ids = ["a1b2", "c3d4"]
+        reply = [{"parts": [{"type": "text", "text": "t"}]} for _ in string_ids]
+
+        self.assertIsNone(
+            # ruff: ignore[private-member-access]
+            RoutedLLMTranslation._resolve_reply_order(cast("list", reply), string_ids)
+        )
 
     def test_malformed_content_omits_schema(self) -> None:
         payload = self.payload("not json")
@@ -373,3 +481,58 @@ class RoutedDownloadTest(TestCase):
             )
 
         self.assertEqual(machine.get_model(), GEMINI)
+
+
+class RoutedLiteLLMTest(SimpleTestCase):
+    """Cover what differs from ``RoutedLLMTranslation``: slug, URL, timeout, payload."""
+
+    def machine(self, **overrides: object) -> RoutedLiteLLMTranslation:
+        configuration = {**LITELLM_CONFIGURATION, **overrides}
+        return RoutedLiteLLMTranslation(as_settings(configuration))
+
+    def test_registration_slug(self) -> None:
+        self.assertEqual(RoutedLiteLLMTranslation.name, "LiteLLM")
+        self.assertEqual(RoutedLiteLLMTranslation.get_identifier(), "litellm")
+
+    def test_default_base_url(self) -> None:
+        configuration = {
+            key: value
+            for key, value in LITELLM_CONFIGURATION.items()
+            if key != "base_url"
+        }
+        machine = RoutedLiteLLMTranslation(as_settings(configuration))
+        self.assertEqual(machine.get_runtime_base_url(), LITELLM_DEFAULT_BASE_URL)
+
+    def test_request_timeout(self) -> None:
+        self.assertEqual(RoutedLiteLLMTranslation.request_timeout, 55)
+
+    def test_trusted_error_host(self) -> None:
+        self.assertIn(
+            "hcbifrost.herocraft.com", RoutedLiteLLMTranslation.trusted_error_hosts
+        )
+
+    def test_chat_payload_has_schema_without_provider(self) -> None:
+        payload = self.machine().get_chat_payload(
+            GEMINI, "prompt", batch_content(2), "", ""
+        )
+        self.assertIn("response_format", payload)
+        self.assertNotIn("provider", payload)
+
+    def test_malformed_content_pop_is_safe(self) -> None:
+        payload = self.machine().get_chat_payload(GEMINI, "prompt", "not json", "", "")
+        self.assertNotIn("response_format", payload)
+        self.assertNotIn("provider", payload)
+
+
+class RoutedLiteLLMDownloadTest(TestCase):
+    @http_mock.activate
+    def test_sync_multiple_routes_cjk(self) -> None:
+        mock_litellm_chat()
+        machine = RoutedLiteLLMTranslation(as_settings(dict(LITELLM_CONFIGURATION)))
+        machine.delete_cache()
+        machine.cache_translations = False
+
+        result = machine.download_multiple_translations("en", "ja", [("Hello", None)])
+
+        self.assertTrue(result)
+        self.assertEqual(litellm_sent_models(), [DEEPSEEK])

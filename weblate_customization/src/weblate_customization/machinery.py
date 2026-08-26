@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""OpenRouter LLM machinery with per-target-language model routing."""
+"""OpenRouter and LiteLLM machinery with per-target-language model routing."""
 
 from __future__ import annotations
 
@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 LANGUAGE_CODE_PART_RE = re.compile(r"[-_@]")
 FALLBACK_KEY = "*"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
+LITELLM_DEFAULT_BASE_URL = "https://hcbifrost.herocraft.com/litellm/v1"
 
 
 def normalize_language_code(code: str) -> str:
@@ -99,6 +100,22 @@ class RoutedLLMMachineryForm(BaseOpenAIMachineryForm):
 
             result[key] = model
         return result
+
+
+class RoutedLiteLLMMachineryForm(RoutedLLMMachineryForm):
+    """Settings form for routing against the corporate LiteLLM proxy."""
+
+    routing = EmptyMappingJSONField(
+        label=pgettext_lazy(
+            "Automatic suggestion service configuration",
+            "Model routing by language",
+        ),
+        help_text=gettext_lazy(
+            'JSON object mapping target language codes, or "*" fallback, '
+            "to model IDs available on the LiteLLM proxy."
+        ),
+        widget=forms.Textarea,
+    )
 
 
 class RoutedLLMTranslation(OpenAITranslation):
@@ -270,6 +287,14 @@ class RoutedLLMTranslation(OpenAITranslation):
         the dominant failure mode, and no prompt rule enforces the length.
         Part fields stay optional because only placeholders carry them, and a
         text part is rejected downstream unless it holds exactly type and text.
+
+        The outer ``id`` is required because
+        ``BaseLLMTranslation._resolve_reply_order`` pairs a batch reply with its
+        sources through it and refuses a batch whose items carry no usable id.
+        Declaring it in the prompt alone is not enough: a structured reply
+        follows the schema, so an undeclared id is simply absent, every batch
+        larger than one string is refused, and the run degrades into
+        single-string requests that each re-pay the whole prompt prefix.
         """
         return {
             "type": "json_schema",
@@ -282,6 +307,7 @@ class RoutedLLMTranslation(OpenAITranslation):
                     "items": {
                         "type": "object",
                         "properties": {
+                            "id": {"type": "string"},
                             "parts": {
                                 "type": "array",
                                 "minItems": 1,
@@ -301,10 +327,40 @@ class RoutedLLMTranslation(OpenAITranslation):
                                     },
                                     "required": ["type", "text"],
                                 },
-                            }
+                            },
                         },
-                        "required": ["parts"],
+                        "required": ["id", "parts"],
                     },
                 },
             },
         }
+
+
+class RoutedLiteLLMTranslation(RoutedLLMTranslation):
+    """Corporate LiteLLM proxy LLM with per-target-language model routing."""
+
+    name = "LiteLLM"
+    settings_form = RoutedLiteLLMMachineryForm
+    trusted_error_hosts: ClassVar[set[str]] = {"hcbifrost.herocraft.com"}
+    # Below the proxy's hard ~60s gateway timeout (nginx 504 past that);
+    # caps one transport attempt only, inherited retries are unchanged.
+    request_timeout = 55
+
+    def get_runtime_base_url(self) -> str:
+        return self.settings.get("base_url") or LITELLM_DEFAULT_BASE_URL
+
+    def get_chat_payload(
+        self,
+        model: str,
+        prompt: str,
+        content: str,
+        previous_content: str,
+        previous_response: str,
+    ) -> dict:
+        payload = super().get_chat_payload(
+            model, prompt, content, previous_content, previous_response
+        )
+        # The corporate proxy passes response_format through without
+        # enforcing it, and rejects OpenRouter-only request fields.
+        payload.pop("provider", None)
+        return payload

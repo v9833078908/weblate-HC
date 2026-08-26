@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 from typing import Any, ClassVar
 from urllib.parse import quote, urljoin
@@ -19,7 +20,12 @@ from .base import (
     MachineTranslationError,
 )
 from .forms import AzureOpenAIMachineryForm, MistralMachineryForm, OpenAIMachineryForm
-from .llm import BaseLLMTranslation, llm_batch_project, llm_batch_unit_count
+from .llm import (
+    BaseLLMTranslation,
+    llm_batch_project,
+    llm_batch_unit_count,
+    llm_usage_record,
+)
 
 
 class BaseOpenAITranslation(BaseLLMTranslation):
@@ -97,7 +103,7 @@ class BaseOpenAITranslation(BaseLLMTranslation):
             ),
         )
         payload = response.json()
-        self.record_llm_usage(payload, model)
+        self.record_llm_usage(payload, model, self.batch_string_count(content))
         return self.parse_chat_response(payload)
 
     async def afetch_llm_translations(
@@ -113,11 +119,22 @@ class BaseOpenAITranslation(BaseLLMTranslation):
         )
         payload = response.json()
         await sync_to_async(self.record_llm_usage, thread_sensitive=True)(
-            payload, model
+            payload, model, self.batch_string_count(content)
         )
         return self.parse_chat_response(payload)
 
-    def record_llm_usage(self, payload: dict[str, Any], model: str) -> None:
+    @staticmethod
+    def batch_string_count(content: str) -> int:
+        """How many strings the request asks for, read back from its body."""
+        try:
+            strings = json.loads(content)["strings"]
+        except (TypeError, KeyError, ValueError):
+            return 0
+        return len(strings) if isinstance(strings, list) else 0
+
+    def record_llm_usage(
+        self, payload: dict[str, Any], model: str, batch_size: int = 0
+    ) -> None:
         """
         Persist the token usage and cost OpenRouter billed for this request.
 
@@ -125,11 +142,13 @@ class BaseOpenAITranslation(BaseLLMTranslation):
         and the exception is logged so a broken table is visible in the log.
         """
         try:
-            self._write_llm_usage(payload, model)
+            self._write_llm_usage(payload, model, batch_size)
         except Exception:
             LOGGER.exception("Failed to record LLM usage")
 
-    def _write_llm_usage(self, payload: dict[str, Any], model: str) -> None:
+    def _write_llm_usage(
+        self, payload: dict[str, Any], model: str, batch_size: int = 0
+    ) -> None:
         if not isinstance(payload, dict):
             return
         usage = payload.get("usage")
@@ -148,7 +167,7 @@ class BaseOpenAITranslation(BaseLLMTranslation):
         # ruff: ignore[import-outside-top-level]
         from weblate.trans.models.llm_usage import LLMUsageLog
 
-        LLMUsageLog.objects.create(
+        record = LLMUsageLog.objects.create(
             model=model,
             project_slug=project_slug if isinstance(project_slug, str) else "",
             prompt_tokens=prompt_tokens,
@@ -160,7 +179,9 @@ class BaseOpenAITranslation(BaseLLMTranslation):
             reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
             operation=LLMUsageLog.Operation.TRANSLATION,
             unit_count=llm_batch_unit_count.get() or None,
+            batch_size=batch_size,
         )
+        llm_usage_record.set(record.pk)
 
     def get_chat_payload(
         self,

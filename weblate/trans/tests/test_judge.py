@@ -18,6 +18,7 @@ from weblate.auth.models import Group, setup_project_groups
 from weblate.trans.actions import ActionEvents
 from weblate.trans.change_display import RenderJudgeResolution
 from weblate.trans.forms import JudgeResolutionForm
+from weblate.trans.judge import judge_request_upper_bound
 from weblate.trans.judge_loop import build_request
 from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
@@ -745,3 +746,29 @@ class JudgeResolutionLocalizationTest(SimpleTestCase):
                 ),
                 "Это решение неприменимо к данному вердикту.",
             )
+
+
+class JudgeRequestEstimateTest(SimpleTestCase):
+    @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_MAX_REPAIR_ATTEMPTS=1)
+    def test_one_string_still_costs_one_batch(self) -> None:
+        self.assertEqual(judge_request_upper_bound(1), 4)
+
+    @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_MAX_REPAIR_ATTEMPTS=1)
+    def test_a_full_batch_is_not_rounded_up(self) -> None:
+        self.assertEqual(judge_request_upper_bound(5), 4)
+
+    @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_MAX_REPAIR_ATTEMPTS=1)
+    def test_one_string_over_a_batch_adds_one_batch(self) -> None:
+        self.assertEqual(judge_request_upper_bound(6), 8)
+
+    @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_MAX_REPAIR_ATTEMPTS=0)
+    def test_no_repair_attempt_means_one_round(self) -> None:
+        self.assertEqual(judge_request_upper_bound(6), 4)
+
+    @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_MAX_REPAIR_ATTEMPTS=1)
+    def test_no_strings_costs_nothing(self) -> None:
+        self.assertEqual(judge_request_upper_bound(0), 0)
+
+    @override_settings(JUDGE_BATCH_SIZE=0, JUDGE_MAX_REPAIR_ATTEMPTS=1)
+    def test_a_broken_batch_size_yields_no_number(self) -> None:
+        self.assertIsNone(judge_request_upper_bound(6))

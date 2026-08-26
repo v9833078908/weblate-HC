@@ -23,7 +23,7 @@ from weblate.utils.state import FUZZY_STATES, STATE_FUZZY, STATE_TRANSLATED
 
 @override_settings(
     JUDGE_ENABLED=True,
-    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_API_KEY="sk-test",
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_MAX_UNITS_PER_RUN=2000,
@@ -263,8 +263,8 @@ class JudgeAutoTranslateTest(ViewTestCase):
             mock.patch.object(auto, "process_mt"),
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
             mock.patch(
-                "weblate.trans.judge_loop.repair_target",
-                return_value=["repaired translation"],
+                "weblate.trans.judge_loop.repair_targets",
+                return_value={unit.id: ["repaired translation"]},
             ),
         ):
             auto.process_judge(engines=[], threshold=80)
