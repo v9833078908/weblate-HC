@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Status:** Approved for implementation on 2026-08-26.
+**Status:** Completed on 2026-08-26. Focused regression tests and scoped lint passed; the full custom-check module was not run because PostgreSQL at `127.0.0.1:5434` had no response.
 
 **Goal:** Preserve the raw max-length representation for malformed Hero Craft conditional DSL and accurately document the separator-validation boundary without blocking localized branch text.
 
