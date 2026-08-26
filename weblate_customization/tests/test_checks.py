@@ -118,7 +118,7 @@ class ConditionalLengthRepresentationTest(SimpleTestCase):
         self.assertIs(_conditional_length_text(text), text)
 
     def test_unrecognized_header_and_malformed_braces_are_unchanged(self) -> None:
-        for text in ("{value:cond:1}", HUMAN_TIMER_DE[:-1]):
+        for text in ("{value:cond:1}", HUMAN_TIMER_DE[:-1], HUMAN_TIMER_DE + "}"):
             with self.subTest(text=text):
                 self.assertIs(_conditional_length_text(text), text)
 
@@ -280,6 +280,13 @@ class GameMarkupCheckTest(CheckTestCase):
 
     def test_allows_localized_conditional_branch_text(self) -> None:
         self.assertFalse(self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_TR, None))
+        self.assertFalse(
+            self.check.check_single(
+                "{x:cond:>0?{value}a|bc}",
+                "{x:cond:>0?{value}ab|c}",
+                None,
+            )
+        )
 
     def test_unrecognized_source_conditional_adds_no_failure(self) -> None:
         for text in ("{value:cond:1}", "Text {value:00}: text"):

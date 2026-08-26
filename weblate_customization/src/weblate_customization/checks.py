@@ -310,6 +310,8 @@ def _conditional_length_text(text: str) -> str:
     """Return a conservative character representation of conditional DSL."""
     if ":cond:" not in text:
         return text
+    if any(_unmatched_braces(text)):
+        return text
 
     recognized = []
     for start, end, _children in sorted(
