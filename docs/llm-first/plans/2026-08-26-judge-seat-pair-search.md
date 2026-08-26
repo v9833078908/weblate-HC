@@ -233,15 +233,68 @@ across two R3 invalidations at once.
 A single seat is expected to fail the hard gate - `deepseek` alone misses 6 of 7.
 Solo numbers are diagnostic.
 
+## Stage 0 outcome, and the decision it forces
+
+Measured in
+`docs/llm-first/measurements/2026-08-26-litellm-stage0-compatibility.md`. Two
+facts change the plan.
+
+**The binding constraint is a time-to-first-byte reset, not model quality.** The
+peer sends `ConnectionResetError` after ~30.5 s of silence; our transport
+timeout is 120 s. The judge's hardcoded `"stream": False`
+(`weblate/trans/judge.py:542`) is what exposes us to it, and streaming the same
+payload lets a previously impossible model finish in 39-44 s.
+
+**Disabling reasoning moves six candidates from marginal to comfortable.** With
+each vendor's own toggle, `qwen3.8-max` goes from 1 accept in 12 attempts to 3/3
+at 4.4-4.8 s. Four families now pass the production parser: Qwen, GLM, DeepSeek,
+Moonshot.
+
+### The mode decision (open)
+
+The corpus runs must be reproducible by production, or the pair is chosen for
+behaviour production cannot deliver. So the eval mode and the product must
+agree, and there are only two coherent options:
+
+| | Reasoning ON (today's payload) | Reasoning OFF |
+|---|---|---|
+| Candidate pool | GLM, Kimi, both DeepSeek; Qwen effectively out | all four families |
+| Seat 1 today | `deepseek-v4-pro` runs on the wall (30.4 s pass, 30.8 s reset) | 11.6-13.4 s, comfortable |
+| Product change | none | a per-model toggle in `judge.py` |
+| Cost | loses the family that historically carried zh recall | judgment quality with reasoning off is unmeasured |
+
+Recommended: measure with reasoning **off**, and run the anchor
+`deepseek-v4-pro` in **both** modes, so the price of disabling is measured
+rather than assumed. That is one extra 5-repeat run.
+
+### Proposed mechanism, if reasoning-off is chosen
+
+Reuse the existing operator knob instead of adding one. `JUDGE_REASONING_EFFORT`
+is currently refused outright for LiteLLM hosts
+(`weblate/trans/judge.py:137-142`). Extend it so that:
+
+- `""` keeps today's behaviour exactly - no toggle sent, no default changes;
+- `"none"` on a LiteLLM host sends the vendor's disable toggle, mapped per
+  model family: `enable_thinking: false` for Qwen, `thinking: {"type":
+  "disabled"}` for the rest, because the spellings differ and sending the wrong
+  one silently leaves reasoning on - the exact error that mismeasured Qwen in
+  the first pass;
+- any other value on a LiteLLM host stays refused, as today;
+- OpenRouter behaviour is untouched.
+
+The eval then calls `request_verdicts` with that setting, so the measurement and
+production run the same code. Nothing is implemented until the mode is chosen.
+
 ## Stages
 
 ### Stage 0: compatibility, not quality
 
-`analysis/probes/litellm-model-compat.py` (written, not yet run) sends the
-judge's payload shape to each candidate and reports where the answer landed:
-`content`, `reasoning_content`, a reply the parser refuses, or nowhere. Variants tried per
-model: plain, explicit `max_tokens`, `thinking: {type: disabled}`,
-`reasoning_split`. Roughly 4 requests per model, about 50 in total.
+`analysis/probes/litellm-model-compat.py` sends the judge's own payload to each
+candidate through `_post_batch` and admits a model only when `_parse_reply`
+accepts all five segments. Variants tried per model: plain, explicit
+`max_tokens`, each vendor's thinking toggle, and `reasoning_split`. Each variant
+gets two attempts, because a transport reset is not a model verdict - that retry
+is what saved `QWEN3.7-plus` from being wrongly disqualified.
 
 Output: for each candidate, either "callable, with these parameters" or "not
 callable through this proxy today, for this reason". A model whose answer only
