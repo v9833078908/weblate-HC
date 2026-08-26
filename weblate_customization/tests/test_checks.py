@@ -52,6 +52,9 @@ HUMAN_TIMER_TR = (
     "{seconds:cond:>=0?{seconds} sn.|}"
 )
 NESTED_CONDITIONAL = "{a:cond:>0?{b:cond:>0?x|}y|}"
+# The nested branch also carries a placeholder, so a change to its text leaves
+# `placeholder_sequence` equal and only the conditional signature can catch it.
+NESTED_PLACEHOLDER_CONDITIONAL = "{a:cond:>0?{b:cond:>0?{c}x|}y|}"
 
 
 class ConditionalDslSyntaxSpansTest(SimpleTestCase):
@@ -203,9 +206,9 @@ class GameMarkupCheckTest(CheckTestCase):
                 self.assertTrue(self.check.check_single(source, target, None))
 
     def test_rejects_a_malformed_conditional_target(self) -> None:
-        self.assertTrue(
-            self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_EN[:-1], None)
-        )
+        for target in (HUMAN_TIMER_EN[:-1], HUMAN_TIMER_EN + "}"):
+            with self.subTest(target=target):
+                self.assertTrue(self.check.check_single(HUMAN_TIMER_EN, target, None))
 
     def test_a_nested_conditional_branch_is_immutable(self) -> None:
         self.assertTrue(
@@ -219,6 +222,17 @@ class GameMarkupCheckTest(CheckTestCase):
             )
         )
 
+    def test_a_nested_conditional_branch_is_immutable_without_token_help(self) -> None:
+        # The generic placeholder sequence is identical here, so this fails only
+        # while the conditional signature carries the nested block verbatim.
+        self.assertTrue(
+            self.check.check_single(
+                NESTED_PLACEHOLDER_CONDITIONAL,
+                NESTED_PLACEHOLDER_CONDITIONAL.replace("}x|", "}z|", 1),
+                None,
+            )
+        )
+
     def test_allows_localized_conditional_branch_text(self) -> None:
         self.assertFalse(self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_TR, None))
 
@@ -226,6 +240,15 @@ class GameMarkupCheckTest(CheckTestCase):
         for text in ("{value:cond:1}", "Text {value:00}: text"):
             with self.subTest(text=text):
                 self.assertFalse(self.check.check_single(text, text, None))
+
+    def test_a_target_only_conditional_adds_no_failure(self) -> None:
+        # `:cond:` in the source without a recognized conditional gives the
+        # target no contract, even when the target grows one.
+        self.assertFalse(
+            self.check.check_single(
+                "{value} :cond:", "{x:cond:>0?{value}|} :cond:", None
+            )
+        )
 
 
 class GameLineBreakCheckTest(CheckTestCase):

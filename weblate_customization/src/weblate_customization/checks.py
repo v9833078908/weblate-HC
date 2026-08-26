@@ -206,10 +206,38 @@ def _balanced_brace_blocks(
     return [] if starts else blocks
 
 
+def _unmatched_braces(text: str) -> tuple[int, int]:
+    """
+    Count the braces the engine cannot pair: unmatched closes, then opens.
+
+    `_balanced_brace_blocks()` ignores a stray closing brace, so a target that
+    appends one keeps every span, token and signature of a well-formed one.
+    The engine does not: the count is what tells the two apart.
+    """
+    opens = closes = 0
+    for char in text:
+        if char == "{":
+            opens += 1
+        elif char == "}":
+            if opens:
+                opens -= 1
+            else:
+                closes += 1
+    return closes, opens
+
+
 def _parse_conditional_dsl(
     text: str,
 ) -> tuple[list[tuple[int, int]], tuple[tuple[str, ...], ...]]:
-    """Return immutable conditional spans and ordered conditional signatures."""
+    """
+    Return immutable conditional spans and the ordered conditional signatures.
+
+    A signature holds the exact header, every immediate nested placeholder and
+    every top-level delimiter, in source order, and no branch text. Only the
+    outermost recognized conditional is a record: a nested one travels verbatim
+    inside its parent, which keeps spans non-overlapping and walks every branch
+    interior once.
+    """
     spans: list[tuple[int, int]] = []
     signatures: list[tuple[str, ...]] = []
     recognized_end = 0
@@ -221,6 +249,8 @@ def _parse_conditional_dsl(
         if header is None:
             continue
 
+        # The header's comparison cannot cross a nested placeholder. The
+        # matching outer brace proved every nested placeholder is complete.
         spans.extend(
             (
                 (start, start + 1),
@@ -265,6 +295,8 @@ def conditional_dsl_syntax_spans(text: str) -> list[tuple[int, int]]:
         for match in PLACEHOLDER_PATTERN.finditer(text)
         if match.group().startswith("{")
     ]
+    # A separate rule, never part of a signature: it protects the `:` in
+    # `{minutes:00}:{seconds:00}`, which belongs to no conditional.
     for previous, following in pairwise(simple_placeholders):
         if previous[1] + 1 == following[0] and text[previous[1]] == ":":
             spans.append((previous[1], following[0]))
@@ -287,6 +319,9 @@ class GameMarkupCheck(TargetCheck):
     def check_single(self, source: str, target: str, unit) -> bool:
         if not target:
             return False
+        # The existing comparisons run first: they are cheap, and a string that
+        # already fails must not pay for the conditional parser. The substring
+        # test is a C-level scan, while the parser is a per-character loop.
         if Counter(markup_tokens(source)) != Counter(markup_tokens(target)):
             return True
         if placeholder_sequence(source) != placeholder_sequence(target):
@@ -295,8 +330,10 @@ class GameMarkupCheck(TargetCheck):
             return False
 
         source_conditionals = _parse_conditional_dsl(source)[1]
-        return bool(source_conditionals) and (
-            source_conditionals != _parse_conditional_dsl(target)[1]
+        if not source_conditionals:
+            return False
+        return source_conditionals != _parse_conditional_dsl(target)[1] or (
+            _unmatched_braces(source) != _unmatched_braces(target)
         )
 
     def check_highlight(self, source: str, unit):
