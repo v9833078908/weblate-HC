@@ -91,7 +91,7 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
         self.assertNotContains(response, "No blocking action")
 
     @override_settings(
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_MODEL_SEAT_1="vendor-a/model",
         JUDGE_MODEL_SEAT_2="vendor-b/model",
     )
@@ -120,7 +120,7 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
 
     @override_settings(
         CELERY_TASK_ALWAYS_EAGER=True,
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_MODEL_SEAT_1="vendor-a/model",
         JUDGE_MODEL_SEAT_2="vendor-b/model",
     )
@@ -154,7 +154,7 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
         self.assertEqual(response.context["judge_row_count"], expected)
 
     @override_settings(
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_MODEL_SEAT_1="vendor-a/model",
         JUDGE_MODEL_SEAT_2="vendor-b/model",
     )
@@ -185,7 +185,7 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
         )
 
     @override_settings(
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_MODEL_SEAT_1="vendor-a/model",
         JUDGE_MODEL_SEAT_2="vendor-b/model",
     )
@@ -1055,7 +1055,7 @@ class JudgeResolutionViewTest(ViewTestCase):
 
 @override_settings(
     JUDGE_ENABLED=True,
-    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_API_KEY="sk-test",
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
 )

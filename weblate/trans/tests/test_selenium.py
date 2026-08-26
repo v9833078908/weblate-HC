@@ -1484,7 +1484,7 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
             override_settings(
                 CELERY_TASK_ALWAYS_EAGER=False,
                 JUDGE_ENABLED=True,
-                JUDGE_OPENROUTER_KEY="sk-test",
+                JUDGE_API_KEY="sk-test",
                 JUDGE_MODEL_SEAT_1="vendor-a/model",
                 JUDGE_MODEL_SEAT_2="vendor-b/model",
             ),
@@ -1655,7 +1655,7 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
 
         with override_settings(
             JUDGE_ENABLED=True,
-            JUDGE_OPENROUTER_KEY="sk-test",
+            JUDGE_API_KEY="sk-test",
             JUDGE_MODEL_SEAT_1="vendor-a/model",
             JUDGE_MODEL_SEAT_2="vendor-b/model",
         ):
@@ -1764,7 +1764,7 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
 
         with override_settings(
             JUDGE_ENABLED=True,
-            JUDGE_OPENROUTER_KEY="sk-test",
+            JUDGE_API_KEY="sk-test",
             JUDGE_MODEL_SEAT_1="vendor-a/model",
             JUDGE_MODEL_SEAT_2="vendor-b/model",
         ):
@@ -1807,7 +1807,7 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
 
         with override_settings(
             JUDGE_ENABLED=True,
-            JUDGE_OPENROUTER_KEY="sk-test",
+            JUDGE_API_KEY="sk-test",
             JUDGE_MODEL_SEAT_1="vendor-a/model",
             JUDGE_MODEL_SEAT_2="vendor-b/model",
         ):
@@ -1853,7 +1853,7 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
 
         with override_settings(
             JUDGE_ENABLED=True,
-            JUDGE_OPENROUTER_KEY="sk-test",
+            JUDGE_API_KEY="sk-test",
             JUDGE_MODEL_SEAT_1="vendor-a/model",
             JUDGE_MODEL_SEAT_2="vendor-b/model",
         ):

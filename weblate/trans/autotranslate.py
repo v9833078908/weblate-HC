@@ -173,6 +173,7 @@ def _judge_phase(
         worst_case_calls - initial_calls,
     )
 
+
 def check_auto_translate_permission(
     user: User | None, translation: Translation, mode: str
 ) -> bool | PermissionResult:

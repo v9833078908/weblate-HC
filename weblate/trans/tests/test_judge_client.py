@@ -172,6 +172,7 @@ class JudgeClientGateTest(SimpleTestCase):
     )
     def test_readiness_rejects_an_invalid_cap(self) -> None:
         self.assertFalse(judge_configuration_ready())
+
     @override_settings(JUDGE_ENABLED=True, JUDGE_API_KEY="sk-test", JUDGE_BASE_URL="")
     @http_mock.activate
     def test_blank_base_url_makes_no_network_call(self) -> None:

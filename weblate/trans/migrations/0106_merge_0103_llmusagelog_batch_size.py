@@ -8,7 +8,8 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-    """Join the two parallel leaves produced by merging main.
+    """
+    Join the two parallel leaves produced by merging main.
 
     ``0105_alter_change_action`` (the tip of this branch's chain, which already
     descends from ``0103_judge_target_storage_hash``) and main's
