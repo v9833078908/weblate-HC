@@ -1077,9 +1077,7 @@ class DetailedCountByTranslationTest(ViewTestCase):
         self.assert_matches_per_translation()
 
     def test_retry_ineligible_blocking_history(self) -> None:
-        unit = self.change_unit(
-            "Ahoj sv\u011bte!\n", translation=self.translation_cs
-        )
+        unit = self.change_unit("Ahoj sv\u011bte!\n", translation=self.translation_cs)
         pending = PendingUnitChange.objects.get(unit=unit)
         pending.metadata = {
             "last_failed": timezone.now().isoformat(),
