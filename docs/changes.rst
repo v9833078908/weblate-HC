@@ -46,6 +46,7 @@ Weblate 2026.8.1
 * The ``game-markup`` check now also compares Unity sprite tags such as ``<sprite name="fire">``, whose attribute follows a space instead of ``=``, so a renamed or dropped inline icon is reported.
 * An engine substitution token the source string uses is now reported by the ``game-token`` check when it is missing from the translation. Mission descriptions substitute values through ``item_type[|{0}]`` and ``skirmish_league_id[gen|в {0}|в любой лиге]``: the bracketed alternatives are translated, but the identifier in front of the bracket is a lookup key, and a translated one resolves to nothing in the game. Brackets without a ``|`` are ordinary text and are never treated as a substitution.
 * Added the ``game-length`` check, which flags a translation whose visible length (markup and placeholders stripped) grows far past the source: short labels tolerate up to 3.0x, long sentences only 1.35x, with minimum-length floors so legitimate short-label growth is not flagged. Ignore with the ``ignore-game-length`` flag when the space is known to fit.
+* The ``game-markup`` check now also compares the syntax of Hero Craft conditional placeholders such as ``{hours:cond:>0?{hours}h. |}``: a space inserted inside a conditional header, a lost, added or moved ``|``, and a changed identifier, comparison or nested placeholder are reported, while the text of a conditional branch stays translatable.
 
 .. rubric:: Bug fixes
 
