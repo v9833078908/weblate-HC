@@ -523,6 +523,28 @@ function interpolate(fmt, obj, named) {
   return fmt.replace(/%s/g, () => String(obj.shift()));
 }
 
+/* Judge run phase text for the task progress poller, textContent-only. */
+function describeJudgePhase(result) {
+  if (result === null || typeof result !== "object") {
+    return "";
+  }
+  if (result.phase === "judging") {
+    return interpolate(
+      gettext("Judging %(current)s of %(total)s strings"),
+      { current: result.phase_current, total: result.phase_total },
+      true,
+    );
+  }
+  if (result.phase === "repairing") {
+    return interpolate(
+      gettext("Repairing %(current)s of %(total)s strings"),
+      { current: result.phase_current, total: result.phase_total },
+      true,
+    );
+  }
+  return "";
+}
+
 function loadMatrix() {
   const loadingNext = document.getElementById("loading-next");
   const loader = document.getElementById("matrix-load");
@@ -1186,15 +1208,32 @@ onReady(() => {
     persistForms.forEach((form) => {
       const storedRaw = window.localStorage[form.dataset.persist];
       if (storedRaw) {
+        const urlParameters = new URLSearchParams(window.location.search);
         const storedValue = JSON.parse(storedRaw);
         for (const [key, value] of Object.entries(storedValue)) {
-          if (!key) {
+          if (!key || urlParameters.has(key)) {
             continue;
           }
           const selector = `[name="${CSS.escape(key)}"]`;
           form.querySelectorAll(selector).forEach((target) => {
             if (target.type === "checkbox") {
               target.checked = value;
+            } else if (target instanceof HTMLSelectElement) {
+              /* A stored choice can be missing from this page's options:
+               * the automatic translation form only offers "judge" where
+               * the user may review, so a judge run persisted on one scope
+               * would restore a value no <option> carries. Assigning it
+               * leaves selectedIndex at -1, and a browser omits an
+               * unselected select from the submission, so an apparently
+               * valid form posts without the field and comes back as a
+               * required-field error. Keep the rendered selection. */
+              if (
+                Array.from(target.options).some(
+                  (option) => option.value === value,
+                )
+              ) {
+                target.value = value;
+              }
             } else {
               target.value = value;
             }
@@ -1287,6 +1326,120 @@ onReady(() => {
     });
     updateAutoSource();
   }
+
+  document.querySelectorAll("form[data-judge-preview-url]").forEach((form) => {
+    const mode = form.querySelector('[name="mode"]');
+    const query = form.querySelector('[name="q"]');
+    const preview = form.querySelector("#id_auto_judge_preview");
+    const apply = form.querySelector("#id_auto_apply");
+    if (mode === null || query === null || preview === null || apply === null) {
+      return;
+    }
+    let timer;
+    let controller;
+    /* autoform.html renders the preview with Bootstrap's `d-none` as well as
+     * an inline `display: none`. The global show()/hide() helpers only touch
+     * the inline style, and `.d-none { display: none !important }` outranks
+     * it, so the preview would stay invisible however much text it holds. */
+    const showPreview = () => {
+      preview.classList.remove("d-none");
+      show(preview);
+    };
+    const hidePreview = () => {
+      hide(preview);
+      preview.classList.add("d-none");
+    };
+    const updateJudgePreview = () => {
+      if (mode.value !== "judge") {
+        hidePreview();
+        apply.disabled = false;
+        return;
+      }
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        controller?.abort();
+        controller = new AbortController();
+        const params = new URLSearchParams(new FormData(form));
+        fetch(`${form.dataset.judgePreviewUrl}?${params}`, {
+          signal: controller.signal,
+        })
+          .then((response) => {
+            if (response.status === 400) {
+              return response.json().then(() => {
+                const error = new Error("Invalid judge preview");
+                error.invalid = true;
+                throw error;
+              });
+            }
+            if (!response.ok) {
+              throw new Error("Judge preview failed");
+            }
+            return response.json();
+          })
+          .then((data) => {
+            const judgeCost = data.judge_cost.available
+              ? interpolate(
+                  gettext("Observed judge cost: %(min)s to %(max)s USD."),
+                  data.judge_cost,
+                  true,
+                )
+              : gettext("Observed judge cost is unavailable.");
+            const pretranslationCost = data.pretranslation_cost.available
+              ? interpolate(
+                  gettext(
+                    "Observed pretranslation cost: %(min)s to %(max)s USD.",
+                  ),
+                  data.pretranslation_cost,
+                  true,
+                )
+              : gettext("Observed pretranslation cost is unavailable.");
+            preview.textContent = interpolate(
+              gettext(
+                "%(matched)s matching strings: %(processed)s will be judge-evaluated, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap. %(initial)s initial and %(worst)s worst-case LLM requests. %(judgeCost)s %(pretranslationCost)s",
+              ),
+              {
+                matched: data.matched,
+                processed: data.processed,
+                writable: data.writable,
+                remaining: data.remaining,
+                initial: data.judge_calls_initial,
+                worst: data.judge_calls_worst_case,
+                judgeCost,
+                pretranslationCost,
+              },
+              true,
+            );
+            showPreview();
+            apply.disabled = data.processed === 0;
+          })
+          .catch((error) => {
+            if (error.name === "AbortError") {
+              return;
+            }
+            if (error.invalid) {
+              preview.textContent = gettext("Judge preview input is invalid.");
+              showPreview();
+              apply.disabled = true;
+              return;
+            }
+            preview.textContent = gettext(
+              "Judge preview is unavailable. You can still apply this run.",
+            );
+            showPreview();
+            apply.disabled = false;
+          });
+      }, 250);
+    };
+    mode.addEventListener("change", updateJudgePreview);
+    query.addEventListener("input", updateJudgePreview);
+    form
+      .querySelector('[name="overwrite_existing"]')
+      ?.addEventListener("change", updateJudgePreview);
+    form
+      .querySelector('[name="engines"]')
+      ?.addEventListener("change", updateJudgePreview);
+    updateJudgePreview();
+  });
 
   const findElements = (root, selector) => {
     const elements = [];
@@ -1617,6 +1770,7 @@ onReady(() => {
     const bar = message.querySelector(".progress-bar");
     const messageText = message.querySelector(".task-message");
     const warnings = message.querySelector(".task-warnings");
+    const phase = message.querySelector(".task-phase");
     if (bar !== null) {
       bar.setAttribute("data-completed", "0");
     }
@@ -1653,6 +1807,11 @@ onReady(() => {
           const data = await response.json();
           if (bar !== null) {
             bar.style.width = `${data.progress}%`;
+          }
+          if (phase !== null) {
+            phase.textContent = data.completed
+              ? ""
+              : describeJudgePhase(data.result);
           }
           if (data.completed) {
             const result = data.result ?? {};

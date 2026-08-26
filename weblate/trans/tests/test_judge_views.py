@@ -5,18 +5,31 @@
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
+from weblate.trans.actions import ActionEvents
 from weblate.trans.judge_loop import build_request
+from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
+    compute_target_storage_hash,
 )
+from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.models.unit import Unit
 from weblate.trans.tests.test_views import ViewTestCase
-from weblate.utils.state import STATE_TRANSLATED
+from weblate.utils.state import (
+    STATE_FUZZY,
+    STATE_NEEDS_CHECKING,
+    STATE_READONLY,
+    STATE_TRANSLATED,
+)
+from weblate.workspaces.models import Workspace
 
 
 def judge_context_hash(unit) -> str:
@@ -69,16 +82,158 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(JudgeVerdict.objects.count(), 0)
 
+    def test_old_readiness_card_is_absent(self) -> None:
+        response = self.client.get(self.component.get_absolute_url())
+
+        self.assertNotContains(response, "Release readiness")
+        self.assertNotContains(response, "Delivery")
+        self.assertNotContains(response, "Primary action")
+        self.assertNotContains(response, "No blocking action")
+
+    @override_settings(
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_preview_accepts_a_project_scope(self) -> None:
+        url = reverse(
+            "auto_translation_preview", kwargs={"path": self.project.get_url_path()}
+        )
+        response = self.client.get(
+            f"{url}?mode=judge&q=state%3Aempty&auto_source=mt&threshold=80"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("matched", response.json())
+
+    def test_post_accepts_a_project_scope_and_queues_a_run(self) -> None:
+        response = self.client.post(
+            reverse("auto_translation", kwargs={"path": self.project.get_url_path()}),
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "engines": [],
+                "threshold": 80,
+            },
+        )
+        self.assertRedirects(response, self.project.get_absolute_url())
+
+    @override_settings(
+        CELERY_TASK_ALWAYS_EAGER=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_project_scope_task_runs_in_eager_mode(self) -> None:
+        response = self.client.post(
+            reverse("auto_translation", kwargs={"path": self.project.get_url_path()}),
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "engines": [],
+                "threshold": 80,
+            },
+        )
+
+        self.assertRedirects(response, self.project.get_absolute_url())
+
+    def test_translation_estimate_uses_the_judge_default_query(self) -> None:
+        translation = self.get_translation()
+        unit = translation.unit_set.first()
+        assert unit is not None
+        unit.translate(self.user, ["Needs editing"], STATE_FUZZY)
+        expected = (
+            translation.unit_set.exclude(state=STATE_READONLY)
+            .search("state:empty", parser="unit")
+            .count()
+        )
+
+        response = self.client.get(translation.get_absolute_url())
+
+        self.assertEqual(response.context["judge_row_count"], expected)
+
+    @override_settings(
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_preview_reports_the_capped_execution_scope(self) -> None:
+        response = self.client.get(
+            reverse("auto_translation_preview", kwargs=self.kw_translation),
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "threshold": 80,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            set(response.json()),
+            {
+                "matched",
+                "processed",
+                "remaining",
+                "writable",
+                "judge_calls_initial",
+                "judge_calls_worst_case",
+                "judge_cost",
+                "pretranslation_cost",
+            },
+        )
+
+    @override_settings(
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_preview_uses_observed_judge_costs(self) -> None:
+        for model, cost in (("vendor-a/model", "0.01"), ("vendor-b/model", "0.02")):
+            for _ in range(5):
+                LLMUsageLog.objects.create(
+                    model=model,
+                    project_slug=self.component.project.slug,
+                    operation=LLMUsageLog.Operation.JUDGE,
+                    cost_usd=cost,
+                    unit_count=1,
+                )
+        response = self.client.get(
+            reverse("auto_translation_preview", kwargs=self.kw_translation),
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "threshold": 80,
+            },
+        )
+
+        cost = response.json()["judge_cost"]
+        self.assertTrue(cost["available"])
+        self.assertEqual(cost["min"], "0.12")
+        self.assertEqual(cost["max"], "0.24")
+
     def test_form_shows_how_many_strings_a_run_would_touch(self) -> None:
         response = self.client.get(self.translation_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "id_auto_row_count")
 
-    def test_form_shows_the_honest_request_estimate(self) -> None:
-        response = self.client.get(self.translation_url)
+    def test_form_estimates_requests_from_batches_not_strings(self) -> None:
+        with override_settings(JUDGE_BATCH_SIZE=2):
+            response = self.client.get(self.translation_url)
         self.assertEqual(response.status_code, 200)
-        # Worst case: strings x 2 seats x (1 + repair attempts).
-        self.assertContains(response, "id_auto_request_estimate")
+        rows = response.context["judge_row_count"]
+        self.assertGreater(rows, 2)
+        batched = ((rows + 1) // 2) * 2 * 2
+        per_string = rows * 2 * 2
+        self.assertContains(response, f"plans up to {batched} LLM requests")
+        self.assertNotContains(response, f"plans up to {per_string} LLM requests")
+
+    def test_form_estimate_never_floors_a_partial_batch_to_zero(self) -> None:
+        with override_settings(JUDGE_BATCH_SIZE=1000):
+            response = self.client.get(self.translation_url)
+        self.assertContains(response, "plans up to 4 LLM requests")
 
     def test_form_explains_judge_duration_contention(self) -> None:
         response = self.client.get(self.translation_url)
@@ -269,6 +424,8 @@ class JudgeVerdictCardTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "latest judge answer was not parsed")
         self.assertContains(response, "historical evidence")
+        self.assertContains(response, "Rejected")
+        self.assertContains(response, "Will not ship")
 
     def test_no_verdict_means_no_card(self) -> None:
         response = self.client.get(self.get_unit().get_absolute_url())
@@ -280,6 +437,446 @@ class JudgeVerdictCardTest(ViewTestCase):
         self.make_reject(unit, context_hash="stale-context-hash")
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "context changed")
+
+    def test_major_card_shows_a_ships_badge(self) -> None:
+        unit = self.get_unit()
+        self.make_flag(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Ships with evidence")
+
+    def test_critical_card_shows_a_will_not_ship_badge(self) -> None:
+        unit = self.get_unit()
+        self.make_reject(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Will not ship")
+        self.assertNotContains(response, "Ships with evidence")
+
+    def test_current_context_round_beats_newer_context_stale_evidence(self) -> None:
+        unit = self.get_unit()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+        current_context = judge_context_hash(unit)
+        first = JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="major",
+            seat=1,
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "major",
+                    "description": "current context",
+                }
+            ],
+            judge_model="vendor/model-a",
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash=current_context,
+        )
+        newer = JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="critical",
+            seat=1,
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "changed context",
+                }
+            ],
+            judge_model="vendor/model-a",
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash="changed-context",
+        )
+        JudgeVerdict.objects.filter(pk=newer.pk).update(
+            timestamp=first.timestamp + timedelta(seconds=1)
+        )
+
+        response = self.client.get(unit.get_absolute_url())
+
+        self.assertContains(response, "current context")
+        self.assertNotContains(response, "changed context")
+        self.assertContains(response, "id_judge_resolution_form")
+
+    def test_pass_card_renders_minor_errors(self) -> None:
+        unit = self.get_unit()
+        self.make(
+            unit,
+            "minor",
+            errors=[
+                {
+                    "span": "x",
+                    "category": "fluency",
+                    "severity": "minor",
+                    "description": "a minor style note",
+                }
+            ],
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "a minor style note")
+
+    def test_pass_card_omits_error_list_for_none(self) -> None:
+        unit = self.get_unit()
+        self.make(
+            unit,
+            "none",
+            errors=[
+                {
+                    "span": "x",
+                    "category": "fluency",
+                    "severity": "none",
+                    "description": "should never render",
+                }
+            ],
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "id_judge_card")
+        self.assertNotContains(response, "should never render")
+
+
+class JudgeRepairEvidenceTest(ViewTestCase):
+    def make_round(self, unit, *, run_id, attempt, severity, when, tag):
+        """Judge the CURRENT stored text with both seats."""
+        target_hash = compute_target_hash(unit.get_target_plurals())
+        errors = (
+            []
+            if severity == "none"
+            else [
+                {
+                    "span": "x",
+                    "category": "terminology",
+                    "severity": severity,
+                    "description": f"{tag} objection",
+                }
+            ]
+        )
+        rows = [
+            JudgeVerdict.objects.create(
+                unit=unit,
+                max_severity=severity,
+                seat=seat,
+                run_id=run_id,
+                attempt=attempt,
+                errors=errors,
+                judge_model=f"vendor/model-{seat}",
+                target_hash=target_hash,
+                context_hash="c",
+            )
+            for seat in (1, 2)
+        ]
+        JudgeVerdict.objects.filter(pk__in=[row.pk for row in rows]).update(
+            timestamp=when
+        )
+        unit.run_checks()
+        return rows
+
+    def make_change(self, unit, *, old, target, when):
+        change = Change.objects.create(
+            unit=unit,
+            action=ActionEvents.CHANGE,
+            user=self.user,
+            author=self.user,
+            old=old,
+            target=target,
+        )
+        Change.objects.filter(pk=change.pk).update(timestamp=when)
+        return change
+
+    def test_exact_match_renders_the_comparison(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        unit.translate(self.user, ["Fixed sentence"], STATE_FUZZY)
+        unit = self.get_unit()
+        change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=change.pk).update(timestamp=now + timedelta(seconds=1))
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertContains(response, "original objection")
+        self.assertContains(response, "Text before the repair:")
+        self.assertContains(response, "Broken")
+        # Regression: value/diff must not be swapped, or the comparison
+        # shows the fixed wording as removed and the broken wording as
+        # added - exactly backwards from what a producer needs to trust.
+        # A plain substring assertion on "Broken" alone would pass either
+        # way (the unit's own change-history section elsewhere on the same
+        # page independently renders the identical Broken->Fixed diff the
+        # correct way round, which would make an unscoped assertion pass
+        # even if THIS block's tags were swapped) - so this locates the
+        # "Text before the repair:" block specifically and only inspects
+        # the few hundred bytes right after it.
+        label = b"Text before the repair:"
+        idx = response.content.index(label)
+        evidence_html = response.content[idx : idx + len(label) + 300]
+        self.assertIn(b"<del>Broken", evidence_html)
+        self.assertIn(b"<ins>Fixed", evidence_html)
+
+    def test_second_repair_shows_the_text_before_that_repair(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        unit.translate(self.user, ["First repair"], STATE_FUZZY)
+        unit = self.get_unit()
+        first_change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=first_change.pk).update(
+            timestamp=now + timedelta(seconds=1)
+        )
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="major",
+            when=now + timedelta(seconds=2),
+            tag="first repair",
+        )
+        unit.translate(self.user, ["Final repair"], STATE_FUZZY)
+        unit = self.get_unit()
+        second_change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=second_change.pk).update(
+            timestamp=now + timedelta(seconds=3)
+        )
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=2,
+            severity="none",
+            when=now + timedelta(seconds=4),
+            tag="final repair",
+        )
+
+        response = self.client.get(unit.get_absolute_url())
+
+        self.assertContains(response, "Text before the repair:")
+        label = b"Text before the repair:"
+        idx = response.content.index(label)
+        evidence_html = response.content[idx : idx + len(label) + 300]
+        self.assertIn(b"<ins>nal</ins> repair", evidence_html)
+        self.assertNotIn(b"Broken", evidence_html)
+
+    def test_missing_change_omits_the_comparison(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        # The repair happened without going through translate(), so no
+        # Change row exists in the window at all.
+        Unit.objects.filter(pk=unit.pk).update(target="Fixed sentence")
+        unit = self.get_unit()
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertContains(response, "original objection")
+        self.assertNotContains(response, "Text before the repair:")
+
+    def test_purged_change_omits_the_comparison(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        # A Change matched "Fixed sentence" inside the window once, but a
+        # later edit (outside this narrative's window) moved the current
+        # text on to "Fixed sentence v2" - the earlier Change no longer
+        # describes the text that is actually current.
+        self.make_change(
+            unit,
+            old="Broken sentence",
+            target="Fixed sentence",
+            when=now + timedelta(seconds=1),
+        )
+        Unit.objects.filter(pk=unit.pk).update(target="Fixed sentence v2")
+        unit = self.get_unit()
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertNotContains(response, "Text before the repair:")
+
+    def test_ambiguous_changes_omit_the_comparison(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        # Two Change rows both land in the window with the repaired
+        # target: neither may be trusted as THE previous text.
+        self.make_change(
+            unit,
+            old="Broken sentence",
+            target="Fixed sentence",
+            when=now + timedelta(seconds=1),
+        )
+        self.make_change(
+            unit,
+            old="Broken sentence take two",
+            target="Fixed sentence",
+            when=now + timedelta(seconds=1, milliseconds=500),
+        )
+        Unit.objects.filter(pk=unit.pk).update(target="Fixed sentence")
+        unit = self.get_unit()
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertNotContains(response, "Text before the repair:")
+
+    def test_plural_unit_shows_every_form(self) -> None:
+        unit = self.get_unit("Orangutan")
+        unit.translate(
+            self.user,
+            ["Puvodni jedna", "Puvodni dva", "Puvodni pet"],
+            STATE_TRANSLATED,
+        )
+        unit = self.get_unit("Orangutan")
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        unit.translate(
+            self.user,
+            ["Opraveno jedna", "Opraveno dva", "Opraveno pet"],
+            STATE_FUZZY,
+        )
+        unit = self.get_unit("Orangutan")
+        change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=change.pk).update(timestamp=now + timedelta(seconds=1))
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Text before the repair:")
+        self.assertContains(response, "Puvodni jedna")
+        self.assertContains(response, "Puvodni dva")
+        self.assertContains(response, "Puvodni pet")
+
+    def test_unresolved_repair_still_shows_evidence(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=0,
+            severity="critical",
+            when=now,
+            tag="original",
+        )
+        unit.translate(self.user, ["Still broken sentence"], STATE_FUZZY)
+        unit = self.get_unit()
+        change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=change.pk).update(timestamp=now + timedelta(seconds=1))
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="critical",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Will not ship")
+        self.assertContains(response, "Text before the repair:")
+        self.assertContains(response, "Broken sentence")
+
+    def test_first_pass_renders_nothing(self) -> None:
+        unit = self.get_unit()
+        self.make_round(
+            unit,
+            run_id=uuid.uuid4(),
+            attempt=0,
+            severity="major",
+            when=timezone.now(),
+            tag="original",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Repaired since the original verdict")
+        self.assertNotContains(response, "Text before the repair:")
+
+    def test_stale_active_round_renders_nothing(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        unit.translate(self.user, ["Fixed sentence"], STATE_FUZZY)
+        unit = self.get_unit()
+        change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=change.pk).update(timestamp=now + timedelta(seconds=1))
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="none",
+            when=now + timedelta(seconds=2),
+            tag="repaired",
+        )
+        # A further manual edit invalidates every recorded round.
+        Unit.objects.filter(pk=unit.pk).update(target="Edited again by a human")
+        unit = self.get_unit()
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "previous version")
+        self.assertNotContains(response, "Repaired since the original verdict")
+        self.assertNotContains(response, "Text before the repair:")
 
 
 class JudgeBackTranslationTest(ViewTestCase):
@@ -332,3 +929,410 @@ class JudgeBackTranslationTest(ViewTestCase):
         self.make_flag(unit, back_translation="")
         response = self.client.get(unit.get_absolute_url())
         self.assertNotContains(response, "Approximate reconstruction")
+
+
+class JudgeResolutionViewTest(ViewTestCase):
+    def enable_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        return verdict
+
+    def resolve_url(self, verdict) -> str:
+        return reverse("resolve-judge-verdict", kwargs={"pk": verdict.pk})
+
+    def test_escalating_a_critical_keeps_it_held(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "needs a second look"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_FUZZY)
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.resolution, "escalated")
+
+    def test_accepting_a_held_verdict_ships_it(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "accepted_as_is", "reason": "acceptable in context"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Ships with override")
+        self.assertNotContains(response, "Will not ship")
+
+    def test_escalating_a_major_holds_it_for_review(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "wants a second opinion"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_NEEDS_CHECKING)
+
+    def test_resolve_requires_review_permission(self) -> None:
+        # PermissionDenied is converted to a real 403 by Django's own
+        # exception handling before it would ever reach the test client
+        # as a raised exception (same pattern as ignore_check_source's
+        # own permission test in test_edit.py).
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "needs a look"},
+        )
+        self.assertEqual(response.status_code, 403)
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.resolution, "")
+
+    def test_invalid_transition_shows_an_error_without_a_crash(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "accepted_as_is", "reason": "already ships"},
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "does not apply")
+
+    def test_card_offers_the_resolution_form_when_reviewer(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "id_judge_resolution_form")
+        self.assertContains(response, self.resolve_url(verdict))
+
+    def test_card_hides_the_resolution_form_without_permission(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "id_judge_resolution_form")
+
+    def test_card_shows_the_recorded_decision(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "escalated", "reason": "flagged for a human"},
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Escalated for review")
+        self.assertContains(response, "flagged for a human")
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class JudgeQueueStripViewTest(ViewTestCase):
+    """The producer queue strip on component/project pages (Task 4)."""
+
+    def enable_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault(
+            "target_storage_hash", compute_target_storage_hash(unit.target)
+        )
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        kwargs.setdefault("run_id", uuid.uuid4())
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        self.refresh_stats(unit.translation)
+        return verdict
+
+    def resolve_url(self, verdict) -> str:
+        return reverse("resolve-judge-verdict", kwargs={"pk": verdict.pk})
+
+    def refresh_stats(self, translation) -> None:
+        with self.captureOnCommitCallbacks(execute=True):
+            translation.invalidate_cache()
+
+    # -- Visibility gates --------------------------------------------------
+
+    @override_settings(JUDGE_ENABLED=False)
+    def test_strip_hidden_when_configuration_incomplete(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    def test_strip_hidden_without_permission(self) -> None:
+        # Default test user has no translation.auto/unit.review grant.
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    def test_strip_hidden_for_glossary(self) -> None:
+        self.enable_review()
+        self.component.create_glossary()
+        glossary = self.project.component_set.get(is_glossary=True)
+        response = self.client.get(glossary.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    def test_strip_visible_when_ready(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(response, 'id="judge-queue-heading"')
+
+    # -- Counts --------------------------------------------------------
+
+    def test_unresolved_critical_counts_as_needs_a_human(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 1)
+        self.assertContains(response, "needs a human")
+
+    def test_accepted_as_is_removes_critical_from_needs_a_human(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 1)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                self.resolve_url(verdict),
+                {"resolution": "accepted_as_is", "reason": "acceptable in context"},
+            )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 0)
+
+    def test_same_state_resolution_invalidates_judge_stats(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        translation = unit.translation
+        self.refresh_stats(translation)
+        self.assertEqual(translation.stats.judge_resolved, 0)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                self.resolve_url(verdict),
+                {"resolution": "accepted_as_is", "reason": "ships as-is"},
+            )
+
+        translation.stats.force_load()
+        self.assertEqual(translation.stats.judge_resolved, 1)
+
+    def test_escalated_major_counts_as_needs_a_human(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 0)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                self.resolve_url(verdict),
+                {"resolution": "escalated", "reason": "wants a second opinion"},
+            )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 1)
+
+    def test_rejudging_drops_a_stale_resolution_from_needs_a_human(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                self.resolve_url(verdict),
+                {"resolution": "escalated", "reason": "wants a second opinion"},
+            )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 1)
+
+        # A fresh round supersedes the escalated round; the new verdict is
+        # unresolved and not critical, so it no longer needs a human.
+        unit = self.get_unit()
+        self.make_verdict(
+            unit,
+            "none",
+            run_id=uuid.uuid4(),
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 0)
+
+    def test_unparsed_attempt_counts_separately(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        self.make_verdict(unit, "none", unparsed=True)
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+        self.assertEqual(counts["unparsed"], 1)
+
+    def test_source_unit_is_excluded_from_counts(self) -> None:
+        self.enable_review()
+        source_translation = self.component.source_translation
+        source_unit = source_translation.unit_set.get(
+            source__startswith="Hello, world!"
+        )
+        self.make_verdict(source_unit, "critical", context_hash="source-context")
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+        self.assertEqual(counts["needs_human"], 0)
+
+    def test_every_number_matches_its_direct_query_count(self) -> None:
+        self.enable_review()
+        units = list(
+            self.get_translation().unit_set.order_by("pk").exclude(state=STATE_READONLY)
+        )
+        # Unresolved critical.
+        self.make_verdict(units[0], "critical")
+        # Escalated major.
+        escalated = self.make_verdict(units[1], "major")
+        escalated.resolution = "escalated"
+        escalated.save(update_fields=["resolution"])
+        # Unparsed attempt.
+        self.make_verdict(units[2], "none", unparsed=True)
+        # Left untouched: still "not reviewed".
+
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+
+        component_units = Unit.objects.filter(
+            translation__component=self.component
+        ).exclude(translation=self.component.source_translation)
+
+        self.assertEqual(
+            counts["needs_human"],
+            component_units.search(
+                "(judge:reject AND NOT judge:resolved) OR judge:escalated"
+            ).count(),
+        )
+        self.assertEqual(
+            counts["not_reviewed"],
+            component_units.search("NOT has:judge AND NOT state:read-only").count(),
+        )
+        self.assertEqual(
+            counts["unparsed"],
+            component_units.search("judge:unparsed").count(),
+        )
+
+    # -- Project scope: controls only -----------------------------------
+
+    def test_project_shows_controls_without_counts(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertContains(response, 'id="judge-queue-heading"')
+        self.assertIsNone(response.context["judge_queue"]["counts"])
+        self.assertNotContains(response, "needs a human")
+
+    # -- Workspace scope: controls only -----------------------------------
+
+    def attach_workspace(self) -> Workspace:
+        workspace = Workspace.objects.create(name="Judge queue workspace")
+        self.project.workspace = workspace
+        self.project.save(update_fields=["workspace"])
+        return workspace
+
+    def test_workspace_shows_controls_without_counts(self) -> None:
+        self.enable_review()
+        workspace = self.attach_workspace()
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(workspace.get_absolute_url())
+        self.assertContains(response, 'id="judge-queue-heading"')
+        self.assertIsNone(response.context["judge_queue"]["counts"])
+        self.assertNotContains(response, "needs a human")
+
+    def test_workspace_strip_hidden_without_permission(self) -> None:
+        # Default test user has no translation.auto/unit.review grant on any
+        # project in the workspace.
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+        workspace = self.attach_workspace()
+        response = self.client.get(workspace.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    @override_settings(JUDGE_ENABLED=False)
+    def test_workspace_strip_hidden_when_configuration_incomplete(self) -> None:
+        self.enable_review()
+        workspace = self.attach_workspace()
+        response = self.client.get(workspace.get_absolute_url())
+        self.assertNotContains(response, 'id="judge-queue-heading"')
+
+    # -- Prefilled launchers ------------------------------------------
+
+    def test_component_binds_prefilled_judge_mode(self) -> None:
+        self.enable_review()
+        response = self.client.get(
+            self.component.get_absolute_url(), {"mode": "judge", "q": "NOT has:judge"}
+        )
+        self.assertEqual(response.context["autoform"].initial.get("mode"), "judge")
+        self.assertEqual(response.context["autoform"].initial.get("q"), "NOT has:judge")
+
+    def test_project_binds_prefilled_judge_mode(self) -> None:
+        self.enable_review()
+        response = self.client.get(
+            self.project.get_absolute_url(), {"mode": "judge", "q": "NOT has:judge"}
+        )
+        self.assertEqual(response.context["autoform"].initial.get("mode"), "judge")
+
+    def test_workspace_binds_prefilled_judge_mode(self) -> None:
+        self.enable_review()
+        workspace = self.attach_workspace()
+        response = self.client.get(
+            workspace.get_absolute_url(), {"mode": "judge", "q": "NOT has:judge"}
+        )
+        self.assertEqual(response.context["autoform"].initial.get("mode"), "judge")
+        self.assertEqual(response.context["autoform"].initial.get("q"), "NOT has:judge")
+
+    def test_run_url_targets_the_not_reviewed_queue(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        run_url = response.context["judge_queue"]["run_url"]
+        self.assertIn("mode=judge", run_url)
+        self.assertIn("q=NOT+has%3Ajudge", run_url)

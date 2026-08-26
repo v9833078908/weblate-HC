@@ -1,0 +1,43 @@
+{
+  "target": "heart-abyss/hub-1",
+  "language": "en",
+  "total_units": 396,
+  "total_words": 2371,
+  "failing_checks": {
+    "duplicate": [
+      343339
+    ],
+    "game-number": [
+      343336
+    ],
+    "end_stop": [
+      343188,
+      343190,
+      343191,
+      343214,
+      343263,
+      343264,
+      343370,
+      343414,
+      343429,
+      343524,
+      343535,
+      343552
+    ],
+    "end_question": [
+      343370,
+      343429,
+      343537,
+      343547
+    ],
+    "end_exclamation": [
+      343207,
+      343208,
+      343209,
+      343337,
+      343482
+    ]
+  },
+  "candidates": [],
+  "mqm_results": null
+}

@@ -44,6 +44,26 @@ _OPENROUTER_HOST = "openrouter.ai"
 _LITELLM_HOST = "hcbifrost.herocraft.com"
 JUDGE_REQUEST_TIMEOUT = 120
 JUDGE_SEATS = (1, 2)
+
+
+def judge_request_upper_bound(strings: int) -> int | None:
+    """
+    Estimate the requests one judge run plans for a number of strings.
+
+    Batches, not strings: request_verdicts() sends JUDGE_BATCH_SIZE segments
+    per call. A repair round re-judges only the strings that were repaired, so
+    this is a ceiling for the run; it is not absolute because a refused batch
+    is retried once. None means the configured batch size cannot be read.
+    """
+    batch_size = settings.JUDGE_BATCH_SIZE
+    if not isinstance(batch_size, int) or batch_size < 1:
+        return None
+    if strings < 1:
+        return 0
+    batches = (strings + batch_size - 1) // batch_size
+    return batches * len(JUDGE_SEATS) * (1 + settings.JUDGE_MAX_REPAIR_ATTEMPTS)
+
+
 # A verdict batch reply is kilobytes; this only bounds a broken peer.
 MAX_BATCH_RESPONSE_BYTES = 8 * 1024 * 1024
 # Measured category set (st2-zh-recalibration.py:59-68).
@@ -133,18 +153,10 @@ def _litellm_reasoning_disable_payload(model: str) -> dict:
 def judge_configuration_ready() -> bool:
     """Whether the complete two-seat judge configuration is usable."""
     try:
-        get_judge_base_url()
+        validate_judge_configuration()
     except JudgeError:
         return False
-    return bool(
-        settings.JUDGE_ENABLED
-        and isinstance(settings.JUDGE_API_KEY, str)
-        and settings.JUDGE_API_KEY.strip()
-        and isinstance(settings.JUDGE_MODEL_SEAT_1, str)
-        and settings.JUDGE_MODEL_SEAT_1.strip()
-        and isinstance(settings.JUDGE_MODEL_SEAT_2, str)
-        and settings.JUDGE_MODEL_SEAT_2.strip()
-    )
+    return True
 
 
 def validate_request_settings() -> None:
@@ -179,6 +191,10 @@ def validate_judge_configuration() -> None:
         and settings.JUDGE_MODEL_SEAT_1.strip()
         and isinstance(settings.JUDGE_MODEL_SEAT_2, str)
         and settings.JUDGE_MODEL_SEAT_2.strip()
+        and isinstance(settings.JUDGE_MAX_REPAIR_ATTEMPTS, int)
+        and settings.JUDGE_MAX_REPAIR_ATTEMPTS >= 0
+        and isinstance(settings.JUDGE_MAX_UNITS_PER_RUN, int)
+        and settings.JUDGE_MAX_UNITS_PER_RUN >= 0
     ):
         raise JudgeError(_("The LLM judge is not configured."))
 
@@ -341,7 +357,9 @@ class _BatchResponse:
     transport_failed: bool = False
 
 
-def _write_llm_usage(payload: dict, model: str, project_slug: str) -> None:
+def _write_llm_usage(
+    payload: dict, model: str, project_slug: str, unit_count: int
+) -> None:
     usage = payload.get("usage")
     if not isinstance(usage, dict):
         return
@@ -363,10 +381,14 @@ def _write_llm_usage(payload: dict, model: str, project_slug: str) -> None:
         response_id=str(payload.get("id") or ""),
         cached_tokens=prompt_details.get("cached_tokens") or 0,
         reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
+        operation=LLMUsageLog.Operation.JUDGE,
+        unit_count=unit_count,
     )
 
 
-def _record_usage(payload: dict, model: str, project_slug: str) -> None:
+def _record_usage(
+    payload: dict, model: str, project_slug: str, unit_count: int
+) -> None:
     """
     Mirror machinery's record_llm_usage (never raises).
 
@@ -375,7 +397,7 @@ def _record_usage(payload: dict, model: str, project_slug: str) -> None:
     mechanism, so accounting must be symmetric.
     """
     try:
-        _write_llm_usage(payload, model, project_slug)
+        _write_llm_usage(payload, model, project_slug, unit_count)
     except Exception:
         LOGGER.exception("Failed to record LLM usage")
 
@@ -644,7 +666,7 @@ def request_verdicts(
                     elapsed_ms,
                 )
             if response.payload is not None:
-                _record_usage(response.payload, model, project_slug)
+                _record_usage(response.payload, model, project_slug, len(batch))
             if response.payload is not None and (
                 response.status_code is None or response.status_code < 400
             ):

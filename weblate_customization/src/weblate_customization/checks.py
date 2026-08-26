@@ -17,12 +17,15 @@ from collections import Counter
 from decimal import Decimal, InvalidOperation
 from functools import cache
 from itertools import pairwise
+from operator import itemgetter
 from typing import NamedTuple
 
 import regex
-from django.utils.translation import gettext_lazy
+from django.utils.translation import gettext_lazy, ngettext
 
 from weblate.checks.base import Highlight, TargetCheck
+from weblate.checks.chars import MaxLengthCheck
+from weblate.checks.source import SourceMaxLengthCheck
 from weblate.trans.protected_tokens import (
     MARKUP,
     PLACEHOLDER_PATTERN,
@@ -205,18 +208,45 @@ def _balanced_brace_blocks(
     return [] if starts else blocks
 
 
-def conditional_dsl_syntax_spans(text: str) -> list[tuple[int, int]]:
+def _unmatched_braces(text: str) -> tuple[int, int]:
     """
-    Return immutable spans in the documented Hero Craft conditional DSL.
+    Count the braces the engine cannot pair: unmatched closes, then opens.
 
-    Branch text remains unprotected so it can be translated. Nested brace
-    placeholders, delimiters, and a directly adjacent placeholder separator
-    are syntax rather than rendered text.
+    `_balanced_brace_blocks()` ignores a stray closing brace, so a target that
+    appends one keeps every span, token and signature of a well-formed one.
+    The engine does not: the count is what tells the two apart.
     """
-    blocks = _balanced_brace_blocks(text)
+    opens = closes = 0
+    for char in text:
+        if char == "{":
+            opens += 1
+        elif char == "}":
+            if opens:
+                opens -= 1
+            else:
+                closes += 1
+    return closes, opens
+
+
+def _parse_conditional_dsl(
+    text: str,
+) -> tuple[list[tuple[int, int]], tuple[tuple[str, ...], ...]]:
+    """
+    Return immutable conditional spans and the ordered conditional signatures.
+
+    A signature holds the exact header, every immediate nested placeholder and
+    every top-level delimiter, in source order, and no branch text. Only the
+    outermost recognized conditional is a record: a nested one travels verbatim
+    inside its parent, which keeps spans non-overlapping and walks every branch
+    interior once.
+    """
     spans: list[tuple[int, int]] = []
+    signatures: list[tuple[str, ...]] = []
+    recognized_end = 0
 
-    for start, end, children in blocks:
+    for start, end, children in sorted(_balanced_brace_blocks(text), key=itemgetter(0)):
+        if start < recognized_end:
+            continue
         header = _CONDITIONAL_HEADER.match(text, start + 1, end - 1)
         if header is None:
             continue
@@ -232,6 +262,82 @@ def conditional_dsl_syntax_spans(text: str) -> list[tuple[int, int]]:
         )
         spans.extend(children)
 
+        signature = [text[start + 1 : header.end()]]
+        children_by_start = dict(children)
+        position = header.end()
+        while position < end - 1:
+            child_end = children_by_start.get(position)
+            if child_end is not None:
+                signature.append(text[position:child_end])
+                position = child_end
+            elif text[position] == "|":
+                spans.append((position, position + 1))
+                signature.append("|")
+                position += 1
+            else:
+                position += 1
+
+        signatures.append(tuple(signature))
+        recognized_end = end
+
+    return spans, tuple(signatures)
+
+
+def conditional_dsl_syntax_spans(text: str) -> list[tuple[int, int]]:
+    """
+    Return immutable spans in the documented Hero Craft conditional DSL.
+
+    Branch text remains unprotected so it can be translated. Nested brace
+    placeholders, delimiters, and a directly adjacent placeholder separator
+    are syntax rather than rendered text.
+    """
+    spans, _signatures = _parse_conditional_dsl(text)
+    simple_placeholders = [
+        (match.start(), match.end())
+        for match in PLACEHOLDER_PATTERN.finditer(text)
+        if match.group().startswith("{")
+    ]
+    # A separate rule, never part of a signature: it protects the `:` in
+    # `{minutes:00}:{seconds:00}`, which belongs to no conditional.
+    for previous, following in pairwise(simple_placeholders):
+        if previous[1] + 1 == following[0] and text[previous[1]] == ":":
+            spans.append((previous[1], following[0]))
+
+    return sorted({span for span in spans if span[0] < span[1]})
+
+
+def _conditional_length_text(text: str) -> str:
+    """Return a conservative character representation of conditional DSL."""
+    if ":cond:" not in text:
+        return text
+    if any(_unmatched_braces(text)):
+        return text
+
+    recognized = []
+    for start, end, _children in sorted(
+        _balanced_brace_blocks(text), key=itemgetter(0)
+    ):
+        header = _CONDITIONAL_HEADER.match(text, start + 1, end - 1)
+        if header is not None:
+            recognized.append((start, end, header))
+    if not recognized:
+        return text
+
+    open_ends: list[int] = []
+    for start, end, _header in recognized:
+        while open_ends and start >= open_ends[-1]:
+            open_ends.pop()
+        if open_ends:
+            return text
+        open_ends.append(end)
+
+    result: list[str] = []
+    previous = 0
+    for start, end, header in recognized:
+        assert header is not None  # ruff: ignore[assert]
+        result.append(text[previous:start])
+        branches: list[str] = []
+        branch_start = header.end()
         depth = 0
         for position in range(header.end(), end - 1):
             char = text[position]
@@ -240,18 +346,13 @@ def conditional_dsl_syntax_spans(text: str) -> list[tuple[int, int]]:
             elif char == "}":
                 depth -= 1
             elif char == "|" and depth == 0:
-                spans.append((position, position + 1))
-
-    simple_placeholders = [
-        (match.start(), match.end())
-        for match in PLACEHOLDER_PATTERN.finditer(text)
-        if match.group().startswith("{")
-    ]
-    for previous, following in pairwise(simple_placeholders):
-        if previous[1] + 1 == following[0] and text[previous[1]] == ":":
-            spans.append((previous[1], following[0]))
-
-    return sorted({span for span in spans if span[0] < span[1]})
+                branches.append(text[branch_start:position])
+                branch_start = position + 1
+        branches.append(text[branch_start : end - 1])
+        result.append(max(branches, key=len))
+        previous = end
+    result.append(text[previous:])
+    return "".join(result)
 
 
 class GameMarkupCheck(TargetCheck):
@@ -269,9 +370,22 @@ class GameMarkupCheck(TargetCheck):
     def check_single(self, source: str, target: str, unit) -> bool:
         if not target:
             return False
-        return Counter(markup_tokens(source)) != Counter(
-            markup_tokens(target)
-        ) or placeholder_sequence(source) != placeholder_sequence(target)
+        # The existing comparisons run first: they are cheap, and a string that
+        # already fails must not pay for the conditional parser. The substring
+        # test is a C-level scan, while the parser is a per-character loop.
+        if Counter(markup_tokens(source)) != Counter(markup_tokens(target)):
+            return True
+        if placeholder_sequence(source) != placeholder_sequence(target):
+            return True
+        if ":cond:" not in source:
+            return False
+
+        source_conditionals = _parse_conditional_dsl(source)[1]
+        if not source_conditionals:
+            return False
+        return source_conditionals != _parse_conditional_dsl(target)[1] or (
+            _unmatched_braces(source) != _unmatched_braces(target)
+        )
 
     def check_highlight(self, source: str, unit):
         if self.should_skip(unit):
@@ -722,3 +836,26 @@ class GameLengthCheck(TargetCheck):
             if source_len <= max_source:
                 return target_len > minimum and target_len > source_len * ratio
         return target_len > source_len * _LENGTH_MAX_RATIO
+
+
+class GameMaxLengthCheck(MaxLengthCheck):
+    def get_replacement_function(self, unit):
+        replace = super().get_replacement_function(unit)
+        return lambda text: _conditional_length_text(replace(text))
+
+    def get_description(self, check_obj):
+        try:
+            limit = self.get_value(check_obj.unit)
+        except ValueError:
+            return super().get_description(check_obj)
+        return ngettext(
+            "Translation must not exceed %(limit)d character.",
+            "Translation must not exceed %(limit)d characters.",
+            limit,
+        ) % {"limit": limit}
+
+
+class GameSourceMaxLengthCheck(SourceMaxLengthCheck):
+    def get_replacement_function(self, unit):
+        replace = super().get_replacement_function(unit)
+        return lambda text: _conditional_length_text(replace(text))

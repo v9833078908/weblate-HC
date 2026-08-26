@@ -1,0 +1,397 @@
+unit_id	context	ru_source	target
+370414	hub1_first_1_1	Леон, вставай. Мы уже приехали.	Leon, alzati. Siamo arrivati.
+370415	hub1_first_1_2	Хорошо… Давно мы приехали?	Va bene… È da tanto che siamo arrivati?
+370416	hub1_first_1_3	Недавно. Ты проспал всю дорогу.	Non molto. Hai dormito per tutto il viaggio.
+370417	hub1_first_1_4	Проспал очередные виды на ебеня?	Mi sono perso l'ennesimo panorama di merda?
+370418	hub1_first_1_5	Даже не знаю, как я это переживу.	Non so nemmeno come farò a superarla.
+370419	hub1_first_1_6	Добро пожаловать в Столицу.	Benvenuti nella Capitale.
+370420	hub1_first_1_7	Ну, или в самую её «лучшую» часть — Рыбный тупик.	Beh, o nella sua parte più «bella»: il Vicolo dei Pesci.
+370421	hub1_first_1_8	Построили недавно, ещё при третьем императоре Акито.	Costruito di recente, ancora sotto il terzo imperatore Akito.
+370422	hub1_first_1_9	Он опять завёл эту шарманку.	Ha ricominciato con la solita tiritera.
+370423	hub1_first_1_10	Я чёт подустал от этих уроков истории.	Sono un po' stanco di queste lezioni di storia.
+370424	hub1_first_1_11	Все пауки такие?	Tutti i ragni sono così?
+370425	hub1_first_1_12	Хранители знаний, да	Custodi della conoscenza, sì
+370426	hub1_first_1_13	Скукота.	Che noia.
+370427	hub1_first_1_14	Очень интересно. И спасибо, что подкинули нас.	Molto interessante. E grazie per averci dato un passaggio.
+370428	hub1_first_1_15	Без проблем.	Nessun problema.
+370429	hub1_first_1_16	Не мог пройти мимо вас, тем более напоминаете мне племянников.	Non potevo non aiutarvi, soprattutto perché mi ricordate i miei nipoti.
+370430	hub1_first_1_17	Только… с чешуей и шерстью.	Solo… con squame e pelliccia.
+370431	hub1_first_1_18	Заглядывайте ко мне в «Тысячу мелочей»!	Venite a trovarmi a «Mille Cose»!
+370432	hub1_first_1_19	Хорошо, спасибо!	Bene, grazie!
+370433	hub1_first_1_20	У меня здесь есть свои дела. Встретимся позже	Ho i miei affari qui. Ci vediamo dopo
+370434	hub1_first_1_21	А как мне тебя найти?	E come faccio a trovarti?
+370435	hub1_first_1_22	Я тебя сам найду.	Ti troverò io.
+370436	hub1_first_1_23	У меня от него чешуя дыбом стоит.	Mi fa rizzare le squame.
+370437	hub1_first_1_24	Серьезно, Хадзуо его собрат, но рядом с ним, я не чувствую такого страха.	Seriamente, Hazuo è un suo simile, ma vicino a lui non sento questa paura.
+370438	hub1_first_1_25	А я думал, вы лучшие подружки.	E io che pensavo foste migliori amiche.
+370439	hub1_first_1_26	Ха-ха. Что будем дальше делать?	Ah-ah. Cosa facciamo adesso?
+370440	hub1_first_1_27	Кажется, я не ел целую вечность.	Mi sembra di non mangiare da un'eternità.
+370441	hub1_first_1_28	Может, набьём животы?	Forse ci riempiamo la pancia?
+370442	hub1_first_1_29	Можно.	Va bene.
+370443	hub1_overlook_1_1	Ого! Как же тут… я не знаю… КРАСИВО!	Oh! Com'è qui... non so... BELLO!
+370444	hub1_overlook_1_2	Тут? Это же просто трущобы.	Qui? Ma queste sono solo baraccopoli.
+370445	hub1_overlook_1_3	Я никогда не видел такого большого города!	Non ho mai visto una città così grande!
+370446	hub1_overlook_1_4	Думаю, сама Столица тебя поразит!	Credo che la Capitale stessa ti sorprenderà!
+370447	hub1_overlook_1_5	А тут как раз рамен подают. Пойдем!	E qui servono proprio il ramen. Andiamo!
+370448	hub1_ramen_1_1	Это что за фигня?!	Che cazzo è questo?!
+370449	hub1_ramen_1_2	Это рамен. Никогда такого не пробовал что ли?	È ramen. Non l'hai mai provato?
+370450	hub1_ramen_1_3	Нет. У нас в деревне такого не готовили.	No. Nel mio villaggio non lo cucinavano.
+370451	hub1_ramen_1_4	А потом я ел только… с пола…	E dopo ho mangiato solo… dal pavimento…
+370452	hub1_ramen_1_5	Ясно.	Capisco.
+370453	hub1_ramen_1_6	Попробуй скорее. Тебе понравится.	Provalo subito. Ti piacerà.
+370454	hub1_ramen_1_7	ЕБАТЬ. КАК. ВКУСНО.	CAZZO. CHE. BUONO.
+370455	hub1_ramen_1_9	Я всегда говорю. Ешь рамен - БУДЕШЬ КАК КАМЕНЬ!	Lo dico sempre. Mangia ramen e SARAI FORTE COME UNA ROCCIA!
+370456	hub1_ramen_1_10	ЗАТКНИСЬ, СТАРЫЙ! Не приставай к ним!	ZITTO, VECCHIO! Non infastidirli!
+370457	hub1_ramen_1_11	Да я ничего не делал!	Ma non ho fatto niente!
+370458	hub1_ramen_1_12	Вот и не делай!	E non fare niente!
+370459	hub1_ramen_1_13	Нам нужно где-то остановиться.	Dobbiamo trovare un posto dove stare.
+370460	hub1_ramen_1_14	Мне все равно!	Non mi interessa!
+370461	hub1_ramen_1_15	Я хочу только узнать, кому продали мою сестру!	Voglio solo sapere a chi hanno venduto mia sorella!
+370462	hub1_ramen_1_16	И как ты это сделаешь?	E come farai?
+370463	hub1_ramen_1_17	Без понятия.	Non ne ho idea.
+370464	hub1_ramen_1_18	Нам нужна комната на несколько дней.	Ci serve una stanza per qualche giorno.
+370465	hub1_ramen_1_19	Отлично! А мне нужны постояльцы!	Ottimo! E a me servono degli ospiti!
+370466	hub1_ramen_1_20	Ты подслушивал?	Stavi origliando?
+370467	hub1_ramen_1_21	Так я всегда подслушиваю.	Io origlio sempre.
+370468	hub1_ramen_1_22	Вы можете спать в подсобке за раменной.	Potete dormire nel ripostiglio dietro la ramen-ya.
+370469	hub1_ramen_1_23	Только учтите! Все шиитаке посчитаны.	Ma attenzione! Tutti gli shiitake sono contati.
+370470	hub1_ramen_1_24	… что за нахрен шиитаке…	...che cazzo sono gli shiitake…
+370471	hub1_ramen_1_25	Мы бы с радостью у вас остановились.	Saremmo felici di fermarci da voi.
+370472	hub1_ramen_1_26	Но у нас совсем немного денег.	Ma abbiamo pochi soldi.
+370473	hub1_ramen_1_27	А мне и не нужны деньги.	E a me non servono soldi.
+370474	hub1_ramen_1_28	Я на вас новые рецепты раменов опробую! По рукам?	Proverò su di voi nuove ricette di ramen! Ci stai?
+370475	hub1_ramen_1_29	По рукам!	Ci sto!
+370476	hub1_ramen_1_30	А нам бы еще какого-нибудь проводника для города…	Ma ci servirebbe una guida per la città…
+370477	hub1_ramen_1_31	Мы тут совсем не ориентируемся…	Non ci orientiamo per niente…
+370478	hub1_ramen_1_32	Никто из наших отсюда носа не высунет в Столицу…	Nessuno dei nostri metterebbe il naso fuori di qui per andare nella Capitale…
+370479	hub1_ramen_1_33	Хотя, загляните в чайный домик.	Comunque, fate un salto alla casa da tè.
+370480	hub1_ramen_1_34	Девочки госпожи Яэко частенько в городе бывают.	Le ragazze della signora Yaeko sono spesso in città.
+370481	hub1_ramen_1_35	Как их найти?	Come le troviamo?
+370482	hub1_ramen_1_36	Вот тут у нас главное место Рыбного тупика - моя раменная!	Qui abbiamo il posto principale del Vicolo dei Pesci: la mia ramen-ya!
+370483	hub1_ramen_1_37	Но это вы и так знаете.	Ma questo lo sapete già.
+370484	hub1_ramen_1_38	Пойдете вот сюда - окажетесь на пристани.	Andando di qua, arriverete al molo.
+370485	hub1_ramen_1_39	Вот на этот корабль лучше не соваться.	È meglio non salire su questa nave.
+370486	hub1_ramen_1_40	Если конечно не хотите встретиться с морскими волками.	A meno che non vogliate incontrare i lupi di mare, ovviamente.
+370487	hub1_ramen_1_41	Свернете сюда и окажетесь в банях, шикарное место для отдыха.	Girate qui e vi ritroverete ai bagni, un posto fantastico per rilassarsi.
+370488	hub1_ramen_1_42	Тут будет лавка травника,	Qui ci sarà la bottega dell'erborista,
+370489	hub1_ramen_1_43	а тут барахолка.	e qui un mercatino delle pulci.
+370490	hub1_ramen_1_44	А прямо над нами находится чайный домик.	E proprio sopra di noi c'è la casa da tè.
+370491	hub1_ramen_1_45	Если запутаетесь, изучите нашу карту.	Se vi perdete, consultate la nostra mappa.
+370492	hub1_ramen_1_46	Ясно, погнали.	Chiaro, andiamo.
+370493	hub1_fisherman_quest_1_1	Вот что еще вспомнил…	Ah, un'altra cosa che mi è venuta in mente…
+370494	hub1_fisherman_quest_1_2	Может сделаете для меня кое-чего, молодежь?	Potreste farmi un favore, giovanotti?
+370495	hub1_fisherman_quest_1_3	А то мне самому лень.	Sono troppo pigro per farlo da solo.
+370496	hub1_fisherman_quest_1_4	Вам по пути!	È sulla vostra strada!
+370497	hub1_fisherman_quest_1_5	Ладно, что нужно?	Va bene, cosa ti serve?
+370498	hub1_fisherman_quest_1_6	Заберите у рыбака на пристани нефритового угря…	Prendete l'anguilla di giada dal pescatore al molo…
+370499	hub1_fisherman_quest_1_7	Приготовлю божественный рамен!	Preparerò un ramen divino!
+370500	hub1_fisherman_quest_1_8	Всего-то? Да без проблем.	Tutto qui? Nessun problema.
+370501	hub1_fisherman_quest_1_9	Сейчас вообще не до того, извини.	Ora non posso proprio, scusa.
+370502	hub1_fisherman_quest_1_10	Эх, ладно. Выгуляю свои старые кости.	Ah, va bene. Porterò a spasso le mie vecchie ossa.
+370503	hub1_teahouse_1_1	Ну и кто это у нас?	E chi abbiamo qui?
+370504	hub1_teahouse_1_2	О-о-о… какой милый лисёнок.	O-o-oh… che volpacchiotto carino.
+370505	hub1_teahouse_1_3	И симпатичный наг…	E un Naga simpatico…
+370506	hub1_teahouse_1_4	Даже не начинайте.	Non cominciate nemmeno.
+370507	hub1_teahouse_1_5	А зачем тогда пришли?	Allora perché siete venuti?
+370508	hub1_teahouse_1_6	Чайный домик — не приют для бездомных.	La casa da tè non è un rifugio per i senzatetto.
+370509	hub1_teahouse_1_7	Мне нужен сопровождающий в город.	Ho bisogno di una scorta per la città.
+370510	hub1_teahouse_1_8	ТЕБЕ?!	TU?!
+370511	hub1_teahouse_1_9	Сопровождающий для дзинко?!	Una scorta per un Jinko?!
+370512	hub1_teahouse_1_10	Мальчик, половина Империи захочет сдать за награду раньше…	Ragazzo, metà dell'Impero vorrà consegnarti per la ricompensa prima…
+370513	hub1_teahouse_1_11	Чем ты дойдёшь до соседней улицы.	Che tu arrivi alla strada successiva.
+370514	hub1_teahouse_1_12	Да понял я уже, хватит ржать.	Ho capito, smettila di ridere.
+370515	hub1_teahouse_1_13	А куда тебе вообще надо?	E tu dove devi andare?
+370516	hub1_teahouse_1_14	Вообще… нам нужна информация о дзинко. Документы, отчеты…	Beh... ci servono informazioni sui Jinko. Documenti, rapporti…
+370517	hub1_teahouse_1_15	Может подскажите, где ее можно найти?	Potrebbe dirci dove trovarle?
+370518	hub1_teahouse_1_16	Вам нужно в Архивы.	Dovete andare agli Archivi.
+370519	hub1_teahouse_1_17	Там хранятся все старые документы Империи.	Lì sono conservati tutti i vecchi documenti dell'Impero.
+370520	hub1_teahouse_1_18	И как туда попасть?	E come ci arriviamo?
+370521	hub1_teahouse_1_19	Какое совпадение.	Che coincidenza.
+370522	hub1_teahouse_1_20	У меня предложение, которое будет выгодно нам обоим, молодой человек.	Ho una proposta che sarà vantaggiosa per entrambi, giovane uomo.
+370523	hub1_teahouse_1_21	Доставь это послание нашему человеку в Нижнем Городе…	Consegna questo messaggio al nostro uomo nella Città Bassa…
+370524	hub1_teahouse_1_22	И он даст тебе ключ от туннелей под городом.	E ti darà la chiave per i tunnel sotto la città.
+370525	hub1_teahouse_1_23	Там можно попасть в Архив.	Lì potrai accedere agli Archivi.
+370526	hub1_teahouse_1_24	Сделка?	Affare fatto?
+370527	hub1_teahouse_1_25	Уговор.	Affare fatto.
+370528	hub1_teahouse_1_26	Леон, ты с ума сошел? Как ты проберешься через Нижний город?	Leon, sei impazzito? Come farai ad attraversare la Città Bassa?
+370529	hub1_teahouse_1_27	По крышам.	Sui tetti.
+370530	hub1_teahouse_1_28	Ой, какой самоуверенный.	Oh, che presuntuoso.
+370531	hub1_teahouse_1_29	Мне нравится.	Mi piace.
+370532	hub1_teahouse_1_30	Мне тоже.	Anche a me.
+370533	hub1_teahouse_1_31	Я думаю у барахольщика Хадзуо ты найдешь что-нибудь…	Credo che dal rigattiere Hazuo troverai qualcosa…
+370534	hub1_teahouse_1_32	Что поможет тебе в этом пути.	Che ti aiuterà in questo viaggio.
+370535	hub1_teahouse_1_33	Что именно?	Cosa, esattamente?
+370536	hub1_teahouse_1_34	Он же барахольщик. Какое-нибудь барахло.	È un rigattiere. Qualche cianfrusaglia.
+370537	hub1_teahouse_1_35	Ладно, я загляну к нему.	Va bene, gli farò visita.
+370538	hub1_scrappy_1_1	А, мои племяннички вернулись!	Ah, i miei nipotini sono tornati!
+370539	hub1_scrappy_1_2	В поисках знаний, или вас привела нужда?	In cerca di conoscenza, o è la necessità che vi ha portato qui?
+370540	hub1_scrappy_1_3	Нужно что-то, чтобы по крышам пройти.	Ci serve qualcosa per passare sui tetti.
+370541	hub1_scrappy_1_4	По крышам, говорите…	Sui tetti, dite…
+370542	hub1_scrappy_1_5	Ах! Это напоминает мне о мостах из бамбука времён императора Акито!	Ah! Questo mi ricorda i ponti di bambù dell'epoca dell'imperatore Akito!
+370543	hub1_scrappy_1_6	Знаете ли вы, что его войска…	Sapete che le sue truppe…
+370544	hub1_scrappy_1_7	Ты уверен, что у тебя в лавке вообще есть хоть что-то полезное?	Sei sicuro che nel tuo negozio ci sia qualcosa di utile?
+370545	hub1_scrappy_1_8	Вот, к примеру, веер придворной дамы.	Ecco, per esempio, un ventaglio da dama di corte.
+370546	hub1_scrappy_1_9	Когда она убегала к любовнику, этот звук маскировал её шаги…	Quando scappava dall'amante, questo suono mascherava i suoi passi…
+370547	hub1_scrappy_1_10	Может, у тебя есть ещё бамбуковая зубочистка?	Forse hai anche uno stuzzicadenti di bambù?
+370548	hub1_scrappy_1_11	Тоже пригодится, ага.	Sarà utile anche quello, sì.
+370549	hub1_scrappy_1_12	Хадзуо, может быть, что-то попрактичнее?	Hazuo, forse qualcosa di più pratico?
+370550	hub1_scrappy_1_13	А это — маска актёра.	E questa è una maschera da attore.
+370551	hub1_scrappy_1_14	Один вор использовал её, чтобы стоять неподвижно на площади и притворяться статуей…	Un ladro la usava per stare immobile in piazza e fingersi una statua…
+370552	hub1_scrappy_1_15	ВСЁ, ХВАТИТ! Мне не нужна коллекция пиздежа!	BASTA, ORA! Non mi serve una collezione di stronzate!
+370553	hub1_scrappy_1_16	О! Инструмент кровельщиков.	Oh! Uno strumento da copritetto.
+370554	hub1_scrappy_1_17	С его помощью поднимали черепицу! Для тебя то, что нужно.	Serviva per sollevare le tegole! È proprio quello che ti serve.
+370555	hub1_scrappy_1_18	Наконец-то. Хоть раз твой мусор оказался в тему.	Finalmente. Per una volta la tua spazzatura è utile.
+370556	hub1_scrappy_1_19	Спасибо, Хадзуо.	Grazie, Hazuo.
+370557	hub1_scrappy_1_20	История всегда знает, когда подоспеть.	La storia sa sempre quando farsi avanti.
+370558	hub1_fisherman_quest_2_1	Малыш, а ты не видел тут рыбака?	Piccolo, hai visto un pescatore da queste parti?
+370559	hub1_fisherman_quest_2_2	Не мешайте мне, я занят.	Non disturbarmi, sono occupato.
+370560	hub1_fisherman_quest_2_3	Пока не сделаю, меня не трогайте.	Finché non ho finito, non toccatemi.
+370561	hub1_fisherman_quest_2_4	И че ты делаешь?	E che stai facendo?
+370562	hub1_fisherman_quest_2_5	Хочу чтобы моя лягушка допрыгала до корабля.	Voglio che la mia rana salti fino alla nave.
+370563	hub1_fisherman_quest_2_6	Дай сюда!	Dammela!
+370564	hub1_fisherman_quest_2_7	Я ЩАС КОМУ ТО УШИ ПООТРЫВАЮ!	ORA SPACCERÒ QUALCHE TESTA!
+370565	hub1_fisherman_quest_2_8	Твоя лягушка в трюме. Ну че, где рыбак?	La tua rana è nella stiva. Allora, dov'è il pescatore?
+370566	hub1_fisherman_quest_2_9	Вау! Какой ты сильный!	Wow! Sei così forte!
+370567	hub1_fisherman_quest_2_10	Да, дядя Унаги как всегда пьет, наверное. В банях.	Sì, zio Unagi sta bevendo come al solito, immagino. Ai bagni.
+370568	hub1_fisherman_quest_2_11	Меня это начинает раздражать.	Questo sta iniziando a infastidirmi.
+370569	hub1_fisherman_quest_2_12	Это разве не легкое задание?	Non è un compito facile?
+370570	hub1_fisherman_quest_2_13	Спасибо, мальчик! Ты нам очень помог!	Grazie, ragazzo! Ci hai aiutato molto!
+370571	hub1_fisherman_quest_2_14	Идем в баню.	Andiamo ai bagni.
+370572	hub1_guard_1_1	Смотри!	Guarda!
+370573	hub1_guard_1_2	За твою голову назначили награду!	C'è una taglia sulla tua testa!
+370574	hub1_guard_1_3	10 тысяч мон!	10 mila mon!
+370575	hub1_guard_1_4	Научись считать - ваще та 100 тысяч мон!	Impara a contare, sono 100 mila mon!
+370576	hub1_guard_1_5	Я только приехал, а уже надо ломать морды.	Sono appena arrivato e già devo spaccare facce.
+370577	hub1_guard_1_6	Не-не-не, мне столько не платят, шобы я даже смотрел в твою сторону.	No-no-no, non mi pagano abbastanza per guardarti anche solo.
+370578	hub1_guard_1_7	Вы в баню шли? Вот и идите. Иннара в помощь.	Andavate ai bagni? Allora andateci. Inara vi aiuti.
+370579	hub1_fisherman_quest_3_1	О, новые клиенты? Заходите, располагайтесь.	Oh, nuovi clienti? Entrate, mettetevi comodi.
+370580	hub1_fisherman_quest_3_2	А ничего, что мы нелюди?	E non importa che siamo Non-umani?
+370581	hub1_fisherman_quest_3_3	Мне все равно шерстяной ты или кожаный.	Non mi importa se sei peloso o di pelle.
+370582	hub1_fisherman_quest_3_4	Хорошая баня нужна всем.	Un buon bagno serve a tutti.
+370583	hub1_fisherman_quest_3_5	Да и у нас тут не такое не смотрят.	E qui da noi non si guarda a queste cose.
+370584	hub1_fisherman_quest_3_6	Мокрая шерсть воняет.	Il pelo bagnato puzza.
+370585	hub1_fisherman_quest_3_7	Вот кого я не люблю, так это алкоголиков.	Se c'è una cosa che non sopporto, sono gli alcolizzati.
+370586	hub1_fisherman_quest_3_8	…	…
+370587	hub1_fisherman_quest_3_9	Ну да, я дал ему саке. Но кто же знал, что он так нажрется.	Certo, gli ho dato del sake. Ma chi avrebbe mai detto che si sarebbe ubriacato così?
+370588	hub1_fisherman_quest_3_10	Хотя… он каждый раз так нажирается.	Anche se… si ubriaca sempre così.
+370589	hub1_fisherman_quest_3_11	Рыбак Унаги?	Il pescatore Unagi?
+370590	hub1_fisherman_quest_3_12	Че надо?! Я отдыхаю.	Che vuoi?! Mi sto riposando.
+370591	hub1_fisherman_quest_3_13	Ты меня достал.	Mi hai stufato.
+370592	hub1_fisherman_quest_3_14	Ребят, выведите этого алкаша и сможете за мой счет потом попариться.	Ragazzi, portate via questo ubriacone e potrete farvi un bagno a spese mie.
+370593	hub1_fisherman_quest_3_15	Слышь!	Ehi!
+370594	hub1_fisherman_quest_3_16	Нам нужен нефритовый угорь для раменщика. Ты его поймал.	Ci serve un'anguilla di giada per il ramen-ya. L'hai presa.
+370595	hub1_fisherman_quest_3_17	Может и поймал! А может и не поймал…	Forse l'ho presa! O forse no…
+370596	hub1_fisherman_quest_3_18	Тащи опохмел. Без этого я с места не сдвинусь.	Portami un rimedio per i postumi. Senza quello non mi muovo.
+370597	hub1_fisherman_quest_3_19	Я тебя сейчас сам двину!	Adesso ti muovo io!
+370598	hub1_fisherman_quest_3_20	Леон, успокойся. Я могу легко сделать то, что приведет его в чувство.	Leon, calmati. Posso facilmente fare qualcosa per farlo rinsavire.
+370599	hub1_fisherman_quest_3_21	Нужно лишь немного трав.	Mi servono solo un po' di erbe.
+370600	hub1_fisherman_quest_3_22	Здесь должна быть лавка травника.	Qui dovrebbe esserci la bottega di un erborista.
+370601	hub1_fisherman_quest_3_23	Ну пойдем поищем.	Bene, andiamo a cercare.
+370602	hub1_asuna_archive_1_1	О, приятно увидеть новый лица в Трущобах.	Oh, è un piacere vedere volti nuovi nei Bassifondi.
+370603	hub1_asuna_archive_1_2	Особенно такие необычные, как у вас.	Soprattutto così insoliti come i vostri.
+370604	hub1_asuna_archive_1_3	Да, мы только приехали!	Sì, siamo appena arrivati!
+370605	hub1_asuna_archive_1_4	Я еще не видел такой большой лавки с травами!	Non ho mai visto un negozio di erbe così grande!
+370606	hub1_asuna_archive_1_5	У вас тут столько всего! Даже желтый многолетник есть!	Avete così tante cose qui! C'è persino una perenne gialla!
+370607	hub1_asuna_archive_1_6	Я его давно не видел.	Non la vedevo da tanto tempo.
+370608	hub1_asuna_archive_1_7	Может хватит трепаться? Мы вроде по делу пришли.	Forse è ora di smetterla di chiacchierare? Siamo venuti per affari.
+370609	hub1_asuna_archive_1_8	Или мне вас оставить вдвоем?	O devo lasciarvi da soli?
+370610	hub1_asuna_archive_1_9	Можешь и оставить. Я не против.	Puoi anche lasciarci. Non mi dispiace.
+370611	hub1_asuna_archive_1_10	Думаю, двоим нагам всегда есть о чем поговорить…	Immagino che due Naga abbiano sempre qualcosa di cui parlare…
+370612	hub1_asuna_archive_1_11	А у тебя горячее сердце. Я чувствую даже отсюда.	E tu hai un cuore caldo. Lo sento anche da qui.
+370613	hub1_asuna_archive_1_12	Наверное, как и у всех дзинко	Probabilmente, come tutti i Jinko
+370614	hub1_asuna_archive_1_13	И много ты видела дзинко?	E quanti Jinko hai visto?
+370615	hub1_asuna_archive_1_14	Ты первый. Они же главные враги империи, так что их всех переловили.	Tu sei il primo. Sono i principali nemici dell'Impero, quindi li hanno catturati tutti.
+370616	hub1_asuna_archive_1_15	Я удивлена, что ты разгуливаешь без ошейника.	Sono sorpresa che tu stia in giro senza collare.
+370617	hub1_asuna_archive_1_16	Тут за каждым дзинко учет и слежка, не дай боги хоть один сбежит.	Ogni Jinko è registrato e sorvegliato, non sia mai che uno scappi.
+370618	hub1_asuna_archive_1_17	И где этот «учет» можно посмотреть?	E dove posso vedere questa registrazione?
+370619	hub1_asuna_archive_1_18	Я точно не знаю, но… я бы искала в Императорских архивах.	Non lo so di preciso, ma… cercherei negli Archivi Imperiali.
+370620	hub1_asuna_archive_1_19	Там же буквально ВСЯ информация в Империи хранится.	Lì è letteralmente conservata TUTTA l'informazione dell'Impero.
+370621	hub1_asuna_archive_1_20	Наконец-то хоть что- то полезное!	Finalmente qualcosa di utile!
+370622	hub1_asuna_archive_1_21	Вообще мы хотели купить сушёный корень имбиря и чёрный лотос.	In realtà volevamo comprare radice di zenzero essiccata e loto nero.
+370623	hub1_asuna_archive_1_22	У тебя найдется?	Ne hai?
+370624	hub1_asuna_archive_1_23	У тебя найдется?	Ne hai?
+370625	hub1_asuna_archive_1_24	Для тебя все найдется.	Per te c'è tutto.
+370626	hub1_asuna_archive_1_25	Теперь понятно где искать информацию об Аки.	Ora so dove cercare informazioni su Aki.
+370627	hub1_fisherman_quest_4_1	Ух, сразу жить захотелось. Спасибо вам, ребятки.	Uff, mi è tornata subito la voglia di vivere. Grazie, ragazzi.
+370628	hub1_fisherman_quest_4_2	Угорь где?	Dov'è l'anguilla?
+370629	hub1_fisherman_quest_4_3	Да я его продал в гейшам в чайном домике.	L'ho venduta alle geisha della casa da tè.
+370630	hub1_fisherman_quest_4_4	Они мои любимые покупательницы.	Sono le mie clienti preferite.
+370631	hub1_fisherman_quest_4_5	БЛЯЯЯЯЯ…	CAZZOOOO…
+370632	hub1_fisherman_quest_4_6	Ладно. Чайный домик.	Va bene. Casa da tè.
+370633	hub1_teahouse_2_1	Цуру, ты доставишь послание.	Tsuru, tu consegnerai il messaggio.
+370634	hub1_teahouse_2_2	Вынуждена отказать, госпожа Яэко. Я не хочу, чтобы меня видели в этом районе.	Devo rifiutare, signora Yaeko. Non voglio essere vista in questo quartiere.
+370635	hub1_teahouse_2_3	Купец Сэго подумает, что я обслуживаю его конкурентов. А он мой лучший клиент.	Il mercante Sego penserà che servo i suoi concorrenti. Ed è il mio miglior cliente.
+370636	hub1_teahouse_2_4	Я могу сходить, госпожа Яэко.	Posso andarci io, signora Yaeko.
+370637	hub1_teahouse_2_5	Момо, ты нюня и плакса. Ты все испоганишь. Поэтому пойти должна Цуру.	Momo, sei una piagnucolona e una frignona. Rovinerai tutto. Per questo deve andare Tsuru.
+370638	hub1_teahouse_2_6	Вы оглохли, госпожа Яэко? Я СКАЗАЛА, Я НИКУДА НЕ ПОЙДУ!	Siete sorda, signora Yaeko? HO DETTO CHE NON CI VADO!
+370639	hub1_teahouse_2_7	Как будто у тебя есть выбор! Запомни, соплячка, ты моя собственность!	Come se avessi scelta! Ricorda, mocciosa, sei di mia proprietà!
+370640	hub1_teahouse_2_8	Пока я приношу больше всего мон чайному домику, то могу делать что захочу.	Finché porto più mon alla casa da tè, posso fare quello che voglio.
+370641	hub1_teahouse_2_9	Ах, ты мелкая дрянь…	Ah, piccola carogna…
+370642	hub1_teahouse_2_10	Извините, дамы, можно помешать вашей беседе…	Scusate, signore, posso interrompere la vostra conversazione…
+370643	hub1_teahouse_2_11	А вам что надо, оборванцы?	E voi cosa volete, straccioni?
+370644	hub1_teahouse_2_12	По вам сразу видно, что у вас нет денег, чтобы даже рядом с чайным домиком постоять.	Si vede subito che non hai i soldi nemmeno per stare vicino alla casa da tè.
+370645	hub1_teahouse_2_13	Как хорошо, что мои кулаки бесплатные.	Meno male che i miei pugni sono gratis.
+370646	hub1_teahouse_2_14	Извините, нам просто нужно забрать угря, которого вам продали утром.	Scusate, dobbiamo solo riprendere l'anguilla che vi hanno venduto stamattina.
+370647	hub1_teahouse_2_15	АХХАХАХА, мальчики, у вас проблемы с вашими нефритовыми жезлами?	AHAHAHAHA, ragazzi, avete problemi con le vostre bacchette di giada?
+370648	hub1_teahouse_2_16	Че?	Cosa?
+370649	hub1_teahouse_2_17	Просто порошок из этой рыбы помогает мужчинам, чтобы их… жезл… ну, дольше…	La polvere di questo pesce aiuta gli uomini a far sì che la loro… bacchetta… beh, più a lungo…
+370650	hub1_teahouse_2_18	По ним видно, что они нуждаются в этом.	Si vede che ne hanno bisogno.
+370651	hub1_teahouse_2_19	ВСЕ! Хорошо, что мне все равно кому бить морду.	BENE! Meno male che non mi importa chi picchiare.
+370652	hub1_teahouse_2_20	Потише, потише, мальчик. Угря уже приготовили на кухне и подали клиентам.	Calma, calma, ragazzo. L'anguilla è già stata preparata in cucina e servita ai clienti.
+370653	hub1_teahouse_2_21	Ты опоздал, к сожалению.	Sei in ritardo, purtroppo.
+370654	hub1_teahouse_2_22	Да и не советую тебе размахивать кулаками. У меня связи по всему городу.	E non ti consiglio di usare i pugni. Ho contatti in tutta la città.
+370655	hub1_teahouse_2_23	Стоит мне щелкнуть пальцами, и они узнают о том, что в Трущобах скрывается дзинко.	Mi basta schioccare le dita e sapranno che un Jinko si nasconde nei Bassifondi.
+370656	hub1_teahouse_2_24	А че, твои гейши много где бывают?	Ehi, le tue geisha vanno in molti posti?
+370657	hub1_teahouse_2_25	Да, обслуживают клиентов по всему городу.	Sì, servono clienti in tutta la città.
+370658	hub1_teahouse_2_26	А в Архивах?	E negli Archivi?
+370659	hub1_teahouse_2_27	Ближе к делу, молодой человек.	Vieni al dunque, giovane.
+370660	hub1_teahouse_2_28	Мне нужно как то скрытно попасть в Императорские архивы.	Devo entrare di nascosto negli Archivi Imperiali.
+370661	hub1_teahouse_2_29	Как я понимаю твои гейши знают как?	Immagino che le tue geisha sappiano come fare?
+370662	hub1_teahouse_2_30	Какое совпадение. У меня предложение, которое будет выгодно нам обоим, молодой человек.	Che coincidenza. Ho una proposta che sarà vantaggiosa per entrambi, giovane.
+370663	hub1_teahouse_2_31	Доставь это послание нашему человеку в Нижнем Городе и он даст тебе ключ от туннелей под городом.	Consegna questo messaggio al nostro uomo nella Città Bassa e ti darà la chiave dei tunnel sotto la città.
+370664	hub1_teahouse_2_32	Там можно попасть в Архив.	Lì puoi accedere agli Archivi.
+370665	hub1_teahouse_2_33	Сделка?	Affare fatto?
+370666	hub1_teahouse_2_34	Уговор.	Affare fatto.
+370667	hub1_teahouse_2_35	Леон, ты с ума сошел? Как ты проберешься через Нижний город?	Leon, sei impazzito? Come farai ad attraversare la Città Bassa?
+370668	hub1_teahouse_2_36	По крышам.	Sui tetti.
+370669	hub1_teahouse_2_37	Мне нравится твой настрой.	Mi piace il tuo atteggiamento.
+370670	hub1_teahouse_2_38	Я думаю у барахольщика Хадзуо ты найдешь что-нибудь, что поможет тебе в этом пути.	Credo che dal rigattiere Hazuo troverai qualcosa che ti aiuterà in questo viaggio.
+370671	hub1_teahouse_2_39	Что именно?	Cosa, esattamente?
+370672	hub1_teahouse_2_40	Он же барахольщик. Какое-нибудь барахло.	È un rigattiere. Qualche cianfrusaglia.
+370673	hub1_teahouse_2_41	Ладно, я загляну к нему.	Va bene, gli farò visita.
+370674	hub1_scrappy_2_1	А, мои племяннички вернулись!	Ah, i miei nipotini sono tornati!
+370675	hub1_scrappy_2_2	В поисках знаний, или вас привела нужда?	In cerca di conoscenza, o è la necessità che vi ha portato qui?
+370676	hub1_scrappy_2_3	Нужно что-то, чтобы по крышам пройти.	Ci serve qualcosa per passare sui tetti.
+370677	hub1_scrappy_2_4	По крышам, говорите…	Sui tetti, dite…
+370678	hub1_scrappy_2_5	Ах! Это напоминает мне о мостах из бамбука времён императора Акито!	Ah! Questo mi ricorda i ponti di bambù dell'epoca dell'imperatore Akito!
+370679	hub1_scrappy_2_6	Знаете ли вы, что его войска…	Sapete che le sue truppe…
+370680	hub1_scrappy_2_7	Ты уверен, что у тебя в лавке вообще есть хоть что-то полезное?	Sei sicuro che nel tuo negozio ci sia qualcosa di utile?
+370681	hub1_scrappy_2_8	Вот, к примеру, веер придворной дамы.	Ecco, per esempio, un ventaglio da dama di corte.
+370682	hub1_scrappy_2_9	Когда она убегала к любовнику, этот звук маскировал её шаги…	Quando scappava dall'amante, questo suono mascherava i suoi passi…
+370683	hub1_scrappy_2_10	Может, у тебя есть ещё бамбуковая зубочистка? Тоже пригодится, ага.	Magari hai anche uno stuzzicadenti di bambù? Anche quello sarebbe utile, eh.
+370684	hub1_scrappy_2_11	Хадзуо, может быть, что-то попрактичнее?	Hazuo, forse qualcosa di più pratico?
+370685	hub1_scrappy_2_12	А это — маска актёра.	E questa… è la maschera di un attore.
+370686	hub1_scrappy_2_13	Один вор использовал её, чтобы стоять неподвижно на площади и притворяться статуей…	Un ladro la usava per stare immobile in piazza e fingersi una statua…
+370687	hub1_scrappy_2_14	ВСЁ, ХВАТИТ! Мне не нужна коллекция пиздежа!	BASTA, HO CAPITO! Non mi serve una collezione di cazzate!
+370688	hub1_scrappy_2_15	О! Инструмент кровельщиков. С его помощью поднимали черепицу!	Oh! Uno strumento da copritetto. Lo usavano per sollevare le tegole!
+370689	hub1_scrappy_2_16	Для тебя то, что нужно.	Per te è quello che ci vuole.
+370690	hub1_scrappy_2_17	Наконец-то. Хоть раз твой мусор оказался в тему.	Finalmente. Per una volta la tua spazzatura è utile.
+370691	hub1_scrappy_2_18	Спасибо, Хадзуо.	Grazie, Hazuo.
+370692	hub1_scrappy_2_19	История всегда знает, когда подоспеть.	La storia sa sempre quando arrivare.
+370693	hub1_fisherman_1_1	Давайте-ка потише. Вы мне всю рыбу распугаете.	Fate un po' meno rumore. Mi spaventate tutti i pesci.
+370694	hub1_fisherman_1_2	Мужик, мы ни слова не сказали.	Amico, non abbiamo detto una parola.
+370695	hub1_fisherman_1_3	ТШШШШ! Садитесь и учитесь как надо ловить.	SHHHH! Sedetevi e imparate a pescare.
+370696	hub1_fisherman_1_4	Вы тут каждый день рыбачите?	Peschi qui tutti i giorni?
+370697	hub1_fisherman_1_5	Когда рыбачу. Когда сплю. Когда похмелье пережидаю.	Quando pesco. Quando dormo. Quando aspetto che mi passi la sbornia.
+370698	hub1_fisherman_1_6	Море любит постоянство.	Il mare ama la costanza.
+370699	hub1_fisherman_1_7	Понял. Алкаш с жизненной мудростью.	Capito. Un ubriacone con la saggezza della vita.
+370700	hub1_fisherman_1_8	Я и пьяница и лучший рыбак во всей империи!	Sono un ubriacone e il miglior pescatore di tutto l'Impero!
+370701	hub1_fisherman_1_9	И тебя могу научить!	E posso insegnarti!
+370702	hub1_fisherman_1_10	Пить?	A bere?
+370703	hub1_fisherman_1_11	Ловить рыбу! Приходите в любое время.	A pescare! Venite quando volete.
+370704	hub1_fisherman_1_12	Спасибо за приглашение!	Grazie dell'invito!
+370705	hub1_asuna_1_1	Ого, Дзинко и Наг?	Oh, un Jinko e un Naga?
+370706	hub1_asuna_1_2	Давно не встречала своих, да еще таких симпатичных…	È da tanto che non incontro i miei simili, e così carini per giunta…
+370707	hub1_asuna_1_3	Кхмх! У вас столько редких трав… Потрясающе.	Ehm! Hai così tante erbe rare… Incredibile.
+370708	hub1_asuna_1_4	А еще настоек,мазей, ядов… Смотря что именно вам нужно.	E anche tinture, unguenti, veleni… Dipende da cosa ti serve.
+370709	hub1_asuna_1_5	Хотя тебе я бы просто посоветовала побольше отдыхать.	Anche se a te consiglierei solo di riposare di più.
+370710	hub1_asuna_1_6	У тебя сердце слишком быстро бьётся.	Il tuo cuore batte troppo forte.
+370711	hub1_asuna_1_7	Ч-что?..	C-cosa?..
+370712	hub1_asuna_1_8	Меня сейчас стошнит.	Adesso vomito.
+370713	hub1_asuna_1_9	А ты чего такой колючий?	E tu perché sei così spinoso?
+370714	hub1_asuna_1_10	Боишься, что я уведу твоего друга?	Hai paura che ti porti via il tuo amico?
+370715	hub1_asuna_1_11	Чего?! За языком следи.	Cosa?! Stai attenta a come parli.
+370716	hub1_asuna_1_12	Милый ребёнок.	Che bambino carino.
+370717	hub1_asuna_1_13	Ладно, если понадобятся редкие травы или зелья — вы знаете, где меня искать.	Bene, se avete bisogno di erbe o pozioni rare, sapete dove trovarmi.
+370718	hub1_bathman_1_1	ЭЙ ВЫ! Шерстяной! Чешуйчатый! Да-да, я вам!	EHI VOI! Peloso! Squamoso! Sì, dico a voi!
+370719	hub1_bathman_1_2	… Чего ему надо?	…Cosa vuole?
+370720	hub1_bathman_1_3	По лицам вижу — мышцы забиты!	Dalle vostre facce vedo che i muscoli sono tesi!
+370721	hub1_bathman_1_4	Спины деревянные! Душа уставшая!	Schiena rigida! Anima stanca!
+370722	hub1_bathman_1_5	Вам срочно нужна баня!	Avete un disperato bisogno di un bagno!
+370723	hub1_bathman_1_6	Вообще-то… звучит не так уж плохо.	A dire il vero… non suona così male.
+370724	hub1_bathman_1_7	Даже не начинай.	Non ci provare nemmeno.
+370725	hub1_bathman_1_8	Пять минут в пару — как заново родишься!	Cinque minuti di vapore e rinasci!
+370726	hub1_bathman_1_9	Чтобы снова проживать всю эту херь? Ну уж нет!	Per rivivere tutta questa merda? No, grazie!
+370727	hub1_bathman_1_10	Это потому что ты ещё нормально не пропотел!	È perché non hai ancora sudato per bene!
+370728	hub1_bathman_1_11	Заходите, бойцы! Сегодня и каждый день банный марафон!	Avanti, guerrieri! Oggi e ogni giorno, maratona di bagni!
+370729	hub1_fisherman_quest_5_1	Ты можешь поймать еще одного угря?	Puoi prendere un'altra anguilla?
+370730	hub1_fisherman_quest_5_2	Сам ловить? Ха… нет уж.	Pescare da solo? Ah... no.
+370731	hub1_fisherman_quest_5_3	Мои руки… для кружки, не для удочки.	Le mie mani... sono per la tazza, non per la canna da pesca.
+370732	hub1_fisherman_quest_5_4	Но вас научу…	Ma vi insegnerò…
+370733	hub1_fisherman_quest_5_5	Так ты пьяный вусмерть.	Sei ubriaco fradicio.
+370734	hub1_fisherman_quest_5_6	Чему ты вообще можешь научить?	Cosa puoi insegnare, in fondo?
+370735	hub1_fisherman_quest_5_7	Рыбу не я ловлю.	Non sono io a pescare.
+370736	hub1_fisherman_quest_5_8	Рыба сама приходит… если правильно позвать.	Il pesce viene da solo… se lo chiami nel modo giusto.
+370737	hub1_fisherman_quest_5_9	Сушёная лягушка — приманка.	Una rana essiccata è l'esca.
+370738	hub1_fisherman_quest_5_10	Бросаешь туда, под корягу.	La lanci lì, sotto il tronco.
+370739	hub1_fisherman_quest_5_11	Дёргаешь… три раза. Три. Не два… не пять. Три.	Tiri… tre volte. Tre. Non due… non cinque. Tre.
+370740	hub1_fisherman_quest_5_12	Может, ещё хором посчитаем? Раз, два, три?	Magari contiamo in coro? Uno, due, tre?
+370741	hub1_fisherman_quest_5_13	Посчитайте. Угрю всё равно…	Contate pure. All'anguilla non importa…
+370742	hub1_fisherman_quest_5_14	а вам веселее будет.	e voi vi divertirete di più.
+370743	hub1_fisherman_quest_5_15	Спасибо. Мы попробуем.	Grazie. Ci proveremo.
+370744	hub1_fisherman_quest_5_16	Ну… вот. У вас пошло…	Beh… ecco. Ti è andata…
+370745	hub1_fisherman_quest_5_17	Зови, если цунами… а мне надо проспаться…	Chiamami se c’è uno tsunami… ora devo dormire…
+370746	hub1_fisherman_quest_5_18	Вот охеревший.	Che stronzo.
+370747	hub1_fisherman_quest_5_19	Зато мы хорошо проведём время.	Ma ci divertiremo un mondo.
+370748	hub1_fisherman_quest_5_20	Ну… посмотрим.	Beh… vedremo.
+370749	hub1_fisherman_quest_6_1	Когда я этого угря выловлю…	Quando prenderò quell’anguilla…
+370750	hub1_fisherman_quest_6_2	я из него всю дурь выбью.	gli farò passare la voglia di fare lo scemo.
+370751	hub1_fisherman_quest_6_3	Какого черта так долго.	Che cazzo ci vuole tanto.
+370752	hub1_fisherman_quest_6_4	В тебе так много экспрессии!	Hai così tanta espressività!
+370753	hub1_fisherman_quest_6_5	Я никогда не встречал никого подобного.	Non ho mai incontrato nessuno come te.
+370754	hub1_fisherman_quest_6_6	Так, я не понял.	Allora, non ho capito.
+370755	hub1_fisherman_quest_6_7	Ты меня типа унизил или мне показалось?	Mi hai umiliato o mi è sembrato?
+370756	hub1_fisherman_quest_6_8	Нет, нет, нет! У тебя очень необычная речь.	No, no, no! Hai un modo di parlare molto insolito.
+370757	hub1_fisherman_quest_6_9	Ты рубишь с плеча…	Vai dritto al punto…
+370758	hub1_fisherman_quest_6_10	но всегда своими словами попадаешь прямо в суть.	ma con le tue parole cogli sempre l'essenza.
+370759	hub1_fisherman_quest_6_11	В твоей деревне все так общаются?	Nel tuo villaggio tutti parlano così?
+370760	hub1_fisherman_quest_6_12	Такие же эмоциональные?	Sono tutti così emotivi?
+370761	hub1_fisherman_quest_6_13	А, ты про это.	Ah, parli di questo.
+370762	hub1_fisherman_quest_6_14	Этот базар мне достался от мразей, у которых я провел всю свою жизнь.	Questo modo di parlare l'ho imparato dalle bastarde con cui ho passato tutta la mia vita.
+370763	hub1_fisherman_quest_6_15	А как было в моей родной деревне… я уже плохо помню.	E com'era nel mio villaggio natale… non me lo ricordo più bene.
+370764	hub1_fisherman_quest_6_16	Совсем ничего?	Proprio niente?
+370765	hub1_fisherman_quest_6_17	Я помню сестру, как она мне лепила онигири…	Ricordo mia sorella, come mi preparava gli onigiri…
+370766	hub1_fisherman_quest_6_18	как она заставляла убираться в нашей хижине	come mi costringeva a pulire la nostra capanna
+370767	hub1_fisherman_quest_6_19	постоянно играла со мной и шутила.	giocava sempre con me e scherzava.
+370768	hub1_fisherman_quest_6_20	Смешила меня. Мне казалось, что все будет хорошо.	Mi faceva ridere. Pensavo che tutto sarebbe andato bene.
+370769	hub1_fisherman_quest_6_21	Ну… рядом с ней - всегда так было.	Beh… con lei era sempre così.
+370770	hub1_fisherman_quest_6_22	Мне так жаль это слышать.	Mi dispiace tanto sentirlo.
+370771	hub1_fisherman_quest_6_23	Тебе наверное пришлось тяжело.	Devi aver passato dei momenti difficili.
+370772	hub1_fisherman_quest_6_24	Но хорошо, что у тебя есть эти воспоминания о сестре.	Ma è un bene che tu abbia questi ricordi di tua sorella.
+370773	hub1_fisherman_quest_6_25	Они как светлячки в ночи - выведут тебя на верный путь.	Sono come lucciole nella notte: ti guideranno sulla strada giusta.
+370774	hub1_fisherman_quest_6_26	…	…
+370775	hub1_fisherman_quest_6_27	Слышь?	Senti?
+370776	hub1_fisherman_quest_6_28	Этим задротским словечкам тебя твои родители чудилы научили?	Ti hanno insegnato queste parole da sfigato i tuoi genitori, quei mostri?
+370777	hub1_fisherman_quest_6_29	Ну… да.	Beh… sì.
+370778	hub1_fisherman_quest_6_30	Наги редко выбирают стезю воина…	I Naga raramente scelgono la via del guerriero…
+370779	hub1_fisherman_quest_6_31	большинство из нас становятся врачевателями, счетоводами, поэтами,	la maggior parte di noi diventa guaritore, contabile, poeta,
+370780	hub1_fisherman_quest_6_32	некоторые становятся историками.	alcuni diventano storici.
+370781	hub1_fisherman_quest_6_33	Я даже встречал парочку адвокатов.	Ho persino incontrato un paio di avvocati.
+370782	hub1_fisherman_quest_6_34	Поэтому мои родители с детства обучали меня грамоте.	Per questo i miei genitori mi hanno insegnato a leggere e scrivere fin da piccolo.
+370783	hub1_fisherman_quest_6_35	ОК, лучше бы я не спрашивал.	OK, avrei preferito non chiedere.
+370784	hub1_fisherman_quest_6_36	Все про тебя понятно, чудила.	Ho capito tutto di te, strano.
+370785	hub1_fisherman_quest_6_37	Что бы сказали твои родители, увидев тебя с таким как я?	Cosa direbbero i tuoi genitori, vedendoti con uno come me.
+370786	hub1_fisherman_quest_6_38	Ловящим сранного угря посреди самого вонючего уголка Столицы? А?	A pescare una fottuta anguilla nel posto più puzzolente della Capitale? Eh?
+370787	hub1_fisherman_quest_6_39	Ничего.	Niente.
+370788	hub1_fisherman_quest_6_40	Почему?	Perché?
+370789	hub1_fisherman_quest_6_41	Когда в нашу деревню пришли рабовладельцы…	Quando gli schiavisti sono venuti nel nostro villaggio…
+370790	hub1_fisherman_quest_6_42	мама и папа не захотели отдавать меня.	mamma e papà non hanno voluto darmi via.
+370791	hub1_fisherman_quest_6_43	Их больше нет.	Non ci sono più.
+370792	hub1_fisherman_quest_6_44	Оу. Я немного перегнул. Извини.	Oh. Ho esagerato un po'. Scusa.
+370793	hub1_fisherman_quest_6_45	Я так рад, что мы узнали друг друга лучше!	Sono così contento che ci siamo conosciuti meglio!
+370794	hub1_fisherman_quest_6_46	Мда, чувствую что ты от меня не отвалишь.	Mmh, sento che non mi mollerai.
+370795	hub1_fisherman_quest_6_47	ЕПТ, УГОРЬ! НАКАНЕЦТА!	CAZZO, ANGUILLA! FINALMENTE!
+370796	hub1_fisherman_quest_6_48	Ура! Мы сделали это!	Evviva! Ce l'abbiamo fatta!
+370797	hub1_fisherman_quest_7_1	О! Нефритовый угорь!	Oh! Un’anguilla di giada!
+370798	hub1_fisherman_quest_7_2	Спасибо вам, ребята.	Grazie, ragazzi.
+370799	hub1_fisherman_quest_7_3	Надеюсь, моя просьба не доставила слишком много хлопот?	Spero che la mia richiesta non vi abbia causato troppi problemi?
+370800	hub1_fisherman_quest_7_4	Что вы! Совсем нет. Мы были рады помочь.	Ma che dice! Affatto. Siamo stati felici di aiutare.
+370801	hub1_fisherman_quest_7_5	Ты нас отправил к рыбаку. А его нет, он бухой!	Ci hai mandato dal pescatore. Ma non c'è, è ubriaco!
+370802	hub1_fisherman_quest_7_6	И мы пошли в баню.	E siamo andati ai bagni.
+370803	hub1_fisherman_quest_7_7	Банщик отправил к травнице, потом обратно в баню,	Il bagnino ci ha mandato dall'erborista, poi di nuovo ai bagni,
+370804	hub1_fisherman_quest_7_8	потом поперлись к гейшам, потом к барахольщику!	poi siamo andati dalle geisha, poi dal rigattiere!
+370805	hub1_fisherman_quest_7_9	И в итоге сами выловили эту сраную рыбу!	E alla fine abbiamo pescato noi stessi quel cazzo di pesce!
+370806	hub1_fisherman_quest_7_10	Так что да. Было пиздец как несложно.	Quindi sì. È stato fottutamente facile.
+370807	hub1_fisherman_quest_7_11	Леон…	Leon…
+370808	hub1_fisherman_quest_7_12	Эм… Ну…	Ehm… Beh…
+370809	hub1_fisherman_quest_7_13	В таком случае следующий рамен за мой счёт.	In tal caso, il prossimo ramen lo offro io.

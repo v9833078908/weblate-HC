@@ -82,6 +82,15 @@ class EngageTaskChecklistTest(SimpleTestCase):
     def test_fuzzy_filter_query_matches_fuzzy_states(self) -> None:
         self.assertEqual(FILTERS.get_filter_query("fuzzy"), "is:needs-editing")
 
+    def test_judge_filter_queries_are_available(self) -> None:
+        self.assertEqual(FILTERS.get_filter_query("judge-uncovered"), "NOT has:judge")
+        self.assertEqual(FILTERS.get_filter_query("judge-advisory"), "judge:pass")
+        self.assertEqual(
+            FILTERS.get_filter_query("judge-held"), "judge:flag OR judge:reject"
+        )
+        self.assertEqual(FILTERS.get_filter_query("judge-stale"), "judge:stale")
+        self.assertEqual(FILTERS.get_filter_query("judge-incomplete"), "judge:unparsed")
+
     def test_engage_tasks_hide_empty_review(self) -> None:
         tasks = self.get_engage_tasks(enable_review=True)
 

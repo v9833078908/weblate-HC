@@ -47,6 +47,10 @@ from weblate.utils.translation import pgettext_noop
 #: Project slug of the batch currently fetching, for usage accounting at the
 #: HTTP seam, which does not receive the batch units.
 llm_batch_project: ContextVar[str] = ContextVar("llm_batch_project", default="")
+#: Source batch size of the request currently fetching, set/reset at the same
+#: seam as llm_batch_project. Reflects the exact batch sent over HTTP,
+#: including split-recovery sub-batches, not the original caller's batch.
+llm_batch_unit_count: ContextVar[int] = ContextVar("llm_batch_unit_count", default=0)
 
 #: Primary key of the usage row written for the request currently being
 #: parsed. The cost of a request is measured at the HTTP seam, while whether
@@ -2783,6 +2787,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
             )
         )
         project_token = llm_batch_project.set(_sources_project_slug(sources))
+        unit_count_token = llm_batch_unit_count.set(len(sources))
         # Scoped per attempt: a halved retry must not resolve the previous
         # attempt's row, and a reply billed without usable usage leaves the
         # variable at None so nothing is marked at all.
@@ -2798,6 +2803,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 translations_string, sources, source_occurrences, string_ids=string_ids
             )
         finally:
+            llm_batch_unit_count.reset(unit_count_token)
             llm_usage_record.reset(usage_token)
 
     async def _adownload_multiple_translations(
@@ -2906,6 +2912,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
             string_ids,
         )
         project_token = llm_batch_project.set(_sources_project_slug(sources))
+        unit_count_token = llm_batch_unit_count.set(len(sources))
         usage_token = llm_usage_record.set(None)
         try:
             try:
@@ -2918,6 +2925,7 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 translations_string, sources, source_occurrences, string_ids=string_ids
             )
         finally:
+            llm_batch_unit_count.reset(unit_count_token)
             llm_usage_record.reset(usage_token)
 
     def _prepare_llm_translation(

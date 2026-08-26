@@ -587,12 +587,24 @@ end_stop 58-71 против 18-28).
 `docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md`) и универсализация промпта
 (плечо H плана `docs/llm-first/plans/2026-08-20-judge-prompt-universalization.md`)
 реализованы. Ремонтный контур и review-gate (план
-`docs/llm-first/plans/2026-08-22-03-judge-review-gate.md`) развёрнуты на проде:
+`docs/llm-first/archive/2026-08-22-03-judge-review-gate.md`, superseded) развёрнуты на проде:
 major/critical вердикты на записываемых строках получают один ремонтный
 кандидат от `openrouter`-machinery и повторное суждение обоих мест;
-прошедший ремонт становится `Translated`, нерешённый major —
-`Needs checking` + `judge-flag`, нерешённый critical — `Needs editing` +
-`judge-reject` (исключены из экспорта через `WITHOUT_NEEDS_EDITING`).
+прошедший ремонт становится `Translated`, нерешённый critical держится
+автоматически на `Needs editing` + `judge-reject` до аудируемого решения
+ревьюера (исключён из экспорта через `WITHOUT_NEEDS_EDITING`).
+
+**Обновлено планом `docs/llm-first/plans/2026-08-25-01-judge-producer-ux-and-delivery.md`
+(не задеплоено в прод, требует отдельного одобрения):** нерешённый major
+больше не держится на `Needs checking` — он отгружается как `Translated` с
+доказательством `judge-flag` (advisory, не блокирует поставку); minor
+становится видимой не блокирующей уликой `judge-note`. Ревьюер с правом
+`unit.review` может зафиксировать аудируемое решение по held/escalated
+вердикту (`accepted_as_is` или `escalated`) через CSRF-protected POST;
+текущая резолюция может снова смениться через разрешённый переход
+(например, `escalated` -> `accepted_as_is`), но каждый переход навсегда
+дописывает свою запись — кто, когда, почему — в историю строки. Dismiss
+для judge-чеков отключён — решение принимается только через этот путь.
 Судья включён на проде (`JUDGE_ENABLED`, два места,
 `JUDGE_MAX_REPAIR_ATTEMPTS=1`, `JUDGE_MAY_APPROVE` выключен), а
 `translation_review=True` + `commit_policy=WITHOUT_NEEDS_EDITING`

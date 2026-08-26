@@ -1,5 +1,13 @@
 # LLM judge repair and review-gate rollout plan
 
+> **Superseded 2026-08-25** by
+> `docs/llm-first/plans/2026-08-25-01-judge-producer-ux-and-delivery.md`.
+> Point 4 below (an unresolved `major` becomes `Needs checking`) is no
+> longer current: a `major` now ships as `Translated` with advisory
+> `judge-flag` evidence, and a resolution is an audited producer decision
+> recorded through `resolve-judge-verdict`, not a checks dismissal. Kept for
+> history; do not implement against this document.
+
 ## Goal
 
 Make a manually started **Add as translation with an LLM judge** run safe and
@@ -59,6 +67,7 @@ def test_flag_triggers_one_repair_judged_by_both_seats(self) -> None:
     self.assertEqual(verdict.attempt, 1)
     self.assertEqual(self.get_unit().target, "fixed text")
     self.assertEqual(client.call_count, 4)
+
 
 def test_exhausted_flag_repair_keeps_the_last_flag(self) -> None:
     _unit, verdict, client = self.run_batch(

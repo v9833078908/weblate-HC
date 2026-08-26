@@ -1,0 +1,72 @@
+{
+ "heart-abyss/hub-1/de": {
+  "units": 396,
+  "component_units": 396,
+  "runs": [],
+  "duplicates": []
+ },
+ "heart-abyss/hub-1/en": {
+  "units": 396,
+  "component_units": 396,
+  "runs": [],
+  "duplicates": [
+   {
+    "target": "Don't even start.",
+    "units": [
+     {
+      "id": 343268,
+      "context": "hub1_teahouse_1_4",
+      "source": "Даже не начинайте."
+     },
+     {
+      "id": 343486,
+      "context": "hub1_bathman_1_7",
+      "source": "Даже не начинай."
+     }
+    ]
+   }
+  ]
+ },
+ "heart-abyss/hub-1/es": {
+  "units": 396,
+  "component_units": 396,
+  "runs": [],
+  "duplicates": []
+ },
+ "heart-abyss/hub-1/fr": {
+  "units": 396,
+  "component_units": 396,
+  "runs": [],
+  "duplicates": []
+ },
+ "heart-abyss/hub-1/it": {
+  "units": 396,
+  "component_units": 396,
+  "runs": [],
+  "duplicates": []
+ },
+ "heart-abyss/hub-1/ja": {
+  "units": 396,
+  "component_units": 396,
+  "runs": [],
+  "duplicates": []
+ },
+ "heart-abyss/hub-1/ko": {
+  "units": 396,
+  "component_units": 396,
+  "runs": [],
+  "duplicates": []
+ },
+ "heart-abyss/hub-1/zh_Hans": {
+  "units": 396,
+  "component_units": 396,
+  "runs": [],
+  "duplicates": []
+ },
+ "heart-abyss/hub-1/zh_Hant": {
+  "units": 396,
+  "component_units": 396,
+  "runs": [],
+  "duplicates": []
+ }
+}

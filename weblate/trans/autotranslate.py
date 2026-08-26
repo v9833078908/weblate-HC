@@ -4,25 +4,25 @@
 
 from __future__ import annotations
 
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import partial
+from dataclasses import dataclass, replace
+from math import ceil
 from typing import TYPE_CHECKING, Any, Literal
 
 from celery import current_task
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.db import connections, transaction
+from django.db import transaction
 from django.db.models import Case, IntegerField, QuerySet, Value, When
 from django.db.models.functions import MD5, Lower
 from django.utils.translation import gettext, ngettext
 
-from weblate.logger import LOGGER
+from weblate.checks.models import CHECKS
 from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.models import MACHINERY
 from weblate.trans.actions import ActionEvents
 from weblate.trans.judge import JUDGE_SEATS, JudgeError, validate_judge_configuration
 from weblate.trans.judge_loop import run_judge_batch
+from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models import (
     Category,
     Component,
@@ -59,210 +59,120 @@ if TYPE_CHECKING:
 # A refusal that outlived the request retries stops the service for everyone, so
 # batches of a run started meanwhile are skipped. Wait for a short stop to pass
 # rather than dropping their strings, but never hold a run for a long one.
-RATE_LIMIT_WAIT = 90
-RATE_LIMIT_POLL = 5
 
 
-def _fetch_machinery_batch(
-    *,
-    service: BatchMachineTranslation,
-    batch: list[Unit],
-    user: User | None,
-    threshold: int,
-    log_translation: Translation | None,
-    close_connections: bool,
-) -> bool:
-    """Fetch a single batch, keeping a failure local to it."""
-    try:
-        if service.is_rate_limited():
-            # The service refused often enough to be stopped for everyone; every
-            # remaining string would be dropped without a request anyway.
-            return False
-        service.batch_translate(batch, user, threshold=threshold)
-    except MachineTranslationError as error:
-        if log_translation is not None:
-            log_translation.log_error("failed automatic translation: %s", error)
-        else:
-            LOGGER.warning(
-                "failed machinery translation from %s: %s",
-                service.name,
-                error,
-            )
-    finally:
-        # Django only closes connections it opened for a request or a task, so a
-        # worker thread has to release its own.
-        if close_connections:
-            connections.close_all()
-    return True
+@dataclass(frozen=True, slots=True)
+class JudgeScopePreview:
+    matched: int
+    processed: int
+    remaining: int
+    writable: int
+    initial_calls: int
+    worst_case_calls: int
 
 
-def _wait_for_rate_limit(
-    service: BatchMachineTranslation, log_translation: Translation | None
-) -> bool:
-    """Wait for a stop to pass, up to what a run can afford."""
-    deadline = time.monotonic() + min(service.rate_limit_period, RATE_LIMIT_WAIT)
-    logged = False
-    while True:
-        if not service.is_rate_limited():
-            return True
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            return False
-        if not logged and log_translation is not None:
-            log_translation.log_info(
-                "waiting for %s to accept requests again", service.name
-            )
-            logged = True
-        time.sleep(min(RATE_LIMIT_POLL, remaining))
-
-
-def _fetch_machinery_batches(
-    *,
-    service: BatchMachineTranslation,
-    batches: list[list[Unit]],
-    user: User | None,
-    threshold: int,
-    log_translation: Translation | None,
-    concurrency: int,
-    done: Callable[[list[Unit]], None],
-) -> list[list[Unit]]:
-    """Fetch batches, returning the ones a stopped service refused to be asked."""
-    skipped: list[list[Unit]] = []
-    if concurrency < 2:
-        for batch in batches:
-            if _fetch_machinery_batch(
-                service=service,
-                batch=batch,
-                user=user,
-                threshold=threshold,
-                log_translation=log_translation,
-                close_connections=False,
-            ):
-                done(batch)
-            else:
-                skipped.append(batch)
-        return skipped
-
-    # Progress is reported from this thread because Celery keeps the current
-    # task in thread-local storage.
-    with ThreadPoolExecutor(
-        max_workers=concurrency, thread_name_prefix="machinery-batch"
-    ) as pool:
-        futures = {
-            pool.submit(
-                _fetch_machinery_batch,
-                service=service,
-                batch=batch,
-                user=user,
-                threshold=threshold,
-                log_translation=log_translation,
-                close_connections=True,
-            ): batch
-            for batch in batches
-        }
-        for future in as_completed(futures):
-            if future.result():
-                done(futures[future])
-            else:
-                skipped.append(futures[future])
-    return skipped
-
-
-def _fetch_machinery_service(
-    *,
-    service: BatchMachineTranslation,
-    batches: list[list[Unit]],
-    user: User | None,
-    threshold: int,
-    log_translation: Translation | None,
-    set_progress: Callable[[int], None] | None,
-    progress_offset: int,
-    concurrency: int,
-    on_batch: Callable[[list[Unit]], None] | None,
-) -> None:
-    """Fetch all batches of one service, in parallel when it allows it."""
-    fetched = 0
-
-    def done(batch: list[Unit]) -> None:
-        nonlocal fetched
-        # Runs on the calling thread, so the callback may touch the database.
-        if on_batch is not None:
-            on_batch(batch)
-        fetched += len(batch)
-        if set_progress is not None:
-            set_progress(progress_offset + fetched)
-
-    fetch = partial(
-        _fetch_machinery_batches,
-        service=service,
-        user=user,
-        threshold=threshold,
-        log_translation=log_translation,
-        concurrency=concurrency,
-        done=done,
-    )
-    skipped = fetch(batches=batches)
-    if skipped and _wait_for_rate_limit(service, log_translation):
-        skipped = fetch(batches=skipped)
-    # Keep the progress total honest: every batch counts once, asked or not.
-    for batch in skipped:
-        done(batch)
-
-
-def fetch_machinery_matches(
-    *,
-    units: list[Unit],
-    user: User | None,
-    services: Sequence[BatchMachineTranslation],
-    threshold: int,
-    set_progress: Callable[[int], None] | None = None,
-    log_translation: Translation | None = None,
-    on_batch: Callable[[list[Unit]], None] | None = None,
-) -> dict[int, UnitMemoryResultDict]:
+@dataclass(frozen=True, slots=True)
+class JudgeSummary:
     """
-    Fetch machinery matches without applying them to units.
+    Producer-facing tally of one judge run's outcomes.
 
-    ``on_batch`` receives every batch as soon as it is fetched, on the calling
-    thread. It is ignored for more than one service, because a unit's best
-    result is only known once every service has answered.
+    ``repaired`` counts verdicts whose retained round has ``attempt > 0``:
+    a repair-then-rejudge cycle happened, not that the severity improved.
     """
-    num_units = len(units)
-    if len(services) != 1:
-        on_batch = None
 
-    for pos, translation_service in enumerate(services):
-        batch_size = translation_service.batch_size
-        batches = [
-            units[batch_start : batch_start + batch_size]
-            for batch_start in range(0, num_units, batch_size)
-        ]
-        concurrency = max(1, min(translation_service.batch_concurrency, len(batches)))
-        if log_translation is not None:
-            log_translation.log_info(
-                "fetching translations for %d units from %s, %d per request, %d in parallel",
-                num_units,
-                translation_service.name,
-                batch_size,
-                concurrency,
-            )
+    evaluated: int = 0
+    nothing_blocking: int = 0
+    minor_noted: int = 0
+    major_not_fixed: int = 0
+    critical_held: int = 0
+    unparsed: int = 0
+    repaired: int = 0
+    cap_remainder: int = 0
 
-        _fetch_machinery_service(
-            service=translation_service,
-            batches=batches,
-            user=user,
-            threshold=threshold,
-            log_translation=log_translation,
-            set_progress=set_progress,
-            progress_offset=pos * num_units,
-            concurrency=concurrency,
-            on_batch=on_batch,
+    def __add__(self, other: JudgeSummary) -> JudgeSummary:
+        if not isinstance(other, JudgeSummary):
+            return NotImplemented
+        return JudgeSummary(
+            evaluated=self.evaluated + other.evaluated,
+            nothing_blocking=self.nothing_blocking + other.nothing_blocking,
+            minor_noted=self.minor_noted + other.minor_noted,
+            major_not_fixed=self.major_not_fixed + other.major_not_fixed,
+            critical_held=self.critical_held + other.critical_held,
+            unparsed=self.unparsed + other.unparsed,
+            repaired=self.repaired + other.repaired,
+            cap_remainder=self.cap_remainder + other.cap_remainder,
         )
 
-    return {
-        unit.id: unit.machinery
-        for unit in units
-        if unit.machinery and any(unit.machinery["quality"])
+
+def format_judge_summary(summary: JudgeSummary) -> str:
+    """Build the one producer-facing completion message for a judge run."""
+    message = gettext(
+        "%(evaluated)d evaluated: %(nothing_blocking)d with no blocking concern, "
+        "%(minor_noted)d minor noted, %(major_not_fixed)d major not fixed, "
+        "%(critical_held)d critical held, %(unparsed)d unparsed."
+    ) % {
+        "evaluated": summary.evaluated,
+        "nothing_blocking": summary.nothing_blocking,
+        "minor_noted": summary.minor_noted,
+        "major_not_fixed": summary.major_not_fixed,
+        "critical_held": summary.critical_held,
+        "unparsed": summary.unparsed,
     }
+    if summary.repaired:
+        message += " " + ngettext(
+            "%(repaired)d string was repaired and re-judged.",
+            "%(repaired)d strings were repaired and re-judged.",
+            summary.repaired,
+        ) % {"repaired": summary.repaired}
+    if summary.cap_remainder:
+        message += " " + gettext(
+            "%(remaining)d matching strings remain because of the per-run cap."
+        ) % {"remaining": summary.cap_remainder}
+    return message
+
+
+def _summarize_verdicts(
+    verdicts: dict[int, JudgeVerdict], *, cap_remainder: int
+) -> JudgeSummary:
+    """Tally one judge run's retained verdicts into producer-facing buckets."""
+    nothing_blocking = minor_noted = major_not_fixed = critical_held = 0
+    unparsed = repaired = 0
+    for verdict in verdicts.values():
+        if verdict.unparsed:
+            unparsed += 1
+        elif verdict.max_severity == JudgeVerdict.Severity.CRITICAL:
+            critical_held += 1
+        elif verdict.max_severity == JudgeVerdict.Severity.MAJOR:
+            major_not_fixed += 1
+        elif verdict.max_severity == JudgeVerdict.Severity.MINOR:
+            minor_noted += 1
+        else:
+            nothing_blocking += 1
+        if verdict.attempt > 0:
+            repaired += 1
+    return JudgeSummary(
+        evaluated=len(verdicts),
+        nothing_blocking=nothing_blocking,
+        minor_noted=minor_noted,
+        major_not_fixed=major_not_fixed,
+        critical_held=critical_held,
+        unparsed=unparsed,
+        repaired=repaired,
+        cap_remainder=cap_remainder,
+    )
+
+
+def _judge_phase(
+    completed_batches: int, *, initial_calls: int, worst_case_calls: int
+) -> tuple[str, int, int]:
+    """Split a judge run's batch count into its judging/repairing phase."""
+    if completed_batches <= initial_calls:
+        return "judging", completed_batches, initial_calls
+    return (
+        "repairing",
+        completed_batches - initial_calls,
+        worst_case_calls - initial_calls,
+    )
 
 
 def check_auto_translate_permission(
@@ -311,8 +221,11 @@ class BaseAutoTranslate:
         )
         self.failure_message: str | None = None
         self.warnings: list[str] = []
+        self.judge_summary: JudgeSummary | None = None
 
     def get_message(self) -> str:
+        if self.mode == "judge" and self.judge_summary is not None:
+            return format_judge_summary(self.judge_summary)
         if self.updated == 0:
             return gettext("Automatic translation completed, no strings were updated.")
         message = ngettext(
@@ -336,14 +249,24 @@ class BaseAutoTranslate:
     def get_warnings(self) -> list[str]:
         return self.warnings
 
-    def set_progress(self, current: int) -> None:
+    def set_progress(
+        self,
+        current: int,
+        *,
+        phase: str | None = None,
+        phase_current: int | None = None,
+        phase_total: int | None = None,
+    ) -> None:
         if current_task and current_task.request.id and self.progress_steps:
             low, high = self.progress_range
-            current_task.update_state(
-                state="PROGRESS",
-                meta=self.get_task_meta()
-                | {"progress": low + (high - low) * current // self.progress_steps},
-            )
+            meta = self.get_task_meta() | {
+                "progress": low + (high - low) * current // self.progress_steps,
+            }
+            if phase is not None:
+                meta["phase"] = phase
+                meta["phase_current"] = phase_current
+                meta["phase_total"] = phase_total
+            current_task.update_state(state="PROGRESS", meta=meta)
 
 
 class AutoTranslate(BaseAutoTranslate):
@@ -377,7 +300,9 @@ class AutoTranslate(BaseAutoTranslate):
         self.target_state = STATE_TRANSLATED
         self.overwrite_existing = overwrite_existing
         self.judge_limit = judge_limit
+        self.judge_units_matched = 0
         self.judge_units_processed = 0
+        self.judge_units_remaining = 0
         # D2/fail-safe: a judge translation never starts shippable; the
         # verdict decides the final state per string.
         self.fresh_translation_state = STATE_FUZZY
@@ -403,7 +328,14 @@ class AutoTranslate(BaseAutoTranslate):
         if isinstance(target, str):
             target = [target]
         max_length = unit.get_max_length()
-        if self.mode == "suggest" or any(len(item) > max_length for item in target):
+        max_length_check = CHECKS.get("max-length")
+        replace = (
+            max_length_check.get_replacement_function(unit)
+            if max_length_check is not None
+            else lambda text: text
+        )
+        over_max_length = any(len(replace(item)) > max_length for item in target)
+        if self.mode == "suggest" or (over_max_length and self.mode != "judge"):
             _, result = Suggestion.objects.add(
                 unit,
                 target,
@@ -734,37 +666,55 @@ class AutoTranslate(BaseAutoTranslate):
         self.written.update(translations)
         self.set_progress(self.progress_base + len(self.written))
 
-    def process_judge(self, *, engines: list[str], threshold: int) -> None:
+    def preview_judge_scope(self) -> tuple[JudgeScopePreview, list[Unit]]:
+        """Return the ordered, capped judge scope used by execution."""
         validate_judge_configuration()
-        units = list(self.get_units().select_related("source_unit"))
-        judge_limit = (
+        limit = (
             settings.JUDGE_MAX_UNITS_PER_RUN
             if self.judge_limit is None
             else self.judge_limit
         )
-        if len(units) > judge_limit:
-            warning = ngettext(
-                "Judge run refused: %(n)d string exceeds the per-run cap of %(cap)d.",
-                "Judge run refused: %(n)d strings exceed the per-run cap of %(cap)d.",
-                len(units),
-            ) % {"n": len(units), "cap": judge_limit}
-            self.failure_message = warning
-            self.add_warning(warning)
+        units = (
+            self.get_units().select_related("source_unit").order_by("position", "pk")
+        )
+        matched = units.count()
+        selected = list(units[:limit])
+        processed = len(selected)
+        writable = sum(
+            not unit.translated or self.overwrite_existing for unit in selected
+        )
+        batches = ceil(processed / settings.JUDGE_BATCH_SIZE)
+        return (
+            JudgeScopePreview(
+                matched=matched,
+                processed=processed,
+                remaining=matched - processed,
+                writable=writable,
+                initial_calls=batches * len(JUDGE_SEATS),
+                worst_case_calls=(
+                    batches
+                    * len(JUDGE_SEATS)
+                    * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)
+                ),
+            ),
+            selected,
+        )
+
+    def process_judge(self, *, engines: list[str], threshold: int) -> None:
+        preview, units = self.preview_judge_scope()
+        self.judge_units_matched = preview.matched
+        self.judge_units_processed = preview.processed
+        self.judge_units_remaining = preview.remaining
+        if not units:
+            self.judge_summary = JudgeSummary(cap_remainder=preview.remaining)
             return
         writable_ids = {
-            unit.id
-            for unit in units
-            if (not unit.translated or self.overwrite_existing)
+            unit.id for unit in units if not unit.translated or self.overwrite_existing
         }
 
-        # Phase 1: pre-translate the writable strings via the native MT
-        # path, scoped by unit_ids, written at needs-editing. Reuses
-        # process_mt / fetch_mt / store_results / update — no second
-        # write path (plan mechanism 5).
+        # Phase 1: pre-translate writable strings through the native MT path.
         base_low, base_high = self.progress_range
         split = base_low + (base_high - base_low) // 10
-        # set_progress has no clamp. Phase 2 restarts its counter, so the
-        # phases use disjoint ranges to keep task progress monotonic.
         if writable_ids:
             saved_ids, saved_state, saved_range = (
                 self.unit_ids,
@@ -782,29 +732,39 @@ class AutoTranslate(BaseAutoTranslate):
                     saved_state,
                     saved_range,
                 )
-        # Phase 1 may have written targets, so the judged instances are always
-        # reloaded, whether or not anything was writable.
+
+        order = Case(
+            *[When(pk=unit.pk, then=index) for index, unit in enumerate(units)],
+            output_field=IntegerField(),
+        )
         units = list(
-            self.translation.unit_set.filter(pk__in=[unit.id for unit in units])
+            self.translation.unit_set.filter(pk__in=[unit.pk for unit in units])
+            .annotate(scope_order=order)
+            .order_by("scope_order")
             .prefetch()
             .prefetch_source()
         )
 
-        # Phase 2: judge everything in q; the state is decided per verdict.
-        judged = 0
+        completed_batches = 0
+        initial_calls = preview.initial_calls
 
-        def tick(_requests, results) -> None:
-            nonlocal judged
-            judged += len(results)
-            self.set_progress(min(judged, self.progress_steps))
+        def tick(_requests, _results) -> None:
+            nonlocal completed_batches
+            completed_batches += 1
+            phase, phase_current, phase_total = _judge_phase(
+                completed_batches,
+                initial_calls=initial_calls,
+                worst_case_calls=preview.worst_case_calls,
+            )
+            self.set_progress(
+                min(completed_batches, self.progress_steps),
+                phase=phase,
+                phase_current=phase_current,
+                phase_total=phase_total,
+            )
 
         self.progress_range = (split, base_high)
-        # A defect is re-judged by both seats once per repair attempt, so the
-        # denominator is the worst case. Sizing it to one round would clamp the
-        # bar at the phase maximum and freeze it for the whole repair loop.
-        self.progress_steps = (
-            len(units) * len(JUDGE_SEATS) * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)
-        )
+        self.progress_steps = preview.worst_case_calls
         try:
             verdicts = run_judge_batch(
                 units,
@@ -812,9 +772,13 @@ class AutoTranslate(BaseAutoTranslate):
                 user=self.user,
                 on_batch=tick,
             )
+            if completed_batches < self.progress_steps:
+                self.set_progress(self.progress_steps)
         finally:
             self.progress_range = (base_low, base_high)
-        self.judge_units_processed = len(units)
+        self.judge_summary = _summarize_verdicts(
+            verdicts, cap_remainder=preview.remaining
+        )
         final_snapshots = {
             unit.id: (unit.target, unit.state) for unit in units if unit.id in verdicts
         }
@@ -840,9 +804,6 @@ class AutoTranslate(BaseAutoTranslate):
                     or current.pk != verdict.pk
                     or (locked.target, locked.state) != final_snapshots[unit.id]
                 ):
-                    # The target or glossary context changed while requests
-                    # were in flight. Never apply a verdict to a different
-                    # version.
                     continue
                 if verdict.verdict == JudgeVerdict.Verdict.UNPARSED:
                     unparsed += 1
@@ -851,9 +812,15 @@ class AutoTranslate(BaseAutoTranslate):
                     enable_review=self.translation.enable_review,
                     may_approve=settings.JUDGE_MAY_APPROVE,
                 )
+                if verdict.verdict == JudgeVerdict.Verdict.PASS and any(
+                    check.name == "max-length" for check in locked.active_checks
+                ):
+                    # A repair-exhausted over-budget candidate must not ship
+                    # just because the judge approved its content.
+                    state = STATE_FUZZY
                 if state is not None and locked.state != state:
                     self.update(locked, state, locked.get_target_plurals())
-        if unparsed:  # D5: never a silent no-op on money spent
+        if unparsed:
             self.add_warning(
                 ngettext(
                     "%d string was left unjudged (the judge did not answer).",
@@ -921,7 +888,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
 
     def __init__(
         self,
-        obj: Translation | Component | Category | ProjectLanguage | Workspace,
+        obj: Translation | Component | Category | Project | ProjectLanguage | Workspace,
         *,
         user: User | None,
         q: str,
@@ -963,6 +930,13 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     .exclude_source()
                 )
                 self._task_meta = {"category": obj.pk}
+            case Project():
+                self.translations = (
+                    Translation.objects.filter(component__project=obj)
+                    .select_related("language", "component", "component__project")
+                    .exclude_source()
+                )
+                self._task_meta = {"project": obj.pk}
             case ProjectLanguage():
                 self.translations = list(
                     obj.action_translation_set.select_related("language")
@@ -995,8 +969,58 @@ class BatchAutoTranslate(BaseAutoTranslate):
             case _:  # pragma: no cover
                 msg = "Unsupported object type for BatchAutoTranslate"
                 raise ValueError(msg)
+        if isinstance(self.translations, QuerySet):
+            self.translations = self.translations.order_by(
+                "component_id", "language_id", "pk"
+            )
+        else:
+            self.translations = sorted(
+                self.translations,
+                key=lambda translation: (
+                    translation.component_id,
+                    translation.language_id,
+                    translation.pk,
+                ),
+            )
         self._preload_workflow_settings()
         self.progress_steps = len(self.translations)
+
+    def preview_judge_scope(self) -> JudgeScopePreview:
+        """Aggregate the same permission-filtered, globally capped judge scope."""
+        validate_judge_configuration()
+        remaining = settings.JUDGE_MAX_UNITS_PER_RUN
+        matched = processed = writable = initial_calls = worst_case_calls = 0
+        for translation in self.translations:
+            if not self._can_process_translation(translation):
+                continue
+            auto_translate = AutoTranslate(
+                user=self.user,
+                translation=translation,
+                q=self.q,
+                mode="judge",
+                component_wide=self.component_wide,
+                unit_ids=self.unit_ids,
+                allow_non_shared_tm_source_components=(
+                    self.allow_non_shared_tm_source_components
+                ),
+                overwrite_existing=self.overwrite_existing,
+                judge_limit=remaining,
+            )
+            preview, _units = auto_translate.preview_judge_scope()
+            matched += preview.matched
+            processed += preview.processed
+            writable += preview.writable
+            initial_calls += preview.initial_calls
+            worst_case_calls += preview.worst_case_calls
+            remaining -= preview.processed
+        return JudgeScopePreview(
+            matched=matched,
+            processed=processed,
+            remaining=matched - processed,
+            writable=writable,
+            initial_calls=initial_calls,
+            worst_case_calls=worst_case_calls,
+        )
 
     def _preload_workflow_settings(self) -> None:
         self.translations = list(self.translations)
@@ -1033,13 +1057,19 @@ class BatchAutoTranslate(BaseAutoTranslate):
     def _finish_translation(
         self, auto_translate: AutoTranslate, judge_remaining: int | None
     ) -> int | None:
-        if judge_remaining is not None and not auto_translate.failure_message:
+        if judge_remaining is not None:
             judge_remaining -= auto_translate.judge_units_processed
         if auto_translate.failure_message:
             self.failure_message = auto_translate.failure_message
         self.updated += auto_translate.updated
         for warning in auto_translate.get_warnings():
             self.add_warning(warning)
+        if auto_translate.judge_summary is not None:
+            self.judge_summary = (
+                auto_translate.judge_summary
+                if self.judge_summary is None
+                else self.judge_summary + auto_translate.judge_summary
+            )
         return judge_remaining
 
     def perform(
@@ -1050,14 +1080,14 @@ class BatchAutoTranslate(BaseAutoTranslate):
         threshold: int,
         source_component_ids: list[int] | None,
     ) -> str:
-        if self.mode == "judge":
-            validate_judge_configuration()
-        judge_remaining = (
-            settings.JUDGE_MAX_UNITS_PER_RUN if self.mode == "judge" else None
-        )
+        judge_preview = self.preview_judge_scope() if self.mode == "judge" else None
+        if judge_preview is not None:
+            self.judge_summary = JudgeSummary()
+        judge_remaining = judge_preview.processed if judge_preview is not None else None
         selected_workspace_source_component_ids: dict[int, list[int]] | None = None
         if (
-            auto_source == "others"
+            self.mode != "judge"
+            and auto_source == "others"
             and source_component_ids is not None
             and self.workspace_source_component_ids is not None
         ):
@@ -1075,11 +1105,6 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 self.set_progress(pos)
                 continue
             if self.mode == "judge" and not judge_remaining:
-                self.add_warning(
-                    gettext(
-                        "Judge run skipped because the per-run string cap was reached."
-                    )
-                )
                 self.set_progress(pos)
                 continue
 
@@ -1103,7 +1128,8 @@ class BatchAutoTranslate(BaseAutoTranslate):
 
             effective_source_component_ids = source_component_ids
             if (
-                auto_source == "others"
+                self.mode != "judge"
+                and auto_source == "others"
                 and self.workspace_source_component_ids is not None
             ):
                 source_language_id = translation.component.source_language_id
@@ -1167,4 +1193,12 @@ class BatchAutoTranslate(BaseAutoTranslate):
             judge_remaining = self._finish_translation(auto_translate, judge_remaining)
             self.set_progress(pos)
 
+        if judge_preview is not None and judge_preview.remaining:
+            self.judge_summary = replace(
+                self.judge_summary or JudgeSummary(),
+                cap_remainder=judge_preview.remaining,
+            )
+            self.add_warning(
+                gettext("Judge run skipped because the per-run string cap was reached.")
+            )
         return self.failure_message or self.get_message()

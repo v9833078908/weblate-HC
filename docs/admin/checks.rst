@@ -166,25 +166,43 @@ glossary meanings, while ``terminology`` is maintenance metadata and does not
 make an entry stricter. See :ref:`glossary` for maintaining terms and
 explanations.
 
-The verdict maps to the checks ``judge-flag`` and ``judge-reject``, which
-behave like any other check for navigation, search, and the API (for example
-``check:judge-reject``), but never appear in the :guilabel:`Things to check`
-card and can never be added to a component's :ref:`component-enforced_checks`:
-a probabilistic opinion must not be treated as an enforced, deterministic
-fact.
+The verdict maps to the checks ``judge-reject`` (critical), ``judge-flag``
+(major), and ``judge-note`` (minor). All three behave like any other check
+for navigation, search, and the API (for example ``check:judge-reject``), but
+never appear in the :guilabel:`Things to check` card and can never be added
+to a component's :ref:`component-enforced_checks` or dismissed: a
+probabilistic opinion must not be treated as an enforced, deterministic fact,
+and only an audited producer decision, not a checks dismissal, resolves one.
 
-A ``flag`` verdict sets the string to :ref:`needs checking <states>` and a
-``reject`` verdict sets it to :ref:`needs editing <states>`. The
-:ref:`project-commit_policy` :guilabel:`Skip translations marked as needing
-editing` excludes both states from version control commits. Either parsed
-negative verdict on a writable string is eligible for one repair through the
+A ``critical`` verdict holds the string automatically at :ref:`needs editing
+<states>`; only an authorized reviewer can ship it, by recording an
+``accepted_as_is`` decision. A ``major`` verdict ships as
+:ref:`translated <states>` with ``judge-flag`` evidence attached: it does not
+block delivery on its own. A ``minor`` verdict is non-blocking evidence,
+visible as ``judge-note``; no action is expected. Either parsed negative
+verdict on a writable string is eligible for one repair through the
 project's configured machine translation engine, followed by another
 two-seat judgment. A repaired ``pass`` ships as translated; an unresolved
-verdict stays in the human queue. This is not an automatic guarantee that a
+``major`` or ``critical`` stays in the human queue, where the reviewer can
+also escalate it (``escalated``) to request a second opinion without
+changing what it currently blocks. This is not an automatic guarantee that a
 broken translation never ships: verify with your own held-out sample before
 relying on it, and note that a ``pass`` verdict does not, on its own, move a
 string to :ref:`approved <states>` unless the site additionally sets
 :setting:`JUDGE_MAY_APPROVE`.
+
+Recording a decision on a verdict requires the :guilabel:`Review strings`
+permission (the same :guilabel:`unit.review` boundary the resolution form
+itself enforces) and always needs a written reason; it is a CSRF-protected
+POST and the only way a decision is ever recorded. Weblate recomputes the
+verdict's current round at request time and rejects a decision against
+stale, superseded, or already-resolved evidence rather than silently
+applying it to a string that no longer matches what was reviewed. The
+verdict's current resolution can move again through an allowed transition
+(for example ``escalated`` to ``accepted_as_is``), but every transition
+permanently appends its own entry, with actor and reason, to the string's
+history, kept distinct from the delivery state it produced: a shipped
+string and an AI-clean string are tracked as two separate facts, not one.
 
 A string with an existing translation is judged, not rewritten, unless the
 run explicitly turns on the :guilabel:`Overwrite the existing translation`
@@ -201,6 +219,17 @@ the source, the string comment and the glossary alone, and the judge is
 instructed not to assume a genre; describing the project is therefore worth
 doing before a large run, because an unstated register is reported as a style
 error less often than a wrongly assumed one.
+
+The component :guilabel:`Release readiness` table separates pending changes
+ready for delivery from current judge coverage. It displays stale and
+incomplete attempts as evidence that needs attention, never as a release
+decision. Only users with automatic translation and review permissions see
+evaluation actions; machinery configuration remains restricted to its
+management permission.
+
+Judge previews use observed, project- and model-specific request costs only
+after at least five priced requests. The range is an estimate, not a provider
+quote, and an unavailable range must not be treated as zero.
 
 .. seealso::
 

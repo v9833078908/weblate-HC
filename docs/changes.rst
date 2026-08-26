@@ -6,7 +6,8 @@ Weblate 2026.8.1
 .. rubric:: New features
 
 * Added an optional :ref:`LLM judge <llm-judge>` automatic translation mode, where two independently configured language models review each string in a filter and record a per-string verdict; a rejected string is held in the existing :guilabel:`Needs editing` queue for a human decision instead of shipping automatically.
-* Major LLM-judge verdicts are now repaired once when possible and otherwise held in :guilabel:`Needs checking`, so they are excluded from guarded commits instead of shipping automatically.
+* Major LLM-judge verdicts are now repaired once when possible; an unresolved major ships as translated with advisory ``judge-flag`` evidence attached instead of holding the string, while a critical verdict still holds automatically until a reviewer records an audited decision, see :ref:`llm-judge`.
+* A reviewer can now record an audited decision on a held or escalated LLM-judge verdict (accept it as-is or escalate it for a second opinion); the verdict's resolution can move again through an allowed transition, but every transition permanently records who made it, when, and why in the string's history, see :ref:`llm-judge`.
 * Added guarded ``check_judge_repair_routes`` and ``enable_review_workflow`` management commands for the LLM judge rollout.
 * Components can now exchange all language targets through one multilingual CSV or XLSX spreadsheet, with previewed imports that protect keys and placeholders.
 * Added an optional **LiteLLM** :ref:`automatic suggestion <machine-translation-setup>` service for the corporate LiteLLM proxy, alongside the existing OpenRouter service, and made the LLM judge endpoint configurable via :setting:`JUDGE_BASE_URL` (default OpenRouter).
@@ -17,6 +18,7 @@ Weblate 2026.8.1
 * Project-level :ref:`automatic suggestion <machine-translation-setup>` configuration now overrides the site-wide one field by field, so a project can set its own translator persona, style, and language-specific instructions without restating credentials.
 * LLM machine translation now records per-request token usage and cost, reportable via the ``llm_usage_report`` management command.
 * Large language model machine translation services now receive the note left by developers for a string, see :ref:`llm-translation-context`.
+* LLM judge runs now show capped scope and observed-cost previews, record per-unit judge usage, and keep delivery state separate from advisory AI evidence.
 * Added optional :ref:`TBX glossary import from CSV, TSV, and XLSX tables <uploading-glossary-tables>`, with a locally validated profile proposal path.
 * Glossary tables with only language columns are now mapped deterministically without contacting the automatic analyzer, and the sheet-selection step is skipped for single-sheet uploads, see :ref:`uploading-glossary-tables`.
 * Glossary tables where a term is followed by its description on the next row are now recognised deterministically: descriptions become explanations, section captions become sections, and the detected layout can be switched from the import preview, see :ref:`uploading-glossary-tables`.
@@ -48,6 +50,8 @@ Weblate 2026.8.1
 * An engine substitution token the source string uses is now reported by the ``game-token`` check when it is missing from the translation. Mission descriptions substitute values through ``item_type[|{0}]`` and ``skirmish_league_id[gen|в {0}|в любой лиге]``: the bracketed alternatives are translated, but the identifier in front of the bracket is a lookup key, and a translated one resolves to nothing in the game. Brackets without a ``|`` are ordinary text and are never treated as a substitution.
 * Added the ``game-length`` check, which flags a translation whose visible length (markup and placeholders stripped) grows far past the source: short labels tolerate up to 3.0x, long sentences only 1.35x, with minimum-length floors so legitimate short-label growth is not flagged. Ignore with the ``ignore-game-length`` flag when the space is known to fit.
 * An LLM judge batch whose connection is dropped without a reply is now repeated once, configurable through :setting:`JUDGE_TRANSPORT_RETRIES`. A gateway that closes slow connections drops whichever request happens to answer near its ceiling, which previously marked the batch unparsed and looked like a failure of the model rather than of the transport.
+* The ``game-markup`` check now also compares the syntax of Hero Craft conditional placeholders such as ``{hours:cond:>0?{hours}h. |}``: a space inserted inside a conditional header, a lost or added ``|``, a separator moved across a protected placeholder, and a changed identifier, comparison or nested placeholder are reported, while the text of a conditional branch stays translatable.
+* Hero Craft conditional placeholders now use their worst-case visible branch when evaluating ``max-length`` and ``source-max-length`` budgets. Judge-mode automatic translations that exceed an opted-in ``max-length`` budget are retried with the concrete limit and remain pending when the limit cannot be met.
 
 .. rubric:: Bug fixes
 

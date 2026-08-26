@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Status:** Awaiting implementation approval.
+**Status:** Completed and verified on 2026-08-26.
 
 **Goal:** Make `game-markup` reject parser-breaking changes to Hero Craft conditional DSL while continuing to allow localized branch text.
 

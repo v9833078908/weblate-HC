@@ -25361,6 +25361,179 @@ msgstr "Рабочее пространство нельзя удалить, т�
 msgid "The workspace has been removed."
 msgstr "Рабочее пространство удалено."
 
+#: weblate/checks/judge.py:94
+msgid "Judge - major"
+msgstr "Судья — серьёзно"
+
+#: weblate/checks/judge.py:95
+msgid ""
+"An LLM judge reported a major problem. The string ships with this "
+"evidence attached."
+msgstr ""
+"ИИ-судья сообщил о серьёзной проблеме. Строка публикуется с этим "
+"замечанием в качестве свидетельства."
+
+#: weblate/checks/judge.py:104
+msgid "Judge - critical"
+msgstr "Судья — критично"
+
+#: weblate/checks/judge.py:105
+msgid ""
+"An LLM judge reported a critical problem. The string is held "
+"automatically until an authorized override."
+msgstr ""
+"ИИ-судья сообщил о критической проблеме. Строка автоматически "
+"удерживается до авторизованного решения."
+
+#: weblate/checks/judge.py:114
+msgid "Judge - minor"
+msgstr "Судья — незначительно"
+
+#: weblate/checks/judge.py:115
+msgid ""
+"An LLM judge reported a minor problem. The string ships; no action is "
+"expected."
+msgstr ""
+"ИИ-судья сообщил о незначительной проблеме. Строка публикуется; "
+"никаких действий не требуется."
+
+#: weblate/templates/snippets/judge-verdict.html:66
+msgid "Ships with evidence"
+msgstr "Публикуется с замечанием"
+
+#: weblate/templates/snippets/judge-verdict.html:39
+msgid "Ships with override"
+msgstr "Публикуется по решению"
+
+#: weblate/templates/snippets/judge-verdict.html:41
+msgid "Will not ship"
+msgstr "Не публикуется"
+
+#: weblate/trans/filter.py:81
+msgid "Judge - major (ships)"
+msgstr "Судья — серьёзно (публикуется)"
+
+#: weblate/trans/filter.py:86
+msgid "Judge - critical (held)"
+msgstr "Судья — критично (удерживается)"
+
+#: weblate/trans/filter.py:91
+msgid "Judge - minor (nothing blocking)"
+msgstr "Судья — незначительно (ничего не блокирует)"
+
+#: weblate/trans/filter.py:96
+msgid "Judge - nothing blocking"
+msgstr "Судья — ничего не блокирует"
+
+#: weblate/trans/actions.py:654
+msgid "A producer recorded a decision on a judge verdict."
+msgstr "Продюсер зафиксировал решение по вердикту судьи."
+
+#: weblate/trans/actions.py:655
+msgid "Judge verdict resolved"
+msgstr "Решение по вердикту судьи"
+
+#: weblate/trans/change_display.py:449
+msgid "unresolved"
+msgstr "не разрешено"
+
+#: weblate/trans/change_display.py:450
+msgid "escalated"
+msgstr "эскалировано"
+
+#: weblate/trans/change_display.py:451
+msgid "accepted as-is"
+msgstr "принято как есть"
+
+#: weblate/trans/change_display.py:463
+#, python-format
+msgid "%(old)s -> %(new)s: %(reason)s"
+msgstr "%(old)s -> %(new)s: %(reason)s"
+
+#: weblate/trans/forms.py:1421
+msgid "Decision"
+msgstr "Решение"
+
+#: weblate/trans/forms.py:1425
+msgid "Escalate for review"
+msgstr "Эскалировать на проверку"
+
+#: weblate/trans/forms.py:1429
+msgid "Accept as-is"
+msgstr "Принять как есть"
+
+#: weblate/trans/forms.py:1434
+msgid "Reason"
+msgstr "Причина"
+
+#: weblate/trans/views/edit.py:1830
+msgid "Could not record the decision."
+msgstr "Не удалось зафиксировать решение."
+
+#: weblate/trans/views/edit.py:1845
+msgid "The decision has been recorded."
+msgstr "Решение зафиксировано."
+
+#: weblate/templates/snippets/judge-verdict.html:117
+msgid "Escalated for review"
+msgstr "Эскалировано на проверку"
+
+#: weblate/templates/snippets/judge-verdict.html:119
+msgid "Accepted as-is"
+msgstr "Принято как есть"
+
+#: weblate/templates/snippets/judge-verdict.html:144
+msgid "Record decision"
+msgstr "Зафиксировать решение"
+
+#: weblate/templates/snippets/judge-readiness.html:6
+msgid "AI judge"
+msgstr "ИИ-судья"
+
+#: weblate/templates/snippets/judge-readiness.html:12
+msgid "needs a human"
+msgstr "ждут решения человека"
+
+#: weblate/templates/snippets/judge-readiness.html:15
+msgid "not reviewed"
+msgstr "не проверено"
+
+#: weblate/templates/snippets/judge-readiness.html:18
+msgid "last attempt returned nothing"
+msgstr "последняя попытка ничего не вернула"
+
+#: weblate/templates/snippets/judge-readiness.html:22
+msgid "Breakdown by check"
+msgstr "Разбивка по проверкам"
+
+#: weblate/templates/snippets/judge-readiness.html:23
+msgid "Run the judge"
+msgstr "Запустить судью"
+
+#: weblate/trans/models/judge.py:503
+msgid "A reason is required."
+msgstr "Необходимо указать причину."
+
+#: weblate/trans/models/judge.py:509
+msgid "That decision is not available."
+msgstr "Это решение недоступно."
+
+#: weblate/trans/models/judge.py:516
+msgid ""
+"This verdict no longer matches the current text or context; "
+"reload and try again."
+msgstr ""
+"Этот вердикт больше не соответствует текущему тексту или контексту; "
+"обновите страницу и попробуйте снова."
+
+#: weblate/trans/models/judge.py:530
+msgid "No current judge verdict was found for this string."
+msgstr "Для этой строки не найден актуальный вердикт судьи."
+
+#: weblate/trans/models/judge.py:546
+msgid "That decision does not apply to this verdict."
+msgstr "Это решение неприменимо к данному вердикту."
+
 #~ msgid "Could not open a ticket, please try again later."
 #~ msgstr "Не удалось открыть заявку, попробуйте позже."
 

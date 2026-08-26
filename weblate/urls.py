@@ -215,6 +215,11 @@ real_patterns = [
         name="new-unit",
     ),
     path(
+        "auto-translate-preview/<object_path:path>/",
+        weblate.trans.views.edit.auto_translation_preview,
+        name="auto_translation_preview",
+    ),
+    path(
         "auto-translate/<object_path:path>/",
         weblate.trans.views.edit.auto_translation,
         name="auto_translation",
@@ -459,6 +464,12 @@ real_patterns = [
         "comment/<int:pk>/resolve/",
         weblate.trans.views.edit.resolve_comment,
         name="resolve-comment",
+    ),
+    # Judge verdicts
+    path(
+        "judge-verdict/<int:pk>/resolve/",
+        weblate.trans.views.edit.resolve_judge_verdict,
+        name="resolve-judge-verdict",
     ),
     # VCS manipulation - commit
     path(

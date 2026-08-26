@@ -86,6 +86,7 @@ from weblate.trans.models import (
     Change,
     CommitPolicyChoices,
     Component,
+    JudgeVerdict,
     Label,
     Project,
     Unit,
@@ -1249,6 +1250,7 @@ class AutoForm(forms.Form):
         min_value=1,
         max_value=100,
     )
+    next = forms.CharField(required=False, widget=forms.HiddenInput)
     overwrite_existing = forms.BooleanField(
         label=gettext_lazy("Overwrite the existing translation"),
         required=False,
@@ -1369,6 +1371,9 @@ class AutoForm(forms.Form):
                     ("judge", gettext("Add as translation with an LLM judge"))
                 )
         self.fields["mode"].choices = choices
+        allowed_modes = {choice[0] for choice in choices}
+        if self.initial.get("mode") not in allowed_modes:
+            self.initial.pop("mode", None)
 
         self.helper = FormHelper(self)
         self.helper.form_tag = False
@@ -1428,6 +1433,28 @@ class AutoForm(forms.Form):
                 )
             )
         return result.pk
+
+
+class JudgeResolutionForm(forms.Form):
+    """Record a producer decision on a judge verdict."""
+
+    resolution = forms.ChoiceField(
+        label=gettext_lazy("Decision"),
+        choices=(
+            (
+                JudgeVerdict.Resolution.ESCALATED,
+                gettext_lazy("Escalate for review"),
+            ),
+            (
+                JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+                gettext_lazy("Accept as-is"),
+            ),
+        ),
+    )
+    reason = forms.CharField(
+        label=gettext_lazy("Reason"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )
 
 
 class CommentForm(forms.Form):
