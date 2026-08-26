@@ -160,6 +160,11 @@ batches was scored against ground truth.
    The reset is load-dependent, so a repeat at a different hour is needed before
    any retry budget or batch width is treated as settled.
 
+The work that follows from this is planned in
+`docs/llm-first/plans/2026-08-26-judge-provider-failover.md`: score the LiteLLM
+candidates, then run them as the primary seats with OpenRouter as an
+availability fallback.
+
 ## Reproduce
 
 ```sh
