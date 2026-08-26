@@ -1320,9 +1320,21 @@ onReady(() => {
     }
     let timer;
     let controller;
+    /* autoform.html renders the preview with Bootstrap's `d-none` as well as
+     * an inline `display: none`. The global show()/hide() helpers only touch
+     * the inline style, and `.d-none { display: none !important }` outranks
+     * it, so the preview would stay invisible however much text it holds. */
+    const showPreview = () => {
+      preview.classList.remove("d-none");
+      show(preview);
+    };
+    const hidePreview = () => {
+      hide(preview);
+      preview.classList.add("d-none");
+    };
     const updateJudgePreview = () => {
       if (mode.value !== "judge") {
-        hide(preview);
+        hidePreview();
         apply.disabled = false;
         return;
       }
@@ -1357,7 +1369,9 @@ onReady(() => {
               : gettext("Observed judge cost is unavailable.");
             const pretranslationCost = data.pretranslation_cost.available
               ? interpolate(
-                  gettext("Observed pretranslation cost: %(min)s to %(max)s USD."),
+                  gettext(
+                    "Observed pretranslation cost: %(min)s to %(max)s USD.",
+                  ),
                   data.pretranslation_cost,
                   true,
                 )
@@ -1378,7 +1392,7 @@ onReady(() => {
               },
               true,
             );
-            show(preview);
+            showPreview();
             apply.disabled = data.processed === 0;
           })
           .catch((error) => {
@@ -1386,17 +1400,15 @@ onReady(() => {
               return;
             }
             if (error.invalid) {
-              preview.textContent = gettext(
-                "Judge preview input is invalid.",
-              );
-              show(preview);
+              preview.textContent = gettext("Judge preview input is invalid.");
+              showPreview();
               apply.disabled = true;
               return;
             }
             preview.textContent = gettext(
               "Judge preview is unavailable. You can still apply this run.",
             );
-            show(preview);
+            showPreview();
             apply.disabled = false;
           });
       }, 250);

@@ -1632,6 +1632,72 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
         self.assertEqual(seen_phases, {""})
         self.assertEqual(final_width, 100)
 
+    def test_judge_preview_estimate_is_actually_visible(self) -> None:
+        """
+        The judge run estimate must be rendered, not merely populated.
+
+        ``autoform.html`` ships the estimate with Bootstrap's ``d-none`` as
+        well as an inline ``display: none``, and the shared ``show()`` helper
+        only clears the inline style. ``.d-none { display: none !important }``
+        then outranks it, so the estimate stayed invisible however much text
+        the preview fetch wrote into it. Asserting on text alone passes
+        against that bug, so this checks what the producer can actually see.
+        """
+        self.do_login(superuser=True)
+        self.clear_persisted_form_state()
+        project = self.create_component()
+        component = project.component_set.get(slug="django")
+        # "judge" mode is only offered when the user can review, which in
+        # turn requires reviews to be enabled on the project.
+        project.translation_review = True
+        project.save(update_fields=["translation_review"])
+
+        with override_settings(
+            JUDGE_ENABLED=True,
+            JUDGE_OPENROUTER_KEY="sk-test",
+            JUDGE_MODEL_SEAT_1="vendor-a/model",
+            JUDGE_MODEL_SEAT_2="vendor-b/model",
+        ):
+            self.open_component(component=component, project=project)
+            self.click("Operations")
+            self.click("Batch automatic translation")
+            Select(self.driver.find_element(By.ID, "id_auto_mode")).select_by_value(
+                "judge"
+            )
+
+            WebDriverWait(self.driver, 30).until(
+                lambda driver: driver.execute_script(
+                    """
+                    const preview = document.getElementById(
+                        "id_auto_judge_preview"
+                    );
+                    return preview !== null
+                        && preview.textContent.trim().length > 0;
+                    """
+                )
+            )
+            state = self.driver.execute_script(
+                """
+                const preview = document.getElementById(
+                    "id_auto_judge_preview"
+                );
+                const rect = preview.getBoundingClientRect();
+                return {
+                    text: preview.textContent.trim(),
+                    classes: preview.className,
+                    display: window.getComputedStyle(preview).display,
+                    height: Math.round(rect.height),
+                    rendered: preview.offsetParent !== null,
+                };
+                """
+            )
+
+        self.assertNotEqual(state["text"], "")
+        self.assertNotIn("d-none", state["classes"])
+        self.assertNotEqual(state["display"], "none")
+        self.assertTrue(state["rendered"])
+        self.assertGreater(state["height"], 0)
+
     def test_login(self) -> None:
         # Do proper login with new user
         self.do_login()
