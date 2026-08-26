@@ -1,8 +1,8 @@
 # Judge seat pair search on LiteLLM (two corpora, complementary recall)
 
-**Date:** 2026-08-26. **Status:** stages 0-1 completed; the corpus is frozen.
-The remaining mode decision is whether production and the eval run with
-reasoning on or with the opt-in per-model disable mapping described below.
+**Date:** 2026-08-26. **Status:** stages 0-2 completed; reasoning-off selected.
+The shared LiteLLM per-model disable mapping is the next prerequisite for
+stages 3-6.
 **Supersedes:** `docs/llm-first/plans/2026-08-26-litellm-judge-seat-r3-eval.md`,
 which searched for a replacement for one seat against a single corpus. The
 objective is now the *pair*, measured on ru->zh_Hans and en->fr.
@@ -250,7 +250,7 @@ each vendor's own toggle, `qwen3.8-max` goes from 1 accept in 12 attempts to 3/3
 at 4.4-4.8 s. Four families now pass the production parser: Qwen, GLM, DeepSeek,
 Moonshot.
 
-### The mode decision (open)
+### The mode decision - reasoning off selected
 
 The corpus runs must be reproducible by production, or the pair is chosen for
 behaviour production cannot deliver. So the eval mode and the product must
@@ -323,6 +323,16 @@ Write a deterministic en->fr builder that:
 4. records mutation kind, severity and source unit in a truth file; no human
    annotation is claimed;
 5. checks seed determinism and parse-back before any paid judge request.
+
+Completed in commit `b86ec7b`:
+
+- `analysis/probes/nfg-ui-fr-goldenset-build.py` deterministically builds the
+  slice from the frozen data;
+- `analysis/data/nfg-ui-fr-golden.json` has 236 records: all 150 clean bases,
+  90 held-out clean records with no mutation, and 86 construction-labelled
+  mutations (27 critical and 59 major);
+- the builder excludes all 17 `fails_check` units, and a second run produced
+  byte-identical JSON after parse-back validation.
 
 The target stays French, so the target-side French mutation mechanics can be
 reused only after inspection. The current col4 builder has Russian source
@@ -410,7 +420,7 @@ count is recorded before the other models proceed.
   separate approval.
 - Production rollout, and any write to the production instance.
 
-## Approvals and the one open decision
+## Approvals and decisions
 
 Resolved on 2026-08-26:
 
@@ -419,8 +429,9 @@ Resolved on 2026-08-26:
    `analysis/data/nfg-ui-fr-glossary.json`.
 2. LiteLLM-key usage is unlimited for this evaluation.
 3. A product change may be proposed, including a thinking toggle.
+4. Reasoning-off is selected. The eval and product use
+   `JUDGE_REASONING_EFFORT="none"` through the per-model mapping in
+   `Proposed mechanism, if reasoning-off is chosen`.
 
-**Open:** choose the mode in `Stage 0 outcome, and the decision it forces`.
-Stage 2 is independent of that choice and may run now. Stages 3-6 do not run
-until it is recorded: reasoning-on excludes the Qwen family, while reasoning-off
-requires the shared judge mapping first.
+Stage 2 is complete. Stages 3-6 remain blocked until the shared judge mapping
+is implemented and verified; reasoning-off retains the Qwen family.
