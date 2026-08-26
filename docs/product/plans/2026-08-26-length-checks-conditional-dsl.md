@@ -1,266 +1,303 @@
-# Length checks and conditional DSL Implementation Plan
+# Conditional DSL-aware max-length Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Status:** Awaiting implementation approval.
+**Status:** Awaiting implementation approval. Revised after engineering review on 2026-08-26.
 
-**Goal:** Make every length measurement — `game-length`, `max-length`,
-`source-max-length`, `max-size`, and the auto-translate length gate — count the
-text a player reads instead of the Hero Craft conditional DSL scaffold, so
-per-key length budgets become meaningful for formula strings such as
-`humanTimer`, and so a `max-length:N` flag cannot silently divert all machine
-output for a formula string into suggestions.
+**Goal:** Make the opt-in `max-length:N` and `source-max-length` checks measure a safe worst-case character representation of Hero Craft conditional DSL, and make an over-budget automatic translation in judge mode reach the existing repair loop instead of becoming an unreviewed suggestion.
 
-**Architecture:** One new pure function in `weblate_customization/checks.py`
-strips the immutable conditional scaffold (outer braces,
-`identifier:cond:comparison?` header, top-level `|`) from a text while keeping
-branch text, nested placeholders, and everything else byte-identical.
-`_visible_length()` consumes it for `game-length`. Three thin subclasses of the
-stock length checks override `get_replacement_function()` to strip the scaffold
-*after* `replacements:` expansion, and replace the stock classes in
-`CHECK_LIST` through the existing `WEBLATE_REMOVE_CHECK`/`WEBLATE_ADD_CHECK`
-mechanism, keeping every `check_id`, flag, and documentation anchor unchanged.
-The auto-translate length gate stops measuring raw text and instead measures
-through the *registered* `max-length` check's replacement function, so core
-never imports `weblate_customization` and the gate always agrees with the check
-that will judge the stored translation.
+**Architecture:** Keep the stock check IDs and flag schema. Two custom subclasses replace only `MaxLengthCheck` and `SourceMaxLengthCheck` through `CHECK_LIST`. Their replacement function first applies stock `replacements:` behavior, then collapses each recognized outer conditional to its longest top-level branch and concatenates the selected branches of sequential conditionals. A judge-mode over-budget candidate is stored in `Needs editing`, forced through the existing repair engine with its concrete budget in the failing-check description, and remains non-shippable if the budget still fails after the configured repair attempts.
 
-**Tech Stack:** Python, `regex`, Django/Weblate checks, pytest in the shared
-dev Docker stack.
+**Tech Stack:** Python, Django/Weblate checks, `regex`, pytest, shared dev Docker stack.
 
 ---
 
-## Context
+## Problem and evidence
 
-The developer's question that exposed this (2026-08-26): the `humanTimer`
-formula renders `1ч. 2м. 53с.` in Russian but `1Std. 2Min. 53Sek.` in German,
-and the German does not fit its slot. The same applies to Latvian and Turkish.
-The team plans to import per-key `max-length:N` budgets in bulk, and the team
-has no human translators: everything must survive a fully automated
-translate → check → judge → repair pipeline.
-
-### Root cause, verified 2026-08-26
-
-`conditional_dsl_syntax_spans()`
-(`weblate_customization/src/weblate_customization/checks.py:208-254`) already
-parses this DSL, but it feeds only `GameMarkupCheck.check_highlight()` — editor
-highlighting, autofix protection, and LLM placeholder protection. No length
-consumer uses it. Each one measures the raw scaffold:
-
-|Consumer|Where|What it measures today|
-|---|---|---|
-|`game-length`|`_visible_length()`, `checks.py:682-684`|`MARKUP.sub("", text)` strips `{hours}` but keeps `{hours:cond:>0?`, `\|`, `}`|
-|`max-length`|`weblate/checks/chars.py:552-553`|`len(replace(target))` — `replacements:`-aware, scaffold included|
-|`source-max-length`|`weblate/checks/source.py:76-81`|same, plus the 85 % rule for English sources|
-|`max-size`|`weblate/checks/render.py:87-90`|renders the scaffold as glyphs, so the measurement itself is invalid; whether it fires depends on the configured pixel limit|
-|auto-translate gate|`weblate/trans/autotranslate.py:405-406`|`len(item)` — raw, not even `replacements:`-aware, against `unit.get_max_length()`|
-
-Measured with byte-identical copies of the installed regexes and check logic:
+Hero Craft source strings can contain conditional blocks:
 
 ```text
-RU source {hours:cond:>0?{hours}ч. |}…   _visible_length = 64, player reads 12 ("1ч. 2м. 53с.")
-DE target {hours:cond:>0?{hours}Std. |}… _visible_length = 70, player reads 18 ("1Std. 2Min. 53Sek.")
-game-length ratio today: 70/64 = 1.09 (scaffold noise) — true ratio 18/12 = 1.50
+{identifier:cond:comparison?branch[|alternate]}
 ```
 
-The scaffold is near-identical in every language, so it dominates both sides of
-the ratio and dilutes the real signal. `game-length` stays silent by
-coincidence, not by verification. Any `max-length:N` flag set on a formula
-string is nonsense today: the scaffold alone eats ~64 characters, so a budget
-of 15 visible characters cannot be expressed at all.
+The documented grammar is in
+`docs/product/plans/2026-08-22-nested-game-placeholder-protection.md:120-128`.
+A branch is visible text; the header, outer braces, and top-level `|` are
+engine syntax. Stock `max-length` and `source-max-length` count the raw DSL
+because they call `len(get_replacement_function(unit)(text))`
+(`weblate/checks/chars.py:549-553`, `weblate/checks/source.py:68-81`).
 
-### The auto-translate gate is the automation blocker
-
-`weblate/trans/autotranslate.py:405-406`:
+The existing auto-translate gate has a second, independent failure:
 
 ```python
 max_length = unit.get_max_length()
 if self.mode == "suggest" or any(len(item) > max_length for item in target):
-    _, result = Suggestion.objects.add(...)
+    Suggestion.objects.add(...)
 ```
 
-`Unit.get_max_length()` (`weblate/trans/models/unit.py:2588-2606`) returns the
-`max-length` flag value when the flag exists (`:2597-2598`); without a flag the
-source-derived fallback `max(100, len(source) * 10)` is far too big to matter
-for formula strings. Today the gate never fires on them. The moment a
-`max-length:16` flag lands on `humanTimer`, the raw ~90-character machine
-output is always `> 16`, and **every** machine translation of that string is
-diverted into a `Suggestion` — which, in a pipeline with no humans, nobody will
-ever accept. The gate must measure the same text the `max-length` check will
-measure, or the flag import kills auto-translation for exactly the strings it
-is meant to protect.
+`weblate/trans/autotranslate.py:400-435` therefore turns a raw conditional
+formula with a tight `max-length:N` into a suggestion. In judge mode,
+`process_judge()` pre-translates via this path and judges only persisted targets
+(`weblate/trans/autotranslate.py:760-790`), so a suggestion has no check row,
+never reaches `repair_target()`, and cannot be repaired automatically.
 
-The other `get_max_length()` consumers were audited and need no change:
-
-- `weblate/trans/forms.py:544` puts it in `data-max`; the editor JS
-  (`weblate/static/editor/base.js:157-170`) only styles a character counter
-  (`has-warning`/`has-error`), saving is never blocked. A formula string with a
-  tight budget shows a red counter to a human — cosmetic, accepted.
-- `weblate/trans/validators.py:29-33` allows `10 * (max_length + 100)` — with
-  a budget of 16 that is 1160 characters of headroom, no formula string comes
-  close.
-
-### What this plan does *not* fix, on purpose
-
-- Even with honest counting, `game-length` will not fire on `humanTimer`
-  (12 → 18 sits under the `_LENGTH_TIERS` floor at `checks.py:692-698`, by
-  design — short labels get slack). The enforcement lever for tight slots is a
-  per-key `max-length:N` flag, which this plan makes meaningful. Retuning the
-  tiers is out of scope.
-- Structural tampering with the DSL (`>0` → `<0`, a lost `|`, whitespace inside
-  a header) is the subject of
-  `docs/product/plans/2026-08-24-05-conditional-dsl-validation.md`
-  (awaiting approval). This plan does not validate anything; it only measures.
-  Land that plan first: it touches the same file, and its signature parser is
-  the natural future home for the scaffold walk added here.
-
-### How the repair pipeline picks these checks up — no extra wiring
-
-`weblate/machinery/llm.py:1035-1039` already feeds a unit's failing checks,
-with descriptions, into every translation request, and prompt rule 23
-(`llm.py:199`) requires the model to change the translation so every listed
-check passes. The judge repair loop hands them to the judge as evidence
-(`weblate/trans/judge_loop.py:79`) and rolls back any repair that introduces a
-new deterministic failure (`judge_loop.py:260-269`). A DSL-aware `max-length`
-failure therefore automatically becomes a repair instruction on the next
-translation round and a no-regress gate on every repair.
-
-### Worked example the plan must enable
-
-With this plan implemented, a formula string can carry:
+The supplied Need for Greed runtime fixture establishes the required behavior
+for one project only:
 
 ```text
-max-length:16, replacements:{hours}:8:{minutes}:59:{seconds}:59
+{hours:cond:>0?{hours}Std. |}{minutes:cond:>0?{minutes}Min. |}{seconds:cond:>=0?{seconds}Sek.|}
+
+hours=0,  minutes=22, seconds=55 -> 22Min. 55Sek.
+hours=0,  minutes=22, seconds=0  -> 22Min. 0Sek.
+hours=0,  minutes=0,  seconds=23 -> 23Sek.
+hours=15, minutes=45, seconds=10 -> 15Std. 45Min. 10Sek.
+hours=15, minutes=0,  seconds=10 -> 15Std. 10Sek.
 ```
 
-`replacements:` expands the value placeholders first (stock behavior,
-`weblate/checks/base.py:283-301`), then the scaffold is stripped:
+The three top-level blocks are independent and concatenate when true. For the
+project-specific scenario `hours=minutes=seconds=9`, the German template
+renders `9Std. 9Min. 9Sek.` (17 characters). A per-unit flag
 
 ```text
-RU "8ч. 59м. 59с."      = 13 ≤ 16  pass
-DE "8Std. 59Min. 59Sek." = 19 > 16  max-length fires — the defect the developer asked about
-TR "8 sa. 59 dk. 59 sn." = 19 > 16  fires
+max-length:11, replacements:{hours}:9:{minutes}:9:{seconds}:9
 ```
 
-Without `replacements:`, nested placeholders keep counting at their literal
-width (`{hours}` = 7), exactly as stock `max-length` counts them today — the
-convention does not change, only the scaffold stops counting.
+must therefore fail for that target. It is a detection fixture, not a shared
+rule and not a passing German translation. A compact German target or a revised
+budget remains that project's content decision.
 
-### Fixed contract
+## Scope decisions
 
-1. Only the scaffold of a *recognized outermost* conditional is stripped: the
-   outer `{` and `}`, the exact `identifier:cond:comparison?` header, and each
-   top-level `|`. Recognition is `_CONDITIONAL_HEADER` (`checks.py:185-187`),
-   unchanged.
-2. Nested placeholders (`{hours}`) are **kept**: they count like every other
-   placeholder unless `replacements:` expands them.
-3. The `:` between two adjacent placeholders (`{minutes:00}:{seconds:00}`) is
-   **kept**: it renders (`12:30`) even though it is protected from editing.
-   Protection and visibility are different properties.
-4. A text without `:cond:` passes through byte-identical, guarded by a
-   C-level substring test before any parsing.
-5. An unrecognized conditional (`{value:cond:1}` — no `?`) passes through
-   byte-identical.
-6. Scaffold stripping happens *after* `replacements:` expansion, so
-   `replacements:{hours}:8` sees `{hours}` intact.
-7. Every `check_id` (`max-length`, `source-max-length`, `max-size`,
-   `game-length`), every flag (`max-length:N`, `ignore-max-length`,
-   `replacements:`), and every documentation anchor stays unchanged.
-8. `max-lines` is not touched: the scaffold contains no newline, so stripping
-   cannot change a line count.
-9. The auto-translate gate measures through the **registered** `max-length`
-   check (`weblate.checks.models.CHECKS`), never by importing
-   `weblate_customization`: on a stock deployment the gate becomes
-   `replacements:`-aware (it finally agrees with the check), on this fork's
-   deployment it resolves to the DSL-aware subclass for free.
+### Included
 
-### CHECK_LIST replacement is safe — demonstrated
+- `max-length` and `source-max-length` only. Their identifiers, flags, and
+  stock documentation anchors stay unchanged.
+- Judge-only handling of an over-budget `max-length` candidate: persist,
+  repair, and hold it rather than silently creating a suggestion.
+- A dynamic `GameMaxLengthCheck` description that tells the repair model the
+  concrete limit.
+- Scoped check recomputation after an approved project rollout.
+- A concise operator guide for project/component/per-unit budget policy.
 
-- The registry is keyed by `check_id`, not class path
-  (`weblate/utils/classloader.py:102`:
-  `result[obj.get_identifier()] = obj`), so a subclass with an inherited
-  `check_id` is a drop-in.
-- `Check` DB rows store the `check_id` string
-  (`weblate/checks/models.py:86`), so existing failing-check rows and
-  dismissals survive the swap.
-- `modify_env_list` folds add-then-remove
-  (`weblate/utils/environment.py:184-187`), so no duplicate id ever sits in
-  `CHECK_LIST`.
-- The exact removal strings exist in `DEFAULT_CHECK_LIST`
-  (`weblate/checks/defaults.py:22,63,81`).
-- The mechanism is the one already carrying the Game* checks
-  (`dev-docker/docker-compose.yml:64`).
+### Deliberately excluded
 
-### Implementation boundaries
+- `game-length`, `_visible_length()`, `_LENGTH_TIERS`, and `max-size`. A
+  character-longest branch is not necessarily pixel-widest, so `max-size`
+  needs a separate branch-aware renderer and an actual font/slot contract.
+- A generic runtime evaluator for condition comparisons. This plan computes a
+  conservative template bound; it does not simulate the game engine.
+- Recursive normalization of nested recognized conditionals. The dev corpus
+  has no such source, and plan 05 already documents outermost-only semantics.
+- New check IDs, new flag grammar, a project-specific `humanTimer` class, or
+  hard-coded values such as `11` in shared Python code.
+- Importing budgets, setting any live component flags, restarting any shared
+  stack, running `updatechecks` against a live instance, or production work.
+- Dependency on
+  `docs/product/plans/2026-08-24-05-conditional-dsl-validation.md`. Both
+  plans use the same low-level primitives and should land serially to avoid a
+  same-file merge conflict, but neither is a functional prerequisite of the
+  other.
 
-- Work in the existing checkout and the shared `dev-docker` stack; copy
-  `weblate_customization` into `dev-docker/data/python/` after every edit.
-- No edits to stock check classes under `weblate/checks/`: they stay intact and
-  are swapped per-deployment, so a plain Weblate installation is unaffected.
-  The single core edit is the auto-translate gate (Task 4), and it stays
-  generic.
-- Do not run anything against production. The compose restart in Task 5
-  recreates the shared dev containers and needs its own explicit go-ahead.
-- `weblate/trans/tests/test_autotranslate.py` is flaky under xdist in the dev
-  container: run it with `-n 0` and compare against a baseline run before
-  blaming a change.
-- Use @superpowers:test-driven-development for Tasks 1-4.
+## Configuration ownership
 
----
+The implementation is generic; each game owns its data policy.
 
-### Task 1: The scaffold stripper and its contract tests
+`Flags` merge from broad to narrow scope: project/category/component,
+translation, format/unit flags, source extra flags, then unit extra flags
+(`weblate/trans/models/component.py:6186-6198`,
+`weblate/trans/models/translation.py:403-406`,
+`weblate/trans/models/unit.py:2489-2507`). Later values replace earlier values
+with the same name (`weblate/checks/flags.py:305-321`).
+
+Use a project or component `max-length:N` only when that exact static budget
+applies to every string in scope. Use a source-file flag or unit extra flag for
+a specific UI slot. `replacements:` supplies a declared width scenario, not
+live runtime values. For a condition-dependent project rule, select the
+worst-case scenario that the rule actually promises. The Need for Greed
+`9/9/9` profile above is one example; it must not be copied to another game.
+
+English sources normally need 15% headroom under `source-max-length`
+(`weblate/checks/source.py:76-81`). When a particular source intentionally
+uses a whole fixed slot, add `ignore-source-max-length` to that unit only. Do
+not suppress the source check for every conditional string.
+
+## Fixed behavioral contract
+
+### Conditional representation
+
+```text
+stock replacements
+        |
+        v
+conditional worst-case collapse
+  +-- no :cond: -> return the same str object
+  +-- malformed braces -> leave transformed input unchanged
+  +-- each recognized conditional -> longest top-level branch
+  +-- consecutive conditionals -> concatenate their selected branches
+  +-- nested recognized conditional -> leave transformed input unchanged
+        |
+        v
+len(representation)
+```
+
+1. Run the stock replacement function first. With a valid key such as
+   `replacements:{hours}:9`, only the nested `{hours}` placeholder changes:
+
+   ```text
+   {hours:cond:>0?{hours}Std. |}
+   -> {hours:cond:>0?9Std. |}
+   ```
+
+   The conditional header remains recognizable. Never use a bare `hours` key
+   in a replacement profile.
+2. A recognized block splits only at top-level `|`; braces inside nested
+   placeholders raise depth and protect their `|` from being a delimiter.
+3. Select `max(branches, key=len)` for one recognized block. This is a
+   conservative character bound. It can over-count an engine path whose longer
+   branch is unreachable in a chosen runtime scenario, but it must never join
+   mutually exclusive alternatives.
+4. Concatenate the selected branch of every sequential recognized block. This
+   matches the supplied timer fixture, where all three true branches display at
+   once.
+5. If any recognized conditional is nested inside another recognized
+   conditional, return the input received by the helper unchanged. It is a
+   safe raw fallback, not an implicit recursive DSL interpreter. Add exact
+   engine evidence before extending this behavior.
+6. A text without `:cond:` returns by identity before parsing. An unrecognized
+   `{value:cond:1}` and a malformed brace sequence retain existing stock length
+   behavior.
+7. `max-lines` is untouched. This plan changes neither line counting nor
+   pixel-width rendering.
+
+### Judge-mode repair contract
+
+```text
+MT result
+  |
+  +-- under max-length -> normal write
+  |
+  +-- over max-length, non-judge mode -> existing Suggestion path
+  |
+  +-- over max-length, judge mode -> write Needs editing
+                                      -> run deterministic checks
+                                      -> judge round
+                                      -> repair when max-length remains,
+                                         including judge PASS
+                                      -> re-check and re-judge
+                                      -> fixed: normal verdict state
+                                      -> still failing: Needs editing
+```
+
+- The change is opt-in: only units carrying `max-length:N` can take this path.
+- Existing `suggest`, `translate`, `approved`, and `fuzzy` modes retain their
+  existing over-budget suggestion behavior.
+- A judge `UNPARSED` result remains a transport failure and does not invent a
+  repair attempt.
+- A repair that remains over budget after `JUDGE_MAX_REPAIR_ATTEMPTS` is not
+  silently promoted by a judge PASS. It remains `STATE_FUZZY`/Needs editing.
+- `GameMaxLengthCheck.get_description()` supplies the numeric budget to the
+  translator. `BaseLLMTranslation._get_failing_checks_context()` already sends
+  that description (`weblate/machinery/llm.py:575-583`), so no broad
+  `all_flags` exposure is necessary.
+
+## Existing code to reuse
+
+|Existing surface|Reuse|
+|---|---|
+|`_balanced_brace_blocks()` and `_CONDITIONAL_HEADER` in `weblate_customization/checks.py`|Recognize balanced outer conditional candidates. Do not introduce a second regex grammar.|
+|`BaseCheck.get_replacement_function()`|Run its XML/replacement behavior before the conditional collapse.|
+|`MaxLengthCheck` and `SourceMaxLengthCheck`|Inherit IDs, flag parsers, skip behavior, and check execution.|
+|`CHECKS` registry|Resolve the active max-length implementation in core without importing the customization package.|
+|`AutoTranslate.process_judge()`|Reuse its native write, check, judge, and repair pipeline; add no second MT path.|
+|`repair_target()` and `JUDGE_MAX_REPAIR_ATTEMPTS`|Reuse the configured project engine and existing bounded retry budget.|
+|`updatechecks` command|Recompute persisted rows for one approved rollout component.|
+
+## Task 1: Add conditional worst-case helper and custom check tests
 
 **Files:**
 
 - Modify: `weblate_customization/src/weblate_customization/checks.py`
 - Modify: `weblate_customization/tests/test_checks.py`
 
-#### Step 1: Add the failing tests
+### Step 1: Add failing pure-function regressions
 
-`StripConditionalScaffoldTest(SimpleTestCase)` with fixtures already present
-in the test module (`HUMAN_TIMER_EN`, `HUMAN_TIMER_DE`, `TIMER`,
-`AMOUNT_FORMATTED`):
+Import `SimpleTestCase`, `make_check`, `BaseLLMTranslation`, and the two new
+check classes. Keep the existing test module's fixtures, then add an explicit
+nonempty-alternative fixture and an explicit nested fixture:
 
-- `HUMAN_TIMER_EN` → `"{hours}h. {minutes}m. {seconds}s."` (scaffold gone,
-  placeholders and branch text kept, including branch-trailing spaces).
-- `HUMAN_TIMER_DE` → `"{hours}Std. {minutes}Min. {seconds}Sek."`.
-- `TIMER` (`{hours:cond:>0?{hours:00}:|}{minutes:00}:{seconds:00}`) →
-  `"{hours:00}:{minutes:00}:{seconds:00}"` — the adjacent-placeholder colons
-  survive, both inside and outside the branch.
-- `AMOUNT_FORMATTED` → `"{value:amount()}{value:N0}"`.
-- `"{value:cond:1}"` → unchanged (unrecognized, no `?`).
-- `"Text without conditionals {0} <b>x</b>"` → returned by identity
-  (`assertIs`), proving the `":cond:"` guard short-circuits.
+```python
+ALTERNATE = "{value:cond:>0?{value}x|much-longer}"
+SEQUENTIAL = "{hours:cond:>0?{hours}h |}{minutes:cond:>0?{minutes}m |}"
+NESTED = "{outer:cond:>0?{inner:cond:>0?x|}y|}"
+HUMAN_TIMER_DE = (
+    "{hours:cond:>0?{hours}Std. |}"
+    "{minutes:cond:>0?{minutes}Min. |}"
+    "{seconds:cond:>=0?{seconds}Sek.|}"
+)
+TIMER_FLAGS = "max-length:11, replacements:{hours}:9:{minutes}:9:{seconds}:9"
+```
 
-Run (expected: FAIL — function does not exist):
+`ConditionalLengthRepresentationTest(SimpleTestCase)` must assert:
+
+1. Plain text without `:cond:` is returned by identity (`assertIs`).
+2. `"{value:cond:1}"` and malformed balanced input are unchanged.
+3. `ALTERNATE` becomes `"much-longer"`, not `"{value}xmuch-longer"`.
+4. With `replacements:{value}:123`, the first branch of `ALTERNATE` becomes
+   longer and is selected. This proves replacement happens before branch
+   selection.
+5. `SEQUENTIAL` with `hours=9, minutes=9` becomes `"9h 9m "`, proving maxima
+   from distinct blocks are concatenated.
+6. `HUMAN_TIMER_DE` with `TIMER_FLAGS` becomes `"9Std. 9Min. 9Sek."` and has
+   length 17.
+7. `NESTED` is unchanged by the conditional helper. This is the deliberate
+   safe fallback.
+
+Run before implementation:
 
 ```bash
 cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
 WEBLATE_PORT=3001 ./rundev.sh test \
-  weblate_customization/tests/test_checks.py::StripConditionalScaffoldTest -n 0 -q
+  weblate_customization/tests/test_checks.py::ConditionalLengthRepresentationTest \
+  -n 0 -q
 ```
 
-#### Step 2: Implement
+Expected: collection succeeds and fails because the helper does not exist.
 
-Add below `conditional_dsl_syntax_spans()`:
+### Step 2: Implement the minimal helper
+
+Add a private helper near `_balanced_brace_blocks()`:
 
 ```python
-def strip_conditional_scaffold(text: str) -> str:
-    """
-    Text with the immutable conditional scaffold removed.
-
-    What remains is what the player can read: branch text and nested
-    placeholders. Placeholders keep their literal width, as they do for
-    every stock length check, unless `replacements:` expanded them first.
-    """
+def _conditional_length_text(text: str) -> str:
+    """Return a conservative character representation of conditional DSL."""
     if ":cond:" not in text:
         return text
-    spans: list[tuple[int, int]] = []
-    for start, end, _children in _balanced_brace_blocks(text):
+
+    recognized = []
+    for start, end, _children in sorted(
+        _balanced_brace_blocks(text), key=lambda block: block[0]
+    ):
         header = _CONDITIONAL_HEADER.match(text, start + 1, end - 1)
-        if header is None:
-            continue
-        spans.extend(((start, header.end()), (end - 1, end)))
+        if header is not None:
+            recognized.append((start, end, header))
+    if not recognized:
+        return text
+
+    open_ends: list[int] = []
+    for start, end, _header in recognized:
+        while open_ends and start >= open_ends[-1]:
+            open_ends.pop()
+        if open_ends:
+            return text
+        open_ends.append(end)
+
+    result: list[str] = []
+    previous = 0
+    for start, end, header in recognized:
+        assert header is not None
+        result.append(text[previous:start])
+        branches: list[str] = []
+        branch_start = header.end()
         depth = 0
         for position in range(header.end(), end - 1):
             char = text[position]
@@ -269,318 +306,368 @@ def strip_conditional_scaffold(text: str) -> str:
             elif char == "}":
                 depth -= 1
             elif char == "|" and depth == 0:
-                spans.append((position, position + 1))
-    if not spans:
-        return text
-    pieces = []
-    previous = 0
-    for start, end in sorted(spans):
-        pieces.append(text[previous:start])
-        previous = max(previous, end)
-    pieces.append(text[previous:])
-    return "".join(pieces)
+                branches.append(text[branch_start:position])
+                branch_start = position + 1
+        branches.append(text[branch_start : end - 1])
+        result.append(max(branches, key=len))
+        previous = end
+    result.append(text[previous:])
+    return "".join(result)
 ```
 
-Note the deliberate differences from `conditional_dsl_syntax_spans()`: child
-placeholder spans and the adjacent-colon rule are *not* collected — those are
-protected from editing but rendered to the player. If plan 2026-08-24-05 has
-landed by implementation time, derive the spans from `_parse_conditional_dsl()`
-instead of repeating the walk; the tests above are the contract either way.
+### Step 3: Add the two subclasses and numeric repair description
 
-#### Step 3: Run the tests, then commit
+Import `ngettext`, `MaxLengthCheck`, and `SourceMaxLengthCheck`. Do not add a
+mixin and do not import `MaxSizeCheck`.
 
-Same command as Step 1, expected: all new tests pass. Then:
+```python
+class GameMaxLengthCheck(MaxLengthCheck):
+    def get_replacement_function(self, unit):
+        replace = super().get_replacement_function(unit)
+        return lambda text: _conditional_length_text(replace(text))
+
+    def get_description(self, check_obj):
+        try:
+            limit = self.get_value(check_obj.unit)
+        except ValueError:
+            return super().get_description(check_obj)
+        return ngettext(
+            "Translation must not exceed %(limit)d character.",
+            "Translation must not exceed %(limit)d characters.",
+            limit,
+        ) % {"limit": limit}
+
+
+class GameSourceMaxLengthCheck(SourceMaxLengthCheck):
+    def get_replacement_function(self, unit):
+        replace = super().get_replacement_function(unit)
+        return lambda text: _conditional_length_text(replace(text))
+```
+
+The inherited check IDs remain `max-length` and `source-max-length`.
+`ParametrizedCheck.get_description()` keeps its existing invalid-flag error
+path because the subclass delegates on `ValueError`.
+
+### Step 4: Add target, source, and prompt-context tests
+
+Use `make_unit(flags=...)`, never an invented `MockUnit`.
+
+- `GameMaxLengthCheck.check_target_params(..., value=11)` returns `True` for
+  the Need for Greed German fixture and `False` for an 11-character compact
+  fixture. `value` is an integer, not `[11]`.
+- The dynamic description of a `make_check(unit, check)` contains
+  `11 characters`; an invalid `max-length:*` retains the stock parse-error
+  description.
+- Build a small fake active Check around `GameMaxLengthCheck.get_description()`
+  and call `BaseLLMTranslation._get_failing_checks_context()`. Assert the
+  emitted `failing_checks` item has `check_id == "max-length"` and the exact
+  numeric English description. This is the repair-prompt contract without
+  importing the customization package into a core test module.
+- `GameSourceMaxLengthCheck` retains stock English 85% behavior, plural
+  handling, `replacements:`, invalid-flag behavior, and an
+  `ignore-source-max-length` skip. Follow
+  `weblate/checks/tests/test_source_checks.py:55-120` for each regression.
+
+Run:
+
+```bash
+cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
+WEBLATE_PORT=3001 ./rundev.sh test \
+  weblate_customization/tests/test_checks.py \
+  -n 0 -q
+```
+
+Commit only the named files:
 
 ```bash
 git add weblate_customization/src/weblate_customization/checks.py \
   weblate_customization/tests/test_checks.py
-git commit -m "feat(checks): strip conditional DSL scaffold for length measurement"
+git commit -m "feat(checks): measure conditional DSL max-length budgets"
 ```
 
----
-
-### Task 2: Make `game-length` measure the player-visible text
+## Task 2: Make the auto-translate gate use the registered measurement
 
 **Files:**
 
-- Modify: `weblate_customization/src/weblate_customization/checks.py:682-684`
-- Modify: `weblate_customization/tests/test_checks.py`
-
-#### Step 1: Failing test
-
-In `GameLengthCheckTest`:
-
-```python
-    def test_visible_length_ignores_conditional_scaffold(self) -> None:
-        self.assertEqual(_visible_length(HUMAN_TIMER_EN), len("h. m. s."))
-        self.assertEqual(_visible_length(HUMAN_TIMER_DE), len("Std. Min. Sek."))
-```
-
-`check_single(HUMAN_TIMER_EN, HUMAN_TIMER_DE, None)` must stay `False` — the
-pair sits under the tier floor by design.
-
-#### Step 2: Implement
-
-```python
-def _visible_length(text: str) -> int:
-    """Length of what the player reads: markup, placeholders and DSL scaffold removed."""
-    return len(MARKUP.sub("", strip_conditional_scaffold(text)))
-```
-
-#### Step 3: Run the whole custom check module, commit
-
-```bash
-cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
-WEBLATE_PORT=3001 ./rundev.sh test weblate_customization/tests/test_checks.py -n 0 -q
-```
-
-Expected: all pass; no existing `game-length` expectation changes, because no
-existing fixture pairs a conditional source with a non-conditional target.
-
-```bash
-git commit -am "feat(checks): game-length measures branch text, not DSL scaffold"
-```
-
----
-
-### Task 3: DSL-aware `max-length`, `source-max-length`, `max-size`
-
-**Files:**
-
-- Modify: `weblate_customization/src/weblate_customization/checks.py`
-- Modify: `weblate_customization/tests/test_checks.py`
-
-#### Step 1: Failing tests
-
-```python
-class GameMaxLengthCheckTest(SimpleTestCase):
-    def test_budget_applies_to_visible_text(self) -> None:
-        check = GameMaxLengthCheck()
-        replace = check.get_replacement_function(MockUnit(
-            flags='max-length:16, replacements:{hours}:8:{minutes}:59:{seconds}:59'
-        ))
-        self.assertEqual(replace(HUMAN_TIMER_EN), "8h. 59m. 59s.")
-        self.assertEqual(replace(HUMAN_TIMER_DE), "8Std. 59Min. 59Sek.")
-```
-
-Plus one end-to-end row: `check_target_params(..., value=[16])` is `False` for
-the EN text (13) and `True` for the DE text (19). Reuse the existing mock-unit
-helper the module already uses for flag-carrying tests; if none exists, follow
-`weblate/checks/tests/test_chars.py` for constructing one.
-
-#### Step 2: Implement
-
-```python
-class _StripScaffoldMixin:
-    """Length checks measure visible text: expand replacements, then drop DSL scaffold."""
-
-    def get_replacement_function(self, unit):
-        replace = super().get_replacement_function(unit)
-        return lambda text: strip_conditional_scaffold(replace(text))
-
-
-class GameMaxLengthCheck(_StripScaffoldMixin, MaxLengthCheck): ...
-class GameSourceMaxLengthCheck(_StripScaffoldMixin, SourceMaxLengthCheck): ...
-class GameMaxSizeCheck(_StripScaffoldMixin, MaxSizeCheck): ...
-```
-
-Imports: `from weblate.checks.chars import MaxLengthCheck`,
-`from weblate.checks.source import SourceMaxLengthCheck`,
-`from weblate.checks.render import MaxSizeCheck`. No other body: `check_id`,
-name, description, params are inherited, so `./manage.py list_checks` output
-and every docs anchor stay identical.
-
-#### Step 3: Run, commit
-
-```bash
-cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
-WEBLATE_PORT=3001 ./rundev.sh test weblate_customization/tests/test_checks.py -n 0 -q
-git commit -am "feat(checks): DSL-aware max-length, source-max-length, max-size"
-```
-
----
-
-### Task 4: The auto-translate gate measures like the `max-length` check
-
-Without this task, a `max-length:N` flag on a formula string silently diverts
-every machine translation into a suggestion that no one will accept in a
-pipeline without humans.
-
-**Files:**
-
-- Modify: `weblate/trans/autotranslate.py:405-406`
+- Modify: `weblate/trans/autotranslate.py`
 - Modify: `weblate/trans/tests/test_autotranslate.py`
 
-#### Step 1: Failing test
+### Step 1: Add core-registry regressions
 
-In `weblate/trans/tests/test_autotranslate.py`, on a unit whose source is a
-conditional formula and whose flags are
-`max-length:16, replacements:{hours}:8:{minutes}:59:{seconds}:59`, a mocked MT
-result that is a formula string (raw length ~90, visible 13) must be written as
-a **translation**, not a suggestion. Control case: a plain (non-formula)
-result whose measured length exceeds the budget still becomes a suggestion.
-Follow the module's existing mock-machinery pattern.
+Keep this core test independent of `weblate_customization`. Patch
+`CHECKS.data["max-length"]` with a local test stub whose
+`get_replacement_function()` returns a known representation.
 
-Run first against the unmodified module to record the baseline (the file is
-flaky under xdist; always `-n 0`):
+Test all of these observable contracts:
 
-```bash
-WEBLATE_PORT=3001 ./rundev.sh test weblate/trans/tests/test_autotranslate.py -n 0 -q
-```
+1. In ordinary `translate` mode, a raw-long target whose stub representation
+   fits the unit's `max-length` is stored as a translation, not a suggestion.
+2. With no `max-length` check in `CHECKS`, the identity fallback preserves the
+   current raw-length suggestion behavior.
+3. For plural targets, one over-budget plural form sends the full target list
+   to the existing suggestion path.
+4. In `judge` mode, an over-budget candidate is stored at `STATE_FUZZY`, not
+   created as a suggestion. It is now available to checks and the repair loop.
+5. Existing explicit `mode="suggest"` behavior remains a suggestion regardless
+   of measurement.
 
-#### Step 2: Implement
+Use direct `AutoTranslate.update()` calls with existing `ViewTestCase` factories
+instead of a real machine service.
 
-In `AutoTranslate.update()` (`weblate/trans/autotranslate.py:405-406`), measure
-through the registered `max-length` check:
+### Step 2: Implement the judge-only branch
+
+At module level import `CHECKS`. In `AutoTranslate.update()`:
 
 ```python
-from weblate.checks.models import CHECKS  # module-level import
-
 max_length = unit.get_max_length()
 max_length_check = CHECKS.get("max-length")
-measure = (
+replace = (
     max_length_check.get_replacement_function(unit)
     if max_length_check is not None
     else lambda text: text
 )
-if self.mode == "suggest" or any(len(measure(item)) > max_length for item in target):
+over_max_length = any(len(replace(item)) > max_length for item in target)
+
+if self.mode == "suggest" or (over_max_length and self.mode != "judge"):
+    # existing Suggestion.objects.add() path
+    ...
+else:
+    # existing unit.translate() path
+    ...
 ```
 
-This is deliberately generic core behavior: the gate now measures exactly what
-the registered `max-length` check will measure. On stock class lists that adds
-`replacements:` awareness (gate and check finally agree); after Task 5's swap
-it resolves to `GameMaxLengthCheck` and becomes DSL-aware, with no core import
-of `weblate_customization`. A deployment that removed the `max-length` check
-entirely keeps today's raw behavior.
+Do not change non-judge over-budget behavior. Judge mode already sets fresh
+machine targets to `STATE_FUZZY` in `process_judge()`.
 
-Boundary: formats that import a physical width limit as a `max-length` flag
-(for example XLIFF `maxwidth`) would now measure replaced text against it.
-This fork's formats are monolingual PO/CSV game kits; none import such flags.
-
-#### Step 3: Run, compare to baseline, commit
+### Step 3: Run and commit
 
 ```bash
-WEBLATE_PORT=3001 ./rundev.sh test weblate/trans/tests/test_autotranslate.py -n 0 -q
-git add weblate/trans/autotranslate.py weblate/trans/tests/test_autotranslate.py
-git commit -m "fix(trans): auto-translate length gate measures like max-length check"
+WEBLATE_PORT=3001 ./rundev.sh test \
+  weblate/trans/tests/test_autotranslate.py \
+  -n 0 -q
+
+git add weblate/trans/autotranslate.py \
+  weblate/trans/tests/test_autotranslate.py
+git commit -m "fix(trans): retain over-budget judge candidates for repair"
 ```
 
----
-
-### Task 5: Registration, changelog, and the restart gate
+## Task 3: Force deterministic max-length repair in judge mode
 
 **Files:**
 
-- Modify: `dev-docker/docker-compose.yml:64` (and add `WEBLATE_REMOVE_CHECK`)
-- Modify: `deploy/environment.example`
-- Modify: `docs/changes.rst` (top unreleased section)
+- Modify: `weblate/trans/judge_loop.py`
+- Modify: `weblate/trans/autotranslate.py`
+- Modify: `weblate/trans/tests/test_judge_loop.py`
+- Modify: `weblate/trans/tests/test_judge_autotranslate.py`
 
-#### Step 1: Swap the classes per-deployment
+### Step 1: Add failing judge-loop regressions
 
-In `dev-docker/docker-compose.yml`, extend the `weblate` service environment:
+Follow `JudgeLoopTest.run_batch()` in
+`weblate/trans/tests/test_judge_loop.py:71-83`.
 
-```yaml
-WEBLATE_REMOVE_CHECK: weblate.checks.chars.MaxLengthCheck,weblate.checks.source.SourceMaxLengthCheck,weblate.checks.render.MaxSizeCheck
+1. With both seats returning `PASS`, a writable unit whose deterministic checks
+   contain `max-length` still calls `repair_target()` once and re-judges both
+   seats.
+2. An `UNPARSED` pair never calls `repair_target()`, even when `max-length`
+   exists.
+3. A repair that clears `max-length` may reach the normal PASS state.
+4. A repair that leaves `max-length` active exhausts the bounded attempt count
+   and remains in a fuzzy/non-shippable state. A judge PASS must not override
+   this deterministic failure.
+5. A unit without `max-length` retains the existing PASS-does-not-repair path.
+
+Use the existing request and repair mocks; do not call a real LLM.
+
+### Step 2: Implement the narrow repair trigger
+
+In `_process_round_unit()`, run checks before deciding whether PASS is
+non-repairable. Preserve the `UNPARSED` behavior, but treat an active
+`max-length` deterministic check as repairable even when the judge verdict is
+PASS and the unit is writable with attempts remaining. Continue to use
+`repair_target()` and `_apply_repair()` unchanged for the actual write and
+no-regress protection.
+
+In `AutoTranslate.process_judge()` finalization, if the locked unit still has
+an active `max-length` check, preserve `STATE_FUZZY` instead of projecting a
+PASS to `STATE_TRANSLATED` or approved. Other judge outcomes and all units
+without the check retain `state_for_verdict()` behavior.
+
+Do not generalize this to every deterministic check in this change. A unit has
+opted into a hard UI budget by carrying `max-length:N`; extending automatic
+repair policy to other checks needs its own design.
+
+### Step 3: Run and commit
+
+```bash
+WEBLATE_PORT=3001 ./rundev.sh test \
+  weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_judge_autotranslate.py \
+  -n 0 -q
+
+git add weblate/trans/judge_loop.py \
+  weblate/trans/autotranslate.py \
+  weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_judge_autotranslate.py
+git commit -m "fix(judge): repair over-budget automatic translations"
 ```
 
-and append to the existing `WEBLATE_ADD_CHECK` line:
+## Task 4: Register checks, document configuration, and define rollout gates
+
+**Files:**
+
+- Modify: `dev-docker/docker-compose.yml`
+- Modify: `deploy/environment.example`
+- Modify: `docs/changes.rst`
+- Modify: `docs/guides/producer-guide-weblate.md`
+
+### Step 1: Replace only the two check classes
+
+In both deployment environments remove only:
 
 ```text
-,weblate_customization.checks.GameMaxLengthCheck,weblate_customization.checks.GameSourceMaxLengthCheck,weblate_customization.checks.GameMaxSizeCheck
+weblate.checks.chars.MaxLengthCheck,weblate.checks.source.SourceMaxLengthCheck
 ```
 
-Mirror both (as `WEBLATE_REMOVE_CHECK=` / additions to `WEBLATE_ADD_CHECK=`) in
-`deploy/environment.example`.
+and add only:
 
-#### Step 2: Changelog
+```text
+weblate_customization.checks.GameMaxLengthCheck,weblate_customization.checks.GameSourceMaxLengthCheck
+```
 
-One bullet in the unreleased `Improvements` section of `docs/changes.rst`:
+Do not remove or add `MaxSizeCheck`, `GameLengthCheck`, or any unrelated check.
+`modify_env_list()` adds before removing (`weblate/utils/environment.py:182-188`),
+so the final registry has one implementation per inherited check ID.
+
+### Step 2: Add user-facing documentation
+
+Add a short Russian subsection immediately after the existing `Флаги перевода`
+bullet in `docs/guides/producer-guide-weblate.md`:
+
+- Project/component flags are defaults; a source-file or unit flag overrides
+  them for a specific UI slot.
+- `max-length:N` is a static character budget. Use it only where the same
+  budget really applies.
+- `replacements:` describes a selected width scenario; it is not live engine
+  evaluation. It must use whole placeholder tokens such as `{hours}`.
+- Add `ignore-source-max-length` only to a source intentionally using all of a
+  fixed slot.
+- For no-human automatic correction, run the judge workflow: a failing
+  `max-length` candidate is retried and otherwise remains `Needs editing`.
+
+Do not name Need for Greed, German abbreviations, or `11` in the guide.
+
+### Step 3: Add the unreleased changelog entry
+
+Add one concise bullet in the current `Improvements` section:
 
 ```rst
-* The ``max-length``, ``source-max-length``, ``max-size`` and ``game-length`` checks, and the automatic translation length gate, now measure the player-visible text of Hero Craft conditional placeholders such as ``{hours:cond:>0?{hours}h. |}``: the conditional scaffold no longer counts toward a length budget, so ``max-length:N`` flags become meaningful for formula strings and no longer divert machine translations into suggestions.
+* Hero Craft conditional placeholders now use their worst-case visible branch when evaluating ``max-length`` and ``source-max-length`` budgets. Judge-mode automatic translations that exceed an opted-in ``max-length`` budget are retried with the concrete limit and remain pending when the limit cannot be met.
 ```
 
-#### Step 3: Scoped hooks
+### Step 4: Run scoped checks and commit
 
 ```bash
 uv run prek run ruff-check ruff-format --files \
   weblate_customization/src/weblate_customization/checks.py \
   weblate_customization/tests/test_checks.py \
   weblate/trans/autotranslate.py \
-  weblate/trans/tests/test_autotranslate.py
-uv run prek run trailing-whitespace end-of-file-fixer rst-double-space \
-  sphinx-lint codespell --files docs/changes.rst
+  weblate/trans/judge_loop.py \
+  weblate/trans/tests/test_autotranslate.py \
+  weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_judge_autotranslate.py \
+  --skip typos --skip reuse --skip kingfisher-auto
+uv run prek run --files \
+  docs/changes.rst \
+  docs/guides/producer-guide-weblate.md \
+  --skip typos --skip reuse --skip kingfisher-auto
+
+git add dev-docker/docker-compose.yml deploy/environment.example \
+  docs/changes.rst docs/guides/producer-guide-weblate.md
+git commit -m "feat(checks): register conditional max-length budgets"
 ```
 
-Do not run `--all-files`; `typos` and `reuse` scan the whole tree regardless
-and report pre-existing findings tracked in
-`docs/product/plans/2026-08-23-prek-full-pass-remaining-hooks.md`.
+Never use `git commit -am` in the shared checkout.
 
-#### Step 4: Restart gate — explicit approval required
+### Step 5: Restart and recomputation gates require separate approval
 
-The environment block is baked at container creation: the swap takes effect
-only after a full `./rundev.sh` (rebuild + start) of the shared dev stack.
-Stop and ask before running it. After the restart, verify in the container:
+The environment block is baked into the running container. Do not restart the
+shared dev stack, apply live flags, or run management commands until the user
+approves that rollout separately.
+
+After an approved dev restart, verify:
 
 ```bash
 WEBLATE_PORT=3001 ./rundev.sh check
-docker compose -f dev-docker/docker-compose.yml exec weblate weblate shell -c \
-  "from weblate.checks.models import CHECKS; print(type(CHECKS['max-length']))"
+WEBLATE_PORT=3001 ./rundev.sh exec -T weblate weblate shell -c \
+  "from weblate.checks.models import CHECKS; print(type(CHECKS['max-length']).__name__); print(type(CHECKS['source-max-length']).__name__)"
 ```
 
-Expected: `GameMaxLengthCheck`. Production deployment is out of scope and
-needs its own approval per `AGENTS.md`.
+Expected output includes `GameMaxLengthCheck` and `GameSourceMaxLengthCheck`.
 
-#### Step 5: Commit and push
+For one explicitly approved project/component rollout only, record the baseline
+number of active `max-length` checks, assign its reviewed flags, then run:
 
 ```bash
-git add dev-docker/docker-compose.yml deploy/environment.example docs/changes.rst \
-  docs/product/plans/2026-08-26-length-checks-conditional-dsl.md
-git commit -m "feat(checks): register DSL-aware length checks"
+WEBLATE_PORT=3001 ./rundev.sh exec -T weblate weblate updatechecks project-slug/component-slug
+```
+
+`updatechecks` calls `unit.run_checks()` for the selected units
+(`weblate/checks/management/commands/updatechecks.py:11-19`). Verify the
+post-run count and sample affected strings. Never use `--all` for this feature
+rollout.
+
+### Step 6: Push only after all approved verification passes
+
+```bash
 git push origin HEAD
 ```
 
----
-
-## Out of scope
-
-- **`game-number` and scaffold digits.** `_prepare()` (`checks.py:417-423`)
-  reads `>0`/`>99999` comparison digits as quantities. Today this is harmless
-  (the scaffold contributes equal counts to both sides) and even accidentally
-  reports some comparison tampering; plan 2026-08-24-05 reports that tampering
-  properly. Strip the scaffold there only if real false positives appear, and
-  only after 2026-08-24-05 lands — otherwise the accidental protection is
-  removed with nothing replacing it.
-- Retuning `_LENGTH_TIERS` or `_LENGTH_MAX_RATIO`.
-- Choosing per-key `max-length:N` budgets and importing them in bulk — that is
-  the developer's flag-import task, a separate plan. It must not start before
-  this plan lands (Task 4 is its prerequisite).
-- Font upload, font groups, and actual `max-size` limits — separate adoption
-  work (`docs/llm-first/plans/2026-08-10-git-localization-quality-gate.md`
-  covers the COL4 variant).
-- The editor character counter (`data-max`): it shows raw length and will show
-  red on formula strings with tight budgets. Advisory styling only
-  (`weblate/static/editor/base.js:157-170`), saving is not blocked.
-- Repairing stored translations, suggestions, or translation memory.
-- Moving the DSL scanner into `weblate/trans/protected_tokens.py`.
-
 ## Acceptance criteria
 
-1. `strip_conditional_scaffold(HUMAN_TIMER_EN)` == `"{hours}h. {minutes}m. {seconds}s."`;
-   the TIMER adjacent-colons and `{value:cond:1}` cases hold as specified.
-2. `_visible_length(HUMAN_TIMER_DE)` == 14 (`"Std. Min. Sek."`), not 70.
-3. With `max-length:16, replacements:{hours}:8:{minutes}:59:{seconds}:59`,
-   the EN/RU text passes and the DE/TR text fails `max-length`.
-4. With the same flags, auto-translate writes a formula MT result as a
-   translation, not a suggestion; an over-budget plain result still becomes a
-   suggestion.
-5. A text without `:cond:` is returned by identity from the stripper, and no
-   stock check behavior changes for it.
-6. `CHECKS["max-length"]`, `["source-max-length"]`, `["max-size"]` resolve to
-   the Game* subclasses in the dev container after the approved restart;
-   `check_id`s, flags, and docs anchors are unchanged.
-7. `weblate_customization/tests/test_checks.py` fully passes;
-   `weblate/trans/tests/test_autotranslate.py` matches its pre-change baseline
-   plus the new tests; no stock test under `weblate/checks/tests/` is modified.
-8. Only the files named in the tasks are committed; nothing is deployed to
-   production.
+1. `GameMaxLengthCheck` and `GameSourceMaxLengthCheck` keep the stock
+   `max-length` and `source-max-length` IDs, flags, and invalid-flag behavior.
+2. A nonempty `|alternate` chooses one longest top-level branch, never the
+   concatenation of both alternatives.
+3. Consecutive recognized conditionals concatenate their selected maxima; the
+   supplied German timer with `9/9/9` measures as 17 and fails a budget of 11.
+4. Stock replacements run before branch selection. `{hours}:9` changes the
+   nested value while preserving the `hours:cond:` header.
+5. A nested recognized conditional uses the documented safe raw fallback.
+6. `GameMaxLengthCheck` exposes the exact numeric limit to the LLM
+   `failing_checks` context and retains stock malformed-flag diagnostics.
+7. In judge mode, an over-budget result is stored in a non-shippable state,
+   repaired despite a judge PASS, and remains non-shippable if the bounded
+   repair budget is exhausted. Ordinary auto-translate modes retain suggestion
+   fallback behavior.
+8. Source headroom, plural handling, replacements, and
+   `ignore-source-max-length` remain covered by custom regressions.
+9. The dev registry resolves only `GameMaxLengthCheck` and
+   `GameSourceMaxLengthCheck` after the separately approved restart; existing
+   rows are refreshed only through separately approved, component-scoped
+   `updatechecks`.
+10. The producer guide documents generic per-project configuration without a
+    game-specific hard-coded budget. No live flags, restart, recomputation, or
+    production deployment occurs as part of this implementation plan.
+
+## Implementation order and parallelization
+
+Sequential implementation. Tasks 1 and 3 both modify
+`weblate_customization/checks.py`/the judge flow dependencies; Task 2 consumes
+the check interface; Task 4 registers and documents the final behavior. Do not
+split them into parallel worktrees.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope and strategy | 0 | Not run | - |
+| Codex Review | `/codex review` | Independent second opinion | 0 | Not run | - |
+| Eng Review | `/plan-eng-review` | Architecture and tests | 1 | Revised | 10 findings folded into the plan |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | Not applicable | No UI change |
+| DX Review | `/plan-devex-review` | Developer experience | 0 | Not run | Producer guide added by eng review |
+
+**CROSS-MODEL:** Independent architect review agreed with the engineering review: the original plan had to be narrowed and the judge repair path completed.
+
+**VERDICT:** ENG REVIEW REVISIONS APPROVED - plan awaits implementation approval and separate rollout approval.
+
+NO UNRESOLVED DECISIONS

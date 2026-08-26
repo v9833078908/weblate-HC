@@ -332,6 +332,25 @@ Source "Он ушёл" with existing translation "Il est parti." must produce "I
 - Заметка разработчика из файла (если она там была) тоже уходит в запрос;
   модель использует её для выбора рода, регистра и тона.
 
+### Interface limits
+
+`max-length:N` defines a static character budget for one string. Set it at
+project or component scope only when the same limit fits every string; use a
+source-file or unit flag for a specific UI slot. A narrower flag overrides a
+broader one.
+
+`replacements:` defines a placeholder width scenario before the check runs. For
+a timer formula, use the maximum values for that scenario, for example
+`replacements:{hours}:9:{minutes}:9`. Use the complete `{hours}` placeholder,
+not the `hours:cond:` condition header. This does not run the game engine: the
+check uses the conservative longest branch of every conditional block.
+
+When a source intentionally fills a fixed slot, add
+`ignore-source-max-length` only to that unit; otherwise the source check keeps
+useful localization headroom. In judge mode, a translation that fails
+`max-length` is retried with its exact budget. If attempts are exhausted, the
+unit remains in Needs editing rather than being published.
+
 Одна строка стабильно переводится неверно из-за неоднозначности исходника -
 пишем пояснение и перезапускаем автоперевод только по ней.
 
