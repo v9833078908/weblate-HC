@@ -18,7 +18,7 @@ from weblate.trans.models.judge import (
 )
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.hash import calculate_hash
-from weblate.utils.state import STATE_TRANSLATED
+from weblate.utils.state import STATE_FUZZY, STATE_TRANSLATED
 
 
 def result(severity, verdict, **kw):
@@ -438,3 +438,97 @@ class JudgeIncrementalPersistenceTest(ViewTestCase):
             JudgeVerdict.objects.filter(unit__in=units, seat=1).count(),
             2,
         )
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
+class JudgeMaxLengthRepairTest(ViewTestCase):
+    """An active `max-length` check keeps a PASS verdict repairable."""
+
+    def run_gated_batch(
+        self,
+        seat_results,
+        *,
+        max_length: int,
+        target: str,
+        repair: list[str] | None = None,
+        writable: bool = True,
+    ):
+        client = mock_request_verdicts([[result] for result in seat_results])
+        unit = self.change_unit(target)
+        unit.extra_flags = f"max-length:{max_length}"
+        unit.save(update_fields=["extra_flags"], same_content=True)
+        writable_ids = {unit.id} if writable else set()
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.repair_target", return_value=repair
+            ) as repair_mock,
+        ):
+            verdicts = run_judge_batch(
+                [unit], writable_ids=writable_ids, user=self.user
+            )
+        return self.get_unit(), verdicts[unit.id], client, repair_mock
+
+    def test_pass_with_active_max_length_still_triggers_one_repair(self) -> None:
+        _unit, verdict, client, repair_mock = self.run_gated_batch(
+            [PASS, PASS, PASS, PASS],
+            max_length=5,
+            target="a much longer raw target",
+            repair=["short"],
+        )
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
+        self.assertEqual(verdict.attempt, 1)
+        self.assertEqual(repair_mock.call_count, 1)
+        self.assertEqual(client.call_count, 4)
+
+    def test_unparsed_never_triggers_repair_even_with_active_max_length(
+        self,
+    ) -> None:
+        _unit, verdict, client, repair_mock = self.run_gated_batch(
+            [DEAD, DEAD],
+            max_length=5,
+            target="a much longer raw target",
+            repair=["short"],
+        )
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.UNPARSED)
+        self.assertEqual(repair_mock.call_count, 0)
+        self.assertEqual(client.call_count, 2)
+
+    def test_repair_clearing_max_length_drops_the_check(self) -> None:
+        unit, verdict, _client, _repair_mock = self.run_gated_batch(
+            [PASS, PASS, PASS, PASS],
+            max_length=5,
+            target="a much longer raw target",
+            repair=["tiny"],
+        )
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
+        self.assertFalse(unit.has_check("max-length"))
+
+    def test_repair_leaving_max_length_exhausts_attempts_and_stays_fuzzy(
+        self,
+    ) -> None:
+        unit, verdict, _client, repair_mock = self.run_gated_batch(
+            [PASS, PASS, PASS, PASS],
+            max_length=5,
+            target="a much longer raw target",
+            repair=["still much too long to fit the budget"],
+        )
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
+        self.assertEqual(verdict.attempt, 1)
+        self.assertEqual(repair_mock.call_count, 1)
+        self.assertTrue(unit.has_check("max-length"))
+        self.assertEqual(unit.state, STATE_FUZZY)
+
+    def test_unit_without_max_length_retains_pass_does_not_repair(self) -> None:
+        _unit, verdict, client, repair_mock = self.run_gated_batch(
+            [PASS, PASS], max_length=1000, target="short", repair=["unused"]
+        )
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
+        self.assertEqual(repair_mock.call_count, 0)
+        self.assertEqual(client.call_count, 2)

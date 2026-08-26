@@ -859,6 +859,12 @@ class AutoTranslate(BaseAutoTranslate):
                     enable_review=self.translation.enable_review,
                     may_approve=settings.JUDGE_MAY_APPROVE,
                 )
+                if verdict.verdict == JudgeVerdict.Verdict.PASS and any(
+                    check.name == "max-length" for check in locked.active_checks
+                ):
+                    # A repair-exhausted over-budget candidate must not ship
+                    # just because the judge approved its content.
+                    state = STATE_FUZZY
                 if state is not None and locked.state != state:
                     self.update(locked, state, locked.get_target_plurals())
         if unparsed:  # D5: never a silent no-op on money spent

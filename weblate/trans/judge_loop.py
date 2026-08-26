@@ -170,6 +170,11 @@ def _deterministic_checks(unit: Unit) -> set[str]:
     return {name for name in unit.all_checks_names if not name.startswith("judge-")}
 
 
+def _has_active_check(unit: Unit, check_id: str) -> bool:
+    """Whether a non-dismissed check row is currently on the unit."""
+    return any(check.name == check_id for check in unit.active_checks)
+
+
 def _cached_verdict(
     unit: Unit, request: JudgeRequest, models: tuple[str, str]
 ) -> JudgeVerdict | None:
@@ -294,7 +299,12 @@ def _process_round_unit(
         # A changed target/context or an all-unparsed round must not fall
         # back to an older opinion for repair or finalization.
         return None, _RepairOutcome(None)
-    if verdict.verdict in _NON_REPAIRABLE_VERDICTS:
+    if verdict.verdict == JudgeVerdict.Verdict.UNPARSED:
+        # A transport failure is never a repair opinion, active check or not.
+        return verdict, _RepairOutcome(current)
+    if verdict.verdict in _NON_REPAIRABLE_VERDICTS and not _has_active_check(
+        current, "max-length"
+    ):
         return verdict, _RepairOutcome(current)
     if attempt >= attempts or unit.id not in writable_ids:
         return verdict, _RepairOutcome(current)

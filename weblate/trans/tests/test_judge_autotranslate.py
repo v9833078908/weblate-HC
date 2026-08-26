@@ -83,6 +83,24 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.perform(JudgeVerdict.Verdict.UNPARSED)
         self.assertEqual(self.get_unit().state, before)
 
+    def test_pass_with_active_max_length_check_stays_fuzzy(self) -> None:
+        unit = self.get_unit()
+        unit.extra_flags = "max-length:5"
+        unit.save(update_fields=["extra_flags"], same_content=True)
+        unit.translate(
+            self.user, ["a much longer over budget target"], STATE_TRANSLATED
+        )
+        self.perform(JudgeVerdict.Verdict.PASS)
+        self.assertEqual(self.get_unit().state, STATE_FUZZY)
+
+    def test_pass_without_active_max_length_reaches_translated(self) -> None:
+        unit = self.get_unit()
+        unit.extra_flags = "max-length:100"
+        unit.save(update_fields=["extra_flags"], same_content=True)
+        unit.translate(self.user, ["short target"], STATE_TRANSLATED)
+        self.perform(JudgeVerdict.Verdict.PASS)
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
+
     def test_existing_translation_is_judged_not_rewritten(self) -> None:
         unit = self.get_unit()
         unit.translate(self.user, ["Human translation"], STATE_TRANSLATED)
