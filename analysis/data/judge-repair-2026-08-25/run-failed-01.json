@@ -1,0 +1,6631 @@
+{
+ "plan": "docs/llm-first/plans/2026-08-25-judge-repair-loop-measurement.md",
+ "status": "collected",
+ "error": "collected after the fact; `before` is reconstructed",
+ "message": null,
+ "started": null,
+ "finished": null,
+ "wall_seconds": null,
+ "settings": {
+  "seat_1": "deepseek/deepseek-v4-pro",
+  "seat_2": "qwen/qwen3-235b-a22b-2507",
+  "max_repair_attempts": 1,
+  "may_approve": false,
+  "engine": "openrouter",
+  "enable_review": false
+ },
+ "before": {
+  "306252": {
+   "key": "ID_CARAVAN_REACHED_HOME_DESC",
+   "source": "Конвой вернулся из плаванья в страну {0} с товарами на сумму {1}. {2}",
+   "target": "",
+   "state": 0
+  },
+  "306335": {
+   "key": "ID_CARAVAN_LAUNCH_OFFER_OPTION_ACCEPT_FAST",
+   "source": "Отправить конвой и ускорить его возвращение на {[PARAM0]} ходов.",
+   "target": "",
+   "state": 0
+  },
+  "306336": {
+   "key": "ID_CARAVAN_BOOST_FOR_GOLD_FAILED",
+   "source": "Не удалось совершить покупку ускорения конвоя",
+   "target": "",
+   "state": 0
+  },
+  "306258": {
+   "key": "ID_CARAVAN_REACHED_HOME_PROTECTION_COMPENSATION",
+   "source": "Нет доступных провинций для размещения вернувшегося конвоя. Компенсация - {0} ресурсов.",
+   "target": "",
+   "state": 0
+  },
+  "306271": {
+   "key": "ID_ENEMY_AIR_BLOW_CASUALITIES_DESC",
+   "source": "Вражеская авиация: {0} напала на нашу провинцию {1} из провинций: {2}\n\n{3}{4}\n{5}{6}\n\nПолучено урона по нашим наземным войскам: {7}\n\nНанесено урона по вражеской авиации: {8}",
+   "target": "",
+   "state": 0
+  },
+  "306317": {
+   "key": "ID_TRADE_NAME_0",
+   "source": "Саудовская Аравия",
+   "target": "",
+   "state": 0
+  },
+  "306288": {
+   "key": "ID_AIR_COMBAT_CASUALITIES_NAME",
+   "source": "Итоги воздушного боя",
+   "target": "",
+   "state": 0
+  },
+  "306299": {
+   "key": "ID_ENEMY_SURVIVORS_STRENGTH",
+   "source": "Влияние выживших противника: {0}",
+   "target": "",
+   "state": 0
+  },
+  "306272": {
+   "key": "ID_USER_AIR_BLOW_CASUALITIES_DESC",
+   "source": "Результаты воздушного налёта на вражескую провинцию {0}\n\n{1}{2}\n{3}{4}\n\nПолучено урона по нашей авиации: {5}\nНанесено урона по вражеским наземным войскам: {6}",
+   "target": "",
+   "state": 0
+  },
+  "306242": {
+   "key": "ID_DIVISION_EXP_DESC_TURNS_ALIVE",
+   "source": "Ходов пережито: {[PARAM0]}",
+   "target": "",
+   "state": 0
+  },
+  "306251": {
+   "key": "ID_CARAVAN_REACHED_DESTINATION_DESC",
+   "source": "Наш конвой достиг места назначения - страны {0}. Товары стоимостью {1} ресурсов загружены на борт. Конвой отправился домой.",
+   "target": "",
+   "state": 0
+  },
+  "306315": {
+   "key": "ID_DIVISION_WITH_EXP_LVL_DIED_NAME",
+   "source": "Потери среди лучших!",
+   "target": "",
+   "state": 0
+  },
+  "306306": {
+   "key": "ID_RANK_STATUS_NOTIFICATION_RANK_UP_MULTI",
+   "source": "повышен",
+   "target": "",
+   "state": 0
+  },
+  "306262": {
+   "key": "ID_USER_IMPORTANT_DEFEAT_DESC_NEW",
+   "source": "Наши войска разгромлены в провинции {0} армией страны {1}\n\n{2}",
+   "target": "",
+   "state": 0
+  },
+  "306340": {
+   "key": "ID_TROOPS_DIVISION_EXP_STEP",
+   "source": "У вас появилась дивизия ветеранов! Такие дивизии наносят больше урона в атаке и получают меньше урона в защите. Нажмите дважды на иконку дивизии, чтобы получить подробную информацию",
+   "target": "",
+   "state": 0
+  },
+  "306298": {
+   "key": "ID_USER_SURVIVORS_STRENGTH",
+   "source": "Влияние выживших: {0}",
+   "target": "",
+   "state": 0
+  },
+  "306295": {
+   "key": "ID_ENEMY_SURVIVORS",
+   "source": "Выжившие страны {0}: {1}",
+   "target": "",
+   "state": 0
+  },
+  "306279": {
+   "key": "ID_USER_LOSE_NAVY_BATTLE_CASUALITIES_DESC",
+   "source": "Результаты проигранного морского боя в провинции {0}\n\n{1}{2}\n{3}{4}\n{5}\nПолучено урона нашими войсками: {6}{7}\n\nНанесено урона по вражеским войскам: {8}{9}",
+   "target": "",
+   "state": 0
+  },
+  "306228": {
+   "key": "ID_AGITATION_CAMPAIGN_ACTIVATION_NEWS_HEADER",
+   "source": "Агитационная кампания",
+   "target": "",
+   "state": 0
+  },
+  "306238": {
+   "key": "ID_DIVISION_EXP_LEVEL_2",
+   "source": "Ветераны",
+   "target": "",
+   "state": 0
+  },
+  "306277": {
+   "key": "ID_AI_FAILED_CAPTURED_ARMED_PROVINCE_DESC\n",
+   "source": "Результаты удачной обороны укреплений в провинции {0}\n\n{1}",
+   "target": "",
+   "state": 0
+  },
+  "306281": {
+   "key": "ID_USER_LOSE_NAVY_BATTLE_CASUALITIES_NAME",
+   "source": "Поражение в море",
+   "target": "",
+   "state": 0
+  },
+  "306287": {
+   "key": "ID_USER_AIR_BLOW_CASUALITIES_NAME",
+   "source": "Мы провели налет",
+   "target": "",
+   "state": 0
+  },
+  "306319": {
+   "key": "ID_TRADE_NAME_2",
+   "source": "Венесуэла",
+   "target": "",
+   "state": 0
+  },
+  "306275": {
+   "key": "ID_USER_LOST_ARMED_PROVINCE_DESC",
+   "source": "Результаты провальной обороны укреплений в провинции {0}\n\n{1}",
+   "target": "",
+   "state": 0
+  },
+  "306235": {
+   "key": "ID_MINEFIELD_NOTIFICATION_HEADER",
+   "source": "Враг попался в ловушку!",
+   "target": "",
+   "state": 0
+  },
+  "306304": {
+   "key": "ID_RANK_STATUS_NOTIFICATION_RANK_UP_SINGLE",
+   "source": "повышен",
+   "target": "",
+   "state": 0
+  },
+  "306265": {
+   "key": "ID_ENEMY_SHIP_LANDING_KILLED_DESC_NEW",
+   "source": "Морские десантники страны {0}, отправленные в провинцию {1}, были уничтожены.\n\n{2}",
+   "target": "",
+   "state": 0
+  },
+  "306269": {
+   "key": "ID_PROVINCE_CAPTURED_EVENT_DESC_NEW",
+   "source": "Наши войска захватили провинцию {0}\n\n{1}",
+   "target": "",
+   "state": 0
+  },
+  "306327": {
+   "key": "ID_ACCEPT_TRADE_RELATIONS",
+   "source": "Согласиться",
+   "target": "",
+   "state": 0
+  },
+  "306246": {
+   "key": "ID_DIVISION_EXP_BATTLE_VICTORY",
+   "source": "Победа",
+   "target": "",
+   "state": 0
+  },
+  "306231": {
+   "key": "ID_RESEARCH_POINT_IN_APP_OFFER",
+   "source": "Получить дополнительное очко науки до конца этой миссии за {[PARAM0]}?",
+   "target": "",
+   "state": 0
+  },
+  "306296": {
+   "key": "ID_USER_CASUALTIES",
+   "source": "Ваши потери: {0}",
+   "target": "",
+   "state": 0
+  },
+  "306331": {
+   "key": "ID_CARAVAN_PROTECT_NOT_AVAILABLE_PROVINCES",
+   "source": "Нет доступных провинций для выбора охраны!",
+   "target": "",
+   "state": 0
+  },
+  "306273": {
+   "key": "ID_AIR_COMBAT_CASUALITIES_DESC",
+   "source": "Результаты воздушного боя над провинцией {0}\n\n{1}{2}\n{3}{4}\n\nПолучено урона по нашей авиации: {5}\n\nНанесено урона по вражеской авиации: {6}",
+   "target": "",
+   "state": 0
+  },
+  "306283": {
+   "key": "ID_AI_FAILED_CAPTURED_ARMED_PROVINCE_NAME\n",
+   "source": "Провальный штурм укреплений врагами",
+   "target": "",
+   "state": 0
+  },
+  "306276": {
+   "key": "ID_USER_FAILED_CAPTURED_ARMED_PROVINCE_DESC\n",
+   "source": "Результаты провального штурма укреплений в провинции {0}\n\n{1}",
+   "target": "",
+   "state": 0
+  },
+  "306341": {
+   "key": "ID_TROOPS_DIVISION_EXP_WIDGET_STEP_0",
+   "source": "Накопленный опыт и опыта, необходимый для перехода на следующий уровень",
+   "target": "",
+   "state": 0
+  },
+  "306293": {
+   "key": "ID_NOT_ALIVE_UNITS",
+   "source": "Нет выживших",
+   "target": "",
+   "state": 0
+  },
+  "306253": {
+   "key": "ID_CARAVAN_REACHED_HOME_PROTECTION",
+   "source": "Боевые корабли конвоя вернулись в провинцию {0}",
+   "target": "",
+   "state": 0
+  },
+  "306226": {
+   "key": "ID_AGITATION_CAMPAIGN_ACTIVATION_NEWS",
+   "source": "Агитационная кампания сподвигла рабочих трудиться еще усерднее! В течение следующих {[PARAM1]} ходов вы будете получать {[PARAM0]}% к доходу.",
+   "target": "",
+   "state": 0
+  },
+  "306249": {
+   "key": "ID_TRIPLE_OFFER_GET_EVERYTHING",
+   "source": "Получи все сразу!",
+   "target": "",
+   "state": 0
+  },
+  "306247": {
+   "key": "ID_DIVISION_EXP_BATTLE_LOSE",
+   "source": "Поражение",
+   "target": "",
+   "state": 0
+  },
+  "306243": {
+   "key": "ID_DIVISION_EXP_DESC_BATTLES_ALIVE",
+   "source": "Cражений пережито: {[PARAM0]}",
+   "target": "",
+   "state": 0
+  },
+  "306342": {
+   "key": "ID_TROOPS_DIVISION_EXP_WIDGET_STEP_1",
+   "source": "Посмотрите боевой путь дивизии",
+   "target": "",
+   "state": 0
+  },
+  "306232": {
+   "key": "ID_ADDITIONAL_REINFORCEMENTS_SLOTS_AVAILABLE_AT_USER_LEVEL",
+   "source": "Достигните уровень {[PARAM0]}, чтобы получить доступ к дополнительным подкреплениям.",
+   "target": "",
+   "state": 0
+  },
+  "306225": {
+   "key": "ID_AGITATION_CAMPAIGN_PURCHASE_QUESTION",
+   "source": "Время действия агитационной кампании закончилось. Хотите включить ее до конца миссии и получать {[PARAM0]}% к доходу за {[PARAM1]}?",
+   "target": "",
+   "state": 0
+  },
+  "306312": {
+   "key": "ID_RANK_STATUS_NOTIFICATION_NEUTRAL",
+   "source": "нейтральных",
+   "target": "",
+   "state": 0
+  },
+  "306330": {
+   "key": "ID_CARAVAN_PROTECT_OFFER_QUESTION",
+   "source": "Хотите выдать торговым судам охрану? Суда без охраны могут подвергнуться нападению!",
+   "target": "",
+   "state": 0
+  },
+  "306343": {
+   "key": "ID_MINES_STEP_1",
+   "source": "Вам стал доступен новый вид вооружения - мины!",
+   "target": "",
+   "state": 0
+  },
+  "306227": {
+   "key": "ID_SCIENTIFIC_BREAKTHROUGH_OFFER_QUESTION",
+   "source": "Запрошено дополнительное финансирование. Ученые запрашивают {[PARAM0]}, чтобы досрочно завершить все запущенные исследования. Выделить?\n\nАктивных исследований: {[PARAM1]}\nБудет сэкономлено ходов: {[PARAM2]}",
+   "target": "",
+   "state": 0
+  },
+  "306266": {
+   "key": "ID_ENEMY_SHIP_LANDING_ARRIVED_DESC_NEW",
+   "source": "Морские десантники страны {0} высадились в провинции {1}.\n\n{2}",
+   "target": "",
+   "state": 0
+  },
+  "306314": {
+   "key": "ID_DIVISION_EXP_LVL_UP_DESC",
+   "source": "Поздравляем! Дивизия {0} прожила достаточно долго и перешла на новый уровень: {1}! Дивизия служит стране уже {3} ходов, количество боев дивизии: {2} . Дивизия находится в провинции {4}.",
+   "target": "",
+   "state": 0
+  },
+  "306347": {
+   "key": "ID_MINES_STEP_5",
+   "source": "Вы можете установить больше 12 минных полей в провинции. Чем больше мин в провинции - тем больше урона они нанесут!",
+   "target": "",
+   "state": 0
+  },
+  "306344": {
+   "key": "ID_MINES_STEP_2",
+   "source": "Мины покупаются как любое другое подкрепление в игре, сделайте это сейчас.",
+   "target": "",
+   "state": 0
+  },
+  "306320": {
+   "key": "ID_TRADE_NAME_3",
+   "source": "Исландия",
+   "target": "",
+   "state": 0
+  },
+  "306345": {
+   "key": "ID_MINES_STEP_3",
+   "source": "Мины наносят урон наземным войскам и десанту, которые атакуют эту провинцию. Все минные поля в провинции после этого считаются уничтоженными.",
+   "target": "",
+   "state": 0
+  },
+  "306233": {
+   "key": "ID_DIPLOMACY_AVAILABLE_AT_USER_LEVEL",
+   "source": "Достигните уровень {[PARAM0]}, чтобы получить доступ к дипломатическим действиям.",
+   "target": "",
+   "state": 0
+  },
+  "306346": {
+   "key": "ID_MINES_STEP_4",
+   "source": "Эта иконка показывает, что в провинции установлены мины.",
+   "target": "",
+   "state": 0
+  },
+  "306325": {
+   "key": "ID_NOT_ENOUGH_DIPLOMACY_POINTS_FOR_CREATE_TRADE_RELATIONS",
+   "source": "Для заключения торгового соглашения, накопите больше дипломатических очков. Послы скоро вернутся (через ходов: {[PARAM0]}).",
+   "target": "",
+   "state": 0
+  },
+  "306294": {
+   "key": "ID_USER_SURVIVORS",
+   "source": "Выжившие: {0}",
+   "target": "",
+   "state": 0
+  },
+  "306270": {
+   "key": "ID_PROVINCE_LOST_EVENT_DESC_NEW",
+   "source": "Наша провинция {0} была захвачена войсками страны {1}\n\n{2}",
+   "target": "",
+   "state": 0
+  },
+  "306261": {
+   "key": "ID_USER_IMPORTANT_VICTORY_DESC_NEW",
+   "source": "Наши победоносные войска одержали грандиозную победу в провинции {0} над армией страны {1}\n\n{2}",
+   "target": "",
+   "state": 0
+  },
+  "306332": {
+   "key": "ID_CARAVAN_LAUNCH_OFFER_HEADER",
+   "source": "<line-height=100%><size=120%><color=#A00F00>О</size></color>тправьте Конвой",
+   "target": "",
+   "state": 0
+  },
+  "306268": {
+   "key": "ID_ENEMY_BLOW_CASUALITIES_DESC_NEW",
+   "source": "Страна {1} обстреляла провинцию {0}\n\n{2}\n{3}\n\nПолучено урона: {4}",
+   "target": "",
+   "state": 0
+  },
+  "306286": {
+   "key": "ID_ENEMY_AIR_BLOW_CASUALITIES_NAME",
+   "source": "Последствия налета",
+   "target": "",
+   "state": 0
+  },
+  "306310": {
+   "key": "ID_RANK_STATUS_NOTIFICATION_ALLIES",
+   "source": "союзных",
+   "target": "",
+   "state": 0
+  },
+  "306321": {
+   "key": "ID_TRADE_NAME_4",
+   "source": "Иран",
+   "target": "",
+   "state": 0
+  },
+  "306290": {
+   "key": "ID_NOT_RETREAT_ABILITY_USED",
+   "source": "Сработала пассивная способность \"войска не отступают\"",
+   "target": "",
+   "state": 0
+  },
+  "306267": {
+   "key": "ID_USER_BLOW_CASUALITIES_DESC_NEW",
+   "source": "Результаты обстрела вражеской провинции {0}\n\n{1}{2}\n\nНанесено урона: {3}",
+   "target": "",
+   "state": 0
+  },
+  "306302": {
+   "key": "ID_AI_PLAYER_RANK_STATUS_NOTIFICATION_DESC",
+   "source": "Статус {0} cтран {1} изменился: {2} до {3}!",
+   "target": "",
+   "state": 0
+  },
+  "306292": {
+   "key": "ID_NOT_RETREAT_ABILITY_CASTLE_USED",
+   "source": "Защитники укреплений не отступают!",
+   "target": "",
+   "state": 0
+  },
+  "306338": {
+   "key": "DIVISION_NAME_17",
+   "source": "Мины",
+   "target": "",
+   "state": 0
+  },
+  "306284": {
+   "key": "ID_USER_CAPTURED_ARMED_PROVINCE_NAME",
+   "source": "Успешный штурм укреплений",
+   "target": "",
+   "state": 0
+  },
+  "306278": {
+   "key": "ID_USER_WIN_NAVY_BATTLE_CASUALITIES_DESC",
+   "source": "Результаты победного морского боя в провинции {0}\n\n{1}{2}\n{3}{4}\n{5}\nПолучено урона нашими войсками: {6}{7}\n\nНанесено урона по вражеским войскам: {8}{9}",
+   "target": "",
+   "state": 0
+  },
+  "306308": {
+   "key": "ID_RANK_STATUS_NOTIFICATION_HEGEMON_LOST",
+   "source": "потерян",
+   "target": "",
+   "state": 0
+  },
+  "306324": {
+   "key": "ID_CREATE_TRADE_RELATIONS_HEADER",
+   "source": "Торговое соглашение",
+   "target": "",
+   "state": 0
+  },
+  "306255": {
+   "key": "ID_CARAVAN_ON_PATH_TO_HOME_ROBBERY_FAILED_DESC",
+   "source": "Шел {0} ход возвращения конвоя из страны {1}. Сообщают, что конвой подвергся нападению и успешно его отразил. {2}",
+   "target": "",
+   "state": 0
+  },
+  "306326": {
+   "key": "ID_AGAIN_NOT_ENOUGH_DIPLOMACY_POINTS_FOR_CREATE_TRADE_RELATIONS",
+   "source": "Вы не смогли накопить достаточное количество дипломатических очков для заключения торгового соглашения.",
+   "target": "",
+   "state": 0
+  },
+  "306244": {
+   "key": "ID_DIVISION_EXP_PATH_HEADER",
+   "source": "Боевой путь",
+   "target": "",
+   "state": 0
+  },
+  "306259": {
+   "key": "ID_USER_WIN_BATTLE_CASUALITIES_DESC_NEW",
+   "source": "Результаты победного боя в провинции {0}\n\n{1}\n{2}",
+   "target": "",
+   "state": 0
+  },
+  "306256": {
+   "key": "ID_CARAVAN_ON_PATH_TO_HOME_ROBBERY_SUCCESS_DESC",
+   "source": "Шел {0} ход возвращения конвоя из страны {1}. Сообщают, что конвой подвергся нападению и лишился части товаров в размере {2}%. {3}",
+   "target": "",
+   "state": 0
+  },
+  "306291": {
+   "key": "ID_NOT_RETREAT_NAVY_ABILITY_USED",
+   "source": "Сработала пассивная способность \"флот не отступает\"",
+   "target": "",
+   "state": 0
+  },
+  "306313": {
+   "key": "ID_DIVISION_EXP_LVL_UP_NAME",
+   "source": "Новый уровень войск!",
+   "target": "",
+   "state": 0
+  },
+  "306322": {
+   "key": "ID_TRADE_NAME_5",
+   "source": "Аргентина",
+   "target": "",
+   "state": 0
+  },
+  "306334": {
+   "key": "ID_CARAVAN_LAUNCH_OFFER_OPTION_DECLAIN",
+   "source": "Не отправлять",
+   "target": "",
+   "state": 0
+  },
+  "306339": {
+   "key": "ID_MINEFIELD_DESCRIPTION",
+   "source": "Мины - устанавливайте в подконтрольных провинциях, чтобы нанести урон наступающей наземной технике и пехоте противника.",
+   "target": "",
+   "state": 0
+  },
+  "306264": {
+   "key": "ID_USER_SHIP_LANDING_ARRIVED_DESC_NEW",
+   "source": "Морские десантники успешно высадились в провинции {0}!\n\n{1}",
+   "target": "",
+   "state": 0
+  },
+  "306316": {
+   "key": "ID_DIVISION_WITH_EXP_LVL_DIED_DESC",
+   "source": "Трагическая новость: в боях погибла дивизия {0} уровня {1}. Количество боев дивизии: {2}.",
+   "target": "",
+   "state": 0
+  },
+  "306280": {
+   "key": "ID_USER_WIN_NAVY_BATTLE_CASUALITIES_NAME",
+   "source": "Победа в море",
+   "target": "",
+   "state": 0
+  },
+  "306237": {
+   "key": "ID_DIVISION_EXP_LEVEL_1",
+   "source": "Бывалые",
+   "target": "",
+   "state": 0
+  },
+  "306263": {
+   "key": "ID_USER_SHIP_LANDING_KILLED_DESC_ NEW",
+   "source": "Морские десантники, отправленные в провинцию {0}, были уничтожены.\n\n{1}",
+   "target": "",
+   "state": 0
+  },
+  "306289": {
+   "key": "ID_DETAILED_BATTLE_LOG",
+   "source": "{0}{1}\n{2}{3}\n{4}\nПолучено урона по небронированным: {5}\nПолучено урона по бронированным: {6}{7}\n\nНанесено урона по небронированным: {8}\nНанесено урона по бронированным: {9}{10}",
+   "target": "",
+   "state": 0
+  },
+  "306260": {
+   "key": "ID_USER_LOSE_BATTLE_CASUALITIES_DESC_NEW",
+   "source": "Результаты проигранного боя в провинции {0}\n\n{1}\n{2}",
+   "target": "",
+   "state": 0
+  },
+  "306245": {
+   "key": "ID_DIVISION_EXP_BATTLE_DESC",
+   "source": "Битва в провинции {0}",
+   "target": "",
+   "state": 0
+  },
+  "306257": {
+   "key": "ID_CARAVAN_DIVISION_LOST_DESC",
+   "source": "Потери конвоя составили: {0}",
+   "target": "",
+   "state": 0
+  },
+  "306303": {
+   "key": "ID_AI_PLAYER_HEGEMON_STATUS_NOTIFICATION_DESC",
+   "source": "Статус страны {0} изменился: {1} статус {2}!",
+   "target": "",
+   "state": 0
+  },
+  "306297": {
+   "key": "ID_ENEMY_CASUALTIES",
+   "source": "Потери страны {0}: {1}",
+   "target": "",
+   "state": 0
+  },
+  "306248": {
+   "key": "ID_MINEFIELD_ATTACK",
+   "source": "Урон",
+   "target": "",
+   "state": 0
+  },
+  "306241": {
+   "key": "ID_DIVISION_EXP_MODIFY_DESC",
+   "source": "Бонус к атаке и защите: <color=#ff9a06>{[PARAM0]}%</color>",
+   "target": "",
+   "state": 0
+  },
+  "306307": {
+   "key": "ID_RANK_STATUS_NOTIFICATION_RANK_DOWN_MULTI",
+   "source": "понижен",
+   "target": "",
+   "state": 0
+  },
+  "306234": {
+   "key": "ID_MINEFIELD_NOTIFICATION_DESCRIPTION",
+   "source": "Войска противника подорвались на минных полях в провинции {[PARAM0]}. Уничтожено вражеских дивизий: {[PARAM1]}.\n",
+   "target": "",
+   "state": 0
+  },
+  "306274": {
+   "key": "ID_USER_CAPTURED_ARMED_PROVINCE_DESC\n",
+   "source": "Результаты удачного штурма укреплений в провинции {0}\n\n{1}",
+   "target": "",
+   "state": 0
+  },
+  "306311": {
+   "key": "ID_RANK_STATUS_NOTIFICATION_ENEMY",
+   "source": "вражеских",
+   "target": "",
+   "state": 0
+  },
+  "306282": {
+   "key": "ID_USER_FAILED_CAPTURED_ARMED_PROVINCE_NAME\n",
+   "source": "Провальный штурм укреплений",
+   "target": "",
+   "state": 0
+  },
+  "306300": {
+   "key": "ID_RANK_STATUS_NOTIFICATION_HEADER",
+   "source": "Смена статуса!",
+   "target": "",
+   "state": 0
+  },
+  "306240": {
+   "key": "ID_DIVISION_EXP_DESC",
+   "source": "Чем больше у войск опыта - тем лучше они сражаются. Очки опыта накапливается за каждый пережитый ход и за каждое пережитое сражение.\n",
+   "target": "",
+   "state": 0
+  },
+  "306285": {
+   "key": "ID_USER_LOST_ARMED_PROVINCE_NAME",
+   "source": "Провальная оборона укреплений",
+   "target": "",
+   "state": 0
+  },
+  "306309": {
+   "key": "ID_RANK_STATUS_NOTIFICATION_HEGEMON_PURCHASE",
+   "source": "получен",
+   "target": "",
+   "state": 0
+  },
+  "306329": {
+   "key": "ID_CARAVAN_LAUNCH_OFFER_QUESTION",
+   "source": "Хотите отправить конвой в страну {[PARAM0]}? Предполагаемая длительность = {[PARAM1]} ходов, предполагаемая выгода = {[PARAM2]} ресурсов.",
+   "target": "",
+   "state": 0
+  },
+  "306236": {
+   "key": "ID_DIVISION_EXP_LEVEL_0",
+   "source": "Новобранцы",
+   "target": "",
+   "state": 0
+  },
+  "306229": {
+   "key": "ID_FIRST_MISSION_CLUE_MAIN_DESCRIPTION",
+   "source": "Атакуйте вражескую артиллерию и авиацию. Они не могут отступать, и будут мгновенно уничтожены.",
+   "target": "",
+   "state": 0
+  },
+  "306318": {
+   "key": "ID_TRADE_NAME_1",
+   "source": "Либерия",
+   "target": "",
+   "state": 0
+  },
+  "306328": {
+   "key": "ID_DECLAIN_TRADE_RELATIONS",
+   "source": "Отказаться",
+   "target": "",
+   "state": 0
+  },
+  "306250": {
+   "key": "ID_CARAVAN_PATH_NOTIFICATION_NAME",
+   "source": "Новости о конвоях",
+   "target": "",
+   "state": 0
+  },
+  "306230": {
+   "key": "ID_FIRST_MISSION_CLUE_PROVINCE_DESCRIPTION",
+   "source": "Провинция {[PARAM0]} - лучшая цель для атаки.",
+   "target": "",
+   "state": 0
+  },
+  "306254": {
+   "key": "ID_CARAVAN_ON_PATH_TO_HOME_NOTHING_DESC",
+   "source": "Шел {0} ход возвращения конвоя из страны {1}. Пока без происшествий.",
+   "target": "",
+   "state": 0
+  },
+  "306348": {
+   "key": "ID_UNLOCK_REVOLUTION_MODE_PURCHASE_CONFIRMATION",
+   "source": "Хотите открыть модифицированный режим <color=\"white\">{[NAME]}</color> прямо сейчас за {0}?",
+   "target": "",
+   "state": 0
+  },
+  "306301": {
+   "key": "ID_USER_PLAYER_RANK_STATUS_NOTIFICATION_DESC",
+   "source": "Статус вашей страны изменился: {0} до {1}!",
+   "target": "",
+   "state": 0
+  },
+  "306337": {
+   "key": "ID_CARAVAN_TROOPS_SELECTOR_HEADER",
+   "source": "Выберите охрану",
+   "target": "",
+   "state": 0
+  },
+  "306333": {
+   "key": "ID_CARAVAN_LAUNCH_OFFER_OPTION_ACCEPT",
+   "source": "Отправить",
+   "target": "",
+   "state": 0
+  },
+  "306305": {
+   "key": "ID_RANK_STATUS_NOTIFICATION_RANK_DOWN_SINGLE",
+   "source": "понижен",
+   "target": "",
+   "state": 0
+  },
+  "306239": {
+   "key": "ID_DIVISION_EXP_MAX",
+   "source": "МАКС",
+   "target": "",
+   "state": 0
+  },
+  "306323": {
+   "key": "ID_CREATE_TRADE_RELATIONS_QUESTION",
+   "source": "К нам прибыли торговые представители из страны {[PARAM0]}. Они предлагают заключить торговое соглашение. После заключения соглашения мы сможем отправлять торговые конвои в эту страну. Заключить торговое соглашение?",
+   "target": "",
+   "state": 0
+  }
+ },
+ "after": {
+  "306252": {
+   "target": "车队从{0}的航行中返回，带回价值{1}的商品。{2}",
+   "state": 10
+  },
+  "306335": {
+   "target": "派遣车队并加速其返回，缩短{[PARAM0]}回合。",
+   "state": 10
+  },
+  "306336": {
+   "target": "购买车队加速失败",
+   "state": 10
+  },
+  "306258": {
+   "target": "没有可用省份安置返回的车队。补偿 - {0} 单位资源。",
+   "state": 10
+  },
+  "306271": {
+   "target": "敌方空军：{0} 袭击了我方省份 {1}，来自省份：{2}\n\n{3}{4}\n{5}{6}\n\n我方地面部队受到伤害：{7}\n\n对敌方空军造成伤害：{8}",
+   "state": 10
+  },
+  "306317": {
+   "target": "沙特阿拉伯",
+   "state": 10
+  },
+  "306288": {
+   "target": "空战结果",
+   "state": 10
+  },
+  "306299": {
+   "target": "敌方幸存者影响力： {0}",
+   "state": 10
+  },
+  "306272": {
+   "target": "对敌方省份 {0} 的空袭结果\n\n{1}{2}\n{3}{4}\n\n我方空军受到伤害：{5}\n对敌方地面部队造成伤害：{6}",
+   "state": 10
+  },
+  "306242": {
+   "target": "存活回合数：{[PARAM0]}",
+   "state": 10
+  },
+  "306251": {
+   "target": "我们的商队已抵达目的地 - {0}国。价值{1}资源的货物已装载上船。商队启程返航。",
+   "state": 10
+  },
+  "306315": {
+   "target": "精锐部队的损失！",
+   "state": 10
+  },
+  "306306": {
+   "target": "已升级",
+   "state": 10
+  },
+  "306262": {
+   "target": "我军在省份 {0} 被 {1} 国的军队击溃。\n\n{2}",
+   "state": 10
+  },
+  "306340": {
+   "target": "您获得了一支老兵师！这样的师在进攻时造成更多伤害，在防守时受到更少伤害。双击师图标查看详细信息",
+   "state": 10
+  },
+  "306298": {
+   "target": "幸存者影响力： {0}",
+   "state": 10
+  },
+  "306295": {
+   "target": "幸存国家 {0}： {1}",
+   "state": 10
+  },
+  "306279": {
+   "target": "省份 {0} 海战失败结果\n\n{1}{2}\n{3}{4}\n{5}\n我军承受伤害：{6}{7}\n\n敌军承受伤害：{8}{9}",
+   "state": 10
+  },
+  "306228": {
+   "target": "宣传活动",
+   "state": 10
+  },
+  "306238": {
+   "target": "精英",
+   "state": 10
+  },
+  "306277": {
+   "target": "省份 {0} 防御工事防御成功结果\n\n{1}",
+   "state": 10
+  },
+  "306281": {
+   "target": "海战失败",
+   "state": 10
+  },
+  "306287": {
+   "target": "我方发动空袭",
+   "state": 10
+  },
+  "306319": {
+   "target": "委内瑞拉",
+   "state": 10
+  },
+  "306275": {
+   "target": "省份 {0} 防御工事防御失败结果\n\n{1}",
+   "state": 10
+  },
+  "306235": {
+   "target": "敌人掉入陷阱！",
+   "state": 10
+  },
+  "306304": {
+   "target": "已提升",
+   "state": 10
+  },
+  "306265": {
+   "target": "国家{0}派往{1}省的海军陆战队已被歼灭。\n\n{2}",
+   "state": 10
+  },
+  "306269": {
+   "target": "我军已占领省份{0}\n\n{1}",
+   "state": 10
+  },
+  "306327": {
+   "target": "同意",
+   "state": 10
+  },
+  "306246": {
+   "target": "",
+   "state": 0
+  },
+  "306231": {
+   "target": "在本任务结束前花费 {[PARAM0]} 获得额外科学点数？",
+   "state": 10
+  },
+  "306296": {
+   "target": "您的损失： {0}",
+   "state": 10
+  },
+  "306331": {
+   "target": "没有可选的护卫省份！",
+   "state": 10
+  },
+  "306273": {
+   "target": "省份 {0} 上空的空战结果\n\n{1}{2}\n{3}{4}\n\n我军航空部队受到的伤害：{5}\n\n敌军航空部队受到的伤害：{6}",
+   "state": 10
+  },
+  "306283": {
+   "target": "敌军防御工事进攻失败",
+   "state": 10
+  },
+  "306276": {
+   "target": "省份 {0} 防御工事进攻失败结果\n\n{1}",
+   "state": 10
+  },
+  "306341": {
+   "target": "累计经验和升级到下一级所需经验",
+   "state": 10
+  },
+  "306293": {
+   "target": "无幸存者",
+   "state": 10
+  },
+  "306253": {
+   "target": "",
+   "state": 0
+  },
+  "306226": {
+   "target": "宣传活动激励工人更加努力工作！在接下来的{[PARAM1]}回合内，您将获得{[PARAM0]}%的收入加成。",
+   "state": 10
+  },
+  "306249": {
+   "target": "一次全部获取！",
+   "state": 10
+  },
+  "306247": {
+   "target": "失败",
+   "state": 10
+  },
+  "306243": {
+   "target": "存活战斗数：{[PARAM0]}",
+   "state": 10
+  },
+  "306342": {
+   "target": "查看师的战斗历程",
+   "state": 10
+  },
+  "306232": {
+   "target": "达到 {[PARAM0]} 级可解锁额外增援部队。",
+   "state": 10
+  },
+  "306225": {
+   "target": "宣传活动时间已结束。您希望在任务结束前启用它，并获得{[PARAM0]}%的收入加成，持续{[PARAM1]}？",
+   "state": 10
+  },
+  "306312": {
+   "target": "中立",
+   "state": 10
+  },
+  "306330": {
+   "target": "要为商船提供护卫吗？没有护卫的船只可能遭到袭击！",
+   "state": 10
+  },
+  "306343": {
+   "target": "您已解锁新类型武器 - 地雷！",
+   "state": 10
+  },
+  "306227": {
+   "target": "请求额外资金。科学家们请求{[PARAM0]}，以提前完成所有进行中的研究。是否拨款？\n\n进行中研究：{[PARAM1]}\n将节省回合数：{[PARAM2]}",
+   "state": 10
+  },
+  "306266": {
+   "target": "国家{0}的海军陆战队已在{1}省登陆。\n\n{2}",
+   "state": 10
+  },
+  "306314": {
+   "target": "恭喜！师团 {0} 已服役足够长的时间并晋升至新等级：{1}！该师团已为国家服务 {3} 回合，参与战斗次数：{2}。该师团当前位于省份 {4}。",
+   "state": 10
+  },
+  "306347": {
+   "target": "你可以在一个省份布设超过12个雷区。省份中的地雷越多，造成的伤害就越大！",
+   "state": 10
+  },
+  "306344": {
+   "target": "地雷像游戏中其他增援一样购买，现在就行动吧。",
+   "state": 10
+  },
+  "306320": {
+   "target": "冰岛",
+   "state": 10
+  },
+  "306345": {
+   "target": "地雷会对攻击该省份的地面部队和空降部队造成伤害。之后，该省份的所有雷区都将被视为已清除。",
+   "state": 10
+  },
+  "306233": {
+   "target": "达到 {[PARAM0]} 级可解锁外交行动。",
+   "state": 10
+  },
+  "306346": {
+   "target": "此图标表示该省份已布设地雷。",
+   "state": 10
+  },
+  "306325": {
+   "target": "要达成贸易协议，请积累更多外交点数。大使即将返回（回合数：{[PARAM0]}）。",
+   "state": 10
+  },
+  "306294": {
+   "target": "幸存者: {0}",
+   "state": 10
+  },
+  "306270": {
+   "target": "我方省份{0}已被国家{1}的部队占领。\n\n{2}",
+   "state": 10
+  },
+  "306261": {
+   "target": "我军在省份 {0} 对 {1} 国的军队取得了一场辉煌的胜利！\n\n{2}",
+   "state": 10
+  },
+  "306332": {
+   "target": "<line-height=100%><size=120%><color=#A00F00>派</size></color>遣商队",
+   "state": 10
+  },
+  "306268": {
+   "target": "国家{1}炮击了省份{0}\n\n{2}\n{3}\n\n受到伤害：{4}",
+   "state": 10
+  },
+  "306286": {
+   "target": "空袭后果",
+   "state": 10
+  },
+  "306310": {
+   "target": "盟军",
+   "state": 10
+  },
+  "306321": {
+   "target": "伊朗",
+   "state": 10
+  },
+  "306290": {
+   "target": "被动技能\"部队不撤退\"已触发",
+   "state": 10
+  },
+  "306267": {
+   "target": "对敌方省份{0}的炮击结果\n\n{1}{2}\n\n造成伤害：{3}",
+   "state": 10
+  },
+  "306302": {
+   "target": "{0} 的 {1} 个国家状态已变更：从 {2} 到 {3}！",
+   "state": 10
+  },
+  "306292": {
+   "target": "防御工事守军不撤退！",
+   "state": 10
+  },
+  "306338": {
+   "target": "地雷",
+   "state": 10
+  },
+  "306284": {
+   "target": "防御工事进攻成功",
+   "state": 10
+  },
+  "306278": {
+   "target": "省份 {0} 海战胜利结果\n\n{1}{2}\n{3}{4}\n{5}\n我军承受伤害：{6}{7}\n\n敌军承受伤害：{8}{9}",
+   "state": 10
+  },
+  "306308": {
+   "target": "已失去",
+   "state": 10
+  },
+  "306324": {
+   "target": "贸易协定",
+   "state": 10
+  },
+  "306255": {
+   "target": "正在执行{0}返回{1}国商队的行动。据报道，商队遭到袭击并成功击退了袭击。{2}",
+   "state": 10
+  },
+  "306326": {
+   "target": "您未能积累足够的外交点数来达成贸易协议。",
+   "state": 10
+  },
+  "306244": {
+   "target": "战斗历程",
+   "state": 10
+  },
+  "306259": {
+   "target": "省份 {0} 胜利战斗结果\n\n{1}\n{2}",
+   "state": 10
+  },
+  "306256": {
+   "target": "这是{0}回合，车队正从{1}返回。据报道，车队遭到袭击，损失了{2}%的货物。{3}",
+   "state": 10
+  },
+  "306291": {
+   "target": "被动技能\"舰队不撤退\"已触发",
+   "state": 10
+  },
+  "306313": {
+   "target": "部队新等级！",
+   "state": 10
+  },
+  "306322": {
+   "target": "阿根廷",
+   "state": 10
+  },
+  "306334": {
+   "target": "不派遣",
+   "state": 10
+  },
+  "306339": {
+   "target": "地雷 - 部署在控制的省份中，对进攻的敌方地面部队和步兵造成伤害。",
+   "state": 10
+  },
+  "306264": {
+   "target": "海军陆战队已在省份 {0} 成功登陆！\n\n{1}",
+   "state": 10
+  },
+  "306316": {
+   "target": "噩耗：一支 {0} 级 {1} 师在战斗中全军覆没。该师累计参战次数：{2}。",
+   "state": 10
+  },
+  "306280": {
+   "target": "海战胜利",
+   "state": 10
+  },
+  "306237": {
+   "target": "老兵",
+   "state": 10
+  },
+  "306263": {
+   "target": "派往省份 {0} 的海军陆战队已被歼灭。\n\n{1}",
+   "state": 10
+  },
+  "306289": {
+   "target": "{0}{1}\n{2}{3}\n{4}\n非装甲单位承受伤害: {5}\n装甲单位承受伤害: {6}{7}\n\n非装甲单位造成伤害: {8}\n装甲单位造成伤害: {9}{10}",
+   "state": 10
+  },
+  "306260": {
+   "target": "在省份 {0} 战败的结果\n\n{1}\n{2}",
+   "state": 10
+  },
+  "306245": {
+   "target": "",
+   "state": 0
+  },
+  "306257": {
+   "target": "护航队损失为：{0}",
+   "state": 10
+  },
+  "306303": {
+   "target": "国家 {0} 的状态已变更：从 {1} 状态变为 {2} 状态！",
+   "state": 10
+  },
+  "306297": {
+   "target": "国家 {0} 的损失： {1}",
+   "state": 10
+  },
+  "306248": {
+   "target": "伤害",
+   "state": 10
+  },
+  "306241": {
+   "target": "攻击和防御加成：<color=#ff9a06>{[PARAM0]}%</color>",
+   "state": 10
+  },
+  "306307": {
+   "target": "已降级",
+   "state": 10
+  },
+  "306234": {
+   "target": "敌军部队在 {[PARAM0]} 省份触发地雷。摧毁敌军师团：{[PARAM1]}。\n",
+   "state": 10
+  },
+  "306274": {
+   "target": "省份 {0} 成功突袭防御工事的结果\n\n{1}",
+   "state": 10
+  },
+  "306311": {
+   "target": "敌军",
+   "state": 10
+  },
+  "306282": {
+   "target": "防御工事进攻失败",
+   "state": 10
+  },
+  "306300": {
+   "target": "状态变更！",
+   "state": 10
+  },
+  "306240": {
+   "target": "部队经验越多，战斗力越强。每存活一个回合和每经历一场战斗都会积累经验值。\n",
+   "state": 10
+  },
+  "306285": {
+   "target": "防御工事惨败",
+   "state": 10
+  },
+  "306309": {
+   "target": "已获得",
+   "state": 10
+  },
+  "306329": {
+   "target": "要向{[PARAM0]}国家派遣商队吗？预计持续时间={[PARAM1]}回合，预计收益={[PARAM2]}资源。",
+   "state": 10
+  },
+  "306236": {
+   "target": "新兵",
+   "state": 10
+  },
+  "306229": {
+   "target": "攻击敌方炮兵和空军。它们无法撤退，并将被立即摧毁。",
+   "state": 10
+  },
+  "306318": {
+   "target": "利比里亚",
+   "state": 10
+  },
+  "306328": {
+   "target": "拒绝",
+   "state": 10
+  },
+  "306250": {
+   "target": "商队新闻",
+   "state": 10
+  },
+  "306230": {
+   "target": "省份 {[PARAM0]} 是最佳的攻击目标。",
+   "state": 10
+  },
+  "306254": {
+   "target": "",
+   "state": 0
+  },
+  "306348": {
+   "target": "",
+   "state": 0
+  },
+  "306301": {
+   "target": "您的国家状态已变更：从 {0} 到 {1}！",
+   "state": 10
+  },
+  "306337": {
+   "target": "选择护卫部队",
+   "state": 10
+  },
+  "306333": {
+   "target": "派遣",
+   "state": 10
+  },
+  "306305": {
+   "target": "已降级",
+   "state": 10
+  },
+  "306239": {
+   "target": "最大",
+   "state": 10
+  },
+  "306323": {
+   "target": "来自 {[PARAM0]} 的贸易代表已抵达我国。他们提议签订贸易协定。协定签署后，我们将可以向该国派遣贸易船队。是否签订贸易协定？",
+   "state": 10
+  }
+ },
+ "changes": [
+  {
+   "unit": 306225,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802392+00:00"
+  },
+  {
+   "unit": 306226,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802406+00:00"
+  },
+  {
+   "unit": 306227,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802408+00:00"
+  },
+  {
+   "unit": 306228,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802410+00:00"
+  },
+  {
+   "unit": 306229,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802412+00:00"
+  },
+  {
+   "unit": 306230,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802413+00:00"
+  },
+  {
+   "unit": 306231,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802415+00:00"
+  },
+  {
+   "unit": 306232,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802417+00:00"
+  },
+  {
+   "unit": 306233,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802419+00:00"
+  },
+  {
+   "unit": 306234,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802420+00:00"
+  },
+  {
+   "unit": 306235,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802422+00:00"
+  },
+  {
+   "unit": 306236,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802423+00:00"
+  },
+  {
+   "unit": 306237,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802424+00:00"
+  },
+  {
+   "unit": 306238,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802426+00:00"
+  },
+  {
+   "unit": 306239,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802427+00:00"
+  },
+  {
+   "unit": 306240,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802429+00:00"
+  },
+  {
+   "unit": 306241,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802430+00:00"
+  },
+  {
+   "unit": 306242,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802432+00:00"
+  },
+  {
+   "unit": 306243,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802434+00:00"
+  },
+  {
+   "unit": 306244,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802436+00:00"
+  },
+  {
+   "unit": 306245,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802437+00:00"
+  },
+  {
+   "unit": 306246,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802439+00:00"
+  },
+  {
+   "unit": 306247,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802440+00:00"
+  },
+  {
+   "unit": 306248,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802441+00:00"
+  },
+  {
+   "unit": 306249,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802443+00:00"
+  },
+  {
+   "unit": 306250,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802444+00:00"
+  },
+  {
+   "unit": 306251,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802445+00:00"
+  },
+  {
+   "unit": 306252,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802447+00:00"
+  },
+  {
+   "unit": 306253,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802448+00:00"
+  },
+  {
+   "unit": 306254,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802450+00:00"
+  },
+  {
+   "unit": 306255,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802451+00:00"
+  },
+  {
+   "unit": 306256,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802452+00:00"
+  },
+  {
+   "unit": 306257,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802453+00:00"
+  },
+  {
+   "unit": 306258,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802455+00:00"
+  },
+  {
+   "unit": 306259,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802456+00:00"
+  },
+  {
+   "unit": 306260,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802458+00:00"
+  },
+  {
+   "unit": 306261,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802459+00:00"
+  },
+  {
+   "unit": 306262,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802460+00:00"
+  },
+  {
+   "unit": 306263,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802462+00:00"
+  },
+  {
+   "unit": 306264,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802463+00:00"
+  },
+  {
+   "unit": 306265,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802464+00:00"
+  },
+  {
+   "unit": 306266,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802466+00:00"
+  },
+  {
+   "unit": 306267,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802467+00:00"
+  },
+  {
+   "unit": 306268,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802469+00:00"
+  },
+  {
+   "unit": 306269,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802470+00:00"
+  },
+  {
+   "unit": 306270,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802471+00:00"
+  },
+  {
+   "unit": 306271,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802472+00:00"
+  },
+  {
+   "unit": 306272,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802474+00:00"
+  },
+  {
+   "unit": 306273,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802475+00:00"
+  },
+  {
+   "unit": 306274,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802479+00:00"
+  },
+  {
+   "unit": 306275,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802480+00:00"
+  },
+  {
+   "unit": 306276,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802482+00:00"
+  },
+  {
+   "unit": 306277,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802483+00:00"
+  },
+  {
+   "unit": 306278,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802484+00:00"
+  },
+  {
+   "unit": 306279,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802486+00:00"
+  },
+  {
+   "unit": 306280,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802487+00:00"
+  },
+  {
+   "unit": 306281,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802489+00:00"
+  },
+  {
+   "unit": 306282,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802490+00:00"
+  },
+  {
+   "unit": 306283,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802491+00:00"
+  },
+  {
+   "unit": 306284,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802493+00:00"
+  },
+  {
+   "unit": 306285,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802494+00:00"
+  },
+  {
+   "unit": 306286,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802495+00:00"
+  },
+  {
+   "unit": 306287,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802496+00:00"
+  },
+  {
+   "unit": 306288,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802498+00:00"
+  },
+  {
+   "unit": 306289,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802499+00:00"
+  },
+  {
+   "unit": 306290,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802500+00:00"
+  },
+  {
+   "unit": 306291,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802502+00:00"
+  },
+  {
+   "unit": 306292,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802503+00:00"
+  },
+  {
+   "unit": 306293,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802504+00:00"
+  },
+  {
+   "unit": 306294,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802506+00:00"
+  },
+  {
+   "unit": 306295,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802507+00:00"
+  },
+  {
+   "unit": 306296,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802508+00:00"
+  },
+  {
+   "unit": 306297,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802510+00:00"
+  },
+  {
+   "unit": 306298,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802511+00:00"
+  },
+  {
+   "unit": 306299,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802512+00:00"
+  },
+  {
+   "unit": 306300,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802514+00:00"
+  },
+  {
+   "unit": 306301,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802515+00:00"
+  },
+  {
+   "unit": 306302,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802517+00:00"
+  },
+  {
+   "unit": 306303,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802518+00:00"
+  },
+  {
+   "unit": 306304,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802519+00:00"
+  },
+  {
+   "unit": 306305,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802521+00:00"
+  },
+  {
+   "unit": 306306,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802522+00:00"
+  },
+  {
+   "unit": 306307,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802523+00:00"
+  },
+  {
+   "unit": 306308,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802525+00:00"
+  },
+  {
+   "unit": 306309,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802526+00:00"
+  },
+  {
+   "unit": 306310,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802527+00:00"
+  },
+  {
+   "unit": 306311,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802528+00:00"
+  },
+  {
+   "unit": 306312,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802530+00:00"
+  },
+  {
+   "unit": 306313,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802532+00:00"
+  },
+  {
+   "unit": 306314,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802533+00:00"
+  },
+  {
+   "unit": 306315,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802534+00:00"
+  },
+  {
+   "unit": 306316,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802536+00:00"
+  },
+  {
+   "unit": 306317,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802537+00:00"
+  },
+  {
+   "unit": 306318,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802539+00:00"
+  },
+  {
+   "unit": 306319,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802540+00:00"
+  },
+  {
+   "unit": 306320,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802541+00:00"
+  },
+  {
+   "unit": 306321,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802542+00:00"
+  },
+  {
+   "unit": 306322,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802544+00:00"
+  },
+  {
+   "unit": 306323,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802545+00:00"
+  },
+  {
+   "unit": 306324,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802546+00:00"
+  },
+  {
+   "unit": 306325,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802548+00:00"
+  },
+  {
+   "unit": 306326,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802549+00:00"
+  },
+  {
+   "unit": 306327,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802550+00:00"
+  },
+  {
+   "unit": 306328,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802552+00:00"
+  },
+  {
+   "unit": 306329,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802553+00:00"
+  },
+  {
+   "unit": 306330,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802554+00:00"
+  },
+  {
+   "unit": 306331,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802556+00:00"
+  },
+  {
+   "unit": 306332,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802557+00:00"
+  },
+  {
+   "unit": 306333,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802559+00:00"
+  },
+  {
+   "unit": 306334,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802560+00:00"
+  },
+  {
+   "unit": 306335,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802562+00:00"
+  },
+  {
+   "unit": 306336,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802563+00:00"
+  },
+  {
+   "unit": 306337,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802564+00:00"
+  },
+  {
+   "unit": 306338,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802566+00:00"
+  },
+  {
+   "unit": 306339,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802567+00:00"
+  },
+  {
+   "unit": 306340,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802568+00:00"
+  },
+  {
+   "unit": 306341,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802569+00:00"
+  },
+  {
+   "unit": 306342,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802571+00:00"
+  },
+  {
+   "unit": 306343,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802572+00:00"
+  },
+  {
+   "unit": 306344,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802573+00:00"
+  },
+  {
+   "unit": 306345,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802575+00:00"
+  },
+  {
+   "unit": 306346,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802576+00:00"
+  },
+  {
+   "unit": 306347,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802577+00:00"
+  },
+  {
+   "unit": 306348,
+   "action": 71,
+   "action_name": "String added in the repository",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802579+00:00"
+  },
+  {
+   "unit": null,
+   "action": 0,
+   "action_name": "Resource updated",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T10:59:43.802580+00:00"
+  },
+  {
+   "unit": 306235,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "敌人掉入陷阱！",
+   "at": "2026-08-25T11:04:09.072347+00:00"
+  },
+  {
+   "unit": 306236,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "新兵",
+   "at": "2026-08-25T11:04:09.072361+00:00"
+  },
+  {
+   "unit": 306237,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "老兵",
+   "at": "2026-08-25T11:04:09.072364+00:00"
+  },
+  {
+   "unit": 306238,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "精英",
+   "at": "2026-08-25T11:04:09.072365+00:00"
+  },
+  {
+   "unit": 306239,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "最大",
+   "at": "2026-08-25T11:04:09.072367+00:00"
+  },
+  {
+   "unit": 306240,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "部队经验越多，战斗力越强。每存活一个回合和每经历一场战斗都会积累经验值。\n",
+   "at": "2026-08-25T11:04:09.072369+00:00"
+  },
+  {
+   "unit": 306241,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "攻击和防御加成：<color=#ff9a06>{[PARAM0]}%</color>",
+   "at": "2026-08-25T11:04:09.072371+00:00"
+  },
+  {
+   "unit": 306242,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "存活回合数：{[PARAM0]}",
+   "at": "2026-08-25T11:04:09.072373+00:00"
+  },
+  {
+   "unit": 306243,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "存活战斗数：{[PARAM0]}",
+   "at": "2026-08-25T11:04:09.072375+00:00"
+  },
+  {
+   "unit": 306244,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "战斗历程",
+   "at": "2026-08-25T11:04:09.072376+00:00"
+  },
+  {
+   "unit": 306225,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "宣传活动时间已结束。您希望在任务结束前启用它，并获得{[PARAM0]}%的收入加成，持续{[PARAM1]}？",
+   "at": "2026-08-25T11:04:59.795383+00:00"
+  },
+  {
+   "unit": 306226,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "宣传活动激励工人更加努力工作！在接下来的{[PARAM1]}回合内，您将获得{[PARAM0]}%的收入加成。",
+   "at": "2026-08-25T11:04:59.795393+00:00"
+  },
+  {
+   "unit": 306227,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "请求额外资金。科学家们请求{[PARAM0]}，以提前完成所有进行中的研究。是否拨款？\n\n进行中研究：{[PARAM1]}\n将节省回合数：{[PARAM2]}",
+   "at": "2026-08-25T11:04:59.795395+00:00"
+  },
+  {
+   "unit": 306228,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "宣传活动",
+   "at": "2026-08-25T11:04:59.795397+00:00"
+  },
+  {
+   "unit": 306229,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "攻击敌方炮兵和空军。它们无法撤退，并将被立即摧毁。",
+   "at": "2026-08-25T11:04:59.795398+00:00"
+  },
+  {
+   "unit": 306230,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "省份 {[PARAM0]} 是最佳的攻击目标。",
+   "at": "2026-08-25T11:04:59.795400+00:00"
+  },
+  {
+   "unit": 306231,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "在本任务结束前花费 {[PARAM0]} 获得额外科学点数？",
+   "at": "2026-08-25T11:04:59.795402+00:00"
+  },
+  {
+   "unit": 306232,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "达到 {[PARAM0]} 级可解锁额外增援部队。",
+   "at": "2026-08-25T11:04:59.795403+00:00"
+  },
+  {
+   "unit": 306233,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "达到 {[PARAM0]} 级可解锁外交行动。",
+   "at": "2026-08-25T11:04:59.795405+00:00"
+  },
+  {
+   "unit": 306234,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "敌军部队在 {[PARAM0]} 省份触发地雷。摧毁敌军师团：{[PARAM1]}。\n",
+   "at": "2026-08-25T11:04:59.795407+00:00"
+  },
+  {
+   "unit": 306247,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "失败",
+   "at": "2026-08-25T11:06:03.047543+00:00"
+  },
+  {
+   "unit": 306248,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "伤害",
+   "at": "2026-08-25T11:06:03.047561+00:00"
+  },
+  {
+   "unit": 306249,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "一次全部获取！",
+   "at": "2026-08-25T11:06:03.047564+00:00"
+  },
+  {
+   "unit": 306250,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "商队新闻",
+   "at": "2026-08-25T11:06:03.047566+00:00"
+  },
+  {
+   "unit": 306251,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "我们的商队已抵达目的地 - {0}国。价值{1}资源的货物已装载上船。商队启程返航。",
+   "at": "2026-08-25T11:06:03.047568+00:00"
+  },
+  {
+   "unit": 306252,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "商队从{0}国航行归来，带回总价值{1}的商品。{2}",
+   "at": "2026-08-25T11:06:03.047570+00:00"
+  },
+  {
+   "unit": 306255,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "正在执行{0}返回{1}国商队的行动。据报道，商队遭到袭击并成功击退了袭击。{2}",
+   "at": "2026-08-25T11:07:24.573879+00:00"
+  },
+  {
+   "unit": 306256,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "这是{0}回合，车队正从{1}返回。据报道，车队遭到袭击，损失了{2}%的货物。{3}",
+   "at": "2026-08-25T11:07:24.574305+00:00"
+  },
+  {
+   "unit": 306257,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "护航队损失为：{0}",
+   "at": "2026-08-25T11:07:24.574311+00:00"
+  },
+  {
+   "unit": 306258,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "没有可用省份安置返回的商队。补偿 - {0} 资源。",
+   "at": "2026-08-25T11:07:24.574313+00:00"
+  },
+  {
+   "unit": 306259,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "省份 {0} 胜利战斗结果\n\n{1}\n{2}",
+   "at": "2026-08-25T11:07:24.574315+00:00"
+  },
+  {
+   "unit": 306260,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "在省份 {0} 战败的结果\n\n{1}\n{2}",
+   "at": "2026-08-25T11:07:24.574317+00:00"
+  },
+  {
+   "unit": 306261,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "我军在省份 {0} 对 {1} 国的军队取得了一场辉煌的胜利！\n\n{2}",
+   "at": "2026-08-25T11:07:24.574319+00:00"
+  },
+  {
+   "unit": 306262,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "我军在省份 {0} 被 {1} 国的军队击溃。\n\n{2}",
+   "at": "2026-08-25T11:07:24.574321+00:00"
+  },
+  {
+   "unit": 306263,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "派往省份 {0} 的海军陆战队已被歼灭。\n\n{1}",
+   "at": "2026-08-25T11:07:24.574323+00:00"
+  },
+  {
+   "unit": 306264,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "海军陆战队已在省份 {0} 成功登陆！\n\n{1}",
+   "at": "2026-08-25T11:07:24.574325+00:00"
+  },
+  {
+   "unit": 306275,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "省份 {0} 防御工事防御失败结果\n\n{1}",
+   "at": "2026-08-25T11:08:15.249520+00:00"
+  },
+  {
+   "unit": 306276,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "省份 {0} 防御工事进攻失败结果\n\n{1}",
+   "at": "2026-08-25T11:08:15.250243+00:00"
+  },
+  {
+   "unit": 306277,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "省份 {0} 防御工事防御成功结果\n\n{1}",
+   "at": "2026-08-25T11:08:15.250249+00:00"
+  },
+  {
+   "unit": 306278,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "省份 {0} 海战胜利结果\n\n{1}{2}\n{3}{4}\n{5}\n我军承受伤害：{6}{7}\n\n敌军承受伤害：{8}{9}",
+   "at": "2026-08-25T11:08:15.250252+00:00"
+  },
+  {
+   "unit": 306279,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "省份 {0} 海战失败结果\n\n{1}{2}\n{3}{4}\n{5}\n我军承受伤害：{6}{7}\n\n敌军承受伤害：{8}{9}",
+   "at": "2026-08-25T11:08:15.250254+00:00"
+  },
+  {
+   "unit": 306280,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "海战胜利",
+   "at": "2026-08-25T11:08:15.250256+00:00"
+  },
+  {
+   "unit": 306281,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "海战失败",
+   "at": "2026-08-25T11:08:15.250258+00:00"
+  },
+  {
+   "unit": 306282,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "防御工事进攻失败",
+   "at": "2026-08-25T11:08:15.250260+00:00"
+  },
+  {
+   "unit": 306283,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "敌军防御工事进攻失败",
+   "at": "2026-08-25T11:08:15.250262+00:00"
+  },
+  {
+   "unit": 306284,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "防御工事进攻成功",
+   "at": "2026-08-25T11:08:15.250264+00:00"
+  },
+  {
+   "unit": 306285,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "防御工事惨败",
+   "at": "2026-08-25T11:08:23.929969+00:00"
+  },
+  {
+   "unit": 306286,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "空袭后果",
+   "at": "2026-08-25T11:08:23.929985+00:00"
+  },
+  {
+   "unit": 306287,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "我方发动空袭",
+   "at": "2026-08-25T11:08:23.929988+00:00"
+  },
+  {
+   "unit": 306288,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "空战结果",
+   "at": "2026-08-25T11:08:23.929990+00:00"
+  },
+  {
+   "unit": 306289,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "{0}{1}\n{2}{3}\n{4}\n非装甲单位承受伤害: {5}\n装甲单位承受伤害: {6}{7}\n\n非装甲单位造成伤害: {8}\n装甲单位造成伤害: {9}{10}",
+   "at": "2026-08-25T11:08:23.929991+00:00"
+  },
+  {
+   "unit": 306290,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "被动技能\"部队不撤退\"已触发",
+   "at": "2026-08-25T11:08:23.929993+00:00"
+  },
+  {
+   "unit": 306291,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "被动技能\"舰队不撤退\"已触发",
+   "at": "2026-08-25T11:08:23.929994+00:00"
+  },
+  {
+   "unit": 306292,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "防御工事守军不撤退！",
+   "at": "2026-08-25T11:08:23.929996+00:00"
+  },
+  {
+   "unit": 306293,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "无幸存者",
+   "at": "2026-08-25T11:08:23.929998+00:00"
+  },
+  {
+   "unit": 306294,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "幸存者: {0}",
+   "at": "2026-08-25T11:08:23.930000+00:00"
+  },
+  {
+   "unit": 306295,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "幸存国家 {0}： {1}",
+   "at": "2026-08-25T11:08:57.833805+00:00"
+  },
+  {
+   "unit": 306296,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "您的损失： {0}",
+   "at": "2026-08-25T11:08:57.833827+00:00"
+  },
+  {
+   "unit": 306297,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "国家 {0} 的损失： {1}",
+   "at": "2026-08-25T11:08:57.833832+00:00"
+  },
+  {
+   "unit": 306298,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "幸存者影响力： {0}",
+   "at": "2026-08-25T11:08:57.833834+00:00"
+  },
+  {
+   "unit": 306299,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "敌方幸存者影响力： {0}",
+   "at": "2026-08-25T11:08:57.833835+00:00"
+  },
+  {
+   "unit": 306300,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "状态变更！",
+   "at": "2026-08-25T11:08:57.833837+00:00"
+  },
+  {
+   "unit": 306301,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "您的国家状态已变更：从 {0} 到 {1}！",
+   "at": "2026-08-25T11:08:57.833839+00:00"
+  },
+  {
+   "unit": 306302,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "{0} 的 {1} 个国家状态已变更：从 {2} 到 {3}！",
+   "at": "2026-08-25T11:08:57.833841+00:00"
+  },
+  {
+   "unit": 306303,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "国家 {0} 的状态已变更：从 {1} 状态变为 {2} 状态！",
+   "at": "2026-08-25T11:08:57.833843+00:00"
+  },
+  {
+   "unit": 306304,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "已提升",
+   "at": "2026-08-25T11:08:57.833844+00:00"
+  },
+  {
+   "unit": 306305,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "已降级",
+   "at": "2026-08-25T11:09:19.465012+00:00"
+  },
+  {
+   "unit": 306306,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "已升级",
+   "at": "2026-08-25T11:09:19.465043+00:00"
+  },
+  {
+   "unit": 306307,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "已降级",
+   "at": "2026-08-25T11:09:19.465053+00:00"
+  },
+  {
+   "unit": 306308,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "已失去",
+   "at": "2026-08-25T11:09:19.465062+00:00"
+  },
+  {
+   "unit": 306309,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "已获得",
+   "at": "2026-08-25T11:09:19.465070+00:00"
+  },
+  {
+   "unit": 306310,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "盟军",
+   "at": "2026-08-25T11:09:19.465079+00:00"
+  },
+  {
+   "unit": 306311,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "敌军",
+   "at": "2026-08-25T11:09:19.465090+00:00"
+  },
+  {
+   "unit": 306312,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "中立",
+   "at": "2026-08-25T11:09:19.465099+00:00"
+  },
+  {
+   "unit": 306313,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "部队新等级！",
+   "at": "2026-08-25T11:09:19.465108+00:00"
+  },
+  {
+   "unit": 306314,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "恭喜！师团 {0} 已服役足够长的时间并晋升至新等级：{1}！该师团已为国家服务 {3} 回合，参与战斗次数：{2}。该师团当前位于省份 {4}。",
+   "at": "2026-08-25T11:09:19.465118+00:00"
+  },
+  {
+   "unit": 306265,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "国家{0}派往{1}省的海军陆战队已被歼灭。\n\n{2}",
+   "at": "2026-08-25T11:09:32.506964+00:00"
+  },
+  {
+   "unit": 306266,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "国家{0}的海军陆战队已在{1}省登陆。\n\n{2}",
+   "at": "2026-08-25T11:09:32.506980+00:00"
+  },
+  {
+   "unit": 306267,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "对敌方省份{0}的炮击结果\n\n{1}{2}\n\n造成伤害：{3}",
+   "at": "2026-08-25T11:09:32.506982+00:00"
+  },
+  {
+   "unit": 306268,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "国家{1}炮击了省份{0}\n\n{2}\n{3}\n\n受到伤害：{4}",
+   "at": "2026-08-25T11:09:32.506984+00:00"
+  },
+  {
+   "unit": 306269,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "我军已占领省份{0}\n\n{1}",
+   "at": "2026-08-25T11:09:32.506986+00:00"
+  },
+  {
+   "unit": 306270,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "我方省份{0}已被国家{1}的部队占领。\n\n{2}",
+   "at": "2026-08-25T11:09:32.506988+00:00"
+  },
+  {
+   "unit": 306271,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "敌方空军：{0} 袭击了我方省份 {1}，来自省份：{2}\n\n{3}{4}\n{5}{6}\n\n我方地面部队受到伤害：{7}\n\n对敌方空军造成伤害：{8}",
+   "at": "2026-08-25T11:09:32.506989+00:00"
+  },
+  {
+   "unit": 306272,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "对敌方省份 {0} 的空袭结果\n\n{1}{2}\n{3}{4}\n\n我方空军受到伤害：{5}\n对敌方地面部队造成伤害：{6}",
+   "at": "2026-08-25T11:09:32.506991+00:00"
+  },
+  {
+   "unit": 306273,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "省份 {0} 上空的空战结果\n\n{1}{2}\n{3}{4}\n\n我军航空部队受到的伤害：{5}\n\n敌军航空部队受到的伤害：{6}",
+   "at": "2026-08-25T11:09:32.506993+00:00"
+  },
+  {
+   "unit": 306274,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "省份 {0} 成功突袭防御工事的结果\n\n{1}",
+   "at": "2026-08-25T11:09:32.507001+00:00"
+  },
+  {
+   "unit": 306315,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "精锐部队的损失！",
+   "at": "2026-08-25T11:09:41.901017+00:00"
+  },
+  {
+   "unit": 306316,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "噩耗：一支 {0} 级 {1} 师在战斗中全军覆没。该师累计参战次数：{2}。",
+   "at": "2026-08-25T11:09:41.901617+00:00"
+  },
+  {
+   "unit": 306317,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "沙特阿拉伯",
+   "at": "2026-08-25T11:09:41.901621+00:00"
+  },
+  {
+   "unit": 306318,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "利比里亚",
+   "at": "2026-08-25T11:09:41.901636+00:00"
+  },
+  {
+   "unit": 306319,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "委内瑞拉",
+   "at": "2026-08-25T11:09:41.901639+00:00"
+  },
+  {
+   "unit": 306320,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "冰岛",
+   "at": "2026-08-25T11:09:41.901641+00:00"
+  },
+  {
+   "unit": 306321,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "伊朗",
+   "at": "2026-08-25T11:09:41.901643+00:00"
+  },
+  {
+   "unit": 306322,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "阿根廷",
+   "at": "2026-08-25T11:09:41.901645+00:00"
+  },
+  {
+   "unit": 306323,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "来自 {[PARAM0]} 的贸易代表已抵达我国。他们提议签订贸易协定。协定签署后，我们将可以向该国派遣贸易船队。是否签订贸易协定？",
+   "at": "2026-08-25T11:09:41.901647+00:00"
+  },
+  {
+   "unit": 306324,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "贸易协定",
+   "at": "2026-08-25T11:09:41.901649+00:00"
+  },
+  {
+   "unit": 306325,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "要达成贸易协议，请积累更多外交点数。大使即将返回（回合数：{[PARAM0]}）。",
+   "at": "2026-08-25T11:09:44.774888+00:00"
+  },
+  {
+   "unit": 306326,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "您未能积累足够的外交点数来达成贸易协议。",
+   "at": "2026-08-25T11:09:44.774913+00:00"
+  },
+  {
+   "unit": 306327,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "同意",
+   "at": "2026-08-25T11:09:44.774920+00:00"
+  },
+  {
+   "unit": 306328,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "拒绝",
+   "at": "2026-08-25T11:09:44.774923+00:00"
+  },
+  {
+   "unit": 306329,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "要向{[PARAM0]}国家派遣商队吗？预计持续时间={[PARAM1]}回合，预计收益={[PARAM2]}资源。",
+   "at": "2026-08-25T11:09:44.774925+00:00"
+  },
+  {
+   "unit": 306330,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "要为商船提供护卫吗？没有护卫的船只可能遭到袭击！",
+   "at": "2026-08-25T11:09:44.774927+00:00"
+  },
+  {
+   "unit": 306331,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "没有可选的护卫省份！",
+   "at": "2026-08-25T11:09:44.774929+00:00"
+  },
+  {
+   "unit": 306332,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "<line-height=100%><size=120%><color=#A00F00>派</size></color>遣商队",
+   "at": "2026-08-25T11:09:44.774931+00:00"
+  },
+  {
+   "unit": 306333,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "派遣",
+   "at": "2026-08-25T11:09:44.774933+00:00"
+  },
+  {
+   "unit": 306334,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "不派遣",
+   "at": "2026-08-25T11:09:44.774935+00:00"
+  },
+  {
+   "unit": 306335,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "派遣车队并加速其返回，缩短{[PARAM0]}回合。",
+   "at": "2026-08-25T11:09:47.172193+00:00"
+  },
+  {
+   "unit": 306336,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "购买车队加速失败",
+   "at": "2026-08-25T11:09:47.172201+00:00"
+  },
+  {
+   "unit": 306337,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "选择护卫部队",
+   "at": "2026-08-25T11:09:47.172203+00:00"
+  },
+  {
+   "unit": 306338,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "地雷",
+   "at": "2026-08-25T11:09:47.172204+00:00"
+  },
+  {
+   "unit": 306339,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "地雷 - 部署在控制的省份中，对进攻的敌方地面部队和步兵造成伤害。",
+   "at": "2026-08-25T11:09:47.172206+00:00"
+  },
+  {
+   "unit": 306340,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "您获得了一支老兵师！这样的师在进攻时造成更多伤害，在防守时受到更少伤害。双击师图标查看详细信息",
+   "at": "2026-08-25T11:09:47.172208+00:00"
+  },
+  {
+   "unit": 306341,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "累计经验和升级到下一级所需经验",
+   "at": "2026-08-25T11:09:47.172209+00:00"
+  },
+  {
+   "unit": 306342,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "查看师的战斗历程",
+   "at": "2026-08-25T11:09:47.172211+00:00"
+  },
+  {
+   "unit": 306343,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "您已解锁新类型武器 - 地雷！",
+   "at": "2026-08-25T11:09:47.172213+00:00"
+  },
+  {
+   "unit": 306344,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "地雷像游戏中其他增援一样购买，现在就行动吧。",
+   "at": "2026-08-25T11:09:47.172214+00:00"
+  },
+  {
+   "unit": 306345,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "地雷会对攻击该省份的地面部队和空降部队造成伤害。之后，该省份的所有雷区都将被视为已清除。",
+   "at": "2026-08-25T11:09:58.013006+00:00"
+  },
+  {
+   "unit": 306346,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "此图标表示该省份已布设地雷。",
+   "at": "2026-08-25T11:09:58.013768+00:00"
+  },
+  {
+   "unit": 306347,
+   "action": 6,
+   "action_name": "Automatically translated",
+   "old": "",
+   "target": "你可以在一个省份布设超过12个雷区。省份中的地雷越多，造成的伤害就越大！",
+   "at": "2026-08-25T11:09:58.013777+00:00"
+  },
+  {
+   "unit": 306252,
+   "action": 45,
+   "action_name": "Contributor joined",
+   "old": "",
+   "target": "",
+   "at": "2026-08-25T11:39:26.672051+00:00"
+  },
+  {
+   "unit": 306252,
+   "action": 37,
+   "action_name": "Marked for edit",
+   "old": "商队从{0}国航行归来，带回总价值{1}的商品。{2}",
+   "target": "车队从{0}的航行中返回，带回价值{1}的商品。{2}",
+   "at": "2026-08-25T11:39:26.680445+00:00"
+  },
+  {
+   "unit": 306258,
+   "action": 37,
+   "action_name": "Marked for edit",
+   "old": "没有可用省份安置返回的商队。补偿 - {0} 资源。",
+   "target": "没有可用省份安置返回的车队。补偿 - {0} 单位资源。",
+   "at": "2026-08-25T11:39:38.650565+00:00"
+  }
+ ],
+ "verdicts": [
+  {
+   "unit": 306225,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:18:40.043846+00:00"
+  },
+  {
+   "unit": 306225,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:15.545657+00:00"
+  },
+  {
+   "unit": 306226,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:17:17.026632+00:00"
+  },
+  {
+   "unit": 306226,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:04.288196+00:00"
+  },
+  {
+   "unit": 306227,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:20:02.969815+00:00"
+  },
+  {
+   "unit": 306227,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:40.211265+00:00"
+  },
+  {
+   "unit": 306228,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "unparsed",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": true,
+   "errors": [],
+   "created": "2026-08-25T11:13:08.905344+00:00"
+  },
+  {
+   "unit": 306228,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "宣传活动",
+     "category": "terminology",
+     "severity": "major",
+     "description": "The term 'Агитационная кампания' is translated as '宣传活动', but 'agitation' in political/military context refers to targeted subversive or propaganda efforts, not general 'promotion'; '宣传活动' implies marketing or public outreach, which distorts the intended meaning of political agitation."
+    }
+   ],
+   "created": "2026-08-25T11:33:49.066276+00:00"
+  },
+  {
+   "unit": 306229,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:31:19.311900+00:00"
+  },
+  {
+   "unit": 306229,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:38:25.482619+00:00"
+  },
+  {
+   "unit": 306230,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:32:07.947147+00:00"
+  },
+  {
+   "unit": 306230,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:39:02.315020+00:00"
+  },
+  {
+   "unit": 306231,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:15:52.619608+00:00"
+  },
+  {
+   "unit": 306231,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "花费",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says '花费 {[PARAM0]} 获得...' meaning 'spend {[PARAM0]} to obtain...', but the source asks 'Получить... за {[PARAM0]}?' meaning 'Obtain an additional science point before the end of this mission for {[PARAM0]}?'. The target inverts the transaction direction: it implies the player must pay, whereas the source implies the player pays to gain. This misleads the player about cost and benefit."
+    }
+   ],
+   "created": "2026-08-25T11:34:23.745270+00:00"
+  },
+  {
+   "unit": 306232,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:18:40.040056+00:00"
+  },
+  {
+   "unit": 306232,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:15.541715+00:00"
+  },
+  {
+   "unit": 306233,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:20:23.336665+00:00"
+  },
+  {
+   "unit": 306233,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:54.028755+00:00"
+  },
+  {
+   "unit": 306234,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:29:58.687996+00:00"
+  },
+  {
+   "unit": 306234,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "触发地雷",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The target says 'triggered landmines', which implies the enemy activated them passively, whereas the source says 'blew up on minefields', indicating the mines exploded and caused damage. The verb choice weakens the causality and impact."
+    }
+   ],
+   "created": "2026-08-25T11:38:06.570623+00:00"
+  },
+  {
+   "unit": 306235,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:14:54.034504+00:00"
+  },
+  {
+   "unit": 306235,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:34:13.287791+00:00"
+  },
+  {
+   "unit": 306236,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:31:19.220893+00:00"
+  },
+  {
+   "unit": 306236,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:38:25.476704+00:00"
+  },
+  {
+   "unit": 306237,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:27:50.621389+00:00"
+  },
+  {
+   "unit": 306237,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:41.458730+00:00"
+  },
+  {
+   "unit": 306238,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "unparsed",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": true,
+   "errors": [],
+   "created": "2026-08-25T11:13:08.912046+00:00"
+  },
+  {
+   "unit": 306238,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "精英",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The source 'Ветераны' means 'Veterans', referring to experienced military units; the target '精英' means 'Elite', which implies superior quality or selection, not necessarily experience level — this misrepresents the unit tier."
+    }
+   ],
+   "created": "2026-08-25T11:33:49.068463+00:00"
+  },
+  {
+   "unit": 306239,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:32:30.292493+00:00"
+  },
+  {
+   "unit": 306239,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:39:11.022260+00:00"
+  },
+  {
+   "unit": 306240,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "minor",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "每经历一场战斗",
+     "category": "mistranslation",
+     "severity": "minor",
+     "description": "The target says '每经历一场战斗' which means 'each experienced battle', whereas the source says 'за каждое пережитое сражение' meaning 'each survived battle'. The player may think any battle, not just survived ones, grants experience."
+    }
+   ],
+   "created": "2026-08-25T11:30:34.556384+00:00"
+  },
+  {
+   "unit": 306240,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:38:14.073841+00:00"
+  },
+  {
+   "unit": 306241,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:28:35.399779+00:00"
+  },
+  {
+   "unit": 306241,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:55.428884+00:00"
+  },
+  {
+   "unit": 306242,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:11:55.541969+00:00"
+  },
+  {
+   "unit": 306242,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:33:13.724820+00:00"
+  },
+  {
+   "unit": 306243,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:17:17.033846+00:00"
+  },
+  {
+   "unit": 306243,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:04.292931+00:00"
+  },
+  {
+   "unit": 306244,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:25:04.870599+00:00"
+  },
+  {
+   "unit": 306244,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:57.464768+00:00"
+  },
+  {
+   "unit": 306245,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "",
+     "category": "omission",
+     "severity": "critical",
+     "description": "The target is empty; the source 'Битва в провинции {0}' (Battle in province {0}) is missing, so the player will not see this information."
+    }
+   ],
+   "created": "2026-08-25T11:27:50.628646+00:00"
+  },
+  {
+   "unit": 306245,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "",
+     "category": "omission",
+     "severity": "critical",
+     "description": "The target is empty, while the source says 'Битва в провинции {0}', meaning 'Battle in province {0}'. The entire content is missing in the target."
+    }
+   ],
+   "created": "2026-08-25T11:37:41.465035+00:00"
+  },
+  {
+   "unit": 306246,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "",
+     "category": "omission",
+     "severity": "critical",
+     "description": "The target is empty, providing no text. The source means 'Victory'; the player would see nothing."
+    }
+   ],
+   "created": "2026-08-25T11:15:52.614934+00:00"
+  },
+  {
+   "unit": 306246,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "",
+     "category": "omission",
+     "severity": "critical",
+     "description": "The target is empty, but the source is 'Победа' (Victory). The player will see no text where a victory label should appear, leading to confusion about the outcome."
+    }
+   ],
+   "created": "2026-08-25T11:34:23.738088+00:00"
+  },
+  {
+   "unit": 306247,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:17:17.033121+00:00"
+  },
+  {
+   "unit": 306247,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:04.292307+00:00"
+  },
+  {
+   "unit": 306248,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:28:35.399269+00:00"
+  },
+  {
+   "unit": 306248,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:55.428244+00:00"
+  },
+  {
+   "unit": 306249,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:17:17.031921+00:00"
+  },
+  {
+   "unit": 306249,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:04.291466+00:00"
+  },
+  {
+   "unit": 306250,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:31:19.318217+00:00"
+  },
+  {
+   "unit": 306250,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "商队新闻",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The target says '商队新闻', which means 'caravan news' or 'news about caravans', whereas the source 'Новости о конвоях' specifically means 'news about convoys'. The term 'caravan' implies civilian or trade movement, while 'convoys' implies military or escorted transport — the target uses a less precise and potentially misleading term."
+    }
+   ],
+   "created": "2026-08-25T11:38:25.486475+00:00"
+  },
+  {
+   "unit": 306251,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:12:44.627823+00:00"
+  },
+  {
+   "unit": 306251,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "价值{1}资源的货物已装载上船",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "the target says '货物已装载上船', which means 'goods have been loaded onto the ship', whereas the source says 'Товары... загружены на борт' — 'goods have been loaded on board', implying completion before arrival; the target incorrectly suggests loading occurred after reaching destination"
+    }
+   ],
+   "created": "2026-08-25T11:33:37.629800+00:00"
+  },
+  {
+   "unit": 306252,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "商队",
+     "category": "terminology",
+     "severity": "major",
+     "description": "Segment has no glossary, but 'Конвой' is consistently '车队' in segments 1–3. Using '商队' (trade caravan) instead of '车队' (convoy/fleet) is a terminology inconsistency that could confuse the player about the unit type."
+    },
+    {
+     "span": "航行",
+     "category": "fluency",
+     "severity": "minor",
+     "description": "The target says '航行' (sail/navigate), which implies a sea voyage. 'из плаванья' does mean a voyage, but in a game context where a 'конвой' may travel by land or air, '航行' over-specifies sea travel. A more neutral term would be safer."
+    },
+    {
+     "span": "7的商品",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The rendered target says '7的商品' (goods of 7), which means the value 7 is simply appended to 'goods', making it read like '7 goods' instead of 'goods worth 7'. The source 'с товарами на сумму 7' means 'goods worth 7'. The player would understand the number as a count, not a value."
+    }
+   ],
+   "created": "2026-08-25T11:11:21.635236+00:00"
+  },
+  {
+   "unit": 306252,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:33:02.796703+00:00"
+  },
+  {
+   "unit": 306253,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "",
+     "category": "omission",
+     "severity": "critical",
+     "description": "The target is empty, omitting the entire source string 'Боевые корабли конвоя вернулись в провинцию {0}'. The player will see no text."
+    }
+   ],
+   "created": "2026-08-25T11:16:39.743301+00:00"
+  },
+  {
+   "unit": 306253,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "",
+     "category": "omission",
+     "severity": "critical",
+     "description": "The target is completely empty. The source states 'Boевые корабли конвоя вернулись в провинцию {0}', meaning 'Convoy warships have returned to province {0}'. This entire message is missing in the target."
+    }
+   ],
+   "created": "2026-08-25T11:34:55.523466+00:00"
+  },
+  {
+   "unit": 306254,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "",
+     "category": "omission",
+     "severity": "critical",
+     "description": "The target is empty. The source says 'Шел {0} ход возвращения конвоя из страны {1}. Пока без происшествий.', meaning a player is informed about the progress of their convoy returning from another country. An empty string hides crucial game state information from the player."
+    }
+   ],
+   "created": "2026-08-25T11:32:07.986369+00:00"
+  },
+  {
+   "unit": 306254,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "",
+     "category": "omission",
+     "severity": "critical",
+     "description": "The target is empty, while the source contains two complete sentences describing the caravan's return progress and that no incidents have occurred so far. The entire message is missing in the target, which would leave the player uninformed about a key gameplay event."
+    }
+   ],
+   "created": "2026-08-25T11:39:02.318796+00:00"
+  },
+  {
+   "unit": 306255,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "正在执行{0}返回{1}国商队的行动",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says 'currently executing the {0} return caravan action from country {1}', which means the number {0} becomes a modifier of 'return', and the concept of 'turn' (ход) is omitted. The source says 'it was the {0}th turn of the convoy returning from country {1}'. The player will misinterpret what the displayed number represents."
+    }
+   ],
+   "created": "2026-08-25T11:25:04.868626+00:00"
+  },
+  {
+   "unit": 306255,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "正在执行{0}返回{1}国商队的行动",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The target says '正在执行{0}返回{1}国商队的行动', which means 'executing the action of {0} returning {1} country's caravan', whereas the source says 'Шел {0} ход возвращения конвоя из страны {1}' meaning 'The {0}th turn of the convoy's return from country {1} was ongoing'. The target incorrectly frames it as an active operation being executed now, rather than describing the turn in progress."
+    }
+   ],
+   "created": "2026-08-25T11:36:57.462520+00:00"
+  },
+  {
+   "unit": 306256,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:26:26.966906+00:00"
+  },
+  {
+   "unit": 306256,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "minor",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "这是",
+     "category": "fluency",
+     "severity": "minor",
+     "description": "The target starts with '这是' (This is), which creates an unnatural and narrative-distant tone. The source does not use a demonstrative frame — it directly states the turn count and situation. The back-translation becomes 'This was the 3rd turn', whereas the source is 'The 3rd turn of return was ongoing'. The added '这是' distorts the temporal framing and reads like a subtitle or commentary, not an in-game event log."
+    }
+   ],
+   "created": "2026-08-25T11:37:11.492823+00:00"
+  },
+  {
+   "unit": 306257,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:28:35.394702+00:00"
+  },
+  {
+   "unit": 306257,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:55.419975+00:00"
+  },
+  {
+   "unit": 306258,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "商队",
+     "category": "terminology",
+     "severity": "major",
+     "description": "Segment has no glossary, but 'конвой' was translated as '车队' in segments 1 and 2. '商队' (trade caravan) is an inconsistent terminology choice that could cause the player to see this as a different type of unit."
+    }
+   ],
+   "created": "2026-08-25T11:11:21.655001+00:00"
+  },
+  {
+   "unit": 306258,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "资源",
+     "category": "terminology",
+     "severity": "major",
+     "description": "The target uses '资源', which is a general term for 'resources', but the source uses 'ресурсов' in the context of a specific numeric compensation (e.g. 3 units). The glossary likely expects a countable term like '单位资源' or a specific resource name. Using uncountable '资源' may obscure whether a quantity is involved."
+    }
+   ],
+   "created": "2026-08-25T11:33:02.854747+00:00"
+  },
+  {
+   "unit": 306259,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:26:26.961341+00:00"
+  },
+  {
+   "unit": 306259,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:11.488387+00:00"
+  },
+  {
+   "unit": 306260,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:27:50.628021+00:00"
+  },
+  {
+   "unit": 306260,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:41.464512+00:00"
+  },
+  {
+   "unit": 306261,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "minor",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "我军",
+     "category": "omission",
+     "severity": "minor",
+     "description": "The target '我军' (our army) omits the adjective 'победоносные' (victorious) from the source 'победоносные войска' (victorious troops). Meaning is not altered significantly."
+    }
+   ],
+   "created": "2026-08-25T11:21:29.938342+00:00"
+  },
+  {
+   "unit": 306261,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:08.375956+00:00"
+  },
+  {
+   "unit": 306262,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:12:45.026582+00:00"
+  },
+  {
+   "unit": 306262,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "minor",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "被 {1} 国的军队击溃",
+     "category": "fluency",
+     "severity": "minor",
+     "description": "the target uses '被 {1} 国的军队击溃', which is grammatically correct but stylistically awkward; '被{1}国军队击溃' would be more natural in zh_Hans, though meaning is preserved"
+    }
+   ],
+   "created": "2026-08-25T11:33:37.635152+00:00"
+  },
+  {
+   "unit": 306263,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:27:50.626435+00:00"
+  },
+  {
+   "unit": 306263,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:41.462801+00:00"
+  },
+  {
+   "unit": 306264,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:26:31.119253+00:00"
+  },
+  {
+   "unit": 306264,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:29.692377+00:00"
+  },
+  {
+   "unit": 306265,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:14:54.042851+00:00"
+  },
+  {
+   "unit": 306265,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:34:13.294285+00:00"
+  },
+  {
+   "unit": 306266,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:20:03.062305+00:00"
+  },
+  {
+   "unit": 306266,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:40.216053+00:00"
+  },
+  {
+   "unit": 306267,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:21:36.054090+00:00"
+  },
+  {
+   "unit": 306267,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:13.287742+00:00"
+  },
+  {
+   "unit": 306268,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:21:29.941046+00:00"
+  },
+  {
+   "unit": 306268,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:08.377799+00:00"
+  },
+  {
+   "unit": 306269,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:14:54.043623+00:00"
+  },
+  {
+   "unit": 306269,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:34:13.295480+00:00"
+  },
+  {
+   "unit": 306270,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:21:29.936513+00:00"
+  },
+  {
+   "unit": 306270,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:08.375083+00:00"
+  },
+  {
+   "unit": 306271,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:11:21.656095+00:00"
+  },
+  {
+   "unit": 306271,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "来自省份",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The target says '来自省份：{2}', which means 'from province: {2}', but the source says 'из провинций: {2}', which is plural 'from provinces: {2}'. The target incorrectly renders the plural as singular, potentially misleading the player about whether one or multiple provinces were used in the attack."
+    },
+    {
+     "span": "{3}{4}\n{5}{6}",
+     "category": "fluency",
+     "severity": "minor",
+     "description": "The lines '{3}{4}' and '{5}{6}' are rendered without any separator or explanation. In the target, they appear as raw concatenated placeholders (e.g. '2842\\n5664'), which is ungrammatical and confusing. The source implies these are structured data blocks (possibly unit losses), but the target provides no formatting or labeling, reducing player comprehension."
+    }
+   ],
+   "created": "2026-08-25T11:33:02.861208+00:00"
+  },
+  {
+   "unit": 306272,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:11:55.541280+00:00"
+  },
+  {
+   "unit": 306272,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:33:13.724053+00:00"
+  },
+  {
+   "unit": 306273,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:15:52.621834+00:00"
+  },
+  {
+   "unit": 306273,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:34:23.748307+00:00"
+  },
+  {
+   "unit": 306274,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "minor",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "突袭",
+     "category": "mistranslation",
+     "severity": "minor",
+     "description": "The target says '突袭' (surprise attack/raid), whereas the source says 'штурм' (assault). This changes the type of military action described."
+    }
+   ],
+   "created": "2026-08-25T11:29:58.688983+00:00"
+  },
+  {
+   "unit": 306274,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:38:06.571456+00:00"
+  },
+  {
+   "unit": 306275,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:14:21.802094+00:00"
+  },
+  {
+   "unit": 306275,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "防御工事防御失败结果",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The target says '防御工事防御失败结果' which means 'result of failed defense of defensive structures', but the source says 'провальной обороны укреплений' meaning 'failed defense of fortifications'. The repetition of '防御' (defense) is redundant and distorts the meaning by suggesting two layers of defense rather than one failed action. The correct phrasing should reflect a single failed defense of fortifications."
+    }
+   ],
+   "created": "2026-08-25T11:34:08.276951+00:00"
+  },
+  {
+   "unit": 306276,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:16:39.738316+00:00"
+  },
+  {
+   "unit": 306276,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "防御工事进攻失败结果",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The target says '防御工事进攻失败结果', which back-translates to 'results of failed attack on defensive structures', but the source specifies that the assault itself was failed — 'Провальный штурм'. The nuance of an attempted and failed military action is lost; the target reads more generically as 'failure of attack', not 'a failed assault'."
+    },
+    {
+     "span": "防御工事",
+     "category": "terminology",
+     "severity": "minor",
+     "description": "The target uses '敌军防御工事' in the previous segment but here only '防御工事', creating inconsistency. If 'укреплений' refers to enemy fortifications in both cases, the terminology should be consistent."
+    }
+   ],
+   "created": "2026-08-25T11:34:55.521042+00:00"
+  },
+  {
+   "unit": 306277,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:14:17.302788+00:00"
+  },
+  {
+   "unit": 306277,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "防御工事防御成功结果",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The target says '防御工事防御成功结果' which means 'result of successful defense of defensive structures', but the source says 'удачной обороны укреплений' meaning 'successful defense of fortifications'. The repetition of '防御' (defense) is redundant and distorts the original meaning by implying two separate defense actions instead of one. The correct phrasing should reflect a single successful defense of fortifications."
+    }
+   ],
+   "created": "2026-08-25T11:34:08.268860+00:00"
+  },
+  {
+   "unit": 306278,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:24:03.084840+00:00"
+  },
+  {
+   "unit": 306278,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:41.921245+00:00"
+  },
+  {
+   "unit": 306279,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "unparsed",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": true,
+   "errors": [],
+   "created": "2026-08-25T11:13:08.892120+00:00"
+  },
+  {
+   "unit": 306279,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:33:49.063756+00:00"
+  },
+  {
+   "unit": 306280,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:26:31.124561+00:00"
+  },
+  {
+   "unit": 306280,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:29.694725+00:00"
+  },
+  {
+   "unit": 306281,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:14:19.127246+00:00"
+  },
+  {
+   "unit": 306281,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:34:08.274293+00:00"
+  },
+  {
+   "unit": 306282,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:29:58.691457+00:00"
+  },
+  {
+   "unit": 306282,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:38:06.572510+00:00"
+  },
+  {
+   "unit": 306283,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "敌军防御工事进攻失败",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says '敌军防御工事进攻失败', which means 'enemy fortifications attack failed' (the attack on enemy fortifications failed), whereas the source says 'Провальный штурм укреплений врагами' meaning 'Failed assault on fortifications by enemies' (the enemy's assault failed). The agent is misrepresented, potentially misleading the player about who attacked."
+    }
+   ],
+   "created": "2026-08-25T11:16:39.728188+00:00"
+  },
+  {
+   "unit": 306283,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "进攻失败",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says '进攻失败', which means 'attack failed', but the source says 'Провальный штурм' — 'a failed assault', implying the assault already took place and failed; the target misrepresents the event as a general failure to launch an attack rather than the failure of an actual assault."
+    },
+    {
+     "span": "敌军",
+     "category": "terminology",
+     "severity": "major",
+     "description": "The target uses '防御工事' for 'укреплений', which is acceptable, but '敌军防御工事' renders 'врагами' as 'enemy's defensive structures', whereas the source has 'врагами' (by the enemies) as the agent of the assault. The target incorrectly makes 'enemy' the possessor of the fortifications rather than the attacker."
+    }
+   ],
+   "created": "2026-08-25T11:34:55.517321+00:00"
+  },
+  {
+   "unit": 306284,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:24:03.082348+00:00"
+  },
+  {
+   "unit": 306284,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "防御工事进攻成功",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The target says '防御工事进攻成功', which means 'successful attack on fortifications', but the source 'Успешный штурм укреплений' refers specifically to a 'successful storming/assault' of fortifications. 'Штурм' implies a direct, forceful attack, which '进攻' is too general to fully convey. The nuance of intensity and immediacy is lost."
+    }
+   ],
+   "created": "2026-08-25T11:36:41.920528+00:00"
+  },
+  {
+   "unit": 306285,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:30:34.557156+00:00"
+  },
+  {
+   "unit": 306285,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "防御工事惨败",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The target says '防御工事惨败' which means 'catastrophic defeat in fortification defense', implying a military loss, whereas the source 'Провальная оборона укреплений' means 'failed defense of fortifications' — a factual description without the exaggerated emotional tone of '惨败'. The target adds intensity not present in the source."
+    }
+   ],
+   "created": "2026-08-25T11:38:14.074543+00:00"
+  },
+  {
+   "unit": 306286,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:21:36.043761+00:00"
+  },
+  {
+   "unit": 306286,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:13.278538+00:00"
+  },
+  {
+   "unit": 306287,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:14:19.365560+00:00"
+  },
+  {
+   "unit": 306287,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:34:08.275449+00:00"
+  },
+  {
+   "unit": 306288,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:11:55.539066+00:00"
+  },
+  {
+   "unit": 306288,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:33:13.722455+00:00"
+  },
+  {
+   "unit": 306289,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "非装甲单位造成伤害",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says '非装甲单位造成伤害', which means 'unarmored units dealt damage', whereas the source 'Нанесено урона по небронированным' means 'damage dealt to unarmored (enemies)'. This swaps the subject, misleading the player about who took the damage."
+    },
+    {
+     "span": "装甲单位造成伤害",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says '装甲单位造成伤害', which means 'armored units dealt damage', whereas the source 'Нанесено урона по бронированным' means 'damage dealt to armored (enemies)'. This swaps the subject, misleading the player about who took the damage."
+    }
+   ],
+   "created": "2026-08-25T11:27:50.627260+00:00"
+  },
+  {
+   "unit": 306289,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:41.463744+00:00"
+  },
+  {
+   "unit": 306290,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:21:36.053588+00:00"
+  },
+  {
+   "unit": 306290,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:13.286799+00:00"
+  },
+  {
+   "unit": 306291,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:26:26.969721+00:00"
+  },
+  {
+   "unit": 306291,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:11.493984+00:00"
+  },
+  {
+   "unit": 306292,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:24:03.076824+00:00"
+  },
+  {
+   "unit": 306292,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:41.919150+00:00"
+  },
+  {
+   "unit": 306293,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:16:39.742146+00:00"
+  },
+  {
+   "unit": 306293,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:34:55.522839+00:00"
+  },
+  {
+   "unit": 306294,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:21:29.911821+00:00"
+  },
+  {
+   "unit": 306294,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:08.370774+00:00"
+  },
+  {
+   "unit": 306295,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "unparsed",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": true,
+   "errors": [],
+   "created": "2026-08-25T11:13:08.859461+00:00"
+  },
+  {
+   "unit": 306295,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "幸存国家",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says '幸存国家' meaning 'surviving country', whereas the source says 'Выжившие страны' meaning 'Survivors of country {0}', referring to the number of survivors from a given country, not the country itself surviving."
+    }
+   ],
+   "created": "2026-08-25T11:33:49.060194+00:00"
+  },
+  {
+   "unit": 306296,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:15:52.620567+00:00"
+  },
+  {
+   "unit": 306296,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:34:23.746558+00:00"
+  },
+  {
+   "unit": 306297,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:28:35.398778+00:00"
+  },
+  {
+   "unit": 306297,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:55.426562+00:00"
+  },
+  {
+   "unit": 306298,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "unparsed",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": true,
+   "errors": [],
+   "created": "2026-08-25T11:13:08.624624+00:00"
+  },
+  {
+   "unit": 306298,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:33:48.936511+00:00"
+  },
+  {
+   "unit": 306299,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:11:55.540534+00:00"
+  },
+  {
+   "unit": 306299,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:33:13.723329+00:00"
+  },
+  {
+   "unit": 306300,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:30:34.552405+00:00"
+  },
+  {
+   "unit": 306300,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:38:14.072162+00:00"
+  },
+  {
+   "unit": 306301,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:32:08.010131+00:00"
+  },
+  {
+   "unit": 306301,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:39:02.321059+00:00"
+  },
+  {
+   "unit": 306302,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "{0} 的 {1} 个国家",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target places {0} as possessor of the countries, e.g. '3's 7 countries', while the source uses {0} as an identifier of the status that changed ('Status 3 of 7 countries'). The rendered target misassigns the number roles, potentially altering what the notification refers to."
+    }
+   ],
+   "created": "2026-08-25T11:24:03.014037+00:00"
+  },
+  {
+   "unit": 306302,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "{0} 的 {1} 个国家状态已变更",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says '{0} 的 {1} 个国家状态已变更', which means 'the status of {1} countries of {0} has changed', but the source says 'the status of {0} countries of {1} has changed'. The roles of {0} and {1} are swapped, leading to incorrect referents."
+    }
+   ],
+   "created": "2026-08-25T11:36:41.914627+00:00"
+  },
+  {
+   "unit": 306303,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:28:35.398156+00:00"
+  },
+  {
+   "unit": 306303,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "从 {1} 状态变为 {2} 状态",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says 'from {1} status to {2} status', which means the status changed from value {1} to value {2}, whereas the source says 'status of country {0} changed: {1} status {2}!', conveying no direction or transition—only that the status is now {2}, with {1} possibly being an actor or descriptor. The addition of '从...变为' fabricates a meaning not present in the source and misleads the player about the nature of the status change."
+    }
+   ],
+   "created": "2026-08-25T11:37:55.425639+00:00"
+  },
+  {
+   "unit": 306304,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:14:54.041857+00:00"
+  },
+  {
+   "unit": 306304,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:34:13.293009+00:00"
+  },
+  {
+   "unit": 306305,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:32:30.291434+00:00"
+  },
+  {
+   "unit": 306305,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:39:11.021576+00:00"
+  },
+  {
+   "unit": 306306,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "minor",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "已升级",
+     "category": "mistranslation",
+     "severity": "minor",
+     "description": "The target says \"upgraded\", which can mean any kind of improvement, while the source says \"promoted\" (rank increased). The key mentions rank up, so the target may cause confusion with experience level rather than rank."
+    }
+   ],
+   "created": "2026-08-25T11:12:44.899171+00:00"
+  },
+  {
+   "unit": 306306,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:33:37.634316+00:00"
+  },
+  {
+   "unit": 306307,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:29:58.684138+00:00"
+  },
+  {
+   "unit": 306307,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:38:06.568914+00:00"
+  },
+  {
+   "unit": 306308,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:25:04.856287+00:00"
+  },
+  {
+   "unit": 306308,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:57.457975+00:00"
+  },
+  {
+   "unit": 306309,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:30:34.558119+00:00"
+  },
+  {
+   "unit": 306309,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:38:14.075042+00:00"
+  },
+  {
+   "unit": 306310,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:21:36.051871+00:00"
+  },
+  {
+   "unit": 306310,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "盟军",
+     "category": "terminology",
+     "severity": "major",
+     "description": "the target says '盟军', which means 'allied forces' or 'the Allies' as a proper noun, whereas the source 'союзных' is a genitive plural adjective meaning 'of allied' or 'allied' and requires agreement with a noun not present in this segment; this standalone use misrepresents the grammatical role and may not fit syntactically in context"
+    }
+   ],
+   "created": "2026-08-25T11:36:13.285239+00:00"
+  },
+  {
+   "unit": 306311,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:29:58.690686+00:00"
+  },
+  {
+   "unit": 306311,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:38:06.572017+00:00"
+  },
+  {
+   "unit": 306312,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:18:40.045016+00:00"
+  },
+  {
+   "unit": 306312,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:15.546349+00:00"
+  },
+  {
+   "unit": 306313,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:26:26.971153+00:00"
+  },
+  {
+   "unit": 306313,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:11.495246+00:00"
+  },
+  {
+   "unit": 306314,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:20:03.066739+00:00"
+  },
+  {
+   "unit": 306314,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:40.217888+00:00"
+  },
+  {
+   "unit": 306315,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "minor",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "精锐部队的损失",
+     "category": "mistranslation",
+     "severity": "minor",
+     "description": "The target says \"losses of elite troops\", implying a specific elite unit was lost, while the source says \"losses among the best\" (i.e. some of the best soldiers died). The nuance differs."
+    }
+   ],
+   "created": "2026-08-25T11:12:44.832240+00:00"
+  },
+  {
+   "unit": 306315,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "精锐部队的损失！",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "the target says 'loss of elite troops', which implies a specific military unit type was lost, whereas the source 'Потери среди лучших!' means 'losses among the best!' — a general statement about high-performing personnel, not necessarily 'elite troops' as a formal designation"
+    }
+   ],
+   "created": "2026-08-25T11:33:37.633231+00:00"
+  },
+  {
+   "unit": 306316,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:26:31.121699+00:00"
+  },
+  {
+   "unit": 306316,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "{0} 级 {1} 师",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says 'a level {0} {1} division', which reverses the order of the source: 'division {0} level {1}'. In the source, {0} is the division type or name and {1} is the level; in the target, {0} is incorrectly rendered as level and {1} as the division number. This swaps the meaning and misleads the player about which value refers to level and which to division type/number."
+    }
+   ],
+   "created": "2026-08-25T11:37:29.693552+00:00"
+  },
+  {
+   "unit": 306317,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:11:55.531899+00:00"
+  },
+  {
+   "unit": 306317,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:33:13.716928+00:00"
+  },
+  {
+   "unit": 306318,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:31:19.315749+00:00"
+  },
+  {
+   "unit": 306318,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:38:25.483871+00:00"
+  },
+  {
+   "unit": 306319,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:14:20.156578+00:00"
+  },
+  {
+   "unit": 306319,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:34:08.276268+00:00"
+  },
+  {
+   "unit": 306320,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:20:23.300579+00:00"
+  },
+  {
+   "unit": 306320,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:54.024051+00:00"
+  },
+  {
+   "unit": 306321,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:21:36.052918+00:00"
+  },
+  {
+   "unit": 306321,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:13.285984+00:00"
+  },
+  {
+   "unit": 306322,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:26:26.972515+00:00"
+  },
+  {
+   "unit": 306322,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:11.496112+00:00"
+  },
+  {
+   "unit": 306323,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:32:30.294401+00:00"
+  },
+  {
+   "unit": 306323,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:39:11.023027+00:00"
+  },
+  {
+   "unit": 306324,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:25:04.867135+00:00"
+  },
+  {
+   "unit": 306324,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:57.461756+00:00"
+  },
+  {
+   "unit": 306325,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:20:23.343309+00:00"
+  },
+  {
+   "unit": 306325,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:54.030318+00:00"
+  },
+  {
+   "unit": 306326,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:25:04.869814+00:00"
+  },
+  {
+   "unit": 306326,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:57.463312+00:00"
+  },
+  {
+   "unit": 306327,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:14:54.045968+00:00"
+  },
+  {
+   "unit": 306327,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:34:13.296400+00:00"
+  },
+  {
+   "unit": 306328,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:31:19.317073+00:00"
+  },
+  {
+   "unit": 306328,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "拒绝",
+     "category": "terminology",
+     "severity": "major",
+     "description": "The target says '拒绝', which means 'to refuse', whereas the source 'Отказаться' means 'to decline' or 'to renounce' — in a diplomatic context, 'decline' is more accurate and 'refuse' carries a stronger, more confrontational tone not present in the source."
+    }
+   ],
+   "created": "2026-08-25T11:38:25.485208+00:00"
+  },
+  {
+   "unit": 306329,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:30:34.558991+00:00"
+  },
+  {
+   "unit": 306329,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "minor",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "{[PARAM0]}国家",
+     "category": "fluency",
+     "severity": "minor",
+     "description": "The target renders {[PARAM0]} as '3国家' in the rendered form, which is ungrammatical in Chinese. The correct word order should be '国家3' or preferably a proper name substitution; placing a number before '国家' without a determiner or particle makes it sound like a label or code rather than a country name. The rendered output misaligns with natural Chinese syntax."
+    }
+   ],
+   "created": "2026-08-25T11:38:14.075620+00:00"
+  },
+  {
+   "unit": 306330,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:18:40.045931+00:00"
+  },
+  {
+   "unit": 306330,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:15.547001+00:00"
+  },
+  {
+   "unit": 306331,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:15:52.621286+00:00"
+  },
+  {
+   "unit": 306331,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:34:23.747455+00:00"
+  },
+  {
+   "unit": 306332,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:21:29.940167+00:00"
+  },
+  {
+   "unit": 306332,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:08.376993+00:00"
+  },
+  {
+   "unit": 306333,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:32:30.287223+00:00"
+  },
+  {
+   "unit": 306333,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:39:11.019184+00:00"
+  },
+  {
+   "unit": 306334,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:26:31.113185+00:00"
+  },
+  {
+   "unit": 306334,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:29.687461+00:00"
+  },
+  {
+   "unit": 306335,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "车队",
+     "category": "terminology",
+     "severity": "major",
+     "description": "Segment has no glossary, but 'конвой' is translated as '商队' in segment 0 and '车队' here. This internal inconsistency can confuse the player about whether the game entity is a trade caravan or a military/logistics convoy."
+    },
+    {
+     "span": "派遣车队",
+     "category": "addition",
+     "severity": "minor",
+     "description": "The target says '派遣车队' (dispatch the convoy). The source 'Отправить конвой' (Send the convoy) does not contain a separate word for 'dispatch' that requires adding '派遣'; 'Отправить' alone is 'Send'. Adding '派遣' is slightly redundant."
+    }
+   ],
+   "created": "2026-08-25T11:11:21.652734+00:00"
+  },
+  {
+   "unit": 306335,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "minor",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "缩短",
+     "category": "fluency",
+     "severity": "minor",
+     "description": "The target says '缩短{[PARAM0]}回合', which means 'shorten by {[PARAM0]} turns', but the source says 'ускорить его возвращение на {[PARAM0]} ходов', which means 'accelerate its return by {[PARAM0]} turns'. While '缩短' is close, it implies reduction of duration rather than acceleration, creating a slight mismatch in action framing. However, the meaning is recoverable in context."
+    }
+   ],
+   "created": "2026-08-25T11:33:02.836907+00:00"
+  },
+  {
+   "unit": 306336,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:11:21.653948+00:00"
+  },
+  {
+   "unit": 306336,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:33:02.848936+00:00"
+  },
+  {
+   "unit": 306337,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "选择护卫部队",
+     "category": "fluency",
+     "severity": "major",
+     "description": "The target says '选择护卫部队', which back-translates to 'Select the escort troops'. The source 'Выберите охрану' is a general instruction to 'Choose guards' or 'Select protection'. The zh_Hans specifies 'troops', adding a military nuance that distorts the source's more general meaning, which could refer to any type of protectors."
+    }
+   ],
+   "created": "2026-08-25T11:32:08.011487+00:00"
+  },
+  {
+   "unit": 306337,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:39:02.321726+00:00"
+  },
+  {
+   "unit": 306338,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:24:03.080243+00:00"
+  },
+  {
+   "unit": 306338,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:36:41.919869+00:00"
+  },
+  {
+   "unit": 306339,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:26:31.118030+00:00"
+  },
+  {
+   "unit": 306339,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:37:29.691259+00:00"
+  },
+  {
+   "unit": 306340,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:12:45.125231+00:00"
+  },
+  {
+   "unit": 306340,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "双击",
+     "category": "terminology",
+     "severity": "major",
+     "description": "the target uses '老兵师' for 'дивизия ветеранов'; if 'ветеранов' refers to veteran status rather than elite classification, '老兵' may be acceptable, but '师' is a direct translation of 'дивизия'; without glossary confirmation, this may not be a terminology error — however, '双击' means 'double-click', but the source says 'нажмите дважды', which means 'click twice'; in UI context, 'double-click' may not be equivalent to 'click twice' depending on game mechanics — if intended as two separate clicks, '双击' is incorrect"
+    }
+   ],
+   "created": "2026-08-25T11:33:37.637094+00:00"
+  },
+  {
+   "unit": 306341,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:16:39.740502+00:00"
+  },
+  {
+   "unit": 306341,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "minor",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "经验和升级到下一级所需经验",
+     "category": "mistranslation",
+     "severity": "minor",
+     "description": "The source contains a repetition or typo: 'опыта, необходимый' after 'Накопленный опыт и', likely meant to be 'и опыт, необходимый'. The target renders both as '经验和升级到下一级所需经验', which correctly captures the intended meaning, but duplicates '经验' unnecessarily. While not changing meaning, it reflects the source error without correction."
+    }
+   ],
+   "created": "2026-08-25T11:34:55.521844+00:00"
+  },
+  {
+   "unit": 306342,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:17:17.034373+00:00"
+  },
+  {
+   "unit": 306342,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:04.293547+00:00"
+  },
+  {
+   "unit": 306343,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:18:40.046743+00:00"
+  },
+  {
+   "unit": 306343,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:15.547769+00:00"
+  },
+  {
+   "unit": 306344,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:20:03.070195+00:00"
+  },
+  {
+   "unit": 306344,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "像游戏中其他增援一样",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The target says 'like other reinforcements in the game', but the source says 'like any other reinforcement in the game', implying a general category, not necessarily limited to those currently in the game. The addition of '中' (in the game) narrows the scope and changes the meaning."
+    }
+   ],
+   "created": "2026-08-25T11:35:40.220153+00:00"
+  },
+  {
+   "unit": 306345,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:20:23.330862+00:00"
+  },
+  {
+   "unit": 306345,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:54.027836+00:00"
+  },
+  {
+   "unit": 306346,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:20:23.339064+00:00"
+  },
+  {
+   "unit": 306346,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:35:54.029390+00:00"
+  },
+  {
+   "unit": 306347,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "pass",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "none",
+   "unparsed": false,
+   "errors": [],
+   "created": "2026-08-25T11:20:03.068567+00:00"
+  },
+  {
+   "unit": 306347,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "flag",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "major",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "超过12个雷区",
+     "category": "mistranslation",
+     "severity": "major",
+     "description": "The target says 'more than 12 minefields', which means exceeding 12, whereas the source says 'more than 12 mines' (мин), not minefields (минных полей). The source refers to individual mines, not minefield units."
+    }
+   ],
+   "created": "2026-08-25T11:35:40.218880+00:00"
+  },
+  {
+   "unit": 306348,
+   "seat": 1,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "deepseek/deepseek-v4-pro",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "",
+     "category": "omission",
+     "severity": "critical",
+     "description": "The target is empty. The source asks 'Хотите открыть модифицированный режим <color=\"white\">{[NAME]}</color> прямо сейчас за {0}?', which is a confirmation to unlock a mode. The player cannot consent to or decline the purchase because the prompt is missing."
+    }
+   ],
+   "created": "2026-08-25T11:32:07.992614+00:00"
+  },
+  {
+   "unit": 306348,
+   "seat": 2,
+   "attempt": 0,
+   "run": "39940521-c560-4589-8d61-7706862dd269",
+   "verdict": "reject",
+   "judge_model": "qwen/qwen3-235b-a22b-2507",
+   "max_severity": "critical",
+   "unparsed": false,
+   "errors": [
+    {
+     "span": "",
+     "category": "omission",
+     "severity": "critical",
+     "description": "The target is empty, while the source asks whether the player wants to unlock a modified mode immediately for a cost, including a color-tagged mode name and a price placeholder. The complete omission prevents the player from making an informed decision about a purchase."
+    }
+   ],
+   "created": "2026-08-25T11:39:02.319780+00:00"
+  }
+ ],
+ "usage": []
+}

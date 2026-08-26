@@ -1,0 +1,17 @@
+[
+ {
+  "project": "heart-abyss",
+  "component": "all-glossary",
+  "languages": [
+   "de",
+   "en",
+   "es",
+   "fr",
+   "it",
+   "ja",
+   "ko",
+   "zh_Hans",
+   "zh_Hant"
+  ]
+ }
+]

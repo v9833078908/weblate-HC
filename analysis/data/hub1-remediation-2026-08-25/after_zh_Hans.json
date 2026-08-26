@@ -1,0 +1,29 @@
+{
+  "target": "heart-abyss/hub-1",
+  "language": "zh_Hans",
+  "total_units": 396,
+  "total_words": 2371,
+  "failing_checks": {
+    "duplicate": [
+      371840
+    ],
+    "game-number": [
+      371762,
+      371763
+    ],
+    "end_stop": [
+      371613,
+      371621,
+      371782,
+      371855,
+      371973
+    ],
+    "end_question": [
+      371782,
+      371855,
+      371973
+    ]
+  },
+  "candidates": [],
+  "mqm_results": null
+}

@@ -1,0 +1,36 @@
+{
+  "target": "heart-abyss/hub-1",
+  "language": "ko",
+  "total_units": 396,
+  "total_words": 2371,
+  "failing_checks": {
+    "duplicate": [
+      371444,
+      371548
+    ],
+    "game-number": [
+      371367
+    ],
+    "end_stop": [
+      371459,
+      371509,
+      371577
+    ],
+    "end_question": [
+      371335,
+      371459,
+      371509,
+      371567,
+      371577
+    ],
+    "end_exclamation": [
+      371567
+    ],
+    "ellipsis": [
+      371335,
+      371441
+    ]
+  },
+  "candidates": [],
+  "mqm_results": null
+}
