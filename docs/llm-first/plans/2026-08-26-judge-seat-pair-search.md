@@ -421,5 +421,6 @@ Resolved on 2026-08-26:
 3. A product change may be proposed, including a thinking toggle.
 
 **Open:** choose the mode in `Stage 0 outcome, and the decision it forces`.
-Until then, stages 2-6 do not run: reasoning-on excludes the Qwen family,
-reasoning-off requires the shared judge mapping first.
+Stage 2 is independent of that choice and may run now. Stages 3-6 do not run
+until it is recorded: reasoning-on excludes the Qwen family, while reasoning-off
+requires the shared judge mapping first.
