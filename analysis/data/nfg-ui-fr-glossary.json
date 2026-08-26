@@ -1,0 +1,1817 @@
+{
+ "dataset": "need-for-greed/glossary/fr",
+ "terms": [
+  {
+   "source": "A New Glasses",
+   "target": "De nouvelles lunettes",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "All about the likes!",
+   "target": "Tout sur les likes !",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Altar",
+   "target": "Autel",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Amethyst (Big)",
+   "target": "Améthyste (grande)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Amethyst (Medium)",
+   "target": "Améthyste (moyenne)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Amethyst (Rough)",
+   "target": "Améthyste (brute)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Amethyst (Small)",
+   "target": "Améthyste (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Ancient Coin (Gold)",
+   "target": "Pièce ancienne (or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Ancient Coin (Silver)",
+   "target": "Pièce ancienne (argent)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Ancient Money",
+   "target": "Argent ancien",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Ancient Tome",
+   "target": "Tome ancien",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Appraisal",
+   "target": "Évaluation",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Artifact",
+   "target": "Artefact",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Artifacts",
+   "target": "Artefacts",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Avian Gemstone",
+   "target": "Pierre précieuse aviaire",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Backpack",
+   "target": "Sac à dos",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Bad profit",
+   "target": "Mauvais profit",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Ball-Roller",
+   "target": "Ball-Roller",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Beacon",
+   "target": "Phare",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Belomar",
+   "target": "Belomar",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Best Heater",
+   "target": "Meilleur chauffage",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Best profit",
+   "target": "Meilleur profit",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Big Deal",
+   "target": "Grosse affaire",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Big Owl",
+   "target": "Grand hibou",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Big bag",
+   "target": "Grand sac",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Bird",
+   "target": "Oiseau",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Bleed",
+   "target": "Saignement",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Blooming Garden Brooch (Gold)",
+   "target": "Broche Jardin fleuri (Or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Blue Sapphire (Big)",
+   "target": "Saphir bleu (grand)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Blue Sapphire (Medium)",
+   "target": "Saphir bleu (moyen)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Blue Sapphire (Small)",
+   "target": "Saphir bleu (petit)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Bonded Belt (Silver)",
+   "target": "Ceinture liée (argent)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Bondstone (Big)",
+   "target": "Pierre de liaison (grande)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Bondstone (Medium)",
+   "target": "Pierre de liaison (moyenne)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Bondstone (Small)",
+   "target": "Pierre de liaison (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Bracelet",
+   "target": "Bracelet",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Broken Visage Mask",
+   "target": "Masque de visage brisé",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Brooch",
+   "target": "Broche",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Brown Ruby",
+   "target": "Rubis brun",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Buried Chest",
+   "target": "Coffre enfoui",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Buyer",
+   "target": "Acheteur",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Canary",
+   "target": "Canari",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Capacity",
+   "target": "Capacité",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Casket",
+   "target": "Coffret",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Celestial Ring",
+   "target": "Anneau Céleste",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Character",
+   "target": "Personnage",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Character Status",
+   "target": "Statut du personnage",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Chest",
+   "target": "Coffre",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Chest of the Jarl",
+   "target": "Coffre du Jarl",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Chest slot",
+   "target": "Emplacement de coffre",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Chests",
+   "target": "Coffres",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Chipped Big Diamond",
+   "target": "Grand diamant ébréché",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Coco",
+   "target": "Coco",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Coin of Ancient Glory",
+   "target": "Pièce de gloire ancienne",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Coins",
+   "target": "Pièces",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Collected",
+   "target": "Collecté",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Colophony Mosquito",
+   "target": "Moustique Colophony",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Colossal Diamond",
+   "target": "Diamant colossal",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Common",
+   "target": "Commun",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Cosmic Intruder",
+   "target": "Intrus cosmique",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Count Blingula",
+   "target": "Comte Blingula",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Covenant Stone",
+   "target": "Pierre d'Alliance",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Crab Metal",
+   "target": "Métal de crabe",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Crab Warmcoat",
+   "target": "Manteau chaud de crabe",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Crab Warmth",
+   "target": "Chaleur de crabe",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Cracked Gauntlet",
+   "target": "Gantelet fissuré",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Craft",
+   "target": "Fabriquer",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Craft slot",
+   "target": "Emplacement d'artisanat",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Crimson Ruby (Big)",
+   "target": "Rubis cramoisi (grand)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Crimson Ruby (Medium)",
+   "target": "Rubis cramoisi (moyen)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Crimson Ruby (Small)",
+   "target": "Rubis cramoisi (petit)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Crimson-blood Ruby",
+   "target": "Rubis couleur sang",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Crumbled Gold",
+   "target": "Or émietté",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Cryolis",
+   "target": "Cryolis",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Cryolis Nugget (Small)",
+   "target": "Pépite de cryolis (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Cursed",
+   "target": "Maudit",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Cursed Relic",
+   "target": "Relique maudite",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Dagger",
+   "target": "Dague",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Dead Man’s Chest",
+   "target": "Coffre du mort",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Dealer",
+   "target": "Marchand",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Dexterity",
+   "target": "Dextérité",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Diadem",
+   "target": "Diadème",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Diamond (Rough)",
+   "target": "Diamant (brut)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Dull Silver",
+   "target": "Argent terne",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Dummy drive",
+   "target": "Lecteur factice",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Dung Pie",
+   "target": "Galette de fumier",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Earring",
+   "target": "Boucle d'oreille",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Egg",
+   "target": "Œuf",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Eggs",
+   "target": "Œufs",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Elf Lustro",
+   "target": "Lustro elfe",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Elite slot",
+   "target": "Emplacement élite",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Eliza Glitterford",
+   "target": "Eliza Glitterford",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Emerald (Big)",
+   "target": "Émeraude (grande)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Emerald (Medium)",
+   "target": "Émeraude (moyenne)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Emerald (Rough)",
+   "target": "Émeraude (brute)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Emerald (Small)",
+   "target": "Émeraude (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Epic",
+   "target": "Épique",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Essence of Flame",
+   "target": "Essence de Flamme",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Exhaustion",
+   "target": "Épuisement",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Fatigue",
+   "target": "Fatigue",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Fenmar Swamp",
+   "target": "Marais de Fenmar",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Flawed Diamond (Medium)",
+   "target": "Diamant imparfait (moyen)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Flawless Diamond (Medium)",
+   "target": "Diamant sans défaut (moyen)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Floppy with Flopcoins",
+   "target": "Disquette avec Flopcoins",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Forge",
+   "target": "Forge",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Fractured Crown",
+   "target": "Couronne fracturée",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Fractured Dagger of Will",
+   "target": "Dague de volonté fracturée",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Friday Night Mask",
+   "target": "Masque du vendredi soir",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frostbite",
+   "target": "Engelure",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frosty Gold",
+   "target": "Or givré",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frosty Silver",
+   "target": "Argent givré",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen",
+   "target": "Gelé",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen Ancient Tome",
+   "target": "Tome ancien gelé",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen Diamond (Big)",
+   "target": "Diamant gelé (grand)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen Diamond (Medium)",
+   "target": "Diamant gelé (moyen)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen Gold Nugget (Small)",
+   "target": "Pépite d'or gelée (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen Idol",
+   "target": "Idole gelée",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen Large Gold Chunk",
+   "target": "Gros morceau d'or gelé",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen Opal (Small)",
+   "target": "Opale gelée (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen Ruby (Small)",
+   "target": "Rubis gelé (petit)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen Sapphire (Small)",
+   "target": "Saphir gelé (petit)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen Shipyard",
+   "target": "Chantier naval gelé",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen Silver Nugget (Small)",
+   "target": "Pépite d'argent gelée (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Frozen item",
+   "target": "Objet gelé",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Gem",
+   "target": "Gemme",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Gem Seeker",
+   "target": "Chercheur de gemmes",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Gems",
+   "target": "Gemmes",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Generous buyers",
+   "target": "Acheteurs généreux",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Genghis Khan Tooth",
+   "target": "Dent de Gengis Khan",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Geode",
+   "target": "Géode",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Geode (Medium)",
+   "target": "Géode (moyenne)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Geode (Small)",
+   "target": "Géode (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Geodes",
+   "target": "Géodes",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Getting Used to the Land",
+   "target": "S'habituer à la terre",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Glasses",
+   "target": "Lunettes",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Gleam of Dawn",
+   "target": "Lueur de l'aube",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Gleaming Silver Nugget",
+   "target": "Pépite d'argent étincelante",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Going Big",
+   "target": "Voir grand",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Gold",
+   "target": "Or",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Gold Nugget (Big)",
+   "target": "Pépite d'or (grande)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Gold Nugget (Small)",
+   "target": "Pépite d'or (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Golden Crown",
+   "target": "Couronne dorée",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Golden Dagger of Will",
+   "target": "Dague de volonté dorée",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Golden Gauntlet",
+   "target": "Gantelet doré",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Golden Omelette",
+   "target": "Omelette dorée",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Golden Scarab",
+   "target": "Scarabée doré",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Golden Scepter",
+   "target": "Sceptre doré",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Golden Visage Mask",
+   "target": "Masque de visage doré",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Golden coins",
+   "target": "Pièces d'or",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Golden toilet",
+   "target": "Toilettes dorées",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Goldmine",
+   "target": "Mine d'or",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Good profit",
+   "target": "Bon profit",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Graves",
+   "target": "Tombes",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Grimdal",
+   "target": "Grimdal",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Grounded Astrology",
+   "target": "Astrologie terrestre",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Heaven’s Grace",
+   "target": "Grâce du Ciel",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Hexed Coin",
+   "target": "Pièce ensorcelée",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Hidden Gem Pin (Gold)",
+   "target": "Épingle de gemme cachée (or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Holy Dubai Choco",
+   "target": "Choco sacré de Dubaï",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Horse",
+   "target": "Cheval",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Horse cargo bag",
+   "target": "Sac de chargement de cheval",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Ice Cubes",
+   "target": "Glaçons",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Idol",
+   "target": "Idole",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Idol Hearth",
+   "target": "Idole du Foyer",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Idol Spark",
+   "target": "Étincelle d'Idole",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Idol of the Blazing Skull",
+   "target": "Idole du Crâne Flamboyant",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Idol of the Great Boar",
+   "target": "Idole du Grand Sanglier",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Idol of the Mustachedness",
+   "target": "Idole de la Moustache",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Idol of the Singed Noggin",
+   "target": "Idole du Crâne Rôti",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Idol of the Wisdom",
+   "target": "Idole de la Sagesse",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Incubator",
+   "target": "Incubateur",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Insert",
+   "target": "Insérer",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Inventory",
+   "target": "Inventaire",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Invisible Gem",
+   "target": "Gemme invisible",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Iridescent Stone",
+   "target": "Pierre irisée",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "It Left Offspring!",
+   "target": "Il a laissé une progéniture !",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Jarl Chest",
+   "target": "Coffre du Jarl",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Jewelry",
+   "target": "Bijoux",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Jewelry Sprint",
+   "target": "Sprint de bijoux",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Keepsake Box",
+   "target": "Boîte à souvenirs",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "King’s Signet (Gold)",
+   "target": "Chevalière du Roi (Or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Labyrinth",
+   "target": "Labyrinthe",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Lady Amethysta",
+   "target": "Lady Amethysta",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Large Gold Chunk",
+   "target": "Gros morceau d'or",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Leaders",
+   "target": "Dirigeants",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Legendary",
+   "target": "Légendaire",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Leonard Goldstein",
+   "target": "Leonard Goldstein",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Likes",
+   "target": "J'aime",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Lion’s Blood",
+   "target": "Sang de lion",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Loot",
+   "target": "Butin",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Lopsided Sapphire",
+   "target": "Saphir déséquilibré",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Lord Glimo",
+   "target": "Lord Glimo",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Lostwood",
+   "target": "Bois perdu",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Luminous Opal",
+   "target": "Opale lumineuse",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Mangled Gold Chunk",
+   "target": "Morceau d'or déformé",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Map",
+   "target": "Carte",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Mask",
+   "target": "Masque",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Metal",
+   "target": "Métal",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Metals",
+   "target": "Métaux",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Meteor Core",
+   "target": "Noyau de météore",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Meteorfall",
+   "target": "Chute de météores",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Monday 12th Mask",
+   "target": "Masque du lundi 12",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Moonlit Ring (Silver)",
+   "target": "Anneau lunaire (argent)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Mossy Coin",
+   "target": "Pièce moussue",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Murky Opal",
+   "target": "Opale trouble",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Mystery-Crap Stone",
+   "target": "Pierre mystérieuse",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Mythic",
+   "target": "Mythique",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Narrow Stone Bracelet (Gold)",
+   "target": "Bracelet en pierre étroite (Or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Necklace",
+   "target": "Collier",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Needle of Honor (Silver)",
+   "target": "Aiguille d'honneur (Argent)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "New Sensors",
+   "target": "Nouveaux capteurs",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "New slot",
+   "target": "Nouvel emplacement",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Noisy Tool",
+   "target": "Outil bruyant",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Opal (Big)",
+   "target": "Opale (grande)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Opal (Medium)",
+   "target": "Opale (moyenne)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Opal (Rough)",
+   "target": "Opale (brute)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Opal (Small)",
+   "target": "Opale (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Ore Seeker",
+   "target": "Chercheur de minerai",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Owl Chick",
+   "target": "Petit hibou",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Paradise Bird Egg",
+   "target": "Œuf d'oiseau de paradis",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Pendant of Hidden Light (Gold)",
+   "target": "Pendentif de lumière cachée (Or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Pick",
+   "target": "Pioche",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Pin",
+   "target": "Épingle",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Polishing",
+   "target": "Polissage",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Poor Man's Boar Idol",
+   "target": "Idole de sanglier du pauvre",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Pristine Gold Nugget",
+   "target": "Pépite d'or immaculée",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Prospectors",
+   "target": "Prospecteurs",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Pure Diamond (Big)",
+   "target": "Diamant pur (grand)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Pure Diamond (Medium)",
+   "target": "Diamant pur (moyen)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Pure Diamond (Small)",
+   "target": "Diamant pur (petit)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Quietwood",
+   "target": "Bois paisible",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Radiant Medallion (Gold)",
+   "target": "Médaillon radiant (Or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Rare",
+   "target": "Rare",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Rarity",
+   "target": "Rareté",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Recipe",
+   "target": "Recette",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Recipe book",
+   "target": "Livre de recettes",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Regeneration",
+   "target": "Régénération",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Resonant Earrings (Gold)",
+   "target": "Boucles d'oreilles résonnantes (Or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Ring",
+   "target": "Bague",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Ring (Gold)",
+   "target": "Bague (Or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Roman von Valiant",
+   "target": "Roman von Valiant",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Rough",
+   "target": "Brut",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Ruby (Rough)",
+   "target": "Rubis (brut)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Ruby Ray",
+   "target": "Ruby Ray",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Rubybeard",
+   "target": "Rubybeard",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Sapphire (Rough)",
+   "target": "Saphir (brut)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Sawmill",
+   "target": "Scierie",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Serpent Ring (Silver)",
+   "target": "Anneau Serpent (Argent)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Shattered Scepter",
+   "target": "Sceptre brisé",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Shrine",
+   "target": "Sanctuaire",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Silent Tool",
+   "target": "Outil silencieux",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Silver Nugget (Small)",
+   "target": "Pépite d'argent (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Silver coins",
+   "target": "Pièces d'argent",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Silver for Tempering",
+   "target": "Argent pour le trempage",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Sir Maxillion",
+   "target": "Sir Maxillion",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Skyborn Sapphire",
+   "target": "Saphir céleste",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Slot",
+   "target": "Emplacement",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Slowdown",
+   "target": "Ralentissement",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Source of the Old Blood",
+   "target": "Source du Vieux Sang",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Sovereign’s Signet (Gold)",
+   "target": "Chevalière du Souverain (Or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Sparkwing",
+   "target": "Ailes-étincelles",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Speed Boost",
+   "target": "Accélération",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Splendid Gold Chunk",
+   "target": "Magnifique morceau d'or",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Star Iron (Small)",
+   "target": "Fer stellaire (petit)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Starfall",
+   "target": "Chute d'étoiles",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Stone Bowling",
+   "target": "Bowling de pierres",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Storage",
+   "target": "Stockage",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Sun Cult",
+   "target": "Culte du Soleil",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Sun Sphere",
+   "target": "Sphère solaire",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Sunburst Brooch (Gold)",
+   "target": "Broche Rayon de soleil (Or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Super slot",
+   "target": "Super emplacement",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Swamp",
+   "target": "Marais",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Swamp Larva",
+   "target": "Larve des marais",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Tentacle Signet (Silver)",
+   "target": "Chevalière Tentacule (Argent)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Trader",
+   "target": "Marchand",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Trading",
+   "target": "Commerce",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Trading shop",
+   "target": "Boutique de commerce",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Trash",
+   "target": "Déchets",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Treasure detector",
+   "target": "Détecteur de trésors",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Twin Fates Ring (Gold)",
+   "target": "Bague des destins jumeaux (Or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Uncommon",
+   "target": "Inhabituel",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Unknown",
+   "target": "Inconnu",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Unknown item",
+   "target": "Objet inconnu",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Valuable Geode (Medium)",
+   "target": "Géode précieuse (moyenne)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Valuable Geode (Small)",
+   "target": "Géode précieuse (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Vanity Spectacles (Gold)",
+   "target": "Lunettes de vanité (Or)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Wasteland",
+   "target": "Terre désolée",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "We Need More Gold!",
+   "target": "Nous avons besoin de plus d'or !",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Whitelands",
+   "target": "Terres blanches",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Whitelands Treasure",
+   "target": "Trésor des Terres Blanches",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Wild Gemstone (Medium)",
+   "target": "Gemme sauvage (moyenne)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Wild Gemstone (small)",
+   "target": "Gemme sauvage (petite)",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Wise notes",
+   "target": "Notes sages",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Worm",
+   "target": "Ver",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Worm Egg",
+   "target": "Œuf de ver",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Worn Scroll",
+   "target": "Parchemin usé",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Yolk of Fortune",
+   "target": "Jaune de Fortune",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "You reek of riches",
+   "target": "Vous sentez la richesse",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Your tooth?!?",
+   "target": "Votre dent?!?",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Zlatovich the Dealer",
+   "target": "Zlatovich le Marchand",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "Zlatovich’s Trading Shop",
+   "target": "Boutique de commerce de Zlatovich",
+   "explanation": "",
+   "flags": ""
+  },
+  {
+   "source": "ice crab",
+   "target": "Crabe de glace",
+   "explanation": "",
+   "flags": ""
+  }
+ ]
+}
