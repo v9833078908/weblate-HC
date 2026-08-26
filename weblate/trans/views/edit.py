@@ -1300,10 +1300,12 @@ def _judge_view_context(
     """Judge-verdict context for the unit page: round, verdict, staleness."""
     judge_round = latest_round(unit)
     judge_current_round = current_round(unit)
-    judge_verdict = active_verdict(unit)
+    judge_current_verdict = current_verdict(unit)
     judge_unparsed = bool(judge_current_round) and all(
         row.unparsed for row in judge_current_round
     )
+    active = active_verdict(unit)
+    judge_verdict = active if judge_unparsed else judge_current_verdict or active
     judge_stale = (
         bool(judge_round)
         and judge_verdict is None
@@ -1317,11 +1319,8 @@ def _judge_view_context(
             glossary_terms=get_matched_glossary_prompt_entries(unit),
         )
     )
-    # Only the strictly current (target+context fresh) round is eligible
-    # for resolution - the same freshness resolve_verdict() itself checks.
-    judge_current_verdict = current_verdict(unit)
     judge_resolution_choices: set[str] = set()
-    if judge_current_verdict is not None and not judge_context_changed:
+    if judge_current_verdict is not None:
         judge_resolution_choices = {
             resolution
             for verdict, old_resolution, resolution in ALLOWED_RESOLUTION_TRANSITIONS
@@ -1342,7 +1341,15 @@ def _judge_view_context(
     return {
         "judge_round": judge_round,
         "judge_verdict": judge_verdict,
-        "judge_seats": active_round(unit) if judge_verdict is not None else [],
+        "judge_seats": (
+            active_round(unit)
+            if judge_unparsed
+            else judge_current_round
+            if judge_current_verdict is not None
+            else active_round(unit)
+            if judge_verdict is not None
+            else []
+        ),
         "judge_stale": judge_stale,
         "judge_unparsed": judge_unparsed,
         "judge_context_changed": judge_context_changed,

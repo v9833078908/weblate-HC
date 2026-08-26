@@ -77,15 +77,11 @@ class JudgeError(Exception):
 
 def judge_configuration_ready() -> bool:
     """Whether the complete two-seat judge configuration is usable."""
-    return bool(
-        settings.JUDGE_ENABLED
-        and isinstance(settings.JUDGE_OPENROUTER_KEY, str)
-        and settings.JUDGE_OPENROUTER_KEY.strip()
-        and isinstance(settings.JUDGE_MODEL_SEAT_1, str)
-        and settings.JUDGE_MODEL_SEAT_1.strip()
-        and isinstance(settings.JUDGE_MODEL_SEAT_2, str)
-        and settings.JUDGE_MODEL_SEAT_2.strip()
-    )
+    try:
+        validate_judge_configuration()
+    except JudgeError:
+        return False
+    return True
 
 
 def validate_request_settings() -> None:

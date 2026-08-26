@@ -25401,6 +25401,14 @@ msgstr ""
 msgid "Ships with evidence"
 msgstr "Публикуется с замечанием"
 
+#: weblate/templates/snippets/judge-verdict.html:39
+msgid "Ships with override"
+msgstr "Публикуется по решению"
+
+#: weblate/templates/snippets/judge-verdict.html:41
+msgid "Will not ship"
+msgstr "Не публикуется"
+
 #: weblate/trans/filter.py:81
 msgid "Judge - major (ships)"
 msgstr "Судья — серьёзно (публикуется)"

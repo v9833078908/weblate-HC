@@ -17,6 +17,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from weblate.trans.judge import (
     JudgeError,
     JudgeRequest,
+    judge_configuration_ready,
     render_preview,
     request_verdicts,
     validate_judge_configuration,
@@ -159,6 +160,16 @@ class JudgeClientGateTest(SimpleTestCase):
     def test_run_gate_rejects_an_unusable_batch_size(self) -> None:
         with self.assertRaises(JudgeError):
             validate_judge_configuration()
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+        JUDGE_MAX_UNITS_PER_RUN=-1,
+    )
+    def test_readiness_rejects_an_invalid_cap(self) -> None:
+        self.assertFalse(judge_configuration_ready())
 
 
 @override_settings(

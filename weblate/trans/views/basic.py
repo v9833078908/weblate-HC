@@ -901,7 +901,7 @@ def show_translation(
     if settings.JUDGE_ENABLED:
         judge_row_count = (
             obj.unit_set.exclude(state=STATE_READONLY)
-            .search("state:<translated", parser="unit")
+            .search("state:empty", parser="unit")
             .count()
         )
         judge_request_estimate = (

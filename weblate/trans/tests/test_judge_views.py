@@ -119,6 +119,41 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
         self.assertRedirects(response, self.project.get_absolute_url())
 
     @override_settings(
+        CELERY_TASK_ALWAYS_EAGER=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_project_scope_task_runs_in_eager_mode(self) -> None:
+        response = self.client.post(
+            reverse("auto_translation", kwargs={"path": self.project.get_url_path()}),
+            {
+                "mode": "judge",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "engines": [],
+                "threshold": 80,
+            },
+        )
+
+        self.assertRedirects(response, self.project.get_absolute_url())
+
+    def test_translation_estimate_uses_the_judge_default_query(self) -> None:
+        translation = self.get_translation()
+        unit = translation.unit_set.first()
+        assert unit is not None
+        unit.translate(self.user, ["Needs editing"], STATE_FUZZY)
+        expected = (
+            translation.unit_set.exclude(state=STATE_READONLY)
+            .search("state:empty", parser="unit")
+            .count()
+        )
+
+        response = self.client.get(translation.get_absolute_url())
+
+        self.assertEqual(response.context["judge_row_count"], expected)
+
+    @override_settings(
         JUDGE_OPENROUTER_KEY="sk-test",
         JUDGE_MODEL_SEAT_1="vendor-a/model",
         JUDGE_MODEL_SEAT_2="vendor-b/model",
@@ -379,6 +414,8 @@ class JudgeVerdictCardTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "latest judge answer was not parsed")
         self.assertContains(response, "historical evidence")
+        self.assertContains(response, "Rejected")
+        self.assertContains(response, "Will not ship")
 
     def test_no_verdict_means_no_card(self) -> None:
         response = self.client.get(self.get_unit().get_absolute_url())
@@ -403,6 +440,53 @@ class JudgeVerdictCardTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "Will not ship")
         self.assertNotContains(response, "Ships with evidence")
+
+    def test_current_context_round_beats_newer_context_stale_evidence(self) -> None:
+        unit = self.get_unit()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+        current_context = judge_context_hash(unit)
+        first = JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="major",
+            seat=1,
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "major",
+                    "description": "current context",
+                }
+            ],
+            judge_model="vendor/model-a",
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash=current_context,
+        )
+        newer = JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="critical",
+            seat=1,
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "changed context",
+                }
+            ],
+            judge_model="vendor/model-a",
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash="changed-context",
+        )
+        JudgeVerdict.objects.filter(pk=newer.pk).update(
+            timestamp=first.timestamp + timedelta(seconds=1)
+        )
+
+        response = self.client.get(unit.get_absolute_url())
+
+        self.assertContains(response, "current context")
+        self.assertNotContains(response, "changed context")
+        self.assertContains(response, "id_judge_resolution_form")
 
     def test_pass_card_renders_minor_errors(self) -> None:
         unit = self.get_unit()
@@ -530,6 +614,53 @@ class JudgeRepairEvidenceTest(ViewTestCase):
         evidence_html = response.content[idx : idx + len(label) + 300]
         self.assertIn(b"<del>Broken", evidence_html)
         self.assertIn(b"<ins>Fixed", evidence_html)
+
+    def test_second_repair_shows_the_text_before_that_repair(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Broken sentence"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        now = timezone.now()
+        self.make_round(
+            unit, run_id=run_id, attempt=0, severity="major", when=now, tag="original"
+        )
+        unit.translate(self.user, ["First repair"], STATE_FUZZY)
+        unit = self.get_unit()
+        first_change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=first_change.pk).update(
+            timestamp=now + timedelta(seconds=1)
+        )
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=1,
+            severity="major",
+            when=now + timedelta(seconds=2),
+            tag="first repair",
+        )
+        unit.translate(self.user, ["Final repair"], STATE_FUZZY)
+        unit = self.get_unit()
+        second_change = unit.change_set.get(target=unit.target)
+        Change.objects.filter(pk=second_change.pk).update(
+            timestamp=now + timedelta(seconds=3)
+        )
+        self.make_round(
+            unit,
+            run_id=run_id,
+            attempt=2,
+            severity="none",
+            when=now + timedelta(seconds=4),
+            tag="final repair",
+        )
+
+        response = self.client.get(unit.get_absolute_url())
+
+        self.assertContains(response, "Text before the repair:")
+        label = b"Text before the repair:"
+        idx = response.content.index(label)
+        evidence_html = response.content[idx : idx + len(label) + 300]
+        self.assertIn(b"<ins>nal</ins> repair", evidence_html)
+        self.assertNotIn(b"Broken", evidence_html)
 
     def test_missing_change_omits_the_comparison(self) -> None:
         unit = self.get_unit()
@@ -840,6 +971,9 @@ class JudgeResolutionViewTest(ViewTestCase):
         self.assertRedirects(response, unit.get_absolute_url())
         refreshed = self.get_unit()
         self.assertEqual(refreshed.state, STATE_TRANSLATED)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Ships with override")
+        self.assertNotContains(response, "Will not ship")
 
     def test_escalating_a_major_holds_it_for_review(self) -> None:
         self.enable_review()
@@ -996,6 +1130,25 @@ class JudgeQueueStripViewTest(ViewTestCase):
             )
         response = self.client.get(self.component.get_absolute_url())
         self.assertEqual(response.context["judge_queue"]["counts"]["needs_human"], 0)
+
+    def test_same_state_resolution_invalidates_judge_stats(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        translation = unit.translation
+        self.refresh_stats(translation)
+        self.assertEqual(translation.stats.judge_resolved, 0)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                self.resolve_url(verdict),
+                {"resolution": "accepted_as_is", "reason": "ships as-is"},
+            )
+
+        translation.stats.force_load()
+        self.assertEqual(translation.stats.judge_resolved, 1)
 
     def test_escalated_major_counts_as_needs_a_human(self) -> None:
         self.enable_review()

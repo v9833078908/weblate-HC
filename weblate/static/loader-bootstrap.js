@@ -1208,9 +1208,10 @@ onReady(() => {
     persistForms.forEach((form) => {
       const storedRaw = window.localStorage[form.dataset.persist];
       if (storedRaw) {
+        const urlParameters = new URLSearchParams(window.location.search);
         const storedValue = JSON.parse(storedRaw);
         for (const [key, value] of Object.entries(storedValue)) {
-          if (!key) {
+          if (!key || urlParameters.has(key)) {
             continue;
           }
           const selector = `[name="${CSS.escape(key)}"]`;
@@ -1431,6 +1432,12 @@ onReady(() => {
     };
     mode.addEventListener("change", updateJudgePreview);
     query.addEventListener("input", updateJudgePreview);
+    form
+      .querySelector('[name="overwrite_existing"]')
+      ?.addEventListener("change", updateJudgePreview);
+    form
+      .querySelector('[name="engines"]')
+      ?.addEventListener("change", updateJudgePreview);
     updateJudgePreview();
   });
 

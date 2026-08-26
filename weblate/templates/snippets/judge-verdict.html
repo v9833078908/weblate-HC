@@ -35,7 +35,11 @@
           <h5 class="list-group-item-heading">
             <span class="red">{% icon "cancel.svg" %}</span>
             {% translate "Rejected" %}
-            <span class="badge text-bg-danger">{% translate "Will not ship" %}</span>
+            {% if judge_current_verdict.resolution == "accepted_as_is" %}
+              <span class="badge text-bg-success">{% translate "Ships with override" %}</span>
+            {% else %}
+              <span class="badge text-bg-danger">{% translate "Will not ship" %}</span>
+            {% endif %}
           </h5>
           <p class="list-group-item-text text-muted">
             {% blocktranslate with model=judge_verdict.judge_model when=judge_verdict.timestamp|naturaltime %}{{ model }} · {{ when }}{% endblocktranslate %}
@@ -83,7 +87,7 @@
             {% endfor %}
           {% endfor %}
         </div>
-      {% elif judge_verdict %}
+      {% elif judge_verdict and not judge_verdict.unparsed %}
         <div class="list-group-item check">
           <h5 class="list-group-item-heading">
             <span class="green">{% icon "check.svg" %}</span>
@@ -116,9 +120,7 @@
             {% icon "wrench.svg" %}
             {% translate "Repaired since the original verdict" %}
           </h5>
-          <p class="list-group-item-text text-muted">
-            {% translate "What the judge originally flagged:" %}
-          </p>
+          <p class="list-group-item-text text-muted">{% translate "What the judge originally flagged:" %}</p>
           {% for seat in judge_repair_evidence.original_seats %}
             {% for error in seat.errors %}
               <p class="list-group-item-text">
@@ -129,9 +131,7 @@
             {% endfor %}
           {% endfor %}
           {% if judge_repair_evidence.previous_target %}
-            <p class="list-group-item-text text-muted">
-              {% translate "Text before the repair:" %}
-            </p>
+            <p class="list-group-item-text text-muted">{% translate "Text before the repair:" %}</p>
             {% format_unit_target unit value=unit.target diff=judge_repair_evidence.previous_target %}
           {% endif %}
         </div>

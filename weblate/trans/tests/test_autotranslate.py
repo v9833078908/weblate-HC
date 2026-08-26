@@ -739,6 +739,38 @@ class AutoTranslationTest(ViewTestCase):
             response, "Automatic translation completed, 1 string was updated."
         )
 
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_judge_workspace_ignores_source_selection(self) -> None:
+        workspace = Workspace.objects.create(name="Judge workspace")
+        self.project.workspace = workspace
+        self.component.source_language = Language.objects.get(code="de")
+        self.project.save(update_fields=["workspace"])
+        self.component.save(update_fields=["source_language"])
+
+        with (
+            patch.object(AutoTranslate, "process_mt"),
+            patch(
+                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+            ) as run,
+        ):
+            auto_translate(
+                workspace_id=str(workspace.pk),
+                user_id=self.user.id,
+                mode="judge",
+                q="state:empty",
+                auto_source="others",
+                source_component_id=self.component.id,
+                engines=[],
+                threshold=100,
+            )
+
+        self.assertTrue(run.called)
+
     def test_autotranslate_workspace_skips_mismatched_selected_source(self) -> None:
         workspace = Workspace.objects.create(name="Automatic translation workspace")
         self.project.workspace = workspace
@@ -808,14 +840,14 @@ class AutoTranslationTest(ViewTestCase):
         )
 
     def test_autotranslate_fail(self) -> None:
-        # invalid object type
-        self.perform_auto(
-            expected=0, path_params={"path": self.project.get_url_path()}, success=False
-        )
 
         self.user.is_superuser = False
         self.user.save()
 
+        # test missing autotranslate permission on project
+        self.perform_auto(
+            expected=0, path_params={"path": self.project.get_url_path()}, success=False
+        )
         # test missing autotranslate permission on translation
         self.perform_auto(expected=0, success=False)
 
@@ -855,17 +887,24 @@ class AutoTranslationTest(ViewTestCase):
                 threshold=100,
             )
 
-        with self.assertRaises(ValueError):
-            auto_translate(
-                user_id=None,
-                mode="suggest",
-                q="state:<translated",
-                auto_source="others",
+    def test_auto_translate_accepts_a_project_target(self) -> None:
+        with patch(
+            "weblate.trans.tasks.BatchAutoTranslate.perform",
+            return_value="completed",
+        ) as perform:
+            result = auto_translate(
+                user_id=self.user.id,
+                mode="judge",
+                q="state:empty",
+                auto_source="mt",
                 source_component_id=None,
-                engines=["weblate"],
-                threshold=100,
-                project_id=1,
+                engines=[],
+                threshold=80,
+                project_id=self.project.id,
             )
+
+        perform.assert_called_once()
+        self.assertEqual(result["project"], self.project.id)
 
     def test_labeling(self) -> None:
         self.perform_auto(overwrite="1")

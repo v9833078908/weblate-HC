@@ -83,6 +83,7 @@ from weblate.trans.tests.utils import (
 from weblate.trans.widgets import WIDGETS
 from weblate.utils.data import data_dir
 from weblate.utils.files import remove_tree
+from weblate.utils.state import STATE_TRANSLATED
 from weblate.utils.stats import GlobalStats, ProjectLanguage
 from weblate.vcs.ssh import ssh_file
 from weblate.wladmin.models import BackupService, ConfigurationError, SupportStatus
@@ -1751,6 +1752,143 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
         self.assertGreaterEqual(state["selectedIndex"], 0)
         self.assertNotEqual(state["value"], "")
         self.assertIsNotNone(state["submitted"])
+
+    def test_judge_launcher_url_beats_persisted_form_state(self) -> None:
+        self.do_login(superuser=True)
+        self.clear_persisted_form_state()
+        self.addCleanup(self.clear_persisted_form_state)
+        project = self.create_component()
+        component = project.component_set.get(slug="django")
+        project.translation_review = True
+        project.save(update_fields=["translation_review"])
+
+        with override_settings(
+            JUDGE_ENABLED=True,
+            JUDGE_OPENROUTER_KEY="sk-test",
+            JUDGE_MODEL_SEAT_1="vendor-a/model",
+            JUDGE_MODEL_SEAT_2="vendor-b/model",
+        ):
+            self.open_component(component=component, project=project)
+            self.driver.execute_script(
+                """
+                window.localStorage["auto-translation"] = JSON.stringify({
+                    mode: "translate",
+                    q: "state:empty",
+                });
+                """
+            )
+            with self.wait_for_page_load():
+                self.click("Run the judge")
+            state = self.driver.execute_script(
+                """
+                return {
+                    mode: document.getElementById("id_auto_mode").value,
+                    query: document.getElementById("id_auto_q").value,
+                };
+                """
+            )
+
+        self.assertEqual(state["mode"], "judge")
+        self.assertEqual(state["query"], "NOT has:judge")
+
+    def test_judge_preview_refreshes_after_overwrite_change(self) -> None:
+        user = self.do_login(superuser=True)
+        self.clear_persisted_form_state()
+        self.addCleanup(self.clear_persisted_form_state)
+        project = self.create_component()
+        component = project.component_set.get(slug="django")
+        project.translation_review = True
+        project.save(update_fields=["translation_review"])
+        translation = component.translation_set.exclude_source().first()
+        assert translation is not None
+        unit = translation.unit_set.first()
+        assert unit is not None
+        unit.translate(user, ["Existing translation"], STATE_TRANSLATED)
+
+        with override_settings(
+            JUDGE_ENABLED=True,
+            JUDGE_OPENROUTER_KEY="sk-test",
+            JUDGE_MODEL_SEAT_1="vendor-a/model",
+            JUDGE_MODEL_SEAT_2="vendor-b/model",
+        ):
+            self.open_component(component=component, project=project)
+            self.click("Operations")
+            self.click("Batch automatic translation")
+            Select(self.driver.find_element(By.ID, "id_auto_mode")).select_by_value(
+                "judge"
+            )
+            WebDriverWait(self.driver, 10).until(
+                lambda driver: driver.execute_script(
+                    """
+                    return document
+                        .getElementById("id_auto_judge_preview")
+                        .textContent.trim().length > 0;
+                    """
+                )
+            )
+            self.driver.execute_script(
+                """
+                const form = document.querySelector(
+                    "form[data-judge-preview-url]"
+                );
+                form.dataset.judgePreviewUrl = "data:application/json,{}";
+                """
+            )
+            self.driver.find_element(By.ID, "id_auto_overwrite_existing").click()
+            WebDriverWait(self.driver, 10).until(
+                lambda driver: (
+                    "Judge preview is unavailable."
+                    in driver.find_element(By.ID, "id_auto_judge_preview").text
+                )
+            )
+
+    def test_judge_preview_refreshes_after_engine_change(self) -> None:
+        self.do_login(superuser=True)
+        self.clear_persisted_form_state()
+        self.addCleanup(self.clear_persisted_form_state)
+        project = self.create_component()
+        component = project.component_set.get(slug="django")
+        project.translation_review = True
+        project.save(update_fields=["translation_review"])
+
+        with override_settings(
+            JUDGE_ENABLED=True,
+            JUDGE_OPENROUTER_KEY="sk-test",
+            JUDGE_MODEL_SEAT_1="vendor-a/model",
+            JUDGE_MODEL_SEAT_2="vendor-b/model",
+        ):
+            self.open_component(component=component, project=project)
+            self.click("Operations")
+            self.click("Batch automatic translation")
+            Select(self.driver.find_element(By.ID, "id_auto_mode")).select_by_value(
+                "judge"
+            )
+            WebDriverWait(self.driver, 10).until(
+                lambda driver: driver.execute_script(
+                    """
+                    return document
+                        .getElementById("id_auto_judge_preview")
+                        .textContent.trim().length > 0;
+                    """
+                )
+            )
+            self.driver.execute_script(
+                """
+                const form = document.querySelector(
+                    "form[data-judge-preview-url]"
+                );
+                form.dataset.judgePreviewUrl = "data:application/json,{}";
+                document.getElementById("id_auto_engines").dispatchEvent(
+                    new Event("change", {bubbles: true})
+                );
+                """
+            )
+            WebDriverWait(self.driver, 10).until(
+                lambda driver: (
+                    "Judge preview is unavailable."
+                    in driver.find_element(By.ID, "id_auto_judge_preview").text
+                )
+            )
 
     def test_login(self) -> None:
         # Do proper login with new user

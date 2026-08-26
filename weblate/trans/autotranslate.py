@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from math import ceil
 from typing import TYPE_CHECKING, Any, Literal
@@ -905,8 +905,7 @@ class AutoTranslate(BaseAutoTranslate):
         self.judge_units_processed = preview.processed
         self.judge_units_remaining = preview.remaining
         if not units:
-            if preview.remaining:
-                self.judge_summary = JudgeSummary(cap_remainder=preview.remaining)
+            self.judge_summary = JudgeSummary(cap_remainder=preview.remaining)
             return
         writable_ids = {
             unit.id for unit in units if not unit.translated or self.overwrite_existing
@@ -1163,6 +1162,19 @@ class BatchAutoTranslate(BaseAutoTranslate):
             case _:  # pragma: no cover
                 msg = "Unsupported object type for BatchAutoTranslate"
                 raise ValueError(msg)
+        if isinstance(self.translations, QuerySet):
+            self.translations = self.translations.order_by(
+                "component_id", "language_id", "pk"
+            )
+        else:
+            self.translations = sorted(
+                self.translations,
+                key=lambda translation: (
+                    translation.component_id,
+                    translation.language_id,
+                    translation.pk,
+                ),
+            )
         self._preload_workflow_settings()
         self.progress_steps = len(self.translations)
 
@@ -1238,7 +1250,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
     def _finish_translation(
         self, auto_translate: AutoTranslate, judge_remaining: int | None
     ) -> int | None:
-        if judge_remaining is not None and not auto_translate.failure_message:
+        if judge_remaining is not None:
             judge_remaining -= auto_translate.judge_units_processed
         if auto_translate.failure_message:
             self.failure_message = auto_translate.failure_message
@@ -1261,14 +1273,14 @@ class BatchAutoTranslate(BaseAutoTranslate):
         threshold: int,
         source_component_ids: list[int] | None,
     ) -> str:
-        if self.mode == "judge":
-            validate_judge_configuration()
-        judge_remaining = (
-            settings.JUDGE_MAX_UNITS_PER_RUN if self.mode == "judge" else None
-        )
+        judge_preview = self.preview_judge_scope() if self.mode == "judge" else None
+        if judge_preview is not None:
+            self.judge_summary = JudgeSummary()
+        judge_remaining = judge_preview.processed if judge_preview is not None else None
         selected_workspace_source_component_ids: dict[int, list[int]] | None = None
         if (
-            auto_source == "others"
+            self.mode != "judge"
+            and auto_source == "others"
             and source_component_ids is not None
             and self.workspace_source_component_ids is not None
         ):
@@ -1286,11 +1298,6 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 self.set_progress(pos)
                 continue
             if self.mode == "judge" and not judge_remaining:
-                self.add_warning(
-                    gettext(
-                        "Judge run skipped because the per-run string cap was reached."
-                    )
-                )
                 self.set_progress(pos)
                 continue
 
@@ -1314,7 +1321,8 @@ class BatchAutoTranslate(BaseAutoTranslate):
 
             effective_source_component_ids = source_component_ids
             if (
-                auto_source == "others"
+                self.mode != "judge"
+                and auto_source == "others"
                 and self.workspace_source_component_ids is not None
             ):
                 source_language_id = translation.component.source_language_id
@@ -1378,4 +1386,12 @@ class BatchAutoTranslate(BaseAutoTranslate):
             judge_remaining = self._finish_translation(auto_translate, judge_remaining)
             self.set_progress(pos)
 
+        if judge_preview is not None and judge_preview.remaining:
+            self.judge_summary = replace(
+                self.judge_summary or JudgeSummary(),
+                cap_remainder=judge_preview.remaining,
+            )
+            self.add_warning(
+                gettext("Judge run skipped because the per-run string cap was reached.")
+            )
         return self.failure_message or self.get_message()

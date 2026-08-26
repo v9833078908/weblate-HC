@@ -393,11 +393,9 @@ def repair_evidence(
     ``active`` lets a caller that already computed ``active_verdict(unit)``
     (for example ``_judge_view_context``) pass it in, avoiding a second
     ``active_round`` query on a hot per-unit-view path. Always compares
-    attempt 0 against attempt 1, which assumes
-    ``JUDGE_MAX_REPAIR_ATTEMPTS <= 1`` (today's only supported value; see
-    ``docs/llm-first/plans/2026-08-25-01-judge-producer-ux-and-delivery.md``
-    Task 5). A unit repaired more than once would still compare 0 against
-    1, not the pair that actually produced its current text.
+    ``original_seats`` remain attempt 0, but the comparison window follows
+    the active attempt: a unit repaired twice must show the text before the
+    second repair, not a stale first-repair comparison.
     """
     if active is None:
         active = active_verdict(unit)
@@ -408,15 +406,22 @@ def repair_evidence(
     )
     if not original_seats:
         return None
-    repaired_seats = list(
-        unit.judge_verdicts.filter(run_id=active.run_id, attempt=1).order_by(
-            "timestamp"
-        )
+    previous_seats = list(
+        unit.judge_verdicts.filter(
+            run_id=active.run_id, attempt=active.attempt - 1
+        ).order_by("timestamp")
     )
-    if not repaired_seats:
+    if not previous_seats:
         return None
-    window_start = max(row.timestamp for row in original_seats)
-    window_end = repaired_seats[0].timestamp
+    current_seats = list(
+        unit.judge_verdicts.filter(
+            run_id=active.run_id, attempt=active.attempt
+        ).order_by("timestamp")
+    )
+    if not current_seats:
+        return None
+    window_start = max(row.timestamp for row in previous_seats)
+    window_end = current_seats[0].timestamp
     candidates = list(
         unit.change_set.filter(
             target=unit.target,
@@ -662,6 +667,7 @@ def resolve_verdict(
                 propagate=False,
                 select_for_update=False,
             )
+        locked_unit.translation.invalidate_cache()
     return representative
 
 
