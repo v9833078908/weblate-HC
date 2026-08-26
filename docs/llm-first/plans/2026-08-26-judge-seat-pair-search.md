@@ -1,7 +1,7 @@
 # Judge seat pair search on LiteLLM (two corpora, complementary recall)
 
-**Date:** 2026-08-26. **Status:** stages 0-2 completed; reasoning-off mapping
-implemented and smoke-verified. Stage 3 is ready.
+**Date:** 2026-08-26. **Status:** stopped at Stage 3. The reasoning-off mapping
+works, but no candidate passed the cross-corpus smoke gate.
 **Supersedes:** `docs/llm-first/plans/2026-08-26-litellm-judge-seat-r3-eval.md`,
 which searched for a replacement for one seat against a single corpus. The
 objective is now the *pair*, measured on ru->zh_Hans and en->fr.
@@ -338,11 +338,14 @@ reused only after inspection. The current col4 builder has Russian source
 stemmers, Cyrillic donor logic and COL4-specific realia dictionaries, so it
 cannot be copied unmodified.
 
-### Stage 3: smoke on both corpora
+### Stage 3: smoke on both corpora - stopped
 
-15 zh units (including several of the 7 critical units) and 15 fr injected
-defects, one repeat per surviving candidate. Disqualify on `unparsed` > 0 or a
-missed planted critical. About 12 requests per candidate.
+The completed smoke used all seven sealed zh criticals plus eight known-clean
+units, and 15 injected fr criticals. `qwen3.8-max` had no unparsed batches but
+missed 6/7 zh criticals; every other candidate had unparsed batches. The full
+results are in
+`docs/llm-first/measurements/2026-08-26-judge-seat-pair-search-stage3.md`.
+No candidate reached Stage 4.
 
 ### Stage 4: per-model runs
 
@@ -381,18 +384,15 @@ Only then may `WEBLATE_JUDGE_MODEL_SEAT_1/2` change.
 |---|---:|---|
 | 0 compatibility | measured | complete |
 | 1 metadata duplicate check | 4 | complete, inconclusive |
-| 2 en->fr construction | 0 | pending |
-| 3 smoke | 12 × 6 = 72 | pending, reasoning mode decides the pool |
-| 4 per-model runs | 275 × 6 + 125 anchor mode comparison = 1775 | pending |
-| 6 full confirmation | 1190 | pending |
-| **remaining upper bound, six survivors** | **3037** | |
+| 2 en->fr construction | 0 | complete |
+| 3 smoke | 39 | complete, stopped at gate |
+| 4 per-model runs | 0 | not run: no Stage 3 survivor |
+| 6 full confirmation | 0 | not run: no Stage 3 survivor |
+| **remaining requests** | **0** | **stopped** |
 
-The old estimate of ~2100 was wrong because it counted only ~600 confirmation
-requests. A correct full rerun costs 94 fr batches × 2 models × 5 repeats
-(940), plus 25 zh batches × 2 models × 5 repeats (250). The proxy returns no
-`usage.cost` (shadow pricing, vision:670-672), so tokens from `LLMUsageLog` are
-reported instead of dollars. Stage 4 begins with the anchor; its actual token
-count is recorded before the other models proceed.
+The planned full-run cost no longer applies. The 39 Stage 3 requests are the
+complete LiteLLM evaluation spend for this search; no Stage 4 token baseline or
+pair confirmation run is warranted after the gate failure.
 
 ## Stop conditions
 
@@ -432,5 +432,5 @@ Resolved on 2026-08-26:
    `JUDGE_REASONING_EFFORT="none"` through the per-model mapping in
    `Implemented reasoning-off mechanism`.
 
-Stage 2 and the shared judge mapping are complete. Stage 3 is next; reasoning-off
-retains the Qwen family.
+Stages 2 and 3, and the shared judge mapping, are complete. Stage 3 disqualified
+every measured route; the existing OpenRouter seats remain unchanged.
