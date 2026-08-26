@@ -8,20 +8,24 @@ from __future__ import annotations
 
 from itertools import pairwise
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 from weblate_customization.checks import (
     CyrillicLeakCheck,
     GameLengthCheck,
     GameLineBreakCheck,
     GameMarkupCheck,
+    GameMaxLengthCheck,
     GameNumberCheck,
+    GameSourceMaxLengthCheck,
     GameTokenCheck,
+    _conditional_length_text,  # ruff: ignore[import-private-name]
     conditional_dsl_syntax_spans,
     game_number_fails,
 )
 
 from weblate.checks.tests.test_checks import CheckTestCase
-from weblate.trans.tests.factories import make_language, make_unit
+from weblate.machinery.llm import BaseLLMTranslation
+from weblate.trans.tests.factories import make_check, make_language, make_unit
 
 AMOUNT_FORMATTED = (
     "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
@@ -55,6 +59,10 @@ NESTED_CONDITIONAL = "{a:cond:>0?{b:cond:>0?x|}y|}"
 # The nested branch also carries a placeholder, so a change to its text leaves
 # `placeholder_sequence` equal and only the conditional signature can catch it.
 NESTED_PLACEHOLDER_CONDITIONAL = "{a:cond:>0?{b:cond:>0?{c}x|}y|}"
+ALTERNATE = "{value:cond:>0?{value}x|much-longer}"
+SEQUENTIAL = "{hours:cond:>0?{hours}h |}{minutes:cond:>0?{minutes}m |}"
+NESTED = "{outer:cond:>0?{inner:cond:>0?x|}y|}"
+TIMER_FLAGS = "max-length:11, replacements:{hours}:9:{minutes}:9:{seconds}:9"
 
 
 class ConditionalDslSyntaxSpansTest(SimpleTestCase):
@@ -102,6 +110,43 @@ class ConditionalDslSyntaxSpansTest(SimpleTestCase):
         self.assertTrue(all(left[1] <= right[0] for left, right in pairwise(spans)))
         self.assertIn((inner, inner + len(inner_block)), spans)
         self.assertNotIn((inner + 1, inner + 1 + len("b:cond:>0?")), spans)
+
+
+class ConditionalLengthRepresentationTest(SimpleTestCase):
+    def test_plain_text_is_returned_by_identity(self) -> None:
+        text = "no conditional here"
+        self.assertIs(_conditional_length_text(text), text)
+
+    def test_unrecognized_header_and_malformed_braces_are_unchanged(self) -> None:
+        for text in ("{value:cond:1}", HUMAN_TIMER_DE[:-1]):
+            with self.subTest(text=text):
+                self.assertIs(_conditional_length_text(text), text)
+
+    def test_nonempty_alternate_selects_one_longest_branch(self) -> None:
+        self.assertEqual(_conditional_length_text(ALTERNATE), "much-longer")
+
+    def test_replacements_run_before_branch_selection(self) -> None:
+        # The replacement value is long enough to make the first branch
+        # outgrow "much-longer" (11 characters), proving branch selection
+        # sees the replaced text, not the raw {value} placeholder.
+        unit = make_unit(flags="replacements:{value}:123456789012")
+        replace = GameMaxLengthCheck().get_replacement_function(unit)
+        self.assertEqual(replace(ALTERNATE), "123456789012x")
+
+    def test_sequential_conditionals_concatenate_their_maxima(self) -> None:
+        unit = make_unit(flags="replacements:{hours}:9:{minutes}:9")
+        replace = GameMaxLengthCheck().get_replacement_function(unit)
+        self.assertEqual(replace(SEQUENTIAL), "9h 9m ")
+
+    def test_human_timer_measures_seventeen_characters(self) -> None:
+        unit = make_unit(flags=TIMER_FLAGS)
+        replace = GameMaxLengthCheck().get_replacement_function(unit)
+        representation = replace(HUMAN_TIMER_DE)
+        self.assertEqual(representation, "9Std. 9Min. 9Sek.")
+        self.assertEqual(len(representation), 17)
+
+    def test_nested_recognized_conditional_is_unchanged(self) -> None:
+        self.assertIs(_conditional_length_text(NESTED), NESTED)
 
 
 class GameMarkupCheckTest(CheckTestCase):
@@ -710,3 +755,114 @@ class GameLengthCheckTest(CheckTestCase):
 
     def test_an_empty_target_passes(self) -> None:
         self.assertFalse(self.check.check_single("Claim reward", "", None))
+
+
+class GameMaxLengthCheckTest(SimpleTestCase):
+    def setUp(self) -> None:
+        self.check = GameMaxLengthCheck()
+
+    def test_over_budget_for_the_human_timer_fixture(self) -> None:
+        unit = make_unit(flags=TIMER_FLAGS)
+        self.assertTrue(
+            self.check.check_target_params([HUMAN_TIMER_DE], [HUMAN_TIMER_DE], unit, 11)
+        )
+
+    def test_under_budget_for_a_compact_fixture(self) -> None:
+        unit = make_unit(flags="max-length:11")
+        compact = "0123456789A"
+        self.assertFalse(self.check.check_target_params([compact], [compact], unit, 11))
+
+    def test_description_reports_the_configured_limit(self) -> None:
+        unit = make_unit(flags="max-length:11")
+        check_row = make_check(unit, self.check)
+        self.assertIn("11 characters", str(self.check.get_description(check_row)))
+
+    def test_description_invalid_flag_retains_stock_message(self) -> None:
+        unit = make_unit(flags="max-length:*")
+        check_row = make_check(unit, self.check)
+        self.assertIn(
+            "Could not parse max-length flag:",
+            str(self.check.get_description(check_row)),
+        )
+
+
+class GameSourceMaxLengthCheckTest(TestCase):
+    def setUp(self) -> None:
+        self.check = GameSourceMaxLengthCheck()
+
+    def get_unit(self, flags: str, source_language: str = "en"):
+        unit = make_unit(flags=flags, is_source=True)
+        language = make_language(source_language)
+        unit.translation.language = language
+        unit.translation.language_code = language.code
+        unit.translation.component.source_language = language
+        return unit
+
+    def test_no_flag(self) -> None:
+        self.assertFalse(self.check.check_source(["x" * 200], self.get_unit("")))
+
+    def test_english_allows_fifteen_percent_headroom(self) -> None:
+        unit = self.get_unit("max-length:100")
+        self.assertFalse(self.check.check_source(["x" * 85], unit))
+        self.assertTrue(self.check.check_source(["x" * 86], unit))
+
+    def test_non_english_uses_max_length(self) -> None:
+        unit = self.get_unit("max-length:100", "cs")
+        self.assertFalse(self.check.check_source(["x" * 100], unit))
+        self.assertTrue(self.check.check_source(["x" * 101], unit))
+
+    def test_invalid_flag(self) -> None:
+        self.assertTrue(
+            self.check.check_source(["text"], self.get_unit("max-length:*"))
+        )
+
+    def test_ignored(self) -> None:
+        unit = self.get_unit("max-length:100, ignore-source-max-length")
+        self.assertFalse(self.check.check_source(["x" * 86], unit))
+
+    def test_plural(self) -> None:
+        unit = self.get_unit("max-length:100")
+        self.assertFalse(self.check.check_source(["x" * 84, "x" * 85], unit))
+        self.assertTrue(self.check.check_source(["x" * 84, "x" * 86], unit))
+
+    def test_replacements(self) -> None:
+        unit = self.get_unit('max-length:100, replacements:%s:"very long text"')
+        self.assertFalse(self.check.check_source(["x" * 82], unit))
+        self.assertTrue(self.check.check_source(["x" * 82 + "%s"], unit))
+
+
+class _FakeActiveCheck:
+    """A minimal check-shaped object for exercising the LLM prompt context."""
+
+    def __init__(self, check, unit) -> None:
+        self.name = check.check_id
+        self.dismissed = False
+        self.unit = unit
+        self._check = check
+
+    def get_name(self):
+        return self._check.name
+
+    def get_description(self):
+        return self._check.get_description(self)
+
+
+class GameMaxLengthCheckPromptContextTest(SimpleTestCase):
+    def test_failing_checks_context_carries_the_numeric_limit(self) -> None:
+        check = GameMaxLengthCheck()
+        unit = make_unit(
+            flags="max-length:11", source=HUMAN_TIMER_DE, target=HUMAN_TIMER_DE
+        )
+        unit.__dict__["all_checks"] = [_FakeActiveCheck(check, unit)]
+
+        context, advisories = BaseLLMTranslation._get_failing_checks_context(  # ruff: ignore[private-member-access]
+            unit, HUMAN_TIMER_DE
+        )
+
+        self.assertEqual(advisories, [])
+        self.assertEqual(len(context), 1)
+        self.assertEqual(context[0]["check_id"], "max-length")
+        self.assertEqual(
+            context[0]["description"],
+            "Translation must not exceed 11 characters.",
+        )

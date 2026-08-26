@@ -21,9 +21,11 @@ from operator import itemgetter
 from typing import NamedTuple
 
 import regex
-from django.utils.translation import gettext_lazy
+from django.utils.translation import gettext_lazy, ngettext
 
 from weblate.checks.base import Highlight, TargetCheck
+from weblate.checks.chars import MaxLengthCheck
+from weblate.checks.source import SourceMaxLengthCheck
 from weblate.trans.protected_tokens import (
     MARKUP,
     PLACEHOLDER_PATTERN,
@@ -302,6 +304,53 @@ def conditional_dsl_syntax_spans(text: str) -> list[tuple[int, int]]:
             spans.append((previous[1], following[0]))
 
     return sorted({span for span in spans if span[0] < span[1]})
+
+
+def _conditional_length_text(text: str) -> str:
+    """Return a conservative character representation of conditional DSL."""
+    if ":cond:" not in text:
+        return text
+
+    recognized = []
+    for start, end, _children in sorted(
+        _balanced_brace_blocks(text), key=itemgetter(0)
+    ):
+        header = _CONDITIONAL_HEADER.match(text, start + 1, end - 1)
+        if header is not None:
+            recognized.append((start, end, header))
+    if not recognized:
+        return text
+
+    open_ends: list[int] = []
+    for start, end, _header in recognized:
+        while open_ends and start >= open_ends[-1]:
+            open_ends.pop()
+        if open_ends:
+            return text
+        open_ends.append(end)
+
+    result: list[str] = []
+    previous = 0
+    for start, end, header in recognized:
+        assert header is not None  # ruff: ignore[assert]
+        result.append(text[previous:start])
+        branches: list[str] = []
+        branch_start = header.end()
+        depth = 0
+        for position in range(header.end(), end - 1):
+            char = text[position]
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+            elif char == "|" and depth == 0:
+                branches.append(text[branch_start:position])
+                branch_start = position + 1
+        branches.append(text[branch_start : end - 1])
+        result.append(max(branches, key=len))
+        previous = end
+    result.append(text[previous:])
+    return "".join(result)
 
 
 class GameMarkupCheck(TargetCheck):
@@ -785,3 +834,26 @@ class GameLengthCheck(TargetCheck):
             if source_len <= max_source:
                 return target_len > minimum and target_len > source_len * ratio
         return target_len > source_len * _LENGTH_MAX_RATIO
+
+
+class GameMaxLengthCheck(MaxLengthCheck):
+    def get_replacement_function(self, unit):
+        replace = super().get_replacement_function(unit)
+        return lambda text: _conditional_length_text(replace(text))
+
+    def get_description(self, check_obj):
+        try:
+            limit = self.get_value(check_obj.unit)
+        except ValueError:
+            return super().get_description(check_obj)
+        return ngettext(
+            "Translation must not exceed %(limit)d character.",
+            "Translation must not exceed %(limit)d characters.",
+            limit,
+        ) % {"limit": limit}
+
+
+class GameSourceMaxLengthCheck(SourceMaxLengthCheck):
+    def get_replacement_function(self, unit):
+        replace = super().get_replacement_function(unit)
+        return lambda text: _conditional_length_text(replace(text))
