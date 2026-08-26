@@ -335,6 +335,10 @@ JudgeSeverityOrdered = ("none", "minor", "major", "critical")
 class _BatchResponse:
     status_code: int | None
     payload: dict | None
+    # A connection that never delivered a reply. Distinct from a refused or
+    # failed one: there is no status to reason about, and the gateway may
+    # simply have been slow, so this is the only failure worth repeating.
+    transport_failed: bool = False
 
 
 def _write_llm_usage(payload: dict, model: str, project_slug: str) -> None:
@@ -508,8 +512,10 @@ def _post_batch(payload: dict, model: str) -> _BatchResponse:
         ) as response:
             buffer = _read_batch_response(response, model=model, started=started)
     except Exception:
-        return _BatchResponse(None, None)
+        return _BatchResponse(None, None, transport_failed=True)
     if buffer is None:
+        # The deadline or the size cap fired. The peer was answering, so a
+        # repeat would spend the same budget again; it is not a transport fault.
         return _BatchResponse(None, None)
     try:
         body = json.loads(buffer)
@@ -519,6 +525,14 @@ def _post_batch(payload: dict, model: str) -> _BatchResponse:
         response.status_code,
         body if isinstance(body, dict) else None,
     )
+
+
+def _transport_retry_budget() -> int:
+    """How many times a connection reset may be repeated, never negative."""
+    configured = getattr(settings, "JUDGE_TRANSPORT_RETRIES", 1)
+    if not isinstance(configured, int) or isinstance(configured, bool):
+        return 1
+    return max(0, configured)
 
 
 def request_verdicts(
@@ -603,7 +617,9 @@ def request_verdicts(
             # is waste; reasoning was 84% of the first dev run's tokens.
             payload["reasoning"] = {"effort": effort.strip(), "exclude": True}
         parsed = None
-        for attempt in range(2):
+        rate_limit_retried = False
+        transport_retries_used = 0
+        while True:
             started = time.monotonic()
             response = _post_batch(payload, model)
             elapsed_ms = int((time.monotonic() - started) * 1000)
@@ -615,7 +631,7 @@ def request_verdicts(
                     position + 1,
                     len(batches),
                     model,
-                    response.status_code,
+                    "reset" if response.transport_failed else response.status_code,
                     elapsed_ms,
                 )
             else:
@@ -635,7 +651,17 @@ def request_verdicts(
                 parsed = _parse_reply(response.payload, len(batch))
                 if parsed is not None:
                     break
-            if attempt == 0 and response.status_code in {403, 429}:
+            if (
+                response.transport_failed
+                and transport_retries_used < _transport_retry_budget()
+            ):
+                # Backoff doubles per repeat: a reset is usually the gateway
+                # under load, and an immediate repeat adds to that load.
+                transport_retries_used += 1
+                time.sleep(max(sleep, 1.0) * 2 ** (transport_retries_used - 1))
+                continue
+            if not rate_limit_retried and response.status_code in {403, 429}:
+                rate_limit_retried = True
                 time.sleep(sleep * 2 + 1.0)
                 continue
             break

@@ -57,6 +57,20 @@ class DrippingStream(httpx2.SyncByteStream):
             yield bytes([chunk])
 
 
+class ResetStream(httpx2.SyncByteStream):
+    """
+    A peer that accepts the request, then drops the connection mid-body.
+
+    This is how the corporate LiteLLM gateway fails near 30 s under load: the
+    reply carries no HTTP status, so a status-based retry rule cannot see it.
+    """
+
+    def __iter__(self):
+        yield b'{"choices":'
+        msg = "connection reset by peer"
+        raise httpx2.ReadError(msg)
+
+
 def _reply(segments: list[dict]) -> dict:
     content = json.dumps({"segments": segments})
     return {"choices": [{"message": {"content": content}}]}
@@ -436,6 +450,72 @@ class JudgeClientTest(SimpleTestCase):
         self.assertFalse(result.unparsed)
         self.assertEqual(len(http_mock.calls), 2)
         sleep.assert_called_once()
+
+    @mock.patch("weblate.trans.judge.time.sleep")
+    @http_mock.activate
+    def test_transport_reset_is_retried_and_recovers(self, sleep) -> None:
+        # The corporate LiteLLM gateway closes a connection near 30 s under
+        # load. The reply carries no status, so the rate-limit branch cannot
+        # see it: measured at 33% of requests for one route, 0% for another
+        # (docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md).
+        http_mock.register_callback(
+            "POST",
+            CHAT_URL,
+            lambda _request: httpx2.Response(200, stream=ResetStream()),
+        )
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertFalse(result.unparsed)
+        self.assertEqual(len(http_mock.calls), 2)
+        sleep.assert_called_once()
+
+    @override_settings(JUDGE_TRANSPORT_RETRIES=2)
+    @mock.patch("weblate.trans.judge.time.sleep")
+    @http_mock.activate
+    def test_transport_retry_budget_is_spent_then_the_batch_is_unparsed(
+        self, sleep
+    ) -> None:
+        for _ in range(4):
+            http_mock.register_callback(
+                "POST",
+                CHAT_URL,
+                lambda _request: httpx2.Response(200, stream=ResetStream()),
+            )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+        self.assertEqual(len(http_mock.calls), 3)
+        self.assertEqual(sleep.call_count, 2)
+
+    @override_settings(JUDGE_TRANSPORT_RETRIES=0)
+    @http_mock.activate
+    def test_transport_retries_can_be_disabled(self) -> None:
+        http_mock.register_callback(
+            "POST",
+            CHAT_URL,
+            lambda _request: httpx2.Response(200, stream=ResetStream()),
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+        self.assertEqual(len(http_mock.calls), 1)
+
+    @override_settings(JUDGE_TRANSPORT_RETRIES=2)
+    @mock.patch("weblate.trans.judge.time.sleep")
+    @http_mock.activate
+    def test_transport_retry_does_not_extend_the_rate_limit_retry(self, sleep) -> None:
+        # A 429 keeps its single retry: the transport budget is independent and
+        # must not turn a paid rate-limit refusal into three paid attempts.
+        for _ in range(4):
+            http_mock.register("POST", CHAT_URL, status_code=429, json={})
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+        self.assertEqual(len(http_mock.calls), 2)
+        self.assertEqual(sleep.call_count, 1)
 
     @http_mock.activate
     def test_malformed_required_fields_make_the_batch_unparsed(self) -> None:

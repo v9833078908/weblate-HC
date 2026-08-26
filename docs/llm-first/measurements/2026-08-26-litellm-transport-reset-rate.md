@@ -97,24 +97,78 @@ This does not yet name a pair. Latency is not judgment: none of these requests
 was scored against ground truth. It removes the transport objection that stopped
 the search, and reinstates DeepSeek as a candidate.
 
+## The retry, and what reasoning costs
+
+`JUDGE_TRANSPORT_RETRIES` (default 1) now repeats a batch whose connection was
+dropped without a reply. A deadline or size-cap failure is deliberately not
+repeated: the peer was answering, so a repeat spends the same budget again.
+
+All rows below drive the real `request_verdicts` against the proxy at
+`JUDGE_BATCH_SIZE = 5`, so the prompt is the production judge prompt, not the
+short one used in the probes above.
+
+| model | reasoning | retries | batches | unparsed | per batch |
+|---|---|---:|---:|---:|---|
+| `qwen3.8-max` | off | 1 | 8 | 0 | 5.6 s |
+| `qwen3.8-max` | off | 0 | 8 | 0 | 5.5 s |
+| `qwen3.8-max` | on | 1 | 8 | **8** | 63 s |
+| `deepseek-v4-pro` | on | 1 | 12 | 0 | 17-23 s |
+
+### The retry did not fire with reasoning off
+
+Rows one and two differ only in the retry budget and give the same result, so
+that pair does not measure the retry. What it measures is headroom: with
+reasoning off `qwen3.8-max` answers in 5.6 s against a ceiling near 30 s.
+
+The 33% reset rate recorded earlier for this model came from the raw probe,
+which sent no reasoning field and therefore ran with the model's default
+thinking on. It is a property of that payload, not of the judge's.
+
+### With reasoning on, the retry fires and still loses
+
+Row three is the answer to whether the seats can simply run with reasoning.
+Every batch failed, and 63 s per batch is two attempts against the same ~30 s
+ceiling: the retry fired and was spent. One repeat cannot rescue a request that
+cannot finish in time, only one that was unlucky.
+
+This is worse than the 33% the raw probe saw for the same model with thinking
+on, and the difference is prompt weight. The judge ships the full rubric, so
+there is more to read before the first output token, and the model spends the
+budget thinking about it.
+
+### It is a per-model answer, not a global one
+
+`deepseek-v4-pro` ran the same production prompt with reasoning on and finished
+12 of 12 batches in 17-23 s. It has the headroom that `qwen3.8-max` lacks.
+
+So reasoning on this proxy is available to DeepSeek and closed to Qwen, at this
+batch width. Neither result says anything about verdict quality: none of these
+batches was scored against ground truth.
+
 ## What is missing before a seat changes
 
-1. `weblate/trans/judge.py:638` retries only on `403`/`429`. A connection reset
-   arrives as `status_code is None` and breaks out of the loop immediately.
-   Cathedral's equivalent retries the reset. This is a transport-layer change
-   that leaves the prompt, the model and the batch width untouched, so R3 does
-   not invalidate prior numbers, but it must be written and tested before any
-   scored run.
-2. A scored run. The Stage 3 gate needs recall against the sealed corpora, which
-   these probes do not measure.
-3. The reset rate is a single 12-repeat sample per route at one hour. If the
-   cause is load, it varies by time of day and needs a repeat before the retry
-   budget is fixed.
+1. A scored run. The Stage 3 gate needs recall against the sealed corpora, and
+   nothing here measures judgment. `deepseek-v4-pro` is the candidate to score
+   first, with reasoning on, because it is the only route that held the
+   production prompt at either setting.
+2. The reasoning decision recorded in
+   `docs/llm-first/plans/2026-08-26-judge-seat-pair-search.md` was reasoning-off
+   for the whole pool. That is now wrong for DeepSeek and still right for Qwen,
+   so the mode has to be per seat, which the existing per-model mapping already
+   expresses.
+3. Timings are one sample per configuration at one hour on a shared gateway.
+   The reset is load-dependent, so a repeat at a different hour is needed before
+   any retry budget or batch width is treated as settled.
 
 ## Reproduce
 
 ```sh
 uv run python analysis/probes/litellm-strict-schema-ab.py
+
+# Production path. EFFORT="" sends no reasoning field, so the model's
+# default thinking applies; RETRIES overrides the transport budget.
+uv run python analysis/probes/litellm-retry-smoke.py 8 qwen3.8-max
+EFFORT="" uv run python analysis/probes/litellm-retry-smoke.py 8 deepseek-v4-pro
 uv run python analysis/probes/litellm-reset-rate.py 12 deepseek-v4-pro qwen3.8-max
 ```
 

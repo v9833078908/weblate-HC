@@ -1903,6 +1903,29 @@ indefinitely.
    * :setting:`JUDGE_ENABLED`
    * :setting:`JUDGE_BATCH_SIZE`
 
+.. setting:: JUDGE_TRANSPORT_RETRIES
+
+JUDGE_TRANSPORT_RETRIES
+-----------------------
+
+.. versionadded:: 2026.8.1
+
+How many times a judge batch is repeated after the connection is dropped
+without a reply. Defaults to 1; set to 0 to disable. This covers only a
+connection that never delivered a response, where there is no HTTP status to
+reason about. A refused or failed request, and a batch that hits
+:setting:`JUDGE_REQUEST_DEADLINE`, are not repeated by this budget.
+
+Raise it when the endpoint sits behind a gateway that closes slow connections:
+such a gateway drops a request whose model happens to answer near the ceiling,
+which looks like a model failure but is a transport one. Each repeat is a paid
+request, and the backoff doubles between repeats.
+
+.. seealso::
+
+   * :setting:`JUDGE_BASE_URL`
+   * :setting:`JUDGE_REQUEST_DEADLINE`
+
 .. setting:: JUDGE_MAY_APPROVE
 
 JUDGE_MAY_APPROVE
