@@ -199,6 +199,33 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
                     WebDriverWait(self.driver, timeout).until(staleness_of(old_page))
                 WebDriverWait(self.driver, timeout).until(self.is_page_loaded)
 
+    def clear_persisted_form_state(self) -> None:
+        """
+        Drop the browser-side form persistence written by an earlier test.
+
+        ``loader-bootstrap.js`` persists every ``<select>`` of a
+        ``[data-persist]`` form into ``localStorage`` on submit, and restores
+        it on load with ``target.value = value``. ``self._driver`` is a class
+        attribute and the live server binds one port per class, so the origin
+        - and therefore ``localStorage`` - is shared by every test method
+        here.
+
+        That leaks across tests: a test that submits the auto-translation
+        form (``data-persist="auto-translation"``) with ``mode=judge`` leaves
+        that value behind, and a later test whose project has reviews
+        disabled renders a mode ``<select>`` with no ``judge`` option.
+        Restoring then assigns a value no option carries, which leaves
+        ``selectedIndex == -1``; the browser omits an unselected select from
+        the submission, so the POST arrives without ``mode`` and the view
+        answers "Error in parameter mode: This field is required." instead of
+        queueing a task - and no task widget is ever rendered.
+
+        Call this before loading the page whose form must start from its
+        server-rendered state. Requires being on the live-server origin
+        already (``do_login`` navigates there).
+        """
+        self.driver.execute_script("window.localStorage.clear();")
+
     @staticmethod
     def is_page_loaded(driver: WebDriver) -> bool:
         try:
@@ -1375,6 +1402,7 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
             return step
 
         self.do_login(superuser=True)
+        self.clear_persisted_form_state()
         project = self.create_component()
         component = project.component_set.get(slug="django")
         # "judge" mode is only offered when the user can review, which in
@@ -1553,6 +1581,7 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
             return sequence[index]
 
         self.do_login(superuser=True)
+        self.clear_persisted_form_state()
         project = self.create_component()
         component = project.component_set.get(slug="django")
 
@@ -1581,6 +1610,16 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
             self.click("Batch automatic translation")
             with self.wait_for_page_load():
                 self.click(htmlid="id_auto_apply")
+
+            # The redirect lands on a fresh page; give the task-status
+            # widget a moment to mount before reading it, matching the
+            # judge-mode sibling test rather than assuming it is already
+            # present the instant the navigation settles.
+            WebDriverWait(self.driver, 20).until(
+                presence_of_element_located(
+                    (By.CSS_SELECTOR, "[data-task] .progress-bar")
+                )
+            )
 
             seen_phases: set[str] = set()
             deadline = time.monotonic() + 20
