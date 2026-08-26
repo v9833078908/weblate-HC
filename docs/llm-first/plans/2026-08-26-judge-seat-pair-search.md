@@ -1,6 +1,8 @@
 # Judge seat pair search on LiteLLM (two corpora, complementary recall)
 
-**Date:** 2026-08-26. **Status:** awaiting approval.
+**Date:** 2026-08-26. **Status:** stages 0-1 completed; the corpus is frozen.
+The remaining mode decision is whether production and the eval run with
+reasoning on or with the opt-in per-model disable mapping described below.
 **Supersedes:** `docs/llm-first/plans/2026-08-26-litellm-judge-seat-r3-eval.md`,
 which searched for a replacement for one seat against a single corpus. The
 objective is now the *pair*, measured on ru->zh_Hans and en->fr.
@@ -102,15 +104,15 @@ Shortlist of five to carry into the eval, with the reason each earns a slot:
    published scores.
 3. `qwen3.8-max` - the family that carried recall on zh historically; Qwen's
    strongest current model, one of only two on this proxy documented for strict
-   JSON Schema, 1M context. Currently failing here; a candidate only if stage 0
-   unblocks it.
+   JSON Schema, 1M context. Stage 0 accepts it 3/3 at 4.4-4.8 s when reasoning
+   is disabled; its default mode is reset around 30.5 s.
 4. `QWEN3.7-plus` - the other documented strict-schema Qwen, cheaper than Max,
-   IFEval 94.6 by vendor-sourced figures. Failed only on the `max_tokens`
-   convention. Same conditional.
+   IFEval 94.6 by vendor-sourced figures. Stage 0 accepts it 3/3 at 5.4-6.8 s
+   with reasoning disabled; default mode is marginal and intermittently reset.
 5. `bytedance/doubao-seed-2.1-turbo-260628` - a fourth family, Seed 2.1 released
    2026-06-23 with an explicit multilingual claim, 262K context, reasoning
-   toggle and `response_format`. Strict-schema support is reported by a
-   third-party integrator, not by ByteDance, so stage 0 decides it.
+   toggle and `response_format`. Stage 0 resets it at 31.3-32.2 s even with the
+   documented toggle, so it is excluded unless streaming is separately built.
 
 `Kimi K2.6` is held as a sixth candidate, and its supposed disqualifier does not
 apply: its JSON mode guarantees an object rather than a bare array, and our
@@ -126,11 +128,11 @@ something the shortlist can inherit.
 
 Three pool hazards to settle before any pairing:
 
-- The `atlas/` prefix is unresolved. DeepSeek's changelog names V4-Pro-0813 and
-  V4-Flash-0731 as the GA versions the bare IDs point at, which makes a re-host
-  plausible, but no public source maps this proxy's `atlas/` namespace. Treat
-  equivalence as unproven and settle it by measurement in stage 1, since a pair
-  of two aliases of one model is not a collegium.
+- The `atlas/` prefix is unresolved. The proxy echoes the requested model ID and
+  provides no `system_fingerprint`, so stage 1 could not establish whether the
+  bare and `atlas/` DeepSeek IDs are aliases. Stage 5 resolves this
+  behaviourally: a near-identical verdict vector yields a near-zero
+  complementarity gain, so aliases cannot win as a pair.
 - `seed-2.1` matches no official SKU - the Seed 2.1 family ships Pro and Turbo -
   so it stays out until the proxy resolves it.
 - Thinking modes are a live latency risk, not a detail. Qwen's own docs report
@@ -138,20 +140,18 @@ Three pool hazards to settle before any pairing:
   prompts with thinking may time out, and recommend streaming or a timeout above
   180 s; Z.ai's docs recommend streaming for the same reason. Our judge reads
   non-streaming with a 120 s transport timeout (`weblate/trans/judge.py:45`).
-  This is a candidate explanation for the ~30.5 s no-status failures and must be
-  tested in stage 0 rather than assumed away. Separately, DeepSeek's own JSON
-  guide warns that JSON output can come back empty or truncated when
-  `max_tokens` is left too low - and our judge sends no `max_tokens` at all,
-  which makes the incumbent seat 1 subject to the same risk.
-- **Thinking cannot be turned off through configuration on this proxy.**
+  Stage 0 established the actual proximate mechanism: the peer resets after
+  ~30.5 s with no byte received, whereas streaming the same payload finishes in
+  39-44 s. DeepSeek's own JSON guide separately warns that JSON output can come
+  back empty or truncated when `max_tokens` is too low - and our judge sends no
+  `max_tokens` at all.
+- **Thinking cannot be turned off through configuration today.**
   `validate_request_settings` refuses any non-empty `JUDGE_REASONING_EFFORT`
   when the host is LiteLLM (`weblate/trans/judge.py:130-147`), and the payload
-  sends no vendor thinking toggle
-  (`:540-578`). Qwen, DeepSeek and GLM all document thinking as **on by
-  default**. So every candidate will be measured in its default thinking mode,
-  and "just disable thinking" is a product change, not a setting - it lands in
-  stop condition 3. This is the most likely way stage 0 ends for a strong
-  candidate, so it is stated up front rather than discovered later.
+  sends no vendor toggle (`:540-578`). Stage 0 confirms that an explicit,
+  vendor-specific toggle does work; the opt-in product mapping is specified in
+  the mode decision below. Until it is implemented, the measured reasoning-off
+  behaviour is not reproducible by production.
 
 ## Ground truth, stated honestly
 
@@ -287,44 +287,66 @@ production run the same code. Nothing is implemented until the mode is chosen.
 
 ## Stages
 
-### Stage 0: compatibility, not quality
+### Stage 0: compatibility, not quality - completed
 
-`analysis/probes/litellm-model-compat.py` sends the judge's own payload to each
-candidate through `_post_batch` and admits a model only when `_parse_reply`
-accepts all five segments. Variants tried per model: plain, explicit
-`max_tokens`, each vendor's thinking toggle, and `reasoning_split`. Each variant
-gets two attempts, because a transport reset is not a model verdict - that retry
-is what saved `QWEN3.7-plus` from being wrongly disqualified.
+The result is recorded in
+`docs/llm-first/measurements/2026-08-26-litellm-stage0-compatibility.md`.
+Candidates are admitted only when `_parse_reply` accepts all five production
+segments. Qwen, GLM, two DeepSeek IDs and Kimi survive. MiniMax and MiMo fail
+the strict schema; doubao resets after ~30.5 s and needs streaming.
 
-Output: for each candidate, either "callable, with these parameters" or "not
-callable through this proxy today, for this reason". A model whose answer only
-appears in `reasoning_content` is reported separately, because unlocking it
-would require a product change and that is a decision, not a workaround.
+### Stage 1: duplicate detection - completed, metadata inconclusive
 
-### Stage 1: duplicate detection
+The proxy echoes the requested model ID and returns no fingerprint, so it cannot
+prove or refute that `atlas/` and bare DeepSeek IDs are aliases. Do not collapse
+them now. The pair search will compute their behavioural complementarity from
+the stored verdict vectors: duplicate routes have zero useful gain and cannot
+win.
 
-Same prompt, `temperature=0`, one request each to the bare and `atlas/`-prefixed
-DeepSeek IDs; compare replies and reported model metadata. Any two IDs that
-behave identically are collapsed to one candidate, so no "pair" is a model with
-itself. About 6 requests.
+### Stage 2: construct the frozen en->fr evaluation slice
 
-### Stage 2: smoke on both corpora
+The production dump is complete and committed:
+`analysis/data/nfg-ui-fr-units.jsonl` (466 units) and
+`analysis/data/nfg-ui-fr-glossary.json` (302 terms). The dump marks the 17
+units returned by `q=has:check` as `fails_check`; the endpoint's `checks` array
+is empty even for them.
 
-15 zh units (including several of the 7 critical units) and 15 fr units (including
-several injected defects), one repeat per surviving candidate. Disqualify on
-`unparsed` > 0 or a missed planted critical. About 12 requests per candidate.
+Write a deterministic en->fr builder that:
 
-### Stage 3: per-model runs
+1. excludes those 17 known-suspect units from the clean pool;
+2. selects a stratified 150-unit slice, retaining every mutation base and the
+   final held-out confirmation population;
+3. injects only French-target defects whose label is true by construction:
+   number loss, placeholder corruption, English leakage, negation/antonym
+   reversal, omission, incorrect glossary rendering, quote-frame loss,
+   obscenity insertion and person switch;
+4. records mutation kind, severity and source unit in a truth file; no human
+   annotation is claimed;
+5. checks seed determinism and parse-back before any paid judge request.
+
+The target stays French, so the target-side French mutation mechanics can be
+reused only after inspection. The current col4 builder has Russian source
+stemmers, Cyrillic donor logic and COL4-specific realia dictionaries, so it
+cannot be copied unmodified.
+
+### Stage 3: smoke on both corpora
+
+15 zh units (including several of the 7 critical units) and 15 fr injected
+defects, one repeat per surviving candidate. Disqualify on `unparsed` > 0 or a
+missed planted critical. About 12 requests per candidate.
+
+### Stage 4: per-model runs
 
 Surviving candidates, 5 repeats each, on both corpora. zh is the full 124 units
-(25 requests per repeat). fr is a stratified 150-unit slice, not all 466, to
-keep the bill proportionate: all injected defects plus a clean sample (30
-requests per repeat). So 275 requests per model.
+(25 requests per repeat). fr is the stratified 150-unit slice (30 requests per
+repeat). Under reasoning-off, also run `deepseek-v4-pro` in its current default
+mode, so the quality price of disabling reasoning is measured. This is 275
+requests per candidate plus 125 for that comparison.
 
-### Stage 4: offline pair search
+### Stage 5: offline pair search
 
-A new corpus-agnostic scorer, `analysis/probes/judge-pair-search.py`, reading a
-truth file, an anchor list and the stored run files, computing the objective
+A new corpus-agnostic scorer, `analysis/probes/judge-pair-search.py`, reads a
+truth file, an anchor list and stored run files, then computes the objective
 above for every pair. Zero API calls.
 
 Acceptance, and this is the test that makes the new scorer trustworthy: on the
@@ -333,7 +355,7 @@ collegium `missed_crit` 0/7, `false_crit` 6, `REAL@14` 11/14, `REAL@24` 19/24,
 `FP` 13/83, noise 26/124, and the per-seat rows above. `st2-zh-score.py` itself
 is not modified.
 
-### Stage 5: confirmation and decision
+### Stage 6: confirmation and decision
 
 The selected pair is re-run on the **full** 466-unit fr corpus and the full zh
 corpus, 5 repeats, to confirm the choice was not an artifact of the 150-unit
@@ -346,20 +368,22 @@ Only then may `WEBLATE_JUDGE_MODEL_SEAT_1/2` change.
 
 ## Cost
 
-| Stage | Requests |
-|---|---|
-| 0 compatibility | ~50 |
-| 1 duplicates | ~6 |
-| 2 smoke | ~12 per candidate, ~70 |
-| 3 per-model runs | 275 per surviving model |
-| 5 confirmation | ~600 for the chosen pair |
-| **total, 5 survivors** | **~2100** |
+| Stage | Requests | Status |
+|---|---:|---|
+| 0 compatibility | measured | complete |
+| 1 metadata duplicate check | 4 | complete, inconclusive |
+| 2 en->fr construction | 0 | pending |
+| 3 smoke | 12 × 6 = 72 | pending, reasoning mode decides the pool |
+| 4 per-model runs | 275 × 6 + 125 anchor mode comparison = 1775 | pending |
+| 6 full confirmation | 1190 | pending |
+| **remaining upper bound, six survivors** | **3037** | |
 
-The proxy returns no `usage.cost` (shadow pricing, vision:670-672), so tokens
-from `LLMUsageLog` are reported instead of dollars. Published list prices, for
-an order-of-magnitude sanity check only, span $0.14/M input (mimo-v2.5) to
-$2/M (qwen3.8-max). Stage 3 starts with one model, whose real token count is
-reported before the rest proceed.
+The old estimate of ~2100 was wrong because it counted only ~600 confirmation
+requests. A correct full rerun costs 94 fr batches × 2 models × 5 repeats
+(940), plus 25 zh batches × 2 models × 5 repeats (250). The proxy returns no
+`usage.cost` (shadow pricing, vision:670-672), so tokens from `LLMUsageLog` are
+reported instead of dollars. Stage 4 begins with the anchor; its actual token
+count is recorded before the other models proceed.
 
 ## Stop conditions
 
@@ -368,13 +392,12 @@ reported before the rest proceed.
    judge cannot be assembled from this proxy and leave the judge on OpenRouter -
    the LiteLLM provider and configurable endpoint already work and are already
    merged, and they do not depend on the seats.
-2. Only same-family models survive stage 0: **stop and report**, since a
-   same-family pair is not a collegium.
-3. Unlocking a candidate would require changing the judge's payload or parser
-   (the `reasoning_content` case, or sending `max_tokens` for every model):
-   **stop and ask**. That is a product change, it applies to all models, and it
-   invalidates prior measurements under R3.
-4. fr injected-defect recall and zh recall disagree on the winner: **stop and
+2. The reasoning-off mapping is approved in principle, but it is not implemented
+   until the operator chooses the mode. **Block before stage 3** until that
+   choice is recorded. Any other payload/parser change - a `reasoning_content`
+   fallback, explicit `max_tokens`, or SSE streaming - is still a stop-and-ask
+   boundary.
+3. fr injected-defect recall and zh recall disagree on the winner: **stop and
    present both**, do not average them into a single score.
 
 ## Out of scope
@@ -387,20 +410,16 @@ reported before the rest proceed.
   separate approval.
 - Production rollout, and any write to the production instance.
 
-## Approvals this plan needs
+## Approvals and the one open decision
 
-1. **Read the fr corpus from production.** Fetching the 466 units and the
-   302-term glossary of `need-for-greed/ui/fr` is a read-only GET, but
-   `AGENTS.md` classes any command against `l10n.herocraft.com` under
-   deployment, so it needs a word.
-2. **The spend**, on the order of 2100 requests as tabulated.
-3. **Whether stage 0 may propose a product change**, and which. Three are
-   already foreseeable: sending an explicit `max_tokens` (unblocks the Qwen
-   400s, and guards DeepSeek against silent truncation), sending a vendor
-   thinking toggle for LiteLLM hosts (the only way to control reasoning cost
-   and the likely cause of the ~30.5 s failures), and falling back to
-   `reasoning_content` when `content` is empty (unblocks MiniMax while LiteLLM
-   PR #38212 stays unmerged). Each applies to every model and so invalidates
-   prior measurements under R3. Default without approval: any candidate that
-   needs one is recorded as blocked and excluded, and the eval proceeds with
-   whoever answers as-is.
+Resolved on 2026-08-26:
+
+1. Production reads are allowed. The corpus and glossary are frozen in
+   `analysis/data/nfg-ui-fr-units.jsonl` and
+   `analysis/data/nfg-ui-fr-glossary.json`.
+2. LiteLLM-key usage is unlimited for this evaluation.
+3. A product change may be proposed, including a thinking toggle.
+
+**Open:** choose the mode in `Stage 0 outcome, and the decision it forces`.
+Until then, stages 2-6 do not run: reasoning-on excludes the Qwen family,
+reasoning-off requires the shared judge mapping first.
