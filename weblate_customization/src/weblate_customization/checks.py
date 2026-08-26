@@ -17,6 +17,7 @@ from collections import Counter
 from decimal import Decimal, InvalidOperation
 from functools import cache
 from itertools import pairwise
+from operator import itemgetter
 from typing import NamedTuple
 
 import regex
@@ -205,24 +206,21 @@ def _balanced_brace_blocks(
     return [] if starts else blocks
 
 
-def conditional_dsl_syntax_spans(text: str) -> list[tuple[int, int]]:
-    """
-    Return immutable spans in the documented Hero Craft conditional DSL.
-
-    Branch text remains unprotected so it can be translated. Nested brace
-    placeholders, delimiters, and a directly adjacent placeholder separator
-    are syntax rather than rendered text.
-    """
-    blocks = _balanced_brace_blocks(text)
+def _parse_conditional_dsl(
+    text: str,
+) -> tuple[list[tuple[int, int]], tuple[tuple[str, ...], ...]]:
+    """Return immutable conditional spans and ordered conditional signatures."""
     spans: list[tuple[int, int]] = []
+    signatures: list[tuple[str, ...]] = []
+    recognized_end = 0
 
-    for start, end, children in blocks:
+    for start, end, children in sorted(_balanced_brace_blocks(text), key=itemgetter(0)):
+        if start < recognized_end:
+            continue
         header = _CONDITIONAL_HEADER.match(text, start + 1, end - 1)
         if header is None:
             continue
 
-        # The header's comparison cannot cross a nested placeholder. The
-        # matching outer brace proved every nested placeholder is complete.
         spans.extend(
             (
                 (start, start + 1),
@@ -232,16 +230,36 @@ def conditional_dsl_syntax_spans(text: str) -> list[tuple[int, int]]:
         )
         spans.extend(children)
 
-        depth = 0
-        for position in range(header.end(), end - 1):
-            char = text[position]
-            if char == "{":
-                depth += 1
-            elif char == "}":
-                depth -= 1
-            elif char == "|" and depth == 0:
+        signature = [text[start + 1 : header.end()]]
+        children_by_start = dict(children)
+        position = header.end()
+        while position < end - 1:
+            child_end = children_by_start.get(position)
+            if child_end is not None:
+                signature.append(text[position:child_end])
+                position = child_end
+            elif text[position] == "|":
                 spans.append((position, position + 1))
+                signature.append("|")
+                position += 1
+            else:
+                position += 1
 
+        signatures.append(tuple(signature))
+        recognized_end = end
+
+    return spans, tuple(signatures)
+
+
+def conditional_dsl_syntax_spans(text: str) -> list[tuple[int, int]]:
+    """
+    Return immutable spans in the documented Hero Craft conditional DSL.
+
+    Branch text remains unprotected so it can be translated. Nested brace
+    placeholders, delimiters, and a directly adjacent placeholder separator
+    are syntax rather than rendered text.
+    """
+    spans, _signatures = _parse_conditional_dsl(text)
     simple_placeholders = [
         (match.start(), match.end())
         for match in PLACEHOLDER_PATTERN.finditer(text)
@@ -269,9 +287,17 @@ class GameMarkupCheck(TargetCheck):
     def check_single(self, source: str, target: str, unit) -> bool:
         if not target:
             return False
-        return Counter(markup_tokens(source)) != Counter(
-            markup_tokens(target)
-        ) or placeholder_sequence(source) != placeholder_sequence(target)
+        if Counter(markup_tokens(source)) != Counter(markup_tokens(target)):
+            return True
+        if placeholder_sequence(source) != placeholder_sequence(target):
+            return True
+        if ":cond:" not in source:
+            return False
+
+        source_conditionals = _parse_conditional_dsl(source)[1]
+        return bool(source_conditionals) and (
+            source_conditionals != _parse_conditional_dsl(target)[1]
+        )
 
     def check_highlight(self, source: str, unit):
         if self.should_skip(unit):

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from itertools import pairwise
 
+from django.test import SimpleTestCase
 from weblate_customization.checks import (
     CyrillicLeakCheck,
     GameLengthCheck,
@@ -36,9 +37,24 @@ HUMAN_TIMER_DE = (
     "{minutes:cond:>0?{minutes}Min. |}"
     "{seconds:cond:>=0?{seconds}Sek.|}"
 )
+AMOUNT_FORMATTED_FR = (
+    "{value\u00a0:cond\u00a0:>99999\u202f?{value\u00a0:amount()}|}"
+    "{value\u00a0:cond\u00a0:<=99999\u202f?{value\u00a0:N0}|}"
+)
+HUMAN_TIMER_FR = (
+    "{hours\u00a0:cond\u00a0:>0\u202f?{hours}h. |}"
+    "{minutes\u00a0:cond\u00a0:>0\u202f?{minutes}m. |}"
+    "{seconds\u00a0:cond\u00a0:>=0\u202f?{seconds}s.|}"
+)
+HUMAN_TIMER_TR = (
+    "{hours:cond:>0?{hours} sa. |}"
+    "{minutes:cond:>0?{minutes} dk. |}"
+    "{seconds:cond:>=0?{seconds} sn.|}"
+)
+NESTED_CONDITIONAL = "{a:cond:>0?{b:cond:>0?x|}y|}"
 
 
-class ConditionalDslSyntaxSpansTest(CheckTestCase):
+class ConditionalDslSyntaxSpansTest(SimpleTestCase):
     def test_protects_conditional_syntax_but_not_branch_text(self) -> None:
         for text in (AMOUNT_FORMATTED, TIMER):
             spans = conditional_dsl_syntax_spans(text)
@@ -46,7 +62,8 @@ class ConditionalDslSyntaxSpansTest(CheckTestCase):
             self.assertIn(":cond:", protected)
             self.assertIn("?", protected)
             self.assertIn(
-                "{value:amount()}", protected if text == AMOUNT_FORMATTED else text
+                "{value:amount()}" if text == AMOUNT_FORMATTED else "{hours:00}",
+                protected,
             )
             self.assertEqual(spans, sorted(spans))
             self.assertTrue(all(left[1] <= right[0] for left, right in pairwise(spans)))
@@ -72,6 +89,16 @@ class ConditionalDslSyntaxSpansTest(CheckTestCase):
             conditional_dsl_syntax_spans("Text {value:00}: text"),
             [],
         )
+
+    def test_a_nested_conditional_is_one_outermost_record(self) -> None:
+        spans = conditional_dsl_syntax_spans(NESTED_CONDITIONAL)
+        inner = NESTED_CONDITIONAL.index("{b")
+        inner_block = "{b:cond:>0?x|}"
+
+        self.assertEqual(spans, sorted(spans))
+        self.assertTrue(all(left[1] <= right[0] for left, right in pairwise(spans)))
+        self.assertIn((inner, inner + len(inner_block)), spans)
+        self.assertNotIn((inner + 1, inner + 1 + len("b:cond:>0?")), spans)
 
 
 class GameMarkupCheckTest(CheckTestCase):
@@ -139,6 +166,66 @@ class GameMarkupCheckTest(CheckTestCase):
             )
         )
         self.assertFalse(self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_DE, unit))
+
+    def test_rejects_whitespace_inside_conditional_syntax(self) -> None:
+        for source, target in (
+            (AMOUNT_FORMATTED, AMOUNT_FORMATTED_FR),
+            (HUMAN_TIMER_EN, HUMAN_TIMER_FR),
+            (HUMAN_TIMER_EN, HUMAN_TIMER_EN.replace("hours:cond", "hours :cond", 1)),
+            (HUMAN_TIMER_EN, HUMAN_TIMER_EN.replace("cond:>0?", "cond: >0 ?", 1)),
+        ):
+            with self.subTest(target=target):
+                self.assertTrue(self.check.check_single(source, target, None))
+
+    def test_rejects_changed_conditional_separators(self) -> None:
+        for target in (
+            HUMAN_TIMER_EN.replace("h. |}", "h. }", 1),
+            HUMAN_TIMER_EN.replace("h. |}", "h. ||}", 1),
+            HUMAN_TIMER_EN.replace("{hours}h. |", "|{hours}h. ", 1),
+        ):
+            with self.subTest(target=target):
+                self.assertTrue(self.check.check_single(HUMAN_TIMER_EN, target, None))
+
+    def test_rejects_changed_conditional_headers(self) -> None:
+        for source, target in (
+            (HUMAN_TIMER_EN, HUMAN_TIMER_EN.replace("hours:cond", "hour:cond", 1)),
+            (
+                HUMAN_TIMER_EN,
+                HUMAN_TIMER_EN.replace("hours:cond:>0?", "hours:cond:>=0?", 1),
+            ),
+            (
+                HUMAN_TIMER_EN,
+                HUMAN_TIMER_EN.replace("hours:cond:>0?", "hours:cond:>1?", 1),
+            ),
+            (AMOUNT_FORMATTED, AMOUNT_FORMATTED.replace(":<=99999?", ":<99999?", 1)),
+        ):
+            with self.subTest(target=target):
+                self.assertTrue(self.check.check_single(source, target, None))
+
+    def test_rejects_a_malformed_conditional_target(self) -> None:
+        self.assertTrue(
+            self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_EN[:-1], None)
+        )
+
+    def test_a_nested_conditional_branch_is_immutable(self) -> None:
+        self.assertTrue(
+            self.check.check_single(
+                NESTED_CONDITIONAL, NESTED_CONDITIONAL.replace("?x|", "?z|", 1), None
+            )
+        )
+        self.assertFalse(
+            self.check.check_single(
+                NESTED_CONDITIONAL, NESTED_CONDITIONAL.replace("|}y|", "|}z|", 1), None
+            )
+        )
+
+    def test_allows_localized_conditional_branch_text(self) -> None:
+        self.assertFalse(self.check.check_single(HUMAN_TIMER_EN, HUMAN_TIMER_TR, None))
+
+    def test_unrecognized_source_conditional_adds_no_failure(self) -> None:
+        for text in ("{value:cond:1}", "Text {value:00}: text"):
+            with self.subTest(text=text):
+                self.assertFalse(self.check.check_single(text, text, None))
 
 
 class GameLineBreakCheckTest(CheckTestCase):
