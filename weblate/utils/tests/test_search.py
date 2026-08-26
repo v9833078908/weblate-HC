@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime, timedelta, timezone
 from typing import TYPE_CHECKING, ClassVar, Literal
 from unittest.mock import patch
@@ -16,6 +17,11 @@ from weblate.auth.models import User
 from weblate.screenshots.models import Screenshot
 from weblate.trans.actions import ActionEvents
 from weblate.trans.models import Change, Project, Unit
+from weblate.trans.models.judge import (
+    JudgeVerdict,
+    compute_target_hash,
+    compute_target_storage_hash,
+)
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.util import PLURAL_SEPARATOR
 from weblate.utils.search import (
@@ -1022,3 +1028,98 @@ class SearchTest(ViewTestCase, SearchTestCase):
             exists=True,
             project=self.project,
         )
+
+
+class JudgeSearchTest(ViewTestCase):
+    def make_verdict(self, unit, severity: str) -> None:
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity=severity,
+            judge_model="vendor/model",
+            seat=1,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(unit.target),
+            context_hash="context",
+            run_id=uuid.uuid4(),
+        )
+
+    def matches(self, query: str, unit) -> bool:
+        filters, annotations = parse_query(query)
+        return (
+            type(unit)
+            .objects.annotate(**annotations)
+            .filter(filters, pk=unit.pk)
+            .exists()
+        )
+
+    def test_judge_filters_only_match_current_evidence(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "major")
+        self.assertTrue(self.matches("has:judge", unit))
+        self.assertTrue(self.matches("judge:flag", unit))
+        self.assertFalse(self.matches("NOT has:judge", unit))
+        type(unit).objects.filter(pk=unit.pk).update(target="Edited")
+        self.assertFalse(self.matches("has:judge", unit))
+        self.assertTrue(self.matches("NOT has:judge", unit))
+        self.assertTrue(self.matches("judge:stale", unit))
+
+    def test_judge_minor_filter_matches_only_minor(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "minor")
+        self.assertTrue(self.matches("judge:minor", unit))
+        self.assertTrue(self.matches("judge:pass", unit))
+        self.assertFalse(self.matches("judge:flag", unit))
+        self.assertFalse(self.matches("judge:reject", unit))
+
+    def test_judge_resolved_and_escalated_filters(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        JudgeVerdict.objects.filter(unit=unit).update(resolution="escalated")
+        self.assertTrue(self.matches("judge:escalated", unit))
+        self.assertFalse(self.matches("judge:resolved", unit))
+        JudgeVerdict.objects.filter(unit=unit).update(resolution="accepted_as_is")
+        self.assertTrue(self.matches("judge:resolved", unit))
+        self.assertFalse(self.matches("judge:escalated", unit))
+
+    def test_every_preset_query_selects_its_exact_severity_set(self) -> None:
+        unit = self.get_unit()
+        expectations = {
+            "none": {
+                "judge:pass": True,
+                "judge:minor": False,
+                "judge:flag": False,
+                "judge:reject": False,
+            },
+            "minor": {
+                "judge:pass": True,
+                "judge:minor": True,
+                "judge:flag": False,
+                "judge:reject": False,
+            },
+            "major": {
+                "judge:pass": False,
+                "judge:minor": False,
+                "judge:flag": True,
+                "judge:reject": False,
+            },
+            "critical": {
+                "judge:pass": False,
+                "judge:minor": False,
+                "judge:flag": False,
+                "judge:reject": True,
+            },
+        }
+        for severity, per_query in expectations.items():
+            # A newer verdict is the active one for the same unit (task 1/2
+            # regression coverage), so this walks every severity in turn.
+            self.make_verdict(unit, severity)
+            for query, expected in per_query.items():
+                self.assertIs(
+                    self.matches(query, unit),
+                    expected,
+                    f"severity={severity!r} query={query!r}",
+                )
+
+    def test_unsupported_judge_filter_raises_search_error(self) -> None:
+        with self.assertRaises(SearchQueryError):
+            parse_query("judge:override")

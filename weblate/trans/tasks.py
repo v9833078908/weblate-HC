@@ -925,7 +925,7 @@ def get_auto_translate_target(
     language_id: int | None,
     workspace_id: str | None = None,
 ) -> tuple[
-    Translation | Component | Category | ProjectLanguage | Workspace,
+    Translation | Component | Category | Project | ProjectLanguage | Workspace,
     dict[str, int | str],
 ]:
     if translation_id is not None:
@@ -938,11 +938,11 @@ def get_auto_translate_target(
         category = Category.objects.get(pk=category_id)
         return category, {"category": category.id}
     if project_id is not None:
+        project = Project.objects.get(pk=project_id)
         if language_id is None:
-            msg = "language_id must be provided when project_id is given"
-            raise ValueError(msg)
+            return project, {"project": project.id}
         project_language = ProjectLanguage(
-            project=Project.objects.get(pk=project_id),
+            project=project,
             language=Language.objects.get(pk=language_id),
         )
         return project_language, {

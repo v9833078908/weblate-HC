@@ -240,6 +240,7 @@
   <div class="tab-content">
     <div class="tab-pane active" id="translations">
 
+      {% include "snippets/judge-readiness.html" %}
       {% include "snippets/list-objects.html" with objects=translations name_source="language" label=_("Language") is_glossary=object.is_glossary add_link="translation" %}
 
     </div>

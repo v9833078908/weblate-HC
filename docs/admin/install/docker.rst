@@ -2364,7 +2364,8 @@ LLM judge
 +++++++++
 
 .. envvar:: WEBLATE_JUDGE_ENABLED
-.. envvar:: WEBLATE_JUDGE_OPENROUTER_KEY
+.. envvar:: WEBLATE_JUDGE_API_KEY
+.. envvar:: WEBLATE_JUDGE_BASE_URL
 .. envvar:: WEBLATE_JUDGE_MODEL_SEAT_1
 .. envvar:: WEBLATE_JUDGE_MODEL_SEAT_2
 .. envvar:: WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS
@@ -2377,13 +2378,15 @@ LLM judge
     .. versionadded:: 2026.8.1
 
     Configures the optional LLM judge :ref:`automatic translation
-    <auto-translation>` mode via OpenRouter. See :setting:`JUDGE_ENABLED` and
-    related settings.
+    <auto-translation>` mode. The provider endpoint defaults to OpenRouter
+    and is set by :setting:`JUDGE_BASE_URL`. See :setting:`JUDGE_ENABLED`
+    and related settings.
 
     .. seealso::
 
        * :setting:`JUDGE_ENABLED`
-       * :setting:`JUDGE_OPENROUTER_KEY`
+       * :setting:`JUDGE_API_KEY`
+       * :setting:`JUDGE_BASE_URL`
        * :setting:`JUDGE_MODEL_SEAT_1`
        * :setting:`JUDGE_MODEL_SEAT_2`
        * :setting:`JUDGE_MAX_REPAIR_ATTEMPTS`

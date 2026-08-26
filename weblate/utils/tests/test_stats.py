@@ -2,10 +2,18 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+
+import uuid
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
+from weblate.trans.models.judge import (
+    JudgeVerdict,
+    compute_target_hash,
+    compute_target_storage_hash,
+)
+from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.state import (
     STATE_APPROVED,
     STATE_EMPTY,
@@ -117,3 +125,149 @@ class StatsPrefetchTest(SimpleTestCase):
                 )
 
         self.assertEqual(covered, TranslationStats.UNIT_DELTA_KEYS)
+
+
+class JudgeStatsTest(ViewTestCase):
+    def add_verdict(self, unit, severity: str, *, unparsed: bool = False, stale=False):
+        return JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity=severity,
+            unparsed=unparsed,
+            judge_model="vendor/model",
+            seat=1,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=(
+                "old-target" if stale else compute_target_storage_hash(unit.target)
+            ),
+            context_hash="context",
+            run_id=uuid.uuid4(),
+        )
+
+    def refresh_stats(self) -> None:
+        with self.captureOnCommitCallbacks(execute=True):
+            self.translation.invalidate_cache()
+
+    def test_translation_judge_stats_are_target_fresh(self) -> None:
+        unit = self.get_unit()
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="major",
+            judge_model="vendor/model",
+            seat=1,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(unit.target),
+            context_hash="context",
+            run_id=uuid.uuid4(),
+        )
+        self.translation.invalidate_cache()
+
+        self.assertEqual(self.translation.stats.judge_total, self.translation.stats.all)
+        self.assertEqual(self.translation.stats.judge_evaluated, 1)
+        self.assertEqual(self.translation.stats.judge_flag, 1)
+        self.assertEqual(self.translation.stats.judge_pass, 0)
+        self.assertEqual(self.translation.stats.judge_reject, 0)
+
+    def test_translation_judge_stats_cover_all_statuses(self) -> None:
+        units = list(self.translation.unit_set.order_by("pk")[:7])
+        while len(units) < 7:
+            seed = units[0]
+            units.append(
+                type(seed).objects.create(
+                    translation=self.translation,
+                    source_unit=seed.source_unit,
+                    source=f"Extra {len(units)}",
+                    target="",
+                    context=f"extra-{len(units)}",
+                    id_hash=seed.id_hash + len(units),
+                    position=100 + len(units),
+                    state=STATE_TRANSLATED,
+                )
+            )
+        self.add_verdict(units[0], "none")
+        self.add_verdict(units[1], "major")
+        self.add_verdict(units[2], "critical")
+        self.add_verdict(units[3], "major", stale=True)
+        self.add_verdict(units[4], "none", unparsed=True)
+        type(units[5]).objects.filter(pk=units[5].pk).update(state=STATE_READONLY)
+        self.add_verdict(units[5], "critical")
+        self.add_verdict(units[6], "minor")
+        self.refresh_stats()
+
+        stats = self.translation.stats
+        self.assertEqual(stats.judge_total, stats.all - stats.readonly)
+        self.assertEqual(stats.judge_evaluated, 4)
+        self.assertEqual(stats.judge_pass, 2)
+        self.assertEqual(stats.judge_minor, 1)
+        self.assertEqual(stats.judge_flag, 1)
+        self.assertEqual(stats.judge_reject, 1)
+        self.assertEqual(
+            stats.judge_pass + stats.judge_flag + stats.judge_reject,
+            stats.judge_evaluated,
+        )
+        self.assertEqual(stats.judge_stale, 1)
+        self.assertEqual(stats.judge_unparsed, 1)
+
+    def test_translation_judge_resolution_stats(self) -> None:
+        unit = self.get_unit()
+        verdict = self.add_verdict(unit, "critical")
+        verdict.resolution = "escalated"
+        verdict.save(update_fields=["resolution"])
+        self.refresh_stats()
+        self.assertEqual(self.translation.stats.judge_escalated, 1)
+        self.assertEqual(self.translation.stats.judge_resolved, 0)
+        verdict.resolution = "accepted_as_is"
+        verdict.save(update_fields=["resolution"])
+        self.refresh_stats()
+        self.assertEqual(self.translation.stats.judge_resolved, 1)
+        self.assertEqual(self.translation.stats.judge_escalated, 0)
+
+    def test_translation_judge_needs_human_stats(self) -> None:
+        units = list(self.translation.unit_set.order_by("pk")[:5])
+        while len(units) < 5:
+            seed = units[0]
+            units.append(
+                type(seed).objects.create(
+                    translation=self.translation,
+                    source_unit=seed.source_unit,
+                    source=f"Extra {len(units)}",
+                    target="",
+                    context=f"extra-{len(units)}",
+                    id_hash=seed.id_hash + len(units),
+                    position=100 + len(units),
+                    state=STATE_TRANSLATED,
+                )
+            )
+        # Unresolved critical: needs a human.
+        self.add_verdict(units[0], "critical")
+        # Accepted critical: no longer needs a human.
+        accepted = self.add_verdict(units[1], "critical")
+        accepted.resolution = "accepted_as_is"
+        accepted.save(update_fields=["resolution"])
+        # Escalated major: needs a human even though it is not critical.
+        escalated_major = self.add_verdict(units[2], "major")
+        escalated_major.resolution = "escalated"
+        escalated_major.save(update_fields=["resolution"])
+        # Escalated critical: needs a human (matches both OR clauses once).
+        escalated_critical = self.add_verdict(units[3], "critical")
+        escalated_critical.resolution = "escalated"
+        escalated_critical.save(update_fields=["resolution"])
+        # Unresolved major, never escalated: does not need a human.
+        self.add_verdict(units[4], "major")
+        self.refresh_stats()
+
+        self.assertEqual(self.translation.stats.judge_needs_human, 3)
+
+    def test_target_edit_stales_and_new_verdict_restores_coverage(self) -> None:
+        unit = self.get_unit()
+        self.add_verdict(unit, "major")
+        self.refresh_stats()
+        self.assertEqual(self.translation.stats.judge_evaluated, 1)
+        type(unit).objects.filter(pk=unit.pk).update(target="changed")
+        self.refresh_stats()
+        self.assertEqual(self.translation.stats.judge_evaluated, 0)
+        self.assertEqual(self.translation.stats.judge_stale, 1)
+        unit.refresh_from_db()
+        self.add_verdict(unit, "none")
+        self.refresh_stats()
+        self.assertEqual(self.translation.stats.judge_evaluated, 1)
+        self.assertEqual(self.translation.stats.judge_pass, 1)

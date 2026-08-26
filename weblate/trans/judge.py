@@ -3,12 +3,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """
-OpenRouter client for the LLM judge (measured arm D).
+LLM judge client for an operator-configured chat-completions endpoint (measured arm D).
 
 Separate from RoutedLLMTranslation on purpose: the judge is not a machine
 translation service. Mirrors the loc-kit profile client
-(weblate/trans/loc_kit.py): fixed host, strict schema, one exception
-type, no user-supplied endpoint/key/model. Requests are batched
+(weblate/trans/loc_kit.py): an operator-configured host, strict schema, one
+exception type, no user-supplied endpoint/key/model. Requests are batched
 (JUDGE_BATCH_SIZE segments per HTTP call) exactly as the measurement was
 run — the measured noise/precision/recall/cost numbers assume batching.
 """
@@ -26,6 +26,7 @@ from importlib import resources
 from itertools import starmap
 from secrets import token_hex
 from typing import TYPE_CHECKING, cast
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.utils.translation import gettext as _
@@ -39,9 +40,30 @@ if TYPE_CHECKING:
 
     from weblate.glossary.models import GlossaryPromptEntry
 
-OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
+_OPENROUTER_HOST = "openrouter.ai"
+_LITELLM_HOST = "hcbifrost.herocraft.com"
 JUDGE_REQUEST_TIMEOUT = 120
 JUDGE_SEATS = (1, 2)
+
+
+def judge_request_upper_bound(strings: int) -> int | None:
+    """
+    Estimate the requests one judge run plans for a number of strings.
+
+    Batches, not strings: request_verdicts() sends JUDGE_BATCH_SIZE segments
+    per call. A repair round re-judges only the strings that were repaired, so
+    this is a ceiling for the run; it is not absolute because a refused batch
+    is retried once. None means the configured batch size cannot be read.
+    """
+    batch_size = settings.JUDGE_BATCH_SIZE
+    if not isinstance(batch_size, int) or batch_size < 1:
+        return None
+    if strings < 1:
+        return 0
+    batches = (strings + batch_size - 1) // batch_size
+    return batches * len(JUDGE_SEATS) * (1 + settings.JUDGE_MAX_REPAIR_ATTEMPTS)
+
+
 # A verdict batch reply is kilobytes; this only bounds a broken peer.
 MAX_BATCH_RESPONSE_BYTES = 8 * 1024 * 1024
 # Measured category set (st2-zh-recalibration.py:59-68).
@@ -75,26 +97,59 @@ class JudgeError(Exception):
     """
 
 
+def get_judge_base_url() -> str:
+    """Validate ``JUDGE_BASE_URL`` and return it; raise before any network call."""
+    base_url = settings.JUDGE_BASE_URL
+    if not isinstance(base_url, str) or not base_url.strip():
+        raise JudgeError(_("The LLM judge is not configured."))
+    parsed = urlsplit(base_url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise JudgeError(_("The LLM judge is not configured."))
+    return base_url
+
+
+def get_judge_chat_completions_url() -> str:
+    """``{JUDGE_BASE_URL}/chat/completions``, with the base URL validated."""
+    return f"{get_judge_base_url().rstrip('/')}/chat/completions"
+
+
+def _judge_provider(base_url: str) -> str:
+    """Resolve the provider identity from the parsed hostname, never a URL substring."""
+    hostname = urlsplit(base_url).hostname or ""
+    if hostname == _OPENROUTER_HOST or hostname.endswith(f".{_OPENROUTER_HOST}"):
+        return "openrouter"
+    if hostname == _LITELLM_HOST or hostname.endswith(f".{_LITELLM_HOST}"):
+        return "litellm"
+    return "unknown"
+
+
+def _judge_provider_profile(base_url: str) -> dict:
+    """OpenRouter-only request fields; empty for every other provider."""
+    if _judge_provider(base_url) == "openrouter":
+        return {"provider": {"require_parameters": True}}
+    return {}
+
+
 def judge_configuration_ready() -> bool:
     """Whether the complete two-seat judge configuration is usable."""
-    return bool(
-        settings.JUDGE_ENABLED
-        and isinstance(settings.JUDGE_OPENROUTER_KEY, str)
-        and settings.JUDGE_OPENROUTER_KEY.strip()
-        and isinstance(settings.JUDGE_MODEL_SEAT_1, str)
-        and settings.JUDGE_MODEL_SEAT_1.strip()
-        and isinstance(settings.JUDGE_MODEL_SEAT_2, str)
-        and settings.JUDGE_MODEL_SEAT_2.strip()
-    )
+    try:
+        validate_judge_configuration()
+    except JudgeError:
+        return False
+    return True
 
 
 def validate_request_settings() -> None:
     """Fail before any paid request when a shared judge setting is unusable."""
     if not settings.JUDGE_ENABLED:
         raise JudgeError(_("The LLM judge is disabled."))
-    if not (
-        isinstance(settings.JUDGE_OPENROUTER_KEY, str)
-        and settings.JUDGE_OPENROUTER_KEY.strip()
+    if not (isinstance(settings.JUDGE_API_KEY, str) and settings.JUDGE_API_KEY.strip()):
+        raise JudgeError(_("The LLM judge is not configured."))
+    base_url = get_judge_base_url()
+    if (
+        _judge_provider(base_url) == "litellm"
+        and isinstance(settings.JUDGE_REASONING_EFFORT, str)
+        and settings.JUDGE_REASONING_EFFORT.strip()
     ):
         raise JudgeError(_("The LLM judge is not configured."))
     if not (
@@ -116,6 +171,10 @@ def validate_judge_configuration() -> None:
         and settings.JUDGE_MODEL_SEAT_1.strip()
         and isinstance(settings.JUDGE_MODEL_SEAT_2, str)
         and settings.JUDGE_MODEL_SEAT_2.strip()
+        and isinstance(settings.JUDGE_MAX_REPAIR_ATTEMPTS, int)
+        and settings.JUDGE_MAX_REPAIR_ATTEMPTS >= 0
+        and isinstance(settings.JUDGE_MAX_UNITS_PER_RUN, int)
+        and settings.JUDGE_MAX_UNITS_PER_RUN >= 0
     ):
         raise JudgeError(_("The LLM judge is not configured."))
 
@@ -274,7 +333,9 @@ class _BatchResponse:
     payload: dict | None
 
 
-def _write_llm_usage(payload: dict, model: str, project_slug: str) -> None:
+def _write_llm_usage(
+    payload: dict, model: str, project_slug: str, unit_count: int
+) -> None:
     usage = payload.get("usage")
     if not isinstance(usage, dict):
         return
@@ -296,10 +357,14 @@ def _write_llm_usage(payload: dict, model: str, project_slug: str) -> None:
         response_id=str(payload.get("id") or ""),
         cached_tokens=prompt_details.get("cached_tokens") or 0,
         reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
+        operation=LLMUsageLog.Operation.JUDGE,
+        unit_count=unit_count,
     )
 
 
-def _record_usage(payload: dict, model: str, project_slug: str) -> None:
+def _record_usage(
+    payload: dict, model: str, project_slug: str, unit_count: int
+) -> None:
     """
     Mirror machinery's record_llm_usage (never raises).
 
@@ -308,7 +373,7 @@ def _record_usage(payload: dict, model: str, project_slug: str) -> None:
     mechanism, so accounting must be symmetric.
     """
     try:
-        _write_llm_usage(payload, model, project_slug)
+        _write_llm_usage(payload, model, project_slug, unit_count)
     except Exception:
         LOGGER.exception("Failed to record LLM usage")
 
@@ -432,11 +497,11 @@ def _post_batch(payload: dict, model: str) -> _BatchResponse:
     try:
         with stream_validated_url(
             "POST",
-            OPENROUTER_CHAT_COMPLETIONS_URL,
+            get_judge_chat_completions_url(),
             # Built inline so the bearer token is never bound to a frame
             # local that an error reporter could serialize.
             headers={
-                "Authorization": f"Bearer {settings.JUDGE_OPENROUTER_KEY}",
+                "Authorization": f"Bearer {settings.JUDGE_API_KEY}",
                 "Content-Type": "application/json",
             },
             json=payload,
@@ -479,6 +544,7 @@ def request_verdicts(
     validate_request_settings()
     if not isinstance(model, str) or not model.strip():
         raise JudgeError(_("The LLM judge is not configured."))
+    base_url = get_judge_base_url()
 
     batch_size = settings.JUDGE_BATCH_SIZE
     sleep = settings.JUDGE_REQUEST_SLEEP
@@ -504,8 +570,6 @@ def request_verdicts(
                     "schema": _response_schema(),
                 },
             },
-            "provider": {"require_parameters": True},
-            "usage": {"include": True},
             "messages": [
                 {
                     "role": "system",
@@ -528,6 +592,7 @@ def request_verdicts(
                 },
             ],
         }
+        payload.update(_judge_provider_profile(base_url))
         effort = settings.JUDGE_REASONING_EFFORT
         if isinstance(effort, str) and effort.strip():
             # exclude: nothing reads the trace, so paying to ship it back
@@ -559,7 +624,7 @@ def request_verdicts(
                     elapsed_ms,
                 )
             if response.payload is not None:
-                _record_usage(response.payload, model, project_slug)
+                _record_usage(response.payload, model, project_slug, len(batch))
             if response.payload is not None and (
                 response.status_code is None or response.status_code < 400
             ):

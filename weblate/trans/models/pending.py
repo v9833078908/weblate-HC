@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, cast
 
@@ -313,6 +314,15 @@ class PendingChangeQuerySet(models.QuerySet["PendingUnitChange", "PendingUnitCha
         """Count distinct units in a PendingUnitChange queryset."""
         return qs.distinct("unit_id").count()
 
+    def _group_units_by_translation(self, qs: PendingChangeQuerySet) -> dict[int, int]:
+        """Distinct pending unit count per translation ID."""
+        counts: dict[int, int] = defaultdict(int)
+        for translation_id, _unit_id in qs.values_list(
+            "unit__translation_id", "unit_id"
+        ).distinct():
+            counts[translation_id] += 1
+        return counts
+
     def detailed_count(self, obj: Project | Component | Translation) -> dict[str, int]:
         """Count total, skipped and eligible units pending and eligible for commit for the given object."""
         from weblate.trans.models import (  # ruff: ignore[import-outside-top-level]
@@ -353,6 +363,52 @@ class PendingChangeQuerySet(models.QuerySet["PendingUnitChange", "PendingUnitCha
         )
 
         counts["eligible_for_commit"] = eligible_after_commit_policy_filter
+
+        return counts
+
+    def detailed_count_by_translation(
+        self, component: Component
+    ) -> dict[int, dict[str, int]]:
+        """
+        Batched detailed_count() for every real translation of a component.
+
+        Runs the retry/blocking and commit-policy passes once for the whole
+        component, then groups distinct units by translation, so callers
+        avoid repeating detailed_count(translation) - and its blocking-unit
+        Python loop - once per language. Values match
+        detailed_count(translation) exactly for every real (non-source)
+        translation; translations without pending rows are zero-filled.
+        """
+        commit_policy = component.project.commit_policy
+        counts: dict[int, dict[str, int]] = {
+            translation_id: {
+                "total": 0,
+                "errors_skipped": 0,
+                "commit_policy_skipped": 0,
+                "eligible_for_commit": 0,
+            }
+            for translation_id in component.translation_set.exclude_source().values_list(
+                "id", flat=True
+            )
+        }
+
+        qs = self.filter(unit__translation__component=component)
+        total = self._group_units_by_translation(qs)
+
+        qs = self._apply_retry_filter(qs, revision=None, blocking_unit_filter=True)
+        after_retry = self._group_units_by_translation(qs)
+
+        qs = self._apply_commit_policy_filter(qs, commit_policy)
+        after_policy = self._group_units_by_translation(qs)
+
+        for translation_id, entry in counts.items():
+            total_count = total.get(translation_id, 0)
+            retry_count = after_retry.get(translation_id, 0)
+            policy_count = after_policy.get(translation_id, 0)
+            entry["total"] = total_count
+            entry["errors_skipped"] = total_count - retry_count
+            entry["commit_policy_skipped"] = retry_count - policy_count
+            entry["eligible_for_commit"] = policy_count
 
         return counts
 

@@ -13,6 +13,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.test.utils import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from weblate.auth.models import User
 from weblate.lang.models import Language
@@ -34,6 +35,7 @@ from weblate.utils.state import (
     STATE_FUZZY,
     STATE_TRANSLATED,
 )
+from weblate.utils.version import GIT_VERSION
 from weblate.vcs.base import RepositoryError
 from weblate.vcs.models import VCS_REGISTRY
 
@@ -1026,6 +1028,66 @@ class MultiRepoTest(ViewTestCase):
             )
         )
         self.assertEqual(response.status_code, 200)
+
+
+class DetailedCountByTranslationTest(ViewTestCase):
+    """detailed_count_by_translation(component) matches detailed_count(translation) per language."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.translation_cs = self.component.translation_set.get(language_code="cs")
+        self.translation_de = self.component.translation_set.get(language_code="de")
+
+    def assert_matches_per_translation(self) -> None:
+        batched = PendingUnitChange.objects.detailed_count_by_translation(
+            self.component
+        )
+        for translation in (self.translation_cs, self.translation_de):
+            with self.subTest(translation=translation.language_code):
+                self.assertEqual(
+                    batched[translation.id],
+                    PendingUnitChange.objects.detailed_count(translation),
+                )
+
+    def test_no_pending(self) -> None:
+        self.assert_matches_per_translation()
+
+    def test_eligible(self) -> None:
+        self.change_unit("Ahoj sv\u011bte!\n", translation=self.translation_cs)
+        self.assert_matches_per_translation()
+
+    def test_policy_skipped(self) -> None:
+        self.project.commit_policy = CommitPolicyChoices.APPROVED_ONLY
+        self.project.translation_review = True
+        self.project.save()
+        self.change_unit("Ahoj sv\u011bte!\n", translation=self.translation_cs)
+        self.change_unit("Hallo welt!\n", translation=self.translation_de)
+        self.assert_matches_per_translation()
+
+    def test_older_eligible_plus_newer_held(self) -> None:
+        self.project.commit_policy = CommitPolicyChoices.APPROVED_ONLY
+        self.project.translation_review = True
+        self.project.save()
+        self.change_unit(
+            "Ahoj sv\u011bte!\n",
+            translation=self.translation_cs,
+            state=STATE_APPROVED,
+        )
+        self.change_unit("\u010cau sv\u011bte!\n", translation=self.translation_cs)
+        self.assert_matches_per_translation()
+
+    def test_retry_ineligible_blocking_history(self) -> None:
+        unit = self.change_unit("Ahoj sv\u011bte!\n", translation=self.translation_cs)
+        pending = PendingUnitChange.objects.get(unit=unit)
+        pending.metadata = {
+            "last_failed": timezone.now().isoformat(),
+            "failed_revision": self.translation_cs.revision,
+            "weblate_version": GIT_VERSION,
+            "blocking_unit": True,
+        }
+        pending.save()
+        self.change_unit("Nazdar sv\u011bte!\n", translation=self.translation_cs)
+        self.assert_matches_per_translation()
 
 
 class FileScanTest(ViewTestCase):

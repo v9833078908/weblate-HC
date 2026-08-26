@@ -94,6 +94,22 @@ BASIC_KEYS = frozenset(
         "stats_timestamp",
     )
 )
+
+JUDGE_KEYS = frozenset(
+    {
+        "judge_total",
+        "judge_evaluated",
+        "judge_pass",
+        "judge_minor",
+        "judge_flag",
+        "judge_reject",
+        "judge_stale",
+        "judge_unparsed",
+        "judge_resolved",
+        "judge_escalated",
+        "judge_needs_human",
+    }
+)
 SOURCE_KEYS = frozenset(
     (
         *BASIC_KEYS,
@@ -907,6 +923,62 @@ class TranslationStats(BaseStats):
             self.calculate_checks()
         elif name.startswith("label:"):
             self.calculate_labels()
+        elif name in JUDGE_KEYS:
+            self.calculate_judge()
+
+    def calculate_judge(self) -> None:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.judge import judge_status_annotations
+
+        totals = (
+            self._object.unit_set.exclude(state=STATE_READONLY)
+            .annotate(**judge_status_annotations())
+            .aggregate(
+                judge_total=Count("pk"),
+                judge_evaluated=Count(
+                    "pk", filter=Q(judge_active_severity__isnull=False)
+                ),
+                # judge_pass mirrors the judge:pass query (none OR minor:
+                # neither blocks). judge_minor is a breakdown *within*
+                # judge_pass, not a disjoint bucket - pass+flag+reject
+                # stays the exhaustive partition of judge_evaluated.
+                judge_pass=Count(
+                    "pk", filter=Q(judge_active_severity__in={"none", "minor"})
+                ),
+                judge_minor=Count("pk", filter=Q(judge_active_severity="minor")),
+                judge_flag=Count("pk", filter=Q(judge_active_severity="major")),
+                judge_reject=Count("pk", filter=Q(judge_active_severity="critical")),
+                judge_stale=Count(
+                    "pk",
+                    filter=Q(
+                        judge_active_severity__isnull=True,
+                        judge_has_parsed_history=True,
+                    ),
+                ),
+                judge_unparsed=Count("pk", filter=Q(judge_latest_incomplete=True)),
+                judge_resolved=Count(
+                    "pk", filter=Q(judge_active_resolution="accepted_as_is")
+                ),
+                judge_escalated=Count(
+                    "pk", filter=Q(judge_active_resolution="escalated")
+                ),
+                # Needs a human: an unresolved (not accepted-as-is) current
+                # critical, unioned with any current escalated verdict
+                # (critical or major). One Count with the OR built in, so a
+                # critical that is *also* escalated is never double-counted.
+                judge_needs_human=Count(
+                    "pk",
+                    filter=(
+                        Q(judge_active_severity="critical")
+                        & ~Q(judge_active_resolution="accepted_as_is")
+                    )
+                    | Q(judge_active_resolution="escalated"),
+                ),
+            )
+        )
+        for key in JUDGE_KEYS:
+            self.store(key, totals[key])
+        self.save()
 
     def calculate_checks(self) -> None:
         """Prefetch check stats."""

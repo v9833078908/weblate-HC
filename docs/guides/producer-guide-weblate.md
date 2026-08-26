@@ -347,32 +347,13 @@ check uses the conservative longest branch of every conditional block.
 
 When a source intentionally fills a fixed slot, add
 `ignore-source-max-length` only to that unit; otherwise the source check keeps
-useful localization headroom. Currently, an automatic candidate that exceeds
-`max-length` becomes a suggestion. Do not rely on an unattended workflow to
-repair it until the judge-mode repair change is deployed.
+useful localization headroom. In the judge workflow, a candidate that exceeds
+`max-length` is retried with the configured budget and remains Needs editing if
+the budget cannot be met.
 
 Одна строка стабильно переводится неверно из-за неоднозначности исходника -
 пишем пояснение и перезапускаем автоперевод только по ней.
 
-### Бюджет длины (`max-length`)
-
-Флаг `max-length:N` в поле :guilabel:`Флаги перевода` задаёт жёсткий бюджет
-символов для перевода строки.
-
-- Флаг на проекте или компоненте - это значение по умолчанию; флаг на
-  файле-источнике или на самой строке переопределяет его для конкретного
-  места в интерфейсе.
-- `max-length:N` - это статичный бюджет символов. Ставьте его только там, где
-  этот бюджет действительно одинаков для всех строк в области действия.
-- `replacements:` описывает один выбранный сценарий ширины, а не поведение
-  движка в реальном времени. В нём нужно указывать целые токены плейсхолдеров,
-  например `{hours}`, а не их часть.
-- Флаг `ignore-source-max-length` ставьте только на строку-исходник, которая
-  осознанно занимает весь отведённый слот целиком.
-- Для автоматического исправления без участия человека запускайте режим
-  судьи: кандидат, не уложившийся в `max-length`, автоматически переписывается
-  заново, а если бюджет так и не выдержан после нескольких попыток - строка
-  остаётся в статусе «Нуждается в правке».
 
 ## Шаг 8. Запустить автоматический перевод
 

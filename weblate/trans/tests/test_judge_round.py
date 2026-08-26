@@ -17,9 +17,11 @@ from weblate.trans.models.judge import (
     active_verdict,
     compute_context_hash,
     compute_target_hash,
+    compute_target_storage_hash,
     current_round,
     current_verdict,
     describe_latest_verdict,
+    judge_status_annotations,
     latest_round,
 )
 from weblate.trans.models.variant import Variant
@@ -31,12 +33,101 @@ from weblate.utils.state import STATE_TRANSLATED
 class JudgeRoundTest(ViewTestCase):
     def make(self, unit, max_severity, *, unparsed=False, **kwargs):
         kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault(
+            "target_storage_hash", compute_target_storage_hash(unit.target)
+        )
         kwargs.setdefault("context_hash", "ctx")
         kwargs.setdefault("judge_model", "vendor/model-a")
         kwargs.setdefault("seat", 1)
         return JudgeVerdict.objects.create(
             unit=unit, max_severity=max_severity, unparsed=unparsed, **kwargs
         )
+
+    def judge_status(self, unit) -> dict[str, object]:
+        return (
+            type(unit)
+            .objects.filter(pk=unit.pk)
+            .annotate(**judge_status_annotations())
+            .values(
+                "judge_active_severity",
+                "judge_has_parsed_history",
+                "judge_latest_incomplete",
+            )
+            .get()
+        )
+
+    def test_status_annotations_without_evidence(self) -> None:
+        self.assertEqual(
+            self.judge_status(self.get_unit()),
+            {
+                "judge_active_severity": None,
+                "judge_has_parsed_history": False,
+                "judge_latest_incomplete": False,
+            },
+        )
+
+    def test_status_annotations_reduce_the_fresh_round(self) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "minor", seat=1, run_id=run)
+        self.make(unit, "critical", seat=2, run_id=run)
+        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "critical")
+
+    def test_status_annotations_keep_parsed_fallback_after_incomplete_round(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        self.make(unit, "major", seat=1, run_id=uuid.uuid4())
+        run = uuid.uuid4()
+        self.make(unit, "none", seat=1, run_id=run, unparsed=True)
+        self.make(unit, "none", seat=2, run_id=run, unparsed=True)
+        self.assertEqual(
+            self.judge_status(unit),
+            {
+                "judge_active_severity": "major",
+                "judge_has_parsed_history": True,
+                "judge_latest_incomplete": True,
+            },
+        )
+
+    def test_status_annotations_identify_current_unparsed_only_evidence(self) -> None:
+        unit = self.get_unit()
+        self.make(unit, "none", unparsed=True)
+        self.assertEqual(
+            self.judge_status(unit),
+            {
+                "judge_active_severity": None,
+                "judge_has_parsed_history": False,
+                "judge_latest_incomplete": True,
+            },
+        )
+
+    def test_status_annotations_identify_stale_parsed_history(self) -> None:
+        unit = self.get_unit()
+        self.make(unit, "major", target_storage_hash="old-target")
+        self.assertEqual(
+            self.judge_status(unit),
+            {
+                "judge_active_severity": None,
+                "judge_has_parsed_history": True,
+                "judge_latest_incomplete": False,
+            },
+        )
+
+    def test_status_annotations_become_stale_after_target_edit(self) -> None:
+        unit = self.get_unit()
+        self.make(unit, "major")
+        type(unit).objects.filter(pk=unit.pk).update(target="Edited target")
+        self.assertEqual(
+            self.judge_status(unit)["judge_active_severity"],
+            None,
+        )
+
+    def test_status_annotations_ignore_context_only_changes(self) -> None:
+        unit = self.get_unit()
+        self.make(unit, "minor")
+        type(unit).objects.filter(pk=unit.pk).update(source="Changed source")
+        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "minor")
 
     def test_collegium_takes_the_strictest_seat(self) -> None:
         unit = self.get_unit()

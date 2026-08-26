@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, cast
 from asgiref.sync import async_to_sync
 from django.test import SimpleTestCase, TestCase
 from weblate_customization.machinery import (
+    LITELLM_DEFAULT_BASE_URL,
+    RoutedLiteLLMTranslation,
     RoutedLLMMachineryForm,
     RoutedLLMTranslation,
 )
@@ -30,6 +32,16 @@ GEMINI = "google/gemini-2.5-flash"
 CONFIGURATION: dict[str, object] = {
     "key": "test-key",
     "base_url": "https://openrouter.ai/api/v1",
+    "routing": {"ja": DEEPSEEK, "ko": DEEPSEEK, "zh": DEEPSEEK, "*": GEMINI},
+    "persona": "",
+    "style": "",
+    "language_instructions": {},
+}
+
+
+LITELLM_CONFIGURATION: dict[str, object] = {
+    "key": "test-key",
+    "base_url": "https://hcbifrost.herocraft.com/litellm/v1",
     "routing": {"ja": DEEPSEEK, "ko": DEEPSEEK, "zh": DEEPSEEK, "*": GEMINI},
     "persona": "",
     "style": "",
@@ -82,6 +94,45 @@ def sent_models() -> list[str]:
         for payload in sent_payloads()
         if isinstance(model := payload.get("model"), str)
     ]
+
+
+LITELLM_CHAT_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/completions"
+
+
+def mock_litellm_chat(content: str = '["テスト"]') -> None:
+    http_mock.register(
+        "POST",
+        LITELLM_CHAT_URL,
+        json={
+            "id": "chatcmpl-1",
+            "object": "chat.completion",
+            "created": 1677652288,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 9,
+                "completion_tokens": 2,
+                "total_tokens": 11,
+            },
+        },
+    )
+
+
+def litellm_sent_models() -> list[str]:
+    models: list[str] = []
+    for call in http_mock.calls:
+        if str(call.request.url) != LITELLM_CHAT_URL:
+            continue
+        payload = json.loads(call.request.content)
+        if isinstance(payload, dict) and isinstance(model := payload.get("model"), str):
+            models.append(model)
+    return models
 
 
 def as_settings(value: dict[str, object]) -> SettingsDict:
@@ -397,6 +448,8 @@ class RoutedDownloadTest(TestCase):
         self.assertEqual(log.completion_tokens, 2)
         self.assertIsNone(log.cost_usd)
         self.assertEqual(log.project_slug, "")
+        self.assertEqual(log.operation, LLMUsageLog.Operation.TRANSLATION)
+        self.assertEqual(log.unit_count, 1)
 
     @http_mock.activate
     def test_route_context_is_reset_after_success(self) -> None:
@@ -428,3 +481,58 @@ class RoutedDownloadTest(TestCase):
             )
 
         self.assertEqual(machine.get_model(), GEMINI)
+
+
+class RoutedLiteLLMTest(SimpleTestCase):
+    """Cover what differs from ``RoutedLLMTranslation``: slug, URL, timeout, payload."""
+
+    def machine(self, **overrides: object) -> RoutedLiteLLMTranslation:
+        configuration = {**LITELLM_CONFIGURATION, **overrides}
+        return RoutedLiteLLMTranslation(as_settings(configuration))
+
+    def test_registration_slug(self) -> None:
+        self.assertEqual(RoutedLiteLLMTranslation.name, "LiteLLM")
+        self.assertEqual(RoutedLiteLLMTranslation.get_identifier(), "litellm")
+
+    def test_default_base_url(self) -> None:
+        configuration = {
+            key: value
+            for key, value in LITELLM_CONFIGURATION.items()
+            if key != "base_url"
+        }
+        machine = RoutedLiteLLMTranslation(as_settings(configuration))
+        self.assertEqual(machine.get_runtime_base_url(), LITELLM_DEFAULT_BASE_URL)
+
+    def test_request_timeout(self) -> None:
+        self.assertEqual(RoutedLiteLLMTranslation.request_timeout, 55)
+
+    def test_trusted_error_host(self) -> None:
+        self.assertIn(
+            "hcbifrost.herocraft.com", RoutedLiteLLMTranslation.trusted_error_hosts
+        )
+
+    def test_chat_payload_has_schema_without_provider(self) -> None:
+        payload = self.machine().get_chat_payload(
+            GEMINI, "prompt", batch_content(2), "", ""
+        )
+        self.assertIn("response_format", payload)
+        self.assertNotIn("provider", payload)
+
+    def test_malformed_content_pop_is_safe(self) -> None:
+        payload = self.machine().get_chat_payload(GEMINI, "prompt", "not json", "", "")
+        self.assertNotIn("response_format", payload)
+        self.assertNotIn("provider", payload)
+
+
+class RoutedLiteLLMDownloadTest(TestCase):
+    @http_mock.activate
+    def test_sync_multiple_routes_cjk(self) -> None:
+        mock_litellm_chat()
+        machine = RoutedLiteLLMTranslation(as_settings(dict(LITELLM_CONFIGURATION)))
+        machine.delete_cache()
+        machine.cache_translations = False
+
+        result = machine.download_multiple_translations("en", "ja", [("Hello", None)])
+
+        self.assertTrue(result)
+        self.assertEqual(litellm_sent_models(), [DEEPSEEK])

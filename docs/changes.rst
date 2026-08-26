@@ -6,9 +6,11 @@ Weblate 2026.8.1
 .. rubric:: New features
 
 * Added an optional :ref:`LLM judge <llm-judge>` automatic translation mode, where two independently configured language models review each string in a filter and record a per-string verdict; a rejected string is held in the existing :guilabel:`Needs editing` queue for a human decision instead of shipping automatically.
-* Major LLM-judge verdicts are now repaired once when possible and otherwise held in :guilabel:`Needs checking`, so they are excluded from guarded commits instead of shipping automatically.
+* Major LLM-judge verdicts are now repaired once when possible; an unresolved major ships as translated with advisory ``judge-flag`` evidence attached instead of holding the string, while a critical verdict still holds automatically until a reviewer records an audited decision, see :ref:`llm-judge`.
+* A reviewer can now record an audited decision on a held or escalated LLM-judge verdict (accept it as-is or escalate it for a second opinion); the verdict's resolution can move again through an allowed transition, but every transition permanently records who made it, when, and why in the string's history, see :ref:`llm-judge`.
 * Added guarded ``check_judge_repair_routes`` and ``enable_review_workflow`` management commands for the LLM judge rollout.
 * Components can now exchange all language targets through one multilingual CSV or XLSX spreadsheet, with previewed imports that protect keys and placeholders.
+* Added an optional **LiteLLM** :ref:`automatic suggestion <machine-translation-setup>` service for the corporate LiteLLM proxy, alongside the existing OpenRouter service, and made the LLM judge endpoint configurable via :setting:`JUDGE_BASE_URL` (default OpenRouter).
 
 .. rubric:: Improvements
 
@@ -16,6 +18,7 @@ Weblate 2026.8.1
 * Project-level :ref:`automatic suggestion <machine-translation-setup>` configuration now overrides the site-wide one field by field, so a project can set its own translator persona, style, and language-specific instructions without restating credentials.
 * LLM machine translation now records per-request token usage and cost, reportable via the ``llm_usage_report`` management command.
 * Large language model machine translation services now receive the note left by developers for a string, see :ref:`llm-translation-context`.
+* LLM judge runs now show capped scope and observed-cost previews, record per-unit judge usage, and keep delivery state separate from advisory AI evidence.
 * Added optional :ref:`TBX glossary import from CSV, TSV, and XLSX tables <uploading-glossary-tables>`, with a locally validated profile proposal path.
 * Glossary tables with only language columns are now mapped deterministically without contacting the automatic analyzer, and the sheet-selection step is skipped for single-sheet uploads, see :ref:`uploading-glossary-tables`.
 * Glossary tables where a term is followed by its description on the next row are now recognised deterministically: descriptions become explanations, section captions become sections, and the detected layout can be switched from the import preview, see :ref:`uploading-glossary-tables`.

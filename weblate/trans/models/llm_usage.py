@@ -4,9 +4,12 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from django.db import models
+
+if TYPE_CHECKING:
+    from decimal import Decimal
 
 
 class LLMUsageLog(models.Model):
@@ -28,6 +31,10 @@ class LLMUsageLog(models.Model):
     again for every retry.
     """
 
+    class Operation(models.TextChoices):
+        TRANSLATION = "translation"
+        JUDGE = "judge"
+
     class Outcome(models.TextChoices):
         APPLIED = "applied", "applied"
         PARTIAL = "partial", "partial"
@@ -45,6 +52,10 @@ class LLMUsageLog(models.Model):
     response_id = models.CharField(max_length=255, blank=True)
     cached_tokens = models.IntegerField(default=0)
     reasoning_tokens = models.IntegerField(default=0)
+    operation = models.CharField(
+        max_length=20, choices=Operation, blank=True, db_index=True
+    )
+    unit_count = models.PositiveIntegerField(null=True, blank=True)
     #: Strings asked for in this request, so a cascade of halved retries is
     #: visible as a falling strings-per-request ratio.
     batch_size = models.IntegerField(default=0)
@@ -59,3 +70,30 @@ class LLMUsageLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.model} {self.total_tokens} tokens ${self.cost_usd}"
+
+
+def recent_cost_range(
+    project_slug: str, model: str, operation: str
+) -> tuple[Decimal, Decimal] | None:
+    """
+    Observed per-unit cost range for the newest priced requests.
+
+    Exact project/model/operation match, newest 20 rows with a stored cost
+    and a positive unit count. Below 5 samples returns None so a thin
+    history never implies a precision the data does not support.
+    """
+    per_unit = [
+        cost / unit_count
+        for cost, unit_count in LLMUsageLog.objects.filter(
+            project_slug=project_slug,
+            model=model,
+            operation=operation,
+            cost_usd__isnull=False,
+            unit_count__gt=0,
+        )
+        .order_by("-created_at", "-pk")[:20]
+        .values_list("cost_usd", "unit_count")
+    ]
+    if len(per_unit) < 5:
+        return None
+    return min(per_unit), max(per_unit)

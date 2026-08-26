@@ -86,6 +86,7 @@ from weblate.trans.models import (
     Change,
     CommitPolicyChoices,
     Component,
+    JudgeVerdict,
     Label,
     Project,
     Unit,
@@ -1175,6 +1176,28 @@ class RevertForm(UnitForm):
         return self.cleaned_data
 
 
+# Judge and machinery routed-LLM engines, in preference order: the first
+# entry with usable configuration wins project-wide; never a per-language
+# fallback to the next one.
+ROUTED_ENGINES = ("openrouter", "litellm")
+
+
+def configured_routed_engine(machinery_settings: Mapping[str, object]) -> str | None:
+    """First routed engine with a non-empty project settings mapping."""
+    for engine_id in ROUTED_ENGINES:
+        if machinery_settings.get(engine_id):
+            return engine_id
+    return None
+
+
+def available_routed_engine(engine_ids: set[str]) -> str | None:
+    """First routed engine present in a registry-filtered engine-id set."""
+    for engine_id in ROUTED_ENGINES:
+        if engine_id in engine_ids:
+            return engine_id
+    return None
+
+
 class AutoForm(forms.Form):
     """Automatic translation form."""
 
@@ -1190,8 +1213,6 @@ class AutoForm(forms.Form):
         "Turn on contribution to shared translation memory for the project to "
         "get access to additional components."
     )
-    # Preselected machinery service, falls back to Weblate translation memory.
-    DEFAULT_ENGINE = "openrouter"
 
     mode = forms.ChoiceField(
         label=gettext_lazy("Automatic translation mode"),
@@ -1229,6 +1250,7 @@ class AutoForm(forms.Form):
         min_value=1,
         max_value=100,
     )
+    next = forms.CharField(required=False, widget=forms.HiddenInput)
     overwrite_existing = forms.BooleanField(
         label=gettext_lazy("Overwrite the existing translation"),
         required=False,
@@ -1327,8 +1349,9 @@ class AutoForm(forms.Form):
         self.fields["engines"].choices = [
             (engine.get_identifier(), engine.name) for engine in engines
         ]
-        if self.DEFAULT_ENGINE in engine_ids:
-            self.fields["engines"].initial = [self.DEFAULT_ENGINE]
+        preferred_engine = available_routed_engine(engine_ids)
+        if preferred_engine is not None:
+            self.fields["engines"].initial = [preferred_engine]
             self.fields["auto_source"].initial = "mt"
         elif "weblate" in engine_ids:
             self.fields["engines"].initial = ["weblate"]
@@ -1348,6 +1371,9 @@ class AutoForm(forms.Form):
                     ("judge", gettext("Add as translation with an LLM judge"))
                 )
         self.fields["mode"].choices = choices
+        allowed_modes = {choice[0] for choice in choices}
+        if self.initial.get("mode") not in allowed_modes:
+            self.initial.pop("mode", None)
 
         self.helper = FormHelper(self)
         self.helper.form_tag = False
@@ -1407,6 +1433,28 @@ class AutoForm(forms.Form):
                 )
             )
         return result.pk
+
+
+class JudgeResolutionForm(forms.Form):
+    """Record a producer decision on a judge verdict."""
+
+    resolution = forms.ChoiceField(
+        label=gettext_lazy("Decision"),
+        choices=(
+            (
+                JudgeVerdict.Resolution.ESCALATED,
+                gettext_lazy("Escalate for review"),
+            ),
+            (
+                JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+                gettext_lazy("Accept as-is"),
+            ),
+        ),
+    )
+    reason = forms.CharField(
+        label=gettext_lazy("Reason"),
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )
 
 
 class CommentForm(forms.Form):

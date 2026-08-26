@@ -438,6 +438,36 @@ class RenderHook(BaseDetailsRenderStrategy):
 
 
 @register_details_display_strategy
+class RenderJudgeResolution(BaseDetailsRenderStrategy):
+    """Strategy for displaying details of a judge verdict resolution."""
+
+    details_required = True
+    actions: ClassVar[set[ActionEvents]] = {ActionEvents.JUDGE_RESOLUTION}
+
+    # Raw resolution values are internal identifiers, never shown as-is.
+    RESOLUTION_LABELS: ClassVar[dict[str, StrOrPromise]] = {
+        "": gettext_lazy("unresolved"),
+        "escalated": gettext_lazy("escalated"),
+        "accepted_as_is": gettext_lazy("accepted as-is"),
+    }
+
+    def render_details(self, change: Change) -> StrOrPromise:
+        details = change.details
+        old_label = self.RESOLUTION_LABELS.get(
+            details.get("old_resolution", ""), details.get("old_resolution", "")
+        )
+        new_label = self.RESOLUTION_LABELS.get(
+            details.get("new_resolution", ""), details.get("new_resolution", "")
+        )
+        reason = details.get("reason", "")
+        return gettext("%(old)s -> %(new)s: %(reason)s") % {
+            "old": old_label,
+            "new": new_label,
+            "reason": reason,
+        }
+
+
+@register_details_display_strategy
 class RenderCreateComponent(BaseDetailsRenderStrategy):
     """Strategy for displaying details of a component creation event."""
 

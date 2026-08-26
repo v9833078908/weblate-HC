@@ -1,0 +1,26 @@
+{% load i18n %}
+
+{% if judge_queue %}
+  <section class="card mb-3" aria-labelledby="judge-queue-heading">
+    <div class="card-header">
+      <h2 class="card-title" id="judge-queue-heading">{% translate "AI judge" %}</h2>
+    </div>
+    <div class="card-body">
+      {% if judge_queue.counts %}
+        <ul class="list-inline mb-3">
+          <li class="list-inline-item">
+            <strong>{{ judge_queue.counts.needs_human }}</strong> {% translate "needs a human" %}
+          </li>
+          <li class="list-inline-item">
+            <strong>{{ judge_queue.counts.not_reviewed }}</strong> {% translate "not reviewed" %}
+          </li>
+          <li class="list-inline-item">
+            <strong>{{ judge_queue.counts.unparsed }}</strong> {% translate "last attempt returned nothing" %}
+          </li>
+        </ul>
+      {% endif %}
+      <a class="btn btn-sm btn-outline-secondary" href="{{ judge_queue.breakdown_url }}">{% translate "Breakdown by check" %}</a>
+      <a class="btn btn-sm btn-outline-primary" href="{{ judge_queue.run_url }}">{% translate "Run the judge" %}</a>
+    </div>
+  </section>
+{% endif %}

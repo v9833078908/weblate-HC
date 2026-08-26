@@ -1015,10 +1015,11 @@ LOC_KIT_PROFILE_OPENROUTER_MODEL = ""
 LOC_KIT_PROFILE_SAMPLE_MAX_BYTES = 131072
 LOC_KIT_IMPORT_DRAFT_EXPIRY = 3600
 
-# LLM judge (off by default). The judge sends component strings to
-# OpenRouter; see docs/security/threat-model.rst.
+# LLM judge (off by default). Sends component strings to the configured
+# endpoint (JUDGE_BASE_URL); see docs/security/threat-model.rst.
 JUDGE_ENABLED = False
-JUDGE_OPENROUTER_KEY = ""
+JUDGE_API_KEY = ""
+JUDGE_BASE_URL = "https://openrouter.ai/api/v1"
 JUDGE_MODEL_SEAT_1 = ""
 JUDGE_MODEL_SEAT_2 = ""
 JUDGE_MAX_REPAIR_ATTEMPTS = 1

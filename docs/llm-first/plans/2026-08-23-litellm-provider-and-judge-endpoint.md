@@ -1,6 +1,8 @@
 # LiteLLM machinery provider and configurable judge endpoint
 
-**Date:** 2026-08-23. **Status:** approved design, implementation pending.
+**Date:** 2026-08-23. **Status:** Tasks 1-6 implemented and merged to `main`
+(commit `657f8ea`). Task 7 (development deployment and live proxy preflight)
+and the production rollout remain pending separate explicit approval.
 **Realizes:** the phase-4 roadmap item "Переезд судьи на корпоративный
 LiteLLM-прокси" (`docs/llm-first/vision/llm-first-product-architecture.md:660-676`)
 plus a second routed machinery provider so machine translation can also run

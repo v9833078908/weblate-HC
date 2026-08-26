@@ -113,12 +113,21 @@ Scope and intended use
        (source: :ref:`uploading-glossary-tables`, :doc:`/admin/config`)
    * - LLM judge
      - :ref:`automatic translation <auto-translation>` in judge mode;
-       :setting:`JUDGE_ENABLED` gates the outbound review request
-     - Database (verdicts), outbound OpenRouter request per batch bounded by
+       :setting:`JUDGE_ENABLED` gates the outbound review request. Recording
+       a decision on a held or escalated verdict is a separate,
+       CSRF-protected POST gated by the same :guilabel:`unit.review`
+       permission; it makes no outbound request and is refused against
+       stale, superseded, or already-resolved evidence
+     - Database (verdicts; each resolution transition permanently appends
+       its own history entry, though the verdict's current resolution can
+       move again through an allowed transition), outbound request per batch
+       to the provider configured by :setting:`JUDGE_BASE_URL`, bounded by
        :setting:`JUDGE_REQUEST_DEADLINE` when enabled
-     - In scope. The outbound request is a fixed-host, site-wide-credentialed
-       review only; provider behavior is out of scope. *(documented)*
-       (source: :ref:`llm-judge`, :doc:`/admin/config`)
+     - In scope. The outbound request is an operator-configured-host,
+       site-wide-credentialed review only; provider behavior is out of scope.
+       Decision recording is a local, permissioned, audited mutation with no
+       outbound leg. *(documented)* (source: :ref:`llm-judge`,
+       :doc:`/admin/config`)
    * - Machine translation and outbound integrations
      - Machine translation, avatars, status reporting, telemetry, error
        reporting, VCS hosts, GitHub App connections, CDN add-on, Fedora
@@ -238,13 +247,14 @@ repository state, background tasks, outbound requests, and rendered UI.
        input that is validated locally and can never create a component
        directly. *(documented)* (source: :ref:`uploading-glossary-tables`,
        :doc:`/admin/config`)
-   * - Judge string batch to OpenRouter
+   * - Judge string batch to the configured provider
      - An automatic translation run in judge mode becomes a batched outbound
        request only when :setting:`JUDGE_ENABLED`, the site-wide key, and
        both seat models are configured. Each batch carries the selected
        strings' source, target, glossary terms, and failing check names to
-       the fixed provider host under separate site-wide credentials; users
-       cannot supply an endpoint, key, or model. The provider response is
+       the provider host configured by :setting:`JUDGE_BASE_URL` under
+       separate site-wide credentials; users cannot supply an endpoint,
+       key, or model. The provider response is
        untrusted input parsed against a strict schema; a batch that exceeds
        :setting:`JUDGE_REQUEST_DEADLINE`, or is malformed, is recorded as
        unparsed and never treated as a favorable verdict. *(documented)*
@@ -918,11 +928,12 @@ Known misuse patterns
   confidential glossaries or use manual profile upload. *(documented)*
   (source: :ref:`uploading-glossary-tables`, :doc:`/admin/config`)
 * Enabling the LLM judge and running it over strings from a confidential or
-  sensitive component without treating OpenRouter as a data recipient. This
-  is unsafe because every judged string's source, target, and matching
-  glossary terms are transmitted to the two configured seat models. Keep the
-  judge disabled for components whose content must not leave the instance.
-  *(documented)* (source: :ref:`llm-judge`, :doc:`/admin/config`)
+  sensitive component without treating the configured provider as a data
+  recipient. This is unsafe because every judged string's source, target,
+  and matching glossary terms are transmitted to the two configured seat
+  models. Keep the judge disabled for components whose content must not
+  leave the instance. *(documented)* (source: :ref:`llm-judge`,
+  :doc:`/admin/config`)
 * Importing project backups from untrusted sources as an administrative
   convenience. This is unsafe because backups carry project metadata,
   translation content, and repository state. Keep import limits enabled and
@@ -979,9 +990,10 @@ rate limit, and locally validated proposal response are documented above.
 
 The LLM judge (see :ref:`llm-judge`) is the reviewed instance of a new
 outbound integration class distinct from ordinary machine translation: it is
-off by default, its key is a single site-wide credential rather than
-per-project configuration, the key is built inline into the request and
-never bound to a frame local an error reporter could serialize, and a
+off by default, its key and provider endpoint are single site-wide
+configuration rather than per-project configuration, the key is built inline
+into the request and never bound to a frame local an error reporter could
+serialize, and a
 transport or parse failure is recorded as unparsed rather than defaulting to
 a favorable verdict. *(maintainer)*
 

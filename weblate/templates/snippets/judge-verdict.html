@@ -1,6 +1,6 @@
-{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed' in context #}
+{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed', 'judge_current_verdict', 'judge_can_resolve', 'judge_resolution_form', 'judge_repair_evidence', 'this_unit_url' in context #}
 
-{% load humanize i18n icons %}
+{% load humanize i18n icons translations %}
 
 {% if judge_verdict or judge_stale or judge_unparsed %}
   <div class="card" id="id_judge_card">
@@ -35,7 +35,11 @@
           <h5 class="list-group-item-heading">
             <span class="red">{% icon "cancel.svg" %}</span>
             {% translate "Rejected" %}
-            <span class="badge text-bg-danger">{% translate "Will not ship" %}</span>
+            {% if judge_current_verdict.resolution == "accepted_as_is" %}
+              <span class="badge text-bg-success">{% translate "Ships with override" %}</span>
+            {% else %}
+              <span class="badge text-bg-danger">{% translate "Will not ship" %}</span>
+            {% endif %}
           </h5>
           <p class="list-group-item-text text-muted">
             {% blocktranslate with model=judge_verdict.judge_model when=judge_verdict.timestamp|naturaltime %}{{ model }} · {{ when }}{% endblocktranslate %}
@@ -63,6 +67,7 @@
           <h5 class="list-group-item-heading">
             {% icon "flag.svg" %}
             {% translate "Questionable" %}
+            <span class="badge text-bg-warning">{% translate "Ships with evidence" %}</span>
           </h5>
           <p class="list-group-item-text text-muted">
             {% blocktranslate with model=judge_verdict.judge_model when=judge_verdict.timestamp|naturaltime %}{{ model }} · {{ when }}{% endblocktranslate %}
@@ -82,7 +87,7 @@
             {% endfor %}
           {% endfor %}
         </div>
-      {% elif judge_verdict %}
+      {% elif judge_verdict and not judge_verdict.unparsed %}
         <div class="list-group-item check">
           <h5 class="list-group-item-heading">
             <span class="green">{% icon "check.svg" %}</span>
@@ -96,6 +101,74 @@
               {% translate "The context changed (glossary or note updated) since this verdict was recorded." %}
             </p>
           {% endif %}
+          {% if judge_verdict.max_severity == "minor" %}
+            {% for seat in judge_seats %}
+              {% for error in seat.errors %}
+                <p class="list-group-item-text">
+                  <strong>{{ error.category }}/{{ error.severity }}</strong>
+                  ({% blocktranslate with model=seat.judge_model %}seat {{ model }}{% endblocktranslate %}):
+                  {{ error.description }}
+                </p>
+              {% endfor %}
+            {% endfor %}
+          {% endif %}
+        </div>
+      {% endif %}
+      {% if judge_repair_evidence %}
+        <div class="list-group-item check">
+          <h5 class="list-group-item-heading">
+            {% icon "wrench.svg" %}
+            {% translate "Repaired since the original verdict" %}
+          </h5>
+          <p class="list-group-item-text text-muted">{% translate "What the judge originally flagged:" %}</p>
+          {% for seat in judge_repair_evidence.original_seats %}
+            {% for error in seat.errors %}
+              <p class="list-group-item-text">
+                <strong>{{ error.category }}/{{ error.severity }}</strong>
+                ({% blocktranslate with model=seat.judge_model %}seat {{ model }}{% endblocktranslate %}):
+                {{ error.description }}
+              </p>
+            {% endfor %}
+          {% endfor %}
+          {% if judge_repair_evidence.previous_target %}
+            <p class="list-group-item-text text-muted">{% translate "Text before the repair:" %}</p>
+            {% format_unit_target unit value=unit.target diff=judge_repair_evidence.previous_target %}
+          {% endif %}
+        </div>
+      {% endif %}
+      {% if judge_current_verdict.resolution %}
+        <div class="list-group-item check">
+          <p class="list-group-item-text">
+            {% if judge_current_verdict.resolution == "escalated" %}
+              <span class="badge text-bg-info">{% translate "Escalated for review" %}</span>
+            {% elif judge_current_verdict.resolution == "accepted_as_is" %}
+              <span class="badge text-bg-success">{% translate "Accepted as-is" %}</span>
+            {% endif %}
+            {% if judge_current_verdict.resolution_reason %}
+              - {{ judge_current_verdict.resolution_reason }}
+            {% endif %}
+          </p>
+        </div>
+      {% endif %}
+      {% if judge_can_resolve %}
+        <div class="list-group-item check">
+          <form method="post"
+                action="{% url 'resolve-judge-verdict' pk=judge_current_verdict.pk %}"
+                id="id_judge_resolution_form">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ this_unit_url }}" />
+            <div class="form-group">
+              {{ judge_resolution_form.resolution.label_tag }}
+              {{ judge_resolution_form.resolution }}
+              {{ judge_resolution_form.resolution.errors }}
+            </div>
+            <div class="form-group">
+              {{ judge_resolution_form.reason.label_tag }}
+              {{ judge_resolution_form.reason }}
+              {{ judge_resolution_form.reason.errors }}
+            </div>
+            <button type="submit" class="btn btn-warning">{% translate "Record decision" %}</button>
+          </form>
         </div>
       {% endif %}
     </div>

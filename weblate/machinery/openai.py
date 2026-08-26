@@ -20,7 +20,12 @@ from .base import (
     MachineTranslationError,
 )
 from .forms import AzureOpenAIMachineryForm, MistralMachineryForm, OpenAIMachineryForm
-from .llm import BaseLLMTranslation, llm_batch_project, llm_usage_record
+from .llm import (
+    BaseLLMTranslation,
+    llm_batch_project,
+    llm_batch_unit_count,
+    llm_usage_record,
+)
 
 
 class BaseOpenAITranslation(BaseLLMTranslation):
@@ -172,6 +177,8 @@ class BaseOpenAITranslation(BaseLLMTranslation):
             response_id=str(payload.get("id") or ""),
             cached_tokens=prompt_details.get("cached_tokens") or 0,
             reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            unit_count=llm_batch_unit_count.get() or None,
             batch_size=batch_size,
         )
         llm_usage_record.set(record.pk)

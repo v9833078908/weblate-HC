@@ -26,7 +26,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext, gettext_lazy, ngettext
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from weblate.auth.results import PermissionResult
 from weblate.checks.models import CHECKS, get_display_checks
@@ -37,8 +37,10 @@ from weblate.glossary.models import (
     get_matched_glossary_prompt_entries,
 )
 from weblate.logger import LOGGER
+from weblate.machinery.models import MACHINERY
 from weblate.screenshots.forms import ScreenshotForm
 from weblate.trans.actions import ActionEvents
+from weblate.trans.autotranslate import BatchAutoTranslate
 from weblate.trans.exceptions import (
     FileParseError,
     SuggestionSimilarToTranslationError,
@@ -49,6 +51,7 @@ from weblate.trans.forms import (
     ChecksumForm,
     CommentForm,
     ContextForm,
+    JudgeResolutionForm,
     MergeForm,
     PositionSearchForm,
     RevertForm,
@@ -60,6 +63,8 @@ from weblate.trans.models import (
     Category,
     Comment,
     Component,
+    JudgeVerdict,
+    Project,
     Suggestion,
     SuggestionAddResult,
     Translation,
@@ -67,12 +72,18 @@ from weblate.trans.models import (
     Vote,
 )
 from weblate.trans.models.judge import (
+    ALLOWED_RESOLUTION_TRANSITIONS,
+    JudgeResolutionError,
     active_round,
     active_verdict,
     compute_context_hash,
     current_round,
+    current_verdict,
     latest_round,
+    repair_evidence,
+    resolve_verdict,
 )
+from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
 from weblate.trans.models.unit import fill_in_source_translation
 from weblate.trans.tasks import auto_translate
 from weblate.trans.templatetags.translations import (
@@ -103,9 +114,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from weblate.auth.models import AuthenticatedHttpRequest
-    from weblate.trans.models import (
-        Project,
-    )
     from weblate.trans.models.unit import UnitQuerySet
 
 SESSION_SEARCH_CACHE_TTL = 1800
@@ -1286,14 +1294,18 @@ def get_translate_unit(
     return TranslateUnitResult(search_result, num_results, offset, unit)
 
 
-def _judge_view_context(unit: Unit) -> dict[str, Any]:
+def _judge_view_context(
+    request: AuthenticatedHttpRequest, unit: Unit
+) -> dict[str, Any]:
     """Judge-verdict context for the unit page: round, verdict, staleness."""
     judge_round = latest_round(unit)
     judge_current_round = current_round(unit)
-    judge_verdict = active_verdict(unit)
+    judge_current_verdict = current_verdict(unit)
     judge_unparsed = bool(judge_current_round) and all(
         row.unparsed for row in judge_current_round
     )
+    active = active_verdict(unit)
+    judge_verdict = active if judge_unparsed else judge_current_verdict or active
     judge_stale = (
         bool(judge_round)
         and judge_verdict is None
@@ -1307,13 +1319,44 @@ def _judge_view_context(unit: Unit) -> dict[str, Any]:
             glossary_terms=get_matched_glossary_prompt_entries(unit),
         )
     )
+    judge_resolution_choices: set[str] = set()
+    if judge_current_verdict is not None:
+        judge_resolution_choices = {
+            resolution
+            for verdict, old_resolution, resolution in ALLOWED_RESOLUTION_TRANSITIONS
+            if verdict == judge_current_verdict.verdict
+            and old_resolution == judge_current_verdict.resolution
+        }
+    judge_can_resolve = bool(judge_resolution_choices) and request.user.has_perm(
+        "unit.review", unit
+    )
+    judge_resolution_form = None
+    if judge_can_resolve:
+        judge_resolution_form = JudgeResolutionForm()
+        judge_resolution_form.fields["resolution"].choices = [
+            choice
+            for choice in judge_resolution_form.fields["resolution"].choices
+            if choice[0] in judge_resolution_choices
+        ]
     return {
         "judge_round": judge_round,
         "judge_verdict": judge_verdict,
-        "judge_seats": active_round(unit) if judge_verdict is not None else [],
+        "judge_seats": (
+            active_round(unit)
+            if judge_unparsed
+            else judge_current_round
+            if judge_current_verdict is not None
+            else active_round(unit)
+            if judge_verdict is not None
+            else []
+        ),
         "judge_stale": judge_stale,
         "judge_unparsed": judge_unparsed,
         "judge_context_changed": judge_context_changed,
+        "judge_current_verdict": judge_current_verdict,
+        "judge_can_resolve": judge_can_resolve,
+        "judge_resolution_form": judge_resolution_form,
+        "judge_repair_evidence": repair_evidence(unit, active=judge_verdict),
     }
 
 
@@ -1396,7 +1439,7 @@ def translate(request: AuthenticatedHttpRequest, path: list[str]) -> HttpRespons
     other_languages_count = max(unit.source_unit.unit_set.count() - 1, 0)
     prepare_glossary_terms([unit], project, full=True)
 
-    judge_context = _judge_view_context(unit)
+    judge_context = _judge_view_context(request, unit)
 
     return render(
         request,
@@ -1467,11 +1510,108 @@ def translate(request: AuthenticatedHttpRequest, path: list[str]) -> HttpRespons
     )
 
 
+@require_GET
+@login_required
+def auto_translation_preview(request: AuthenticatedHttpRequest, path):
+    obj = parse_path(
+        request,
+        path,
+        (Translation, Component, Category, Project, ProjectLanguage, Workspace),
+    )
+    if not request.user.has_perm("translation.auto", obj):
+        raise PermissionDenied
+    form_obj = (
+        obj.component
+        if isinstance(obj, Translation)
+        else obj.project
+        if isinstance(obj, (Category, ProjectLanguage))
+        else obj
+    )
+    if not request.user.has_perm("unit.review", form_obj):
+        raise PermissionDenied
+    autoform = AutoForm(form_obj, request.user, request.GET)
+    if not autoform.is_valid() or autoform.cleaned_data["mode"] != "judge":
+        return JsonResponse({"errors": autoform.errors}, status=400)
+    batch = BatchAutoTranslate(
+        obj,
+        user=request.user,
+        q=autoform.cleaned_data["q"],
+        mode="judge",
+        component_wide=isinstance(obj, Component),
+        overwrite_existing=autoform.cleaned_data["overwrite_existing"],
+    )
+    preview = batch.preview_judge_scope()
+    project_slugs = {
+        translation.component.project.slug for translation in batch.translations
+    }
+    judge_cost: dict[str, str | bool] = {"available": False}
+    if len(project_slugs) == 1:
+        project_slug = project_slugs.pop()
+        ranges = [
+            recent_cost_range(project_slug, model, LLMUsageLog.Operation.JUDGE)
+            for model in (settings.JUDGE_MODEL_SEAT_1, settings.JUDGE_MODEL_SEAT_2)
+        ]
+        if all(cost_range is not None for cost_range in ranges):
+            low = sum(cost_range[0] for cost_range in ranges if cost_range is not None)
+            high = sum(cost_range[1] for cost_range in ranges if cost_range is not None)
+            judge_cost = {
+                "available": True,
+                "min": format((low * preview.processed).normalize(), "f"),
+                "max": format(
+                    (
+                        high
+                        * preview.processed
+                        * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)
+                    ).normalize(),
+                    "f",
+                ),
+            }
+    pretranslation_cost: dict[str, str | bool] = {"available": False}
+    if len(batch.translations) == 1 and len(autoform.cleaned_data["engines"]) == 1:
+        translation = batch.translations[0]
+        engine_id = autoform.cleaned_data["engines"][0]
+        configuration = translation.component.project.get_machinery_settings().get(
+            engine_id
+        )
+        if configuration is not None and engine_id in MACHINERY:
+            machine = MACHINERY[engine_id](configuration)
+            resolve_model = getattr(machine, "resolve_model", None)
+            if callable(resolve_model):
+                model = resolve_model(translation.language.code)
+                if isinstance(model, str):
+                    cost_range = recent_cost_range(
+                        translation.component.project.slug,
+                        model,
+                        LLMUsageLog.Operation.TRANSLATION,
+                    )
+                    if cost_range is not None:
+                        low, high = cost_range
+                        pretranslation_cost = {
+                            "available": True,
+                            "min": format((low * preview.writable).normalize(), "f"),
+                            "max": format((high * preview.writable).normalize(), "f"),
+                        }
+    return JsonResponse(
+        {
+            "matched": preview.matched,
+            "processed": preview.processed,
+            "remaining": preview.remaining,
+            "writable": preview.writable,
+            "judge_calls_initial": preview.initial_calls,
+            "judge_calls_worst_case": preview.worst_case_calls,
+            "judge_cost": judge_cost,
+            "pretranslation_cost": pretranslation_cost,
+        }
+    )
+
+
 @require_POST
 @login_required
 def auto_translation(request: AuthenticatedHttpRequest, path):
     obj = parse_path(
-        request, path, (Translation, Component, Category, ProjectLanguage, Workspace)
+        request,
+        path,
+        (Translation, Component, Category, Project, ProjectLanguage, Workspace),
     )
     update_locked = False
     translation_id: int | None = None
@@ -1500,6 +1640,11 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
             autoform = AutoForm(category.project, request.user, request.POST)
             update_locked = category.component_set.filter(locked=True).exists()
             category_id = category.id
+        case Project():
+            project = obj
+            autoform = AutoForm(project, request.user, request.POST)
+            update_locked = project.locked
+            project_id = project.id
         case ProjectLanguage():
             project = obj.project
             autoform = AutoForm(project, request.user, request.POST)
@@ -1611,7 +1756,7 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
         )
         messages.success(request, message, f"task:{task.id}")
 
-    return redirect(obj)
+    return redirect_next(request.POST.get("next"), obj)
 
 
 @login_required
@@ -1679,6 +1824,41 @@ def resolve_comment(request: AuthenticatedHttpRequest, pk):
     comment_obj.resolve(user=request.user)
     messages.info(request, gettext("Comment has been resolved."))
 
+    return redirect_next(request.POST.get("next"), fallback_url)
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def resolve_judge_verdict(request: AuthenticatedHttpRequest, pk):
+    """Record a producer decision on a judge verdict."""
+    verdict_obj = get_object_or_404(
+        JudgeVerdict.objects.filter(
+            unit__in=Unit.objects.filter_access(request.user)
+        ).select_related("unit"),
+        pk=pk,
+    )
+    unit = verdict_obj.unit
+    fallback_url = unit.get_absolute_url()
+
+    form = JudgeResolutionForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, gettext("Could not record the decision."))
+        return redirect_next(request.POST.get("next"), fallback_url)
+
+    try:
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=pk,
+            actor=request.user,
+            resolution=form.cleaned_data["resolution"],
+            reason=form.cleaned_data["reason"],
+        )
+    except JudgeResolutionError as error:
+        messages.error(request, str(error))
+        return redirect_next(request.POST.get("next"), fallback_url)
+
+    messages.info(request, gettext("The decision has been recorded."))
     return redirect_next(request.POST.get("next"), fallback_url)
 
 

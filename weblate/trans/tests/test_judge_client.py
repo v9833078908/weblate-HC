@@ -11,11 +11,15 @@ from typing import Any
 from unittest import mock
 
 import httpx2
+from django.db import DatabaseError
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from weblate.trans.judge import (
     JudgeError,
     JudgeRequest,
+    get_judge_base_url,
+    get_judge_chat_completions_url,
+    judge_configuration_ready,
     render_preview,
     request_verdicts,
     validate_judge_configuration,
@@ -97,7 +101,7 @@ class JudgeClientGateTest(SimpleTestCase):
             request_verdicts([REQ], model="vendor/model-a")
         self.assertEqual(len(http_mock.calls), 0)
 
-    @override_settings(JUDGE_ENABLED=True, JUDGE_OPENROUTER_KEY="")
+    @override_settings(JUDGE_ENABLED=True, JUDGE_API_KEY="")
     @http_mock.activate
     def test_missing_key_makes_no_network_call(self) -> None:
         with self.assertRaises(JudgeError):
@@ -107,7 +111,7 @@ class JudgeClientGateTest(SimpleTestCase):
     @http_mock.activate
     def test_missing_model_makes_no_network_call(self) -> None:
         with (
-            override_settings(JUDGE_ENABLED=True, JUDGE_OPENROUTER_KEY="sk-test"),
+            override_settings(JUDGE_ENABLED=True, JUDGE_API_KEY="sk-test"),
             self.assertRaises(JudgeError),
         ):
             request_verdicts([REQ], model="")
@@ -115,7 +119,7 @@ class JudgeClientGateTest(SimpleTestCase):
 
     @override_settings(
         JUDGE_ENABLED=True,
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_REQUEST_DEADLINE=0,
     )
     @http_mock.activate
@@ -126,7 +130,7 @@ class JudgeClientGateTest(SimpleTestCase):
 
     @override_settings(
         JUDGE_ENABLED=True,
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_BATCH_SIZE=0,
     )
     @http_mock.activate
@@ -137,7 +141,7 @@ class JudgeClientGateTest(SimpleTestCase):
 
     @override_settings(
         JUDGE_ENABLED=True,
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_BATCH_SIZE=-5,
     )
     @http_mock.activate
@@ -150,7 +154,7 @@ class JudgeClientGateTest(SimpleTestCase):
 
     @override_settings(
         JUDGE_ENABLED=True,
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_MODEL_SEAT_1="vendor-a/model",
         JUDGE_MODEL_SEAT_2="vendor-b/model",
         JUDGE_BATCH_SIZE=0,
@@ -159,10 +163,70 @@ class JudgeClientGateTest(SimpleTestCase):
         with self.assertRaises(JudgeError):
             validate_judge_configuration()
 
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+        JUDGE_MAX_UNITS_PER_RUN=-1,
+    )
+    def test_readiness_rejects_an_invalid_cap(self) -> None:
+        self.assertFalse(judge_configuration_ready())
+
+    @override_settings(JUDGE_ENABLED=True, JUDGE_API_KEY="sk-test", JUDGE_BASE_URL="")
+    @http_mock.activate
+    def test_blank_base_url_makes_no_network_call(self) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True, JUDGE_API_KEY="sk-test", JUDGE_BASE_URL="not-a-url"
+    )
+    @http_mock.activate
+    def test_malformed_base_url_makes_no_network_call(self) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BASE_URL="http://hcbifrost.herocraft.com/litellm/v1",
+    )
+    @http_mock.activate
+    def test_non_https_base_url_makes_no_network_call(self) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_REASONING_EFFORT="low",
+    )
+    @http_mock.activate
+    def test_litellm_with_reasoning_effort_makes_no_network_call(self) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+
+class JudgeEndpointResolutionTest(SimpleTestCase):
+    def test_default_base_url_is_openrouter(self) -> None:
+        self.assertEqual(get_judge_base_url(), "https://openrouter.ai/api/v1")
+
+    def test_default_chat_completions_url(self) -> None:
+        self.assertEqual(
+            get_judge_chat_completions_url(),
+            "https://openrouter.ai/api/v1/chat/completions",
+        )
+
 
 @override_settings(
     JUDGE_ENABLED=True,
-    JUDGE_OPENROUTER_KEY="sk-test-do-not-leak",
+    JUDGE_API_KEY="sk-test-do-not-leak",
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
@@ -411,15 +475,28 @@ class JudgeClientTest(SimpleTestCase):
     @http_mock.activate
     def test_the_api_key_never_reaches_the_exception_text(self) -> None:
         # A gate failure raises; the key must not be in the message.
-        with override_settings(JUDGE_ENABLED=True, JUDGE_OPENROUTER_KEY=""):
+        with override_settings(JUDGE_ENABLED=True, JUDGE_API_KEY=""):
             with self.assertRaises(JudgeError) as ctx:
                 request_verdicts([REQ], model="vendor/model-a")
             self.assertNotIn("sk-test", str(ctx.exception))
 
+    @override_settings(JUDGE_BASE_URL="https://openrouter.ai/api/v1/")
+    @http_mock.activate
+    def test_trailing_slash_base_url_still_resolves_the_chat_endpoint(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertFalse(result.unparsed)
+
 
 @override_settings(
     JUDGE_ENABLED=True,
-    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_API_KEY="sk-test",
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,
 )
@@ -449,7 +526,7 @@ class JudgeRequestLoggingTest(SimpleTestCase):
 
 @override_settings(
     JUDGE_ENABLED=True,
-    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_API_KEY="sk-test",
     JUDGE_REQUEST_SLEEP=0.0,
 )
 class JudgeRequestDeadlineTest(TestCase):
@@ -539,7 +616,7 @@ class JudgeRequestDeadlineTest(TestCase):
 
 @override_settings(
     JUDGE_ENABLED=True,
-    JUDGE_OPENROUTER_KEY="sk-test",
+    JUDGE_API_KEY="sk-test",
     JUDGE_REQUEST_SLEEP=0.0,
 )
 class JudgeOnBatchTest(SimpleTestCase):
@@ -620,7 +697,7 @@ class JudgeOnBatchTest(SimpleTestCase):
 class JudgeUsageLogTest(TestCase):
     @override_settings(
         JUDGE_ENABLED=True,
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_BATCH_SIZE=5,
         JUDGE_REQUEST_SLEEP=0.0,
     )
@@ -669,7 +746,7 @@ class JudgeUsageLogTest(TestCase):
 
     @override_settings(
         JUDGE_ENABLED=True,
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_BATCH_SIZE=5,
         JUDGE_REQUEST_SLEEP=0.0,
     )
@@ -691,7 +768,7 @@ class JudgeUsageLogTest(TestCase):
 
     @override_settings(
         JUDGE_ENABLED=True,
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_BATCH_SIZE=5,
         JUDGE_REQUEST_SLEEP=0.0,
     )
@@ -709,13 +786,89 @@ class JudgeUsageLogTest(TestCase):
         self.assertEqual(row.prompt_tokens, 11)
         self.assertEqual(row.completion_tokens, 7)
 
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_operation_and_unit_count(self) -> None:
+        reqs = [REQ, replace(REQ, unit_key="MENU_DOOR_2")]
+        payload = _reply(
+            [
+                {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""},
+                {"id": 1, "verdict": "pass", "errors": [], "back_translation": ""},
+            ]
+        )
+        payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
+        http_mock.register("POST", CHAT_URL, json=payload)
+        request_verdicts(reqs, model="vendor/model-a")
+        row = LLMUsageLog.objects.get(model="vendor/model-a")
+        self.assertEqual(row.operation, LLMUsageLog.Operation.JUDGE)
+        self.assertEqual(row.unit_count, 2)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @mock.patch("weblate.trans.judge.time.sleep")
+    @http_mock.activate
+    def test_billed_retry_logs_actual_batch_size(self, sleep) -> None:
+        reqs = [REQ, replace(REQ, unit_key="MENU_DOOR_2")]
+        usage = {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0.002}
+        http_mock.register("POST", CHAT_URL, status_code=429, json={"usage": usage})
+        retry_payload = _reply(
+            [
+                {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""},
+                {"id": 1, "verdict": "pass", "errors": [], "back_translation": ""},
+            ]
+        )
+        retry_payload["usage"] = usage
+        http_mock.register("POST", CHAT_URL, json=retry_payload)
+
+        request_verdicts(reqs, model="vendor/model-a")
+
+        rows = list(LLMUsageLog.objects.order_by("id"))
+        self.assertEqual(len(rows), 2)
+        self.assertEqual([row.unit_count for row in rows], [2, 2])
+        self.assertTrue(
+            all(row.operation == LLMUsageLog.Operation.JUDGE for row in rows)
+        )
+        sleep.assert_called_once()
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_accounting_failure_does_not_break_judging(self) -> None:
+        payload = _reply(
+            [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+        )
+        payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
+        http_mock.register("POST", CHAT_URL, json=payload)
+        with mock.patch.object(
+            LLMUsageLog._default_manager,  # ruff: ignore[private-member-access]
+            "create",
+            side_effect=DatabaseError("boom"),
+        ):
+            results = request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].model_verdict, "pass")
+        self.assertEqual(LLMUsageLog.objects.count(), 0)
+
 
 class JudgeReasoningBudgetTest(TestCase):
     """Reasoning tokens were 84% of the first dev run's cost."""
 
     @override_settings(
         JUDGE_ENABLED=True,
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_BATCH_SIZE=5,
         JUDGE_REQUEST_SLEEP=0.0,
     )
@@ -736,7 +889,7 @@ class JudgeReasoningBudgetTest(TestCase):
 
     @override_settings(
         JUDGE_ENABLED=True,
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_BATCH_SIZE=5,
         JUDGE_REQUEST_SLEEP=0.0,
         JUDGE_REASONING_EFFORT="low",
@@ -762,7 +915,7 @@ class JudgePromptContextTest(TestCase):
 
     @override_settings(
         JUDGE_ENABLED=True,
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_BATCH_SIZE=5,
         JUDGE_REQUEST_SLEEP=0.0,
     )
@@ -788,7 +941,7 @@ class JudgePromptContextTest(TestCase):
 
     @override_settings(
         JUDGE_ENABLED=True,
-        JUDGE_OPENROUTER_KEY="sk-test",
+        JUDGE_API_KEY="sk-test",
         JUDGE_BATCH_SIZE=5,
         JUDGE_REQUEST_SLEEP=0.0,
     )
@@ -812,3 +965,50 @@ class JudgePromptContextTest(TestCase):
         for genre in ("World War II", "strategy", "military"):
             self.assertNotIn(genre, prompt)
         self.assertIn("not specified", prompt)
+
+
+LITELLM_CHAT_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/completions"
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_BATCH_SIZE=5,
+    JUDGE_REQUEST_SLEEP=0.0,
+)
+class JudgeLiteLLMPayloadTest(TestCase):
+    @override_settings(JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1")
+    @http_mock.activate
+    def test_litellm_payload_has_neither_usage_nor_provider(self) -> None:
+        http_mock.register(
+            "POST",
+            LITELLM_CHAT_URL,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "segments": [
+                                        {
+                                            "id": 0,
+                                            "verdict": "pass",
+                                            "errors": [],
+                                            "back_translation": "",
+                                        }
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ],
+                "usage": {"prompt_tokens": 11, "completion_tokens": 7},
+            },
+        )
+        request_verdicts([REQ], model="vendor/model-a")
+        body = json.loads(http_mock.calls[0].request.content)
+        self.assertNotIn("usage", body)
+        self.assertNotIn("provider", body)
+        row = LLMUsageLog.objects.get(model="vendor/model-a")
+        self.assertEqual(row.prompt_tokens, 11)
+        self.assertEqual(row.completion_tokens, 7)

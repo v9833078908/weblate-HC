@@ -27,11 +27,12 @@ from weblate.trans.models.change import Change
 from weblate.trans.models.project import Project, prefetch_project_flags
 from weblate.trans.models.translation import Translation
 from weblate.trans.models.unit import Unit
+from weblate.trans.views.basic import judge_queue_strip_context
 from weblate.trans.views.files import can_download_workspace
 from weblate.trans.views.reports import get_reports_context
 from weblate.utils import messages
 from weblate.utils.stats import prefetch_stats
-from weblate.utils.views import get_paginator, show_form_errors
+from weblate.utils.views import get_paginator, optional_form, show_form_errors
 from weblate.workspaces.forms import WorkspaceDeleteForm, WorkspaceSearchForm
 from weblate.workspaces.models import Workspace
 
@@ -273,9 +274,22 @@ def detail(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
                 obj=workspace,
                 query_data=search_query,
             ),
-            "autoform": AutoForm(workspace, user=request.user)
-            if request.user.has_perm("translation.auto", workspace)
-            else None,
+            "autoform": optional_form(
+                AutoForm,
+                request.user,
+                "translation.auto",
+                workspace,
+                obj=workspace,
+                user=request.user,
+                initial={
+                    **{
+                        key: request.GET[key]
+                        for key in ("mode", "q")
+                        if request.GET.get(key)
+                    },
+                    "next": request.GET.get("next", ""),
+                },
+            ),
             "replace_form": ReplaceForm(workspace) if can_edit_units else None,
             "bulk_state_form": BulkEditForm(request.user, workspace)
             if request.user.has_perm("unit.bulk_edit", workspace) and can_edit_units
@@ -292,6 +306,7 @@ def detail(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
             "can_download_workspace": can_download_workspace(request.user, workspace),
             "workspace_has_billing": billing is not None,
             "workspace_has_projects": workspace_has_projects,
+            "judge_queue": judge_queue_strip_context(request.user, workspace),
             **(
                 get_reports_context(request, workspace)
                 if request.user.is_authenticated
