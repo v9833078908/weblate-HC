@@ -30,6 +30,8 @@ from weblate.addons.events import AddonEvent
 from weblate.addons.models import AddonActivityLog
 from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Role, TeamMembership, User
+from weblate.checks.chars import MaxLengthCheck
+from weblate.checks.models import CHECKS
 from weblate.configuration.models import Setting, SettingCategory
 from weblate.lang.models import Language, Plural
 from weblate.machinery.base import (
@@ -55,6 +57,7 @@ from weblate.trans.models import (
 )
 from weblate.trans.tasks import auto_translate, auto_translate_component
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.trans.util import split_plural
 from weblate.utils.celery import (
     PENDING_TASK_MAX_AGE,
     add_user_task,
@@ -62,7 +65,12 @@ from weblate.utils.celery import (
     get_user_tasks,
     get_user_tasks_key,
 )
-from weblate.utils.state import STATE_APPROVED, STATE_READONLY, STATE_TRANSLATED
+from weblate.utils.state import (
+    STATE_APPROVED,
+    STATE_FUZZY,
+    STATE_READONLY,
+    STATE_TRANSLATED,
+)
 from weblate.utils.stats import ProjectLanguage
 from weblate.workspaces.models import Workspace
 
@@ -1663,3 +1671,77 @@ print(json.dumps(
         self.assertGreaterEqual(options.get("visibility_timeout", 0), 4 * 3600)
         self.assertEqual(result_options, options)
         self.assertEqual(visibility_timeout, options["visibility_timeout"])
+
+
+class AutoTranslateMaxLengthGateTest(ViewTestCase):
+    """`AutoTranslate.update()` consults the registered max-length measurement."""
+
+    def get_gated_unit(
+        self, *, max_length: int, source: str = "Hello, world!\n"
+    ) -> Unit:
+        unit = self.get_unit(source)
+        unit.extra_flags = f"max-length:{max_length}"
+        unit.save(update_fields=["extra_flags"], same_content=True)
+        return unit
+
+    def build_auto(self, *, mode: str) -> AutoTranslate:
+        return AutoTranslate(
+            user=self.user,
+            translation=self.get_translation(),
+            q="",
+            mode=mode,
+        )
+
+    def test_registered_measurement_replaces_raw_length(self) -> None:
+        """A raw-long target that collapses under budget is stored, not suggested."""
+        unit = self.get_gated_unit(max_length=5)
+
+        class _StubMaxLengthCheck(MaxLengthCheck):
+            def get_replacement_function(self, unit):
+                return lambda _text: "x"
+
+        with patch.dict(CHECKS.data, {"max-length": _StubMaxLengthCheck()}):
+            auto = self.build_auto(mode="translate")
+            auto.update(unit, STATE_TRANSLATED, ["a much longer raw target"])
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+        self.assertFalse(unit.suggestion_set.exists())
+
+    def test_missing_registration_falls_back_to_raw_length(self) -> None:
+        """Without a registered max-length check, raw length gates as before."""
+        unit = self.get_gated_unit(max_length=5)
+        with patch.dict(CHECKS.data):
+            del CHECKS.data["max-length"]
+            auto = self.build_auto(mode="translate")
+            auto.update(unit, STATE_TRANSLATED, ["a much longer raw target"])
+        unit.refresh_from_db()
+        self.assertNotEqual(unit.state, STATE_TRANSLATED)
+        self.assertTrue(unit.suggestion_set.exists())
+
+    def test_one_over_budget_plural_form_suggests_the_full_list(self) -> None:
+        unit = self.get_gated_unit(max_length=10, source="Orangutan has %d banana.\n")
+        targets = ["short\n", "this plural form is far past the budget\n"]
+        auto = self.build_auto(mode="translate")
+        auto.update(unit, STATE_TRANSLATED, targets)
+        unit.refresh_from_db()
+        self.assertNotEqual(unit.state, STATE_TRANSLATED)
+        suggestion = unit.suggestion_set.get()
+        self.assertEqual(split_plural(suggestion.target), targets)
+
+    def test_judge_mode_over_budget_persists_instead_of_suggesting(self) -> None:
+        """Judge mode keeps an over-budget candidate available to checks/repair."""
+        unit = self.get_gated_unit(max_length=5)
+        auto = self.build_auto(mode="judge")
+        auto.update(unit, STATE_FUZZY, ["a much longer raw target\n"])
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_FUZZY)
+        self.assertEqual(unit.target, "a much longer raw target\n")
+        self.assertFalse(unit.suggestion_set.exists())
+
+    def test_explicit_suggest_mode_always_suggests(self) -> None:
+        unit = self.get_gated_unit(max_length=100)
+        auto = self.build_auto(mode="suggest")
+        auto.update(unit, STATE_TRANSLATED, ["short"])
+        unit.refresh_from_db()
+        self.assertNotEqual(unit.state, STATE_TRANSLATED)
+        self.assertTrue(unit.suggestion_set.exists())

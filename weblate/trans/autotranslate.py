@@ -17,6 +17,7 @@ from django.db.models import Case, IntegerField, QuerySet, Value, When
 from django.db.models.functions import MD5, Lower
 from django.utils.translation import gettext, ngettext
 
+from weblate.checks.models import CHECKS
 from weblate.logger import LOGGER
 from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.models import MACHINERY
@@ -403,7 +404,14 @@ class AutoTranslate(BaseAutoTranslate):
         if isinstance(target, str):
             target = [target]
         max_length = unit.get_max_length()
-        if self.mode == "suggest" or any(len(item) > max_length for item in target):
+        max_length_check = CHECKS.get("max-length")
+        replace = (
+            max_length_check.get_replacement_function(unit)
+            if max_length_check is not None
+            else lambda text: text
+        )
+        over_max_length = any(len(replace(item)) > max_length for item in target)
+        if self.mode == "suggest" or (over_max_length and self.mode != "judge"):
             _, result = Suggestion.objects.add(
                 unit,
                 target,
