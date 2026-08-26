@@ -157,3 +157,14 @@ on this proxy can judge": five routes never got the chance to be judged on
 judgment. It supports only the narrower and still sufficient claim that **no
 two-seat judge can be assembled from this proxy as currently configured**, which
 is what the seat search asked. The seats stay on OpenRouter.
+
+## Overturned on the same day
+
+`docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md`
+repeated today's judge payload against `deepseek-v4-pro` twelve times and
+recorded zero resets, where this run recorded six of eight. The disqualifying
+signal is proxy load at the hour of the run, not a property of the route.
+
+The decision above does not stand. DeepSeek is a live LiteLLM candidate again,
+and the blocker moves to `weblate/trans/judge.py:638`, which does not retry a
+connection reset.
