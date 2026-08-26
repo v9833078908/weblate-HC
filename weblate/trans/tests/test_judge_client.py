@@ -195,7 +195,9 @@ class JudgeClientGateTest(SimpleTestCase):
         JUDGE_REASONING_EFFORT="low",
     )
     @http_mock.activate
-    def test_litellm_with_reasoning_effort_makes_no_network_call(self) -> None:
+    def test_litellm_with_unsupported_reasoning_effort_makes_no_network_call(
+        self,
+    ) -> None:
         with self.assertRaises(JudgeError):
             request_verdicts([REQ], model="vendor/model-a")
         self.assertEqual(len(http_mock.calls), 0)
@@ -924,3 +926,105 @@ class JudgeLiteLLMPayloadTest(TestCase):
         row = LLMUsageLog.objects.get(model="vendor/model-a")
         self.assertEqual(row.prompt_tokens, 11)
         self.assertEqual(row.completion_tokens, 7)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_REASONING_EFFORT="none",
+    )
+    @http_mock.activate
+    def test_qwen_reasoning_disable_mapping(self) -> None:
+        models = ("qwen3.8-max", "QWEN3.7-plus")
+        http_mock.register(
+            "POST",
+            LITELLM_CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+
+        for model in models:
+            with self.subTest(model=model):
+                request_verdicts([REQ], model=model)
+                body = json.loads(http_mock.calls[-1].request.content)
+                self.assertFalse(body["enable_thinking"])
+                self.assertNotIn("thinking", body)
+                self.assertNotIn("reasoning", body)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_REASONING_EFFORT="none",
+    )
+    @http_mock.activate
+    def test_confirmed_non_qwen_models_disable_thinking(self) -> None:
+        models = (
+            "deepseek-v4-pro",
+            "deepseek-ai/deepseek-v4-flash",
+            "atlas/deepseek-v4-pro-0813",
+            "atlas_glm-5.1",
+            "Kimi K2.6",
+        )
+        http_mock.register(
+            "POST",
+            LITELLM_CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+
+        for model in models:
+            with self.subTest(model=model):
+                request_verdicts([REQ], model=model)
+                body = json.loads(http_mock.calls[-1].request.content)
+                self.assertEqual(body["thinking"], {"type": "disabled"})
+                self.assertNotIn("enable_thinking", body)
+                self.assertNotIn("reasoning", body)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_REASONING_EFFORT="none",
+    )
+    @http_mock.activate
+    def test_unmapped_model_with_reasoning_disabled_makes_no_network_call(
+        self,
+    ) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+    )
+    @http_mock.activate
+    def test_litellm_reasoning_is_absent_by_default(self) -> None:
+        http_mock.register(
+            "POST",
+            LITELLM_CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+
+        request_verdicts([REQ], model="deepseek-v4-pro")
+
+        body = json.loads(http_mock.calls[0].request.content)
+        self.assertNotIn("enable_thinking", body)
+        self.assertNotIn("thinking", body)
+        self.assertNotIn("reasoning", body)
+
+    @override_settings(JUDGE_REASONING_EFFORT="none")
+    @http_mock.activate
+    def test_openrouter_none_keeps_generic_reasoning_payload(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+
+        request_verdicts([REQ], model="vendor/model-a")
+
+        body = json.loads(http_mock.calls[0].request.content)
+        self.assertEqual(body["reasoning"], {"effort": "none", "exclude": True})
+        self.assertNotIn("enable_thinking", body)
+        self.assertNotIn("thinking", body)

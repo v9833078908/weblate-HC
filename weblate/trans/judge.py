@@ -66,6 +66,16 @@ _PLACEHOLDER_RE = re.compile(
 )
 
 LOGGER = logging.getLogger(__name__)
+_LITELLM_QWEN_THINKING_DISABLED_MODELS = frozenset({"qwen3.8-max", "qwen3.7-plus"})
+_LITELLM_THINKING_DISABLED_MODELS = frozenset(
+    {
+        "deepseek-v4-pro",
+        "deepseek-ai/deepseek-v4-flash",
+        "atlas/deepseek-v4-pro-0813",
+        "atlas_glm-5.1",
+        "kimi k2.6",
+    }
+)
 
 
 class JudgeError(Exception):
@@ -110,6 +120,16 @@ def _judge_provider_profile(base_url: str) -> dict:
     return {}
 
 
+def _litellm_reasoning_disable_payload(model: str) -> dict:
+    """Return the measured vendor payload for an admitted LiteLLM model."""
+    normalized_model = model.casefold()
+    if normalized_model in _LITELLM_QWEN_THINKING_DISABLED_MODELS:
+        return {"enable_thinking": False}
+    if normalized_model in _LITELLM_THINKING_DISABLED_MODELS:
+        return {"thinking": {"type": "disabled"}}
+    raise JudgeError(_("The LLM judge is not configured."))
+
+
 def judge_configuration_ready() -> bool:
     """Whether the complete two-seat judge configuration is usable."""
     try:
@@ -137,7 +157,7 @@ def validate_request_settings() -> None:
     if (
         _judge_provider(base_url) == "litellm"
         and isinstance(settings.JUDGE_REASONING_EFFORT, str)
-        and settings.JUDGE_REASONING_EFFORT.strip()
+        and settings.JUDGE_REASONING_EFFORT.strip() not in {"", "none"}
     ):
         raise JudgeError(_("The LLM judge is not configured."))
     if not (
@@ -572,7 +592,13 @@ def request_verdicts(
         }
         payload.update(_judge_provider_profile(base_url))
         effort = settings.JUDGE_REASONING_EFFORT
-        if isinstance(effort, str) and effort.strip():
+        if (
+            _judge_provider(base_url) == "litellm"
+            and isinstance(effort, str)
+            and effort.strip() == "none"
+        ):
+            payload.update(_litellm_reasoning_disable_payload(model))
+        elif isinstance(effort, str) and effort.strip():
             # exclude: nothing reads the trace, so paying to ship it back
             # is waste; reasoning was 84% of the first dev run's tokens.
             payload["reasoning"] = {"effort": effort.strip(), "exclude": True}

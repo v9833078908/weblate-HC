@@ -1,8 +1,7 @@
 # Judge seat pair search on LiteLLM (two corpora, complementary recall)
 
-**Date:** 2026-08-26. **Status:** stages 0-2 completed; reasoning-off selected.
-The shared LiteLLM per-model disable mapping is the next prerequisite for
-stages 3-6.
+**Date:** 2026-08-26. **Status:** stages 0-2 completed; reasoning-off mapping
+implemented and smoke-verified. Stage 3 is ready.
 **Supersedes:** `docs/llm-first/plans/2026-08-26-litellm-judge-seat-r3-eval.md`,
 which searched for a replacement for one seat against a single corpus. The
 objective is now the *pair*, measured on ru->zh_Hans and en->fr.
@@ -267,23 +266,23 @@ Recommended: measure with reasoning **off**, and run the anchor
 `deepseek-v4-pro` in **both** modes, so the price of disabling is measured
 rather than assumed. That is one extra 5-repeat run.
 
-### Proposed mechanism, if reasoning-off is chosen
+### Implemented reasoning-off mechanism
 
-Reuse the existing operator knob instead of adding one. `JUDGE_REASONING_EFFORT`
-is currently refused outright for LiteLLM hosts
-(`weblate/trans/judge.py:137-142`). Extend it so that:
+`JUDGE_REASONING_EFFORT` reuses the existing operator knob:
 
 - `""` keeps today's behaviour exactly - no toggle sent, no default changes;
-- `"none"` on a LiteLLM host sends the vendor's disable toggle, mapped per
-  model family: `enable_thinking: false` for Qwen, `thinking: {"type":
-  "disabled"}` for the rest, because the spellings differ and sending the wrong
-  one silently leaves reasoning on - the exact error that mismeasured Qwen in
-  the first pass;
-- any other value on a LiteLLM host stays refused, as today;
-- OpenRouter behaviour is untouched.
+- `"none"` on LiteLLM selects the measured vendor payload: `enable_thinking:
+  false` for `qwen3.8-max` and `QWEN3.7-plus`; `thinking: {"type":
+  "disabled"}` for the admitted DeepSeek, GLM, and Kimi routes;
+- any other non-empty LiteLLM value, or an unrecognised LiteLLM model with
+  `"none"`, fails before a paid request;
+- OpenRouter behaviour is unchanged.
 
-The eval then calls `request_verdicts` with that setting, so the measurement and
-production run the same code. Nothing is implemented until the mode is chosen.
+`weblate/trans/tests/test_judge_client.py` covers every admitted mapping, the
+unmapped gate, an empty LiteLLM setting, and the unchanged OpenRouter payload.
+The live `request_verdicts` smoke at production batch width passed for
+`qwen3.8-max` in 6.92 s and on the second `deepseek-v4-pro` attempt in 12.06 s;
+the first DeepSeek attempt reset at 30.8 s and returned five unparsed results.
 
 ## Stages
 
@@ -431,7 +430,7 @@ Resolved on 2026-08-26:
 3. A product change may be proposed, including a thinking toggle.
 4. Reasoning-off is selected. The eval and product use
    `JUDGE_REASONING_EFFORT="none"` through the per-model mapping in
-   `Proposed mechanism, if reasoning-off is chosen`.
+   `Implemented reasoning-off mechanism`.
 
-Stage 2 is complete. Stages 3-6 remain blocked until the shared judge mapping
-is implemented and verified; reasoning-off retains the Qwen family.
+Stage 2 and the shared judge mapping are complete. Stage 3 is next; reasoning-off
+retains the Qwen family.
