@@ -1,8 +1,14 @@
 # LiteLLM machinery provider and configurable judge endpoint
 
 **Date:** 2026-08-23. **Status:** Tasks 1-6 implemented and merged to `main`
-(commit `657f8ea`). Task 7 (development deployment and live proxy preflight)
-and the production rollout remain pending separate explicit approval.
+(commit `657f8ea`). **Task 7 ran on 2026-08-26 and FAILED at step 3**: the
+provider contract and the configurable endpoint both hold against the live
+proxy, but the configured second judge seat `qwen/qwen3-235b-a22b-2507` does not
+exist there, and an available qwen candidate fails strict parsing and also fails
+with no HTTP status at ~30.5 s. Under step 4 no model was substituted; the next
+move is an R3 eval, not a seat swap. Measured in
+`docs/llm-first/measurements/2026-08-26-litellm-preflight.md`. The containerised
+deployment in step 1 and the production rollout remain pending.
 **Realizes:** the phase-4 roadmap item "Переезд судьи на корпоративный
 LiteLLM-прокси" (`docs/llm-first/vision/llm-first-product-architecture.md:660-676`)
 plus a second routed machinery provider so machine translation can also run
