@@ -4,7 +4,9 @@
 > `test-driven-development` for every behavior change and
 > `verification-before-completion` before each commit.
 
-**Date:** 2026-08-25. **Status:** awaiting implementation approval.
+**Date:** 2026-08-25. **Status:** Tasks 1-7 implemented and merged to `main`
+(merge commit `f91935b`). Browser-driven Selenium coverage and a live judge run
+on a running instance remain pending separate explicit approval.
 
 **Goal:** Let an unresolved `major` verdict ship, expose every judge severity in
 native Weblate checks, and give the producer one coherent surface to launch the
