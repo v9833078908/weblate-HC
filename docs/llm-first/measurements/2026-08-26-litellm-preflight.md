@@ -1,6 +1,10 @@
 # LiteLLM preflight: failed at the judge seat, provider contract passed
 
-**Date:** 2026-08-26. **Status:** measured; **preflight FAILED**.
+**Date:** 2026-08-26. **Status:** historical. The preflight failed as recorded
+here, but the diagnosis in this file - an unusable judge seat - was later shown
+to be a transport fault, not a seat fault, in
+`docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md`. The
+per-probe numbers stand; the conclusion drawn from them does not.
 **Covers:** the local arm of Task 7 of
 `docs/llm-first/plans/2026-08-23-litellm-provider-and-judge-endpoint.md`.
 **Outcome under Task 7.4:** stop, do not substitute a model, schedule an R3

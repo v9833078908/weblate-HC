@@ -1,6 +1,10 @@
 # Judge seat selection on LiteLLM (R3 eval)
 
-**Date:** 2026-08-26. **Status:** awaiting approval.
+**Date:** 2026-08-26. **Status:** archived, never approved and never run. It
+searched for a replacement for one seat against a single corpus; the objective
+became the pair, and then the whole seat search moved to
+`docs/llm-first/plans/2026-08-26-judge-provider-failover.md`. Kept for the
+candidate reasoning, not as a plan of record.
 **Continues:** `docs/llm-first/plans/2026-08-23-litellm-provider-and-judge-endpoint.md`,
 task 7 step 4 - "If any route or seat fails, stop. Do not substitute a model or
 weaken the schema: record the result and start the R3 eval path".

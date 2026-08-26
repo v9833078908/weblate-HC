@@ -1,8 +1,12 @@
 # Judge seat pair search on LiteLLM (two corpora, complementary recall)
 
-**Date:** 2026-08-26. **Status:** stopped at Stage 3. The reasoning-off mapping
-works, but no candidate passed the cross-corpus smoke gate.
-**Supersedes:** `docs/llm-first/plans/2026-08-26-litellm-judge-seat-r3-eval.md`,
+**Date:** 2026-08-26. **Status:** closed, superseded. Stages 0-2 stand and
+their artifacts are reused; Stage 3's stop does not, because the gate it failed
+on measured proxy load. The search continues in
+`docs/llm-first/plans/2026-08-26-judge-provider-failover.md`, whose Stage A
+scores candidates against the corpus designed in
+`docs/llm-first/designs/2026-08-26-balanced-judge-evaluation-corpus.md`.
+**Supersedes:** `docs/llm-first/archive/2026-08-26-litellm-judge-seat-r3-eval.md`,
 which searched for a replacement for one seat against a single corpus. The
 objective is now the *pair*, measured on ru->zh_Hans and en->fr.
 **Rule:** R3 - changing the prompt or the model invalidates the measurement
@@ -346,6 +350,13 @@ missed 6/7 zh criticals; every other candidate had unparsed batches. The full
 results are in
 `docs/llm-first/measurements/2026-08-26-judge-seat-pair-search-stage3.md`.
 No candidate reached Stage 4.
+
+**Stages 4 to 6 never ran.** The scorer and the measurement file named below
+were never produced, so those two paths do not exist. The design is kept
+because Stage A of
+`docs/llm-first/plans/2026-08-26-judge-provider-failover.md` reuses it, against
+the corpus in
+`docs/llm-first/designs/2026-08-26-balanced-judge-evaluation-corpus.md`.
 
 ### Stage 4: per-model runs
 

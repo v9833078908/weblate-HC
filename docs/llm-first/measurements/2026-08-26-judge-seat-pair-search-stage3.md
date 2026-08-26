@@ -1,6 +1,10 @@
 # Stage 3 smoke: reasoning-off LiteLLM candidates
 
-**Date:** 2026-08-26. **Status:** stopped. No candidate passed the Stage 3 gate.
+**Date:** 2026-08-26. **Status:** superseded the same day. This run stopped
+with no candidate through the gate, and that conclusion no longer stands: the
+disqualifying signal was proxy load at the hour of the run. Read
+`docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md` first;
+this file is kept for its per-seat numbers and the split-gate re-score.
 
 ## Method
 
