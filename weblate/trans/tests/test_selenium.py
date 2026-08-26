@@ -1698,6 +1698,60 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
         self.assertTrue(state["rendered"])
         self.assertGreater(state["height"], 0)
 
+    def test_persisted_mode_missing_from_options_is_not_restored(self) -> None:
+        """
+        A stored ``mode`` that no option carries must not break the form.
+
+        ``loader-bootstrap.js`` persists every ``<select>`` of a
+        ``[data-persist]`` form on submit and used to restore it with a bare
+        ``target.value = value``. "judge" is only offered where the user may
+        review, so a judge run persisted on one scope restored into a scope
+        without that option: the assignment leaves ``selectedIndex`` at -1, a
+        browser omits an unselected select from the submission, and a form
+        that looked correct answered "This field is required." on submit.
+        """
+        self.do_login(superuser=True)
+        self.clear_persisted_form_state()
+        # This test deliberately writes the very state the fix guards
+        # against, so it must not leave it behind: the driver is a class
+        # attribute and the live server binds one port per class, so the
+        # origin - and therefore localStorage - is shared by every test here.
+        self.addCleanup(self.clear_persisted_form_state)
+        project = self.create_component()
+        component = project.component_set.get(slug="django")
+        # Reviews stay disabled, so this form offers no "judge" option.
+        self.open_component(component=component, project=project)
+        self.driver.execute_script(
+            """
+            window.localStorage["auto-translation"] = JSON.stringify({
+                mode: "judge",
+            });
+            """
+        )
+        # Load the page again so the restore pass sees the stored value.
+        self.open_component(component=component, project=project)
+        self.click("Operations")
+        self.click("Batch automatic translation")
+        state = self.driver.execute_script(
+            """
+            const select = document.getElementById("id_auto_mode");
+            const form = select.closest("form");
+            return {
+                options: Array.from(select.options).map(
+                    (option) => option.value
+                ),
+                selectedIndex: select.selectedIndex,
+                value: select.value,
+                submitted: new FormData(form).get("mode"),
+            };
+            """
+        )
+
+        self.assertNotIn("judge", state["options"])
+        self.assertGreaterEqual(state["selectedIndex"], 0)
+        self.assertNotEqual(state["value"], "")
+        self.assertIsNotNone(state["submitted"])
+
     def test_login(self) -> None:
         # Do proper login with new user
         self.do_login()

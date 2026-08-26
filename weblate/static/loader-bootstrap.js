@@ -1217,6 +1217,22 @@ onReady(() => {
           form.querySelectorAll(selector).forEach((target) => {
             if (target.type === "checkbox") {
               target.checked = value;
+            } else if (target instanceof HTMLSelectElement) {
+              /* A stored choice can be missing from this page's options:
+               * the automatic translation form only offers "judge" where
+               * the user may review, so a judge run persisted on one scope
+               * would restore a value no <option> carries. Assigning it
+               * leaves selectedIndex at -1, and a browser omits an
+               * unselected select from the submission, so an apparently
+               * valid form posts without the field and comes back as a
+               * required-field error. Keep the rendered selection. */
+              if (
+                Array.from(target.options).some(
+                  (option) => option.value === value,
+                )
+              ) {
+                target.value = value;
+              }
             } else {
               target.value = value;
             }
