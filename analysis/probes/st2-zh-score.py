@@ -19,6 +19,15 @@ Plus the n=5 noise floor (units whose >=flag status varies across repeats) and
 the 4x4 severity confusion matrix summed over the collegium repeats. Degenerate
 runs (all-unparsed transport failures) are reported and skipped.
 
+With --revision (analysis/data/st2-zh-critical-revision.json) three further
+numbers separate the faults that missed_crit conflates, over the overlay's
+in-gate units only:
+
+  missed_defect    judge ranked a confirmed defect below major - a recall
+                   failure, and the only one of the three that disqualifies
+  sev_under        judge reached >=major but below the revised severity
+  sev_over         judge exceeded the revised severity on a real defect
+
 Usage:
     python3 st2-zh-score.py --truth st2-zh-groundtruth.json --out-dir st2-zh-recal
 """
@@ -85,6 +94,26 @@ def metrics(lab, gt, true_crit, true_majorplus, true_none):
     )
 
 
+def load_revision(fn: str) -> dict[str, int]:
+    """Map an in-gate unit id to the rank the revision can defend."""
+    with open(fn, encoding="utf-8") as fh:
+        labels = json.load(fh)["labels"]
+    return {i: RANK[v["revised_severity"]] for i, v in labels.items() if v["in_gate"]}
+
+
+def split_metrics(lab, gate: dict[str, int]) -> dict[str, int]:
+    # Every gate id is scored. A unit the run never labelled - dropped from the
+    # batch, or unparsed - is rank 0, so it counts as missed rather than
+    # shrinking the denominator and flattering the run.
+    seen = {i: RANK[lab[i]] if i in lab else 0 for i in gate}
+    return {
+        "missed_defect": sum(1 for r in seen.values() if r < 2),
+        "absent": sum(1 for i in gate if i not in lab),
+        "sev_under": sum(1 for i, r in seen.items() if 2 <= r < gate[i]),
+        "sev_over": sum(1 for i, r in seen.items() if r > gate[i]),
+    }
+
+
 def load(fn: Path) -> dict | None:
     if not fn.exists():
         return None
@@ -102,6 +131,11 @@ def main() -> None:
     # 3-repeat arm: pass --arms G --repeats 3 --seat1 "" for it.
     p.add_argument("--arms", default="A,B,C,D")
     p.add_argument("--repeats", type=int, default=5)
+    p.add_argument(
+        "--revision",
+        default="",
+        help="severity revision overlay; adds the split recall/calibration gate",
+    )
     args = p.parse_args()
 
     gt = {
@@ -114,6 +148,12 @@ def main() -> None:
     print(
         f"truth: critical {len(true_crit)}  major+ {len(true_majorplus)}  none {len(true_none)}"
     )
+    gate = load_revision(args.revision) if args.revision else {}
+    if gate:
+        print(
+            f"revision: in-gate {len(gate)}  "
+            + " ".join(f"{i}={LEVELS[r]}" for i, r in sorted(gate.items()))
+        )
 
     out = Path(args.out_dir)
     for arm in args.arms.split(","):
@@ -164,6 +204,16 @@ def main() -> None:
                 f"REAL@24={med('real24')}/24 FP={med('fp')}/{len(true_none)} "
                 f"noise>=flag={flip}/124"
             )
+            if gate:
+
+                def smed(key, runs=labs):
+                    return st.median(split_metrics(run, gate)[key] for run in runs)
+
+                print(
+                    f"  {'':10} missed_defect={smed('missed_defect')}/{len(gate)} "
+                    f"absent={smed('absent')} sev_under={smed('sev_under')} "
+                    f"sev_over={smed('sev_over')}"
+                )
         if pairs == args.repeats and configs and configs[-1][0] == "collegium":
             conf = collections.Counter()
             for lab in configs[-1][1]:

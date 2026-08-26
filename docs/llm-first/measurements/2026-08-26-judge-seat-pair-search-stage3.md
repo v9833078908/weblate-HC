@@ -45,6 +45,101 @@ The `deepseek-v4-pro` mapping smoke immediately before Stage 3 had one accepted
 five-segment call at 12.06 s after a preceding 30.8 s reset. The Stage 3 sample
 shows that one success is not enough to establish batch reliability.
 
+## Re-score under the split gate (added 2026-08-26)
+
+The table above stands: the transport numbers and the sealed-truth `missed_crit`
+are what the run produced. What changed afterwards is the reading of
+`missed_crit`, because the seven sealed critical labels were reviewed against
+the human artifacts in
+`docs/llm-first/reviews/2026-08-26-zh-critical-label-revision.md`. Six of the
+seven defects are real; only `24221` survives as critical, `24130` lacks
+evidence either way, and the rest are major.
+
+`missed_crit` charges a candidate both for missing a defect and for finding it
+and grading it lower. The split gate separates them. Verdicts are persisted in
+`analysis/data/st2-stage3-verdicts.json` and re-scored by
+`analysis/probes/st2-stage3-rescore.py`, which imports the gate logic from
+`analysis/probes/st2-zh-score.py`. No judge request was repeated.
+
+| model | unparsed | missed_crit | missed_defect | sev_under | sev_over |
+|---|---:|---:|---:|---:|---:|
+| `qwen3.8-max` | 0/15 | 6/7 | **1/6** | 1 | 1 |
+| `QWEN3.7-plus` | 5/15 | 6/7 | 5/6 | 0 | 0 |
+| `deepseek-v4-pro` | 15/15 | 7/7 | 6/6 | 0 | 0 |
+| `deepseek-ai/deepseek-v4-flash` | 15/15 | 7/7 | 6/6 | 0 | 0 |
+| `atlas/deepseek-v4-pro-0813` | 15/15 | 7/7 | 6/6 | 0 | 0 |
+| `atlas_glm-5.1` | 15/15 | 7/7 | 6/6 | 0 | 0 |
+| `Kimi K2.6` | 15/15 | 7/7 | 6/6 | 0 | 0 |
+
+`qwen3.8-max` is the only candidate the split gate moves. It found five of the
+six in-gate defects, described each mechanism correctly, and failed on one:
+`24208`, where it passed a target whose rendered word order is broken. Its two
+calibration entries are `24221` graded major instead of critical, and `24207`
+graded critical on a defect that is major. Every other candidate still fails on
+transport, and their `missed_defect` is a consequence of unparsed batches rather
+than of judgment.
+
+As a control, the same gate was run on the committed arm-H files. The incumbent
+`qwen3-235b-a22b-2507` scores `missed_defect=0/6` with `sev_over=5`: its
+published `missed_crit=0/7` came from grading nearly everything critical, not
+from precision. `deepseek-v4-pro` on the same arm scores `missed_defect=5/6`.
+That is the complementarity gap the pair search set out to close, and it is
+visible in the split numbers where `missed_crit` hid it.
+
+### What this does and does not authorise
+
+It does not clear `qwen3.8-max`. One unpatched recall miss on a six-unit gate is
+a weak result from a single unrepeated run, and a 15-unit slice cannot separate
+skill from luck. It does mean the Stage 3 stop was recorded against a metric
+that overstated the failure, and that `qwen3.8-max` is the one route where a
+repeat run could change the answer.
+
+Deciding that requires Stage 4 approval: repeated runs cost real requests, and
+R3 forbids reusing these numbers for a differently configured judge.
+
+## The unparsed batches are a gateway timeout, not a model property
+
+Per-batch transport timings were extracted from the captured judge logs after
+the re-score. They separate perfectly:
+
+| outcome | batches | elapsed range |
+|---|---:|---|
+| parsed | 17 | 5.1 s - 27.8 s |
+| reset (`status=None`) | 19 | 30.4 s - 32.1 s |
+
+No batch failed under 30 s and none succeeded over 30 s; the gap between the
+slowest success and the fastest reset is 2.7 s. The client deadline was
+`JUDGE_REQUEST_DEADLINE = 300.0`, so the ceiling is server-side. This is the
+same ~30.5 s reset Stage 0 recorded for doubao.
+
+Per route, at `JUDGE_BATCH_SIZE = 5`:
+
+| model | parsed batches | reset batches |
+|---|---|---|
+| `qwen3.8-max` | 6 (5.1-11.2 s) | 0 |
+| `QWEN3.7-plus` | 5 (7.7-12.0 s) | 1 |
+| `atlas_glm-5.1` | 2 (8.9-11.3 s) | 3 |
+| `deepseek-ai/deepseek-v4-flash` | 2 (11.6-27.8 s) | 4 |
+| `deepseek-v4-pro` | 2 (12.1-22.5 s) | 6, plus one 429 |
+| `atlas/deepseek-v4-pro-0813` | 0 | 6 |
+
+Every route except `atlas/deepseek-v4-pro-0813` returned at least one clean,
+schema-valid five-segment batch. The DeepSeek and GLM routes are therefore not
+schema-incompatible and not incapable of judging: at this batch width they
+usually do not finish before the proxy closes the connection.
+
+This invalidates the reading of the `unparsed` column for five of the seven
+routes. Their `missed_defect = 6/6` is a consequence of receiving no verdict,
+not of grading a verdict wrongly. Only `qwen3.8-max` was measured on judgment
+throughout, and `QWEN3.7-plus` nearly so.
+
+It does **not** rescue those routes. A judge that cannot return a verdict at the
+production batch width is unusable as configured, and lowering
+`JUDGE_BATCH_SIZE` is a configuration change that invalidates every number here
+under R3, including the OpenRouter seat numbers this search is measured against.
+What changes is the diagnosis: the blocker is latency at batch width, which is
+testable, rather than model quality, which would not be.
+
 ## Decision
 
 Stage 3's explicit gate disqualifies a candidate on any unparsed batch or a
@@ -52,3 +147,13 @@ missed planted critical. It leaves no candidate eligible for Stage 4. Therefore
 no repeated per-model runs, offline pair search, confirmation run, or seat
 configuration change is justified. The LiteLLM provider and reasoning-off
 mapping stay available, but the judge seats remain on OpenRouter.
+
+The split-gate re-score does not overturn this, and the timeout finding does not
+either. `qwen3.8-max` still fails the recall gate, on one unit instead of six.
+The other routes remain unusable at the production batch width.
+
+What both findings do is narrow the conclusion. Stage 3 cannot support "no model
+on this proxy can judge": five routes never got the chance to be judged on
+judgment. It supports only the narrower and still sufficient claim that **no
+two-seat judge can be assembled from this proxy as currently configured**, which
+is what the seat search asked. The seats stay on OpenRouter.

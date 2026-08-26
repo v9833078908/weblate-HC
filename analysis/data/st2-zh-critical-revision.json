@@ -1,0 +1,51 @@
+{
+  "_purpose": "Severity revision for the seven critical labels in st2-zh-groundtruth.json. The sealed ground truth is NOT modified; this file is an overlay consumed by st2-zh-score.py --revision.",
+  "_dated": "2026-08-26",
+  "_method": "Each critical label was re-derived from the source/target pair, the string ID, the annotator reason in st2-zh-judge-annotations.json, and the rendered examples recorded by the human reviewer in docs/operations/plans/2026-08-14-st2-zh-corrected-export.md. The existence of every defect is taken from those human artifacts. What is revised is only the rubric step that promoted all seven to critical.",
+  "_gate": "in_gate=true units form the defect-recall denominator. revised_severity is the severity the evidence supports. A unit is excluded only when the human record itself could not establish the defect.",
+  "_caveat": "The corrected-export review states that placeholder roles in 24207, 24208, 24221 and 24230 were inferred from the source text and sibling strings, not from game code. That inference is documented and reproducible, but it is not runtime verification.",
+  "labels": {
+    "24130": {
+      "sealed_severity": "critical",
+      "revised_severity": "unproven",
+      "in_gate": false,
+      "reason": "The target adds an explicit payment verb (支付) for {[PARAM1]}. Russian 'за {[PARAM1]}' is ambiguous between a price and a duration, and the neighbouring 24131 uses PARAM1 as a turn count. The human reviewer tried to settle it against other languages of the same key and failed: the production API returned 401 without a token and the local strategy-and-tactics-2 copy does not contain the key. The sealed record carries disputed=true. Excluded because the evidence is absent, not because the target is clean."
+    },
+    "24180": {
+      "sealed_severity": "critical",
+      "revised_severity": "major",
+      "in_gate": true,
+      "reason": "失败防御 correctly renders 'провальная оборона'. The annotator's own reason is 'набор существительных без связей' - a connector-less noun pile (省份{0}防御工事失败防御结果) with no 的 and no verb. That is a fluency defect: readability is damaged, the event is still recoverable. Major."
+    },
+    "24181": {
+      "sealed_severity": "critical",
+      "revised_severity": "major",
+      "in_gate": true,
+      "reason": "失败进攻 correctly renders 'провальный штурм'. The annotator records it as the same defect as 24180."
+    },
+    "24182": {
+      "sealed_severity": "critical",
+      "revised_severity": "major",
+      "in_gate": true,
+      "reason": "成功防御 correctly renders 'удачная оборона'. The annotator records it as the same defect as 24180. Whether the source's viewpoint matches the AI_FAILED_CAPTURED key is a separate source-side question and is not part of this label."
+    },
+    "24207": {
+      "sealed_severity": "critical",
+      "revised_severity": "major",
+      "in_gate": true,
+      "reason": "The placeholder role is NOT inverted: the reviewer's rendered example is «3 个国家 盟国 的状态», so {0} is a count and the measure-word construction {0} 个国家 is correct. The Russian genitive plural 'стран' after {0} agrees, and the sibling 24208 uses singular 'страны {0}' for an identity. The defect is the rendered word order, where the count phrase and {1} sit juxtaposed without a connector. Fluency, not meaning inversion. Major."
+    },
+    "24208": {
+      "sealed_severity": "critical",
+      "revised_severity": "major",
+      "in_gate": true,
+      "reason": "Not a faithful mirror. The reviewer's rendered example is «失去 状态 霸主», where Chinese requires 失去霸主状态. The translator carried Russian modifier order into Chinese, so the rendered string is broken on the target side even though the source fragment is also awkward. A real target defect; the meaning is still decodable, so major."
+    },
+    "24221": {
+      "sealed_severity": "critical",
+      "revised_severity": "critical",
+      "in_gate": true,
+      "reason": "The human review states the roles outright: {0} is the division name and {1} the level, while the target renders {0}级别的{1}师, binding {0} to the level. The rendered string is wrong for every pair of values and the reader cannot recover the intended one. Confirmed critical."
+    }
+  }
+}
