@@ -35,6 +35,9 @@ Review revision, in one place so a reader of the earlier draft knows what moved:
   neighbours, no test or report may claim peer-crossing equivalence before it is
   published, and the fallback if it fails is a stored-row property
   (`unit_count == 1`), not a redesign of batching.
+- Every stored fingerprint and digest is keyed (HMAC-SHA-256, `SECRET_KEY`, one
+  domain label per kind), because the serialized batch carries source and target
+  text and a plain hash in a readable table is a confirmation oracle.
 - Implementation runs in two waves: evidence and profiles first, retry policy
   only after the probe shows the terminal-failure mix.
 
@@ -99,8 +102,8 @@ The existing contracts are non-negotiable:
   the replacement were a second opinion.
 - A retry uses the same source, target, glossary/context and seat profile.
   A changed target is stale, not a candidate for a delayed request.
-- Request logs contain no API key, prompt, target text, raw response or
-  reasoning trace.
+- Request logs contain no API key, prompt, target text, raw response,
+  reasoning trace, or any unkeyed derivation of them.
 
 `docs/llm-first/plans/2026-08-26-judge-provider-failover.md` remains the plan
 for endpoint failover. Its safety line, no fallback on a parser-invalid `200`,
@@ -133,7 +136,7 @@ It contains only technical metadata:
 | `logical_run_id` | current model-call round ID (`JudgeVerdict.run_id`) |
 | `round_kind` | `initial`, `repair`, or `unparsed-retry` |
 | `seat`, `batch_index`, `attempt_index`, `unit_count` | position and bounded retry history |
-| `batch_digest` | digest of the exact serialized batch: evidence for the peer question in D3, never a cache predicate |
+| `batch_digest` | keyed digest of the exact serialized batch: evidence for the peer question in D3, never a cache predicate |
 | `provider`, `model`, `profile_fingerprint`, `request_fingerprint` | request provenance without a credential |
 | `status_code`, `finish_reason`, `response_id`, `retry_after_seconds` | safe peer outcome metadata |
 | `failure_kind`, `parsed`, `will_retry` | normalized result and decision |
@@ -210,8 +213,8 @@ Add nullable provenance fields to new `JudgeVerdict` rows:
 - `judge_run`, the producer run that issued this fresh evidence;
 - `request_attempt`, the terminal `JudgeRequestAttempt` for the batch;
 - `judge_provider`, `profile_fingerprint`, `request_fingerprint`;
-- `batch_unit_count` and `batch_digest`, the realized batch this verdict came
-  from; and
+- `batch_unit_count` and the keyed `batch_digest`, the realized batch this
+  verdict came from; and
 - `round_kind`.
 
 `judge_provider` is the same field
@@ -328,6 +331,11 @@ correctness hole rather than only tightening a measurement:
 prompt, so editing a project's judge persona or style currently leaves stale
 verdicts reusable.
 
+Every fingerprint this plan stores - profile, request, endpoint and batch - uses
+one keyed construction, HMAC-SHA-256 with the deployment's `SECRET_KEY` and a
+distinct domain label per kind. None of them is a plain hash of content the
+invariants forbid logging, and no two kinds can be substituted for one another.
+
 Batch shape belongs in the fingerprint because it is literally part of the
 request: `request_verdicts()` serializes the whole batch's `segments` into one
 user message (`weblate/trans/judge.py:605-642`), so a verdict about one string
@@ -341,6 +349,23 @@ The realized batch is recorded rather than fingerprinted: the attempt stores
 `unit_count` and a digest of the exact serialized batch, and a fresh verdict
 carries the same digest. That is what makes the peer question answerable later
 instead of arguable now.
+
+That digest is keyed, for the same reason the endpoint fingerprint in D2 is: the
+serialized batch contains source and target text, so a plain hash stored in an
+append-only, report-displayable table is a confirmation oracle - anyone who can
+read a row can test a guessed translation against it. It is therefore
+HMAC-SHA-256 over the serialized batch with the deployment's `SECRET_KEY` and
+its own domain label, distinct from the endpoint fingerprint's, so the two
+values can never be substituted for one another. Equality inside one deployment
+is all the peer arm needs; cross-deployment comparison is not a goal, and a
+`SECRET_KEY` rotation is harmless here because this digest is evidence, never a
+predicate.
+
+The unkeyed hashes that already exist for staleness -
+`JudgeVerdict.target_hash` and `target_storage_hash`
+(`weblate/trans/models/judge.py:51-68`) - are a pre-existing exposure of the
+same shape. This plan does not widen that class and does not migrate them;
+it only refuses to add a new member to it.
 
 The accepted cost is stated rather than avoided: a verdict earned in a
 width-one retry round is not reused by a later ordinary run, so that unit is
@@ -730,15 +755,17 @@ the migration from Task 2 or a successor, and
    field, or no field.
 3. Build the payload from the resolved profile, adding `max_tokens` only when
    non-zero. Never put an unset value into the payload.
-4. Compute and persist the safe profile and request fingerprints. Update
+4. Compute and persist the safe profile and request fingerprints through one
+   keyed helper (HMAC-SHA-256, `SECRET_KEY`, one domain label per fingerprint
+   kind), never a bare `hashlib` call over request content. Update
    `_cached_verdict()` to require one matching slot/profile/request fingerprint
    per cached verdict, including the effective project-context digest and the
    configured batch size. The predicate compares stored production conditions
    against current configuration only; it never derives anything from the batch
    the current run would form, which is not knowable at cache-check time.
 5. Give every fresh verdict and attempt its resolved profile fingerprint, plus
-   the realized `unit_count` and batch digest as evidence. Nothing in Tasks 1-6
-   reads the digest as a cache predicate.
+   the realized `unit_count` and the keyed batch digest as evidence. Nothing in
+   Tasks 1-6 reads the digest as a cache predicate.
 
 Tests:
 
@@ -754,7 +781,10 @@ Tests:
 - an inadmissible seat/model reasoning pair fails validation before any POST;
 - matching profiles retain cache reuse;
 - a fresh verdict and its attempt record the realized `unit_count` and batch
-  digest, and no cache decision reads either; and
+  digest, and no cache decision reads either;
+- no stored fingerprint or digest equals the unkeyed hash of its own input, and
+  the same input under two domain labels yields two different values, so a row
+  cannot be used to test a guessed translation;
 - old blank-profile evidence never satisfies the new cache predicate.
 
 No live model setting is changed in this task. The correct DeepSeek
