@@ -1,6 +1,11 @@
 # Синхронизация прод-конфигурации и выкатка слитой работы
 
-Дата: 2026-08-27. Статус: ожидает одобрения.
+Дата: 2026-08-27. Статус: одобрен, исполняется в отдельной сессии.
+
+Решение владельца от 2026-08-27: новый ключ OpenRouter не выпускается и не
+добавляется. Прод сохраняет текущий ключ, LiteLLM регистрируется без
+конфигурации. План написан так, чтобы его выполнила другая сессия по шагам
+ниже, без повторного исследования.
 
 ## Проблема
 
@@ -73,6 +78,42 @@
 Итоговые списки берутся из `deploy/environment.example` - он и есть эталон,
 расхождение с которым породило проблему.
 
+Скрипт правки. Пишется локально в `deploy/fix-env.sh`, выполняется на VPS от
+root; значения ключей он не печатает - сравнение идёт по именам переменных.
+
+```sh
+set -e
+cd /srv/hcgameloc/deploy
+cp -p .env .env.bak-2026-08-27
+
+sed -i 's/^WEBLATE_JUDGE_OPENROUTER_KEY=/WEBLATE_JUDGE_API_KEY=/' .env
+
+sed -i '/^WEBLATE_ADD_MACHINERY=/c\
+WEBLATE_ADD_MACHINERY=weblate_customization.machinery.RoutedLLMTranslation,weblate_customization.machinery.RoutedLiteLLMTranslation' .env
+
+sed -i '/^WEBLATE_ADD_CHECK=/c\
+WEBLATE_ADD_CHECK=weblate_customization.checks.GameMarkupCheck,weblate_customization.checks.GameLineBreakCheck,weblate_customization.checks.CyrillicLeakCheck,weblate_customization.checks.GameNumberCheck,weblate_customization.checks.GameTokenCheck,weblate_customization.checks.GameLengthCheck,weblate_customization.checks.GameMaxLengthCheck,weblate_customization.checks.GameSourceMaxLengthCheck' .env
+
+grep -q '^WEBLATE_REMOVE_CHECK=' .env || sed -i '/^WEBLATE_ADD_CHECK=/a\
+WEBLATE_REMOVE_CHECK=weblate.checks.chars.MaxLengthCheck,weblate.checks.source.SourceMaxLengthCheck' .env
+
+# контроль: только имена переменных, без значений
+diff <(sed -E 's/=.*//' .env.bak-2026-08-27) <(sed -E 's/=.*//' .env) || true
+```
+
+Доставка на сервер (шлюз должен быть поднят, `./deploy/vps.sh status`):
+
+```sh
+cd deploy && . ./.env.local
+B64=$(base64 < fix-env.sh | tr -d '\n')
+./vps.sh ssh "echo $B64 | base64 -d > /tmp/fix-env.sh; \
+  echo '$VPS_PASSWORD' | sudo -S bash /tmp/fix-env.sh; rm -f /tmp/fix-env.sh"
+```
+
+`docker cp` в `hcgameloc-weblate-1` не использовать: это запись в работающий
+прод-контейнер. Всё, что нужно прочитать, читается через `weblate shell -c` и
+`psql` без переноса файлов.
+
 ### 2. Выкатка
 
 `./deploy/vps.sh deploy` из чистой рабочей копии на `main` = `origin/main` =
@@ -90,8 +131,21 @@
 
 Пересчёт делается `weblate updatechecks <project/component>` покомпонентно, а
 не `--all`: команда прогоняет `run_checks()` по каждому юниту, это тяжёлая
-операция на живом инстансе. Порядок: сначала один компонент с реальными
-бюджетами длины, замер времени, потом остальные по одному.
+операция на живом инстансе.
+
+Радиус мал и известен точно. На прод-данных бюджеты длины есть ровно у одного
+компонента - `strategy-and-tactics-2/summer-update` (флаг `max-length` на
+уровне компонента); юнитов с собственным `max-length` во всей базе нет. То же
+ограничивает и последствия снятия штатных проверок из пункта 1: обнулиться и
+пересчитаться может только этот компонент.
+
+```sh
+docker exec hcgameloc-weblate-1 \
+  time weblate updatechecks strategy-and-tactics-2/summer-update
+```
+
+Остальные компоненты пересчитывать не требуется: без флагов длины ни одна из
+трёх новых проверок на них не срабатывает.
 
 ### 4. LiteLLM
 
@@ -139,3 +193,19 @@
    отдают 200.
 6. После пункта 3 плана - на выбранном компоненте появляются срабатывания
    `max-length`, посчитанные с разбором условного DSL.
+
+Пункт 4 одной командой:
+
+```sh
+docker exec hcgameloc-weblate-1 weblate shell -c '
+from django.conf import settings
+from weblate.trans import judge
+from weblate.machinery.models import MACHINERY
+print("judge_ready:", judge.judge_configuration_ready())
+print("length checks:", [c.split(".")[-1] for c in settings.CHECK_LIST if "ength" in c])
+print("litellm registered:", "litellm" in MACHINERY)
+'
+```
+
+`judge_ready` должен быть `True`, в списке проверок - три класса `Game*`, без
+штатных `MaxLengthCheck` и `SourceMaxLengthCheck`.
