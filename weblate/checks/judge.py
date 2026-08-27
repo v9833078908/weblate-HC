@@ -37,6 +37,10 @@ class BaseJudgeCheck(TargetCheck):
     """A verdict projected from JudgeVerdict, never computed here."""
 
     default_disabled = False
+    # Glossary components run only CHECKS.glossary (Unit.run_checks), so a
+    # judged glossary would otherwise never get its verdict projected into
+    # Check rows and the check:judge-* filters would stay empty there.
+    glossary = True
     # A verdict exists for any judged text, an empty target included:
     # this is a verdict reader, not a linguistic check.
     ignore_untranslated = False

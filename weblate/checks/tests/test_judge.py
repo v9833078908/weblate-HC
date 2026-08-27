@@ -25,6 +25,7 @@ from weblate.trans.models.judge import (
     compute_target_hash,
 )
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.forms import SearchField
 from weblate.utils.state import STATE_TRANSLATED
 
 
@@ -131,6 +132,36 @@ class JudgeCheckTest(ViewTestCase):
         unit.clear_checks_cache()
         row = Check.objects.get(unit=unit, name="judge-reject")
         self.assertIn("DOORS", row.get_description())
+
+    def test_glossary_unit_gets_the_projected_row(self) -> None:
+        # Glossary components run only CHECKS.glossary in Unit.run_checks,
+        # so the judge checks must be part of that set or a judged
+        # glossary never shows its verdicts as checks (production defect,
+        # Strategy and Tactics 2 glossary run of 2026-08-27).
+        self.assertTrue(set(CHECKS.glossary) >= JUDGE_CHECKS)
+        self.component.create_glossary()
+        glossary = self.project.component_set.get(is_glossary=True).translation_set.get(
+            language__code="cs"
+        )
+        glossary.add_unit(None, "", "hello", "ahoj", author=self.user)
+        unit = glossary.unit_set.get(source="hello")
+        self.make(unit, "critical")
+        unit.run_checks()
+        unit.clear_checks_cache()
+        self.assertIn("judge-reject", unit.all_checks_names)
+
+    def test_judge_filters_are_offered_in_the_search_dropdown(self) -> None:
+        # The "Filters" dropdown uses a hardcoded key list, not
+        # FILTERS.full_list; the judge presets must be in it.
+        choices = SearchField("q").get_search_query_choices(None)
+        queries = {key: query for key, _name, query in choices}
+        self.assertEqual(queries["judge-held"], "judge:reject")
+        self.assertEqual(queries["judge-advisory"], "judge:flag")
+        self.assertEqual(queries["judge-minor"], "judge:minor")
+        self.assertEqual(queries["judge-pass"], "judge:pass")
+        self.assertEqual(queries["judge-uncovered"], "NOT has:judge")
+        self.assertEqual(queries["judge-stale"], "judge:stale")
+        self.assertEqual(queries["judge-incomplete"], "judge:unparsed")
 
 
 class JudgeCheckDismissalTest(ViewTestCase):

@@ -300,6 +300,13 @@ class SearchField(Field):
             "allchecks",
             "approved",
             "unapproved",
+            "judge-held",
+            "judge-advisory",
+            "judge-minor",
+            "judge-pass",
+            "judge-uncovered",
+            "judge-stale",
+            "judge-incomplete",
         ]
         result = [
             (key, FILTERS.get_filter_name(key), FILTERS.get_filter_query(key))
