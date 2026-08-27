@@ -132,6 +132,76 @@ class JudgeCheckTest(ViewTestCase):
         row = Check.objects.get(unit=unit, name="judge-reject")
         self.assertIn("DOORS", row.get_description())
 
+    def test_machine_description_contains_instruction_exactly_once(self) -> None:
+        unit = self.get_unit()
+        self.make(
+            unit,
+            "critical",
+            errors=[
+                {
+                    "span": "x",
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "the Gates are called DOORS here",
+                }
+            ],
+            instruction="Replace DOORS with Gates to match the glossary.",
+        )
+        Check.objects.filter(unit=unit).delete()
+        unit.run_checks()
+        unit.clear_checks_cache()
+        row = Check.objects.get(unit=unit, name="judge-reject")
+        machine_description = str(row.get_machine_description())
+        self.assertEqual(machine_description.count("Replace DOORS with Gates"), 1)
+
+    def test_instruction_absent_from_the_human_description(self) -> None:
+        unit = self.get_unit()
+        self.make(
+            unit,
+            "critical",
+            errors=[
+                {
+                    "span": "x",
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "the Gates are called DOORS here",
+                }
+            ],
+            instruction="Replace DOORS with Gates to match the glossary.",
+        )
+        Check.objects.filter(unit=unit).delete()
+        unit.run_checks()
+        unit.clear_checks_cache()
+        row = Check.objects.get(unit=unit, name="judge-reject")
+        self.assertNotIn("Replace DOORS with Gates", str(row.get_description()))
+
+    def test_instruction_markup_is_escaped_for_the_prompt(self) -> None:
+        # machinery/llm.py strip_tags()s this text before handing it to the
+        # translator; a literal game-markup tag the instruction quotes must
+        # be escaped here, or strip_tags() would silently eat it (same
+        # reasoning as describe_latest_verdict's error descriptions).
+        unit = self.get_unit()
+        self.make(
+            unit,
+            "critical",
+            errors=[
+                {
+                    "span": "x",
+                    "category": "markup",
+                    "severity": "critical",
+                    "description": "the tag was dropped",
+                }
+            ],
+            instruction="Keep the <color=#RRGGBB> tag exactly as in the source.",
+        )
+        Check.objects.filter(unit=unit).delete()
+        unit.run_checks()
+        unit.clear_checks_cache()
+        row = Check.objects.get(unit=unit, name="judge-reject")
+        machine_description = str(row.get_machine_description())
+        self.assertIn("&lt;color=#RRGGBB&gt;", machine_description)
+        self.assertNotIn("<color=#RRGGBB>", machine_description)
+
 
 class JudgeCheckDismissalTest(ViewTestCase):
     def make(self, unit, max_severity, **kwargs):

@@ -832,6 +832,34 @@ To install :ref:`mt-deepl`:
 
    :doc:`machine`
 
+judge_release_advisory_holds
+-----------------------------
+
+.. weblate-admin:: judge_release_advisory_holds [--write] <project|project/component>
+
+Releases legacy LLM judge advisory holds still stuck at :ref:`needs editing
+<states>` from before the current judge policy (see :ref:`llm-judge`), where
+a ``major`` verdict no longer holds a string automatically. Dry-run by
+default; lists writable and needs-review strings per component and language
+without writing anything. A string is only released when the newest change
+on it proves an untouched automatic hold, its current verdict is still a
+fresh, unresolved ``major``, and no enforced check currently fails on it.
+Anything else, including a string a reviewer explicitly escalated, is left
+for the usual :guilabel:`Review strings` resolution instead.
+
+.. weblate-admin-option:: --write
+
+   Release the writable strings found by the scan. Without it, nothing is
+   written.
+
+Requires an explicit project or component argument; it never runs
+instance-wide.
+
+.. seealso::
+
+   * :ref:`llm-judge`
+   * :ref:`states`
+
 list_addons
 -----------
 

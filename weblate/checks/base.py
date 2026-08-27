@@ -254,6 +254,10 @@ class BaseCheck(ClassLoaderProtocol, DocVersionsMixin):
     def get_description(self, check_obj: Check) -> StrOrPromise:
         return self.description
 
+    def get_machine_description(self, check_obj: Check) -> StrOrPromise:
+        """Return the description supplied to machine translation."""
+        return self.get_description(check_obj)
+
     def get_fixup(self, unit: Unit) -> Iterable[FixupType] | None:
         return None
 

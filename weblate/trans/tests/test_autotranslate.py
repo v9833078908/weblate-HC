@@ -46,6 +46,7 @@ from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models import (
     Change,
     Component,
+    JudgeRun,
     PendingUnitChange,
     Project,
     Translation,
@@ -910,6 +911,69 @@ class AutoTranslationTest(ViewTestCase):
 
         perform.assert_called_once()
         self.assertEqual(result["project"], self.project.id)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_judge_task_result_and_report_url_share_the_same_run(self) -> None:
+        with patch("weblate.trans.autotranslate.run_judge_batch", return_value={}):
+            result = auto_translate(
+                user_id=self.user.id,
+                mode="judge",
+                q="state:empty",
+                auto_source="mt",
+                source_component_id=None,
+                engines=[],
+                threshold=80,
+                component_id=self.component.id,
+                enforce_permissions=False,
+            )
+        run = JudgeRun.objects.get()
+        self.assertIn("report_url", result)
+        self.assertEqual(
+            result["report_url"], reverse("judge-run", kwargs={"pk": run.pk})
+        )
+
+    def test_non_judge_task_result_has_no_report_url(self) -> None:
+        result = auto_translate(
+            user_id=self.user.id,
+            mode="translate",
+            q="",
+            auto_source="mt",
+            source_component_id=None,
+            engines=["weblate"],
+            threshold=80,
+            component_id=self.component.id,
+            enforce_permissions=False,
+        )
+        self.assertNotIn("report_url", result)
+        self.assertFalse(JudgeRun.objects.exists())
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_auto_translate_component_task_result_carries_report_url(self) -> None:
+        with patch("weblate.trans.autotranslate.run_judge_batch", return_value={}):
+            result = auto_translate_component(
+                self.component.id,
+                mode="judge",
+                q="state:empty",
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                user_id=self.user.id,
+                enforce_permissions=False,
+            )
+        run = JudgeRun.objects.get()
+        self.assertEqual(
+            result["report_url"], reverse("judge-run", kwargs={"pk": run.pk})
+        )
 
     def test_labeling(self) -> None:
         self.perform_auto(overwrite="1")

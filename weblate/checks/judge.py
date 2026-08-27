@@ -87,6 +87,19 @@ class BaseJudgeCheck(TargetCheck):
 
         return describe_latest_verdict(check_obj.unit) or self.description
 
+    def get_machine_description(self, check_obj: Check) -> StrOrPromise:
+        from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
+            describe_latest_instruction,
+        )
+
+        description = str(self.get_description(check_obj))
+        instruction = describe_latest_instruction(check_obj.unit)
+        return (
+            f"{description}\n\nRepair instruction: {instruction}"
+            if instruction
+            else description
+        )
+
 
 class JudgeFlagCheck(BaseJudgeCheck):
     check_id = "judge-flag"

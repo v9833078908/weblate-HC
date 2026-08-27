@@ -7,16 +7,20 @@ from __future__ import annotations
 from unittest import mock
 
 from django.conf import settings
+from django.db import IntegrityError
 from django.test import override_settings
 
 from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
 from weblate.trans.judge import JudgeError, JudgeResult
 from weblate.trans.judge_loop import build_request
 from weblate.trans.models.judge import (
+    JudgeRun,
+    JudgeRunUnit,
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
 )
+from weblate.trans.models.unit import Unit
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.state import FUZZY_STATES, STATE_FUZZY, STATE_TRANSLATED
 
@@ -54,7 +58,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         attempt=0,
         unit_ids=None,
     ):
-        def fake_batch(units, *, writable_ids, user, on_batch=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
             out = {}
             for u in units:
                 request = build_request(u)
@@ -305,7 +309,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             unit_ids=[unit.id],
         )
 
-        def fake_batch(units, *, writable_ids, user, on_batch=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
             current = units[0]
             request = build_request(current)
             verdict = JudgeVerdict.objects.create(
@@ -347,7 +351,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             auto.progress_steps = 1
             auto.set_progress(1)
 
-        def fake_judge(units, *, writable_ids, user, on_batch=None):
+        def fake_judge(units, *, writable_ids, user, on_batch=None, run=None):
             if on_batch is not None:
                 on_batch([object()], [object()])
             return {}
@@ -383,7 +387,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         auto.progress_range = (0, 100)
         reported: list[int] = []
 
-        def fake_judge(units, *, writable_ids, user, on_batch=None):
+        def fake_judge(units, *, writable_ids, user, on_batch=None, run=None):
             # One string, two seats, one repair attempt: four batches, which a
             # denominator sized to a single round would clamp into a plateau.
             for _ in range(2 * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)):
@@ -475,7 +479,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         assert unit1 is not None
         assert unit2 is not None
 
-        def fake_batch(units, *, writable_ids, user, on_batch=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
             out = {}
             for u in units:
                 request = build_request(u)
@@ -561,7 +565,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         assert unit2 is not None
         calls: list[list[int]] = []
 
-        def fake_batch(units, *, writable_ids, user, on_batch=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
             calls.append([unit.id for unit in units])
             if units[0].id == unit1.id:
                 msg = "boom"
@@ -637,7 +641,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         auto.progress_range = (0, 100)
         reported: list[tuple[str | None, int | None, int | None]] = []
 
-        def fake_judge(units, *, writable_ids, user, on_batch=None):
+        def fake_judge(units, *, writable_ids, user, on_batch=None, run=None):
             for _ in range(2):
                 on_batch([object()], [object()])
             return {}
@@ -677,7 +681,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         auto.progress_range = (0, 100)
         reported: list[tuple[str | None, int | None, int | None]] = []
 
-        def fake_judge(units, *, writable_ids, user, on_batch=None):
+        def fake_judge(units, *, writable_ids, user, on_batch=None, run=None):
             for _ in range(2 * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)):
                 on_batch([object()], [object()])
             return {}
@@ -724,3 +728,364 @@ class JudgeAutoTranslateTest(ViewTestCase):
         message = auto.get_message()
         self.assertNotIn("evaluated", message)
         self.assertIn("string was updated", message)
+
+    def test_project_launch_records_one_run_across_translations(self) -> None:
+        translations = list(
+            self.component.translation_set.exclude_source().order_by("pk")[:2]
+        )
+        if len(translations) < 2:
+            self.skipTest("fixture has only one target translation")
+        units = [translation.unit_set.first() for translation in translations]
+        self.assertTrue(all(units))
+
+        seen_runs: list[JudgeRun | None] = []
+
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+            seen_runs.append(run)
+            verdicts = {}
+            for unit in units:
+                request = build_request(unit)
+                verdicts[unit.id] = JudgeVerdict.objects.create(
+                    unit=unit,
+                    max_severity="none",
+                    model_verdict=JudgeVerdict.Verdict.PASS,
+                    judge_model="vendor-a/model",
+                    seat=1,
+                    target_hash=compute_target_hash(request.target_plurals),
+                    context_hash=compute_context_hash(
+                        source=request.source,
+                        note=request.note,
+                        glossary_terms=request.glossary_terms,
+                    ),
+                )
+            return verdicts
+
+        batch = BatchAutoTranslate(
+            self.project,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id for unit in units if unit is not None],
+            enforce_permissions=False,
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
+        ):
+            batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+
+        run = JudgeRun.objects.get()
+        self.assertTrue(all(seen_run == run for seen_run in seen_runs))
+        self.assertEqual(
+            set(JudgeRunUnit.objects.filter(run=run).values_list("unit_id", flat=True)),
+            {unit.id for unit in units if unit is not None},
+        )
+
+    @override_settings(JUDGE_MAX_UNITS_PER_RUN=1)
+    def test_capped_units_record_a_cap_skip(self) -> None:
+        translations = list(
+            self.component.translation_set.exclude_source().order_by("pk")[:2]
+        )
+        if len(translations) < 2:
+            self.skipTest("fixture has only one target translation")
+        units = [translation.unit_set.first() for translation in translations]
+        self.assertTrue(all(units))
+
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+            unit = units[0]
+            request = build_request(unit)
+            return {
+                unit.id: JudgeVerdict.objects.create(
+                    unit=unit,
+                    max_severity="none",
+                    model_verdict=JudgeVerdict.Verdict.PASS,
+                    judge_model="vendor-a/model",
+                    seat=1,
+                    target_hash=compute_target_hash(request.target_plurals),
+                    context_hash=compute_context_hash(
+                        source=request.source,
+                        note=request.note,
+                        glossary_terms=request.glossary_terms,
+                    ),
+                )
+            }
+
+        batch = BatchAutoTranslate(
+            self.project,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id for unit in units if unit is not None],
+            enforce_permissions=False,
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
+        ):
+            batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+
+        self.assertEqual(
+            JudgeRunUnit.objects.get(unit_id_snapshot=units[1].id).skip_reason,
+            JudgeRunUnit.SkipReason.CAP,
+        )
+
+    def test_task_exception_marks_the_run_failed(self) -> None:
+        unit = self.get_unit()
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+
+        with (
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch",
+                side_effect=RuntimeError("boom"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "boom"),
+        ):
+            batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+
+        run = JudgeRun.objects.get()
+        self.assertEqual(run.status, JudgeRun.Status.FAILED)
+        self.assertIsNotNone(run.finished)
+        self.assertEqual(run.failure, "boom")
+
+    def test_target_race_records_stale_conflict(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["original"], STATE_TRANSLATED)
+
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+            current = units[0]
+            request = build_request(current)
+            verdict = JudgeVerdict.objects.create(
+                unit=current,
+                max_severity="none",
+                model_verdict=JudgeVerdict.Verdict.PASS,
+                judge_model="vendor-a/model",
+                seat=1,
+                target_hash=compute_target_hash(request.target_plurals),
+                context_hash=compute_context_hash(
+                    source=request.source,
+                    note=request.note,
+                    glossary_terms=request.glossary_terms,
+                ),
+            )
+            current.translate(self.user, ["changed"], STATE_TRANSLATED)
+            return {current.id: verdict}
+
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
+        ):
+            batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+
+        self.assertEqual(
+            JudgeRunUnit.objects.get(unit_id_snapshot=unit.id).outcome,
+            JudgeRunUnit.Outcome.STALE_CONFLICT,
+        )
+
+    def test_run_records_the_real_actor_and_scope_not_request_data(self) -> None:
+        """
+        JudgeRun.actor/scope come only from constructor objects.
+
+        BatchAutoTranslate takes a typed ``user: User | None`` and a typed
+        ``obj: Translation | Component | ... | Workspace``, both resolved by
+        the caller (the view resolves the scope from the URL path and the
+        user from the authenticated session, never from POST body fields -
+        see weblate/trans/views/edit.py, auto_translate.delay(user_id=
+        request.user.id, ...)). There is no field on this boundary a
+        request body could use to override them.
+        """
+        unit = self.get_unit()
+        batch = BatchAutoTranslate(
+            self.project,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        with mock.patch("weblate.trans.autotranslate.run_judge_batch", return_value={}):
+            batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+        run = JudgeRun.objects.get()
+        self.assertEqual(run.actor_id, self.user.pk)
+        self.assertEqual(run.scope_type, JudgeRun.ScopeType.PROJECT)
+        self.assertEqual(run.scope_id, str(self.project.pk))
+        self.assertEqual(run.scope_label, str(self.project))
+        self.assertEqual(run.scope_path, self.project.get_absolute_url())
+
+    def test_finish_judge_run_does_not_overwrite_a_terminal_run(self) -> None:
+        unit = self.get_unit()
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        with mock.patch("weblate.trans.autotranslate.run_judge_batch", return_value={}):
+            batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+        run = JudgeRun.objects.get()
+        self.assertEqual(run.status, JudgeRun.Status.COMPLETED)
+        first_finished = run.finished
+
+        # A second finalize call (a redundant exception handler, a stray
+        # retry) must never overwrite an already-terminal run.
+        batch._finish_judge_run(  # ruff: ignore[private-member-access]
+            run, JudgeRun.Status.FAILED, "should not apply"
+        )
+        run.refresh_from_db()
+        self.assertEqual(run.status, JudgeRun.Status.COMPLETED)
+        self.assertEqual(run.finished, first_finished)
+        self.assertEqual(run.failure, "")
+
+    def test_record_skipped_judge_units_is_idempotent_on_retry(self) -> None:
+        unit = self.get_unit()
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        run = batch._create_judge_run()  # ruff: ignore[private-member-access]
+        # Simulate a retried step recording the same skip twice: this must
+        # update the one (run, unit) row, never insert a second one.
+        batch._record_skipped_judge_units(  # ruff: ignore[private-member-access]
+            run, [unit], JudgeRunUnit.SkipReason.CAP
+        )
+        batch._record_skipped_judge_units(  # ruff: ignore[private-member-access]
+            run, [unit], JudgeRunUnit.SkipReason.CAP
+        )
+        self.assertEqual(
+            JudgeRunUnit.objects.filter(run=run, unit_id_snapshot=unit.id).count(), 1
+        )
+
+    def test_duplicate_run_unit_row_is_rejected_at_the_database(self) -> None:
+        unit = self.get_unit()
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        run = batch._create_judge_run()  # ruff: ignore[private-member-access]
+        JudgeRunUnit.objects.create(
+            run=run,
+            unit=unit,
+            unit_id_snapshot=unit.id,
+            translation_id=unit.translation_id,
+            component_id=unit.translation.component_id,
+            project_id=unit.translation.component.project_id,
+            input_target=[],
+            input_target_hash=compute_target_hash([]),
+            context_hash="x",
+            outcome=JudgeRunUnit.Outcome.SKIPPED,
+        )
+        with self.assertRaises(IntegrityError):
+            JudgeRunUnit.objects.create(
+                run=run,
+                unit=unit,
+                unit_id_snapshot=unit.id,
+                translation_id=unit.translation_id,
+                component_id=unit.translation.component_id,
+                project_id=unit.translation.component.project_id,
+                input_target=[],
+                input_target_hash=compute_target_hash([]),
+                context_hash="x",
+                outcome=JudgeRunUnit.Outcome.SKIPPED,
+            )
+
+    def test_deleted_unit_and_verdict_leave_a_safe_dangling_row(self) -> None:
+        unit = self.get_unit()
+
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+            current = units[0]
+            request = build_request(current)
+            return {
+                current.id: JudgeVerdict.objects.create(
+                    unit=current,
+                    max_severity="none",
+                    model_verdict=JudgeVerdict.Verdict.PASS,
+                    judge_model="vendor-a/model",
+                    seat=1,
+                    target_hash=compute_target_hash(request.target_plurals),
+                    context_hash=compute_context_hash(
+                        source=request.source,
+                        note=request.note,
+                        glossary_terms=request.glossary_terms,
+                    ),
+                )
+            }
+
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
+        ):
+            batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+        row = JudgeRunUnit.objects.get(unit_id_snapshot=unit.id)
+        self.assertIsNotNone(row.unit)
+        self.assertIsNotNone(row.verdict)
+
+        JudgeVerdict.objects.filter(pk=row.verdict_id).delete()
+        Unit.objects.filter(pk=unit.id).delete()
+
+        row.refresh_from_db()
+        self.assertIsNone(row.unit)
+        self.assertIsNone(row.verdict)
+        self.assertEqual(row.unit_id_snapshot, unit.id)

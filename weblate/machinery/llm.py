@@ -582,7 +582,9 @@ class BaseLLMTranslation(BatchMachineTranslation):
                     name = cls._normalize_check_text(check.get_name())
                     if name:
                         item["name"] = name
-                    description = cls._normalize_check_text(check.get_description())
+                    description = cls._normalize_check_text(
+                        check.get_machine_description()
+                    )
                     if description:
                         item["description"] = description
             result.append(item)

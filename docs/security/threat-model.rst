@@ -117,17 +117,27 @@ Scope and intended use
        a decision on a held or escalated verdict is a separate,
        CSRF-protected POST gated by the same :guilabel:`unit.review`
        permission; it makes no outbound request and is refused against
-       stale, superseded, or already-resolved evidence
+       stale, superseded, or already-resolved evidence. Reading a
+       producer's durable run report, and running the guarded
+       :wladmin:`judge_release_advisory_holds` cleanup command, are both
+       local, read/local-write operations gated by the same automatic
+       translation and review permissions, re-checked for the requesting
+       user or operator rather than trusted from the run's stored actor
      - Database (verdicts; each resolution transition permanently appends
        its own history entry, though the verdict's current resolution can
        move again through an allowed transition), outbound request per batch
        to the provider configured by :setting:`JUDGE_BASE_URL`, bounded by
-       :setting:`JUDGE_REQUEST_DEADLINE` when enabled
+       :setting:`JUDGE_REQUEST_DEADLINE` when enabled. A durable run and its
+       per-string outcomes are database-only records with no outbound leg,
+       readable only through the permission-checked report page; the report
+       never renders a cost figure
      - In scope. The outbound request is an operator-configured-host,
        site-wide-credentialed review only; provider behavior is out of scope.
        Decision recording is a local, permissioned, audited mutation with no
-       outbound leg. *(documented)* (source: :ref:`llm-judge`,
-       :doc:`/admin/config`)
+       outbound leg. The run report and the cleanup command are local reads
+       and a guarded, dry-run-by-default local write; neither makes an
+       outbound request. *(documented)* (source: :ref:`llm-judge`,
+       :doc:`/admin/config`, :doc:`/admin/management`)
    * - Machine translation and outbound integrations
      - Machine translation, avatars, status reporting, telemetry, error
        reporting, VCS hosts, GitHub App connections, CDN add-on, Fedora

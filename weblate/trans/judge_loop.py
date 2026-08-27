@@ -38,6 +38,7 @@ from weblate.trans.judge import (
 )
 from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models.judge import (
+    JudgeRun,
     JudgeVerdict,
     collegium_verdict,
     compute_context_hash,
@@ -220,6 +221,7 @@ def _write_verdict(
         unparsed=result.unparsed,
         errors=result.errors,
         back_translation=result.back_translation,
+        instruction=result.instruction,
         judge_model=model,
         seat=seat,
         attempt=attempt,
@@ -444,23 +446,33 @@ def _persist_verdict_batches(
     return persist
 
 
-def run_judge_batch(
+class JudgeBatchResult(dict[int, JudgeVerdict]):  # ruff: ignore[subclass-builtin]
+    """Final verdicts plus producer-run participation metadata."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.cached_unit_ids: set[int] = set()
+        self.initial_severity: dict[int, str] = {}
+        self.repair_status: dict[int, str] = {}
+        self.attempt_counts: dict[int, int] = {}
+
+
+def run_judge_batch(  # ruff: ignore[complex-structure]
     units: list[Unit],
     *,
     writable_ids: set[int],
     user: User | None,
     on_batch: OnBatch | None = None,
-) -> dict[int, JudgeVerdict]:
+    run: JudgeRun | None = None,
+) -> JudgeBatchResult:
     """
     Judge every unit with both seats; repair writable defects.
 
-    Returns the final active verdict per unit id. The repair loop runs
-    until JUDGE_MAX_REPAIR_ATTEMPTS is spent; a string that stays
-    negative keeps its last verdict for the caller to project into the
-    appropriate human-review state.
+    ``JudgeVerdict.run_id`` remains a per-invocation model-call identity.
+    ``run`` exists only to keep the producer-run boundary explicit to callers.
     """
     if not units:
-        return {}
+        return JudgeBatchResult()
     validate_judge_configuration()
     original_units = {unit.id: unit for unit in units}
 
@@ -470,15 +482,10 @@ def run_judge_batch(
         original.state = unit.state
 
     run_id = uuid.uuid4()
-    # Accounting must be symmetric with machinery, which attributes every
-    # paid request to a project (machinery/openai.py:147). All units of a
-    # run share one translation, so the slug is read once.
     project_slug = units[0].translation.component.project.slug
-    # Read once per run: every unit of a run shares one project, and the
-    # value goes into the system message of every batch.
     project_context = judge_project_context(units[0].translation.component.project)
     pending = list(units)
-    verdicts: dict[int, JudgeVerdict] = {}
+    verdicts = JudgeBatchResult()
     attempts = settings.JUDGE_MAX_REPAIR_ATTEMPTS
     seats = tuple(
         zip(
@@ -490,11 +497,7 @@ def run_judge_batch(
 
     attempt = 0
     while True:
-        # Do not continue with instances that may have been changed while the
-        # previous request or repair was in flight.
         pending = [_refresh_unit(unit) for unit in pending]
-        # Both seats judge EVERY string unconditionally; there is no if
-        # between the two calls (B2': a cascade loses recall).
         round_requests: dict[int, JudgeRequest] = {}
         cached_ids: set[int] = set()
         round_states = {unit.id: unit.state for unit in pending}
@@ -529,7 +532,6 @@ def run_judge_batch(
                 model=model,
                 on_batch=on_batch,
             )
-
             request_verdicts(
                 requests,
                 model=model,
@@ -537,6 +539,7 @@ def run_judge_batch(
                 project_context=project_context,
                 on_batch=persist,
             )
+
             LOGGER.info(
                 "judge run %s: seat %d done, %d strings judged with %s",
                 run_id,
@@ -544,7 +547,6 @@ def run_judge_batch(
                 len(request_units),
                 model,
             )
-
         prepared = [
             _prepare_round_unit(
                 unit,
@@ -564,10 +566,19 @@ def run_judge_batch(
         for unit, item in zip(pending, prepared, strict=True):
             if item is None:
                 verdicts.pop(unit.id, None)
+                verdicts.cached_unit_ids.discard(unit.id)
                 continue
             verdicts[unit.id] = item.verdict
+            verdicts.initial_severity.setdefault(unit.id, item.verdict.max_severity)
+            verdicts.attempt_counts[unit.id] = attempt + 1
             new_target = repairs.get(unit.id) if item.needs_repair else None
             if new_target is None:
+                if item.needs_repair:
+                    verdicts.repair_status[unit.id] = "no-candidate"
+                if unit.id in cached_ids:
+                    verdicts.cached_unit_ids.add(unit.id)
+                else:
+                    verdicts.cached_unit_ids.discard(unit.id)
                 record_final_snapshot(item.unit)
                 continue
             outcome = _apply_repair(
@@ -581,10 +592,15 @@ def run_judge_batch(
             )
             if outcome.unit is None:
                 verdicts.pop(unit.id, None)
+                verdicts.cached_unit_ids.discard(unit.id)
                 continue
             if outcome.changed:
+                verdicts.repair_status[unit.id] = "applied"
+                verdicts.cached_unit_ids.discard(unit.id)
                 next_pending.append(outcome.unit)
             else:
+                verdicts.repair_status[unit.id] = "rolled-back"
+                verdicts.cached_unit_ids.discard(unit.id)
                 record_final_snapshot(outcome.unit)
         pending = next_pending
         if not pending:

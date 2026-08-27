@@ -4627,6 +4627,9 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             def get_description(self) -> str:
                 return f"{self.name} description"
 
+            def get_machine_description(self) -> str:
+                return self.get_description()
+
         unit = make_unit(code="cs", source="Hello, world!", target="Nazdar svete!")
         term = make_unit(code="cs", source="hello", target="ahoj")
         unit.glossary_terms = [term]
@@ -4656,6 +4659,9 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
             def get_description(self) -> str:
                 return f"{self.name} description"
+
+            def get_machine_description(self) -> str:
+                return self.get_description()
 
         unit = make_unit(code="cs", source="Hello, world!", target="Nazdar svete!")
         term = make_unit(code="cs", source="hello", target="ahoj")
@@ -4747,6 +4753,9 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             def get_description() -> str:
                 label_languages.append(get_language())
                 return "<strong>Source</strong> and translation are identical."
+
+            def get_machine_description(self) -> str:
+                return self.get_description()
 
         unit.__dict__["all_checks"] = [FakeCheck()]
         typed_unit = cast("Unit", unit)

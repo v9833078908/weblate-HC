@@ -45,6 +45,7 @@ import weblate.trans.views.error
 import weblate.trans.views.files
 import weblate.trans.views.git
 import weblate.trans.views.js
+import weblate.trans.views.judge
 import weblate.trans.views.labels
 import weblate.trans.views.lock
 import weblate.trans.views.reports
@@ -466,6 +467,11 @@ real_patterns = [
         name="resolve-comment",
     ),
     # Judge verdicts
+    path(
+        "judge-runs/<uuid:pk>/",
+        weblate.trans.views.judge.judge_run,
+        name="judge-run",
+    ),
     path(
         "judge-verdict/<int:pk>/resolve/",
         weblate.trans.views.edit.resolve_judge_verdict,

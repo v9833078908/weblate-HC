@@ -21,6 +21,10 @@
       {% endif %}
       <a class="btn btn-sm btn-outline-secondary" href="{{ judge_queue.breakdown_url }}">{% translate "Breakdown by check" %}</a>
       <a class="btn btn-sm btn-outline-primary" href="{{ judge_queue.run_url }}">{% translate "Run the judge" %}</a>
+      {% if judge_queue.last_run %}
+        <a class="btn btn-sm btn-outline-secondary"
+           href="{% url 'judge-run' pk=judge_queue.last_run.pk %}">{% translate "Last run" %}</a>
+      {% endif %}
     </div>
   </section>
 {% endif %}
