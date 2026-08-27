@@ -10,15 +10,18 @@ inherited from the original codebase.
 
 ## Working agreement
 
-- Start every task with a plan and wait for approval. Before editing any file,
-  state what will change, in which files, how it will be verified, and what is
-  deliberately out of scope. Do not implement until the user approves it. For
-  multi-step work, put the plan in the matching `docs/<area>/plans/` directory
-  (see "Documentation layout" below) following the existing files there.
-  Answering questions, reading code, and research need no plan.
-- Implement only what the approved plan covers. When the work turns out to
-  need something the plan does not mention, stop and get that increment
-  approved instead of widening the change silently.
+- Plan first only for complex feature work: a large change spanning several
+  modules or introducing a new subsystem. For such work, propose a plan - what
+  will change, in which files, how it will be verified, what is out of scope -
+  and wait for approval before editing. Multi-step plans go in the matching
+  `docs/<area>/plans/` directory (see "Documentation layout" below) following
+  the existing files there.
+- Everything else needs no plan: answering questions, reading code, research,
+  bug fixes, small or local changes, documentation edits, test additions, and
+  routine refactoring. Just do the work and report what changed.
+- When approved plan work turns out to need something the plan does not
+  mention, stop and get that increment approved instead of widening the change
+  silently.
 - Never deploy without explicit approval. Deployment is anything that changes a
   running instance: `deploy/vps.sh`, any command against `l10n.herocraft.com`
   or the `hcgameloc-*` containers, production image builds, management commands
