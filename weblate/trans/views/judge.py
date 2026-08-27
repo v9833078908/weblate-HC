@@ -32,7 +32,7 @@ from weblate.workspaces.models import Workspace
 if TYPE_CHECKING:
     from django.db.models import Model, QuerySet
 
-    from weblate.auth.models import AuthenticatedHttpRequest
+    from weblate.auth.models import AuthenticatedHttpRequest, User
 
 _SCOPE_MODELS: dict[str, type[Model]] = {
     JudgeRun.ScopeType.TRANSLATION: Translation,
@@ -108,8 +108,23 @@ def user_can_view_judge_run(user, scope) -> bool:
 
 def last_judge_run(
     scope: Translation | Component | Project | Workspace,
+    *,
+    actor: User,
 ) -> JudgeRun | None:
-    """Return the most recent run for this exact scope, never aggregated across it."""
+    """
+    Return the requesting user's own most recent run for this exact scope.
+
+    Filtered by actor, not just scope: get_user_tasks() forgets a settled
+    task immediately (a shared, tested contract - see
+    test_finished_task_is_forgotten), so a reload after completion has no
+    surviving task id to look up. Scope alone would then show whichever
+    run is newest regardless of who launched it, including a concurrent
+    launch by someone else on a shared component; actor narrows this back
+    to an exact identity match for the common case (at most one launcher
+    reviewing their own reload), and "the latest of my own launches" for a
+    user who launched more than once is the expected result, not an
+    ambiguity.
+    """
     match scope:
         case Translation():
             scope_type = JudgeRun.ScopeType.TRANSLATION
@@ -122,7 +137,9 @@ def last_judge_run(
         case _:
             return None
     return (
-        JudgeRun.objects.filter(scope_type=scope_type, scope_id=str(scope.pk))
+        JudgeRun.objects.filter(
+            scope_type=scope_type, scope_id=str(scope.pk), actor=actor
+        )
         .order_by("-created")
         .first()
     )

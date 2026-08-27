@@ -752,7 +752,7 @@ def judge_queue_strip_context(
         "breakdown_url": reverse("checks", kwargs={"path": obj.get_url_path()}),
         "run_url": f"{obj.get_absolute_url()}?{run_query}#auto",
         "counts": counts,
-        "last_run": last_judge_run(obj),
+        "last_run": last_judge_run(obj, actor=user),
     }
 
 
@@ -914,7 +914,7 @@ def show_translation(
         and user.has_perm("translation.auto", obj)
         and user.has_perm("unit.review", obj)
     ):
-        judge_last_run = last_judge_run(obj)
+        judge_last_run = last_judge_run(obj, actor=user)
     form = get_upload_form(user, obj)
 
     search_form = SearchForm(

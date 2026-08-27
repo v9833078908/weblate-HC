@@ -1365,6 +1365,52 @@ class JudgeQueueStripViewTest(ViewTestCase):
         self.assertEqual(response.context["judge_queue"]["last_run"].pk, run.pk)
         self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
 
+    def test_last_run_shows_the_newest_own_launch_over_someone_elses(self) -> None:
+        # Review: last_run must be an exact identity match to the requesting
+        # user's own launch, not merely "newest for this scope" - a
+        # concurrent launch by someone else on a shared component must
+        # never surface as "my" last run after a reload.
+        self.enable_review()
+        other_user = self.anotheruser
+        JudgeRun.objects.create(
+            actor=other_user,
+            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        own_run = JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["last_run"].pk, own_run.pk)
+
+    def test_last_run_hides_a_run_launched_by_someone_else_only(self) -> None:
+        self.enable_review()
+        other_user = self.anotheruser
+        JudgeRun.objects.create(
+            actor=other_user,
+            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertIsNone(response.context["judge_queue"]["last_run"])
+
     def test_last_run_does_not_leak_across_components(self) -> None:
         self.enable_review()
         other = self.create_json_mono(name="Other component", project=self.project)
@@ -1430,6 +1476,22 @@ class JudgeQueueStripViewTest(ViewTestCase):
             scope_id=str(other.pk),
             scope_label=str(other),
             scope_path=other.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertIsNone(response.context["judge_last_run"])
+
+    def test_translation_last_run_does_not_leak_from_another_actor(self) -> None:
+        self.enable_review()
+        other_user = self.anotheruser
+        JudgeRun.objects.create(
+            actor=other_user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(self.translation.pk),
+            scope_label=str(self.translation),
+            scope_path=self.translation.get_absolute_url(),
             requested_mode="judge",
             cap=10,
             status=JudgeRun.Status.COMPLETED,
