@@ -14,15 +14,19 @@ explicit producer decision (``resolve_verdict`` with
 the old automatic behaviour that nobody has revisited.
 
 This command finds and, only with ``--write``, releases exactly that backlog:
-a needs-checking unit whose newest ``Change`` is the automatic transition into
-that state (``ActionEvents.AUTO``, recorded via
-``weblate.trans.autotranslate.AutoTranslate.update``) with nothing later, a
-fresh parsed verdict still describing the current text as major, no recorded
-resolution (a human explicitly escalating it goes through the normal
-accept/escalate UI instead, never through this command), and no currently
-failing deterministic enforced check. Anything else, including every unit
-held by a real human escalation, is reported under "needs review" and left
-untouched: the fallback is re-judging the string, not widening this predicate.
+a needs-checking unit with a fresh parsed verdict still describing the
+current text as major, no recorded resolution (a human explicitly
+escalating it goes through the normal accept/escalate UI instead, never
+through this command), no currently failing deterministic enforced check,
+and whose newest ``Change`` is both the automatic transition into that
+state (``ActionEvents.AUTO``, recorded via
+``weblate.trans.autotranslate.AutoTranslate.update``, nothing later) and
+timestamped within ``LEGACY_HOLD_CORRELATION_WINDOW`` of that exact
+verdict's own round - the action code alone is not judge-specific, so the
+timing tie to the round it is checked against is required, not just
+advisory. Anything else, including every unit held by a real human
+escalation, is reported under "needs review" and left untouched: the
+fallback is re-judging the string, not widening this predicate.
 
 Dry-run by default. Requires an explicit component or project scope
 (``--all``/``--file-format`` are refused): this is an operator cleanup tool
@@ -32,6 +36,7 @@ for a known scope, not an instance-wide sweep.
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from django.core.management.base import CommandError
@@ -42,15 +47,27 @@ from weblate.checks.judge import JUDGE_CHECKS
 from weblate.checks.models import Check
 from weblate.trans.actions import ActionEvents
 from weblate.trans.models import Change, Unit
-from weblate.trans.models.judge import JudgeVerdict, current_verdict
+from weblate.trans.models.judge import (
+    JudgeVerdict,
+    collegium_verdict,
+    current_round,
+)
 from weblate.utils.management.base import WeblateComponentCommand
 from weblate.utils.state import STATE_NEEDS_CHECKING, STATE_TRANSLATED
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from django.core.management.base import CommandParser
 
 WRITABLE = "writable"
 NEEDS_REVIEW = "needs-review"
+# AutoTranslate.update() writes the state-12 Change once the whole batch's
+# repair loop settles, which can trail a large run's own round verdicts by
+# a while (docs/admin/checks.rst: "tens of minutes per few hundred
+# strings"); this window stays comfortably above that instead of chasing a
+# tight bound, while still ruling out an unrelated later session's edit.
+LEGACY_HOLD_CORRELATION_WINDOW = timedelta(hours=2)
 
 
 class Command(WeblateComponentCommand):
@@ -85,13 +102,25 @@ class Command(WeblateComponentCommand):
         )
 
     @staticmethod
-    def legacy_hold_change(unit: Unit) -> Change | None:
+    def legacy_hold_change(
+        unit: Unit, round_rows: Sequence[JudgeVerdict]
+    ) -> Change | None:
         """
-        Return the newest Change, only if it proves an untouched automatic hold.
+        Return the newest Change, only if it is provably this verdict's own hold.
 
-        None when the newest Change is anything else: a human escalation
-        (``ActionEvents.JUDGE_RESOLUTION``), a later edit, or a state that was
-        already 12 before this Change (not a transition into it).
+        ``ActionEvents.AUTO`` is not judge-specific by itself: every
+        automatic-translation path writes it (``AutoTranslate.update()``),
+        and every one of them - translate, mt, fuzzy, approved, others -
+        only ever targets ``STATE_TRANSLATED``, ``STATE_FUZZY``, or
+        ``STATE_APPROVED``; none can produce a needs-checking transition
+        today. A Change into 12 therefore exists at all only from a
+        ``state_for_verdict()`` mapping the current architecture no longer
+        has (review D1's own history). The action code alone still is not
+        an identity, so this also requires the Change to land inside
+        ``LEGACY_HOLD_CORRELATION_WINDOW`` of this exact round's own seats
+        voting: AutoTranslate.update() writes that Change once the round
+        settles, so an unrelated later edit - human or otherwise - cannot
+        coincidentally land inside that window.
         """
         newest = unit.change_set.order_by("-timestamp", "-pk").first()
         if (
@@ -99,7 +128,11 @@ class Command(WeblateComponentCommand):
             or newest.action != ActionEvents.AUTO
             or newest.details.get("state") != STATE_NEEDS_CHECKING
             or newest.details.get("old_state") == STATE_NEEDS_CHECKING
+            or not round_rows
         ):
+            return None
+        round_end = max(row.timestamp for row in round_rows)
+        if abs(newest.timestamp - round_end) > LEGACY_HOLD_CORRELATION_WINDOW:
             return None
         return newest
 
@@ -113,12 +146,8 @@ class Command(WeblateComponentCommand):
 
     def classify(self, unit: Unit) -> tuple[str, str]:
         """Return (bucket, reason). Read-only; never writes."""
-        if self.legacy_hold_change(unit) is None:
-            return (
-                NEEDS_REVIEW,
-                "the newest change is not an untouched automatic hold",
-            )
-        verdict = current_verdict(unit)
+        round_rows = current_round(unit)
+        verdict = collegium_verdict(round_rows)
         if verdict is None or verdict.unparsed:
             return NEEDS_REVIEW, "no fresh parsed verdict for the current text"
         if verdict.verdict != JudgeVerdict.Verdict.FLAG:
@@ -128,6 +157,11 @@ class Command(WeblateComponentCommand):
             )
         if verdict.resolution:
             return NEEDS_REVIEW, f"a resolution already exists ({verdict.resolution})"
+        if self.legacy_hold_change(unit, round_rows) is None:
+            return (
+                NEEDS_REVIEW,
+                "the newest change is not provably this verdict's own automatic hold",
+            )
         failing = self.failing_enforced_checks(unit)
         if failing:
             checks = ", ".join(sorted(failing))

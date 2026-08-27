@@ -7,6 +7,7 @@
 import json
 import sys
 import tempfile
+from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 from typing import cast
@@ -18,6 +19,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError, SystemCheckError
 from django.test import SimpleTestCase, TestCase
 from django.test.utils import override_settings
+from django.utils import timezone
 
 from weblate.accounts.models import Profile
 from weblate.checks.models import Check
@@ -734,7 +736,9 @@ class JudgeReleaseAdvisoryHoldsCommandTest(ComponentTestCase):
             "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
         )
         self.assertIn(f"needs-review=[{unit.pk}]", output.getvalue())
-        self.assertIn("not an untouched automatic hold", output.getvalue())
+        self.assertIn(
+            "not provably this verdict's own automatic hold", output.getvalue()
+        )
         unit.refresh_from_db()
         self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
 
@@ -762,6 +766,46 @@ class JudgeReleaseAdvisoryHoldsCommandTest(ComponentTestCase):
         self.assertIn("no fresh parsed verdict", output.getvalue())
         unit.refresh_from_db()
         self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+
+    def test_hold_change_far_from_the_verdict_needs_review(self) -> None:
+        # Task 4 review: ActionEvents.AUTO plus state=12 alone does not
+        # prove judge origin (every automatic-translation path shares the
+        # action code). A hold Change far outside the round's own voting
+        # window must not be trusted even though the action/state pair
+        # matches, exactly as an unrelated coincidence would.
+        unit = self.get_unit()
+        change = self.hold_unit(unit)
+        self.create_verdict(unit)
+        Change.objects.filter(pk=change.pk).update(
+            timestamp=timezone.now() + timedelta(hours=3)
+        )
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn(f"needs-review=[{unit.pk}]", output.getvalue())
+        self.assertIn(
+            "not provably this verdict's own automatic hold", output.getvalue()
+        )
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+
+    def test_hold_change_close_to_the_verdict_is_writable(self) -> None:
+        # The positive counterpart: comfortably inside the window (a large
+        # run's own repair/finalization trailing its round) stays writable.
+        unit = self.get_unit()
+        change = self.hold_unit(unit)
+        self.create_verdict(unit)
+        Change.objects.filter(pk=change.pk).update(
+            timestamp=timezone.now() + timedelta(hours=1)
+        )
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn(f"writable=[{unit.pk}]", output.getvalue())
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
 
     def test_unparsed_verdict_needs_review(self) -> None:
         unit = self.get_unit()
