@@ -191,8 +191,9 @@ docker exec hcgameloc-weblate-1 \
    присутствует `litellm` со статусом «не настроен».
 5. В браузере на странице прод-проекта видна полоса `AI judge`, обе ссылки
    отдают 200.
-6. После пункта 3 плана - на выбранном компоненте появляются срабатывания
-   `max-length`, посчитанные с разбором условного DSL.
+6. Пересчёт из пункта 3 отработал: команда завершилась без ошибки, а состав
+   сработок на `strategy-and-tactics-2/summer-update` сверен с базовой
+   цифрой, снятой до деплоя (см. ниже).
 
 Пункт 4 одной командой:
 
@@ -201,11 +202,57 @@ docker exec hcgameloc-weblate-1 weblate shell -c '
 from django.conf import settings
 from weblate.trans import judge
 from weblate.machinery.models import MACHINERY
+from weblate.checks.models import CHECKS
 print("judge_ready:", judge.judge_configuration_ready())
 print("length checks:", [c.split(".")[-1] for c in settings.CHECK_LIST if "ength" in c])
+print("max-length class:", type(CHECKS["max-length"]).__name__)
+print("source-max-length class:", type(CHECKS["source-max-length"]).__name__)
 print("litellm registered:", "litellm" in MACHINERY)
 '
 ```
 
 `judge_ready` должен быть `True`, в списке проверок - три класса `Game*`, без
-штатных `MaxLengthCheck` и `SourceMaxLengthCheck`.
+штатных `MaxLengthCheck` и `SourceMaxLengthCheck`. Классы под идентификаторами
+`max-length` и `source-max-length` должны быть `GameMaxLengthCheck` и
+`GameSourceMaxLengthCheck`: `GameMaxLengthCheck` наследует штатный
+`MaxLengthCheck` и **не переопределяет** `check_id`, поэтому подмена видна
+только по классу, а не по имени проверки.
+
+Снипет проверен 2026-08-27 на dev-стеке, где уже стоит код `origin/main` с той
+же регистрацией - то есть на эквиваленте пост-деплойного состояния. Ожидаемый
+вывод на проде дословно такой, за исключением `litellm registered`, который
+останется `True` (класс регистрируется) при отсутствующей конфигурации:
+
+```text
+judge_ready: True
+length checks: ['GameLengthCheck', 'GameMaxLengthCheck', 'GameSourceMaxLengthCheck']
+max-length class: GameMaxLengthCheck
+source-max-length class: GameSourceMaxLengthCheck
+litellm registered: True
+```
+
+### Базовая цифра для пункта 6
+
+Снято на проде 2026-08-27, до деплоя, компонент
+`strategy-and-tactics-2/summer-update`: 254 юнита, сработки -
+`game-markup` = 6, и **ни одной** строки `max-length`, `source-max-length`
+или `game-length`.
+
+```sh
+docker exec -i hcgameloc-database-1 psql -U weblate -d weblate -At -F"|" <<'SQL'
+SELECT ch.name, count(*)
+FROM checks_check ch
+JOIN trans_unit u ON ch.unit_id = u.id
+JOIN trans_translation t ON u.translation_id = t.id
+JOIN trans_component c ON t.component_id = c.id
+JOIN trans_project p ON c.project_id = p.id
+WHERE p.slug = 'strategy-and-tactics-2' AND c.slug = 'summer-update'
+GROUP BY 1 ORDER BY 2 DESC;
+SQL
+```
+
+Ожидание после пересчёта: `game-markup` остаётся `6` - изменения не должны
+выходить за проверки длины. Ноль новых сработок `max-length` - допустимый
+результат: он означает, что ни одна строка не выходит за бюджет. Тогда
+доказательством того, что фича живая, служит пункт 4 (подменённые классы под
+`max-length`/`source-max-length`), а не число сработок.
