@@ -1,17 +1,21 @@
 # Plan: judge both seats in parallel
 
-Date: 2026-08-27. Status: **proposed, not started.** Needs approval before
-implementation.
+Date: 2026-08-27. Status: **proposed, not started.** Revised after engineering
+review on 2026-08-27; the caller-failure protocol, provider-load gate and
+thread-aware test layout below replace the unsafe first draft. Owner approval
+is still required before implementation.
 
-Genre: implementation. Output: one fan-out helper in `judge_loop.py`, a
-deterministic test harness, and four tests.
+Genre: implementation. Output: one two-seat fan-out helper in
+`judge_loop.py`, a deterministic thread-safe test harness, and focused tests
+split between the existing `ViewTestCase` fixture and a dedicated
+`TransactionTestCase`.
 
-Rule R3 (`docs/llm-first/vision/llm-first-product-architecture.md:674`) is not
-engaged: this plan changes neither the prompt, nor the model, nor the batch
-size, nor the number of requests. The measured noise/precision/recall/cost
-numbers stay valid, because every string is still judged by the same two seats
-with the same `JUDGE_BATCH_SIZE` segments per call. Only the wall-clock order of
-the HTTP calls changes.
+Rule R3 (`docs/llm-first/vision/llm-first-product-architecture.md:686`) is not
+engaged: this plan changes neither the prompt nor either model. The logical
+batch plan also stays fixed: every uncached string is offered to the same two
+seats with the same `JUDGE_BATCH_SIZE`. Actual POST attempts, spend and parsed
+coverage are acceptance measurements, not invariants, because simultaneous
+requests can change provider refusals and retries.
 
 ## Basis
 
@@ -21,10 +25,17 @@ Measured on production during run `24023684-5dc3-4fa4-8f6c-e9ecdc4b3b23`
 `engines=['openrouter']`):
 
 - `JUDGE_BATCH_SIZE=5`, `JUDGE_MAX_REPAIR_ATTEMPTS=1`,
-  `JUDGE_REQUEST_SLEEP=0.0`, read from `django.conf.settings` inside the
-  running container. 557 strings therefore give 112 batches per seat,
-  `initial_calls=224`, `worst_case_calls=448`
-  (`weblate/trans/autotranslate.py:693-698`).
+  `JUDGE_TRANSPORT_RETRIES=1`, `JUDGE_REQUEST_SLEEP=0.0`, read from
+  `django.conf.settings` inside the running container. 557 strings give 112
+  logical batches per seat. The progress model therefore calls these
+  `initial_calls=224` and `worst_case_calls=448`
+  (`weblate/trans/autotranslate.py:693-698`), but 448 is only the logical
+  no-retry ceiling. One logical batch can execute at most
+  `1 + JUDGE_TRANSPORT_RETRIES + 1` POSTs: initial attempt, configured
+  transport repeats, and one 403/429 repeat (`weblate/trans/judge.py:677-688`).
+  With the observed settings the hard full-run POST ceiling is
+  `448 * (1 + 1 + 1) = 1344`; the no-repair initial-pass ceiling is
+  `224 * 3 = 672`.
 - Seat 1 (`deepseek/deepseek-v4-pro`): first batch logged 11:38:23, batch
   112/112 logged 12:16:46, seat-done logged 12:16:46. **38 min 39 s for one
   seat.**
@@ -44,13 +55,21 @@ Code that makes the two seats serial:
 
 ## Goal
 
-Turn the judging phase from `seat_1 + seat_2` into `max(seat_1, seat_2)`.
-On the measured run that is ~39 min instead of ~77 min, for the same number of
-requests, the same spend, and the same verdicts.
+Turn the judging phase from `seat_1 + seat_2` into approximately
+`max(seat_1, seat_2)` without changing the request inputs or the collegium
+contract. On the production observation this targets roughly 39 minutes
+instead of roughly 77 minutes.
 
-## Why this is safe
+The speedup is accepted only if a bounded live canary shows no transport
+degradation: no 403/429, no exhausted transport retry, no new `UNPARSED`
+result, progress continues per persisted batch, and both model streams overlap
+in time. Request count, cost and output verdicts are recorded; they are not
+claimed to be byte-for-byte identical because retries and LLM output are not
+deterministic.
 
-Seat order is already irrelevant to every consumer of the rows:
+## Why the design is bounded
+
+Seat completion order is already irrelevant to every consumer of the rows:
 
 - `current_round()` (`weblate/trans/models/judge.py:291-298`),
   `active_round()` (`:325-343`) and `_cached_verdict()`
@@ -58,19 +77,19 @@ Seat order is already irrelevant to every consumer of the rows:
   `.order_by("seat")`. Row creation order is never observed.
 - `collegium_verdict()` (`weblate/trans/models/judge.py:346-359`) is a `max()`
   over the round by `(SEVERITY_RANK, -seat)`. It is order-independent by
-  construction, and two existing tests already assert exactly that:
-  `test_no_seat_may_lower_the_other` and
+  construction, and `test_no_seat_may_lower_the_other` plus
   `test_the_same_holds_when_the_strict_seat_votes_second`
-  (`weblate/trans/tests/test_judge_loop.py:299-305`).
-- Everything that reads a round - `_prepare_round_unit`, `_round_verdict`,
-  `repair_targets` - runs after the seat loop has finished
-  (`weblate/trans/judge_loop.py:548-562`), not between the seats.
+  (`weblate/trans/tests/test_judge_loop.py:299-305`) already assert that.
+- `_prepare_round_unit`, `_round_verdict` and `repair_targets` run only after
+  both seat jobs terminate (`weblate/trans/judge_loop.py:548-562`).
 
-Two concurrent LLM requests against this provider are already production
-behaviour, not a new risk: `weblate/machinery/llm.py:355` sets
-`batch_concurrency = 2`, and the judge's own repair fetch goes through that
-path (`judge_loop.py:39` imports `fetch_machinery_matches`). A 429/403 is
-already retried once with a doubled sleep (`weblate/trans/judge.py:685-688`).
+`BaseLLMTranslation.batch_concurrency = 2`
+(`weblate/machinery/llm.py:349-355`) is a useful implementation precedent, not
+proof that judge traffic cannot be refused. The machinery path has its own
+rate-limit stop/wait (`weblate/trans/machinery.py:43-46,65-82`); the judge
+instead retries a 403/429 once and converts an exhausted batch to `UNPARSED`
+(`weblate/trans/judge.py:643-695`). The dev and production canary gates below
+therefore remain mandatory.
 
 ## Design decisions
 
@@ -92,92 +111,322 @@ Rejected alternatives:
   contract of `_persist_verdict_batches` under concurrent pressure. Out of
   scope here; worth its own plan once this one is measured.
 
-### D2. Workers do network only; persistence and progress stay on the caller
+### D2. Successful acknowledgements form a cross-seat batch barrier
 
-A worker thread must not run the `on_batch` chain, because
-`_persist_verdict_batches` writes `JudgeVerdict` rows and then calls the
-progress callback, which ends in `current_task.update_state()`
-(`weblate/trans/autotranslate.py:260-269`). Celery keeps the current task in
-thread-local storage, so from a worker thread `current_task` is absent and
-`set_progress` silently does nothing - the run would look frozen at 10% for its
-whole duration. `weblate/trans/machinery.py:112-113` already records this trap
-in a comment and solves it the same way.
+Workers perform HTTP and usage accounting only. `JudgeVerdict` persistence and
+the external progress callback stay on the calling Celery thread.
 
-Mechanism: the worker passes `on_batch=lambda ...: completed.put(...)` into
-`request_verdicts()`, and the calling thread drains that `queue.Queue`, calling
-the seat's own `persist` closure. Progress stays incremental (per batch, as
-today), not per seat.
+A fire-and-forget queue is insufficient. If caller-side persistence or
+`current_task.update_state()` raises, leaving the drain loop would make
+`ThreadPoolExecutor.__exit__()` wait while workers continue paid requests and
+enqueue results nobody persists. Immediate per-event acknowledgement is also
+insufficient: the faster seat could start batch N+1 before the caller observes
+that its peer failed in batch N.
 
-### D3. Each worker releases its own database connection
+Each `_BatchReady` therefore carries a per-seat `batch_index` and an
+acknowledgement. The caller persists each arrival immediately but sends
+successful acknowledgements only after every active seat has delivered and
+persisted the same batch index:
 
-`request_verdicts()` writes usage accounting on the worker thread:
-`_record_usage()` -> `_write_llm_usage()` (`weblate/trans/judge.py:389-402`,
-`:360`). Django only closes connections it opened for a request or a task, so
-the worker closes its own in a `finally`, exactly as
-`weblate/trans/machinery.py:57-61` does. `LLMUsageLog` rows (worker connections)
-and `JudgeVerdict` rows (caller connection) are different tables, so the
-concurrent writes do not contend.
+```text
+seat 1: HTTP N -> event N ----+              +-> success ack -> HTTP N+1
+                              |              |
+                              v              |
+                         caller persists both
+                              ^              |
+                              |              |
+seat 2: HTTP N -> event N ----+              +-> success ack -> HTTP N+1
+```
 
-### D4. Per-seat batch order is preserved
+`_run_seats` validates before starting workers that every job carries the same
+ordered request list. Because `request_verdicts()` applies the same
+`JUDGE_BATCH_SIZE`, both seats then have the same batch indices and the barrier
+cannot wait for a batch that its peer will never produce. A one-job direct test
+uses quorum one; production creates either two jobs or none.
+
+The barrier adds the faster seat's wait for its peer, so the precise target is
+the sum of `max(seat_1_batch_N, seat_2_batch_N)`, not mathematically guaranteed
+`max(total_seat_1, total_seat_2)`. It still overlaps every remote request pair;
+the dev canary decides whether the measured wall-clock benefit is sufficient.
+
+### D3. Any fatal path releases the barrier and aborts later paid work
+
+The caller stores the first genuine `BaseException` raised by persistence,
+progress or a worker but does not leave the drain loop:
+
+1. A caller persistence/progress failure sets `fatal_error`.
+2. A worker publishes `_SeatDone(error)` for an exception before or after a
+   callback; the caller sets `fatal_error` when it observes that terminal
+   event.
+3. Setting `fatal_error` releases every pending batch acknowledgement with that
+   error. Any later completed event is still offered to its persistence closure
+   and then acknowledged with the same error.
+4. Every worker waiting in its callback raises private `_SeatAborted`; no worker
+   can begin batch N+1 until both batch-N results or a fatal terminal event have
+   reached the caller.
+5. The caller continues draining until every `_SeatDone` arrives, resolves all
+   futures, then re-raises the first genuine fatal exception.
+
+This ordering prevents both failure modes: raising before all acknowledgements
+would deadlock executor shutdown, while acknowledging one seat before its peer
+would permit another paid batch after the peer had already failed.
+
+Persistence semantics remain explicit:
+
+- A database error inside `transaction.atomic()` rolls back that batch.
+- The caller still attempts to persist every batch that had already completed.
+- The external progress callback runs after the transaction. If it fails, that
+  batch's verdict rows remain committed.
+- The first genuine fatal event observed by the caller wins. Private
+  `_SeatAborted` control flow never replaces it.
+
+### D4. Worker failure preserves completed work and stops both seats at the
+
+barrier
+
+If seat 2 fails in batch N, seat 1 can complete and persist batch N but cannot
+start N+1: its success acknowledgement is waiting for seat 2, and seat 2's
+terminal error converts that pending acknowledgement into `_SeatAborted`.
+The caller resolves every future before propagating the genuine worker
+exception.
+
+This preserves
+`JudgeIncrementalPersistenceTest.test_completed_request_batches_survive_a_mid_seat_crash`
+(`weblate/trans/tests/test_judge_loop.py:792-817`) without paying for the whole
+other seat after the run has already become unusable.
+
+### D5. Each worker releases its own database connection
+
+`request_verdicts()` records usage from the worker thread:
+`_record_usage()` -> `_write_llm_usage()` (`weblate/trans/judge.py:360-402`).
+Django database wrappers belong to the thread that created them. Each worker
+calls `connections.close_all()` in a nested `finally`, and publishes its
+terminal event even if connection cleanup itself raises. This mirrors
+`weblate/trans/machinery.py:57-61`.
+
+The real worker-connection path needs a dedicated `TransactionTestCase`.
+`ViewTestCase` inherits Django's outer test transaction, which a second
+thread's connection cannot see; the existing explanation is
+`JudgeResolutionRealConcurrencyTest`
+(`weblate/trans/tests/test_judge.py:593-600`).
+
+### D6. Per-seat batch order, lockstep and seat/model identity are preserved
 
 `_persist_verdict_batches` (`weblate/trans/judge_loop.py:419-424`) pairs results
-to units through a `cursor` that advances by batch length. Each seat gets its
-own closure, and a single `queue.Queue` preserves FIFO order, so each closure
-still receives its own batches in the order that seat produced them. Batches
-from the two seats interleave in the queue; they never interleave inside one
-closure. This is the invariant to test, because it is the project's known
-positional-alignment hazard.
+to units through a cursor that advances by batch length. Each seat keeps its
+own closure. `_run_seats` rejects unequal ordered request lists before opening
+the pool. A worker cannot publish batch N+1 until the caller has persisted
+batch N from both seats, so each closure receives exactly that seat's batches
+in request order.
 
-### D5. A failing seat must not lose the other seat's persisted work
+The invariant includes model identity, not merely the set of requested models:
 
-The caller drains every sentinel before touching `future.result()`, so all
-batches that completed are persisted first, and only then does the first
-exception propagate. This preserves the contract of
-`JudgeIncrementalPersistenceTest.test_completed_request_batches_survive_a_mid_seat_crash`
-(`weblate/trans/tests/test_judge_loop.py:792-808`) with two seats in flight.
+```text
+seat 1 -> JUDGE_MODEL_SEAT_1
+seat 2 -> JUDGE_MODEL_SEAT_2
+```
+
+`_cached_verdict()` enforces that exact mapping
+(`weblate/trans/judge_loop.py:286-290`), so tests must assert persisted
+`(seat, judge_model)` pairs. Sorting the request models alone would miss a
+seat/model swap.
+
+## Execution environment
+
+The dev Docker stack is shared rather than worktree-isolated. `rundev.sh`
+changes into `dev-docker/`, and `docker compose exec` runs in the already
+existing `dev-docker` compose project whose `/app/src` mount was fixed when the
+container was created (`rundev.sh:23,49-59`;
+`dev-docker/docker-compose.yml:46-49`). Running `./rundev.sh test` from another
+worktree can therefore execute the main checkout's mounted code, not the
+worktree under review.
+
+Execute this plan on a feature branch in the main checkout so container tests
+and the dev canary exercise the edited files. Preserve unrelated working-tree
+changes and use path-specific staging for only
+`weblate/trans/judge_loop.py` and
+`weblate/trans/tests/test_judge_loop.py`. Do not recreate the shared stack if it
+is absent or stale: `./rundev.sh` rebuild/start requires separate approval
+under the repository working agreement.
 
 ## Change
 
-### Task 1: deterministic seat dispatch in the test harness
+### Task 1: deterministic, thread-safe request fake
 
-`weblate/trans/tests/test_judge_loop.py:63-71`. `mock_request_verdicts` feeds
-one shared `iter(batches)` consumed in call order, so `run_batch([MAJOR, PASS])`
-means "seat 1 gets MAJOR" only because seat 1 calls first. Under a pool that
-pairing becomes a race.
+**File:** `weblate/trans/tests/test_judge_loop.py:7-84`
 
-Rework it to dispatch per seat model: keep one iterator per `model` kwarg
-(`"vendor-a/model"` -> seat 1, `"vendor-b/model"` -> seat 2, from the
-`@override_settings` block at `:74-80`), so `run_batch([MAJOR, PASS])` keeps its
-current meaning deterministically and multi-round cases keep advancing per seat.
+The current `mock_request_verdicts` feeds one shared iterator through an
+ordinary `mock.Mock`. Both are wrong once two threads call it:
 
-Then `test_each_seat_uses_its_configured_model` (`:494-497`) must stop asserting
-call order: compare `sorted(models)` instead of the list.
+- result ownership depends on call order;
+- Python 3.12 `Mock` mutates `call_count` and `call_args_list` without a lock.
 
-Verification: the whole file passes **before** the production code changes, with
-the reworked harness. That proves the harness rework alone is behaviour
-preserving.
+Replace it with a small callable fake. Keep the existing round-major input
+format so call sites remain readable:
 
-### Task 2: the fan-out helper
+```text
+[seat1/round0, seat2/round0, seat1/round1, seat2/round1]
+                    |
+                    +-- model 1 iterator: batches[0::2]
+                    +-- model 2 iterator: batches[1::2]
+```
 
-`weblate/trans/judge_loop.py`. Extend the import at `:25` to
-`from django.db import connections, transaction`, and add `import queue`,
-`from concurrent.futures import ThreadPoolExecutor` and
-`from functools import partial` (the last two mirror
-`weblate/trans/machinery.py:8-9`).
+The fake:
 
-Add a frozen dataclass beside `_PreparedRound` (`:308-316`):
+1. Validates that the batch list has an even length.
+2. Builds one iterator for each configured model.
+3. Under one `threading.Lock`, chooses the next result for `model` and records
+   the call in an internal `mock.Mock`.
+4. Releases the lock before invoking `on_batch`, so the fake does not
+   serialize the behavior under test.
+5. Delegates `call_count`, `call_args_list` and `assert_not_called` to the
+   internally locked recorder.
+
+Migrate every patched `request_verdicts` path that can be called concurrently:
+
+- Replace the three local `round_results` iterators at
+  `test_judge_loop.py:360-367`, `:394-401` and `:466-473` with the same
+  per-model fake, passing batch-shaped results for each round.
+- In `JudgeIncrementalPersistenceTest`, patch the raw `crash` callable with
+  `new=crash`, not `side_effect=crash`, so an unnecessary `Mock` is not shared
+  by worker threads.
+- Replace `JudgeGlossaryRepairLockTest`'s direct
+  `mock.Mock(side_effect=[[MAJOR], [MAJOR]])` at `:767-775` with the per-model
+  fake; it is called concurrently even though that test does not inspect the
+  client.
+- The cached-verdict `mock.Mock` at `:615` is never invoked and can remain: its
+  purpose is `assert_not_called`, not concurrent recording.
+
+Update `test_each_seat_uses_its_configured_model` to ignore call order but keep
+identity:
+
+```python
+self.assertEqual(
+    set(unit.judge_verdicts.values_list("seat", "judge_model")),
+    {(1, "vendor-a/model"), (2, "vendor-b/model")},
+)
+```
+
+Run the whole file before production changes. It must remain green, proving
+that only the test harness changed.
+
+Commit:
+
+```text
+test(judge): make seat result dispatch thread-safe
+```
+
+### Task 2: write the fan-out and failure-contract tests
+
+**File:** `weblate/trans/tests/test_judge_loop.py`
+
+Add five tests to `JudgeLoopTest(ViewTestCase)`. Their worker stubs must not
+touch the database; all ORM writes remain on the test/caller thread.
+
+1. `test_both_seats_are_asked_concurrently`
+   - Both request stubs wait on `threading.Barrier(2, timeout=5)`.
+   - The test fails on the current serial loop and passes only when both seats
+     are in flight.
+2. `test_verdicts_and_progress_run_on_the_calling_thread`
+   - Record the two request thread IDs.
+   - Record the thread ID inside `_write_verdict`.
+   - Pass an external `on_batch` spy to `run_judge_batch` and record its thread.
+   - Assert both persistence and external progress run on the test thread and
+     differ from both worker IDs.
+3. `test_each_seat_advances_in_lockstep_and_keeps_order_and_model`
+   - Two units, `JUDGE_BATCH_SIZE=1`.
+   - Seat 1 publishes batch 0 first; an event proves it cannot begin batch 1
+     until seat 2 has published and the caller has persisted batch 0.
+   - Force a known cross-seat arrival order rather than trusting scheduler
+     timing.
+   - Assert every `(unit, seat, judge_model, result)` row, including the exact
+     seat/model mapping.
+4. `test_a_failing_seat_keeps_the_other_seats_completed_verdicts`
+   - Seat 1 publishes its first batch and waits for proof that seat 2 started.
+   - Seat 2 waits for that first persisted batch, then raises.
+   - Assert seat 1's already completed rows survive, both seats stop before a
+     second HTTP batch, and the genuine worker exception is propagated.
+   - The synchronization makes this fail on the serial implementation instead
+     of accidentally passing it.
+5. `test_caller_failure_stops_seats_after_their_in_flight_batch`
+   - Parameterize two caller failures: `_write_verdict` raises before commit,
+     and the external progress callback raises after commit.
+   - A barrier proves both first HTTP batches started before the failure.
+   - Each fake seat offers several batches, but assert only its first in-flight
+     batch ran.
+   - Assert every acknowledgement was released, both workers emitted terminal
+     events, the original caller exception won, and the DB rows match the
+     explicit D3 commit/rollback contract.
+
+Failure-proof matrix before production code:
+
+| Test | Current serial code |
+|------|---------------------|
+| both seats concurrent | FAIL |
+| caller thread ownership | FAIL |
+| lockstep, order and identity | FAIL |
+| one seat fails while other is live | FAIL |
+| caller failure stops both seats | FAIL |
+
+After implementation, prove the lockstep/order test's sensitivity with two
+targeted mutations: acknowledge seat 1 before seat 2's same-index event, then
+route one event to the other seat's persistence closure. The test must fail for
+each mutation.
+
+### Task 3: add the acknowledged fan-out helper
+
+**File:** `weblate/trans/judge_loop.py`
+
+Imports:
+
+```python
+import queue
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from functools import partial
+
+from django.db import connections, transaction
+```
+
+Add `JudgeResult` to the existing `weblate.trans.judge` import. Under
+`TYPE_CHECKING`, import `Sequence` from `collections.abc`.
+
+Add the event and job types beside `_PreparedRound`:
 
 ```python
 @dataclass(frozen=True)
 class _SeatJob:
     seat: int
     model: str
-    request_units: list[Unit]
     requests: list[JudgeRequest]
     persist: OnBatch
+
+
+@dataclass
+class _BatchReady:
+    seat_index: int
+    batch_index: int
+    requests: Sequence[JudgeRequest]
+    results: Sequence[JudgeResult]
+    acknowledged: threading.Event = field(default_factory=threading.Event)
+    error: BaseException | None = None
+
+
+@dataclass(frozen=True)
+class _SeatDone:
+    seat_index: int
+    error: BaseException | None = None
+
+
+class _SeatAborted(Exception):
+    """Private control flow after another seat or caller failed."""
 ```
 
-Add the helper, with `_SEAT_DONE = object()` at module level:
+Add `_log_seat_done(run_id, job)` with the existing log message. Use
+`len(job.requests)` for the string count.
+
+Implement `_run_seats` with this control flow:
 
 ```python
 def _run_seats(
@@ -187,192 +436,549 @@ def _run_seats(
     project_context: str,
     run_id: uuid.UUID,
 ) -> None:
-    """Judge every seat, in parallel, persisting on the calling thread."""
     if not seat_jobs:
         return
+    if any(job.requests != seat_jobs[0].requests for job in seat_jobs[1:]):
+        msg = "judge seats must receive the same ordered requests"
+        raise ValueError(msg)
+
+    events: queue.Queue[_BatchReady | _SeatDone] = queue.Queue()
     ask = partial(
         request_verdicts,
         project_slug=project_slug,
         project_context=project_context,
     )
-    if len(seat_jobs) < 2:
-        for job in seat_jobs:
-            ask(job.requests, model=job.model, on_batch=job.persist)
-            _log_seat_done(run_id, job)
-        return
-
-    completed: queue.Queue = queue.Queue()
 
     def judge(index: int, job: _SeatJob) -> None:
-        try:
-            ask(
-                job.requests,
-                model=job.model,
-                on_batch=lambda batch_requests, batch_results: completed.put(
-                    (index, batch_requests, batch_results)
-                ),
+        error: BaseException | None = None
+        batch_index = 0
+
+        def publish(
+            batch_requests: Sequence[JudgeRequest],
+            batch_results: Sequence[JudgeResult],
+        ) -> None:
+            nonlocal batch_index
+            event = _BatchReady(
+                index,
+                batch_index,
+                tuple(batch_requests),
+                tuple(batch_results),
             )
-        finally:
-            completed.put((index, _SEAT_DONE, None))
-            # Django only closes connections it opened for a request or a
-            # task, so a worker thread has to release its own.
+            batch_index += 1
+            events.put(event)
+            event.acknowledged.wait()
+            if event.error is not None:
+                raise _SeatAborted from event.error
+
+        try:
+            ask(job.requests, model=job.model, on_batch=publish)
+        except BaseException as caught:
+            error = caught
+        try:
             connections.close_all()
+        except BaseException as caught:
+            if error is None:
+                error = caught
+        finally:
+            events.put(_SeatDone(index, error))
+        if error is not None:
+            raise error
+
+    def release(
+        batch_events: list[_BatchReady], error: BaseException | None = None
+    ) -> None:
+        for batch_event in batch_events:
+            batch_event.error = error
+            batch_event.acknowledged.set()
+
+    fatal_error: BaseException | None = None
+    successful: list[int] = []
+    waiting: dict[int, list[_BatchReady]] = {}
+    quorum = len(seat_jobs)
 
     with ThreadPoolExecutor(
-        max_workers=len(seat_jobs), thread_name_prefix="judge-seat"
+        max_workers=quorum, thread_name_prefix="judge-seat"
     ) as pool:
         futures = [
             pool.submit(judge, index, job) for index, job in enumerate(seat_jobs)
         ]
-        open_seats = len(seat_jobs)
+        open_seats = quorum
         while open_seats:
-            index, batch_requests, batch_results = completed.get()
-            if batch_requests is _SEAT_DONE:
+            event = events.get()
+            if isinstance(event, _SeatDone):
                 open_seats -= 1
+                if (
+                    event.error is not None
+                    and not isinstance(event.error, _SeatAborted)
+                    and fatal_error is None
+                ):
+                    fatal_error = event.error
+                if event.error is None:
+                    successful.append(event.seat_index)
+                if fatal_error is not None:
+                    for batch_events in waiting.values():
+                        release(batch_events, fatal_error)
+                    waiting.clear()
                 continue
-            # Verdict rows and progress are written here: Celery keeps the
-            # current task in thread-local storage, so a worker thread cannot
-            # report progress at all.
-            seat_jobs[index].persist(batch_requests, batch_results)
-        # Every completed batch is persisted above before any failure is
-        # raised, so one dead seat cannot discard the other seat's rows.
+
+            try:
+                seat_jobs[event.seat_index].persist(event.requests, event.results)
+            except BaseException as error:
+                if fatal_error is None:
+                    fatal_error = error
+
+            batch_events = waiting.setdefault(event.batch_index, [])
+            batch_events.append(event)
+            if fatal_error is not None:
+                for pending_events in waiting.values():
+                    release(pending_events, fatal_error)
+                waiting.clear()
+            elif len(batch_events) == quorum:
+                release(waiting.pop(event.batch_index))
+
         for future in futures:
-            future.result()
-    for job in seat_jobs:
-        _log_seat_done(run_id, job)
+            try:
+                future.result()
+            except _SeatAborted:
+                pass
+            except BaseException as error:
+                if fatal_error is None:
+                    fatal_error = error
+
+    for index in successful:
+        _log_seat_done(run_id, seat_jobs[index])
+    if fatal_error is not None:
+        raise fatal_error
 ```
 
-`_log_seat_done` carries the existing message from `:540-546` unchanged. Note
-the ordering change: with two seats the two "seat N done" lines are emitted
-after both seats finish, not interleaved with the run. Content is unchanged, so
-`test_run_and_seat_are_logged` (`:146-152`) still holds.
+The implementation must retain all six ordering properties:
 
-### Task 3: use the helper in `run_judge_batch`
+1. Jobs are rejected before the pool if their ordered requests differ.
+2. A successful acknowledgement waits for the same `batch_index` from every
+   seat.
+3. A fatal error releases every pending and future batch acknowledgement.
+4. The caller never raises from inside the drain loop.
+5. Every worker publishes `_SeatDone`, including its own error, after attempting
+   `connections.close_all()`.
+6. Futures are resolved only after every terminal event was drained.
 
-`weblate/trans/judge_loop.py:519-546`. Replace the body of the seat loop with
-job construction, then one call:
+### Task 4: wire `run_judge_batch`
+
+**File:** `weblate/trans/judge_loop.py:519-546`
+
+Replace the serial seat loop with job construction and one helper call:
 
 ```python
-        seat_jobs = []
-        for seat, model in seats:
-            request_units = [unit for unit in pending if unit.id not in cached_ids]
-            if not request_units:
-                continue
-            seat_jobs.append(
-                _SeatJob(
-                    seat=seat,
-                    model=model,
-                    request_units=request_units,
-                    requests=[round_requests[unit.id] for unit in request_units],
-                    persist=_persist_verdict_batches(
-                        request_units,
-                        seat=seat,
-                        attempt=attempt,
-                        run_id=run_id,
-                        model=model,
-                        on_batch=on_batch,
-                    ),
-                )
-            )
-        _run_seats(
-            seat_jobs,
-            project_slug=project_slug,
-            project_context=project_context,
-            run_id=run_id,
+seat_jobs = []
+for seat, model in seats:
+    request_units = [unit for unit in pending if unit.id not in cached_ids]
+    if not request_units:
+        continue
+    seat_jobs.append(
+        _SeatJob(
+            seat=seat,
+            model=model,
+            requests=[round_requests[unit.id] for unit in request_units],
+            persist=_persist_verdict_batches(
+                request_units,
+                seat=seat,
+                attempt=attempt,
+                run_id=run_id,
+                model=model,
+                on_batch=on_batch,
+            ),
         )
+    )
+
+_run_seats(
+    seat_jobs,
+    project_slug=project_slug,
+    project_context=project_context,
+    run_id=run_id,
+)
 ```
 
-Everything before (`_refresh_unit`, `build_request`, `_cached_verdict`, the
-`judge run ...` log) and everything after (`_prepare_round_unit`,
-`repair_targets`, `_apply_repair`, the repair `while` loop) is untouched. The
-repair round re-enters this same code, so repair rounds get the same speedup for
-free.
+Everything before job construction (`_refresh_unit`, `build_request`,
+`_cached_verdict`, the run log) and everything after `_run_seats`
+(`_prepare_round_unit`, repair, final projection) stays unchanged. Repair
+rounds re-enter the same helper.
+
+Run `./rundev.sh test weblate/trans/tests/test_judge_loop.py`. The five Task 2
+tests must now pass. Commit Tasks 2-4 together so no commit contains tests that
+claim fan-out while `run_judge_batch` still uses the serial path:
+
+```text
+feat(judge): run judge seats in parallel
+```
+
+### Task 5: verify worker connection cleanup with real thread-local DB state
+
+**File:** `weblate/trans/tests/test_judge_loop.py`
+
+Add imports for `threading`, `connections`, `TransactionTestCase`,
+`JudgeRequest`, `_SeatJob`, `_run_seats` and
+`weblate.trans.judge._write_llm_usage`.
+
+Create a database-backed helper test with no Weblate fixture:
+
+```python
+class JudgeSeatConnectionCleanupTest(TransactionTestCase): ...
+```
+
+It calls `_run_seats` directly with two `_SeatJob` instances sharing the same
+one-item `JudgeRequest` list. Each has a caller-side persistence spy; no
+`Unit`, repository, component, user or permission setup is needed.
+`TransactionTestCase` is still
+required because worker-side usage inserts use independent committed database
+connections. A `ViewTestCase` outer transaction would be invisible from the
+workers, as explained by `JudgeResolutionRealConcurrencyTest`
+(`weblate/trans/tests/test_judge.py:593-600`).
+
+Patch `request_verdicts` with a faithful worker stub that:
+
+1. obtains `connections["default"]`;
+2. inserts one real `LLMUsageLog` through `_write_llm_usage`;
+3. records the wrapper and worker thread ID under a lock;
+4. waits at a two-worker barrier before either path completes;
+5. either calls `on_batch`, or raises the test's worker exception.
+
+Use separate tests for success and exception. After `_run_seats` settles,
+assert:
+
+- both observed IDs differ from the caller thread;
+- every captured worker wrapper has `connection is None`;
+- two `LLMUsageLog` rows are committed before cleanup;
+- the persistence spies ran only on the caller thread;
+- cleanup happened on success and exception;
+- in the exception case both worker stubs reached their cleanup path, the other
+  seat stopped after its in-flight batch, and `_run_seats` returned by raising
+  the original worker exception rather than deadlocking.
+
+Before keeping these tests, temporarily remove `connections.close_all()` from
+the helper and run the two class tests: both must fail on the open-wrapper
+assertion. Restore cleanup, rerun the whole class, then commit:
+
+```text
+test(judge): cover judge worker connection cleanup
+```
 
 ## What does not change
 
-- `JUDGE_BATCH_SIZE`, the prompts, the seat models, `JUDGE_MAX_REPAIR_ATTEMPTS`,
-  `JUDGE_REQUEST_SLEEP`, the response schema, the retry policy.
-- The number of HTTP requests and the spend: still `initial_calls` for the first
-  pass, `worst_case_calls` as the ceiling.
-- `request_verdicts()` itself: batches inside one seat stay sequential.
+- `JUDGE_BATCH_SIZE`, prompts, models, response schema, repair attempts,
+  request sleep and retry policy.
+- The logical number and contents of judge batches.
+- Batches inside one seat remain sequential.
 - `_persist_verdict_batches`, `_write_verdict`, `_cached_verdict`,
-  `collegium_verdict`, `current_round`, `active_round`.
-- Progress semantics: one tick per completed batch, `_judge_phase` boundaries
-  unchanged (`weblate/trans/autotranslate.py:165-175`).
-- No settings file, no `deploy/environment.example`, no production `.env`.
+  `collegium_verdict`, `current_round` and `active_round`.
+- Progress still advances once per successfully persisted batch.
+- No setting, environment variable, production toggle or within-seat
+  concurrency is added.
 
-## Tests
+The progress fields count logical callbacks, not POST attempts. Actual attempts
+are bounded by
+`logical_batches * (2 + JUDGE_TRANSPORT_RETRIES)` and can increase only when
+the provider retries. Spend can also vary with output tokens. Parsed verdict
+equality is not promised; the acceptance contract is unchanged inputs plus no
+transport degradation.
 
-All in `weblate/trans/tests/test_judge_loop.py`, mirroring the threading
-conventions of `JudgeResolutionRealConcurrencyTest`
-(`weblate/trans/tests/test_judge.py:593-685`), which uses `TransactionTestCase`
-and closes the connection that must not straddle threads.
+## Canary manifest and runbook
 
-1. `test_both_seats_are_asked_concurrently` - a `threading.Barrier(2, timeout=…)`
-   inside the patched `request_verdicts`; both seats must reach it, which is
-   impossible if the calls are serial. Mirrors
-   `test_autotranslate.py:1464-1466`.
-2. `test_verdicts_are_persisted_on_the_calling_thread` - the patched
-   `request_verdicts` records `threading.get_ident()` of its own thread; the
-   `on_batch`/persist path records the thread that writes. Assert the writing
-   thread is the test's own thread and differs from both worker threads. This is
-   the regression guard for the silent Celery progress failure (D2). Mirrors
-   `test_autotranslate.py:1552-1565`.
-3. `test_each_seat_keeps_its_own_batch_order` - two units, batch size 1, so each
-   seat produces two batches; assert every `JudgeVerdict` row pairs the right
-   unit with the right result for both seats, i.e. the `cursor` invariant of D4
-   survived interleaving.
-4. `test_a_failing_seat_keeps_the_other_seats_verdicts` - seat 2 raises after
-   seat 1 has persisted at least one batch; assert the exception propagates out
-   of `run_judge_batch` **and** seat 1's rows are in the database (D5).
+No canary starts from an open-ended query. The operator first records this
+manifest; any blank field blocks the run:
 
-Existing tests that must keep passing unchanged in intent:
-`test_both_seats_judge_every_string`, `test_no_seat_may_lower_the_other`,
-`test_the_same_holds_when_the_strict_seat_votes_second`,
-`test_verdict_takes_the_higher_severity`,
-`test_unparsed_neither_raises_nor_lowers_the_other_seat`,
-`test_every_verdict_of_one_run_shares_the_run_id`,
-`test_each_seat_votes_once_per_round`,
-`JudgeIncrementalPersistenceTest`, `JudgeMaxLengthRepairTest`,
-`JudgeGlossaryRepairLockTest`.
+```text
+environment: dev | production
+project/component:
+translation_id:
+translation_path:
+target_language:
+unit_ids: 10-25 exact Unit primary keys
+q: id:<pk> OR id:<pk> ...
+overwrite_existing: false
+operator:
+approval/date: required for production only
+start_utc:
+usage_log_start_pk:
+```
+
+### Select an exact judge-only scope
+
+Use the connected Weblate MCP first for production project, component,
+translation and candidate-unit discovery (`listProjects`, `listComponents`,
+`searchUnitsWithFilters`). The MCP and REST API do not expose
+`JudgeVerdict`, `LLMUsageLog`, Celery's global active-task list or container
+logs. The production live-run approval must therefore explicitly authorize the
+read-only shell and log commands below for only this canary; without that
+authorization, the production canary is blocked rather than approximated.
+
+Use the following read-only Django query to exclude cached judge rows,
+substituting only `TRANSLATION_ID`. In dev run it through
+`docker compose exec` from `dev-docker/`. In production run the same snippet
+only through the approved
+`./deploy/vps.sh ssh "docker exec hcgameloc-weblate-1 weblate shell -c ..."`
+path.
+
+```python
+from weblate.trans.models import Translation
+from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.utils.state import STATE_TRANSLATED
+
+t = Translation.objects.get(pk=TRANSLATION_ID)
+ids = list(
+    t.unit_set.filter(
+        state__gte=STATE_TRANSLATED,
+        judge_verdicts__isnull=True,
+    )
+    .order_by("position", "pk")
+    .values_list("pk", flat=True)[:25]
+)
+print("translation_id:", t.pk)
+print("translation_path:", "/".join(t.get_url_path()))
+print("component:", "/".join(t.component.get_url_path()))
+print("target_language:", t.language.code)
+print("unit_ids:", ",".join(map(str, ids)))
+print("q:", " OR ".join(f"id:{unit_id}" for unit_id in ids))
+print(
+    "usage_log_start_pk:",
+    LLMUsageLog.objects.order_by("-pk").values_list("pk", flat=True).first() or 0,
+)
+```
+
+Require 10-25 IDs. Fewer than 10 cannot demonstrate several paired batches;
+more than 25 violates the bounded canary. `judge_verdicts__isnull=True`
+guarantees that the selected units cannot hit `_cached_verdict()`.
+`state__gte=STATE_TRANSLATED` plus `overwrite_existing=false` makes
+`writable=0`, so the canary performs no pretranslation or repair and measures
+only the initial two-seat judging pass.
+
+Before opening the form, inspect active, reserved and scheduled Celery tasks.
+Block the canary if any entry has `mode='judge'`; otherwise batch logs and
+usage rows cannot be attributed to this run:
+
+```text
+dev:  docker compose exec -T weblate celery -A weblate.utils.celery inspect active --json
+      docker compose exec -T weblate celery -A weblate.utils.celery inspect reserved --json
+      docker compose exec -T weblate celery -A weblate.utils.celery inspect scheduled --json
+prod: run the same three inspect commands in hcgameloc-weblate-1 through
+      ./deploy/vps.sh ssh under the live-run approval
+```
+
+### Preview and launch through the real UI
+
+1. Open the manifest's exact target translation.
+2. In `Automatic translation`, select `AI judge`, `Machine translation` and
+   the configured routed engine.
+3. Paste the manifest's exact `id:... OR id:...` query.
+4. Leave `Overwrite the existing translation` unchecked.
+5. Do not submit until `/auto-translate-preview/<translation-path>/` reports:
+   - `matched == processed == len(unit_ids)`;
+   - `remaining == 0`;
+   - `writable == 0`;
+   - `judge_calls_initial == 2 * ceil(len(unit_ids) / JUDGE_BATCH_SIZE)`.
+6. Record `start_utc`, submit once, and capture the Celery task UUID plus the
+   `judge run <run_id>` UUID from the application log.
+
+The production approval names the component, language, exact IDs/query and
+operator from this manifest. A general deploy approval is insufficient.
+
+### Collect the acceptance evidence
+
+From `GET /api/tasks/<uuid>/`, record `phase`, `phase_current`, `phase_total`
+and final result. From application logs beginning at `start_utc`, isolate lines
+matching:
+
+```text
+judge batch N/M ok: model=...
+judge batch N/M failed: model=...
+judge run <run_id>: seat ...
+```
+
+Dev logs:
+
+```text
+./rundev.sh logs --since <start_utc> weblate
+```
+
+Production logs, only after the live-run approval:
+
+```text
+./deploy/vps.sh ssh "docker logs --since <start_utc> hcgameloc-weblate-1 2>&1"
+```
+
+Because the no-other-judge-task preflight is mandatory, the matching batch
+lines are this canary's actual POST attempts. Count every `ok` and `failed`
+line, including repeated `N/M` positions.
+
+After completion, run the exact `run_id` and usage-marker query below locally
+in dev. In production, run it only through the read-only shell command named in
+the live-run approval:
+
+```python
+from collections import Counter
+from decimal import Decimal
+from uuid import UUID
+
+from weblate.trans.models.judge import JudgeVerdict
+from weblate.trans.models.llm_usage import LLMUsageLog
+
+run_id = UUID("RUN_ID")
+verdicts = JudgeVerdict.objects.filter(run_id=run_id)
+usage = LLMUsageLog.objects.filter(
+    pk__gt=USAGE_LOG_START_PK,
+    operation=LLMUsageLog.Operation.JUDGE,
+    project_slug="PROJECT_SLUG",
+)
+print("verdict_rows:", verdicts.count())
+print("distinct_units:", verdicts.values("unit_id").distinct().count())
+print("unparsed:", verdicts.filter(unparsed=True).count())
+print("severity:", Counter(verdicts.values_list("max_severity", flat=True)))
+print("unit_seats:", Counter(verdicts.values_list("unit_id", "seat")))
+print("models:", Counter(verdicts.values_list("judge_model", flat=True)))
+print("usage_rows:", usage.count())
+print(
+    "cost_usd:",
+    sum((row.cost_usd or Decimal(0)) for row in usage),
+)
+```
+
+Require `verdict_rows == 2 * len(unit_ids)`,
+`distinct_units == len(unit_ids)`, `unparsed == 0`, exactly one row per
+`(unit_id, seat)`, and only the two configured seat models. Attach the manifest,
+preview response, task result, filtered batch log, verdict snapshot and usage
+snapshot to the measurement record.
 
 ## Verification
 
-1. `./rundev.sh test weblate/trans/tests/test_judge_loop.py` - green after Task
-   1 alone (harness rework is behaviour preserving), and green again after Tasks
-   2-3.
-2. `./rundev.sh test weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_judge_round.py`
-   - the collegium, autotranslate projection and round tests are the ones that
-   would notice a semantic change.
-3. Scoped lint per the repository recipe: `uv run prek run --files <touched
-   files> --skip typos --skip reuse --skip kingfisher-auto`.
-4. Dev run against a real component with the judge enabled: confirm from
-   `./rundev.sh logs -f weblate` that `judge batch N/M ok` lines for both seat
-   models interleave in time, and that `GET /api/tasks/<uuid>/` keeps advancing
-   `progress` during the whole judging phase. A frozen `progress` with
-   advancing batch logs is the D2 failure and must block the change.
-5. Production measurement after deployment, on a component of comparable size:
-   record seat-1 and seat-2 first/last batch timestamps and compare judging
-   wall clock against the 38 min 39 s + ~39 min baseline above. Write the
-   numbers to `docs/llm-first/measurements/`.
+1. Harness-only checkpoint:
+
+   ```text
+   ./rundev.sh test weblate/trans/tests/test_judge_loop.py
+   ```
+
+   Green before production changes.
+2. Add the five Task 2 tests and run them against the serial implementation.
+   Record the failure-proof matrix from Task 2; all five tests must fail for
+   their named reason.
+3. After Tasks 3-4:
+
+   ```text
+   ./rundev.sh test weblate/trans/tests/test_judge_loop.py
+   ```
+
+   All five Task 2 tests pass.
+4. Add Task 5's two `TransactionTestCase` tests. First remove
+   `connections.close_all()` temporarily and run:
+
+   ```text
+   ./rundev.sh test weblate/trans/tests/test_judge_loop.py::JudgeSeatConnectionCleanupTest
+   ```
+
+   Both tests fail on the open worker connection. Restore cleanup and rerun;
+   both pass.
+5. Run the related regression suites:
+
+   ```text
+   ./rundev.sh test weblate/trans/tests/test_judge_loop.py
+   ./rundev.sh test weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_judge_round.py
+   ```
+
+   Repeat the Task 2 targeted mutations for early acknowledgement, queue
+   routing and caller-failure acknowledgement; the named tests must fail.
+6. Scoped lint:
+
+   ```text
+   uv run prek run --files weblate/trans/judge_loop.py weblate/trans/tests/test_judge_loop.py --skip typos --skip reuse --skip kingfisher-auto
+   ```
+
+7. Dev canary on at most 25 uncached strings:
+   - verify batch lines for both models overlap before either model finishes;
+   - verify task `phase_current` advances after every persisted batch;
+   - count planned logical batches, actual POST attempts, retries,
+     403/429/resets and `UNPARSED`;
+   - record `LLMUsageLog` count/cost and per-seat first/last timestamps.
+
+   Acceptance thresholds:
+
+   - actual POST attempts never exceed
+     `logical_batches * (2 + JUDGE_TRANSPORT_RETRIES)`; exceeding this is an
+     accounting/loop bug;
+   - acceptance still requires actual POST attempts to equal logical batches
+     exactly;
+   - zero 403, 429 and transport-reset log entries;
+   - zero new transport/parse `UNPARSED` results;
+   - both seat windows overlap, and judging wall time is no more than 75% of
+     the sum of the two seat spans;
+   - no progress freeze, worker leak or deadlock.
+
+   Any failed threshold blocks merge. Do not tune retries, batch size, models or
+   thresholds inside this change.
+
+8. Production work requires two explicit approvals after merge:
+   - deploy approval;
+   - separate live-run approval naming the noncritical component, target
+     language, query, cap of at most 25 uncached units, overwrite behavior and
+     operator.
+
+   Apply the same thresholds as the dev canary. Stop on the first failed
+   threshold without widening the unit cap or changing judge settings. If the
+   failure reproduces and is attributable to seat concurrency, revert the
+   implementation commit and deploy the revert before another judge run.
+
+9. Only after the bounded production canary passes, request approval for a
+   comparable-size measurement. Record:
+   - logical batches and actual attempts;
+   - retries/refusals/resets/`UNPARSED`;
+   - usage/cost per seat;
+   - each seat's first/last batch timestamp;
+   - total judging wall time and overlap;
+   - final verdict distribution.
+
+   Save the numbers under `docs/llm-first/measurements/`.
 
 ## Out of scope
 
-- Parallelising batches inside one seat (own plan, own rate-limit evidence).
-- Any change to `JUDGE_BATCH_SIZE` or to the seat models: both invalidate the
-  measurement under R3.
-- The repair engine's own concurrency: already handled by
-  `fetch_machinery_matches`.
-- The `judge-monitor` helper used to observe the current production run.
+- Parallelising batches inside one seat.
+- A concurrency setting, production toggle or environment change.
+- Any prompt, model, batch-size or retry-policy change.
+- The repair engine's own concurrency.
+- The run-specific `judge-monitor` helper.
+- A large production measurement before the bounded canary passes and receives
+  its own approval.
 
 ## Task checklist
 
-- [ ] Task 1: deterministic per-seat harness; `sorted(models)` assertion; file
-      green before any production-code change
-- [ ] Task 2: `_SeatJob`, `_SEAT_DONE`, `_run_seats`, imports
-- [ ] Task 3: `run_judge_batch` builds jobs and calls `_run_seats`
-- [ ] Tests 1-4 added and each one verified to fail with the fan-out reverted
-- [ ] Verification steps 1-3 recorded
-- [ ] Dev run (step 4) observed, progress advancing
-- [ ] Commit and push
-- [ ] Production measurement (step 5) after a separate deploy approval
+- [ ] Task 1: thread-safe per-model harness; exact seat/model assertion; file
+      green before production changes
+- [ ] Task 2: five deterministic fan-out/failure tests; serial failure-proof
+      matrix recorded
+- [ ] Task 3: cross-seat acknowledgement barrier; drain-before-raise; worker
+      cleanup
+- [ ] Task 4: `run_judge_batch` builds jobs and calls `_run_seats`
+- [ ] Task 5: dedicated `TransactionTestCase` proves worker connections close
+      on success and exception
+- [ ] Targeted mutations prove early acknowledgement, queue routing,
+      seat/model identity, caller-failure acknowledgement and worker-connection
+      cleanup tests detect their intended faults
+- [ ] Verification steps 1-6 recorded
+- [ ] Dev canary passes every transport, overlap and progress threshold
+- [ ] Commit and push implementation
+- [ ] Separate deploy approval obtained
+- [ ] Separate bounded production-run approval obtained
+- [ ] Bounded production canary passes
+- [ ] Comparable production measurement approved and recorded
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope and strategy | 0 | NOT RUN | Backend optimization; optional |
+| Codex Review | `/codex review` | Independent second opinion | 0 | NOT RUN | Not required |
+| Eng Review | `/plan-eng-review` | Architecture and tests | 3 | CLEAR | 6 issues corrected, 0 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | N/A | No UI change |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | NOT RUN | Not required |
+
+**VERDICT:** ENG CLEARED - ready for owner approval.
+
+**UNRESOLVED DECISIONS:**
+
+- Owner approval to begin implementation
