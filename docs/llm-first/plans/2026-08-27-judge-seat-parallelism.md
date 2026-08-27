@@ -251,54 +251,85 @@ under the repository working agreement.
 
 ## Change
 
-### Task 1: deterministic, thread-safe request fake
+### Task 1: make seat identity explicit before adding threads
 
-**File:** `weblate/trans/tests/test_judge_loop.py:7-84`
+**Files:**
 
-The current `mock_request_verdicts` feeds one shared iterator through an
-ordinary `mock.Mock`. Both are wrong once two threads call it:
+- Modify: `weblate/trans/judge_loop.py:308-316,519-546`
+- Modify: `weblate/trans/tests/test_judge_loop.py:7-84`
 
-- result ownership depends on call order;
-- Python 3.12 `Mock` mutates `call_count` and `call_args_list` without a lock.
+`validate_judge_configuration()` accepts identical model IDs for both seats.
+The harness therefore cannot use `model` as seat identity: two valid jobs can
+both carry `"vendor/model"` while still needing separate result streams.
 
-Replace it with a small callable fake. Keep the existing round-major input
-format so call sites remain readable:
+First make a behavior-preserving production refactor. Add `_SeatJob` beside
+`_PreparedRound`, plus one synchronous wrapper:
+
+```python
+@dataclass(frozen=True)
+class _SeatJob:
+    seat: int
+    model: str
+    requests: list[JudgeRequest]
+    persist: OnBatch
+
+
+def _request_seat(
+    job: _SeatJob,
+    *,
+    project_slug: str,
+    project_context: str,
+    on_batch: OnBatch | None = None,
+) -> None:
+    request_verdicts(
+        job.requests,
+        model=job.model,
+        project_slug=project_slug,
+        project_context=project_context,
+        on_batch=job.persist if on_batch is None else on_batch,
+    )
+```
+
+Add `_log_seat_done(run_id, job)` with the existing log message. Refactor the
+current seat loop to construct one `_SeatJob`, call `_request_seat()` and log it
+before continuing to the next seat. The loop remains serial in this task.
+
+Then replace `mock_request_verdicts` with a callable fake patched at
+`weblate.trans.judge_loop._request_seat`. Keep the existing round-major result
+input:
 
 ```text
 [seat1/round0, seat2/round0, seat1/round1, seat2/round1]
                     |
-                    +-- model 1 iterator: batches[0::2]
-                    +-- model 2 iterator: batches[1::2]
+                    +-- seat 1 iterator: calls[0::2]
+                    +-- seat 2 iterator: calls[1::2]
 ```
 
-The fake:
+For each wrapper call, the fake:
 
-1. Validates that the batch list has an even length.
-2. Builds one iterator for each configured model.
-3. Under one `threading.Lock`, chooses the next result for `model` and records
-   the call in an internal `mock.Mock`.
-4. Releases the lock before invoking `on_batch`, so the fake does not
-   serialize the behavior under test.
-5. Delegates `call_count`, `call_args_list` and `assert_not_called` to the
+1. Selects the next flat result list by `job.seat`, never by `job.model`.
+2. Under one `threading.Lock`, records the call and advances only that seat's
+   iterator.
+3. Releases the lock before callbacks.
+4. Splits `job.requests` and results by `settings.JUDGE_BATCH_SIZE`, then calls
+   the explicit `on_batch` override when present, otherwise `job.persist`, once
+   per batch in request order.
+5. Delegates `call_count`, `call_args_list` and `assert_not_called` to its
    internally locked recorder.
 
-Migrate every patched `request_verdicts` path that can be called concurrently:
+Migrate every current patch:
 
 - Replace the three local `round_results` iterators at
-  `test_judge_loop.py:360-367`, `:394-401` and `:466-473` with the same
-  per-model fake, passing batch-shaped results for each round.
-- In `JudgeIncrementalPersistenceTest`, patch the raw `crash` callable with
-  `new=crash`, not `side_effect=crash`, so an unnecessary `Mock` is not shared
-  by worker threads.
+  `test_judge_loop.py:360-367`, `:394-401` and `:466-473` with the seat-aware
+  fake.
+- In `JudgeIncrementalPersistenceTest`, patch a raw seat-job crash callable
+  with `new=crash`, not a shared `Mock`.
 - Replace `JudgeGlossaryRepairLockTest`'s direct
-  `mock.Mock(side_effect=[[MAJOR], [MAJOR]])` at `:767-775` with the per-model
-  fake; it is called concurrently even though that test does not inspect the
-  client.
-- The cached-verdict `mock.Mock` at `:615` is never invoked and can remain: its
-  purpose is `assert_not_called`, not concurrent recording.
+  `mock.Mock(side_effect=[[MAJOR], [MAJOR]])` at `:767-775`.
+- Patch the cached-verdict no-call assertion at `:615` with an unused
+  seat-aware fake.
 
-Update `test_each_seat_uses_its_configured_model` to ignore call order but keep
-identity:
+Keep the existing configured-model assertion on persisted rows:
 
 ```python
 self.assertEqual(
@@ -307,13 +338,19 @@ self.assertEqual(
 )
 ```
 
-Run the whole file before production changes. It must remain green, proving
-that only the test harness changed.
+Add `test_request_fake_dispatches_equal_models_by_seat`. Construct two jobs
+with the same model ID, invoke the fake for seat 2 before seat 1, and give the
+two seats distinct results. Assert each persistence spy receives its own seat's
+result. The deliberate reverse order makes this fail deterministically if the
+fake is keyed by model or call order.
+
+Run the whole file while the production loop is still serial. It must pass,
+proving the wrapper and harness refactor changed no behavior.
 
 Commit:
 
 ```text
-test(judge): make seat result dispatch thread-safe
+refactor(judge): make seat request identity explicit
 ```
 
 ### Task 2: write the fan-out and failure-contract tests
@@ -384,7 +421,6 @@ import queue
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from functools import partial
 
 from django.db import connections, transaction
 ```
@@ -392,17 +428,9 @@ from django.db import connections, transaction
 Add `JudgeResult` to the existing `weblate.trans.judge` import. Under
 `TYPE_CHECKING`, import `Sequence` from `collections.abc`.
 
-Add the event and job types beside `_PreparedRound`:
+Add the event types beside `_SeatJob`:
 
 ```python
-@dataclass(frozen=True)
-class _SeatJob:
-    seat: int
-    model: str
-    requests: list[JudgeRequest]
-    persist: OnBatch
-
-
 @dataclass
 class _BatchReady:
     seat_index: int
@@ -423,8 +451,7 @@ class _SeatAborted(Exception):
     """Private control flow after another seat or caller failed."""
 ```
 
-Add `_log_seat_done(run_id, job)` with the existing log message. Use
-`len(job.requests)` for the string count.
+Task 1 already added `_SeatJob`, `_request_seat` and `_log_seat_done`.
 
 Implement `_run_seats` with this control flow:
 
@@ -443,11 +470,6 @@ def _run_seats(
         raise ValueError(msg)
 
     events: queue.Queue[_BatchReady | _SeatDone] = queue.Queue()
-    ask = partial(
-        request_verdicts,
-        project_slug=project_slug,
-        project_context=project_context,
-    )
 
     def judge(index: int, job: _SeatJob) -> None:
         error: BaseException | None = None
@@ -471,7 +493,12 @@ def _run_seats(
                 raise _SeatAborted from event.error
 
         try:
-            ask(job.requests, model=job.model, on_batch=publish)
+            _request_seat(
+                job,
+                project_slug=project_slug,
+                project_context=project_context,
+                on_batch=publish,
+            )
         except BaseException as caught:
             error = caught
         try:
@@ -634,7 +661,7 @@ connections. A `ViewTestCase` outer transaction would be invisible from the
 workers, as explained by `JudgeResolutionRealConcurrencyTest`
 (`weblate/trans/tests/test_judge.py:593-600`).
 
-Patch `request_verdicts` with a faithful worker stub that:
+Patch `_request_seat` with a faithful worker stub that:
 
 1. obtains `connections["default"]`;
 2. inserts one real `LLMUsageLog` through `_write_llm_usage`;
@@ -947,8 +974,8 @@ snapshot to the measurement record.
 
 ## Task checklist
 
-- [ ] Task 1: thread-safe per-model harness; exact seat/model assertion; file
-      green before production changes
+- [ ] Task 1: seat-aware thread-safe harness; equal-model regression; exact
+      seat/model assertion; file green before concurrency changes
 - [ ] Task 2: five deterministic fan-out/failure tests; serial failure-proof
       matrix recorded
 - [ ] Task 3: cross-seat acknowledgement barrier; drain-before-raise; worker
@@ -973,7 +1000,7 @@ snapshot to the measurement record.
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope and strategy | 0 | NOT RUN | Backend optimization; optional |
 | Codex Review | `/codex review` | Independent second opinion | 0 | NOT RUN | Not required |
-| Eng Review | `/plan-eng-review` | Architecture and tests | 3 | CLEAR | 6 issues corrected, 0 critical gaps |
+| Eng Review | `/plan-eng-review` | Architecture and tests | 4 | CLEAR | 7 issues corrected, 0 critical gaps |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | N/A | No UI change |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | NOT RUN | Not required |
 
