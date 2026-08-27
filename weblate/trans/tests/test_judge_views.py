@@ -1369,19 +1369,15 @@ class JudgeQueueStripViewTest(ViewTestCase):
         # Review: last_run must be an exact identity match to the requesting
         # user's own launch, not merely "newest for this scope" - a
         # concurrent launch by someone else on a shared component must
-        # never surface as "my" last run after a reload.
+        # never surface as "my" last run after a reload. own_run's
+        # ``created`` is forced strictly earlier than the other actor's
+        # run via a queryset update (bypassing auto_now_add):
+        # order_by("-created") has no tie-breaker, so relying on
+        # sequential auto_now_add timestamps alone would make the
+        # comparison this test exists to prove non-deterministic.
         self.enable_review()
         other_user = self.anotheruser
-        JudgeRun.objects.create(
-            actor=other_user,
-            scope_type=JudgeRun.ScopeType.COMPONENT,
-            scope_id=str(self.component.pk),
-            scope_label=str(self.component),
-            scope_path=self.component.get_absolute_url(),
-            requested_mode="judge",
-            cap=10,
-            status=JudgeRun.Status.COMPLETED,
-        )
+        now = timezone.now()
         own_run = JudgeRun.objects.create(
             actor=self.user,
             scope_type=JudgeRun.ScopeType.COMPONENT,
@@ -1392,6 +1388,20 @@ class JudgeQueueStripViewTest(ViewTestCase):
             cap=10,
             status=JudgeRun.Status.COMPLETED,
         )
+        other_run = JudgeRun.objects.create(
+            actor=other_user,
+            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        JudgeRun.objects.filter(pk=own_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        JudgeRun.objects.filter(pk=other_run.pk).update(created=now)
         response = self.client.get(self.component.get_absolute_url())
         self.assertEqual(response.context["judge_queue"]["last_run"].pk, own_run.pk)
 
@@ -1498,6 +1508,43 @@ class JudgeQueueStripViewTest(ViewTestCase):
         )
         response = self.client.get(self.translation.get_absolute_url())
         self.assertIsNone(response.context["judge_last_run"])
+
+    def test_translation_last_run_shows_own_launch_over_a_newer_other_actor(
+        self,
+    ) -> None:
+        # Same ordering discipline as the component-scope equivalent above:
+        # own_run's ``created`` is forced strictly earlier than the other
+        # actor's run via a queryset update (bypassing auto_now_add), since
+        # order_by("-created") has no tie-breaker for equal timestamps.
+        self.enable_review()
+        other_user = self.anotheruser
+        now = timezone.now()
+        own_run = JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(self.translation.pk),
+            scope_label=str(self.translation),
+            scope_path=self.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        other_run = JudgeRun.objects.create(
+            actor=other_user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(self.translation.pk),
+            scope_label=str(self.translation),
+            scope_path=self.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        JudgeRun.objects.filter(pk=own_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        JudgeRun.objects.filter(pk=other_run.pk).update(created=now)
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertEqual(response.context["judge_last_run"].pk, own_run.pk)
 
 
 @override_settings(JUDGE_ENABLED=True, JUDGE_API_KEY="sk-test")
