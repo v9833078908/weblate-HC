@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <li class="breadcrumb-item">
+    <a href="{{ scope.get_absolute_url }}">{{ run.scope_label }}</a>
+  </li>
+  <li class="breadcrumb-item">{% translate "Judge run" %}</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{% translate "Judge run" %}</h4>
+    </div>
+    <table class="table" id="judge-run-metadata">
+      <tr>
+        <th scope="row">{% translate "Scope" %}</th>
+        <td><a href="{{ scope.get_absolute_url }}">{{ run.scope_label }}</a></td>
+      </tr>
+      <tr>
+        <th scope="row">{% translate "Filter" %}</th>
+        <td>{{ run.requested_query|default:"-" }}</td>
+      </tr>
+      <tr>
+        <th scope="row">{% translate "Launched by" %}</th>
+        <td>
+          {% if run.actor %}
+            {{ run.actor.profile.get_user_display_link }}
+          {% else %}
+            {% translate "Unknown" %}
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <th scope="row">{% translate "Status" %}</th>
+        <td>{{ run.get_status_display }}</td>
+      </tr>
+      <tr>
+        <th scope="row">{% translate "Started" %}</th>
+        <td>{{ run.started|date:"DATETIME_FORMAT"|default:"-" }}</td>
+      </tr>
+      <tr>
+        <th scope="row">{% translate "Finished" %}</th>
+        <td>
+          {% if run.finished %}
+            {{ run.finished|date:"DATETIME_FORMAT" }}
+            ({{ run.finished|timeuntil:run.started }})
+          {% else %}
+            -
+          {% endif %}
+        </td>
+      </tr>
+    </table>
+    {% if run.status == "queued" or run.status == "running" %}
+      <div class="card-body">
+        {% translate "This run is still in progress; counts may be incomplete." %}
+      </div>
+    {% endif %}
+    {% if run.status == "failed" %}
+      <div class="card-body">
+        {% translate "This run failed." %}
+        {% if run.failure %}{{ run.failure }}{% endif %}
+      </div>
+    {% endif %}
+    {% for warning in run.warnings %}
+      <div class="card-body">{{ warning }}</div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{% translate "Outcomes" %}</h4>
+    </div>
+    <div class="card-body">
+      {% for key, label, count in stats %}
+        <a class="btn btn-sm {% if key == outcome %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+           href="?outcome={{ key }}">{{ label }}: {{ count }}</a>
+      {% endfor %}
+      {% if outcome %}
+        <a class="btn btn-sm btn-outline-secondary" href="?">{% translate "Clear filter" %}</a>
+      {% endif %}
+    </div>
+    <div class="table-responsive">
+      <table class="table table-striped" id="judge-run-units">
+        <thead>
+          <tr>
+            <th>{% translate "String" %}</th>
+            <th>{% translate "Outcome" %}</th>
+            <th>{% translate "Repair" %}</th>
+            <th>{% translate "Text" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in page_obj %}
+            <tr>
+              <td>
+                {% if row.unit %}
+                  <a href="{{ row.unit.get_absolute_url }}">{{ row.unit_id_snapshot }}</a>
+                {% else %}
+                  {% blocktranslate with id=row.unit_id_snapshot %}{{ id }} (deleted){% endblocktranslate %}
+                {% endif %}
+              </td>
+              <td>
+                {{ row.get_outcome_display }}
+                {% if row.cached %}({% translate "cached" %}){% endif %}
+                {% if row.verdict.resolution %}({{ row.verdict.get_resolution_display }}){% endif %}
+              </td>
+              <td>{{ row.get_repair_status_display }}</td>
+              <td>
+                {% if not row.unit %}
+                  {% translate "unit deleted" %}
+                {% elif row.current_target_matches %}
+                  {% translate "matches this run" %}
+                {% else %}
+                  {% translate "current text changed since this run" %}
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">{% translate "No strings in this outcome." %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer">
+      {% include "paginator.html" %}
+    </div>
+  </div>
+{% endblock content %}

@@ -74,7 +74,17 @@ class ResetStream(httpx2.SyncByteStream):
 
 
 def _reply(segments: list[dict]) -> dict:
-    content = json.dumps({"segments": segments})
+    normalized = [
+        {
+            **segment,
+            "instruction": segment.get(
+                "instruction",
+                "Correct the reported translation errors." if segment["errors"] else "",
+            ),
+        }
+        for segment in segments
+    ]
+    content = json.dumps({"segments": normalized})
     return {"choices": [{"message": {"content": content}}]}
 
 
@@ -327,6 +337,169 @@ class JudgeClientTest(SimpleTestCase):
         )
         [result] = request_verdicts([REQ], model="vendor/model-a")
         self.assertEqual(result.max_severity, "none")
+
+    @http_mock.activate
+    def test_instruction_must_match_error_presence(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {
+                        "id": 0,
+                        "verdict": "pass",
+                        "errors": [],
+                        "back_translation": "",
+                        "instruction": "Rewrite it.",
+                    }
+                ]
+            ),
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+
+    @http_mock.activate
+    def test_missing_instruction_key_is_unparsed(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "segments": [
+                                        {
+                                            "id": 0,
+                                            "verdict": "pass",
+                                            "errors": [],
+                                            "back_translation": "",
+                                        }
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+
+    @http_mock.activate
+    def test_non_string_instruction_is_unparsed(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "segments": [
+                                        {
+                                            "id": 0,
+                                            "verdict": "pass",
+                                            "errors": [],
+                                            "back_translation": "",
+                                            "instruction": None,
+                                        }
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+
+    @http_mock.activate
+    def test_too_long_instruction_is_unparsed(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {
+                        "id": 0,
+                        "verdict": "reject",
+                        "errors": [
+                            {
+                                "span": "x",
+                                "category": "fluency",
+                                "severity": "critical",
+                                "description": "y",
+                            }
+                        ],
+                        "back_translation": "",
+                        "instruction": "x" * 1001,
+                    }
+                ]
+            ),
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+
+    @http_mock.activate
+    def test_wrongly_empty_instruction_is_unparsed(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {
+                        "id": 0,
+                        "verdict": "reject",
+                        "errors": [
+                            {
+                                "span": "x",
+                                "category": "fluency",
+                                "severity": "critical",
+                                "description": "y",
+                            }
+                        ],
+                        "back_translation": "",
+                        "instruction": "   ",
+                    }
+                ]
+            ),
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+
+    @http_mock.activate
+    def test_valid_instruction_is_parsed_when_errors_present(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {
+                        "id": 0,
+                        "verdict": "reject",
+                        "errors": [
+                            {
+                                "span": "x",
+                                "category": "fluency",
+                                "severity": "critical",
+                                "description": "y",
+                            }
+                        ],
+                        "back_translation": "",
+                        "instruction": "Replace the wrong term with the glossary term.",
+                    }
+                ]
+            ),
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertFalse(result.unparsed)
+        self.assertEqual(
+            result.instruction, "Replace the wrong term with the glossary term."
+        )
 
     @http_mock.activate
     def test_batches_many_requests_and_keeps_order(self) -> None:

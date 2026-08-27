@@ -7,7 +7,9 @@ from __future__ import annotations
 import uuid
 from datetime import timedelta
 
+from django.db import connection
 from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -15,6 +17,8 @@ from weblate.trans.actions import ActionEvents
 from weblate.trans.judge_loop import build_request
 from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
+    JudgeRun,
+    JudgeRunUnit,
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
@@ -1336,3 +1340,517 @@ class JudgeQueueStripViewTest(ViewTestCase):
         run_url = response.context["judge_queue"]["run_url"]
         self.assertIn("mode=judge", run_url)
         self.assertIn("q=NOT+has%3Ajudge", run_url)
+
+    # -- Last run --------------------------------------------------------
+
+    def test_last_run_link_hidden_without_a_run(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertIsNone(response.context["judge_queue"]["last_run"])
+        self.assertNotContains(response, "Last run")
+
+    def test_last_run_link_shown_for_the_exact_component_scope(self) -> None:
+        self.enable_review()
+        run = JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["last_run"].pk, run.pk)
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_last_run_shows_the_newest_own_launch_over_someone_elses(self) -> None:
+        # Review: last_run must be an exact identity match to the requesting
+        # user's own launch, not merely "newest for this scope" - a
+        # concurrent launch by someone else on a shared component must
+        # never surface as "my" last run after a reload. own_run's
+        # ``created`` is forced strictly earlier than the other actor's
+        # run via a queryset update (bypassing auto_now_add):
+        # order_by("-created") has no tie-breaker, so relying on
+        # sequential auto_now_add timestamps alone would make the
+        # comparison this test exists to prove non-deterministic.
+        self.enable_review()
+        other_user = self.anotheruser
+        now = timezone.now()
+        own_run = JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        other_run = JudgeRun.objects.create(
+            actor=other_user,
+            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        JudgeRun.objects.filter(pk=own_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        JudgeRun.objects.filter(pk=other_run.pk).update(created=now)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["last_run"].pk, own_run.pk)
+
+    def test_last_run_hides_a_run_launched_by_someone_else_only(self) -> None:
+        self.enable_review()
+        other_user = self.anotheruser
+        JudgeRun.objects.create(
+            actor=other_user,
+            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_id=str(self.component.pk),
+            scope_label=str(self.component),
+            scope_path=self.component.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertIsNone(response.context["judge_queue"]["last_run"])
+
+    def test_last_run_does_not_leak_across_components(self) -> None:
+        self.enable_review()
+        other = self.create_json_mono(name="Other component", project=self.project)
+        JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_id=str(other.pk),
+            scope_label=str(other),
+            scope_path=other.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertIsNone(response.context["judge_queue"]["last_run"])
+
+    def test_translation_page_shows_its_own_last_run(self) -> None:
+        # Reload after completion has no durable path through the ephemeral
+        # task message (a finished task is forgotten immediately) or the
+        # component/project/workspace-only queue strip for a
+        # translation-scoped launch, so the translation page carries its
+        # own last-run link instead.
+        self.enable_review()
+        run = JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(self.translation.pk),
+            scope_label=str(self.translation),
+            scope_path=self.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertEqual(response.context["judge_last_run"].pk, run.pk)
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_translation_page_hides_last_run_without_permission(self) -> None:
+        # Default test user has no translation.auto/unit.review grant.
+        JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(self.translation.pk),
+            scope_label=str(self.translation),
+            scope_path=self.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertIsNone(response.context["judge_last_run"])
+
+    def test_translation_last_run_does_not_leak_from_another_translation(
+        self,
+    ) -> None:
+        self.enable_review()
+        other = self.component.translation_set.exclude(pk=self.translation.pk).first()
+        if other is None:
+            self.skipTest("fixture has only one target translation")
+        JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(other.pk),
+            scope_label=str(other),
+            scope_path=other.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertIsNone(response.context["judge_last_run"])
+
+    def test_translation_last_run_does_not_leak_from_another_actor(self) -> None:
+        self.enable_review()
+        other_user = self.anotheruser
+        JudgeRun.objects.create(
+            actor=other_user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(self.translation.pk),
+            scope_label=str(self.translation),
+            scope_path=self.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertIsNone(response.context["judge_last_run"])
+
+    def test_translation_last_run_shows_own_launch_over_a_newer_other_actor(
+        self,
+    ) -> None:
+        # Same ordering discipline as the component-scope equivalent above:
+        # own_run's ``created`` is forced strictly earlier than the other
+        # actor's run via a queryset update (bypassing auto_now_add), since
+        # order_by("-created") has no tie-breaker for equal timestamps.
+        self.enable_review()
+        other_user = self.anotheruser
+        now = timezone.now()
+        own_run = JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(self.translation.pk),
+            scope_label=str(self.translation),
+            scope_path=self.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        other_run = JudgeRun.objects.create(
+            actor=other_user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(self.translation.pk),
+            scope_label=str(self.translation),
+            scope_path=self.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        JudgeRun.objects.filter(pk=own_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        JudgeRun.objects.filter(pk=other_run.pk).update(created=now)
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertEqual(response.context["judge_last_run"].pk, own_run.pk)
+
+
+@override_settings(JUDGE_ENABLED=True, JUDGE_API_KEY="sk-test")
+class JudgeRunReportViewTest(ViewTestCase):
+    """The durable judge run report page (Task 2)."""
+
+    def enable_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def create_run(self, scope=None, *, status=JudgeRun.Status.COMPLETED) -> JudgeRun:
+        scope = scope or self.component
+        return JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_id=str(scope.pk),
+            scope_label=str(scope),
+            scope_path=scope.get_absolute_url(),
+            requested_query="state:empty",
+            requested_mode="judge",
+            cap=1000,
+            status=status,
+            started=timezone.now() - timedelta(minutes=5),
+            finished=(
+                timezone.now()
+                if status in {JudgeRun.Status.COMPLETED, JudgeRun.Status.FAILED}
+                else None
+            ),
+        )
+
+    def add_row(
+        self,
+        run: JudgeRun,
+        unit=None,
+        *,
+        unit_id_snapshot: int | None = None,
+        outcome=JudgeRunUnit.Outcome.PASSED,
+        **overrides,
+    ) -> JudgeRunUnit:
+        if unit is not None:
+            unit_id_snapshot = unit.id
+            overrides.setdefault("translation_id", unit.translation_id)
+            overrides.setdefault("component_id", unit.translation.component_id)
+            overrides.setdefault("project_id", unit.translation.component.project_id)
+            overrides.setdefault("input_target", unit.get_target_plurals())
+            overrides.setdefault(
+                "input_target_hash", compute_target_hash(unit.get_target_plurals())
+            )
+            overrides.setdefault("context_hash", judge_context_hash(unit))
+        else:
+            assert unit_id_snapshot is not None
+            overrides.setdefault("translation_id", self.translation.pk)
+            overrides.setdefault("component_id", self.component.pk)
+            overrides.setdefault("project_id", self.project.pk)
+            overrides.setdefault("input_target", [])
+            overrides.setdefault("input_target_hash", compute_target_hash([]))
+            overrides.setdefault("context_hash", "x")
+        return JudgeRunUnit.objects.create(
+            run=run,
+            unit=unit,
+            unit_id_snapshot=unit_id_snapshot,
+            outcome=outcome,
+            before_target=overrides.get("input_target", []),
+            after_target=overrides.get("input_target", []),
+            **overrides,
+        )
+
+    def report_url(self, run: JudgeRun) -> str:
+        return reverse("judge-run", kwargs={"pk": run.pk})
+
+    def make_verdict(self, unit, *, resolution: str = "") -> JudgeVerdict:
+        return JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="major",
+            model_verdict=JudgeVerdict.Verdict.FLAG,
+            judge_model="vendor/model-a",
+            seat=1,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash=judge_context_hash(unit),
+            resolution=resolution,
+        )
+
+    # -- Counts --------------------------------------------------------
+
+    def test_every_outcome_count_equals_its_report_local_row_count(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        escalated_verdict = self.make_verdict(
+            unit, resolution=JudgeVerdict.Resolution.ESCALATED
+        )
+        self.add_row(
+            run,
+            unit,
+            outcome=JudgeRunUnit.Outcome.MAJOR,
+            verdict=escalated_verdict,
+            repair_status=JudgeRunUnit.RepairStatus.ROLLED_BACK,
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900001,
+            outcome=JudgeRunUnit.Outcome.MINOR,
+            cached=True,
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900002,
+            outcome=JudgeRunUnit.Outcome.SKIPPED,
+            skip_reason=JudgeRunUnit.SkipReason.CAP,
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900003,
+            outcome=JudgeRunUnit.Outcome.PASSED,
+            repair_status=JudgeRunUnit.RepairStatus.APPLIED,
+        )
+
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 200)
+        stats = {key: count for key, _label, count in response.context["stats"]}
+        for key, expected in stats.items():
+            filtered = self.client.get(self.report_url(run), {"outcome": key})
+            self.assertEqual(
+                filtered.context["page_obj"].paginator.count,
+                expected,
+                f"outcome={key}",
+            )
+        self.assertEqual(stats["matched"], 4)
+        self.assertEqual(stats["skipped"], 1)
+        self.assertEqual(stats["checked"], 3)
+        self.assertEqual(stats["cached"], 1)
+        self.assertEqual(stats["major"], 1)
+        self.assertEqual(stats["minor"], 1)
+        self.assertEqual(stats["rolled-back"], 1)
+        self.assertEqual(stats["repaired"], 1)
+        self.assertEqual(stats["escalated"], 1)
+        self.assertEqual(stats["accepted-as-is"], 0)
+
+    def test_cached_evidence_appears_once_and_is_labeled_cached(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.PASSED, cached=True)
+        response = self.client.get(self.report_url(run), {"outcome": "cached"})
+        self.assertEqual(response.context["page_obj"].paginator.count, 1)
+        self.assertContains(response, "cached")
+
+    def test_unit_in_older_and_newer_run_appears_only_in_requested_report(
+        self,
+    ) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        older = self.create_run()
+        newer = self.create_run()
+        self.add_row(older, unit, outcome=JudgeRunUnit.Outcome.MAJOR)
+        self.add_row(newer, unit, outcome=JudgeRunUnit.Outcome.PASSED)
+
+        older_response = self.client.get(self.report_url(older))
+        [older_row] = list(older_response.context["page_obj"])
+        self.assertEqual(older_row.outcome, JudgeRunUnit.Outcome.MAJOR)
+
+        newer_response = self.client.get(self.report_url(newer))
+        [newer_row] = list(newer_response.context["page_obj"])
+        self.assertEqual(newer_row.outcome, JudgeRunUnit.Outcome.PASSED)
+
+    def test_current_and_stale_and_deleted_units_render_safely(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        current_unit = self.get_unit()
+        self.add_row(run, current_unit, outcome=JudgeRunUnit.Outcome.PASSED)
+
+        stale_unit = self.get_unit(source="Thank you for using Weblate.")
+        self.add_row(
+            run,
+            stale_unit,
+            outcome=JudgeRunUnit.Outcome.PASSED,
+            input_target=["a stored snapshot no longer on the unit"],
+        )
+
+        gone = self.add_row(
+            run, unit_id_snapshot=900010, outcome=JudgeRunUnit.Outcome.MAJOR
+        )
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "900010")
+        self.assertContains(response, "current text changed since this run")
+        self.assertIsNone(JudgeRunUnit.objects.get(pk=gone.pk).unit)
+
+    def test_empty_queued_running_completed_failed_runs_render_explicit_states(
+        self,
+    ) -> None:
+        self.enable_review()
+        for status in JudgeRun.Status.values:
+            with self.subTest(status=status):
+                run = self.create_run(status=status)
+                response = self.client.get(self.report_url(run))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, run.get_status_display())
+                if status in {JudgeRun.Status.QUEUED, JudgeRun.Status.RUNNING}:
+                    self.assertContains(response, "still in progress")
+                if status == JudgeRun.Status.FAILED:
+                    self.assertContains(response, "failed")
+                self.assertContains(response, "No strings in this outcome.")
+
+    def test_unauthorized_private_scope_returns_404_with_no_count_leakage(
+        self,
+    ) -> None:
+        # Default test user has no translation.auto/unit.review grant.
+        run = self.create_run()
+        self.add_row(run, self.get_unit(), outcome=JudgeRunUnit.Outcome.CRITICAL)
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 404)
+        self.assertNotContains(response, "Critical held", status_code=404)
+        self.assertNotContains(response, run.scope_label, status_code=404)
+
+    def test_missing_scope_returns_404(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        component_pk = self.component.pk
+        run2 = JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_id="999999999",
+            scope_label="gone",
+            scope_path="/",
+            requested_mode="judge",
+            cap=10,
+            status=JudgeRun.Status.COMPLETED,
+        )
+        self.assertNotEqual(run2.scope_id, str(component_pk))
+        response = self.client.get(self.report_url(run2))
+        self.assertEqual(response.status_code, 404)
+        # A real, currently accessible run still renders normally.
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 200)
+
+    def test_pagination_and_outcome_filter_remain_bounded_on_large_fixtures(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        for offset in range(60):
+            self.add_row(
+                run,
+                unit_id_snapshot=910000 + offset,
+                outcome=JudgeRunUnit.Outcome.MINOR,
+            )
+        first_page = self.client.get(self.report_url(run), {"outcome": "minor"})
+        self.assertEqual(len(first_page.context["page_obj"]), 50)
+        self.assertEqual(first_page.context["page_obj"].paginator.count, 60)
+        second_page = self.client.get(
+            self.report_url(run), {"outcome": "minor", "page": 2}
+        )
+        self.assertEqual(len(second_page.context["page_obj"]), 10)
+
+    def test_unknown_outcome_filter_is_rejected(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        response = self.client.get(self.report_url(run), {"outcome": "made-up"})
+        self.assertEqual(response.status_code, 404)
+
+    def test_no_query_path_emits_a_cost_figure(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(run, self.get_unit(), outcome=JudgeRunUnit.Outcome.MAJOR)
+        for key in (
+            "",
+            "matched",
+            "major",
+            "cached",
+            "repaired",
+            "escalated",
+        ):
+            response = self.client.get(
+                self.report_url(run), {"outcome": key} if key else {}
+            )
+            content = response.content.decode().lower()
+            self.assertNotIn("cost", content)
+            self.assertNotIn("$", content)
+
+    def test_report_page_query_count_does_not_grow_with_row_count(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        for offset in range(5):
+            self.add_row(
+                run,
+                unit_id_snapshot=920000 + offset,
+                outcome=JudgeRunUnit.Outcome.MINOR,
+            )
+        run2 = self.create_run()
+        for offset in range(45):
+            self.add_row(
+                run2,
+                unit_id_snapshot=930000 + offset,
+                outcome=JudgeRunUnit.Outcome.MINOR,
+            )
+        # Warm permission/content-type caches identically before either
+        # capture: an uncached first request is not comparable to a second.
+        self.client.get(self.report_url(run))
+        self.client.get(self.report_url(run2))
+
+        with CaptureQueriesContext(connection) as small:
+            self.client.get(self.report_url(run))
+        with CaptureQueriesContext(connection) as large:
+            self.client.get(self.report_url(run2))
+
+        self.assertEqual(len(small), len(large))

@@ -218,11 +218,17 @@ class JudgeResult:
     model_verdict: str
     errors: list[dict]
     back_translation: str
+    instruction: str = ""
     unparsed: bool = False
 
 
 UNPARSED = JudgeResult(
-    max_severity="none", model_verdict="", errors=[], back_translation="", unparsed=True
+    max_severity="none",
+    model_verdict="",
+    errors=[],
+    back_translation="",
+    instruction="",
+    unparsed=True,
 )
 
 type OnBatch = Callable[[Sequence[JudgeRequest], Sequence[JudgeResult]], None]
@@ -300,8 +306,9 @@ def _response_schema() -> dict:
             "verdict": {"type": "string", "enum": ["pass", "flag", "reject"]},
             "errors": {"type": "array", "items": error},
             "back_translation": {"type": "string"},
+            "instruction": {"type": "string", "maxLength": 1000},
         },
-        "required": ["id", "verdict", "errors", "back_translation"],
+        "required": ["id", "verdict", "errors", "back_translation", "instruction"],
         "additionalProperties": False,
     }
     return {
@@ -450,19 +457,26 @@ def _parse_segment(seg: object, size: int) -> tuple[int, JudgeResult] | None:
     verdict = seg.get("verdict")
     if verdict not in {"pass", "flag", "reject"}:
         return None
-    if set(seg) != {"id", "verdict", "errors", "back_translation"}:
+    if set(seg) != {"id", "verdict", "errors", "back_translation", "instruction"}:
         return None
     errors = seg["errors"]
     if not isinstance(errors, list) or not all(_valid_error(e) for e in errors):
         return None
     back_translation = seg.get("back_translation", "")
-    if not isinstance(back_translation, str):
+    instruction = seg.get("instruction")
+    if (
+        not isinstance(back_translation, str)
+        or not isinstance(instruction, str)
+        or len(instruction) > 1000
+        or bool(errors) != bool(instruction.strip())
+    ):
         return None
     return index, JudgeResult(
         max_severity=_max_severity(errors),
         model_verdict=verdict,
         errors=errors,
         back_translation=back_translation,
+        instruction=instruction.strip(),
     )
 
 

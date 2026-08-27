@@ -7,6 +7,7 @@
 import json
 import sys
 import tempfile
+from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 from typing import cast
@@ -18,8 +19,10 @@ from django.core.management import call_command
 from django.core.management.base import CommandError, SystemCheckError
 from django.test import SimpleTestCase, TestCase
 from django.test.utils import override_settings
+from django.utils import timezone
 
 from weblate.accounts.models import Profile
+from weblate.checks.models import Check
 from weblate.runner import main
 from weblate.trans import defaults as trans_defaults
 from weblate.trans.actions import ActionEvents
@@ -28,9 +31,18 @@ from weblate.trans.file_format_params import (
     BaseFileFormatParam,
     register_file_format_param,
 )
+from weblate.trans.judge_loop import build_request
 from weblate.trans.judge_workflow import TARGET_PROJECT_SLUGS
+from weblate.trans.management.commands.judge_release_advisory_holds import (
+    Command as JudgeReleaseAdvisoryHoldsCommand,
+)
 from weblate.trans.management.commands.reapply_autofixes import Command
 from weblate.trans.models import Change, Component, Project, Translation, Unit
+from weblate.trans.models.judge import (
+    JudgeVerdict,
+    compute_context_hash,
+    compute_target_hash,
+)
 from weblate.trans.models.pending import PendingUnitChange
 from weblate.trans.models.project import CommitPolicyChoices
 from weblate.trans.tests.test_models import RepoTestCase
@@ -45,7 +57,7 @@ from weblate.trans.tests.utils import (
     get_test_file,
     require_github,
 )
-from weblate.utils.state import STATE_READONLY, STATE_TRANSLATED
+from weblate.utils.state import STATE_NEEDS_CHECKING, STATE_READONLY, STATE_TRANSLATED
 from weblate.vcs.mercurial import HgRepository
 
 # The test settings use the default AUTOFIX_LIST, which has none of the custom
@@ -597,6 +609,308 @@ class JudgeWorkflowCommandTest(ComponentTestCase):
         ):
             call_command("check_judge_repair_routes", "--project", self.project.slug)
         litellm_engine.assert_not_called()
+
+
+class JudgeReleaseAdvisoryHoldsCommandTest(ComponentTestCase):
+    """
+    Task 4 of docs/llm-first/plans/2026-08-25-02-judge-run-history-and-resolution-follow-up.md.
+
+    Builds the exact "legacy advisory hold" shape by hand: a unit at
+    STATE_NEEDS_CHECKING whose newest Change is the automatic transition
+    into it (ActionEvents.AUTO, details state=12/old_state!=12), matching
+    ``weblate.trans.autotranslate.AutoTranslate.update`` under the pre-D1
+    judge policy. A real human escalation instead writes
+    ActionEvents.JUDGE_RESOLUTION and a resolution value; tests 4 and 8
+    build that shape explicitly to prove the command leaves it alone.
+    """
+
+    def hold_unit(
+        self,
+        unit: Unit,
+        *,
+        hold_action: int = ActionEvents.AUTO,
+        old_state=STATE_TRANSLATED,
+    ) -> Change:
+        # A hold always covers real translated text; seed it directly
+        # (bypassing translate()) so the only Change this helper adds is
+        # the hold Change itself.
+        Unit.objects.filter(pk=unit.pk).update(
+            target="Ahoj svete!", state=STATE_NEEDS_CHECKING
+        )
+        unit.target = "Ahoj svete!"
+        unit.state = STATE_NEEDS_CHECKING
+        return Change.objects.create(
+            unit=unit,
+            translation=unit.translation,
+            component=unit.translation.component,
+            project=unit.translation.component.project,
+            language=unit.translation.language,
+            action=hold_action,
+            target=unit.target,
+            details={"state": STATE_NEEDS_CHECKING, "old_state": old_state},
+        )
+
+    def create_verdict(
+        self,
+        unit: Unit,
+        *,
+        max_severity: str = "major",
+        model_verdict: str = JudgeVerdict.Verdict.FLAG,
+        unparsed: bool = False,
+        resolution: str = "",
+        target_hash: str | None = None,
+    ) -> JudgeVerdict:
+        request = build_request(unit)
+        return JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity=max_severity,
+            model_verdict=model_verdict,
+            unparsed=unparsed,
+            judge_model="vendor-a/model",
+            seat=1,
+            target_hash=target_hash or compute_target_hash(request.target_plurals),
+            context_hash=compute_context_hash(
+                source=request.source,
+                note=request.note,
+                glossary_terms=request.glossary_terms,
+            ),
+            resolution=resolution,
+        )
+
+    def build_writable_unit(self) -> Unit:
+        unit = self.get_unit()
+        self.hold_unit(unit)
+        self.create_verdict(unit)
+        return unit
+
+    def test_dry_run_lists_writable_unit_without_writing(self) -> None:
+        unit = self.build_writable_unit()
+        change_count = unit.change_set.count()
+        output = StringIO()
+        call_command("judge_release_advisory_holds", self.project.slug, stdout=output)
+        self.assertIn(f"writable=[{unit.pk}]", output.getvalue())
+        self.assertIn("1 writable, 0 needs review", output.getvalue())
+        self.assertIn("Dry run: nothing written.", output.getvalue())
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+        self.assertEqual(unit.change_set.count(), change_count)
+
+    def test_write_releases_writable_unit(self) -> None:
+        unit = self.build_writable_unit()
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds",
+            self.project.slug,
+            "--write",
+            stdout=output,
+        )
+        self.assertIn("1 released, 0 stale", output.getvalue())
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+        newest = unit.change_set.order_by("-timestamp", "-pk").first()
+        assert newest is not None
+        self.assertEqual(newest.action, ActionEvents.AUTO)
+        self.assertTrue(newest.details.get("judge_advisory_hold_release"))
+
+    def test_write_is_idempotent(self) -> None:
+        unit = self.build_writable_unit()
+        call_command("judge_release_advisory_holds", self.project.slug, "--write")
+        change_count = unit.change_set.count()
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn("0 writable, 0 needs review", output.getvalue())
+        self.assertIn("0 released, 0 stale", output.getvalue())
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+        self.assertEqual(unit.change_set.count(), change_count)
+
+    def test_missing_hold_change_needs_review(self) -> None:
+        unit = self.get_unit()
+        Unit.objects.filter(pk=unit.pk).update(state=STATE_NEEDS_CHECKING)
+        unit.state = STATE_NEEDS_CHECKING
+        self.create_verdict(unit)
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn(f"needs-review=[{unit.pk}]", output.getvalue())
+        self.assertIn(
+            "not provably this verdict's own automatic hold", output.getvalue()
+        )
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+
+    def test_human_escalation_hold_needs_review(self) -> None:
+        unit = self.get_unit()
+        self.hold_unit(unit, hold_action=ActionEvents.JUDGE_RESOLUTION)
+        self.create_verdict(unit, resolution=JudgeVerdict.Resolution.ESCALATED)
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn(f"needs-review=[{unit.pk}]", output.getvalue())
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+
+    def test_stale_verdict_needs_review(self) -> None:
+        unit = self.get_unit()
+        self.hold_unit(unit)
+        self.create_verdict(unit, target_hash=compute_target_hash(["something else"]))
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn(f"needs-review=[{unit.pk}]", output.getvalue())
+        self.assertIn("no fresh parsed verdict", output.getvalue())
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+
+    def test_hold_change_far_from_the_verdict_needs_review(self) -> None:
+        # Task 4 review: ActionEvents.AUTO plus state=12 alone does not
+        # prove judge origin (every automatic-translation path shares the
+        # action code). A hold Change far outside the round's own voting
+        # window must not be trusted even though the action/state pair
+        # matches, exactly as an unrelated coincidence would.
+        unit = self.get_unit()
+        change = self.hold_unit(unit)
+        self.create_verdict(unit)
+        Change.objects.filter(pk=change.pk).update(
+            timestamp=timezone.now() + timedelta(hours=3)
+        )
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn(f"needs-review=[{unit.pk}]", output.getvalue())
+        self.assertIn(
+            "not provably this verdict's own automatic hold", output.getvalue()
+        )
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+
+    def test_hold_change_close_to_the_verdict_is_writable(self) -> None:
+        # The positive counterpart: comfortably inside the window (a large
+        # run's own repair/finalization trailing its round) stays writable.
+        unit = self.get_unit()
+        change = self.hold_unit(unit)
+        self.create_verdict(unit)
+        Change.objects.filter(pk=change.pk).update(
+            timestamp=timezone.now() + timedelta(hours=1)
+        )
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn(f"writable=[{unit.pk}]", output.getvalue())
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+
+    def test_unparsed_verdict_needs_review(self) -> None:
+        unit = self.get_unit()
+        self.hold_unit(unit)
+        self.create_verdict(unit, unparsed=True)
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn(f"needs-review=[{unit.pk}]", output.getvalue())
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+
+    def test_critical_verdict_needs_review(self) -> None:
+        unit = self.get_unit()
+        self.hold_unit(unit)
+        self.create_verdict(
+            unit, max_severity="critical", model_verdict=JudgeVerdict.Verdict.REJECT
+        )
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn(f"needs-review=[{unit.pk}]", output.getvalue())
+        self.assertIn("not major", output.getvalue())
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+
+    def test_existing_resolution_needs_review(self) -> None:
+        unit = self.get_unit()
+        self.hold_unit(unit)
+        self.create_verdict(unit, resolution=JudgeVerdict.Resolution.ESCALATED)
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn(f"needs-review=[{unit.pk}]", output.getvalue())
+        self.assertIn("a resolution already exists", output.getvalue())
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+
+    def test_failing_enforced_check_needs_review(self) -> None:
+        unit = self.build_writable_unit()
+        component = unit.translation.component
+        component.enforced_checks = ["same"]
+        component.save(update_fields=["enforced_checks"])
+        Check.objects.create(unit=unit, name="same", dismissed=False)
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn(f"needs-review=[{unit.pk}]", output.getvalue())
+        self.assertIn("enforced check(s) failing: same", output.getvalue())
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+
+    def test_dismissed_judge_checks_are_reported_but_not_touched(self) -> None:
+        unit = self.get_unit()
+        check = Check.objects.create(unit=unit, name="judge-flag", dismissed=True)
+        output = StringIO()
+        call_command(
+            "judge_release_advisory_holds", self.project.slug, "--write", stdout=output
+        )
+        self.assertIn("1 dismissed judge check(s) found", output.getvalue())
+        check.refresh_from_db()
+        self.assertTrue(check.dismissed)
+
+    def test_disappeared_unit_is_stale(self) -> None:
+        unit = self.build_writable_unit()
+        pk = unit.pk
+        Unit.objects.filter(pk=pk).delete()
+        command = JudgeReleaseAdvisoryHoldsCommand()
+        released = command.release(pk, self.user)
+        self.assertFalse(released)
+
+    def test_concurrent_state_change_before_write_is_stale(self) -> None:
+        unit = self.build_writable_unit()
+        Unit.objects.filter(pk=unit.pk).update(state=STATE_TRANSLATED)
+        command = JudgeReleaseAdvisoryHoldsCommand()
+        released = command.release(unit.pk, self.user)
+        self.assertFalse(released)
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+
+    def test_concurrent_resolution_before_write_is_stale(self) -> None:
+        unit = self.get_unit()
+        self.hold_unit(unit)
+        verdict = self.create_verdict(unit)
+        command = JudgeReleaseAdvisoryHoldsCommand()
+        # A producer escalates between listing and write: the classification
+        # must be retaken under the lock, not trusted from the earlier scan.
+        verdict.resolution = JudgeVerdict.Resolution.ESCALATED
+        verdict.save(update_fields=["resolution"])
+        released = command.release(unit.pk, self.user)
+        self.assertFalse(released)
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+
+    def test_requires_component_or_project_scope(self) -> None:
+        with self.assertRaises(CommandError):
+            call_command("judge_release_advisory_holds")
+
+    def test_rejects_all_scope(self) -> None:
+        with self.assertRaises(CommandError):
+            call_command("judge_release_advisory_holds", "--all", "--write")
 
 
 class WeblateComponentCommandMixin:

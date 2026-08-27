@@ -654,6 +654,36 @@ class JudgeLoopTest(ViewTestCase):
             run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
         self.assertEqual(self.get_unit().target, original)
 
+    def test_rollback_is_recorded_in_the_batch_repair_status(self) -> None:
+        unit = self.get_unit()
+        client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.repair_targets",
+                return_value={unit.id: ["new but invalid"]},
+            ),
+            mock.patch(
+                "weblate.trans.judge_loop._deterministic_checks",
+                side_effect=[set(), {"game-markup"}],
+            ),
+        ):
+            verdicts = run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
+        self.assertEqual(verdicts.repair_status[unit.id], "rolled-back")
+
+    def test_applied_repair_is_recorded_in_the_batch_repair_status(self) -> None:
+        unit = self.get_unit()
+        client = mock_request_verdicts([[CRITICAL], [CRITICAL], [PASS], [PASS]])
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.repair_targets",
+                return_value={unit.id: ["fixed"]},
+            ),
+        ):
+            verdicts = run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
+        self.assertEqual(verdicts.repair_status[unit.id], "applied")
+
     def test_a_human_string_is_not_repaired_when_not_writable(self) -> None:
         # D3/A3: overwrite off => the unit is not in writable_ids => a
         # false critical never rewrites the human translation.

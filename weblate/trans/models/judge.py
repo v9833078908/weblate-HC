@@ -90,6 +90,158 @@ def compute_context_hash(
     return _digest([source, note, *terms])
 
 
+class JudgeRun(models.Model):
+    """One permission-checked producer launch across one closed scope."""
+
+    class ScopeType(models.TextChoices):
+        TRANSLATION = "translation"
+        COMPONENT = "component"
+        PROJECT = "project"
+        WORKSPACE = "workspace"
+
+    class Status(models.TextChoices):
+        QUEUED = "queued"
+        RUNNING = "running"
+        COMPLETED = "completed"
+        FAILED = "failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="judge_runs",
+    )
+    task_id = models.CharField(max_length=255, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    started = models.DateTimeField(null=True, blank=True)
+    finished = models.DateTimeField(null=True, blank=True)
+    scope_type = models.CharField(max_length=20, choices=ScopeType)
+    scope_id = models.CharField(max_length=64)
+    scope_label = models.CharField(max_length=255)
+    scope_path = models.CharField(max_length=500)
+    requested_query = models.TextField(blank=True)
+    requested_mode = models.CharField(max_length=20)
+    cap = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=20, choices=Status, default=Status.QUEUED, db_index=True
+    )
+    summary = models.JSONField(default=dict, blank=True)
+    failure = models.TextField(blank=True)
+    warnings = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        verbose_name = gettext_lazy("Judge run")
+        verbose_name_plural = gettext_lazy("Judge runs")
+        # ruff: ignore[mutable-class-default]
+        indexes = [
+            models.Index(fields=["actor", "-created"], name="judge_run_actor_idx"),
+            models.Index(
+                fields=["scope_type", "scope_id", "-created"],
+                name="judge_run_scope_idx",
+            ),
+            models.Index(fields=["status", "-created"], name="judge_run_status_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.scope_type}: {self.scope_label}"
+
+
+class JudgeRunUnit(models.Model):
+    """The immutable participation record for one unit in one producer run."""
+
+    class Outcome(models.TextChoices):
+        PASSED = "passed"
+        MINOR = "minor"
+        MAJOR = "major"
+        CRITICAL = "critical"
+        UNPARSED = "unparsed"
+        SKIPPED = "skipped"
+        STALE_CONFLICT = "stale-conflict"
+
+    class SkipReason(models.TextChoices):
+        PERMISSION = "permission"
+        CAP = "cap"
+
+    class RepairStatus(models.TextChoices):
+        NOT_ATTEMPTED = "not-attempted"
+        NO_CANDIDATE = "no-candidate"
+        APPLIED = "applied"
+        ROLLED_BACK = "rolled-back"
+
+    run = models.ForeignKey(JudgeRun, on_delete=models.deletion.CASCADE)
+    unit = models.ForeignKey(
+        "trans.Unit",
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="judge_run_units",
+    )
+    unit_id_snapshot = models.BigIntegerField()
+    translation_id = models.BigIntegerField()
+    component_id = models.BigIntegerField()
+    project_id = models.BigIntegerField()
+    input_target = models.JSONField(default=list)
+    input_target_hash = models.CharField(max_length=64)
+    context_hash = models.CharField(max_length=64)
+    verdict = models.ForeignKey(
+        "JudgeVerdict",
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="run_outcomes",
+    )
+    outcome = models.CharField(max_length=20, choices=Outcome)
+    skip_reason = models.CharField(max_length=20, choices=SkipReason, blank=True)
+    repair_status = models.CharField(
+        max_length=20, choices=RepairStatus, default=RepairStatus.NOT_ATTEMPTED
+    )
+    initial_severity = models.CharField(
+        max_length=10,
+        choices=(
+            ("none", "none"),
+            ("minor", "minor"),
+            ("major", "major"),
+            ("critical", "critical"),
+        ),
+        blank=True,
+    )
+    final_severity = models.CharField(
+        max_length=10,
+        choices=(
+            ("none", "none"),
+            ("minor", "minor"),
+            ("major", "major"),
+            ("critical", "critical"),
+        ),
+        blank=True,
+    )
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    before_target = models.JSONField(default=list)
+    after_target = models.JSONField(default=list)
+    cached = models.BooleanField(default=False)
+    projection_succeeded = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = gettext_lazy("Judge run unit")
+        verbose_name_plural = gettext_lazy("Judge run units")
+        # ruff: ignore[mutable-class-default]
+        indexes = [
+            models.Index(fields=["run", "outcome"], name="judge_run_outcome_idx"),
+            models.Index(fields=["run", "repair_status"], name="judge_run_repair_idx"),
+        ]
+        # ruff: ignore[mutable-class-default]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["run", "unit_id_snapshot"], name="judge_run_one_unit"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.run_id}: {self.unit_id_snapshot}"
+
+
 class JudgeVerdict(models.Model):
     """
     One judge opinion about one version of one unit.
@@ -136,6 +288,7 @@ class JudgeVerdict(models.Model):
     unparsed = models.BooleanField(default=False)
     errors = models.JSONField(default=list, blank=True)
     back_translation = models.TextField(blank=True)
+    instruction = models.TextField(blank=True)
     judge_model = models.CharField(max_length=200)
     # Place in the collegium, not seniority: seat 2 may not lower seat 1.
     seat = models.SmallIntegerField()
@@ -692,3 +845,19 @@ def describe_latest_verdict(unit: Unit) -> str:
             if line not in lines:
                 lines.append(line)
     return JUDGE_ERROR_SEPARATOR.join(lines)
+
+
+def describe_latest_instruction(unit: Unit) -> str:
+    """
+    Return the active repair instruction without exposing it to humans.
+
+    Escaped for the same reason as ``describe_latest_verdict``: llm.py runs
+    this text through ``strip_tags()``, which would otherwise eat a literal
+    game-markup tag the instruction happens to quote.
+    """
+    instructions = {
+        escape(row.instruction.strip())
+        for row in active_round(unit)
+        if row.instruction.strip()
+    }
+    return JUDGE_ERROR_SEPARATOR.join(sorted(instructions))

@@ -1771,6 +1771,7 @@ onReady(() => {
     const messageText = message.querySelector(".task-message");
     const warnings = message.querySelector(".task-warnings");
     const phase = message.querySelector(".task-phase");
+    const actions = message.querySelector(".task-actions");
     if (bar !== null) {
       bar.setAttribute("data-completed", "0");
     }
@@ -1836,6 +1837,16 @@ onReady(() => {
                 div.textContent = warning;
                 warnings.appendChild(div);
               });
+            }
+            /* A dedicated slot, never innerHTML: the anchor comes only from
+             * the server-provided URL, the label is a fixed text node. */
+            if (result.report_url && actions !== null) {
+              actions.replaceChildren();
+              const link = document.createElement("a");
+              link.href = result.report_url;
+              link.className = "btn btn-sm btn-primary";
+              link.textContent = gettext("View judge report");
+              actions.appendChild(link);
             }
           }
         } catch (_error) {

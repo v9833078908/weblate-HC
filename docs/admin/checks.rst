@@ -231,6 +231,21 @@ Judge previews use observed, project- and model-specific request costs only
 after at least five priced requests. The range is an estimate, not a provider
 quote, and an unavailable range must not be treated as zero.
 
+Every producer launch (a component, project, or workspace scope) is recorded
+as one durable run, addressed by its own URL, independent of the Celery task
+result that started it. The run report lists checked, matched, cached, and
+skipped counts, and repaired, rolled back, minor, major, critical, unparsed,
+stale-conflict, accepted-as-is, and escalated outcomes; each count opens the
+matching paginated list of strings. A finished component, project, or
+translation page shows a link to its own last run. Access to a run report
+requires the same
+automatic translation and review permissions as launching one, re-checked
+for the current user rather than trusted from who launched it; it never
+shows a cost figure. A guarded, dry-run-by-default
+:wladmin:`judge_release_advisory_holds` command exists for releasing
+strings that an earlier judge policy held automatically, before an
+unresolved ``major`` stopped blocking delivery on its own.
+
 .. seealso::
 
    * :ref:`auto-translation`

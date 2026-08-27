@@ -20,6 +20,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import IntegrityError, transaction
 from django.db.models import Exists, F, OuterRef
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext, ngettext, override
@@ -1037,6 +1038,10 @@ def auto_translate(
                 ),
             )
         except PermissionDenied as error:
+            if auto.active_judge_run is not None:
+                result["report_url"] = reverse(
+                    "judge-run", kwargs={"pk": auto.active_judge_run.id}
+                )
             result.update({"message": str(error), "warnings": auto.get_warnings()})
             return store_auto_translate_activity_log(
                 activity_log_id,
@@ -1045,6 +1050,10 @@ def auto_translate(
                 task_count=activity_log_task_count,
             )
         except JudgeError as error:
+            if auto.active_judge_run is not None:
+                result["report_url"] = reverse(
+                    "judge-run", kwargs={"pk": auto.active_judge_run.id}
+                )
             result.update(
                 {
                     "message": gettext("Automatic translation failed: %s") % error,
@@ -1058,6 +1067,10 @@ def auto_translate(
                 task_count=activity_log_task_count,
             )
         result.update({"message": message, "warnings": auto.get_warnings()})
+        if auto.active_judge_run is not None:
+            result["report_url"] = reverse(
+                "judge-run", kwargs={"pk": auto.active_judge_run.id}
+            )
         return store_auto_translate_activity_log(
             activity_log_id,
             result,
@@ -1115,6 +1128,10 @@ def auto_translate_component(
             "message": message,
             "warnings": auto.get_warnings(),
         }
+        if auto.active_judge_run is not None:
+            result["report_url"] = reverse(
+                "judge-run", kwargs={"pk": auto.active_judge_run.id}
+            )
         return store_auto_translate_activity_log(
             activity_log_id,
             result,
@@ -1126,6 +1143,10 @@ def auto_translate_component(
         "message": message,
         "warnings": auto.get_warnings(),
     }
+    if auto.active_judge_run is not None:
+        result["report_url"] = reverse(
+            "judge-run", kwargs={"pk": auto.active_judge_run.id}
+        )
     return store_auto_translate_activity_log(activity_log_id, result)
 
 

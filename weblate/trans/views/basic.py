@@ -76,6 +76,7 @@ from weblate.trans.models.component import (
 from weblate.trans.models.project import prefetch_project_flags
 from weblate.trans.models.translation import GhostTranslation
 from weblate.trans.util import render, sort_unicode, translation_percent
+from weblate.trans.views.judge import last_judge_run
 from weblate.trans.views.reports import get_reports_context
 from weblate.trans.workspace_move import can_offer_project_move
 from weblate.utils import messages
@@ -751,6 +752,7 @@ def judge_queue_strip_context(
         "breakdown_url": reverse("checks", kwargs={"path": obj.get_url_path()}),
         "run_url": f"{obj.get_absolute_url()}?{run_query}#auto",
         "counts": counts,
+        "last_run": last_judge_run(obj, actor=user),
     }
 
 
@@ -906,6 +908,13 @@ def show_translation(
         )
         judge_request_estimate = judge_request_upper_bound(judge_row_count)
     judge_verdicts_exist = JudgeVerdict.objects.filter(unit__translation=obj).exists()
+    judge_last_run = None
+    if (
+        settings.JUDGE_ENABLED
+        and user.has_perm("translation.auto", obj)
+        and user.has_perm("unit.review", obj)
+    ):
+        judge_last_run = last_judge_run(obj, actor=user)
     form = get_upload_form(user, obj)
 
     search_form = SearchForm(
@@ -1013,6 +1022,7 @@ def show_translation(
             "judge_row_count": judge_row_count,
             "judge_request_estimate": judge_request_estimate,
             "judge_verdicts_exist": judge_verdicts_exist,
+            "judge_last_run": judge_last_run,
         },
     )
 

@@ -3,9 +3,15 @@
 > **For Claude:** Use `executing-plans` task by task. Use
 > `test-driven-development` and `verification-before-completion`.
 
-**Date:** 2026-08-25. **Status:** deferred until
-`docs/llm-first/plans/2026-08-25-01-judge-producer-ux-and-delivery.md` is
-implemented and verified.
+**Date:** 2026-08-25. **Status:** implemented 2026-08-27 (Tasks 1-6);
+production rollout remains separately gated, see "Production rollout" below.
+Verified without a live browser: `./rundev.sh` was not started for this
+worktree (dev-docker is a shared, single-instance resource; restarting it
+needs separate approval). The interactive judge launch and the report page
+are instead covered end to end by the Django test client, including the
+`CELERY_TASK_ALWAYS_EAGER` producer flow, `assertNumQueries`-bounded report
+rendering, and the poller/`message.html` contract (JS syntax and template
+structure only, not a live click-through).
 
 **Goal:** Give every component/project/workspace judge launch one durable
 identity, record a complete per-unit outcome including cached evidence, link the

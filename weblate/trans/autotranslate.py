@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from math import ceil
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -14,6 +14,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Case, IntegerField, QuerySet, Value, When
 from django.db.models.functions import MD5, Lower
+from django.utils import timezone
 from django.utils.translation import gettext, ngettext
 
 from weblate.checks.models import CHECKS
@@ -21,7 +22,7 @@ from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.models import MACHINERY
 from weblate.trans.actions import ActionEvents
 from weblate.trans.judge import JUDGE_SEATS, JudgeError, validate_judge_configuration
-from weblate.trans.judge_loop import run_judge_batch
+from weblate.trans.judge_loop import build_request, run_judge_batch
 from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models import (
     Category,
@@ -33,7 +34,11 @@ from weblate.trans.models import (
     Unit,
 )
 from weblate.trans.models.judge import (
+    JudgeRun,
+    JudgeRunUnit,
     JudgeVerdict,
+    compute_context_hash,
+    compute_target_hash,
     current_verdict,
     state_for_verdict,
 )
@@ -282,6 +287,7 @@ class AutoTranslate(BaseAutoTranslate):
         allow_non_shared_tm_source_components: bool = False,
         overwrite_existing: bool = False,
         judge_limit: int | None = None,
+        judge_run: JudgeRun | None = None,
     ) -> None:
         super().__init__(
             user=user,
@@ -300,6 +306,7 @@ class AutoTranslate(BaseAutoTranslate):
         self.target_state = STATE_TRANSLATED
         self.overwrite_existing = overwrite_existing
         self.judge_limit = judge_limit
+        self.judge_run = judge_run
         self.judge_units_matched = 0
         self.judge_units_processed = 0
         self.judge_units_remaining = 0
@@ -700,7 +707,9 @@ class AutoTranslate(BaseAutoTranslate):
             selected,
         )
 
-    def process_judge(self, *, engines: list[str], threshold: int) -> None:
+    def process_judge(  # ruff: ignore[too-many-locals]
+        self, *, engines: list[str], threshold: int
+    ) -> None:
         preview, units = self.preview_judge_scope()
         self.judge_units_matched = preview.matched
         self.judge_units_processed = preview.processed
@@ -765,12 +774,15 @@ class AutoTranslate(BaseAutoTranslate):
 
         self.progress_range = (split, base_high)
         self.progress_steps = preview.worst_case_calls
+        input_targets = {unit.id: unit.get_target_plurals() for unit in units}
         try:
+            run_kwargs = {} if self.judge_run is None else {"run": self.judge_run}
             verdicts = run_judge_batch(
                 units,
                 writable_ids=writable_ids,
                 user=self.user,
                 on_batch=tick,
+                **run_kwargs,
             )
             if completed_batches < self.progress_steps:
                 self.set_progress(self.progress_steps)
@@ -782,6 +794,8 @@ class AutoTranslate(BaseAutoTranslate):
         final_snapshots = {
             unit.id: (unit.target, unit.state) for unit in units if unit.id in verdicts
         }
+        projections: set[int] = set()
+        stale_conflicts: set[int] = set()
         unparsed = 0
         for unit in (
             self.translation.unit_set.filter(pk__in=verdicts)
@@ -804,6 +818,7 @@ class AutoTranslate(BaseAutoTranslate):
                     or current.pk != verdict.pk
                     or (locked.target, locked.state) != final_snapshots[unit.id]
                 ):
+                    stale_conflicts.add(unit.id)
                     continue
                 if verdict.verdict == JudgeVerdict.Verdict.UNPARSED:
                     unparsed += 1
@@ -820,6 +835,7 @@ class AutoTranslate(BaseAutoTranslate):
                     state = STATE_FUZZY
                 if state is not None and locked.state != state:
                     self.update(locked, state, locked.get_target_plurals())
+                projections.add(unit.id)
         if unparsed:
             self.add_warning(
                 ngettext(
@@ -830,6 +846,84 @@ class AutoTranslate(BaseAutoTranslate):
                 % unparsed
             )
         self.post_process()
+        if self.judge_run is not None:
+            repair_status: dict[int, str] = getattr(verdicts, "repair_status", {})
+            initial_severity: dict[int, str] = getattr(verdicts, "initial_severity", {})
+            attempt_counts: dict[int, int] = getattr(verdicts, "attempt_counts", {})
+            cached_unit_ids: set[int] = getattr(verdicts, "cached_unit_ids", set())
+            for unit in units:
+                verdict = verdicts.get(unit.id)
+                if verdict is None:
+                    request = build_request(unit)
+                    JudgeRunUnit.objects.update_or_create(
+                        run=self.judge_run,
+                        unit_id_snapshot=unit.id,
+                        defaults={
+                            "unit": unit,
+                            "translation_id": unit.translation_id,
+                            "component_id": unit.translation.component_id,
+                            "project_id": unit.translation.component.project_id,
+                            "input_target": input_targets[unit.id],
+                            "input_target_hash": compute_target_hash(
+                                input_targets[unit.id]
+                            ),
+                            "context_hash": compute_context_hash(
+                                source=request.source,
+                                note=request.note,
+                                glossary_terms=request.glossary_terms,
+                            ),
+                            "outcome": JudgeRunUnit.Outcome.UNPARSED,
+                            "before_target": input_targets[unit.id],
+                            "after_target": unit.get_target_plurals(),
+                        },
+                    )
+                    continue
+                severity_outcomes: dict[str, str] = {
+                    JudgeVerdict.Severity.NONE: JudgeRunUnit.Outcome.PASSED,
+                    JudgeVerdict.Severity.MINOR: JudgeRunUnit.Outcome.MINOR,
+                    JudgeVerdict.Severity.MAJOR: JudgeRunUnit.Outcome.MAJOR,
+                    JudgeVerdict.Severity.CRITICAL: JudgeRunUnit.Outcome.CRITICAL,
+                }
+                outcome = (
+                    JudgeRunUnit.Outcome.STALE_CONFLICT
+                    if unit.id in stale_conflicts
+                    else (
+                        JudgeRunUnit.Outcome.UNPARSED
+                        if verdict.unparsed
+                        else severity_outcomes[verdict.max_severity]
+                    )
+                )
+                JudgeRunUnit.objects.update_or_create(
+                    run=self.judge_run,
+                    unit_id_snapshot=unit.id,
+                    defaults={
+                        "unit": unit,
+                        "translation_id": unit.translation_id,
+                        "component_id": unit.translation.component_id,
+                        "project_id": unit.translation.component.project_id,
+                        "input_target": input_targets[unit.id],
+                        "input_target_hash": compute_target_hash(
+                            input_targets[unit.id]
+                        ),
+                        "context_hash": verdict.context_hash,
+                        "verdict": verdict,
+                        "outcome": outcome,
+                        "repair_status": repair_status.get(
+                            unit.id, JudgeRunUnit.RepairStatus.NOT_ATTEMPTED
+                        ),
+                        "initial_severity": initial_severity.get(
+                            unit.id, verdict.max_severity
+                        ),
+                        "final_severity": verdict.max_severity,
+                        "attempt_count": attempt_counts.get(
+                            unit.id, verdict.attempt + 1
+                        ),
+                        "before_target": input_targets[unit.id],
+                        "after_target": unit.get_target_plurals(),
+                        "cached": unit.id in cached_unit_ids,
+                        "projection_succeeded": unit.id in projections,
+                    },
+                )
 
     def _dispatch(
         self,
@@ -913,6 +1007,8 @@ class BatchAutoTranslate(BaseAutoTranslate):
         self.workspace_source_component_ids: dict[int, list[int]] | None = None
         self.enforce_permissions = enforce_permissions
         self.overwrite_existing = overwrite_existing
+        self.judge_scope = obj
+        self.active_judge_run: JudgeRun | None = None
 
         match obj:
             case Translation():
@@ -985,6 +1081,9 @@ class BatchAutoTranslate(BaseAutoTranslate):
         self._preload_workflow_settings()
         self.progress_steps = len(self.translations)
 
+    def get_task_meta(self) -> dict[str, Any]:
+        return self._task_meta
+
     def preview_judge_scope(self) -> JudgeScopePreview:
         """Aggregate the same permission-filtered, globally capped judge scope."""
         validate_judge_configuration()
@@ -1046,8 +1145,86 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 translation.component.project_id
             ][translation.language_id].workflow_settings
 
-    def get_task_meta(self) -> dict[str, Any]:
-        return self._task_meta
+    def _create_judge_run(self) -> JudgeRun:
+        scope = self.judge_scope
+        match scope:
+            case Translation():
+                scope_type = JudgeRun.ScopeType.TRANSLATION
+            case Component():
+                scope_type = JudgeRun.ScopeType.COMPONENT
+            case Project():
+                scope_type = JudgeRun.ScopeType.PROJECT
+            case Workspace():
+                scope_type = JudgeRun.ScopeType.WORKSPACE
+            case _:
+                msg = (
+                    "Judge runs require a translation, component, project, or workspace"
+                )
+                raise ValueError(msg)
+        task_id = (
+            current_task.request.id if current_task and current_task.request.id else ""
+        )
+        return JudgeRun.objects.create(
+            actor=self.user,
+            task_id=task_id,
+            started=timezone.now(),
+            scope_type=scope_type,
+            scope_id=str(scope.pk),
+            scope_label=str(scope),
+            scope_path=scope.get_absolute_url(),
+            requested_query=self.q,
+            requested_mode=self.mode,
+            cap=settings.JUDGE_MAX_UNITS_PER_RUN,
+            status=JudgeRun.Status.RUNNING,
+        )
+
+    @staticmethod
+    def _record_skipped_judge_units(
+        run: JudgeRun,
+        units: Sequence[Unit],
+        reason: JudgeRunUnit.SkipReason,
+    ) -> None:
+        for unit in units:
+            request = build_request(unit)
+            JudgeRunUnit.objects.update_or_create(
+                run=run,
+                unit_id_snapshot=unit.id,
+                defaults={
+                    "unit": unit,
+                    "translation_id": unit.translation_id,
+                    "component_id": unit.translation.component_id,
+                    "project_id": unit.translation.component.project_id,
+                    "input_target": unit.get_target_plurals(),
+                    "input_target_hash": compute_target_hash(unit.get_target_plurals()),
+                    "context_hash": compute_context_hash(
+                        source=request.source,
+                        note=request.note,
+                        glossary_terms=request.glossary_terms,
+                    ),
+                    "outcome": JudgeRunUnit.Outcome.SKIPPED,
+                    "skip_reason": reason,
+                    "before_target": unit.get_target_plurals(),
+                    "after_target": unit.get_target_plurals(),
+                },
+            )
+
+    def _finish_judge_run(
+        self,
+        run: JudgeRun,
+        status: JudgeRun.Status,
+        failure: str = "",
+    ) -> None:
+        # A run is finalized exactly once: a second call (for example a
+        # redundant exception handler further up the same call stack)
+        # must never overwrite an already-terminal run.
+        if run.status in {JudgeRun.Status.COMPLETED, JudgeRun.Status.FAILED}:
+            return
+        run.status = status
+        run.finished = timezone.now()
+        run.failure = failure
+        run.summary = asdict(self.judge_summary or JudgeSummary())
+        run.warnings = self.get_warnings()
+        run.save(update_fields=["status", "finished", "failure", "summary", "warnings"])
 
     def _can_process_translation(self, translation: Translation) -> bool:
         return not self.enforce_permissions or bool(
@@ -1080,7 +1257,32 @@ class BatchAutoTranslate(BaseAutoTranslate):
         threshold: int,
         source_component_ids: list[int] | None,
     ) -> str:
+        self.active_judge_run = None
+        try:
+            return self._perform(
+                auto_source=auto_source,
+                engines=engines,
+                threshold=threshold,
+                source_component_ids=source_component_ids,
+            )
+        except Exception as error:
+            if self.active_judge_run is not None:
+                self._finish_judge_run(
+                    self.active_judge_run, JudgeRun.Status.FAILED, str(error)
+                )
+            raise
+
+    def _perform(  # ruff: ignore[complex-structure]
+        self,
+        *,
+        auto_source: Literal["mt", "others"],
+        engines: list[str],
+        threshold: int,
+        source_component_ids: list[int] | None,
+    ) -> str:
         judge_preview = self.preview_judge_scope() if self.mode == "judge" else None
+        judge_run = self._create_judge_run() if judge_preview is not None else None
+        self.active_judge_run = judge_run
         if judge_preview is not None:
             self.judge_summary = JudgeSummary()
         judge_remaining = judge_preview.processed if judge_preview is not None else None
@@ -1101,13 +1303,6 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     ).append(component_id)
 
         for pos, translation in enumerate(self.translations, start=1):
-            if not self._can_process_translation(translation):
-                self.set_progress(pos)
-                continue
-            if self.mode == "judge" and not judge_remaining:
-                self.set_progress(pos)
-                continue
-
             auto_translate = AutoTranslate(
                 user=self.user,
                 translation=translation,
@@ -1120,7 +1315,34 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 ),
                 overwrite_existing=self.overwrite_existing,
                 judge_limit=judge_remaining,
+                judge_run=judge_run,
             )
+            if not self._can_process_translation(translation):
+                if self.mode == "judge" and judge_run is not None:
+                    self._record_skipped_judge_units(
+                        judge_run,
+                        list(auto_translate.get_units().order_by("position", "pk")),
+                        JudgeRunUnit.SkipReason.PERMISSION,
+                    )
+                self.set_progress(pos)
+                continue
+            if self.mode == "judge" and judge_run is not None:
+                matched_units = list(
+                    auto_translate.get_units().order_by("position", "pk")
+                )
+                if not judge_remaining:
+                    self._record_skipped_judge_units(
+                        judge_run,
+                        matched_units,
+                        JudgeRunUnit.SkipReason.CAP,
+                    )
+                    self.set_progress(pos)
+                    continue
+                self._record_skipped_judge_units(
+                    judge_run,
+                    matched_units[judge_remaining:],
+                    JudgeRunUnit.SkipReason.CAP,
+                )
             auto_translate.progress_range = (
                 100 * (pos - 1) // self.progress_steps,
                 100 * pos // self.progress_steps,
@@ -1184,6 +1406,9 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     self.set_progress(pos)
                     continue
 
+            # A failure here propagates to perform()'s own handler, which
+            # finalizes the run exactly once (active_judge_run stays set);
+            # finalizing here too would double-write the same FAILED run.
             auto_translate.perform(
                 auto_source=auto_source,
                 engines=engines,
@@ -1200,5 +1425,15 @@ class BatchAutoTranslate(BaseAutoTranslate):
             )
             self.add_warning(
                 gettext("Judge run skipped because the per-run string cap was reached.")
+            )
+        if judge_run is not None:
+            self._finish_judge_run(
+                judge_run,
+                (
+                    JudgeRun.Status.FAILED
+                    if self.failure_message
+                    else JudgeRun.Status.COMPLETED
+                ),
+                self.failure_message or "",
             )
         return self.failure_message or self.get_message()
