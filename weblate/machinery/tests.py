@@ -101,6 +101,7 @@ from weblate.machinery.openai import AzureOpenAITranslation, OpenAITranslation
 from weblate.machinery.saptranslationhub import SAPTranslationHub
 from weblate.machinery.systran import SystranTranslation
 from weblate.machinery.tmserver import TMServerTranslation
+from weblate.machinery.views import EditMachineryProjectView
 from weblate.machinery.weblatetm import WeblateTranslation
 from weblate.machinery.yandex import YandexTranslation
 from weblate.machinery.yandexv2 import YandexV2Translation
@@ -10418,6 +10419,50 @@ class ProjectMachineryInheritanceTest(TestCase):
             other.get_machinery_settings()["openai"]["persona"],
             "You translate spaceship UI.",
         )
+
+
+class MachineryProjectStripInheritedTest(TestCase):
+    """
+    Regression test for a project-only save of a dict-valued field.
+
+    strip_inherited() used to compare a field absent from the site-wide
+    configuration against the set literal ``{"", None}``. A routed-LLM
+    service always submits ``routing`` and ``language_instructions`` as
+    dicts (``EmptyMappingJSONField``), and checking a dict for set
+    membership raises ``TypeError: unhashable type: 'dict'`` before it can
+    ever compare unequal. This reproduced whenever the service has no
+    site-wide configuration entry at all, which is always the case for a
+    service that is only ever configured per-project.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.project = Project.objects.create(name="Test", slug="test")
+
+    def _view(self, machinery_id: str) -> EditMachineryProjectView:
+        view = EditMachineryProjectView()
+        view.project = self.project
+        view.machinery_id = machinery_id
+        return view
+
+    def test_dict_field_without_sitewide_entry_does_not_crash(self) -> None:
+        view = self._view("litellm")
+
+        overrides = view.strip_inherited(
+            {
+                "key": "sk-test",
+                "routing": {"*": "some-model"},
+                "language_instructions": {},
+            }
+        )
+
+        self.assertEqual(overrides, {"key": "sk-test", "routing": {"*": "some-model"}})
+
+    def test_empty_json_field_without_sitewide_entry_carries_no_intent(self) -> None:
+        view = self._view("litellm")
+
+        self.assertEqual(view.strip_inherited({"language_instructions": {}}), {})
+        self.assertEqual(view.strip_inherited({"routing": {}}), {})
 
 
 class ListMachineryCommandTest(SimpleTestCase):

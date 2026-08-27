@@ -374,9 +374,13 @@ class EditMachineryProjectView(MachineryProjectMixin, EditMachineryView):
                 # override, so an empty value is kept here.
                 if sitewide[field] != value:
                     overrides[field] = value
-            # Nothing to inherit: an unticked checkbox or a blank text field
-            # carries no intent. Identity is used so that a numeric 0 survives.
-            elif value is not False and value not in {"", None}:
+            # Nothing to inherit: an unticked checkbox, a blank text field, or
+            # an empty JSON object/array (routing, language_instructions)
+            # carries no intent. A tuple, not a set, so an unhashable value
+            # such as a dict or list can be compared with == instead of
+            # crashing when checked for membership. Identity is used for
+            # False so that a numeric 0 survives.
+            elif value is not False and value not in ("", None, {}, []):
                 overrides[field] = value
         return cast("SettingsDict", overrides)
 
