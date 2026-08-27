@@ -26,6 +26,15 @@ Review revision, in one place so a reader of the earlier draft knows what moved:
   attempt reaches the verdict writer without widening `OnBatch`.
 - `judge_provider` ownership, retention, per-seat provider validation and the
   `max_tokens` truncation hazard are settled explicitly.
+- Cache identity is defined as the *configured* request shape plus the unit's
+  own hashes, including the configured batch size. A realized-batch digest is
+  stored as evidence but cannot be a predicate: the cache decision precedes
+  batch formation and membership depends on that decision.
+- Peer sensitivity is treated as an open, measured question rather than an
+  assumption in either direction: the probe gains an arm that varies only
+  neighbours, no test or report may claim peer-crossing equivalence before it is
+  published, and the fallback if it fails is a stored-row property
+  (`unit_count == 1`), not a redesign of batching.
 - Implementation runs in two waves: evidence and profiles first, retry policy
   only after the probe shows the terminal-failure mix.
 
@@ -124,6 +133,7 @@ It contains only technical metadata:
 | `logical_run_id` | current model-call round ID (`JudgeVerdict.run_id`) |
 | `round_kind` | `initial`, `repair`, or `unparsed-retry` |
 | `seat`, `batch_index`, `attempt_index`, `unit_count` | position and bounded retry history |
+| `batch_digest` | digest of the exact serialized batch: evidence for the peer question in D3, never a cache predicate |
 | `provider`, `model`, `profile_fingerprint`, `request_fingerprint` | request provenance without a credential |
 | `status_code`, `finish_reason`, `response_id`, `retry_after_seconds` | safe peer outcome metadata |
 | `failure_kind`, `parsed`, `will_retry` | normalized result and decision |
@@ -199,15 +209,17 @@ Add nullable provenance fields to new `JudgeVerdict` rows:
 
 - `judge_run`, the producer run that issued this fresh evidence;
 - `request_attempt`, the terminal `JudgeRequestAttempt` for the batch;
-- `judge_provider`, `profile_fingerprint`, `request_fingerprint`; and
+- `judge_provider`, `profile_fingerprint`, `request_fingerprint`;
+- `batch_unit_count` and `batch_digest`, the realized batch this verdict came
+  from; and
 - `round_kind`.
 
 `judge_provider` is the same field
 `docs/llm-first/plans/2026-08-26-judge-provider-failover.md:110-117` introduces.
 Both plans are unstarted, so two migrations would collide: this plan owns the
-field and its migration, and that plan is edited to consume it. The batch width
-of a request is both attempt provenance (`unit_count`) and part of request
-identity - see D3.
+field and its migration, and that plan is edited to consume it. The realized
+batch fields are evidence only; what enters cache identity is the *configured*
+request shape - see D3.
 
 Old rows remain valid historical evidence with blank nullable provenance. A
 new result from a retry supersedes the earlier unparsed round by timestamp as
@@ -307,27 +319,74 @@ JUDGE_MAX_TOKENS_SEAT_2=0
 `_cached_verdict()` must require the stored profile and request fingerprints
 for each slot, not only the model strings. The request fingerprint covers the
 provider identity, endpoint fingerprint, model, resolved reasoning request
-fields, `max_tokens`, batch width, the prompt/schema version, and an effective
-project-context digest. The project-context digest closes a live correctness
-hole rather than only tightening a measurement: `compute_context_hash()` covers
-source, note and glossary only (`weblate/trans/models/judge.py:71-90`), while
+fields, `max_tokens`, the configured batch size, the prompt/schema version, and
+an effective project-context digest. The project-context digest closes a live
+correctness hole rather than only tightening a measurement:
+`compute_context_hash()` covers source, note and glossary only
+(`weblate/trans/models/judge.py:71-90`), while
 `judge_project_context()` (`weblate/trans/judge_loop.py:187-205`) goes into the
 prompt, so editing a project's judge persona or style currently leaves stale
 verdicts reusable.
 
-Batch width belongs in the fingerprint because it is literally part of the
+Batch shape belongs in the fingerprint because it is literally part of the
 request: `request_verdicts()` serializes the whole batch's `segments` into one
 user message (`weblate/trans/judge.py:605-642`), so a verdict about one string
 at width five was produced from a prompt that also carried four other strings.
-A width-one retry answer and a width-five answer are different requests, and
-treating them as interchangeable would let cache reuse cross a prompt boundary.
+What enters identity is the *configured* width - `JUDGE_BATCH_SIZE`, or one for
+a D6 retry round - because that is the part a deployment chooses and this plan
+deliberately varies. A width-one retry answer and a width-five answer are
+different requests, and reuse cannot cross that boundary.
+
+The realized batch is recorded rather than fingerprinted: the attempt stores
+`unit_count` and a digest of the exact serialized batch, and a fresh verdict
+carries the same digest. That is what makes the peer question answerable later
+instead of arguable now.
 
 The accepted cost is stated rather than avoided: a verdict earned in a
 width-one retry round is not reused by a later ordinary run, so that unit is
 judged again as part of a normal batch - one extra string in one batch, not a
 multiplied cost - and a change to `JUDGE_BATCH_SIZE` invalidates the cache
 wholesale. Both are cheaper than reusing an answer produced under a different
-prompt.
+configured request.
+
+Peer *content* is the open question, and this plan neither asserts it away nor
+pretends to settle it. Equal-width batches can carry different neighbours, so
+width does not establish request equality.
+
+The predicate can only compare what a stored row records against what the
+deployment is configured to do now. It cannot compare against "the batch this
+run would have formed", because that is circular: the cache decision runs per
+unit before any batch exists (`weblate/trans/judge_loop.py:507-514`), and
+batches are cut from whatever units the cache did not skip
+(`weblate/trans/judge.py:600-603`), so membership would depend on the cache
+result that depends on membership. A stored realized-batch digest is therefore
+evidence, never a predicate.
+
+That reframes the reuse question correctly. It is not "is the new request
+identical" - no new request is made - but "is this stored verdict still valid
+evidence about this string under the current configuration". Configured shape
+answers that; realized peers do not, so reuse across different realized peers
+stays an explicit bounded assumption. The assumption is not introduced here:
+today's predicate matches model names alone
+(`weblate/trans/judge_loop.py:268-273`), so it already reuses across peers,
+widths, endpoints, thinking modes and project contexts. This plan narrows it to
+one configured request shape and makes the remainder measurable; it widens
+nothing.
+
+The assumption is tested, not argued. The probe protocol below gains one arm
+that holds profile and width fixed and varies only the neighbours of a frozen
+set of judged strings, against repeats with peers held fixed. Until that arm is
+published, neither a report nor a measurement may claim that a peer-crossing
+cache hit is equivalent evidence.
+
+If that arm shows peer substitution moving severity beyond the fixed-peer repeat
+noise floor, the fallback is a property of the stored row rather than of a
+hypothetical batch: require peer-free provenance - a stored realized
+`unit_count` of one - before a row may be reused. That is non-circular,
+needs no new schema, and its cost is stated plainly: at any configured width
+above one, cross-run reuse of judged verdicts effectively ends. The decision
+belongs to the measurement; this plan does not pre-approve it, and it is not in
+Tasks 1-6.
 
 Legacy verdicts with no fingerprint are not reused after this feature lands,
 and the cost of that is explicit and one-time: on a deployment holding existing
@@ -442,10 +501,11 @@ Within a round:
 3. Force width one, one unit per request. This prevents one malformed batch
    reply from making an otherwise unrelated peer unparsed. The retry profile
    keeps each seat's model, endpoint, reasoning fields and `max_tokens`, and
-   carries a distinct request fingerprint because width is part of request
-   identity (D3): the verdict it earns is final evidence for this run, and a
-   later ordinary run judges that string again rather than reusing an answer
-   produced from a one-segment prompt.
+   carries a distinct request fingerprint because its configured width is one
+   (D3): the verdict it earns is final evidence for this run, and a later
+   ordinary run judges that string again rather than reusing an answer produced
+   under a different configured shape. It is also the only peer-free evidence
+   the system produces, which is what makes the D3 fallback available at all.
 4. A retry is not a lower-trust second path: a parsed retry verdict enters the
    normal collegium, and a repairable one re-enters the repair loop with the
    unit's already-spent `attempt`, so the existing `attempt > attempts` bound
@@ -673,8 +733,12 @@ the migration from Task 2 or a successor, and
 4. Compute and persist the safe profile and request fingerprints. Update
    `_cached_verdict()` to require one matching slot/profile/request fingerprint
    per cached verdict, including the effective project-context digest and the
-   batch width.
-5. Give every fresh verdict and attempt its resolved profile fingerprint.
+   configured batch size. The predicate compares stored production conditions
+   against current configuration only; it never derives anything from the batch
+   the current run would form, which is not knowable at cache-check time.
+5. Give every fresh verdict and attempt its resolved profile fingerprint, plus
+   the realized `unit_count` and batch digest as evidence. Nothing in Tasks 1-6
+   reads the digest as a cache predicate.
 
 Tests:
 
@@ -685,15 +749,19 @@ Tests:
 - per-seat settings can express DeepSeek default plus Qwen disabled;
 - valid 1–8,192 values, zero omission, booleans and invalid `max_tokens`
   values behave predictably;
-- same models with a different profile, provider, project context or batch
-  width miss cache;
+- same models with a different profile, provider, project context or configured
+  batch size miss cache;
 - an inadmissible seat/model reasoning pair fails validation before any POST;
-- matching profiles retain cache reuse; and
+- matching profiles retain cache reuse;
+- a fresh verdict and its attempt record the realized `unit_count` and batch
+  digest, and no cache decision reads either; and
 - old blank-profile evidence never satisfies the new cache predicate.
 
 No live model setting is changed in this task. The correct DeepSeek
 disable-thinking wire format remains a measurement question, not something a
-unit test against an HTTP fake can prove.
+unit test against an HTTP fake can prove. Neither is peer sensitivity: no test
+here may be read as evidence that a peer-crossing cache hit is equivalent, and
+none is written to suggest it.
 
 Commit: `feat(judge): support per-seat request profiles`
 
@@ -829,9 +897,15 @@ new retry setting, run a read-only paid probe through the actual LiteLLM proxy:
 3. Use the production prompt, strict schema and parser. Preserve per-attempt
    metadata, no raw response content.
 4. Run at least three time-separated repeats against a representative frozen
-   French slice before interpreting a rate. Batch width is recorded and held
-   fixed within a comparison.
-5. Publish the result in `docs/llm-first/measurements/` before changing a
+   French slice before interpreting a rate. Batch width **and batch membership**
+   are recorded and held fixed within a comparison arm, so reshuffled
+   neighbours never confound a rate.
+5. Add one peer-sensitivity arm, which is the only arm that varies membership:
+   same profile, same width, same frozen strings, different neighbours, against
+   repeats with neighbours held fixed. It answers whether a peer-crossing cache
+   hit is equivalent evidence (D3). Report severity movement against the
+   fixed-peer repeat noise floor, not against a single run.
+6. Publish the result in `docs/llm-first/measurements/` before changing a
    deployed profile.
 
 Two different questions are being answered here, and one gate must not block
@@ -843,6 +917,8 @@ the other.
 - retry call counts stay within the D6 arithmetic bound;
 - no retry is made for a parsed verdict, deadline, oversized reply, `401`,
   `403`, `unknown` or `finish_reason=length`;
+- no report, summary or measurement claims that a peer-crossing cache hit is
+  equivalent evidence until the peer-sensitivity arm is published;
 - every persisted producer-run attempt and usage row joins to its `JudgeRun`,
   with zero persistence losses in the canary;
 - cache rejects a deliberately changed profile and reuses an unchanged one;
