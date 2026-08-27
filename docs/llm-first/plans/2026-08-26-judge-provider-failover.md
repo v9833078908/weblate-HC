@@ -1,7 +1,16 @@
 # LiteLLM judge seats in production, with OpenRouter as the fallback
 
-**Date:** 2026-08-26. **Status:** approved in direction, not started. Stage A
-and Stage D each need their own explicit go before they run.
+**Date:** 2026-08-26. **Status:** mechanism absorbed 2026-08-27, Stage A still
+open. `docs/llm-first/plans/2026-08-27-judge-reliability-hardening.md` now owns
+D1-D4, D6, D7 and Stages B-C - the two-endpoint configuration, the per-seat
+per-batch fallback, the availability-only trigger list, the `judge_provider`
+field and the parser-invalid-`200` safety rule - because that plan needs the
+fallback as its terminal machine resolver and must not carry a competing
+migration. D5 (cache reuse) is superseded there by a stricter predicate. What
+remains live here is **Stage A**: no LiteLLM seat pair has been scored against
+ground truth, and scoring is tracked by
+`docs/llm-first/plans/2026-08-27-judge-set-ab-openrouter-vs-litellm.md`.
+Stage A and Stage D each still need their own explicit go before they run.
 **Rule:** R3 - changing the prompt or the model invalidates the measurement
 (`docs/llm-first/vision/llm-first-product-architecture.md:674`).
 
