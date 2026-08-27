@@ -43,6 +43,7 @@ Usage:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import operator
 import os
@@ -309,12 +310,16 @@ def main() -> None:
     size = int(os.environ.get("SMOKE_BATCH", "5"))
     batches = [requests[i : i + size] for i in range(0, len(requests), size)]
     # Per-run filename: a second run with a different batch size or model set is
-    # a different measurement and must not overwrite the first. Model ids carry
-    # spaces and "!", which make the resulting path awkward to quote in a shell,
-    # so reduce the tag to a safe alphabet.
+    # a different measurement and must not overwrite the first. The readable tag
+    # alone cannot carry that guarantee - it folds every punctuation run to "-",
+    # so "a!b" and "a b" collide, and it is truncated to keep the path short.
+    # A digest of the exact joined ids restores injectivity; the tag stays only
+    # so a human can recognise the file.
     order = os.environ.get("SMOKE_ORDER", "interleaved")
-    tag = re.sub(r"[^A-Za-z0-9.]+", "-", "_".join(models)).strip("-")
-    out = OUT.with_name(f"{OUT.stem}-b{size}-{order}-{tag[:50]}{OUT.suffix}")
+    raw = "_".join(models)
+    digest = hashlib.blake2b(raw.encode(), digest_size=4).hexdigest()
+    tag = re.sub(r"[^A-Za-z0-9.]+", "-", raw).strip("-")[:50].rstrip("-")
+    out = OUT.with_name(f"{OUT.stem}-b{size}-{order}-{tag}-{digest}{OUT.suffix}")
     print(f"slice: {len(units)} units from the dev split")
     for bucket, count in SLICE.items():
         print(f"  {bucket}: {count}")
