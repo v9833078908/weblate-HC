@@ -136,8 +136,7 @@ class JudgeCheckTest(ViewTestCase):
     def test_glossary_unit_gets_the_projected_row(self) -> None:
         # Glossary components run only CHECKS.glossary in Unit.run_checks,
         # so the judge checks must be part of that set or a judged
-        # glossary never shows its verdicts as checks (production defect,
-        # Strategy and Tactics 2 glossary run of 2026-08-27).
+        # glossary never shows its verdicts as checks.
         self.assertTrue(set(CHECKS.glossary) >= JUDGE_CHECKS)
         self.component.create_glossary()
         glossary = self.project.component_set.get(is_glossary=True).translation_set.get(
