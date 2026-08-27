@@ -31,26 +31,36 @@ to zero.
    says "N strings were left unjudged" (`:839-847`) and nothing that owns them.
 
 **This is the goal: outcome 2 stops existing.** Not as a lower rate - as a
-contract. No selected unit may leave a producer run in an unowned, unexplained
-absence of a verdict. Every unit ends in exactly one of:
+contract. No selected unit may leave a producer run *silently*: no unit ends in
+an absence of verdict that the machine itself closed, that no one is permitted
+to act on, or that appears nowhere. Every unit ends in exactly one of:
 
 | terminal state | meaning | who owns it next |
 |---|---|---|
 | a parsed verdict | machine opinion recorded | the existing resolution workflow |
 | `skipped` | policy: permission or cap | the operator who set the policy |
 | `stale-conflict` | the judged text changed under us | nobody: the next run re-selects it |
-| `deferred`, open | machine could not judge it yet | a bounded machine ladder, then a named human |
+| `deferred`, open | machine could not judge it yet | a bounded machine ladder, then a visible, permission-addressable case that only a human disposition can close |
 
 `deferred` is not a rename of `unparsed`. It is a durable row that stays open
 until something terminal actually happens to it (D7), and while it is open the
 unit carries a visible check (D8). A run that produces open deferrals says so.
 
-Two claims follow, and they are deliberately different in kind:
+Two claims follow, and they are deliberately different in kind. Keeping them
+apart is the point: the first is a property of this system and is provable, the
+second is a property of a provider and is only measurable.
 
-- **Structural (provable, gated by tests):** zero units end a run unowned.
-- **Empirical (measured, gated by canary):** the number of units that need the
-  human resolver at all is ~zero, because each seat is placed where it is
-  measured healthy (D5).
+- **Structural (provable, gated by tests):** no unit ends a run silently. Every
+  unresolved case is an open row the machine cannot close, addressable by a
+  computable permission set, surfaced in the unit's checks, the run report and a
+  component alert.
+- **Empirical (measured, gated by canary):** the number of units that reach the
+  human path at all is ~zero, because each seat is placed where it is measured
+  healthy (D5).
+
+Neither claim promises that a person acts, and no wording in this plan may be
+read that way. Delivery of a notification is best effort; ownership here means
+"a computable set of accounts may act, and the empty case is itself an alert".
 
 ## Why zero is reachable: the measured cause
 
@@ -463,7 +473,7 @@ Add `JudgeDeferral`, following the durable-queue precedent of
 | `unit` (FK, `SET_NULL`), `unit_id_snapshot` | subject, surviving deletion |
 | `translation_id`, `component_id`, `project_id` | scope for selection and permissions |
 | `target_hash`, `context_hash` | what it was deferred about |
-| `origin_run` (FK), `origin_actor` (FK, `SET_NULL`) | who asked, so the row has an owner |
+| `origin_run` (FK), `origin_actor` (FK, `SET_NULL`) | provenance: which run first deferred it and who launched that run. A periodic pass has no actor, so this is **not** an owner - see D8 |
 | `first_deferred`, `last_attempted` | age and pacing |
 | `passes_done` | bounded machine ladder |
 | `last_failure_kind`, `last_endpoint_role` | why it is still here |
@@ -529,7 +539,7 @@ With `JUDGE_DEFERRAL_ENABLED=False` nothing changes anywhere: same outcomes,
 same reports, same spend. The contract turns on with one setting, after the
 gate.
 
-### D8. Visibility that cannot be missed, without touching unit state
+### D8. What is guaranteed, and what is only visibility
 
 While a deferral is open the unit carries `judge-unavailable`, a new advisory
 check beside the existing projections (`judge-flag`, `judge-reject`,
@@ -542,9 +552,64 @@ It never changes unit state. A proxy reset must not mark a translator's string
 fuzzy, and `state_for_verdict()` already returns `None` for unparsed
 (`weblate/trans/models/judge.py:398-399`).
 
-The check makes the queue navigable through the ordinary filters, which is what
-gives a human the work list. It is *not* the resolver - the open `JudgeDeferral`
-row with its owner is.
+Beyond that, be exact about the difference between a guarantee and a hope.
+
+**Guaranteed, and provable by tests:**
+
+1. **No machine closure.** A deferral closes only on a machine *terminal* event
+   (verdict, hash change, deleted unit, scope change) or on a recorded human
+   disposition. Exhausting `JUDGE_DEFERRAL_MAX_PASSES` closes nothing.
+2. **Addressable.** The set of accounts permitted to dispose is computable:
+   everyone holding `unit.review` on that unit, the same permission
+   `resolve_verdict()` requires (`weblate/trans/models/judge.py:735`). The
+   disposition entry point checks exactly that, so the right to close a deferral
+   never diverges from the right to resolve a verdict.
+3. **Who can act is computed live, never cached.** Eligibility is a property of
+   the *scope*, not of a row, so the alert below and the report evaluate it per
+   component at evaluation time - one query, not one per deferral - through the
+   alert framework's own `check_component()`/`is_passing()` contract
+   (`weblate/trans/alerts/base.py:73-80`), which is already re-evaluated by
+   `update_alerts`. A snapshot boolean on the deferral row would be falsified by
+   the next permission grant or revocation and is therefore not part of any
+   guarantee. Note what "empty" really means: a superuser always passes
+   `has_perm`, so the honest signal is *no project-scoped account holds
+   `unit.review`* - the backlog is disposable only by an administrator. That
+   condition is what the alert states, and it is a configuration fault to read
+   as one, not a queue that looks staffed.
+4. **Visible in three independent places** that do not depend on anyone's
+   notification settings: the unit's check (ordinary filters), the run report
+   (D9), and a component alert `JudgeUnavailable` registered like every other
+   alert (`weblate/trans/alerts/base.py:39-51`,
+   `weblate/trans/alerts/registry.py`), raised through
+   `Component.add_alert()` while that component has any deferral waiting for a
+   human and removed through `delete_alert()` when the last one closes, with the
+   waiting count, the dominant `failure_kind` and the empty-owner flag in its
+   `details`. `category = AlertCategory.CONFIGURATION`, because the measured
+   cause is seat placement (D5), not a translation defect.
+
+**Not guaranteed, and not claimed:**
+
+- That a notification reaches a person. An actionable alert writes a `Change`
+  with `ActionEvents.ALERT` (`weblate/trans/models/alert.py:103-107`) which
+  `NewAlertNotificaton` (`weblate/accounts/notifications.py:1211-1214`) delivers
+  to *subscribers*, and a `SummaryNotification` subclass beside
+  `ToDoStringsNotification` (`:1408-1411`) digests the backlog per scope. Both
+  are best-effort delivery to whoever subscribed. Neither is ownership.
+- That anyone acts, or acts by a deadline. Nothing in a translation platform can
+  promise that, and a plan that implied it would be lying.
+
+**No `assigned_to` field.** Weblate assigns no string to an individual anywhere;
+work is claimed through permissions and filters. Adding per-string assignment
+means inventing reassignment, absence handling, notification targeting and a UI
+nobody asked for - the only part of this plan with no precedent to follow. If
+real assignment is wanted later it is its own plan, and it would build on the
+`JudgeDeferral` row this one creates.
+
+So the contract is stated at the strength it actually holds: **no unit ends a
+run silently.** Every unresolved case is an open row that the machine cannot
+close, addressable by a computable permission set, surfaced in three places, and
+counted per scope - and the number of cases that get there at all is what the
+empirical gate drives to zero through correct seat placement.
 
 ### D9. Reports state the contract, not a rate
 
@@ -815,9 +880,10 @@ Commit: `feat(judge): isolate double-unparsed units at width one`
 
 **Files:** `weblate/trans/models/judge.py`, a migration,
 `weblate/trans/autotranslate.py`, `weblate/trans/tasks.py`,
-`weblate/checks/judge.py`, `weblate/trans/views/judge.py`,
+`weblate/checks/judge.py`, `weblate/trans/alerts/` (one new alert module entry),
+`weblate/accounts/notifications.py`, `weblate/trans/views/judge.py`,
 `weblate/templates/judge-run.html`, `weblate/trans/defaults.py`, settings
-surfaces, and the judge model/loop/autotranslate/view/check tests.
+surfaces, and the judge model/loop/autotranslate/view/check/alert tests.
 
 1. Add `JudgeDeferral` with the D7 fields, the open-row uniqueness constraint,
    and indexes on `(state, last_attempted)` and
@@ -841,7 +907,15 @@ surfaces, and the judge model/loop/autotranslate/view/check tests.
    selects due open rows, respects `JUDGE_DEFERRAL_MAX_UNITS_PER_PASS`, groups
    by translation, and launches `auto_translate` with `mode="judge"` and
    explicit `unit_ids`, incrementing `passes_done` and `last_attempted`.
-8. Add the D10 reaper for runs stuck in `RUNNING`.
+8. Add the `JudgeUnavailable` alert whose `check_component()` reports the count
+   of rows waiting for a human and whether any project-scoped account holds
+   `unit.review`, so both are current whenever the alert is evaluated. Raise it
+   through `Component.add_alert()` when the first row starts waiting and remove
+   it through `delete_alert()` when the last one closes. Store no eligibility
+   snapshot on the deferral row.
+9. Add the backlog digest as a `SummaryNotification` subclass beside
+   `ToDoStringsNotification`. It is best-effort delivery, not the contract.
+10. Add the D10 reaper for runs stuck in `RUNNING`.
 
 Tests: the flag off changes nothing; a unit with no opinion produces exactly one
 open deferral and a `deferred` run outcome; re-running does not duplicate the
@@ -849,12 +923,17 @@ row; a later pass with a verdict closes it `resolved` and clears the check; a
 target edit closes it `stale`; a deleted unit closes it `unit-gone`; exhausting
 the passes leaves it `open` with the check still on the unit; a human
 disposition closes it and is recorded with actor and reason; an unauthorized
-actor cannot dispose; the periodic task respects the interval and the per-pass
-cap and creates a real `JudgeRun` per translation; the check is neither
-enforceable nor dismissible and never changes unit state; the reaper fails only
-genuinely stale runs.
+actor cannot dispose; a row created by a periodic pass has no `origin_actor` and
+is still disposable and still alerted; a component whose project has no
+review-capable account beyond administrators is reported as such by the alert,
+evaluated at read time, and the report agrees after the permission is granted
+without touching any deferral row; the alert is raised on the first waiting row
+and cleared when the last one closes; the periodic task respects the interval and
+the per-pass cap and creates a real `JudgeRun` per translation; the check is
+neither enforceable nor dismissible and never changes unit state; the reaper
+fails only genuinely stale runs.
 
-Commit: `feat(judge): keep unjudged strings owned until resolved`
+Commit: `feat(judge): keep unjudged strings open, addressable and alerted`
 
 ### Task 8: Report, preflight, and the contract test
 
@@ -876,7 +955,9 @@ Commit: `feat(judge): keep unjudged strings owned until resolved`
 4. Add the contract test: for a synthetic run in which every request fails, no
    selected unit ends with an outcome outside
    `{deferred, skipped, stale-conflict}`, every deferred unit has an open row
-   with an owner and a `judge-unavailable` check, and no unit's state changed.
+   that the machine cannot close plus a `judge-unavailable` check and a
+   component alert, the alert reports the current disposition eligibility of the
+   scope, and no unit's state changed.
 5. Document the retention rule: attempts, verdicts, usage and closed deferrals
    are retained; pruning is out of scope.
 6. Changelog entry for the user-visible parts: the new check, the deferral
@@ -914,12 +995,16 @@ paid probes:
 **Structural gate** (must pass before `JUDGE_DEFERRAL_ENABLED` is turned on
 anywhere, and provable by tests rather than by a run):
 
-- no selected unit can end a run with an unowned absence of verdict: the Task 8
-  contract test passes with a 100%-failing endpoint;
+- no selected unit can end a run silently: the Task 8 contract test passes with
+  a 100%-failing endpoint;
 - `JudgeRunUnit.Outcome.UNPARSED` is no longer written by any code path;
 - exhausting the machine budget never closes a deferral;
 - no deferral path changes a unit's state or dismisses a check;
-- every open deferral has an owner and a visible check;
+- every open deferral is disposable by a permission set the alert and report
+  compute at read time, and a scope with no project-scoped reviewer is stated as
+  such rather than looking staffed;
+- a deferral waiting for a human always has both the unit check and a component
+  alert; removing the last one clears the alert;
 - zero persistence losses, and every attempt and usage row joins its `JudgeRun`;
 - no retry for a parsed verdict, deadline, oversized reply, `401`, `403`,
   `unknown` or `finish_reason=length`; no fallback on a parser-invalid `200`;
