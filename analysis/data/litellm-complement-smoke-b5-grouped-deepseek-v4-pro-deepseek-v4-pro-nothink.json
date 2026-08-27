@@ -1,0 +1,93 @@
+{
+  "kind": "smoke, n=1, not a measurement",
+  "batch_size": 5,
+  "corpus": "col4-judge-golden.json dev split",
+  "slice": {
+    "critical": 5,
+    "major": 5,
+    "clean": 5
+  },
+  "units": [
+    "clean-177682",
+    "clean-177701",
+    "clean-177708",
+    "clean-177723",
+    "clean-177755",
+    "mut-177682-cyrillic-fragment",
+    "mut-177701-cyrillic-fragment",
+    "mut-177708-cyrillic-fragment",
+    "mut-177723-cyrillic-fragment",
+    "mut-177755-cyrillic-fragment",
+    "mut-177682-obscenity-injected",
+    "mut-177701-obscenity-injected",
+    "mut-177701-sentence-dropped",
+    "mut-177723-glossary-substituted",
+    "mut-177723-obscenity-injected"
+  ],
+  "anchor": "deepseek-v4-pro",
+  "results": {
+    "deepseek-v4-pro": {
+      "parsed_batches": 1,
+      "of_batches": 3,
+      "flagged": [],
+      "caught": [],
+      "false_flag": [],
+      "seconds": 301.9,
+      "diagnoses": [
+        {
+          "attempts": 3,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 18.8
+        },
+        {
+          "attempts": 3,
+          "status": null,
+          "empty_200": false,
+          "note": "transport failure (status None)",
+          "seconds": 30.7
+        },
+        {
+          "attempts": 3,
+          "status": null,
+          "empty_200": false,
+          "note": "transport failure (status None)",
+          "seconds": 30.8
+        }
+      ]
+    },
+    "deepseek-v4-pro!nothink": {
+      "parsed_batches": 1,
+      "of_batches": 3,
+      "flagged": [],
+      "caught": [],
+      "false_flag": [],
+      "seconds": 271.5,
+      "diagnoses": [
+        {
+          "attempts": 2,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 29.0
+        },
+        {
+          "attempts": 3,
+          "status": null,
+          "empty_200": false,
+          "note": "transport failure (status None)",
+          "seconds": 30.9
+        },
+        {
+          "attempts": 3,
+          "status": null,
+          "empty_200": false,
+          "note": "transport failure (status None)",
+          "seconds": 30.6
+        }
+      ],
+      "unique_vs_anchor": []
+    }
+  }
+}

@@ -1,0 +1,164 @@
+{
+  "kind": "smoke, n=1, not a measurement",
+  "corpus": "col4-judge-golden.json dev split",
+  "slice": {
+    "critical": 5,
+    "major": 5,
+    "clean": 5
+  },
+  "units": [
+    "mut-177682-cyrillic-fragment",
+    "mut-177682-obscenity-injected",
+    "clean-177682",
+    "mut-177701-cyrillic-fragment",
+    "mut-177701-obscenity-injected",
+    "clean-177701",
+    "mut-177708-cyrillic-fragment",
+    "mut-177701-sentence-dropped",
+    "clean-177708",
+    "mut-177723-cyrillic-fragment",
+    "mut-177723-glossary-substituted",
+    "clean-177723",
+    "mut-177755-cyrillic-fragment",
+    "mut-177723-obscenity-injected",
+    "clean-177755"
+  ],
+  "anchor": "deepseek-v4-pro",
+  "results": {
+    "deepseek-v4-pro": {
+      "parsed_batches": 14,
+      "of_batches": 15,
+      "flagged": [
+        "mut-177682-cyrillic-fragment",
+        "mut-177682-obscenity-injected",
+        "mut-177701-cyrillic-fragment",
+        "mut-177701-obscenity-injected",
+        "mut-177701-sentence-dropped",
+        "mut-177708-cyrillic-fragment",
+        "mut-177723-cyrillic-fragment",
+        "mut-177723-obscenity-injected",
+        "mut-177755-cyrillic-fragment"
+      ],
+      "caught": [
+        "mut-177682-cyrillic-fragment",
+        "mut-177682-obscenity-injected",
+        "mut-177701-cyrillic-fragment",
+        "mut-177701-obscenity-injected",
+        "mut-177701-sentence-dropped",
+        "mut-177708-cyrillic-fragment",
+        "mut-177723-cyrillic-fragment",
+        "mut-177723-obscenity-injected",
+        "mut-177755-cyrillic-fragment"
+      ],
+      "false_flag": [],
+      "seconds": 509.0,
+      "diagnoses": [
+        {
+          "attempts": 2,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 29.9
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 11.7
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 23.8
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 18.2
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 28.3
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 23.5
+        },
+        {
+          "attempts": 2,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 8.7
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 29.9
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 5.1
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 18.0
+        },
+        {
+          "attempts": 3,
+          "status": null,
+          "empty_200": false,
+          "note": "transport failure (status None)",
+          "seconds": 30.5
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 15.6
+        },
+        {
+          "attempts": 2,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 15.9
+        },
+        {
+          "attempts": 2,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 24.7
+        },
+        {
+          "attempts": 1,
+          "status": 200,
+          "empty_200": false,
+          "note": "",
+          "seconds": 12.2
+        }
+      ]
+    }
+  }
+}
