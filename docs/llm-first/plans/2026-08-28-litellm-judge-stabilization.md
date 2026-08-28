@@ -118,18 +118,21 @@ Production profiles после canary:
 
 Commit: `feat(judge): support per-seat LiteLLM profiles`.
 
-### 4. Исправить streaming и gateway transport
+### 4. Исправить streaming и локализовать gateway transport
 
 В Weblate:
 
-- Реализовать SSE reader для DeepSeek: собирать только `delta.content`, отдельно
-  учитывать `delta.reasoning_content`, `finish_reason` и final usage.
+- Реализовать общий OpenAI-compatible SSE reader для Qwen и DeepSeek: собирать
+  только `delta.content`, отдельно учитывать `delta.reasoning_content`,
+  `finish_reason` и final usage.
 - Передавать `stream_options.include_usage=true`.
 - Сохранять абсолютный deadline и response-size cap.
 - Partial JSON до `[DONE]`, missing final chunk и `finish_reason=length` считать
   typed failures.
-- Qwen оставить non-streaming, поскольку `enable_thinking=false` даёт
-  достаточный TTFB.
+- Qwen streaming — первичный production candidate: только этот режим отдал
+  первый байт для того же payload до измеренной 30-секундной границы. Qwen
+  non-streaming остаётся control arm и не допускается без отдельного
+  production-envelope gate после исправлений HCBifrost.
 
 На `hcbifrost`:
 
@@ -145,12 +148,15 @@ Commit: `feat(judge): support per-seat LiteLLM profiles`.
   deadline 120 секунд, nginx read/send timeout 130 секунд.
 - Для SSE отключить proxy buffering и подтвердить, что первый chunk доходит до
   клиента.
+- Прокинуть correlation ID и сохранить redacted timestamps: ingress,
+  upstream dispatch, upstream first byte, downstream first byte, completion и
+  reset/error owner. Сопоставить nginx access/error logs с LiteLLM logs.
 - Исправить capability metadata aliases: actual upstream ID, provider,
   structured-output и streaming support.
 - Redacted wire trace должен подтвердить, что DeepSeek получает
   `thinking.disabled`, а Qwen — `enable_thinking=false`.
 
-Proxy acceptance gate:
+Proxy capability smoke, недостаточный для production admission:
 
 - 30 одинаковых safe requests на каждую alias;
 - ноль resets, empty responses и malformed envelopes;
@@ -158,6 +164,16 @@ Proxy acceptance gate:
 - DeepSeek reasoning tokens = 0;
 - если DeepSeek upstream не исполняет `thinking.disabled`, production switch
   блокируется без импровизированной замены модели.
+
+Provider transport gate:
+
+- для каждой seat interleaved-матрица `stream=true/false`, clean/controlled
+  defect, width 1/production ceiling;
+- минимум 30 baseline requests в каждой cell, LiteLLM/provider/Weblate retries
+  выключены; recovery arm измеряется отдельно;
+- точные production prompt, schema, response format и reasoning controls;
+- Qwen non-streaming считается NO-GO до новой успешной проверки после
+  HCBifrost fix; safe requests не могут изменить этот статус.
 
 ### 5. Добавить classified recovery и adaptive batching
 
@@ -181,7 +197,11 @@ Adaptive harness:
 - transport/deadline делит budget пополам;
 - пять последовательных clean attempts увеличивают budget на одну единицу;
 - parser failure не меняет batch budget;
-- target envelope — 20 секунд до первого байта/ответа в non-streaming режиме.
+- streaming target envelope: first-byte p95 <20 секунд, измерять также
+  time-to-first-content, total completion и наличие `[DONE]`;
+- non-streaming target envelope: response/first-byte p95 <20 секунд и ноль
+  reset-before-first-byte; для обоих режимов измерять parse, truncation, bytes,
+  finish reason, reasoning tokens и cost.
 
 Defaults:
 
@@ -296,7 +316,12 @@ GO требует одновременно:
 - false-flag rate ≤10%;
 - union critical recall не хуже OpenRouter;
 - Qwen и DeepSeek reasoning controls фактически исполняются;
-- DeepSeek first-byte p95 <20 секунд и ни одного reset около 30 секунд;
+- для каждой seat и выбранного production mode first-byte p95 <20 секунд,
+  ноль reset-before-first-byte, empty/truncated responses и unknown transport
+  failures на production-shaped envelope;
+- streaming завершается `[DONE]`, накопленный JSON проходит тот же parser, а
+  total completion укладывается в absolute deadline;
+- любой reset Qwen non-streaming около 30 секунд оставляет этот mode в NO-GO;
 - retry multiplier и cost полностью учтены;
 - deferred queue опустошается в пределах тестового окна.
 
@@ -306,8 +331,10 @@ GO требует одновременно:
    deployment не выполнять.
 2. Задеплоить migrations/code с существующим OpenRouter runtime и всеми новыми
    флагами выключенными — только после явного approval.
-3. Применить и проверить `hcbifrost` aliases/timeouts.
-4. Выполнить live envelope и quality gates в dev.
+3. Применить `hcbifrost` aliases/timeouts и получить коррелированный redacted
+   trace через public nginx, internal LiteLLM и, по возможности, direct
+   upstream.
+4. Выполнить interleaved live transport envelope и quality gates в dev.
 5. Production canary: одна контролируемая component, максимум 100 units,
    `JUDGE_MAY_APPROVE=false`, deferral выключен.
 6. Если canary проходит, включить LiteLLM profiles site-wide; затем включить

@@ -137,7 +137,7 @@ the Judge model to generate a second account of the same defect.
 database field only for migration compatibility, store it blank for new rows,
 and construct repair guidance deterministically from validated errors.
 
-## Confirmed root cause 2: a first-byte reset near 30.5 seconds
+## Observed Qwen non-streaming reset and streaming workaround
 
 The strongest transport experiment is recorded in
 `docs/llm-first/measurements/2026-08-26-litellm-stage0-compatibility.md` and
@@ -173,13 +173,48 @@ a non-streaming response is released. A fixed count of strings is therefore a
 poor control variable compared with predicted output and measured first-byte
 time.
 
-**Conclusion:** correct the gateway timeouts and buffering. In two paired Qwen
-observations, streaming was a successful workaround for the observed first-byte
-reset; that sample does not establish a causal effect or production stability.
-Repeat the intervention across the registered envelope corpus and on DeepSeek
-before enabling it for either production profile. Until then, DeepSeek streaming
-remains a planned hypothesis. Adaptive per-seat batching is a safety layer, not
-a substitute for the gateway fix.
+The public endpoint resolves directly to `89.19.213.124` and identifies its
+front end as nginx. That narrows the public path but does not prove that nginx
+created the reset: a client-side TCP reset cannot distinguish the front nginx,
+LiteLLM, another internal hop, or the upstream route. The owner requires one
+correlation ID joined across nginx and LiteLLM timing logs.
+
+**Conclusion:** Qwen non-streaming is not production-admitted on the present
+evidence. In two paired observations, Qwen streaming was a successful workaround
+for the measured first-byte case; it is the primary Qwen production candidate,
+but the sample does not establish production stability. HCBifrost must localize
+and remove or explain the reset with server-side timing evidence. Repeat both
+modes across the registered production-shaped envelope corpus and test DeepSeek
+independently. Adaptive batching is a safety layer, not a substitute for fixing
+the failing transport path.
+
+### Evidence from the Game Pulse client repository
+
+The separate `game_pulse_saas` repository is another production consumer of
+the same corporate endpoint. It does not contain HCBifrost server manifests,
+LiteLLM `config.yaml`, or the HCBifrost nginx virtual host, so it cannot name
+the reset owner. It does provide three useful controls:
+
+- its primary OpenAI client has a 55-second application timeout and two SDK
+  retries, neither of which explains a reset at 30.7-30.8 seconds;
+- its streaming path sends `stream=true` and
+  `stream_options.include_usage=true`, and treats reasoning chunks as upstream
+  activity rather than user-visible content;
+- its earlier HCBifrost measurement observed an nginx 504 at 60.2-60.3 seconds,
+  a different signature and boundary from the Qwen TCP reset measured here.
+
+Game Pulse also translates a Qwen `[no-think]` model suffix into
+`extra_body.enable_thinking=false` and suppresses that field for non-Qwen
+models because the corporate proxy rejected the incompatible parameter. This
+independently supports model-specific request profiles, but does not establish
+that HCBifrost forwarded the field to the upstream deployment.
+
+The relevant local evidence is
+`/Users/eli/Documents/PythonProjects/gamedev tools/game_pulse_saas/backend/app/ai_pipeline/llm_client.py`,
+`/Users/eli/Documents/PythonProjects/gamedev tools/game_pulse_saas/backend/app/config.py`,
+and
+`/Users/eli/Documents/PythonProjects/gamedev tools/game_pulse_saas/docs/LiteLLM/00-architecture-and-roadmap.md`.
+No secret values were read into this report.
 
 ## Confirmed compatibility risk: asymmetric reasoning controls
 
@@ -397,8 +432,8 @@ leaving them to the implementer:
 
 | Seat | Response mode | Reasoning | Streaming | Temperature | Batch ceiling |
 | --- | --- | --- | ---: | ---: | ---: |
-| DeepSeek | `json_object` plus Weblate validation | `thinking.disabled` | true only if the streaming gate passes; otherwise non-streaming must independently pass or the seat is NO-GO | 0 | 2 |
-| Qwen | native strict `json_schema` | `enable_thinking=false` | false | 0 | 5 |
+| DeepSeek | `json_object` plus Weblate validation | `thinking.disabled` | true only if its streaming gate passes; otherwise non-streaming must independently pass or the seat is NO-GO | 0 | 2 |
+| Qwen | native strict `json_schema` | `enable_thinking=false` | true only if its streaming gate passes; non-streaming is a control arm and currently NO-GO | 0 | 5 |
 
 `max_tokens` is initially omitted to avoid turning leaked reasoning into
 `finish_reason=length`. The HCGameLoc Weblate maintainer owns semantic
@@ -412,13 +447,16 @@ rollout ticket before gateway or production mutation begins. Gateway and
 provider retries are set to zero so that Weblate remains the single visible
 owner of paid repeats.
 
-The DeepSeek streaming decision is binary. Run 30 identical streaming and 30
-identical non-streaming capability requests. Streaming is selected only if it
+The streaming decision is binary and seat-specific. For each seat, interleave
+30 streaming and 30 non-streaming requests for every production-shaped cell:
+clean and controlled-defect workloads at width one and at that seat's ceiling.
+Safe requests remain a capability smoke only. Streaming is selected only if it
 has zero transport/protocol failures, first-byte p95 below 20 seconds and no
-quality regression on the envelope corpus. If it fails, non-streaming may be
-selected only if it independently satisfies the same gates after the gateway
-timeout fix. If neither arm passes, the DeepSeek seat remains NO-GO; no third
-mode or substitute model is improvised.
+quality regression. Non-streaming may be selected only if it independently
+satisfies the same gates after the HCBifrost investigation. Qwen non-streaming
+already fails the current evidence and must be requalified after any provider
+change. If neither arm passes for a seat, that seat remains NO-GO; results from
+the other model cannot admit it.
 
 The retry classes are alternatives, not stackable budgets. One logical batch
 has this exact immediate ladder:
@@ -472,14 +510,16 @@ seat must pass independently.
 
 Before production switch:
 
-1. A proxy capability run sends 30 identical safe requests to each dedicated
-   alias with zero resets, empty responses or malformed envelopes.
+1. A proxy capability smoke sends 30 identical safe requests to each dedicated
+   alias with zero resets, empty responses or malformed envelopes. This smoke
+   is necessary but cannot admit a production profile.
 2. Qwen reports zero reasoning tokens with `enable_thinking=false`.
 3. DeepSeek reports zero reasoning tokens with `thinking.disabled`; otherwise
    the alias is not admitted.
-4. The dev envelope test compares width 1 with the intended seat ceiling on
-   matched clean and controlled-defect units, without retries first and with a
-   separate recovery arm.
+4. The dev envelope test interleaves streaming and non-streaming cells at width
+   1 and the intended seat ceiling on matched clean and controlled-defect units.
+   Every cell receives 30 baseline requests without retries; a separately
+   reported recovery arm enables bounded retries.
 5. The existing `ru→zh_Hans` and `en→fr` quality corpora run three repeats per
    profile.
 6. Each seat reaches at least 99% terminal parse coverage; no unit ends with
