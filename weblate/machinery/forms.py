@@ -100,7 +100,13 @@ class BaseMachineryForm(forms.Form):
         machinery.validate_settings()
 
     def needs_service_check(self) -> bool:
-        """Check whether the submitted change can affect the upstream call."""
+        """
+        Check whether the submitted change can affect the upstream call.
+
+        A form submitted without any change keeps being checked on purpose:
+        saving an unchanged configuration is the only way an administrator
+        can verify that the service still answers.
+        """
         changed = set(self.changed_data)
         return not changed or not changed <= self.prompt_only_fields
 
