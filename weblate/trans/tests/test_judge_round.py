@@ -280,6 +280,64 @@ class JudgeRoundTest(ViewTestCase):
         self.assertIn("color=#FF0000", description)  # not eaten by strip_tags
         self.assertIn(" | ", description)  # explicit separator
 
+    def test_one_seat_retry_in_a_new_run_cannot_hide_the_other_seats_critical(
+        self,
+    ) -> None:
+        # A durable deferral retry lands in a different (run_id, attempt);
+        # the reader must still combine seat 1's critical with seat 2's
+        # later pass instead of grouping by the newest round key only.
+        unit = self.get_unit()
+        context_hash = compute_context_hash(
+            source=unit.source,
+            note=unit.source_unit.note,
+            glossary_terms=[],
+        )
+        old = uuid.uuid4()
+        self.make(unit, "critical", seat=1, run_id=old, context_hash=context_hash)
+        self.make(
+            unit, "none", seat=2, run_id=old, unparsed=True, context_hash=context_hash
+        )
+        # Seat 2's deferred retry succeeds in its own new run.
+        retry = uuid.uuid4()
+        self.make(unit, "none", seat=2, run_id=retry, context_hash=context_hash)
+
+        verdict = current_verdict(unit)
+        assert verdict is not None
+        self.assertEqual(verdict.max_severity, "critical")
+        self.assertEqual(verdict.seat, 1)
+
+        active = active_verdict(unit)
+        assert active is not None
+        self.assertEqual(active.max_severity, "critical")
+        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "critical")
+
+    def test_mixed_run_assembly_reads_both_seats_fresh_opinions(self) -> None:
+        # Both seats retried separately: each lands in its own round key
+        # and the strictest fresh per-seat opinion still wins.
+        unit = self.get_unit()
+        context_hash = compute_context_hash(
+            source=unit.source,
+            note=unit.source_unit.note,
+            glossary_terms=[],
+        )
+        first, second = uuid.uuid4(), uuid.uuid4()
+        self.make(unit, "major", seat=1, run_id=first, context_hash=context_hash)
+        self.make(unit, "critical", seat=2, run_id=second, context_hash=context_hash)
+
+        verdict = current_verdict(unit)
+        assert verdict is not None
+        self.assertEqual(verdict.max_severity, "critical")
+        self.assertEqual(verdict.seat, 2)
+
+    def test_active_round_ignores_context_drift(self) -> None:
+        # Historical active_round semantics: target-hash-only matching, so
+        # a glossary/note drift must not unproject a judge check.
+        unit = self.get_unit()
+        self.make(unit, "major", seat=1, context_hash="old-context")
+        verdict = active_verdict(unit)
+        assert verdict is not None
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+
 
 class JudgeGlossaryContextTest(ViewTestCase):
     CREATE_GLOSSARIES = True

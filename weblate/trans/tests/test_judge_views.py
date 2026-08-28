@@ -45,7 +45,13 @@ def judge_context_hash(unit) -> str:
     )
 
 
-@override_settings(JUDGE_ENABLED=True, JUDGE_MAX_REPAIR_ATTEMPTS=1)
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
 class JudgeAutoTranslateViewTest(ViewTestCase):
     def setUp(self) -> None:
         super().setUp()

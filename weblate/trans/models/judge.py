@@ -14,12 +14,12 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.db.models import (
-    BooleanField,
     Case,
     CharField,
     Exists,
     IntegerField,
     OuterRef,
+    Q,
     Subquery,
     Value,
     When,
@@ -46,6 +46,41 @@ if TYPE_CHECKING:
     from weblate.glossary.models import GlossaryPromptEntry
 
 JUDGE_ERROR_SEPARATOR = " | "
+JUDGE_REPAIR_REQUIREMENT = (
+    "Fix all listed errors while preserving the remaining meaning, placeholders, and "
+    "markup."
+)
+
+# These are deliberately limited to request-shape and resolved-profile data.
+# In particular, do not add request text, response text, credentials, or URLs
+# here: JudgeRun is a durable report visible to the producer who started it.
+_SAFE_CONFIGURATION_SNAPSHOT_KEYS = frozenset(
+    {
+        "provider",
+        "endpoint_fingerprint",
+        "model",
+        "upstream_model",
+        "alias_revision",
+        "model_fingerprint",
+        "profile_fingerprint",
+        "response_format",
+        "reasoning",
+        "stream",
+        "temperature",
+        "prompt_schema_version",
+    }
+)
+
+
+def safe_configuration_snapshot(snapshot: Mapping[str, object]) -> dict[str, object]:
+    """Return a serializable, non-secret Judge configuration snapshot."""
+    unknown = set(snapshot) - _SAFE_CONFIGURATION_SNAPSHOT_KEYS
+    if unknown:
+        msg = f"Unsafe Judge configuration snapshot keys: {', '.join(sorted(unknown))}"
+        raise ValueError(msg)
+    # Round-trip so callers cannot retain a mutable nested value after it was
+    # assigned to the model instance.
+    return json.loads(json.dumps(dict(snapshot)))
 
 
 def _digest(parts: Sequence[str]) -> str:
@@ -90,6 +125,38 @@ def compute_context_hash(
     return _digest([source, note, *terms])
 
 
+def compute_judge_request_identity(
+    *,
+    unit_id: int,
+    target_hash: str,
+    context_hash: str,
+    project_context_hash: str,
+    source_language: str,
+    target_language: str,
+    profile_fingerprint: str,
+    prompt_schema_version: str,
+) -> str:
+    """
+    Return the stable, text-free identity of one seat's judge request.
+
+    A seat is intentionally not part of this digest: the same canonical
+    request can be deferred independently by each seat, while
+    ``JudgeDeferral`` keeps the seat as a separate, queryable field.
+    """
+    return _digest(
+        [
+            str(unit_id),
+            target_hash,
+            context_hash,
+            project_context_hash,
+            source_language,
+            target_language,
+            profile_fingerprint,
+            prompt_schema_version,
+        ]
+    )
+
+
 class JudgeRun(models.Model):
     """One permission-checked producer launch across one closed scope."""
 
@@ -130,6 +197,7 @@ class JudgeRun(models.Model):
     summary = models.JSONField(default=dict, blank=True)
     failure = models.TextField(blank=True)
     warnings = models.JSONField(default=list, blank=True)
+    configuration_snapshot = models.JSONField(default=dict, blank=True)
 
     class Meta:
         verbose_name = gettext_lazy("Judge run")
@@ -146,6 +214,208 @@ class JudgeRun(models.Model):
 
     def __str__(self) -> str:
         return f"{self.scope_type}: {self.scope_label}"
+
+    def save(self, *args, **kwargs) -> None:
+        self.configuration_snapshot = safe_configuration_snapshot(
+            self.configuration_snapshot
+        )
+        super().save(*args, **kwargs)
+
+
+class JudgeRequestAttempt(models.Model):
+    """
+    One outbound Judge HTTP request, including calls without a response body.
+
+    This is deliberately an observability record rather than a transcript.
+    All text-bearing request and response material stays outside this model.
+    """
+
+    class FailureKind(models.TextChoices):
+        TRANSPORT = "transport"
+        DEADLINE = "deadline"
+        RESPONSE_TOO_LARGE = "response-too-large"
+        HTTP_AUTH = "http-auth"
+        HTTP_RATE_LIMIT = "http-rate-limit"
+        HTTP_SERVER = "http-server"
+        HTTP_OTHER = "http-other"
+        EMPTY_RESPONSE = "empty-response"
+        INVALID_JSON = "invalid-json"
+        INVALID_ENVELOPE = "invalid-envelope"
+        SEGMENT_COUNT = "segment-count"
+        INVALID_SEGMENT = "invalid-segment"
+        FINISH_LENGTH = "finish-length"
+        UNKNOWN = "unknown"
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    run = models.ForeignKey(
+        JudgeRun,
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="request_attempts",
+    )
+    seat = models.PositiveSmallIntegerField()
+    attempt = models.PositiveSmallIntegerField(default=0)
+    provider = models.CharField(max_length=32, blank=True)
+    endpoint_fingerprint = models.CharField(max_length=64)
+    model = models.CharField(max_length=200)
+    model_fingerprint = models.CharField(max_length=64, blank=True)
+    profile_fingerprint = models.CharField(max_length=64)
+    prompt_schema_version = models.CharField(max_length=64)
+    batch_digest = models.CharField(max_length=64)
+    batch_size = models.PositiveSmallIntegerField()
+    transport_succeeded = models.BooleanField(default=False)
+    parsed = models.BooleanField(default=False)
+    failure_kind = models.CharField(
+        max_length=24, choices=FailureKind, blank=True, db_index=True
+    )
+    http_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    exception_class = models.CharField(max_length=255, blank=True)
+    finish_reason = models.CharField(max_length=64, blank=True)
+    response_shape = models.CharField(max_length=64, blank=True)
+    response_segment_count = models.PositiveSmallIntegerField(null=True, blank=True)
+    elapsed_ms = models.PositiveIntegerField(null=True, blank=True)
+    first_byte_ms = models.PositiveIntegerField(null=True, blank=True)
+    response_bytes = models.PositiveIntegerField(null=True, blank=True)
+    prompt_tokens = models.PositiveIntegerField(null=True, blank=True)
+    completion_tokens = models.PositiveIntegerField(null=True, blank=True)
+    total_tokens = models.PositiveIntegerField(null=True, blank=True)
+    reasoning_tokens = models.PositiveIntegerField(null=True, blank=True)
+    response_id = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = gettext_lazy("Judge request attempt")
+        verbose_name_plural = gettext_lazy("Judge request attempts")
+        # ruff: ignore[mutable-class-default]
+        indexes = [
+            models.Index(
+                fields=["endpoint_fingerprint", "model", "seat", "-created_at"],
+                name="judge_attempt_seat_recent_idx",
+            ),
+            models.Index(
+                fields=["failure_kind", "-created_at"],
+                name="judge_attempt_failure_idx",
+            ),
+            models.Index(fields=["run", "-created_at"], name="judge_attempt_run_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.model} seat {self.seat} attempt {self.pk}"
+
+
+class JudgeAdaptiveState(models.Model):
+    """Shared adaptive batching, circuit-breaker, and token-bucket state."""
+
+    class CircuitState(models.TextChoices):
+        CLOSED = "closed"
+        OPEN = "open"
+        HALF_OPEN = "half-open"
+        OPERATOR_STOPPED = "operator-stopped"
+
+    endpoint_fingerprint = models.CharField(max_length=64)
+    model = models.CharField(max_length=200)
+    seat = models.PositiveSmallIntegerField()
+    batch_budget = models.PositiveSmallIntegerField()
+    clean_attempt_streak = models.PositiveSmallIntegerField(default=0)
+    failure_streak = models.PositiveSmallIntegerField(default=0)
+    last_failure_kind = models.CharField(
+        max_length=24, choices=JudgeRequestAttempt.FailureKind, blank=True
+    )
+    circuit_state = models.CharField(
+        max_length=20, choices=CircuitState, default=CircuitState.CLOSED
+    )
+    circuit_opened_at = models.DateTimeField(null=True, blank=True)
+    circuit_open_until = models.DateTimeField(null=True, blank=True)
+    token_bucket_capacity = models.PositiveIntegerField(default=0)
+    token_bucket_available = models.DecimalField(
+        max_digits=18, decimal_places=6, default=0
+    )
+    token_bucket_refill_per_second = models.DecimalField(
+        max_digits=18, decimal_places=6, default=0
+    )
+    token_bucket_updated_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = gettext_lazy("Judge adaptive state")
+        verbose_name_plural = gettext_lazy("Judge adaptive states")
+        # ruff: ignore[mutable-class-default]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["endpoint_fingerprint", "model", "seat"],
+                name="judge_adaptive_state_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.model} seat {self.seat}"
+
+
+class JudgeDeferral(models.Model):
+    """A durable, per-seat retry record for a request without an opinion."""
+
+    class State(models.TextChoices):
+        QUEUED = "queued"
+        SLOW = "slow"
+        CLOSED = "closed"
+
+    unit = models.ForeignKey(
+        "trans.Unit",
+        on_delete=models.deletion.CASCADE,
+        related_name="judge_deferrals",
+    )
+    request_identity = models.CharField(max_length=64)
+    target_hash = models.CharField(max_length=64)
+    context_hash = models.CharField(max_length=64)
+    project_context_hash = models.CharField(max_length=64)
+    source_language = models.CharField(max_length=32)
+    target_language = models.CharField(max_length=32)
+    profile_fingerprint = models.CharField(max_length=64)
+    prompt_schema_version = models.CharField(max_length=64)
+    seat = models.PositiveSmallIntegerField()
+    state = models.CharField(
+        max_length=10, choices=State, default=State.QUEUED, db_index=True
+    )
+    consecutive_failures = models.PositiveSmallIntegerField(default=0)
+    last_failure_kind = models.CharField(
+        max_length=24, choices=JudgeRequestAttempt.FailureKind, blank=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    next_attempt_at = models.DateTimeField(db_index=True)
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    claim_expires_at = models.DateTimeField(null=True, blank=True)
+    claim_token = models.CharField(max_length=64, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = gettext_lazy("Judge deferral")
+        verbose_name_plural = gettext_lazy("Judge deferrals")
+        # ruff: ignore[mutable-class-default]
+        indexes = [
+            models.Index(
+                fields=["state", "next_attempt_at"],
+                name="judge_deferral_ready_idx",
+            ),
+            models.Index(
+                fields=["state", "claim_expires_at"],
+                name="judge_deferral_claim_idx",
+            ),
+            models.Index(
+                fields=["unit", "seat", "-created_at"],
+                name="judge_deferral_unit_idx",
+            ),
+        ]
+        # ruff: ignore[mutable-class-default]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["unit", "seat", "request_identity"],
+                name="judge_deferral_identity",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.unit_id} seat {self.seat}: {self.state}"
 
 
 class JudgeRunUnit(models.Model):
@@ -300,6 +570,31 @@ class JudgeVerdict(models.Model):
     context_hash = models.CharField(max_length=64)
     run_id = models.UUIDField(default=uuid.uuid4)
     timestamp = models.DateTimeField(auto_now_add=True)
+    request_attempt = models.ForeignKey(
+        JudgeRequestAttempt,
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verdicts",
+    )
+    request_identity = models.CharField(  # ruff: ignore[django-nullable-model-string-field]
+        max_length=64, null=True, blank=True
+    )
+    project_context_hash = models.CharField(  # ruff: ignore[django-nullable-model-string-field]
+        max_length=64, null=True, blank=True
+    )
+    source_language = models.CharField(  # ruff: ignore[django-nullable-model-string-field]
+        max_length=32, null=True, blank=True
+    )
+    target_language = models.CharField(  # ruff: ignore[django-nullable-model-string-field]
+        max_length=32, null=True, blank=True
+    )
+    profile_fingerprint = models.CharField(  # ruff: ignore[django-nullable-model-string-field]
+        max_length=64, null=True, blank=True
+    )
+    prompt_schema_version = models.CharField(  # ruff: ignore[django-nullable-model-string-field]
+        max_length=64, null=True, blank=True
+    )
 
     resolution = models.CharField(max_length=20, choices=Resolution, blank=True)
     resolution_reason = models.TextField(blank=True)
@@ -325,6 +620,16 @@ class JudgeVerdict(models.Model):
                 name="judge_unit_target_idx",
             ),
             models.Index(fields=["run_id"], name="judge_run_idx"),
+            models.Index(
+                fields=[
+                    "unit",
+                    "request_identity",
+                    "profile_fingerprint",
+                    "prompt_schema_version",
+                    "-timestamp",
+                ],
+                name="judge_verdict_cache_idx",
+            ),
         ]
         # ruff: ignore[mutable-class-default]
         constraints = [
@@ -422,33 +727,14 @@ def latest_round(unit: Unit) -> list[JudgeVerdict]:
 
 def current_round(unit: Unit) -> list[JudgeVerdict]:
     """
-    Return the newest round matching the current target and judge context.
+    Return each seat's freshest verdict for the current text and context.
 
-    Unlike ``active_round``, this never falls back to an older parsed round.
-    Orchestration must not repair or finalize a unit using evidence from a
-    transport-dead current run.
+    A seat whose freshest row is unparsed contributes that transport
+    failure: orchestration must not repair or finalize a unit using a
+    fallback opinion from an older round of that seat.
     """
-    target_hash = compute_target_hash(unit.get_target_plurals())
-    context_hash = compute_context_hash(
-        source=unit.source,
-        note=unit.source_unit.note,
-        glossary_terms=_glossary_prompt_entries(unit),
-    )
-    newest = (
-        unit.judge_verdicts.filter(target_hash=target_hash, context_hash=context_hash)
-        .order_by("-timestamp", "-pk")
-        .first()
-    )
-    if newest is None:
-        return []
-    return list(
-        unit.judge_verdicts.filter(
-            target_hash=target_hash,
-            context_hash=context_hash,
-            run_id=newest.run_id,
-            attempt=newest.attempt,
-        ).order_by("seat")
-    )
+    target_hash, context_hash = _current_snapshot_hashes(unit)
+    return _seat_round_rows(unit, target_hash, context_hash, prefer_parsed=False)
 
 
 def _glossary_prompt_entries(unit: Unit) -> list[GlossaryPromptEntry]:
@@ -459,41 +745,73 @@ def _glossary_prompt_entries(unit: Unit) -> list[GlossaryPromptEntry]:
     return get_matched_glossary_prompt_entries(unit)
 
 
+def _current_snapshot_hashes(unit: Unit) -> tuple[str, str]:
+    """Return the (target, context) hashes of the unit as currently stored."""
+    return (
+        compute_target_hash(unit.get_target_plurals()),
+        compute_context_hash(
+            source=unit.source,
+            note=unit.source_unit.note,
+            glossary_terms=_glossary_prompt_entries(unit),
+        ),
+    )
+
+
+def _seat_round_rows(
+    unit: Unit,
+    target_hash: str,
+    context_hash: str | None,
+    *,
+    prefer_parsed: bool,
+) -> list[JudgeVerdict]:
+    """
+    Assemble a round by taking each seat's own freshest matching row.
+
+    Grouping by a single ``(run_id, attempt)`` couples the two seats'
+    timelines: a durable one-seat retry (judge deferrals) lands in a newer
+    round key, and the strictest seat's opinion stops being read even
+    though nothing replaced it. Selecting per seat keeps every valid
+    opinion visible across run boundaries while still never letting a
+    transport failure erase a real verdict (D5).
+
+    ``prefer_parsed=True`` (the ``active_round`` read) drops a seat that
+    never parsed this snapshot: an unparsed row is not an opinion, so it
+    cannot project a check. ``prefer_parsed=False`` (``current_round``)
+    keeps it so orchestration sees the transport failure.
+
+    ``context_hash=None`` keeps the historical target-only matching of
+    ``active_round``: a glossary/note drift must not unproject a check.
+    """
+    base = unit.judge_verdicts.filter(target_hash=target_hash)
+    if context_hash is not None:
+        base = base.filter(context_hash=context_hash)
+    rows: list[JudgeVerdict] = []
+    for seat in base.values_list("seat", flat=True).distinct():
+        seat_rows = base.filter(seat=seat)
+        if prefer_parsed:
+            newest = (
+                seat_rows.filter(unparsed=False).order_by("-timestamp", "-pk").first()
+            )
+        else:
+            newest = seat_rows.order_by("-timestamp", "-pk").first()
+        if newest is not None:
+            rows.append(newest)
+    rows.sort(key=lambda row: row.seat)
+    return rows
+
+
 def active_round(unit: Unit) -> list[JudgeVerdict]:
     """
-    Newest parsed round that describes the current text.
+    Newest parsed per-seat round that describes the current text.
 
-    Staleness is handled by filtering on target_hash. An all-unparsed
-    newest round is skipped in favour of the newest parsed one, so a
-    transport failure never erases the last real verdict (D5).
+    Staleness is handled by filtering on target_hash only, matching the
+    historical behavior: a glossary/note drift must not unproject a
+    judge check. Each seat keeps its newest parsed row for this snapshot,
+    so a transport failure never erases the last real verdict (D5) and a
+    one-seat retry cannot hide the other seat's opinion.
     """
-    current = compute_target_hash(unit.get_target_plurals())
-    newest = (
-        unit.judge_verdicts.filter(target_hash=current)
-        .order_by("-timestamp", "-pk")
-        .first()
-    )
-    if newest is None:
-        return []
-    rows = list(
-        unit.judge_verdicts.filter(
-            target_hash=current, run_id=newest.run_id, attempt=newest.attempt
-        ).order_by("seat")
-    )
-    if any(not row.unparsed for row in rows):
-        return rows
-    parsed = (
-        unit.judge_verdicts.filter(target_hash=current, unparsed=False)
-        .order_by("-timestamp", "-pk")
-        .first()
-    )
-    if parsed is None:
-        return []
-    return list(
-        unit.judge_verdicts.filter(
-            target_hash=current, run_id=parsed.run_id, attempt=parsed.attempt
-        ).order_by("seat")
-    )
+    target_hash = compute_target_hash(unit.get_target_plurals())
+    return _seat_round_rows(unit, target_hash, None, prefer_parsed=True)
 
 
 def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
@@ -590,18 +908,30 @@ def repair_evidence(
 
 def judge_status_annotations() -> dict[str, models.Expression]:
     """Annotate a Unit queryset with target-fresh judge evidence."""
-    newest_parsed = JudgeVerdict.objects.filter(
-        unit_id=OuterRef(OuterRef("pk")),
-        target_storage_hash=MD5(OuterRef(OuterRef("target"))),
-        unparsed=False,
-    ).order_by("-timestamp", "-pk")
+
+    def _has_newer_sibling(*, newer_parsed: bool) -> Exists:
+        """Exists: a fresher same-seat row for the same stored target."""
+        conditions = [
+            Q(unit_id=OuterRef("unit_id")),
+            Q(target_storage_hash=OuterRef("target_storage_hash")),
+            Q(seat=OuterRef("seat")),
+            Q(timestamp__gt=OuterRef("timestamp"))
+            | Q(timestamp=OuterRef("timestamp"), pk__gt=OuterRef("pk")),
+        ]
+        if newer_parsed:
+            conditions.append(Q(unparsed=False))
+        return Exists(
+            JudgeVerdict.objects.filter(*conditions),
+        )
+
+    # The per-seat assembly used by _seat_round_rows, expressed for SQL:
+    # a row is its seat's freshest parsed evidence for the current text
+    # when no newer parsed same-seat row exists for that text.
     current_parsed_round = JudgeVerdict.objects.filter(
         unit_id=OuterRef("pk"),
         target_storage_hash=MD5(OuterRef("target")),
-        run_id=Subquery(newest_parsed.values("run_id")[:1]),
-        attempt=Subquery(newest_parsed.values("attempt")[:1]),
         unparsed=False,
-    )
+    ).exclude(_has_newer_sibling(newer_parsed=True))
     severity_rank = Case(
         *(
             When(max_severity=severity, then=Value(rank))
@@ -609,21 +939,14 @@ def judge_status_annotations() -> dict[str, models.Expression]:
         ),
         output_field=IntegerField(),
     )
-    latest_current = JudgeVerdict.objects.filter(
+    # Some seat's freshest row (parsed or not) for the current text is a
+    # transport failure: the per-seat view of the former "latest round has
+    # no parsed row" signal.
+    seat_fresh_unparsed = JudgeVerdict.objects.filter(
         unit_id=OuterRef("pk"),
         target_storage_hash=MD5(OuterRef("target")),
-    ).order_by("-timestamp", "-pk")
-    newest_current = JudgeVerdict.objects.filter(
-        unit_id=OuterRef(OuterRef("pk")),
-        target_storage_hash=MD5(OuterRef(OuterRef("target"))),
-    ).order_by("-timestamp", "-pk")
-    latest_current_parsed = JudgeVerdict.objects.filter(
-        unit_id=OuterRef("pk"),
-        target_storage_hash=MD5(OuterRef("target")),
-        run_id=Subquery(newest_current.values("run_id")[:1]),
-        attempt=Subquery(newest_current.values("attempt")[:1]),
-        unparsed=False,
-    )
+        unparsed=True,
+    ).exclude(_has_newer_sibling(newer_parsed=False))
 
     return {
         "judge_active_severity": Subquery(
@@ -641,18 +964,7 @@ def judge_status_annotations() -> dict[str, models.Expression]:
         "judge_has_parsed_history": Exists(
             JudgeVerdict.objects.filter(unit_id=OuterRef("pk"), unparsed=False)
         ),
-        "judge_latest_incomplete": Case(
-            When(
-                Exists(latest_current),
-                then=Case(
-                    When(Exists(latest_current_parsed), then=Value(False)),
-                    default=Value(True),
-                    output_field=BooleanField(),
-                ),
-            ),
-            default=Value(False),
-            output_field=BooleanField(),
-        ),
+        "judge_latest_incomplete": Exists(seat_fresh_unparsed),
     }
 
 
@@ -849,15 +1161,14 @@ def describe_latest_verdict(unit: Unit) -> str:
 
 def describe_latest_instruction(unit: Unit) -> str:
     """
-    Return the active repair instruction without exposing it to humans.
+    Build the deterministic repair instruction for the active verdict.
 
-    Escaped for the same reason as ``describe_latest_verdict``: llm.py runs
-    this text through ``strip_tags()``, which would otherwise eat a literal
-    game-markup tag the instruction happens to quote.
+    Historical rows can contain arbitrary model-generated instructions. Repair
+    must use only locally validated error descriptions plus this fixed
+    requirement, so a valid verdict can never be discarded or its repair path
+    changed by optional model prose.
     """
-    instructions = {
-        escape(row.instruction.strip())
-        for row in active_round(unit)
-        if row.instruction.strip()
-    }
-    return JUDGE_ERROR_SEPARATOR.join(sorted(instructions))
+    description = describe_latest_verdict(unit)
+    if not description:
+        return ""
+    return f"{description}\n\n{JUDGE_REPAIR_REQUIREMENT}"

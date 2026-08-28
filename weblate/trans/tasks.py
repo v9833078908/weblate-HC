@@ -1345,6 +1345,55 @@ def cleanup_reports() -> None:
     Report.objects.filter(created__lt=cutoff).delete()
 
 
+def _judge_observability_retention_days(setting_name: str) -> int:
+    """Read an optional retention setting without making older settings fail."""
+    value = getattr(settings, setting_name, 90)
+    return value if isinstance(value, int) and value >= 0 else 90
+
+
+@app.task(trail=False)
+def cleanup_judge_observability() -> None:
+    """
+    Remove bounded-retention Judge transport records.
+
+    Verdicts and run reports are intentionally retained. Foreign keys from
+    verdict and usage rows are nullable, so attempt cleanup preserves their
+    audit value while removing high-volume request diagnostics.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models import JudgeRequestAttempt, LLMUsageLog
+
+    now = timezone.now()
+    JudgeRequestAttempt.objects.filter(
+        created_at__lt=now
+        - timedelta(
+            days=_judge_observability_retention_days(
+                "JUDGE_REQUEST_ATTEMPT_RETENTION_DAYS"
+            )
+        )
+    ).delete()
+    LLMUsageLog.objects.filter(
+        operation=LLMUsageLog.Operation.JUDGE,
+        created_at__lt=now
+        - timedelta(
+            days=_judge_observability_retention_days("LLM_USAGE_LOG_RETENTION_DAYS")
+        ),
+    ).delete()
+
+
+@app.task(trail=False)
+def drain_judge_deferrals() -> int:
+    """Run durable judge retries only when the operator enabled the queue."""
+    if not settings.JUDGE_DEFERRAL_ENABLED:
+        return 0
+    # Importing lazily avoids pulling judge orchestration into every worker
+    # process while this module initializes its task registry.
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.judge_loop import drain_judge_deferrals as drain
+
+    return drain()
+
+
 @app.task(trail=False)
 def cleanup_loc_kit_drafts() -> None:
     """
@@ -1520,6 +1569,21 @@ def setup_periodic_tasks(sender, **kwargs) -> None:
     sender.add_periodic_task(
         crontab(hour=0, minute=50), cleanup_reports.s(), name="reports-cleanup"
     )
+    judge_cleanup_interval = getattr(
+        settings, "JUDGE_OBSERVABILITY_CLEANUP_INTERVAL", 86_400
+    )
+    if isinstance(judge_cleanup_interval, int) and judge_cleanup_interval > 0:
+        sender.add_periodic_task(
+            judge_cleanup_interval,
+            cleanup_judge_observability.s(),
+            name="judge-observability-cleanup",
+        )
+    if settings.JUDGE_DEFERRAL_ENABLED:
+        sender.add_periodic_task(
+            max(1, settings.JUDGE_DEFERRAL_MIN_INTERVAL),
+            drain_judge_deferrals.s(),
+            name="judge-deferral-drain",
+        )
     sender.add_periodic_task(
         900, cleanup_loc_kit_drafts.s(), name="cleanup-loc-kit-drafts"
     )

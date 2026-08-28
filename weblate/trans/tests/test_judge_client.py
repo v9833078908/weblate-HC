@@ -15,6 +15,7 @@ from django.db import DatabaseError
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from weblate.trans.judge import (
+    _ALIAS_CACHE,
     JudgeError,
     JudgeRequest,
     get_judge_base_url,
@@ -22,8 +23,10 @@ from weblate.trans.judge import (
     judge_configuration_ready,
     render_preview,
     request_verdicts,
+    resolve_judge_seat_profile,
     validate_judge_configuration,
 )
+from weblate.trans.models.judge import JudgeRequestAttempt
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.tests import http_mock
 
@@ -74,18 +77,15 @@ class ResetStream(httpx2.SyncByteStream):
 
 
 def _reply(segments: list[dict]) -> dict:
-    normalized = [
-        {
-            **segment,
-            "instruction": segment.get(
-                "instruction",
-                "Correct the reported translation errors." if segment["errors"] else "",
-            ),
-        }
-        for segment in segments
-    ]
-    content = json.dumps({"segments": normalized})
+    content = json.dumps({"segments": segments})
     return {"choices": [{"message": {"content": content}}]}
+
+
+def _sse(*events: object) -> str:
+    return (
+        "".join(f"data: {json.dumps(event)}\n\n" for event in events)
+        + "data: [DONE]\n\n"
+    )
 
 
 def _request_segments(body: dict) -> list[dict]:
@@ -191,6 +191,19 @@ class JudgeClientGateTest(SimpleTestCase):
         JUDGE_ENABLED=True,
         JUDGE_API_KEY="sk-test",
         JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="",
+    )
+    @http_mock.activate
+    def test_seat_request_validates_both_profiles_before_posting(self) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], seat=1)
+
+        self.assertEqual(http_mock.calls, [])
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
         JUDGE_MODEL_SEAT_2="vendor-b/model",
         JUDGE_MAX_UNITS_PER_RUN=-1,
     )
@@ -288,6 +301,60 @@ class JudgeClientTest(SimpleTestCase):
         self.assertIn("DOORS", result.back_translation)
 
     @http_mock.activate
+    def test_ignores_reasoning_content_when_content_is_valid(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "segments": [
+                                        {
+                                            "id": 0,
+                                            "verdict": "pass",
+                                            "errors": [],
+                                            "back_translation": "",
+                                        }
+                                    ]
+                                }
+                            ),
+                            "reasoning_content": '{"segments": "untrusted"}',
+                        }
+                    }
+                ]
+            },
+        )
+
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+
+        self.assertFalse(result.unparsed)
+
+    @http_mock.activate
+    def test_does_not_parse_reasoning_content_without_content(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": None,
+                            "reasoning_content": json.dumps({"segments": []}),
+                        }
+                    }
+                ]
+            },
+        )
+
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+
+        self.assertTrue(result.unparsed)
+        self.assertEqual(result.failure_kind, "invalid-envelope")
+
+    @http_mock.activate
     def test_max_severity_is_derived_from_the_worst_error(self) -> None:
         http_mock.register(
             "POST",
@@ -339,7 +406,7 @@ class JudgeClientTest(SimpleTestCase):
         self.assertEqual(result.max_severity, "none")
 
     @http_mock.activate
-    def test_instruction_must_match_error_presence(self) -> None:
+    def test_model_instruction_is_ignored_for_an_error_free_pass(self) -> None:
         http_mock.register(
             "POST",
             CHAT_URL,
@@ -356,10 +423,11 @@ class JudgeClientTest(SimpleTestCase):
             ),
         )
         [result] = request_verdicts([REQ], model="vendor/model-a")
-        self.assertTrue(result.unparsed)
+        self.assertFalse(result.unparsed)
+        self.assertEqual(result.instruction, "")
 
     @http_mock.activate
-    def test_litellm_none_instruction_is_blank_for_error_free_pass(self) -> None:
+    def test_instruction_none_is_ignored_for_an_error_free_pass(self) -> None:
         http_mock.register(
             "POST",
             CHAT_URL,
@@ -380,7 +448,7 @@ class JudgeClientTest(SimpleTestCase):
         self.assertEqual(result.instruction, "")
 
     @http_mock.activate
-    def test_missing_instruction_key_is_unparsed(self) -> None:
+    def test_missing_instruction_key_is_accepted(self) -> None:
         http_mock.register(
             "POST",
             CHAT_URL,
@@ -406,10 +474,10 @@ class JudgeClientTest(SimpleTestCase):
             },
         )
         [result] = request_verdicts([REQ], model="vendor/model-a")
-        self.assertTrue(result.unparsed)
+        self.assertFalse(result.unparsed)
 
     @http_mock.activate
-    def test_non_string_instruction_is_unparsed(self) -> None:
+    def test_null_instruction_is_ignored(self) -> None:
         http_mock.register(
             "POST",
             CHAT_URL,
@@ -436,10 +504,11 @@ class JudgeClientTest(SimpleTestCase):
             },
         )
         [result] = request_verdicts([REQ], model="vendor/model-a")
-        self.assertTrue(result.unparsed)
+        self.assertFalse(result.unparsed)
+        self.assertEqual(result.instruction, "")
 
     @http_mock.activate
-    def test_too_long_instruction_is_unparsed(self) -> None:
+    def test_long_instruction_is_ignored(self) -> None:
         http_mock.register(
             "POST",
             CHAT_URL,
@@ -463,10 +532,10 @@ class JudgeClientTest(SimpleTestCase):
             ),
         )
         [result] = request_verdicts([REQ], model="vendor/model-a")
-        self.assertTrue(result.unparsed)
+        self.assertFalse(result.unparsed)
 
     @http_mock.activate
-    def test_wrongly_empty_instruction_is_unparsed(self) -> None:
+    def test_empty_instruction_is_ignored(self) -> None:
         http_mock.register(
             "POST",
             CHAT_URL,
@@ -490,10 +559,10 @@ class JudgeClientTest(SimpleTestCase):
             ),
         )
         [result] = request_verdicts([REQ], model="vendor/model-a")
-        self.assertTrue(result.unparsed)
+        self.assertFalse(result.unparsed)
 
     @http_mock.activate
-    def test_valid_instruction_is_parsed_when_errors_present(self) -> None:
+    def test_model_generated_instruction_is_ignored_when_errors_present(self) -> None:
         http_mock.register(
             "POST",
             CHAT_URL,
@@ -518,9 +587,7 @@ class JudgeClientTest(SimpleTestCase):
         )
         [result] = request_verdicts([REQ], model="vendor/model-a")
         self.assertFalse(result.unparsed)
-        self.assertEqual(
-            result.instruction, "Replace the wrong term with the glossary term."
-        )
+        self.assertEqual(result.instruction, "")
 
     @http_mock.activate
     def test_batches_many_requests_and_keeps_order(self) -> None:
@@ -567,7 +634,7 @@ class JudgeClientTest(SimpleTestCase):
                 [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
             ),
         )
-        request_verdicts([REQ], model="vendor/model-a")
+        request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
         body = json.loads(http_mock.calls[0].request.content)
         self.assertTrue(body["response_format"]["json_schema"]["strict"])
         self.assertTrue(body["provider"]["require_parameters"])
@@ -639,7 +706,7 @@ class JudgeClientTest(SimpleTestCase):
         http_mock.register("POST", CHAT_URL, status_code=500, json={})
         [result] = request_verdicts([REQ], model="vendor/model-a")
         self.assertTrue(result.unparsed)
-        self.assertEqual(len(http_mock.calls), 1)
+        self.assertEqual(len(http_mock.calls), 2)
 
     @mock.patch("weblate.trans.judge.time.sleep")
     @http_mock.activate
@@ -656,6 +723,29 @@ class JudgeClientTest(SimpleTestCase):
         self.assertFalse(result.unparsed)
         self.assertEqual(len(http_mock.calls), 2)
         sleep.assert_called_once()
+
+    @mock.patch("weblate.trans.judge.time.sleep")
+    @mock.patch("weblate.trans.judge.time.monotonic", return_value=100.0)
+    @http_mock.activate
+    def test_retry_after_past_deadline_is_not_retried(self, monotonic, sleep) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            status_code=429,
+            headers={"Retry-After": "60"},
+            json={},
+        )
+
+        [result] = request_verdicts(
+            [REQ],
+            model="vendor/model-a",
+            retry_deadline=150.0,
+        )
+
+        self.assertTrue(result.unparsed)
+        self.assertEqual(result.failure_kind, "http-rate-limit")
+        self.assertEqual(len(http_mock.calls), 1)
+        sleep.assert_not_called()
 
     @mock.patch("weblate.trans.judge.time.sleep")
     @http_mock.activate
@@ -749,6 +839,75 @@ class JudgeClientTest(SimpleTestCase):
         self.assertTrue(result.unparsed)
 
     @http_mock.activate
+    def test_unhashable_verdict_returns_invalid_segment_not_a_crash(self) -> None:
+        # "verdict": [] once raised TypeError during set membership instead
+        # of classifying the reply as an invalid segment.
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": [], "errors": [], "back_translation": ""}]
+            ),
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+        self.assertEqual(result.failure_kind, "invalid-segment")
+
+    @http_mock.activate
+    def test_unhashable_severity_returns_invalid_segment_not_a_crash(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {
+                        "id": 0,
+                        "verdict": "flag",
+                        "errors": [
+                            {
+                                "span": "x",
+                                "category": "fluency",
+                                "severity": {},
+                                "description": "d",
+                            }
+                        ],
+                        "back_translation": "",
+                    }
+                ]
+            ),
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+        self.assertEqual(result.failure_kind, "invalid-segment")
+
+    @http_mock.activate
+    def test_unhashable_category_returns_invalid_segment_not_a_crash(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {
+                        "id": 0,
+                        "verdict": "flag",
+                        "errors": [
+                            {
+                                "span": "x",
+                                "category": [],
+                                "severity": "minor",
+                                "description": "d",
+                            }
+                        ],
+                        "back_translation": "",
+                    }
+                ]
+            ),
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+        self.assertEqual(result.failure_kind, "invalid-segment")
+
+    @http_mock.activate
     def test_the_api_key_never_reaches_the_exception_text(self) -> None:
         # A gate failure raises; the key must not be in the message.
         with override_settings(JUDGE_ENABLED=True, JUDGE_API_KEY=""):
@@ -827,6 +986,7 @@ class JudgeRequestDeadlineTest(TestCase):
         elapsed = time.monotonic() - started
 
         self.assertTrue(result.unparsed)
+        self.assertEqual(result.failure_kind, "deadline")
         self.assertLess(elapsed, 1)
         self.assertEqual(LLMUsageLog.objects.count(), 0)
         self.assertEqual(len(http_mock.calls), 1)
@@ -886,7 +1046,7 @@ class JudgeRequestDeadlineTest(TestCase):
             [result] = request_verdicts([REQ], model="vendor/model-a")
 
         self.assertTrue(result.unparsed)
-        self.assertTrue(any("too large" in line for line in logs.output))
+        self.assertTrue(any("response-too-large" in line for line in logs.output))
         self.assertEqual(LLMUsageLog.objects.count(), 0)
 
 
@@ -1011,7 +1171,7 @@ class JudgeUsageLogTest(TestCase):
                 "id": "resp-1",
             },
         )
-        request_verdicts([REQ], model="vendor/model-a")
+        request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
         row = LLMUsageLog.objects.get(model="vendor/model-a")
         self.assertEqual(row.prompt_tokens, 11)
         self.assertEqual(row.completion_tokens, 7)
@@ -1036,7 +1196,12 @@ class JudgeUsageLogTest(TestCase):
         )
         payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
         http_mock.register("POST", CHAT_URL, json=payload)
-        request_verdicts([REQ], model="vendor/model-a", project_slug="need-for-greed")
+        request_verdicts(
+            [REQ],
+            model="vendor/model-a",
+            project_slug="need-for-greed",
+            persist_attempts=True,
+        )
         self.assertEqual(
             LLMUsageLog.objects.get(model="vendor/model-a").project_slug,
             "need-for-greed",
@@ -1047,6 +1212,7 @@ class JudgeUsageLogTest(TestCase):
         JUDGE_API_KEY="sk-test",
         JUDGE_BATCH_SIZE=5,
         JUDGE_REQUEST_SLEEP=0.0,
+        JUDGE_PROTOCOL_RETRIES=0,
     )
     @http_mock.activate
     def test_usage_is_recorded_when_the_batch_fails_to_parse(self) -> None:
@@ -1057,7 +1223,7 @@ class JudgeUsageLogTest(TestCase):
             CHAT_URL,
             json=payload,
         )
-        request_verdicts([REQ], model="vendor/model-a")
+        request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
         row = LLMUsageLog.objects.get(model="vendor/model-a")
         self.assertEqual(row.prompt_tokens, 11)
         self.assertEqual(row.completion_tokens, 7)
@@ -1079,7 +1245,7 @@ class JudgeUsageLogTest(TestCase):
         )
         payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
         http_mock.register("POST", CHAT_URL, json=payload)
-        request_verdicts(reqs, model="vendor/model-a")
+        request_verdicts(reqs, model="vendor/model-a", persist_attempts=True)
         row = LLMUsageLog.objects.get(model="vendor/model-a")
         self.assertEqual(row.operation, LLMUsageLog.Operation.JUDGE)
         self.assertEqual(row.unit_count, 2)
@@ -1105,7 +1271,7 @@ class JudgeUsageLogTest(TestCase):
         retry_payload["usage"] = usage
         http_mock.register("POST", CHAT_URL, json=retry_payload)
 
-        request_verdicts(reqs, model="vendor/model-a")
+        request_verdicts(reqs, model="vendor/model-a", persist_attempts=True)
 
         rows = list(LLMUsageLog.objects.order_by("id"))
         self.assertEqual(len(rows), 2)
@@ -1133,7 +1299,9 @@ class JudgeUsageLogTest(TestCase):
             "create",
             side_effect=DatabaseError("boom"),
         ):
-            results = request_verdicts([REQ], model="vendor/model-a")
+            results = request_verdicts(
+                [REQ], model="vendor/model-a", persist_attempts=True
+            )
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].model_verdict, "pass")
         self.assertEqual(LLMUsageLog.objects.count(), 0)
@@ -1253,6 +1421,17 @@ LITELLM_CHAT_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/completions"
     JUDGE_REQUEST_SLEEP=0.0,
 )
 class JudgeLiteLLMPayloadTest(TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        # Alias resolution is exercised separately; these payload tests
+        # must observe only the chat-completions POST.
+
+        _ALIAS_CACHE.clear()
+
+    @staticmethod
+    def _post_calls():
+        return [call for call in http_mock.calls if call.request.method == "POST"]
+
     @override_settings(JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1")
     @http_mock.activate
     def test_litellm_payload_has_neither_usage_nor_provider(self) -> None:
@@ -1281,8 +1460,8 @@ class JudgeLiteLLMPayloadTest(TestCase):
                 "usage": {"prompt_tokens": 11, "completion_tokens": 7},
             },
         )
-        request_verdicts([REQ], model="vendor/model-a")
-        body = json.loads(http_mock.calls[0].request.content)
+        request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
+        body = json.loads(self._post_calls()[0].request.content)
         self.assertNotIn("usage", body)
         self.assertNotIn("provider", body)
         row = LLMUsageLog.objects.get(model="vendor/model-a")
@@ -1291,11 +1470,19 @@ class JudgeLiteLLMPayloadTest(TestCase):
 
     @override_settings(
         JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
-        JUDGE_REASONING_EFFORT="none",
+        JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+        JUDGE_REASONING_EFFORT_SEAT_1="thinking.disabled",
+        JUDGE_REASONING_EFFORT_SEAT_2="enable_thinking=false",
+        JUDGE_RESPONSE_FORMAT_SEAT_1="json_object",
+        JUDGE_RESPONSE_FORMAT_SEAT_2="json_schema",
+        JUDGE_STREAM_SEAT_1=False,
+        JUDGE_STREAM_SEAT_2=False,
+        JUDGE_BATCH_SIZE_SEAT_1=2,
+        JUDGE_BATCH_SIZE_SEAT_2=5,
     )
     @http_mock.activate
-    def test_qwen_reasoning_disable_mapping(self) -> None:
-        models = ("qwen3.8-max", "QWEN3.7-plus")
+    def test_per_seat_litellm_profiles_control_payloads(self) -> None:
         http_mock.register(
             "POST",
             LITELLM_CHAT_URL,
@@ -1303,27 +1490,46 @@ class JudgeLiteLLMPayloadTest(TestCase):
                 [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
             ),
         )
+        request_verdicts([REQ], seat=1)
+        request_verdicts([REQ], seat=2)
 
-        for model in models:
-            with self.subTest(model=model):
-                request_verdicts([REQ], model=model)
-                body = json.loads(http_mock.calls[-1].request.content)
-                self.assertFalse(body["enable_thinking"])
-                self.assertNotIn("thinking", body)
-                self.assertNotIn("reasoning", body)
+        first, second = (
+            json.loads(call.request.content) for call in self._post_calls()
+        )
+        self.assertEqual(first["model"], "weblate-judge-deepseek-v4-pro")
+        self.assertEqual(first["thinking"], {"type": "disabled"})
+        self.assertNotIn("enable_thinking", first)
+        self.assertEqual(first["response_format"], {"type": "json_object"})
+        self.assertEqual(second["model"], "atlas/qwen3.8-max")
+        self.assertFalse(second["enable_thinking"])
+        self.assertNotIn("thinking", second)
 
     @override_settings(
         JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
-        JUDGE_REASONING_EFFORT="none",
+        JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
     )
     @http_mock.activate
-    def test_confirmed_non_qwen_models_disable_thinking(self) -> None:
-        models = (
-            "deepseek-v4-pro",
-            "deepseek-ai/deepseek-v4-flash",
-            "atlas/deepseek-v4-pro-0813",
-            "atlas_glm-5.1",
-            "Kimi K2.6",
+    def test_alias_resolution_resolves_upstream_and_invalidates_on_retarget(
+        self,
+    ) -> None:
+
+        info_url = "https://hcbifrost.herocraft.com/litellm/v1/model/info"
+
+        def alias_reply(model: str, upstream: str):
+            return {
+                "data": [{"model_name": model, "litellm_params": {"model": upstream}}]
+            }
+
+        http_mock.register(
+            "GET",
+            info_url,
+            json=alias_reply("weblate-judge-deepseek-v4-pro", "deepseek/upstream-a"),
+        )
+        http_mock.register(
+            "GET",
+            info_url,
+            json=alias_reply("weblate-judge-deepseek-v4-pro", "deepseek/upstream-b"),
         )
         http_mock.register(
             "POST",
@@ -1333,13 +1539,45 @@ class JudgeLiteLLMPayloadTest(TestCase):
             ),
         )
 
-        for model in models:
-            with self.subTest(model=model):
-                request_verdicts([REQ], model=model)
-                body = json.loads(http_mock.calls[-1].request.content)
-                self.assertEqual(body["thinking"], {"type": "disabled"})
-                self.assertNotIn("enable_thinking", body)
-                self.assertNotIn("reasoning", body)
+        first = resolve_judge_seat_profile(1)
+        self.assertEqual(first.upstream_model, "deepseek/upstream-a")
+        self.assertTrue(first.alias_revision)
+
+        # Cached resolution: resolving again adds no new capability call
+        # (seat 1's alias is cached; seat 2 resolves once and caches too).
+        resolve_judge_seat_profile(1)
+        alias_calls = [call for call in http_mock.calls if call.request.method == "GET"]
+        self.assertEqual(len(alias_calls), 2)
+        resolve_judge_seat_profile(1)
+        alias_calls = [call for call in http_mock.calls if call.request.method == "GET"]
+        self.assertEqual(len(alias_calls), 2)
+
+        # An operator retarget: expiry forces a re-lookup for seat 1, and
+        # both the model and profile fingerprints must change so the
+        # verdict cache is invalidated with unchanged environment variables.
+        key = ("https://hcbifrost.herocraft.com/litellm/v1", first.model)
+        _ALIAS_CACHE[key] = (first.upstream_model, first.alias_revision, 0.0)
+        second = resolve_judge_seat_profile(1)
+        self.assertEqual(second.upstream_model, "deepseek/upstream-b")
+        self.assertNotEqual(first.model_fingerprint, second.model_fingerprint)
+        self.assertNotEqual(first.profile_fingerprint, second.profile_fingerprint)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://openrouter.ai/api/v1",
+        JUDGE_MODEL_SEAT_1="vendor/model-a",
+        JUDGE_MODEL_SEAT_2="vendor/model-b",
+    )
+    @http_mock.activate
+    def test_non_litellm_provider_never_resolves_aliases(self) -> None:
+        profile = resolve_judge_seat_profile(1)
+        # Non-LiteLLM endpoints have no alias layer: the profile records
+        # the configured model as its own upstream and no revision.
+        self.assertEqual(profile.upstream_model, "vendor/model-a")
+        self.assertEqual(profile.alias_revision, "")
+        self.assertEqual(
+            [call for call in http_mock.calls if call.request.method == "GET"],
+            [],
+        )
 
     @override_settings(
         JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
@@ -1352,6 +1590,212 @@ class JudgeLiteLLMPayloadTest(TestCase):
         with self.assertRaises(JudgeError):
             request_verdicts([REQ], model="vendor/model-a")
         self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+        JUDGE_REASONING_EFFORT_SEAT_1="thinking.disabled",
+        JUDGE_REASONING_EFFORT_SEAT_2="enable_thinking=false",
+        JUDGE_STREAM_SEAT_1=True,
+        JUDGE_STREAM_SEAT_2=True,
+    )
+    @http_mock.activate
+    def test_streaming_profiles_include_usage_and_parse_sse(self) -> None:
+        output = json.dumps(
+            {
+                "segments": [
+                    {
+                        "id": 0,
+                        "verdict": "pass",
+                        "errors": [],
+                        "back_translation": "",
+                    }
+                ]
+            }
+        )
+        http_mock.register(
+            "POST",
+            LITELLM_CHAT_URL,
+            content=_sse(
+                {
+                    "choices": [
+                        {
+                            "delta": {"reasoning_content": "not verdict text"},
+                            "finish_reason": None,
+                        }
+                    ]
+                },
+                {
+                    "choices": [
+                        {
+                            "delta": {"content": output[:20]},
+                            "finish_reason": None,
+                        }
+                    ]
+                },
+                {
+                    "choices": [
+                        {
+                            "delta": {"content": output[20:]},
+                            "finish_reason": "stop",
+                        }
+                    ]
+                },
+                {"choices": [], "usage": {"prompt_tokens": 1, "completion_tokens": 2}},
+            ),
+        )
+
+        [result] = request_verdicts([REQ], seat=2)
+
+        body = json.loads(self._post_calls()[0].request.content)
+        self.assertFalse(result.unparsed, result.failure_kind)
+        self.assertEqual(body["stream_options"], {"include_usage": True})
+        self.assertFalse(body["enable_thinking"])
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+        JUDGE_STREAM_SEAT_2=True,
+        JUDGE_RESPONSE_FORMAT_SEAT_2="json_object",
+    )
+    @http_mock.activate
+    def test_streamed_response_id_is_retained_for_attempt_correlation(self) -> None:
+        output = json.dumps(
+            {
+                "segments": [
+                    {
+                        "id": 0,
+                        "verdict": "pass",
+                        "errors": [],
+                        "back_translation": "",
+                    }
+                ]
+            }
+        )
+        http_mock.register(
+            "POST",
+            LITELLM_CHAT_URL,
+            content=_sse(
+                {"id": "chatcmpl-streamed-42", "choices": []},
+                {"choices": [{"delta": {"content": output}, "finish_reason": "stop"}]},
+            ),
+        )
+
+        [result] = request_verdicts([REQ], seat=2, persist_attempts=True)
+
+        self.assertFalse(result.unparsed, result.failure_kind)
+
+        attempt = JudgeRequestAttempt.objects.get(pk=result.request_attempt_id)
+        self.assertEqual(attempt.response_id, "chatcmpl-streamed-42")
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+        JUDGE_REASONING_EFFORT_SEAT_1="thinking.disabled",
+        JUDGE_REASONING_EFFORT_SEAT_2="enable_thinking=false",
+        JUDGE_STREAM_SEAT_1=True,
+    )
+    @http_mock.activate
+    def test_stream_finish_length_is_not_retried(self) -> None:
+        http_mock.register(
+            "POST",
+            LITELLM_CHAT_URL,
+            content=_sse(
+                {
+                    "choices": [
+                        {
+                            "delta": {"content": "{}"},
+                            "finish_reason": "length",
+                        }
+                    ]
+                }
+            ),
+        )
+
+        [result] = request_verdicts([REQ], seat=1)
+
+        self.assertEqual(result.failure_kind, "finish-length")
+        self.assertEqual(len(self._post_calls()), 1)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+        JUDGE_REASONING_EFFORT_SEAT_1="thinking.disabled",
+        JUDGE_REASONING_EFFORT_SEAT_2="enable_thinking=false",
+        JUDGE_STREAM_SEAT_1=True,
+        JUDGE_PROTOCOL_RETRIES=0,
+    )
+    @http_mock.activate
+    def test_stream_without_done_is_an_invalid_envelope(self) -> None:
+        event = {
+            "choices": [
+                {
+                    "delta": {
+                        "content": json.dumps(
+                            {
+                                "segments": [
+                                    {
+                                        "id": 0,
+                                        "verdict": "pass",
+                                        "errors": [],
+                                        "back_translation": "",
+                                    }
+                                ]
+                            }
+                        )
+                    },
+                    "finish_reason": "stop",
+                }
+            ]
+        }
+        http_mock.register(
+            "POST",
+            LITELLM_CHAT_URL,
+            content=f"data: {json.dumps(event)}\n\n",
+        )
+
+        [result] = request_verdicts([REQ], seat=1)
+
+        self.assertTrue(result.unparsed)
+        self.assertEqual(result.failure_kind, "invalid-envelope")
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+        JUDGE_REASONING_EFFORT_SEAT_1="thinking.disabled",
+        JUDGE_REASONING_EFFORT_SEAT_2="enable_thinking=false",
+    )
+    def test_profile_resolution_includes_atlas_qwen(self) -> None:
+        first, second = resolve_judge_seat_profile(1), resolve_judge_seat_profile(2)
+        self.assertEqual(first.model, "weblate-judge-deepseek-v4-pro")
+        self.assertEqual(second.model, "atlas/qwen3.8-max")
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+        JUDGE_REASONING_EFFORT="enable_thinking=false",
+        JUDGE_RESPONSE_FORMAT="json_object",
+        JUDGE_STREAM=True,
+        JUDGE_BATCH_SIZE=3,
+        JUDGE_TEMPERATURE=0.25,
+        JUDGE_MAX_TOKENS=123,
+    )
+    def test_per_seat_inherit_uses_the_global_profile_values(self) -> None:
+        profile = resolve_judge_seat_profile(2)
+
+        self.assertEqual(profile.model, "atlas/qwen3.8-max")
+        self.assertEqual(profile.reasoning, "enable_thinking=false")
+        self.assertEqual(profile.response_format, "json_object")
+        self.assertTrue(profile.stream)
+        self.assertEqual(profile.batch_size, 3)
+        self.assertEqual(profile.temperature, 0.25)
+        self.assertEqual(profile.max_tokens, 123)
 
     @override_settings(
         JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
@@ -1368,7 +1812,7 @@ class JudgeLiteLLMPayloadTest(TestCase):
 
         request_verdicts([REQ], model="deepseek-v4-pro")
 
-        body = json.loads(http_mock.calls[0].request.content)
+        body = json.loads(self._post_calls()[0].request.content)
         self.assertNotIn("enable_thinking", body)
         self.assertNotIn("thinking", body)
         self.assertNotIn("reasoning", body)

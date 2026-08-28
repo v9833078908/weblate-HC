@@ -59,6 +59,7 @@ from weblate.trans.forms import (
     ZenTranslationForm,
     get_new_unit_form,
 )
+from weblate.trans.judge import judge_seat_profiles
 from weblate.trans.models import (
     Category,
     Comment,
@@ -1548,8 +1549,8 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
     if len(project_slugs) == 1:
         project_slug = project_slugs.pop()
         ranges = [
-            recent_cost_range(project_slug, model, LLMUsageLog.Operation.JUDGE)
-            for model in (settings.JUDGE_MODEL_SEAT_1, settings.JUDGE_MODEL_SEAT_2)
+            recent_cost_range(project_slug, profile.model, LLMUsageLog.Operation.JUDGE)
+            for profile in judge_seat_profiles()
         ]
         if all(cost_range is not None for cost_range in ranges):
             low = sum(cost_range[0] for cost_range in ranges if cost_range is not None)

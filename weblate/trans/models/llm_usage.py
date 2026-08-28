@@ -64,9 +64,26 @@ class LLMUsageLog(models.Model):
     outcome = models.CharField(
         max_length=16, choices=Outcome, blank=True, db_index=True
     )
+    request_attempt = models.ForeignKey(
+        "trans.JudgeRequestAttempt",
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="usage_logs",
+    )
 
     class Meta:
         ordering: ClassVar[list[str]] = ["-created_at"]
+        indexes: ClassVar[list[models.Index]] = [
+            models.Index(
+                fields=["operation", "-created_at"],
+                name="llm_usage_operation_recent_idx",
+            ),
+            models.Index(
+                fields=["request_attempt", "-created_at"],
+                name="llm_usage_attempt_recent_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.model} {self.total_tokens} tokens ${self.cost_usd}"

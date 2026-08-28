@@ -125,12 +125,16 @@ Scope and intended use
        user or operator rather than trusted from the run's stored actor
      - Database (verdicts; each resolution transition permanently appends
        its own history entry, though the verdict's current resolution can
-       move again through an allowed transition), outbound request per batch
-       to the provider configured by :setting:`JUDGE_BASE_URL`, bounded by
-       :setting:`JUDGE_REQUEST_DEADLINE` when enabled. A durable run and its
-       per-string outcomes are database-only records with no outbound leg,
-       readable only through the permission-checked report page; the report
-       never renders a cost figure
+       move again through an allowed transition, and bounded request-attempt
+       diagnostics), outbound request per batch to the provider configured by
+       :setting:`JUDGE_BASE_URL`, bounded by
+       :setting:`JUDGE_REQUEST_DEADLINE` when enabled. Attempts retain only
+       status, timing, response shape, hashes, and token counters, never
+       source/target text, prompts, completions, reasoning, headers, or keys.
+       A durable run and its per-string outcomes are database-only records
+       with no outbound leg, readable only through the permission-checked
+       report page; the report never renders a cost figure or an identity
+       hash that could confirm a known translation
      - In scope. The outbound request is an operator-configured-host,
        site-wide-credentialed review only; provider behavior is out of scope.
        Decision recording is a local, permissioned, audited mutation with no
@@ -1005,7 +1009,9 @@ configuration rather than per-project configuration, the key is built inline
 into the request and never bound to a frame local an error reporter could
 serialize, and a
 transport or parse failure is recorded as unparsed rather than defaulting to
-a favorable verdict. *(maintainer)*
+a favorable verdict. Its bounded request-attempt records contain only
+redacted metadata and keyed digests, and are not an API or report confirmation
+oracle for a source or translation supplied by a user. *(maintainer)*
 
 Microsoft Clarity session recording (see :setting:`CLARITY_PROJECT_ID`) is the
 reviewed instance of a new outbound integration class: once a project ID is

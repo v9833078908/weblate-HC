@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
-from math import ceil
 from typing import TYPE_CHECKING, Any, Literal
 
 from celery import current_task
@@ -21,7 +20,12 @@ from weblate.checks.models import CHECKS
 from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.models import MACHINERY
 from weblate.trans.actions import ActionEvents
-from weblate.trans.judge import JUDGE_SEATS, JudgeError, validate_judge_configuration
+from weblate.trans.judge import (
+    JudgeError,
+    judge_configuration_snapshot,
+    judge_initial_request_count,
+    validate_judge_configuration,
+)
 from weblate.trans.judge_loop import build_request, run_judge_batch
 from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models import (
@@ -690,19 +694,18 @@ class AutoTranslate(BaseAutoTranslate):
         writable = sum(
             not unit.translated or self.overwrite_existing for unit in selected
         )
-        batches = ceil(processed / settings.JUDGE_BATCH_SIZE)
+        initial_calls = judge_initial_request_count(processed)
+        if initial_calls is None:
+            raise JudgeError(gettext("The LLM judge is not configured."))
         return (
             JudgeScopePreview(
                 matched=matched,
                 processed=processed,
                 remaining=matched - processed,
                 writable=writable,
-                initial_calls=batches * len(JUDGE_SEATS),
-                worst_case_calls=(
-                    batches
-                    * len(JUDGE_SEATS)
-                    * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)
-                ),
+                initial_calls=initial_calls,
+                worst_case_calls=initial_calls
+                * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1),
             ),
             selected,
         )
@@ -1176,6 +1179,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
             requested_mode=self.mode,
             cap=settings.JUDGE_MAX_UNITS_PER_RUN,
             status=JudgeRun.Status.RUNNING,
+            configuration_snapshot=judge_configuration_snapshot(),
         )
 
     @staticmethod

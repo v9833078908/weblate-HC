@@ -748,6 +748,12 @@ class JudgeResolutionLocalizationTest(SimpleTestCase):
             )
 
 
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
 class JudgeRequestEstimateTest(SimpleTestCase):
     @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_MAX_REPAIR_ATTEMPTS=1)
     def test_one_string_still_costs_one_batch(self) -> None:
@@ -768,6 +774,15 @@ class JudgeRequestEstimateTest(SimpleTestCase):
     @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_MAX_REPAIR_ATTEMPTS=1)
     def test_no_strings_costs_nothing(self) -> None:
         self.assertEqual(judge_request_upper_bound(0), 0)
+
+    @override_settings(
+        JUDGE_BATCH_SIZE_SEAT_1=2,
+        JUDGE_BATCH_SIZE_SEAT_2=5,
+        JUDGE_MAX_REPAIR_ATTEMPTS=1,
+    )
+    def test_per_seat_batch_ceilings_drive_the_estimate(self) -> None:
+        # ceil(6 / 2) + ceil(6 / 5), multiplied by two judge rounds.
+        self.assertEqual(judge_request_upper_bound(6), 10)
 
     @override_settings(JUDGE_BATCH_SIZE=0, JUDGE_MAX_REPAIR_ATTEMPTS=1)
     def test_a_broken_batch_size_yields_no_number(self) -> None:

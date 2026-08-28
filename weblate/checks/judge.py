@@ -96,12 +96,8 @@ class BaseJudgeCheck(TargetCheck):
             describe_latest_instruction,
         )
 
-        description = str(self.get_description(check_obj))
-        instruction = describe_latest_instruction(check_obj.unit)
-        return (
-            f"{description}\n\nRepair instruction: {instruction}"
-            if instruction
-            else description
+        return describe_latest_instruction(check_obj.unit) or self.get_description(
+            check_obj
         )
 
 

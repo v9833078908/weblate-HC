@@ -17,12 +17,18 @@ is judged, never rewritten.
 from __future__ import annotations
 
 import logging
+import math
+import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
+from django.db.models import Q
+from django.utils import timezone
 
 from weblate.checks.judge import JUDGE_CHECKS
 from weblate.glossary.models import get_matched_glossary_prompt_entries
@@ -32,16 +38,22 @@ from weblate.trans.forms import configured_routed_engine
 from weblate.trans.judge import (
     JUDGE_SEATS,
     JudgeRequest,
+    JudgeResult,
     OnBatch,
+    RetryBudget,
     request_verdicts,
+    resolve_judge_seat_profile,
     validate_judge_configuration,
 )
 from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models.judge import (
+    JudgeAdaptiveState,
+    JudgeDeferral,
     JudgeRun,
     JudgeVerdict,
     collegium_verdict,
     compute_context_hash,
+    compute_judge_request_identity,
     compute_target_hash,
     compute_target_storage_hash,
     current_round,
@@ -65,6 +77,8 @@ _NON_REPAIRABLE_VERDICTS = frozenset(
 )
 
 LOGGER = logging.getLogger(__name__)
+_DEFERRAL_MAX_ELAPSED_SECONDS = 240
+_TOKEN_PRECISION = Decimal("0.000001")
 
 
 def build_request(unit: Unit) -> JudgeRequest:
@@ -212,8 +226,26 @@ def _write_verdict(
     attempt: int,
     run_id: uuid.UUID,
     result,
-    model: str,
+    profile,
+    project_context: str,
 ) -> None:
+    target_hash = compute_target_hash(request.target_plurals or [request.target])
+    context_hash = compute_context_hash(
+        source=request.source,
+        note=request.note,
+        glossary_terms=request.glossary_terms,
+    )
+    project_context_hash = compute_target_hash([project_context])
+    request_identity = compute_judge_request_identity(
+        unit_id=unit.id,
+        target_hash=target_hash,
+        context_hash=context_hash,
+        project_context_hash=project_context_hash,
+        source_language=request.source_language,
+        target_language=request.target_language,
+        profile_fingerprint=profile.profile_fingerprint,
+        prompt_schema_version=profile.prompt_schema_version,
+    )
     JudgeVerdict.objects.create(
         unit=unit,
         model_verdict=result.model_verdict,
@@ -221,18 +253,21 @@ def _write_verdict(
         unparsed=result.unparsed,
         errors=result.errors,
         back_translation=result.back_translation,
-        instruction=result.instruction,
-        judge_model=model,
+        instruction="",
+        judge_model=profile.model,
         seat=seat,
         attempt=attempt,
-        target_hash=compute_target_hash(request.target_plurals or [request.target]),
+        target_hash=target_hash,
         target_storage_hash=compute_target_storage_hash(request.target),
-        context_hash=compute_context_hash(
-            source=request.source,
-            note=request.note,
-            glossary_terms=request.glossary_terms,
-        ),
+        context_hash=context_hash,
         run_id=run_id,
+        request_attempt_id=result.request_attempt_id,
+        request_identity=request_identity,
+        project_context_hash=project_context_hash,
+        source_language=request.source_language,
+        target_language=request.target_language,
+        profile_fingerprint=profile.profile_fingerprint,
+        prompt_schema_version=profile.prompt_schema_version,
     )
     try:
         unit.translation.invalidate_cache()
@@ -255,44 +290,48 @@ def _has_active_check(unit: Unit, check_id: str) -> bool:
     return any(check.name == check_id for check in unit.active_checks)
 
 
+def _request_identity(
+    unit: Unit, request: JudgeRequest, profile, project_context: str
+) -> str:
+    """Build the shared text-free cache, attempt, and deferral identity."""
+    return compute_judge_request_identity(
+        unit_id=unit.id,
+        target_hash=compute_target_hash(request.target_plurals or [request.target]),
+        context_hash=compute_context_hash(
+            source=request.source,
+            note=request.note,
+            glossary_terms=request.glossary_terms,
+        ),
+        project_context_hash=compute_target_hash([project_context]),
+        source_language=request.source_language,
+        target_language=request.target_language,
+        profile_fingerprint=profile.profile_fingerprint,
+        prompt_schema_version=profile.prompt_schema_version,
+    )
+
+
 def _cached_verdict(
-    unit: Unit, request: JudgeRequest, models: tuple[str, str]
+    unit: Unit, request: JudgeRequest, profiles: dict[int, object], project_context: str
 ) -> JudgeVerdict | None:
-    """Reuse the newest parsed two-seat verdict for an unchanged request."""
-    target_hash = compute_target_hash(request.target_plurals or [request.target])
-    context_hash = compute_context_hash(
-        source=request.source,
-        note=request.note,
-        glossary_terms=request.glossary_terms,
-    )
-    queryset = JudgeVerdict.objects.filter(
-        unit=unit,
-        target_hash=target_hash,
-        context_hash=context_hash,
-        judge_model__in=models,
-    )
-    newest = queryset.order_by("-timestamp", "-pk").first()
-    if newest is None:
-        return None
-    rows = list(
-        queryset.filter(run_id=newest.run_id, attempt=newest.attempt).order_by("seat")
-    )
-    if (
-        len(rows) != 2
-        or any(row.unparsed for row in rows)
-        or {row.judge_model for row in rows} != set(models)
-    ):
-        return None
-    if {row.seat for row in rows} != {1, 2}:
-        return None
-    if any(
-        row.judge_model != models[row.seat - 1]
-        for row in rows
-        if 1 <= row.seat <= len(models)
-    ):
-        return None
-    if len({(row.run_id, row.attempt) for row in rows}) != 1:
-        return None
+    """Reuse the newest parsed per-seat verdicts for an unchanged request."""
+    identities = {
+        seat: _request_identity(unit, request, profile, project_context)
+        for seat, profile in profiles.items()
+    }
+    rows = []
+    for seat, identity in identities.items():
+        row = (
+            unit.judge_verdicts.filter(
+                request_identity=identity,
+                unparsed=False,
+                seat=seat,
+            )
+            .order_by("-timestamp", "-pk")
+            .first()
+        )
+        if row is None or row.judge_model != profiles[seat].model:
+            return None
+        rows.append(row)
     return collegium_verdict(rows)
 
 
@@ -409,14 +448,326 @@ def _prepare_round_unit(
     )
 
 
+def _deferral_values(
+    unit: Unit, request: JudgeRequest, profile, project_context: str
+) -> dict[str, object]:
+    """Return the durable, text-free representation of one seat request."""
+    target_hash = compute_target_hash(request.target_plurals or [request.target])
+    context_hash = compute_context_hash(
+        source=request.source,
+        note=request.note,
+        glossary_terms=request.glossary_terms,
+    )
+    project_context_hash = compute_target_hash([project_context])
+    return {
+        "request_identity": compute_judge_request_identity(
+            unit_id=unit.id,
+            target_hash=target_hash,
+            context_hash=context_hash,
+            project_context_hash=project_context_hash,
+            source_language=request.source_language,
+            target_language=request.target_language,
+            profile_fingerprint=profile.profile_fingerprint,
+            prompt_schema_version=profile.prompt_schema_version,
+        ),
+        "target_hash": target_hash,
+        "context_hash": context_hash,
+        "project_context_hash": project_context_hash,
+        "source_language": request.source_language,
+        "target_language": request.target_language,
+        "profile_fingerprint": profile.profile_fingerprint,
+        "prompt_schema_version": profile.prompt_schema_version,
+    }
+
+
+def _deferral_int_setting(name: str, default: int, *, minimum: int = 0) -> int:
+    """Return a non-boolean non-negative deferral setting."""
+    value = getattr(settings, name, default)
+    if not isinstance(value, int) or isinstance(value, bool):
+        return default
+    return max(minimum, value)
+
+
+def _deferral_decimal_setting(name: str, default: float) -> Decimal:
+    """Return a non-negative rate without accepting non-finite values."""
+    value = getattr(settings, name, default)
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return Decimal(str(default))
+    try:
+        result = Decimal(str(value))
+    except ArithmeticError:
+        return Decimal(str(default))
+    return max(Decimal(), result) if result.is_finite() else Decimal(str(default))
+
+
+def _locked_adaptive_state(profile, now) -> JudgeAdaptiveState:
+    """Fetch and lock the shared per-seat adaptive and queue budget state."""
+    capacity = _deferral_int_setting(
+        "JUDGE_DEFERRAL_TOKEN_BUCKET_CAPACITY", 200, minimum=1
+    )
+    refill = _deferral_decimal_setting(
+        "JUDGE_DEFERRAL_TOKEN_BUCKET_REFILL_PER_SECOND", 0.25
+    )
+    state, _created = JudgeAdaptiveState.objects.select_for_update().get_or_create(
+        endpoint_fingerprint=profile.endpoint_fingerprint,
+        model=profile.model,
+        seat=profile.seat,
+        defaults={
+            "batch_budget": profile.batch_size,
+            "token_bucket_capacity": capacity,
+            "token_bucket_available": Decimal(capacity),
+            "token_bucket_refill_per_second": refill,
+            "token_bucket_updated_at": now,
+        },
+    )
+    if state.token_bucket_updated_at is None:
+        state.token_bucket_available = Decimal(capacity)
+    else:
+        elapsed = max(0, (now - state.token_bucket_updated_at).total_seconds())
+        state.token_bucket_available = min(
+            Decimal(capacity),
+            (state.token_bucket_available + Decimal(str(elapsed)) * refill).quantize(
+                _TOKEN_PRECISION
+            ),
+        )
+    state.token_bucket_capacity = capacity
+    state.token_bucket_refill_per_second = refill
+    state.token_bucket_updated_at = now
+    return state
+
+
+def _save_adaptive_state(state: JudgeAdaptiveState) -> None:
+    state.save(
+        update_fields=[
+            "failure_streak",
+            "last_failure_kind",
+            "circuit_state",
+            "circuit_opened_at",
+            "circuit_open_until",
+            "token_bucket_capacity",
+            "token_bucket_available",
+            "token_bucket_refill_per_second",
+            "token_bucket_updated_at",
+            "updated_at",
+        ]
+    )
+
+
+def _record_deferral_circuit_outcome(profile, result: JudgeResult) -> None:
+    """Apply one parsed or terminal queue outcome to the shared circuit."""
+    if not settings.JUDGE_DEFERRAL_ENABLED:
+        return
+    try:
+        _update_deferral_circuit(profile, result, timezone.now())
+    except Exception:
+        LOGGER.exception("Failed to update judge deferral circuit")
+
+
+def _update_deferral_circuit(profile, result: JudgeResult, now) -> None:
+    """Persist a circuit state transition inside the shared-state lock."""
+    with transaction.atomic():
+        state = _locked_adaptive_state(profile, now)
+        if settings.JUDGE_DEFERRAL_OPERATOR_STOPPED:
+            state.circuit_state = JudgeAdaptiveState.CircuitState.OPERATOR_STOPPED
+            state.circuit_opened_at = now
+            state.circuit_open_until = None
+        elif state.circuit_state == JudgeAdaptiveState.CircuitState.OPERATOR_STOPPED:
+            state.circuit_state = JudgeAdaptiveState.CircuitState.CLOSED
+            state.failure_streak = 0
+            state.last_failure_kind = ""
+            state.circuit_opened_at = None
+            state.circuit_open_until = None
+        elif result.unparsed:
+            state.failure_streak += 1
+            state.last_failure_kind = result.failure_kind or "unknown"
+            threshold = _deferral_int_setting(
+                "JUDGE_DEFERRAL_CIRCUIT_FAILURE_THRESHOLD", 5, minimum=1
+            )
+            if (
+                state.failure_streak >= threshold
+                or state.circuit_state == JudgeAdaptiveState.CircuitState.HALF_OPEN
+            ):
+                state.circuit_state = JudgeAdaptiveState.CircuitState.OPEN
+                state.circuit_opened_at = now
+                state.circuit_open_until = now + timedelta(
+                    seconds=_deferral_int_setting(
+                        "JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS", 900, minimum=1
+                    )
+                )
+        else:
+            state.failure_streak = 0
+            state.last_failure_kind = ""
+            state.circuit_state = JudgeAdaptiveState.CircuitState.CLOSED
+            state.circuit_opened_at = None
+            state.circuit_open_until = None
+        _save_adaptive_state(state)
+
+
+def _reserve_deferral_requests(profile, requested_calls: int) -> int:
+    """
+    Reserve shared queue capacity and return the number of HTTP calls allowed.
+
+    A half-open circuit permits exactly one batched call. Returning a smaller
+    number leaves the unreserved leases to be released for a later pass.
+    """
+    if requested_calls < 1:
+        return 0
+    try:
+        return _reserve_deferral_requests_locked(
+            profile, requested_calls, timezone.now()
+        )
+    except Exception:
+        LOGGER.exception("Failed to reserve judge deferral capacity")
+        return 0
+
+
+def _reserve_deferral_requests_locked(profile, requested_calls: int, now) -> int:
+    """Reserve tokens under the shared-state lock."""
+    with transaction.atomic():
+        state = _locked_adaptive_state(profile, now)
+        if settings.JUDGE_DEFERRAL_OPERATOR_STOPPED:
+            state.circuit_state = JudgeAdaptiveState.CircuitState.OPERATOR_STOPPED
+            state.circuit_opened_at = now
+            state.circuit_open_until = None
+            _save_adaptive_state(state)
+            return 0
+        if state.circuit_state == JudgeAdaptiveState.CircuitState.OPERATOR_STOPPED:
+            state.circuit_state = JudgeAdaptiveState.CircuitState.CLOSED
+            state.failure_streak = 0
+            state.last_failure_kind = ""
+            state.circuit_opened_at = None
+            state.circuit_open_until = None
+        if state.circuit_state == JudgeAdaptiveState.CircuitState.OPEN:
+            if state.circuit_open_until and state.circuit_open_until > now:
+                _save_adaptive_state(state)
+                return 0
+            state.circuit_state = JudgeAdaptiveState.CircuitState.HALF_OPEN
+            state.circuit_open_until = now + timedelta(
+                seconds=max(300, settings.JUDGE_DEFERRAL_MIN_INTERVAL)
+            )
+        elif state.circuit_state == JudgeAdaptiveState.CircuitState.HALF_OPEN:
+            if state.circuit_open_until and state.circuit_open_until > now:
+                _save_adaptive_state(state)
+                return 0
+            state.circuit_state = JudgeAdaptiveState.CircuitState.OPEN
+            state.circuit_opened_at = now
+            state.circuit_open_until = now + timedelta(
+                seconds=_deferral_int_setting(
+                    "JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS", 900, minimum=1
+                )
+            )
+            _save_adaptive_state(state)
+            return 0
+        available = max(0, int(state.token_bucket_available))
+        reserved = min(requested_calls, available)
+        if state.circuit_state == JudgeAdaptiveState.CircuitState.HALF_OPEN:
+            reserved = min(reserved, 1)
+        if reserved:
+            state.token_bucket_available -= Decimal(reserved)
+        _save_adaptive_state(state)
+        return reserved
+
+
+def _sync_deferral(
+    unit: Unit,
+    request: JudgeRequest,
+    *,
+    seat: int,
+    profile,
+    project_context: str,
+    result: JudgeResult,
+    attempt_started_at: datetime | None = None,
+) -> None:
+    """Synchronize one seat's bounded-recovery outcome to its durable queue."""
+    if not settings.JUDGE_DEFERRAL_ENABLED:
+        return
+    now = timezone.now()
+    values = _deferral_values(unit, request, profile, project_context)
+    identity = values["request_identity"]
+    stale = JudgeDeferral.objects.filter(unit=unit, seat=seat).exclude(
+        request_identity=identity
+    )
+    if attempt_started_at is not None:
+        # A late response from a request that started before this pass
+        # must not close a deferral queued by a newer one: only rows the
+        # arriving attempt can actually supersede (created before the
+        # request started) are stale.
+        stale = stale.filter(created_at__lte=attempt_started_at)
+    stale.exclude(state=JudgeDeferral.State.CLOSED).update(
+        state=JudgeDeferral.State.CLOSED,
+        closed_at=now,
+        claim_token="",
+        claimed_at=None,
+        claim_expires_at=None,
+    )
+    if not result.unparsed:
+        JudgeDeferral.objects.filter(
+            unit=unit,
+            seat=seat,
+            request_identity=identity,
+        ).exclude(state=JudgeDeferral.State.CLOSED).update(
+            state=JudgeDeferral.State.CLOSED,
+            closed_at=now,
+            claim_token="",
+            claimed_at=None,
+            claim_expires_at=None,
+        )
+        return
+    defaults = {
+        **values,
+        "next_attempt_at": now,
+    }
+    try:
+        with transaction.atomic():
+            deferral, _created = JudgeDeferral.objects.get_or_create(
+                unit=unit,
+                seat=seat,
+                request_identity=identity,
+                defaults=defaults,
+            )
+    except IntegrityError:
+        # The uniqueness constraint is the final arbiter when concurrent
+        # producer runs observe the same transport failure.
+        deferral = JudgeDeferral.objects.get(
+            unit=unit, seat=seat, request_identity=identity
+        )
+
+    failures = deferral.consecutive_failures + 1
+    terminal = result.failure_kind == "finish-length"
+    min_interval = max(1, settings.JUDGE_DEFERRAL_MIN_INTERVAL)
+    max_interval = max(min_interval, settings.JUDGE_DEFERRAL_MAX_INTERVAL)
+    delay = min(max_interval, min_interval * (2 ** min(failures - 1, 30)))
+    JudgeDeferral.objects.filter(pk=deferral.pk).update(
+        state=(
+            JudgeDeferral.State.CLOSED
+            if terminal
+            else (
+                JudgeDeferral.State.SLOW
+                if failures >= settings.JUDGE_DEFERRAL_SLOW_AFTER
+                else JudgeDeferral.State.QUEUED
+            )
+        ),
+        consecutive_failures=failures,
+        last_failure_kind=result.failure_kind or "unknown",
+        last_attempt_at=now,
+        next_attempt_at=now + timedelta(seconds=delay),
+        closed_at=now if terminal else None,
+        claim_token="",
+        claimed_at=None,
+        claim_expires_at=None,
+    )
+
+
 def _persist_verdict_batches(
     request_units: list[Unit],
     *,
     seat: int,
     attempt: int,
     run_id: uuid.UUID,
-    model: str,
+    profile,
+    project_context: str,
     on_batch: OnBatch | None,
+    attempt_started_at: datetime | None = None,
 ) -> OnBatch:
     cursor = 0
 
@@ -424,6 +775,14 @@ def _persist_verdict_batches(
         nonlocal cursor
         batch_units = request_units[cursor : cursor + len(batch_requests)]
         cursor += len(batch_requests)
+        if batch_results:
+            _record_deferral_circuit_outcome(
+                profile,
+                next(
+                    (result for result in batch_results if result.unparsed),
+                    batch_results[0],
+                ),
+            )
         with transaction.atomic():
             for unit, request, result in zip(
                 batch_units,
@@ -438,7 +797,17 @@ def _persist_verdict_batches(
                     attempt,
                     run_id,
                     result,
-                    model,
+                    profile,
+                    project_context,
+                )
+                _sync_deferral(
+                    unit,
+                    request,
+                    seat=seat,
+                    profile=profile,
+                    project_context=project_context,
+                    result=result,
+                    attempt_started_at=attempt_started_at,
                 )
         if on_batch is not None:
             on_batch(batch_requests, batch_results)
@@ -457,23 +826,37 @@ class JudgeBatchResult(dict[int, JudgeVerdict]):  # ruff: ignore[subclass-builti
         self.attempt_counts: dict[int, int] = {}
 
 
-def run_judge_batch(  # ruff: ignore[complex-structure]
+def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-statements]
     units: list[Unit],
     *,
     writable_ids: set[int],
     user: User | None,
     on_batch: OnBatch | None = None,
     run: JudgeRun | None = None,
+    seats: tuple[int, ...] | None = None,
+    use_cache: bool = True,
+    retry_deadline: float | None = None,
 ) -> JudgeBatchResult:
     """
     Judge every unit with both seats; repair writable defects.
 
     ``JudgeVerdict.run_id`` remains a per-invocation model-call identity.
     ``run`` exists only to keep the producer-run boundary explicit to callers.
+    ``retry_deadline`` (monotonic seconds) bounds how long an in-run retry
+    may sleep, so a drain pass can never sleep past its deferral lease.
     """
     if not units:
         return JudgeBatchResult()
     validate_judge_configuration()
+    profiles = {seat: resolve_judge_seat_profile(seat) for seat in JUDGE_SEATS}
+    selected_seats = tuple(JUDGE_SEATS if seats is None else seats)
+    if (
+        not selected_seats
+        or len(set(selected_seats)) != len(selected_seats)
+        or any(seat not in profiles for seat in selected_seats)
+    ):
+        msg = "Judge seats must be a non-empty subset of configured seats"
+        raise ValueError(msg)
     original_units = {unit.id: unit for unit in units}
 
     def record_final_snapshot(unit: Unit) -> None:
@@ -481,18 +864,53 @@ def run_judge_batch(  # ruff: ignore[complex-structure]
         original.target = unit.target
         original.state = unit.state
 
+    def judge_seat_round(seat_units: list[Unit], seat: int, round_attempt: int) -> None:
+        """Send one seat's requests and persist every batch outcome."""
+        profile = profiles[seat]
+        requests = [round_requests[unit.id] for unit in seat_units]
+        started_at = timezone.now()
+        persist = _persist_verdict_batches(
+            seat_units,
+            seat=seat,
+            attempt=round_attempt,
+            run_id=run_id,
+            profile=profile,
+            project_context=project_context,
+            on_batch=on_batch,
+            attempt_started_at=started_at,
+        )
+        request_verdicts(
+            requests,
+            model=profile.model,
+            project_slug=project_slug,
+            project_context=project_context,
+            on_batch=persist,
+            seat=seat,
+            run=run,
+            persist_attempts=True,
+            retry_budget=retry_budget,
+            adaptive=True,
+            attempt=round_attempt,
+            retry_deadline=retry_deadline,
+        )
+
     run_id = uuid.uuid4()
     project_slug = units[0].translation.component.project.slug
     project_context = judge_project_context(units[0].translation.component.project)
     pending = list(units)
     verdicts = JudgeBatchResult()
     attempts = settings.JUDGE_MAX_REPAIR_ATTEMPTS
-    seats = tuple(
-        zip(
-            JUDGE_SEATS,
-            (settings.JUDGE_MODEL_SEAT_1, settings.JUDGE_MODEL_SEAT_2),
-            strict=True,
-        )
+    unparsed_rounds = _deferral_int_setting(
+        "JUDGE_MAX_UNPARSED_RETRY_ROUNDS", 1, minimum=0
+    )
+    initial_paid_calls = sum(
+        math.ceil(len(pending) / profiles[seat].batch_size) for seat in selected_seats
+    )
+    retry_ratio = settings.JUDGE_RETRY_BUDGET_RATIO
+    retry_budget = RetryBudget(
+        maximum=math.ceil(initial_paid_calls * retry_ratio)
+        if isinstance(retry_ratio, (int, float)) and retry_ratio >= 0
+        else 0
     )
 
     attempt = 0
@@ -504,10 +922,10 @@ def run_judge_batch(  # ruff: ignore[complex-structure]
         for unit in pending:
             request = build_request(unit)
             round_requests[unit.id] = request
-            cached = _cached_verdict(
-                unit,
-                request,
-                (settings.JUDGE_MODEL_SEAT_1, settings.JUDGE_MODEL_SEAT_2),
+            cached = (
+                _cached_verdict(unit, request, profiles, project_context)
+                if use_cache and set(selected_seats) == set(JUDGE_SEATS)
+                else None
             )
             if cached is not None:
                 cached_ids.add(unit.id)
@@ -519,40 +937,66 @@ def run_judge_batch(  # ruff: ignore[complex-structure]
             len(writable_ids),
             len(cached_ids),
         )
-        for seat, model in seats:
+        for seat in selected_seats:
+            profile = profiles[seat]
             request_units = [unit for unit in pending if unit.id not in cached_ids]
             if not request_units:
                 continue
-            requests = [round_requests[unit.id] for unit in request_units]
-            persist = _persist_verdict_batches(
-                request_units,
-                seat=seat,
-                attempt=attempt,
-                run_id=run_id,
-                model=model,
-                on_batch=on_batch,
-            )
-            request_verdicts(
-                requests,
-                model=model,
-                project_slug=project_slug,
-                project_context=project_context,
-                on_batch=persist,
-            )
+            judge_seat_round(request_units, seat, attempt)
 
             LOGGER.info(
                 "judge run %s: seat %d done, %d strings judged with %s",
                 run_id,
                 seat,
                 len(request_units),
-                model,
+                profile.model,
             )
+        if unparsed_rounds:
+            # Retry only a round in which every selected seat failed. Use
+            # its persisted rows directly: reader-side per-seat joining may
+            # legitimately retain an older opinion after a transport loss,
+            # but that does not make this invocation's all-dead round parsed.
+            retry_round = 0
+            last_round_attempt = attempt
+            while retry_round < unparsed_rounds:
+                rows_by_unit: dict[int, list[JudgeVerdict]] = {}
+                for row in JudgeVerdict.objects.filter(
+                    unit_id__in=[
+                        unit.id for unit in pending if unit.id not in cached_ids
+                    ],
+                    run_id=run_id,
+                    attempt=last_round_attempt,
+                    seat__in=selected_seats,
+                ):
+                    rows_by_unit.setdefault(row.unit_id, []).append(row)
+                unparsed_ids = {
+                    unit_id
+                    for unit_id, rows in rows_by_unit.items()
+                    if len({row.seat for row in rows}) == len(selected_seats)
+                    and all(row.unparsed for row in rows)
+                }
+                if not unparsed_ids:
+                    break
+                retry_round += 1
+                last_round_attempt = attempts + 1 + retry_round
+                LOGGER.info(
+                    "judge run %s: unparsed retry round %d for %d strings",
+                    run_id,
+                    retry_round,
+                    len(unparsed_ids),
+                )
+                for seat in selected_seats:
+                    seat_units = [unit for unit in pending if unit.id in unparsed_ids]
+                    if seat_units:
+                        judge_seat_round(seat_units, seat, last_round_attempt)
         prepared = [
             _prepare_round_unit(
                 unit,
                 round_requests[unit.id],
                 round_states[unit.id],
-                writable_ids=writable_ids,
+                writable_ids=(
+                    writable_ids if set(selected_seats) == set(JUDGE_SEATS) else set()
+                ),
                 attempt=attempt,
                 attempts=attempts,
             )
@@ -610,3 +1054,154 @@ def run_judge_batch(  # ruff: ignore[complex-structure]
             break
         LOGGER.info("judge run %s: starting repair attempt %d", run_id, attempt)
     return verdicts
+
+
+def _claim_judge_deferrals() -> tuple[str, list[JudgeDeferral]]:
+    """Claim a bounded set of due records without holding locks during HTTP."""
+    now = timezone.now()
+    limit = max(1, settings.JUDGE_DEFERRAL_MAX_UNITS_PER_PASS)
+    token = uuid.uuid4().hex
+    lease = timedelta(seconds=max(300, settings.JUDGE_DEFERRAL_MIN_INTERVAL))
+    with transaction.atomic():
+        candidates = list(
+            JudgeDeferral.objects.select_for_update(skip_locked=True)
+            .filter(state__in=(JudgeDeferral.State.QUEUED, JudgeDeferral.State.SLOW))
+            .filter(next_attempt_at__lte=now)
+            .filter(Q(claim_expires_at__isnull=True) | Q(claim_expires_at__lte=now))
+            .order_by("next_attempt_at", "pk")[: limit * len(JUDGE_SEATS)]
+        )
+        unit_ids: set[int] = set()
+        claimed: list[JudgeDeferral] = []
+        for deferral in candidates:
+            if deferral.unit_id not in unit_ids and len(unit_ids) >= limit:
+                continue
+            unit_ids.add(deferral.unit_id)
+            deferral.claim_token = token
+            deferral.claimed_at = now
+            deferral.claim_expires_at = now + lease
+            deferral.save(
+                update_fields=("claim_token", "claimed_at", "claim_expires_at")
+            )
+            claimed.append(deferral)
+    return token, claimed
+
+
+def _release_judge_deferrals(token: str) -> None:
+    """Release only our still-owned leases after an aborted drain pass."""
+    JudgeDeferral.objects.filter(
+        claim_token=token,
+        state__in=(JudgeDeferral.State.QUEUED, JudgeDeferral.State.SLOW),
+    ).update(claim_token="", claimed_at=None, claim_expires_at=None)
+
+
+def drain_judge_deferrals() -> int:
+    """
+    Rejudge due deferred seats without ever changing a translation.
+
+    Claims are made before calling a paid endpoint and released only by their
+    opaque token.  A changed request identity is closed rather than retried.
+    """
+    if not settings.JUDGE_DEFERRAL_ENABLED:
+        return 0
+    try:
+        validate_judge_configuration()
+        profiles = {seat: resolve_judge_seat_profile(seat) for seat in JUDGE_SEATS}
+    except Exception:
+        LOGGER.exception("judge deferral drain skipped: invalid configuration")
+        return 0
+    token, claimed = _claim_judge_deferrals()
+    if not claimed:
+        return 0
+    started = time.monotonic()
+    processed = 0
+    try:
+        by_translation: dict[int, list[JudgeDeferral]] = {}
+        for deferral in claimed:
+            by_translation.setdefault(deferral.unit.translation_id, []).append(deferral)
+        for deferrals in by_translation.values():
+            if time.monotonic() - started >= _DEFERRAL_MAX_ELAPSED_SECONDS:
+                break
+            unit_ids = {deferral.unit_id for deferral in deferrals}
+            units = list(
+                type(deferrals[0].unit)
+                .objects.filter(pk__in=unit_ids)
+                .prefetch()
+                .prefetch_source()
+                .order_by("pk")
+            )
+            project = units[0].translation.component.project if units else None
+            if project is None:
+                continue
+            project_context = judge_project_context(project)
+            requested_by_seat: dict[int, list[Unit]] = {}
+            for unit in units:
+                request = build_request(unit)
+                for deferral in (item for item in deferrals if item.unit_id == unit.id):
+                    profile = profiles.get(deferral.seat)
+                    if profile is None or (
+                        _request_identity(unit, request, profile, project_context)
+                        != deferral.request_identity
+                    ):
+                        JudgeDeferral.objects.filter(
+                            pk=deferral.pk, claim_token=token
+                        ).update(
+                            state=JudgeDeferral.State.CLOSED,
+                            closed_at=timezone.now(),
+                            claim_token="",
+                            claimed_at=None,
+                            claim_expires_at=None,
+                        )
+                        continue
+                    if not JudgeDeferral.objects.filter(
+                        pk=deferral.pk,
+                        claim_token=token,
+                        claim_expires_at__gt=timezone.now(),
+                    ).exists():
+                        # A slow pass can outlive its lease. Do not spend for
+                        # a record another worker may already have reclaimed.
+                        continue
+                    requested_by_seat.setdefault(deferral.seat, []).append(unit)
+            for seat, seat_units in requested_by_seat.items():
+                if time.monotonic() - started >= _DEFERRAL_MAX_ELAPSED_SECONDS:
+                    break
+                profile = profiles[seat]
+                requested_calls = math.ceil(len(seat_units) / profile.batch_size)
+                reserved_calls = _reserve_deferral_requests(profile, requested_calls)
+                if not reserved_calls:
+                    continue
+                seat_units = seat_units[: reserved_calls * profile.batch_size]
+                # Bound in-run retry sleeps by the earliest claimed lease:
+                # sleeping past it would let another worker reclaim and pay
+                # for the same units while this pass still holds them.
+                earliest_expiry = min(
+                    (
+                        deferral.claim_expires_at
+                        for deferral in claimed
+                        if deferral.seat == seat
+                        and deferral.unit_id in {unit.id for unit in seat_units}
+                        and deferral.claim_expires_at is not None
+                    ),
+                    default=None,
+                )
+                lease_deadline = None
+                if earliest_expiry is not None:
+                    # Reserve the full request deadline for the retried
+                    # call itself: a retry whose request could still run
+                    # when the lease expires must not start.
+                    margin = float(settings.JUDGE_REQUEST_DEADLINE)
+                    remaining = (earliest_expiry - timezone.now()).total_seconds()
+                    lease_deadline = started + max(0.0, remaining - margin)
+                # `run_judge_batch` persists and synchronizes the claimed
+                # rows. Empty writable IDs makes this retry strictly read-only.
+                run_judge_batch(
+                    seat_units,
+                    writable_ids=set(),
+                    user=None,
+                    seats=(seat,),
+                    use_cache=False,
+                    retry_deadline=lease_deadline,
+                )
+                processed += len(seat_units)
+    finally:
+        _release_judge_deferrals(token)
+    return processed

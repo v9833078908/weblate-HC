@@ -161,7 +161,8 @@ class JudgeCheckTest(ViewTestCase):
         self.assertEqual(queries["judge-uncovered"], "NOT has:judge")
         self.assertEqual(queries["judge-stale"], "judge:stale")
         self.assertEqual(queries["judge-incomplete"], "judge:unparsed")
-    def test_machine_description_contains_instruction_exactly_once(self) -> None:
+
+    def test_machine_description_is_a_deterministic_error_wrapper(self) -> None:
         unit = self.get_unit()
         self.make(
             unit,
@@ -181,9 +182,13 @@ class JudgeCheckTest(ViewTestCase):
         unit.clear_checks_cache()
         row = Check.objects.get(unit=unit, name="judge-reject")
         machine_description = str(row.get_machine_description())
-        self.assertEqual(machine_description.count("Replace DOORS with Gates"), 1)
+        self.assertIn(
+            "critical/terminology: the Gates are called DOORS here", machine_description
+        )
+        self.assertIn("Fix all listed errors", machine_description)
+        self.assertNotIn("Replace DOORS with Gates", machine_description)
 
-    def test_instruction_absent_from_the_human_description(self) -> None:
+    def test_historical_instruction_is_absent_from_human_and_repair_text(self) -> None:
         unit = self.get_unit()
         self.make(
             unit,
@@ -203,33 +208,7 @@ class JudgeCheckTest(ViewTestCase):
         unit.clear_checks_cache()
         row = Check.objects.get(unit=unit, name="judge-reject")
         self.assertNotIn("Replace DOORS with Gates", str(row.get_description()))
-
-    def test_instruction_markup_is_escaped_for_the_prompt(self) -> None:
-        # machinery/llm.py strip_tags()s this text before handing it to the
-        # translator; a literal game-markup tag the instruction quotes must
-        # be escaped here, or strip_tags() would silently eat it (same
-        # reasoning as describe_latest_verdict's error descriptions).
-        unit = self.get_unit()
-        self.make(
-            unit,
-            "critical",
-            errors=[
-                {
-                    "span": "x",
-                    "category": "markup",
-                    "severity": "critical",
-                    "description": "the tag was dropped",
-                }
-            ],
-            instruction="Keep the <color=#RRGGBB> tag exactly as in the source.",
-        )
-        Check.objects.filter(unit=unit).delete()
-        unit.run_checks()
-        unit.clear_checks_cache()
-        row = Check.objects.get(unit=unit, name="judge-reject")
-        machine_description = str(row.get_machine_description())
-        self.assertIn("&lt;color=#RRGGBB&gt;", machine_description)
-        self.assertNotIn("<color=#RRGGBB>", machine_description)
+        self.assertNotIn("Replace DOORS with Gates", str(row.get_machine_description()))
 
 
 class JudgeCheckDismissalTest(ViewTestCase):

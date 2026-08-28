@@ -13,7 +13,7 @@ from weblate.machinery.base import (
     MACHINERY_DEFAULT_THRESHOLD,
     MachineTranslationError,
 )
-from weblate.trans.judge import JudgeResult
+from weblate.trans.judge import JudgeResult, resolve_judge_seat_profile
 from weblate.trans.judge_loop import (
     _select_repair_texts,
     _write_verdict,
@@ -22,6 +22,7 @@ from weblate.trans.judge_loop import (
     run_judge_batch,
 )
 from weblate.trans.models.judge import (
+    JudgeRequestAttempt,
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
@@ -77,6 +78,7 @@ def mock_request_verdicts(batches):
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_MAX_REPAIR_ATTEMPTS=1,
+    JUDGE_MAX_UNPARSED_RETRY_ROUNDS=0,
 )
 class JudgeLoopTest(ViewTestCase):
     def run_batch(self, seat_results, repair=None, writable=True):
@@ -136,7 +138,8 @@ class JudgeLoopTest(ViewTestCase):
             attempt=0,
             run_id=uuid.uuid4(),
             result=PASS,
-            model="vendor-a/model",
+            profile=resolve_judge_seat_profile(1),
+            project_context="",
         )
         self.assertEqual(
             unit.judge_verdicts.get().target_storage_hash,
@@ -593,7 +596,7 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.UNPARSED)
         repair.assert_not_called()
 
-    def test_matching_parsed_round_is_reused_without_network(self) -> None:
+    def test_historical_verdict_without_metadata_is_not_reused(self) -> None:
         unit = self.get_unit()
         request = build_request(unit)
         run = uuid.uuid4()
@@ -612,11 +615,68 @@ class JudgeLoopTest(ViewTestCase):
                     glossary_terms=request.glossary_terms,
                 ),
             )
-        client = mock.Mock()
+        client = mock_request_verdicts([[PASS], [PASS]])
         with mock.patch("weblate.trans.judge_loop.request_verdicts", client):
             verdicts = run_judge_batch([unit], writable_ids=set(), user=self.user)
         self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.PASS)
-        client.assert_not_called()
+        self.assertEqual(client.call_count, 2)
+
+    def test_profile_change_invalidates_cached_verdict(self) -> None:
+        unit, _, _ = self.run_batch([PASS, PASS], writable=False)
+        client = mock_request_verdicts([[PASS], [PASS]])
+        with (
+            override_settings(JUDGE_TEMPERATURE_SEAT_1=0.25),
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+        ):
+            run_judge_batch([unit], writable_ids=set(), user=self.user)
+        self.assertEqual(client.call_count, 2)
+
+    def test_prompt_schema_change_invalidates_cached_verdict(self) -> None:
+        unit, _, _ = self.run_batch([PASS, PASS], writable=False)
+        client = mock_request_verdicts([[PASS], [PASS]])
+        with (
+            mock.patch(
+                "weblate.trans.judge._prompt_schema_version",
+                return_value="changed-prompt-schema",
+            ),
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+        ):
+            run_judge_batch([unit], writable_ids=set(), user=self.user)
+        self.assertEqual(client.call_count, 2)
+
+    def test_verdict_stores_request_attempt_and_empty_instruction(self) -> None:
+        unit = self.get_unit()
+        profile = resolve_judge_seat_profile(1)
+        request = build_request(unit)
+        attempt = JudgeRequestAttempt.objects.create(
+            seat=1,
+            endpoint_fingerprint=profile.endpoint_fingerprint,
+            model=profile.model,
+            profile_fingerprint=profile.profile_fingerprint,
+            prompt_schema_version=profile.prompt_schema_version,
+            batch_digest="a" * 64,
+            batch_size=1,
+        )
+        _write_verdict(
+            unit,
+            request,
+            seat=1,
+            attempt=0,
+            run_id=uuid.uuid4(),
+            result=JudgeResult(
+                "none",
+                "pass",
+                [],
+                "",
+                instruction="must not persist",
+                request_attempt_id=attempt.pk,
+            ),
+            profile=profile,
+            project_context="",
+        )
+        verdict = unit.judge_verdicts.get()
+        self.assertEqual(verdict.request_attempt_id, attempt.pk)
+        self.assertEqual(verdict.instruction, "")
 
     def test_confirmed_defect_triggers_one_repair_judged_by_both_seats(self) -> None:
         _unit, verdict, client = self.run_batch(
@@ -760,6 +820,34 @@ class JudgeLoopTest(ViewTestCase):
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_MAX_REPAIR_ATTEMPTS=1,
+    JUDGE_MAX_UNPARSED_RETRY_ROUNDS=1,
+    JUDGE_RETRY_BUDGET_RATIO=1.0,
+)
+class JudgeUnparsedRetryRoundTest(ViewTestCase):
+    def test_all_unparsed_round_is_retried_without_overwriting_history(self) -> None:
+        unit = self.get_unit()
+        client = mock_request_verdicts([[DEAD], [DEAD], [PASS], [PASS]])
+
+        with mock.patch("weblate.trans.judge_loop.request_verdicts", client):
+            verdicts = run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
+
+        self.assertEqual(client.call_count, 4)
+        self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.PASS)
+        # The first all-unparsed round remains durable audit history; the
+        # retry writes a distinct attempt round rather than overwriting it.
+        rows = list(unit.judge_verdicts.order_by("attempt", "seat"))
+        self.assertEqual(len(rows), 4)
+        self.assertTrue(all(row.unparsed for row in rows[:2]))
+        self.assertTrue(all(not row.unparsed for row in rows[2:]))
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+    JUDGE_MAX_UNPARSED_RETRY_ROUNDS=0,
 )
 class JudgeGlossaryRepairLockTest(ViewTestCase):
     CREATE_GLOSSARIES = True
@@ -853,6 +941,7 @@ class JudgeIncrementalPersistenceTest(ViewTestCase):
     JUDGE_MODEL_SEAT_1="vendor-a/model",
     JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_MAX_REPAIR_ATTEMPTS=1,
+    JUDGE_MAX_UNPARSED_RETRY_ROUNDS=0,
 )
 class JudgeMaxLengthRepairTest(ViewTestCase):
     """An active `max-length` check keeps a PASS verdict repairable."""
