@@ -468,8 +468,14 @@ def _parse_segment(seg: object, size: int) -> tuple[int, JudgeResult] | None:
         not isinstance(back_translation, str)
         or not isinstance(instruction, str)
         or len(instruction) > 1000
-        or bool(errors) != bool(instruction.strip())
     ):
+        return None
+    # LiteLLM DeepSeek returns the harmless ``None`` sentinel for an
+    # error-free pass instead of the required empty instruction. It carries no
+    # repair intent, so normalize only that exact no-instruction form.
+    if not errors and instruction.strip().casefold() == "none":
+        instruction = ""
+    if bool(errors) != bool(instruction.strip()):
         return None
     return index, JudgeResult(
         max_severity=_max_severity(errors),

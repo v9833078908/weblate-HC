@@ -359,6 +359,27 @@ class JudgeClientTest(SimpleTestCase):
         self.assertTrue(result.unparsed)
 
     @http_mock.activate
+    def test_litellm_none_instruction_is_blank_for_error_free_pass(self) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [
+                    {
+                        "id": 0,
+                        "verdict": "pass",
+                        "errors": [],
+                        "back_translation": "",
+                        "instruction": "None",
+                    }
+                ]
+            ),
+        )
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertFalse(result.unparsed)
+        self.assertEqual(result.instruction, "")
+
+    @http_mock.activate
     def test_missing_instruction_key_is_unparsed(self) -> None:
         http_mock.register(
             "POST",
