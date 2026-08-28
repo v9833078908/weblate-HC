@@ -33,6 +33,10 @@ class EmptyMappingJSONField(forms.JSONField):
 
 class BaseMachineryForm(forms.Form):
     network_host_fields = frozenset({"base_url", "endpoint_url"})
+    # Fields that only shape the prompt text. Changing one cannot make the
+    # upstream call fail, so it must not require a live service check: an
+    # unavailable service would otherwise block editing the prompt.
+    prompt_only_fields: frozenset[str] = frozenset()
 
     source_language = forms.ChoiceField(
         label=pgettext_lazy(
@@ -95,8 +99,15 @@ class BaseMachineryForm(forms.Form):
         machinery = self.machinery(configuration)
         machinery.validate_settings()
 
+    def needs_service_check(self) -> bool:
+        """Check whether the submitted change can affect the upstream call."""
+        changed = set(self.changed_data)
+        return not changed or not changed <= self.prompt_only_fields
+
     def clean(self) -> None:
         if self.errors:
+            return
+        if not self.needs_service_check():
             return
         try:
             self.validate_configuration()
@@ -467,6 +478,8 @@ class DeepLMachineryForm(KeyURLMachineryForm):
 
 
 class LLMBasicMachineryForm(BaseMachineryForm):
+    prompt_only_fields = frozenset({"persona", "style", "language_instructions"})
+
     base_url = WeblateServiceURLField(
         label=pgettext_lazy("Automatic suggestion service configuration", "API URL"),
         required=False,

@@ -3716,6 +3716,78 @@ class LLMBasicMachineryFormTest(TestCase):
 
         self.assertTrue(form.is_valid())
 
+    def get_service_form(
+        self, data: dict[str, object], initial: dict[str, object]
+    ) -> LLMBasicMachineryForm:
+        class UnavailableLLMTranslation(LLMBasicMachineryFormTest.DummyLLMTranslation):
+            def validate_settings(self) -> None:
+                msg = "Could not fetch translation: service is down"
+                raise ValidationError(msg)
+
+        # The rendered form always submits the source language selection.
+        return LLMBasicMachineryForm(
+            UnavailableLLMTranslation,
+            {"source_language": SourceLanguageChoices.AUTO, **data},
+            initial=initial,
+        )
+
+    def test_prompt_only_change_skips_service_check(self) -> None:
+        """Prompt text is editable while the service itself is unreachable."""
+        initial = {
+            "base_url": "https://openrouter.ai/api/v1",
+            "model": "auto",
+            "persona": "",
+            "style": "",
+            "language_instructions": {},
+        }
+        form = self.get_service_form(
+            {
+                "base_url": "https://openrouter.ai/api/v1",
+                "model": "auto",
+                "persona": "You are a squirrel breeder.",
+                "style": "Use informal language.",
+                "language_instructions": '{"fr": "Use formal language."}',
+            },
+            initial,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(
+            form.cleaned_data["language_instructions"],
+            {"fr": "Use formal language."},
+        )
+
+    def test_connection_change_still_runs_service_check(self) -> None:
+        initial = {
+            "base_url": "https://openrouter.ai/api/v1",
+            "model": "auto",
+            "persona": "",
+            "style": "",
+            "language_instructions": {},
+        }
+        form = self.get_service_form(
+            {
+                "base_url": "https://openrouter.ai/api/v2",
+                "model": "auto",
+                "persona": "",
+                "style": "",
+                "language_instructions": '{"fr": "Use formal language."}',
+            },
+            initial,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("service is down", str(form.errors["__all__"]))
+
+    def test_unchanged_form_still_runs_service_check(self) -> None:
+        initial = {"model": "auto", "persona": "", "style": ""}
+        form = self.get_service_form(
+            {"model": "auto", "persona": "", "style": ""}, initial
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("service is down", str(form.errors["__all__"]))
+
 
 class ProviderModelChoicesTest(SimpleTestCase):
     def test_openai_model_choices(self) -> None:
@@ -9746,6 +9818,48 @@ class ViewsTest(FixtureTestCase):
         # unlike leaving a field it never defined empty.
         self.assertEqual(project.machinery_settings["deepl"], {"context": ""})
         self.assertEqual(project.get_machinery_settings()["deepl"]["context"], "")
+
+    def test_configure_project_prompt_only_change_skips_service_check(self) -> None:
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openai",
+            value={
+                "key": "sitewide-key",
+                "model": "auto",
+                "source_language": SourceLanguageChoices.AUTO,
+            },
+        )
+        self.make_manager()
+
+        with patch.object(
+            OpenAITranslation,
+            "validate_settings",
+            side_effect=ValidationError("Could not fetch translation: service is down"),
+        ) as validate:
+            response = self.client.post(
+                reverse(
+                    "machinery-edit",
+                    kwargs={"project": self.project.slug, "machinery": "openai"},
+                ),
+                {
+                    "key": "sitewide-key",
+                    "model": "auto",
+                    "persona": "",
+                    "style": "",
+                    "language_instructions": '{"fr": "Use formal language."}',
+                    # The rendered form always submits this selection, and
+                    # omitting it would itself be a non-prompt change.
+                    "source_language": SourceLanguageChoices.AUTO,
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        validate.assert_not_called()
+        project = Project.objects.get(pk=self.project.id)
+        self.assertEqual(
+            project.machinery_settings["openai"],
+            {"language_instructions": {"fr": "Use formal language."}},
+        )
 
     def test_configure_invalid(self) -> None:
         self.user.is_superuser = True
