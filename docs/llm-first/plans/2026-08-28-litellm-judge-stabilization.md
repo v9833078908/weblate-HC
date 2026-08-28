@@ -344,7 +344,11 @@ Commit: `feat(judge): drain deferred judge units`.
 
 ### 7. Закрыть credential incident
 
-Перед переключением production:
+Перед переключением production — отдельная security-операция с собственным
+runbook, staged dual-secret rotation (перекрытие старых и новых значений) и
+per-secret rollback: rollback из раздела Rollout восстанавливает только
+OpenRouter + Weblate container и не может вернуть отозванные
+PostgreSQL/SMTP/admin credentials:
 
 - ротировать LiteLLM, OpenRouter, SMTP, PostgreSQL, admin/bootstrap и остальные
   credentials из production `.env`, ранее попавшие в диагностический вывод;
@@ -359,8 +363,10 @@ Commit: `feat(judge): drain deferred judge units`.
 
 - Parser: все failure kinds, duplicate/missing IDs, malformed JSON,
   reasoning-only response и instruction regressions.
-- Profiles: точные payloads для Qwen/DeepSeek, inheritance, invalid
-  configuration before POST и cache invalidation.
+- Profiles: точные payloads для Qwen/DeepSeek (включая `stream: true` и
+  `stream_options.include_usage` для обеих seats), inheritance, invalid
+  configuration before POST и cache invalidation по profile/prompt/schema
+  version.
 - Streaming: fragmented SSE, reasoning/content separation, usage chunk, reset
   before first byte, truncated JSON, deadline и size cap.
 - Recovery: точные call counts, backoff, no retry on auth/length, width-one
@@ -418,7 +424,9 @@ GO требует одновременно:
 - streaming завершается `[DONE]`, накопленный JSON проходит тот же parser, а
   total completion укладывается в absolute deadline;
 - любой reset Qwen non-streaming около 30 секунд оставляет этот mode в NO-GO;
-- retry multiplier и cost полностью учтены;
+- retry multiplier полностью учтён в attempts; cost учтён по token usage с
+  явной пометкой unknown там, где billing reconciliation недоступна
+  (usage.cost сегодня отсутствует);
 - deferred queue опустошается в пределах тестового окна.
 
 ## Rollout
@@ -432,13 +440,20 @@ GO требует одновременно:
    upstream.
 4. Выполнить interleaved live transport envelope и quality gates в dev.
 5. Production canary: одна контролируемая component, максимум 100 units,
-   `JUDGE_MAY_APPROVE=false`, deferral выключен.
-6. Если canary проходит, включить LiteLLM profiles site-wide; затем включить
+   `JUDGE_MAY_APPROVE=false`, deferral выключен, read-only: pre-translate
+   phase пропускается (`writable_ids` пуст), repair не применяется;
+   regression test доказывает, что target/state ни одного unit не изменились
+   — `JUDGE_MAY_APPROVE=false` запрещает approval, но не repair.
+6. Перед canary — OpenRouter rollback smoke: resolver, response format,
+   reasoning params, cache invalidation и model aliases работают под
+   OpenRouter на новом коде; rollback готовность не объявляется без этого
+   прогона.
+7. Если canary проходит, включить LiteLLM profiles site-wide; затем включить
    deferred queue.
-7. Ручной rollback: восстановить OpenRouter environment и recreate только
+8. Ручной rollback: восстановить OpenRouter environment и recreate только
    Weblate container. Автоматического OpenRouter fallback в коде нет.
-8. Любой unknown failure, all-unparsed unit, auth error, terminal coverage <99%
-   или повторный 30-second reset останавливает rollout.
+9. Любой unknown failure, all-unparsed unit, auth error, terminal coverage
+   <99% или повторный 30-second reset останавливает rollout.
 
 ## Assumptions
 
