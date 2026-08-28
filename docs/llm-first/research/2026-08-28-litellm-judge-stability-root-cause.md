@@ -188,6 +188,15 @@ modes across the registered production-shaped envelope corpus and test DeepSeek
 independently. Adaptive batching is a safety layer, not a substitute for fixing
 the failing transport path.
 
+On 2026-08-28 the HCBifrost administrators reported that nginx
+`proxy_read_timeout` and `proxy_send_timeout` had been raised to 130 seconds and
+`proxy_buffering` disabled. The immediate paired control still reset both Qwen
+non-streaming calls after 31.5-31.8 seconds with no first byte, while both
+streaming calls completed with first bytes after 6.6-8.8 seconds. Therefore the
+reported public-nginx change was not sufficient and the owner remains
+unlocalized. See
+`docs/llm-first/measurements/2026-08-28-hcbifrost-timeout-change-control.md`.
+
 ### Evidence from the Game Pulse client repository
 
 The separate `game_pulse_saas` repository is another production consumer of

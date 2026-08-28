@@ -29,7 +29,7 @@ OpenRouter и обеспечить измеряемую стабильность
 ### 1. Исправить Judge output contract
 
 Основной код: `weblate/trans/judge.py`, `weblate/trans/models/judge.py`,
-`weblate/checks/judge.py`.
+`weblate/checks/judge.py`, prompt — `weblate/trans/judge_prompts/verdict.txt`.
 
 - Удалить `instruction` из wire schema и обязательного набора полей model
   response.
@@ -39,7 +39,10 @@ OpenRouter и обеспечить измеряемую стабильность
   для обратной совместимости без миграции данных.
 - Repair prompt строить детерминированно: validated error descriptions плюс
   фиксированное требование «исправить все перечисленные ошибки и сохранить
-  остальной смысл, placeholders и markup».
+  остальной смысл, placeholders и markup». Regression test доказывает
+  эквивалентность нового deterministic wrapper'а существующему
+  `describe_latest_verdict()` — repair path больше не видит model-generated
+  text.
 - Исторические model-generated instructions больше не использовать при repair.
 - Не принимать JSON из `reasoning_content`, Markdown fences, bare arrays,
   index-keyed objects или неполных batches.
@@ -48,6 +51,9 @@ OpenRouter и обеспечить измеряемую стабильность
 - Реализовать через TDD; отдельный regression test должен доказать, что
   `instruction=null`, `"None"`, missing или лишний текст больше не превращают
   валидный verdict в `unparsed`.
+- TODO после переходного релиза: удалить `JudgeResult.instruction` из
+  dataclass и перестать писать `JudgeVerdict.instruction` для новых rows
+  (поле БД остаётся для исторических данных).
 
 Commit: `fix(judge): decouple repair instructions from verdict parsing`.
 
@@ -80,11 +86,24 @@ unknown
   reasoning text.
 - Добавить `JudgeRequestAttempt`, ссылку из usage/verdict rows, safe
   configuration snapshot на `JudgeRun`, provider/model/profile fingerprints и
-  keyed batch digest.
+  keyed batch digest. Attempt создаётся в client-слое на каждый HTTP-вызов
+  (включая transport failures — usage rows сейчас не пишутся при
+  `payload=None`, поэтому attempt, а не usage, является учётной единицей
+  billed spend); его id возвращается внутри `JudgeResult`, и `_write_verdict`
+  (`weblate/trans/judge_loop.py`) пишет FK из него — общего ключа между
+  слоями кроме этого id нет.
 - Все observability writes — best effort: их ошибка не меняет verdict и retry
   decision.
 - Обновить threat model: attempt storage не должен становиться confirmation
   oracle для переводов.
+- Retention: для `JudgeRequestAttempt` и `LLMUsageLog` задаётся bounded
+  retention (или archival) и покрывающие индексы до включения deferred queue:
+  attempt per HTTP call плюс indefinite retries иначе растят БД без cleanup.
+- Задача 4 (SSE reader) зависит от этой задачи: typed `failure_kind` должен
+  существовать до того, как streaming transport начнёт классифицировать
+  partial JSON, missing final chunk и `finish_reason=length`; сейчас
+  `_post_batch` теряет exception class в blanket `except Exception`, а
+  deadline возвращается через `buffer is None` без типа.
 
 Commit: `feat(judge): classify and record judge attempts`.
 
@@ -107,14 +126,49 @@ Production profiles после canary:
 | Seat | Model alias | Format | Reasoning | Stream | Temperature | Batch ceiling |
 | --- | --- | --- | --- | ---: | ---: | ---: |
 | 1 | `weblate-judge-deepseek-v4-pro` | `json_object` + app validation | `thinking.disabled` | true | 0 | 2 |
-| 2 | `weblate-judge-qwen3.8-max` | native strict `json_schema` | `enable_thinking=false` | false | 0 | 5 |
+| 2 | `weblate-judge-qwen3.8-max` | native strict `json_schema` | `enable_thinking=false` | true | 0 | 5 |
+
+Stream для Qwen — `true`: §4 объявляет Qwen SSE первичным production
+candidate, а non-streaming — NO-GO до отдельного production-envelope gate
+после исправлений HCBifrost. Profile resolver берёт значение из этой таблицы,
+поэтому production default здесь обязателен, а не только в тексте §4.
 
 - `max_tokens=0` означает «не передавать»; до измерения не вводить truncation
   cap.
 - Profile resolver валидирует обе seats до первого платного запроса.
+  Hardcoded `_LITELLM_QWEN_THINKING_DISABLED_MODELS` /
+  `_LITELLM_THINKING_DISABLED_MODELS` (`weblate/trans/judge.py`) удаляются:
+  reasoning payload вычисляется из per-seat profile, один источник истины.
 - Cache reuse требует совпадения endpoint, model, response format, reasoning,
   stream mode, temperature, prompt/schema version и project context.
+  Prompt/schema version — конкретный механизм: content hash файла
+  `verdict.txt` плюс schema revision constant в коде; без этого требование
+  «изменение профиля инвалидирует cache» непроверяемо. Тест инвалидации при
+  смене версии обязателен.
 - Любое изменение профиля инвалидирует старый verdict cache.
+- Cache identity материализуется denormalized полями `profile_fingerprint` и
+  `prompt_schema_version` на `JudgeVerdict` (snapshot на `JudgeRun`
+  недоступен из `_cached_verdict`: `run_id` — standalone UUID, а
+  `run_judge_batch` генерирует собственный uuid). Исторические rows имеют
+  NULL и потому никогда не reusable — отдельной data-миграции не нужно.
+- Fingerprint включает resolved upstream model из `/model/info` и alias
+  revision/config hash: retarget alias оператором при неизменных env
+  инвалидирует cache.
+- Единый canonical request identity (unit, target/context hashes, project
+  context, языковая пара, profile fingerprint, prompt/schema version)
+  одинаково используется cache, deferral staleness и attempts; текущий
+  `compute_context_hash()` project context не включает, identity расширяется.
+- Новые настройки объявляются на всех поверхностях:
+  `weblate/trans/defaults.py`, `weblate/trans/models/_conf.py`,
+  `weblate/settings_docker.py`, `settings_example`, docker-compose env — с
+  inherit-семантикой на каждой; `_conf.py` сегодня не имеет даже
+  deadline/transport-retries.
+- Единая profile-aware call-planning функция заменяет расчёты через
+  глобальный `JUDGE_BATCH_SIZE`: `preview_judge_scope`
+  (`weblate/trans/autotranslate.py`), `judge_request_upper_bound`
+  (`weblate/trans/judge.py`), estimate в views; миграция всех callers и их
+  тестов — часть этой задачи, иначе estimates, run cap и progress врут при
+  per-seat ceilings 2/5.
 
 Commit: `feat(judge): support per-seat LiteLLM profiles`.
 
@@ -126,7 +180,12 @@ Commit: `feat(judge): support per-seat LiteLLM profiles`.
   только `delta.content`, отдельно учитывать `delta.reasoning_content`,
   `finish_reason` и final usage.
 - Передавать `stream_options.include_usage=true`.
-- Сохранять абсолютный deadline и response-size cap.
+- Сохранять абсолютный deadline и response-size cap. Мигрировать
+  `DEFAULT_JUDGE_REQUEST_DEADLINE` 300→120 (`weblate/trans/defaults.py`):
+  текущий default позволяет deploy работать с 300s против заявленного 120s
+  контракта. Для SSE httpx timeout определяется как absolute deadline плюс
+  idle-between-chunks, а не один `timeout=120`: молчащий chunk не должен
+  висеть до absolute deadline.
 - Partial JSON до `[DONE]`, missing final chunk и `finish_reason=length` считать
   typed failures.
 - Qwen streaming — первичный production candidate: только этот режим отдал
@@ -148,9 +207,20 @@ Commit: `feat(judge): support per-seat LiteLLM profiles`.
   deadline 120 секунд, nginx read/send timeout 130 секунд.
 - Для SSE отключить proxy buffering и подтвердить, что первый chunk доходит до
   клиента.
+- **Статус 2026-08-28:** администраторы сообщили о применении nginx
+  `proxy_read_timeout=130s`, `proxy_send_timeout=130s` и
+  `proxy_buffering=off`. Post-change control не прошёл: Qwen non-streaming
+  снова reset на 31.5-31.8 секунды без первого байта, streaming завершился
+  дважды. Изменение остаётся незачтённым до проверки serving config/reload и
+  коррелированного trace через public nginx, internal LiteLLM и upstream.
 - Прокинуть correlation ID и сохранить redacted timestamps: ingress,
   upstream dispatch, upstream first byte, downstream first byte, completion и
   reset/error owner. Сопоставить nginx access/error logs с LiteLLM logs.
+- Задача 4 (hcbifrost) — external deliverable вне этого репо: manifests,
+  nginx vhost и LiteLLM config здесь не коммитятся. В плане фиксируется
+  только acceptance contract (этот раздел) и owner; фактическое изменение
+  gateway поставляется, ревьюится и откатывается владельцем hcbifrost со
+  своими artifacts и версией image.
 - Исправить capability metadata aliases: actual upstream ID, provider,
   structured-output и streaming support.
 - Redacted wire trace должен подтвердить, что DeepSeek получает
@@ -185,7 +255,10 @@ App-owned retry policy:
 - invalid JSON/envelope/segment — один same-seat/same-model retry;
 - повторный protocol failure для batch > 1 — одна width-one isolation round;
 - deadline и `finish_reason=length` не повторять с той же формой: уменьшить
-  batch/output budget;
+  batch budget; width-one request с `finish_reason=length` не имеет
+  batch/output knob — unit получает terminal operator-visible failure state,
+  а не бесконечный deferral (per-seat `max_tokens` — измеряемый эксперимент
+  после canary, не default);
 - `401/403` — fail-fast configuration error без повторных платных calls;
 - никогда не подменять opinion другой моделью или OpenRouter.
 
@@ -193,7 +266,9 @@ Adaptive harness:
 
 - отдельное состояние для `(endpoint, model, seat)`;
 - DeepSeek начинает с ceiling 2, Qwen с ceiling 5;
-- batch заполняется до predicted output budget, не только по числу строк;
+- batch заполняется фиксированным per-seat ceiling (DeepSeek 2, Qwen 5) без
+  predictor: ramp только по measured outcome; predicted-output estimator —
+  TODO после накопления attempt data;
 - transport/deadline делит budget пополам;
 - пять последовательных clean attempts увеличивают budget на одну единицу;
 - parser failure не меняет batch budget;
@@ -213,6 +288,11 @@ JUDGE_MAX_UNPARSED_RETRY_ROUNDS=1
 JUDGE_RETRY_BUDGET_RATIO=0.2
 ```
 
+- `JUDGE_RETRY_BUDGET_RATIO` измеряется и резервируется в attempts
+  (`JudgeRequestAttempt`, задача 2): cap проверяется до отправки retry, а не
+  post-hoc по usage rows; token/cost — отдельный reconciliation report с
+  пометкой unknown для reset/billed calls без usage row.
+
 Commit: `feat(judge): add bounded adaptive recovery`.
 
 ### 6. Добавить durable deferred queue
@@ -220,7 +300,9 @@ Commit: `feat(judge): add bounded adaptive recovery`.
 Добавить `JudgeDeferral` для units, которые не получили opinion после bounded
 recovery.
 
-- Identity включает unit, target/context hashes и seat profile.
+- Identity включает unit, target/context hashes, project context и seat
+  profile — per-seat (missing-seat set), не per-unit: одна seat могла
+  ответить, пока другая нет, и unit-level row не различает эти случаи.
 - Состояния: `queued`, `slow`, closed.
 - Повторная постановка не создаёт duplicate.
 - Изменившийся target/context закрывает старую deferral как stale.
@@ -229,8 +311,22 @@ recovery.
 - После пяти последовательных failures запись становится `slow`, но не
   удаляется.
 - Периодическая задача группирует units по translation и использует текущий
-  валидный profile.
-- Circuit breaker и token bucket ограничивают стоимость при outage.
+  валидный profile. Pass chunk'ируется по времени/budget, а не только по
+  `MAX_UNITS_PER_PASS`: 200 units × 2 seats × retries — десятки минут одной
+  Celery-задачи. Verdicts drain-задачи записываются от system actor
+  (`user=None`-эквивалент), не от инициатора исходного run — actor model
+  фиксируется при реализации и отражается в audit. Drain строго read-only:
+  judge вызывается с `writable_ids=set()` и без `repair_targets`; успешный
+  retry сохраняет verdict, но никогда не меняет target/state — system actor
+  сам по себе этого не гарантирует.
+- Claim drain-задачи транзакционен с lease expiry и idempotent completion:
+  два concurrent worker не должны оплатить один unit; stale claim
+  восстанавливается по истечении lease.
+- Circuit breaker и token bucket — shared backend (DB/Redis), не
+  process-local: состояние переживает restart и общее для всех workers;
+  семантика open/half-open, пороги и operator stop state фиксируются при
+  реализации; тот же per-(endpoint, model, seat) state bucket, что и
+  adaptive batching, а не отдельная структура.
 
 Defaults:
 
