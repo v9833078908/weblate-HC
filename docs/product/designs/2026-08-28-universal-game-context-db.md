@@ -482,6 +482,69 @@ C ∈ { loc_strings, loc_creatives, autoanswer, feedback }
 строк, GamePulse и Autoanswer. Этап 1 подключает продукты к этой модели. Этап 2
 — несущий, но он бессмысленен до решения о владении терминологией.
 
+## Анкета продюсера: какие поля
+
+Полный перечень того, что продюсер заполняет вручную. Всё остальное либо
+подтягивается автоматически (store-метрики, скриншоты), либо течёт из Weblate
+(термины), либо является общим системным шаблоном фока (роль переводчика,
+правила плейсхолдеров, правила consistency).
+
+### Универсальное ядро (обязательно для всех продуктов)
+
+| Блок | Поле | Тип | Пример (Pirate Ships) |
+|---|---|---|---|
+| Идентичность | `title` | str | «Pirate Ships» |
+| | `slug` | str | `pirate-ships` |
+| | `platforms[]` | enum | Android, iOS |
+| | `store_links[]` | URL | Google Play, App Store |
+| Игровой бриф | `genre` | enum + free | «мобильная F2P морская баталия» |
+| | `premise` | text 300 | «игрок — пиратский капитан, строит форт, командует флотом исторических парусников» |
+| | `core_loop` | text 800 | «собирай ресурсы → улучшай корабли → абордаж → фракционные войны» |
+| | `setting_and_era` | text 600 | «золотой век пиратства, Карибы, XVII век» |
+| | `target_audience` | text 400 | «мобильные игроки 18-35, любители PvP и коллекционирования кораблей» |
+| | `key_modes[]` | list | PvP-арена, кампания, фракционные войны, охота на кракенов |
+| Типы контента | `content_types[]` | enum | UI labels / ability descriptions / item descriptions / patch notes / push notifications / tutorial / dialogue / lore / store text |
+| Голос игры | `tone` | text 600 | «энергичное пиратское приключение, прямой, слегка грубоватый; юмор уместен в анонсах» |
+| | `register` | enum | informal |
+| | `player_address` | enum + note | «ты» (ру), «you» (en), «du» (de), «tú» (es)... |
+| | `humor` | text 200 | «приветствуется в анонсах и флейвор-текстах, без пародии и пастиша» |
+| | `profanity_policy` | enum | mild |
+| | `forbidden[]` | list | «не превращать в пародию, не делать старомодным пастишем» |
+| Голоса персонажей | `character_voices[]` | table: (name, register, notes) | «гризли-пираты — грубо и идиоматично; дворяне и командиры — формально; нежить и культисты — зловеще» |
+| Терминология | `term_categories[]` | enum | ship_class / fort_tier / crew_type / league / boss_name |
+| | `names_policy` | enum | transliterate / keep_verbatim / translate |
+| Языки и рынки | `source_language` | BCP-47 | ru |
+| | `target_languages[]` | BCP-47 | en, de, es, fr, id, it, ja, ko, nl, pl, tr, vi, pt-BR, zh-Hans |
+| | `locale_notes{}` | map locale → text | de: «десятичный разделитель — запятая»; ja: «катакана для sci-fi заимствований» |
+| Технические ограничения | `engine` | str | Unity |
+| | `markup[]` | enum | unity_rich_text / placeholders_0 / placeholders_key / engine_separator_dollar |
+| | `length_constraints` | text 300 | «мобильный UI узкий; кнопки и лейблы короче исходника или равны» |
+| | `platform` | enum | mobile / pc / console |
+| Референсы | `refs[]` | table: (kind, url_or_ref) | story/wiki, сайт, билд, видео прохождения |
+
+### Блок Weblate (только для локализации строк)
+
+| Поле | Тип | Пример |
+|---|---|---|
+| `grammar_template_syntax` | text 400 | «DSL вида `key[case|{0} text]`: бакеты переводятся, идентификатор впереди — нет» |
+| `number_format_policy` | text 300 | «никогда не округлять; десятичный разделитель по локали» |
+| `notification_style` | text 200 | «push: короткий, срочный, один CTA, восклицательные как в источнике» |
+| `patchnotes_style` | text 200 | «сохранять структуру списка и тире; голос разработчика» |
+
+### Чего в анкете нет
+
+- **`persona` как свободный текст** — роль переводчика («You are a senior game
+  localizer») — общий системный шаблон фока, не факт игры. Сейчас дублируется
+  в каждом проекте с вариациями.
+- **Технические правила плейсхолдеров и тегов** — «keep every %PLACEHOLDER%
+  exactly as in the source» одинаковы во всех проектах дословно. Это общий
+  системный блок промпта.
+- **Правила consistency** — «identical source strings must receive identical
+  translations» тоже везде одинаковые.
+
+Реальный объём ручной работы продюсера после интеграции: заполнить ~20 полей
+анкеты вместо написания двух длинных промптов на английском с нуля.
+
 ## Границы
 
 Сознательно не делается:
