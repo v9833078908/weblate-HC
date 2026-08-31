@@ -14,6 +14,7 @@ import json
 import logging
 import math
 import re
+import threading
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
@@ -123,12 +124,16 @@ class RetryBudget:
 
     maximum: int | None = None
     used: int = 0
+    _lock: threading.Lock = field(
+        default_factory=threading.Lock, init=False, repr=False
+    )
 
     def spend(self) -> bool:
-        if self.maximum is not None and self.used >= self.maximum:
-            return False
-        self.used += 1
-        return True
+        with self._lock:
+            if self.maximum is not None and self.used >= self.maximum:
+                return False
+            self.used += 1
+            return True
 
 
 @dataclass(frozen=True)

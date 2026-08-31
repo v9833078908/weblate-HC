@@ -1,12 +1,12 @@
 # Plan: judge both seats in parallel
 
-Date: 2026-08-27. Status: **proposed, not started.** Revised after engineering
-review on 2026-08-27; the caller-failure protocol, provider-load gate and
-thread-aware test layout below replace the unsafe first draft. Revised again
-on 2026-08-31 against the post-remediation judge loop (c979bbc, 011c95d,
-cc3111d, 75ce50f): see "Revision: 2026-08-31 codebase drift". R1 and R3 there
-are blocking corrections to the original design; implement every task as
-amended. Owner approval is still required before implementation.
+Date: 2026-08-27. Status: **implementation verified; dev canary and rollout
+pending.** Revised after engineering review on 2026-08-27; the caller-failure
+protocol, provider-load gate and thread-aware test layout below replace the
+unsafe first draft. Revised again on 2026-08-31 against the post-remediation
+judge loop (c979bbc, 011c95d, cc3111d, 75ce50f): see "Revision: 2026-08-31
+codebase drift". R1 and R3 there are blocking corrections to the original
+design; every task was implemented as amended.
 
 Genre: implementation. Output: one two-seat fan-out helper in
 `judge_loop.py`, a deterministic thread-safe test harness, and focused tests
@@ -1038,19 +1038,19 @@ the LiteLLM endpoint before trusting the overlap numbers there.
 
 ## Task checklist
 
-- [ ] Task 1: thread-safe distinct-model harness; configured-model assertion;
+- [x] Task 1: thread-safe distinct-model harness; configured-model assertion;
       file green before concurrency changes
-- [ ] Task 2: six deterministic fan-out/failure tests, including equal models;
+- [x] Task 2: six deterministic fan-out/failure tests, including equal models;
       serial failure-proof matrix recorded
-- [ ] Task 3: cross-seat acknowledgement barrier; drain-before-raise; worker
+- [x] Task 3: cross-seat acknowledgement barrier; drain-before-raise; worker
       cleanup
-- [ ] Task 4: `run_judge_batch` builds jobs and calls `_run_seats`
-- [ ] Task 5: dedicated `TransactionTestCase` proves worker connections close
+- [x] Task 4: `run_judge_batch` builds jobs and calls `_run_seats`
+- [x] Task 5: dedicated `TransactionTestCase` proves worker connections close
       on success and exception
-- [ ] Targeted mutations prove early acknowledgement, queue routing,
+- [x] Targeted mutations prove early acknowledgement, queue routing,
       seat/model identity, caller-failure acknowledgement and worker-connection
       cleanup tests detect their intended faults
-- [ ] Verification steps 1-6 recorded
+- [x] Verification steps 1-6 recorded using the isolated host test database
 - [ ] Dev canary passes every transport, overlap and progress threshold
 - [ ] Commit and push implementation
 - [ ] Separate deploy approval obtained
@@ -1068,8 +1068,8 @@ the LiteLLM endpoint before trusting the overlap numbers there.
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | N/A | No UI change |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | NOT RUN | Not required |
 
-**VERDICT:** ENG CLEARED - ready for owner approval.
+**VERDICT:** Engineering cleared; implementation is verified.
 
-**UNRESOLVED DECISIONS:**
+**PENDING GATES:**
 
-- Owner approval to begin implementation
+- Run the dev canary after the branch is integrated with the shared dev stack.
