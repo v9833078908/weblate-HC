@@ -195,6 +195,7 @@ class JudgeRun(models.Model):
         max_length=20, choices=Status, default=Status.QUEUED, db_index=True
     )
     summary = models.JSONField(default=dict, blank=True)
+    next_request_round = models.PositiveIntegerField(default=0)
     failure = models.TextField(blank=True)
     warnings = models.JSONField(default=list, blank=True)
     configuration_snapshot = models.JSONField(default=dict, blank=True)

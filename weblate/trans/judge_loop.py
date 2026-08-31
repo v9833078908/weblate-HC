@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Max, Q
 from django.utils import timezone
 
 from weblate.checks.judge import JUDGE_CHECKS
@@ -760,6 +760,21 @@ def _sync_deferral(
     )
 
 
+def _allocate_request_round(run_id: uuid.UUID, run: JudgeRun | None) -> int:
+    """Reserve one monotonic request-round coordinate for a JudgeRun."""
+    if run is not None:
+        with transaction.atomic():
+            locked_run = JudgeRun.objects.select_for_update().get(pk=run.pk)
+            request_round = locked_run.next_request_round
+            locked_run.next_request_round += 1
+            locked_run.save(update_fields=["next_request_round"])
+            return request_round
+    highest = JudgeVerdict.objects.filter(run_id=run_id).aggregate(
+        highest=Max("request_round")
+    )["highest"]
+    return 0 if highest is None else highest + 1
+
+
 def _persist_verdict_batches(
     request_units: list[Unit],
     *,
@@ -900,8 +915,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
             retry_deadline=retry_deadline,
         )
 
-    run_id = uuid.uuid4()
-    next_request_round = 0
+    run_id = run.id if run is not None else uuid.uuid4()
     project_slug = units[0].translation.component.project.slug
     project_context = judge_project_context(units[0].translation.component.project)
     pending = list(units)
@@ -946,8 +960,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
         )
         request_units = [unit for unit in pending if unit.id not in cached_ids]
         if request_units:
-            request_round = next_request_round
-            next_request_round += 1
+            request_round = _allocate_request_round(run_id, run)
             for seat in selected_seats:
                 profile = profiles[seat]
                 judge_seat_round(request_units, seat, attempt, request_round)
@@ -984,8 +997,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                 if not unparsed_ids:
                     break
                 retry_round += 1
-                last_request_round = next_request_round
-                next_request_round += 1
+                last_request_round = _allocate_request_round(run_id, run)
                 LOGGER.info(
                     "judge run %s: unparsed retry round %d for %d strings",
                     run_id,

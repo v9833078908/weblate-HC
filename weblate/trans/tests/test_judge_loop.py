@@ -23,6 +23,7 @@ from weblate.trans.judge_loop import (
 )
 from weblate.trans.models.judge import (
     JudgeRequestAttempt,
+    JudgeRun,
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
@@ -103,6 +104,38 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
         self.assertEqual(client.call_count, 2)
         self.assertEqual(unit.judge_verdicts.count(), 2)
+
+    def test_shared_judge_run_allocates_request_rounds_monotonically(self) -> None:
+        unit = self.get_unit()
+        run = JudgeRun.objects.create(
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(unit.translation_id),
+            scope_label=str(unit.translation),
+            scope_path=unit.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=1,
+        )
+        client = mock_request_verdicts([[PASS], [PASS], [PASS], [PASS]])
+
+        with mock.patch("weblate.trans.judge_loop.request_verdicts", client):
+            run_judge_batch(
+                [unit],
+                writable_ids=set(),
+                user=self.user,
+                run=run,
+                use_cache=False,
+            )
+            run_judge_batch(
+                [unit],
+                writable_ids=set(),
+                user=self.user,
+                run=run,
+                use_cache=False,
+            )
+
+        rows = list(unit.judge_verdicts.order_by("request_round", "seat"))
+        self.assertEqual({row.run_id for row in rows}, {run.id})
+        self.assertEqual([row.request_round for row in rows], [0, 0, 1, 1])
         self.assertEqual(
             unit.judge_verdicts.first().target_storage_hash,
             compute_target_storage_hash(unit.target),
