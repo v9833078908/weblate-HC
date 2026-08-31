@@ -42,6 +42,7 @@ It writes nothing: no verdict, no unit and no usage row is persisted.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import replace
 
 import httpx2
@@ -68,6 +69,12 @@ VARIANTS: list[tuple[str, int, dict[str, object]]] = [
     ),
     ("seat 2 no reasoning key (inherit)", 2, {"reasoning": ""}),
 ]
+
+# A rejected request puts the model group's deployments into the proxy's
+# cooldown list, after which every later request answers 429 regardless of its
+# own settings. Set PROBE_ONLY to a label substring to measure one variant
+# without first emitting the request that causes the cooldown.
+ONLY = os.environ.get("PROBE_ONLY", "")
 
 
 def raw_body(payload: dict, profile: judge.JudgeSeatProfile) -> str:
@@ -140,6 +147,8 @@ batch = [build_request(unit) for unit in units]
 project_context = judge_project_context(translation.component.project)
 
 for label, seat, overrides in VARIANTS:
+    if ONLY and ONLY not in label:
+        continue
     profile = judge.resolve_judge_seat_profile(seat)
     if overrides:
         profile = replace(profile, **overrides)

@@ -1078,10 +1078,16 @@ the LiteLLM endpoint before trusting the overlap numbers there.
       profile and reports the parser's own outcome.
       `dev-docker/docker-compose.yml` and `deploy/environment.example` now
       carry the corrected pair; the canary must be rerun after the dev stack
-      is recreated under its own approval. Note for that rerun: the
-      `atlas/qwen3.8-max` group answered `429 No deployments available` later
-      the same day, which is an availability fault independent of these
-      settings and would fail a canary on its own.
+      is recreated under its own approval. Both corrected settings were then
+      confirmed on the wire, each returning HTTP 200 and parsing into
+      verdicts. The `429 No deployments available` seen while diagnosing was
+      self-inflicted, not an availability fault: a rejected request puts the
+      model group's deployments into the proxy's cooldown list, after which
+      every later request answers 429 whatever its own settings are. The same
+      request returned both 500 and 429 within one probe run, and the
+      corrected seat returned 200 once the cooldown had expired and the
+      rejected variant was not sent first. `PROBE_ONLY` in the probe selects
+      one variant for exactly that measurement.
 - [x] Commit and push implementation
 - [x] Separate deploy approval obtained
 - [ ] Separate bounded production-run approval obtained
