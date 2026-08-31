@@ -184,6 +184,12 @@ def validate_sheet_headers(
                 else f"{note.scope} note ({note.language})"
             )
             _check(label, note.column, note.header)
+        if grammar.source_flags is not None:
+            _check(
+                "source flags",
+                grammar.source_flags.column,
+                grammar.source_flags.header,
+            )
         for ignored in grammar.ignored_columns:
             _check("ignored column", ignored.column, ignored.header)
 

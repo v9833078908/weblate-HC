@@ -173,6 +173,10 @@ def _render_tbx(
             tbx_unit = store.addsourceunit(unit_data.values[source_lang])
             tbx_unit.setid(unit_data.context)
             tbx_unit.target = unit_data.values.get(target_code, "")
+            if unit_data.source_flags:
+                tbx_unit.xmlelement.set(
+                    "weblate-flags", ", ".join(unit_data.source_flags)
+                )
 
             source_explanation = unit_data.source_explanation
             target_explanation = unit_data.target_explanations.get(target_code, "")
@@ -273,6 +277,25 @@ def _validate_tbx(
                         0,
                         f"target mismatch for context {ctx!r}: "
                         f"expected {expected_target!r}, got {actual_target!r}",
+                    )
+                )
+            actual_flags = tuple(
+                sorted(
+                    token.strip()
+                    for token in tbx_unit.xmlelement.get("weblate-flags", "").split(",")
+                    if token.strip()
+                )
+            )
+            if actual_flags != expected.source_flags:
+                diagnostics.append(
+                    Diagnostic(
+                        Severity.ERROR,
+                        "render.flags_mismatch",
+                        component.component,
+                        "",
+                        0,
+                        f"source flags mismatch for context {ctx!r}: "
+                        f"expected {expected.source_flags!r}, got {actual_flags!r}",
                     )
                 )
 

@@ -10,6 +10,7 @@ from django.db import transaction
 
 from weblate.auth.models import User, get_anonymous
 from weblate.checks.flags import Flags
+from weblate.glossary.models import SOURCE_SCOPED_MODES
 from weblate.lang.models import Language
 from weblate.trans.models import Component, Project, Translation
 from weblate.utils.celery import app
@@ -143,11 +144,11 @@ def flag_glossary_terminology(self, pk: int) -> None:
     """
     Mark every source string of an imported glossary as terminology.
 
-    Terms written straight into TBX carry no flags, and `sync_terminology`
-    copies only flagged strings into the other languages, so without this the
-    glossary exists in the source pair alone. The component is created by a
-    background task, so the source strings may not exist yet: retry rather
-    than flag nothing.
+    Imported target units can carry source-scoped glossary modes from TBX;
+    promote those modes to the source unit before adding `terminology`.
+    `sync_terminology` copies only terminology strings into other languages.
+    The component is created by a background task, so the source strings may
+    not exist yet: retry rather than flag nothing.
     """
     component = Component.objects.get(pk=pk)
     source = component.source_translation
@@ -158,11 +159,21 @@ def flag_glossary_terminology(self, pk: int) -> None:
         scope="glossary", name="sync", verbose="Glossary sync"
     )
     with transaction.atomic():
-        for unit in source.unit_set.select_for_update().order_by("id"):
+        for unit in (
+            source.unit_set.select_for_update()
+            .prefetch_related("unit_set")
+            .order_by("id")
+        ):
             flags = Flags(unit.extra_flags)
-            if "terminology" in flags:
-                continue
+            initial_flags = flags.format()
+            for target in unit.unit_set.all():
+                target_flags = Flags(target.flags, target.extra_flags)
+                for flag in SOURCE_SCOPED_MODES:
+                    if flag in target_flags:
+                        flags.merge(flag)
             flags.merge("terminology")
-            unit.update_extra_flags(flags.format(), author)
+            updated_flags = flags.format()
+            if updated_flags != initial_flags:
+                unit.update_extra_flags(updated_flags, author)
 
     component.schedule_sync_terminology()

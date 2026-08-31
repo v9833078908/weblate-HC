@@ -1259,6 +1259,7 @@ def _store_validated_profile(
                     "targets": term.targets,
                     "source_explanation": term.source_explanation,
                     "target_explanations": term.target_explanations,
+                    "source_flags": list(term.source_flags),
                 }
                 for term in preview.terms
             ],

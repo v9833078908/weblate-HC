@@ -49,6 +49,7 @@ class GlossaryTerm:
     target_explanations: dict[str, str]
     section: str
     term_row: int
+    source_flags: tuple[str, ...] = ()
     note_rows: tuple[int, ...] = ()
 
 

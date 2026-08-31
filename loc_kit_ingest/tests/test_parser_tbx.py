@@ -514,7 +514,13 @@ def test_stride_two_blank_caption_is_error():
     assert any(d.code == "tbx.missing_section" for d in result.diagnostics)
 
 
-def _flat_record_map(*, ignored_columns=(), allow_empty_targets=False, last_row=2):
+def _flat_record_map(
+    *,
+    ignored_columns=(),
+    allow_empty_targets=False,
+    last_row=2,
+    source_flags=None,
+):
     document = {
         "schema_version": 2,
         "components": [
@@ -549,6 +555,8 @@ def _flat_record_map(*, ignored_columns=(), allow_empty_targets=False, last_row=
             }
         ],
     }
+    if source_flags is not None:
+        document["components"][0]["grammar"]["source_flags"] = source_flags
     return parse_profile(document).components[0]
 
 
@@ -567,6 +575,45 @@ def test_record_map_populated_column_without_a_declaration_is_unmapped():
     component = _flat_record_map()
     result = parse_component(component, [row[:] for row in IGNORED_ROWS])
     assert any(d.code == "tbx.unmapped_cell" for d in result.diagnostics)
+
+
+def test_record_map_parses_source_flags() -> None:
+    component = _flat_record_map(
+        source_flags={"column": 3, "header": "flags", "row_offset": 0}
+    )
+    rows = [
+        ["ru", "en", "flags"],
+        ["Герой", "Hero", "read-only, forbidden, read-only"],
+    ]
+
+    result = parse_component(component, rows)
+
+    assert [d for d in result.diagnostics if d.severity is Severity.ERROR] == []
+    assert result.units[0].source_flags == ("forbidden", "read-only")
+
+
+def test_record_map_allows_empty_source_flags() -> None:
+    component = _flat_record_map(
+        source_flags={"column": 3, "header": "flags", "row_offset": 0}
+    )
+    rows = [["ru", "en", "flags"], ["Герой", "Hero", ""]]
+
+    result = parse_component(component, rows)
+
+    assert [d for d in result.diagnostics if d.severity is Severity.ERROR] == []
+    assert result.units[0].source_flags == ()
+
+
+@pytest.mark.parametrize("value", ["exact", "read-only:max", "read-only,"])
+def test_record_map_rejects_unsupported_source_flags(value: str) -> None:
+    component = _flat_record_map(
+        source_flags={"column": 3, "header": "flags", "row_offset": 0}
+    )
+    rows = [["ru", "en", "flags"], ["Герой", "Hero", value]]
+
+    result = parse_component(component, rows)
+
+    assert any(d.code == "tbx.invalid_source_flag" for d in result.diagnostics)
 
 
 def test_record_map_ignored_column_is_allowed_on_a_caption_row():

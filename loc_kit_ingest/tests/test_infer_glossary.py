@@ -424,6 +424,44 @@ def test_unrecognised_extra_column_has_actionable_error() -> None:
         infer_glossary_profile("S", rows, component="s")
 
 
+def test_flags_column_becomes_a_source_flags_field() -> None:
+    rows = [
+        ["ru", "en", "flags"],
+        ["HeroCraft", "HeroCraft", "read-only"],
+        ["Судно", "Vessel", "forbidden"],
+    ]
+
+    document, notes = infer_glossary_profile("S", rows, component="s")
+    (component,) = document["components"]
+
+    assert component["grammar"]["source_flags"] == {
+        "column": 3,
+        "header": "flags",
+        "row_offset": 0,
+    }
+    assert any("source glossary flags" in note for note in notes)
+    parse_profile(document)
+
+
+def test_flags_header_matching_ignores_case_and_padding() -> None:
+    rows = [["ru", "en", " FLAGS "], ["HeroCraft", "HeroCraft", "read-only"]]
+
+    document, _notes = infer_glossary_profile("S", rows, component="s")
+
+    assert document["components"][0]["grammar"]["source_flags"]["column"] == 3
+
+
+def test_flags_on_a_source_less_row_are_refused() -> None:
+    rows = [
+        ["ru", "en", "flags"],
+        ["HeroCraft", "HeroCraft", "read-only"],
+        ["", "", "forbidden"],
+    ]
+
+    with pytest.raises(InferenceError, match="non-term row"):
+        infer_glossary_profile("S", rows, component="s")
+
+
 PAIRS_WITH_NOTE = [
     ["ru", "en", "note"],
     ["Персонажи", "Characters", ""],

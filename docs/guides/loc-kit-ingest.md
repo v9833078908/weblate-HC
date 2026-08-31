@@ -144,6 +144,10 @@ uv run python -m loc_kit_ingest "/path/Temple.csv" \
    кандидата, а не семантика разбора: профиль всё равно проходит полный гейт,
    а человек видит термины до создания компонента. Успех сразу даёт локально
    валидированный превью (шаг 4); отказ переходит к шагу 3.
+   An exact, case-insensitive `flags` header declares source-scoped glossary
+   modes. Each non-empty cell is a comma-separated set containing only
+   `read-only` and `forbidden`; unknown, parameterized, or orphaned values are
+   rejected before preview.
 3. **Кандидат-профиль (опционально, fallback).** Если детерминированный вывод
    отказал и site-wide анализатор включён и настроен, из выбранного листа
    строится детерминированный структурный сэмпл и отправляется одним POST в
@@ -174,16 +178,31 @@ uv run python -m loc_kit_ingest "/path/Temple.csv" \
    `file_format="tbx"`, `filemask="tbx/*.tbx"`, пустой template, профильный
    язык-источник и `is_glossary=True`; эти поля неизменяемы в финальной форме.
    Imported terms are marked as terminology, so they also appear in glossary languages added later.
+
+**Canonical producer template:**
+
+```csv
+en,ru,definition,flags
+HeroCraft,HeroCraft,company name,read-only
+Vessel,Судно,never use this wording; use Ship,forbidden
+```
+
+The leftmost language is the source. Other language headers must be Weblate
+language codes. `definition` is a source explanation; any exact header from
+`_NOTE_HEADERS` is accepted. `flags` is optional and carries only `read-only`
+and `forbidden`, separated by commas. Weblate shows normalized flags in the
+preview, writes them into TBX, and adds `terminology` automatically.
+
 7. **Временный черновик.** Загруженный файл хранится в session-bound,
    owner-bound временном черновике не дольше одного часа; он удаляется при
    создании, отмене или периодической очистке Celery. Чужой владелец, другая
    сессия, истёкший или consumed-токен ведут себя как отсутствующий.
 
-**Минимизация данных LLM.** Наружу уходит только bounded структурный сэмпл:
-метаданные листа, заполняемость строк/колонок, заголовки и усечённые выдержки
-ячеек (capped) - никогда весь файл. Флаги глоссария (`forbidden`/`read-only`/
-`terminology`) и source-only импорты в этом потоке не поддерживаются: требуется
-один источник и хотя бы один целевой язык.
+**LLM data minimization.** Only a bounded structural sample leaves Weblate:
+sheet metadata, fill rates, headers and capped cell excerpts, never the whole
+file. Glossary flags are parsed and validated locally and are not sent to the
+profile analyzer as executable instructions. Source-only imports remain
+unsupported: one source and at least one target language are required.
 
 ### Пополнение существующего глоссария: append-only
 
@@ -230,6 +249,9 @@ uv run python -m loc_kit_ingest "/path/Temple.csv" \
    на каждом добавленном target реально попадают в БД тем же путём, что и
    при первичном импорте (`Unit.update_explanation`); отсутствие notes не
    блокирует добавление термина.
+   Source flags on a new term are also preserved: imported `read-only` and
+   `forbidden` values are merged with the automatic `terminology` flag.
+   Existing terms keep their current flags.
 9. **Apply блокируется целиком, если:** source language таблицы не
    совпадает с source language компонента, или один и тот же source
    встречается под другим context, чем уже существующий в глоссарии
@@ -379,10 +401,11 @@ v1 и не переинтерпретируется как v2. Все объек
 | Pair grammar | `type`, `skip_rows`, `regions` | `type`, `regions`; пропущенные `skip_rows` = `[]` |
 | Pair region | `section_row`, `first_term_row`, `last_description_row` | все |
 | TBX v2 component | common + `initial_target_languages` (без `key_language`) | `initial_target_languages` |
-| Record-map grammar (v2) | `type`, `skip_rows`, `regions`, `term_row_offset`, `section_field`, `notes` | `type`, `regions`, `term_row_offset`; `section_field` и `notes` необязательны |
+| Record-map grammar (v2) | `type`, `skip_rows`, `regions`, `term_row_offset`, `section_field`, `notes`, `source_flags` | `type`, `regions`, `term_row_offset`; `section_field`, `notes` and `source_flags` are optional |
 | Record region | `first_record_row`, `last_record_row`, `record_stride`, `section_row`, `section_column` | `first_record_row`, `last_record_row`, `record_stride`; `section_row`+`section_column` идут вместе и опциональны |
 | Section field | `column`, `header`, `row_offset` | все |
 | Note field | `scope`, `column`, `header`, `row_offset`, `language` | `scope`, `column`, `header`, `row_offset`; `language` обязателен для `scope: "target"`, запрещён для `scope: "source"` |
+| Source flags field | `column`, `header`, `row_offset` | all |
 
 `comments` и `references` используют объект metadata-column. `key` использует
 key-column object, поэтому у него нет `name`. `first_data_row`, `key`,
@@ -681,10 +704,9 @@ v2 `record-map` глоссария, и его справка упоминает 
   исправить `.loc-ingest.json` и перезагрузить. Локальная валидация
   (render → parse-back) обязана пройти до создания компонента. После создания
   проверить `file_format="tbx"`, `filemask="tbx/*.tbx"`, пустой template,
-  `is_glossary=True`, source/target explanations и Unicode-context в реальном
-  TBX и совпадение с панелью глоссария компонента с тем же языком-источником.
-  Source-only импорт и флаги глоссария (`forbidden`/`read-only`/`terminology`)
-  не поддерживаются.
+  `is_glossary=True`, source/target explanations, source flags and
+  Unicode-context in the real TBX and the glossary panel of a component with
+  the same source language. Source-only import is unsupported.
 
 ## Verification contract
 

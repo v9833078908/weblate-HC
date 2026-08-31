@@ -521,9 +521,16 @@ class ProposalResponseHandlingTest(SimpleTestCase):
 
 def _record_map_rows() -> list[list[str]]:
     return [
-        ["domain", "ru", "en", "note_ru", "note_en"],
-        ["Персонажи", "Герой", "Hero", "Главный протагонист", "Main protagonist"],
-        ["Оружие", "Меч", "Sword", "Ближний бой", "Melee weapon"],
+        ["domain", "ru", "en", "note_ru", "note_en", "flags"],
+        [
+            "Персонажи",
+            "Герой",
+            "Hero",
+            "Главный протагонист",
+            "Main protagonist",
+            "read-only",
+        ],
+        ["Оружие", "Меч", "Sword", "Ближний бой", "Melee weapon", "forbidden"],
     ]
 
 
@@ -557,6 +564,7 @@ def _record_map_document(**component_overrides) -> dict:
                     "row_offset": 0,
                 },
             ],
+            "source_flags": {"column": 6, "header": "flags", "row_offset": 0},
         },
         "initial_target_languages": ["en"],
     }
@@ -597,6 +605,7 @@ class LocKitGlossaryValidationTest(SimpleTestCase):
         self.assertEqual(first.targets, {"en": "Hero"})
         self.assertEqual(first.source_explanation, "Главный протагонист")
         self.assertEqual(first.target_explanations, {"en": "Main protagonist"})
+        self.assertEqual(first.source_flags, ("read-only",))
         self.assertLessEqual(len(preview.terms), loc_kit.PREVIEW_TERM_LIMIT)
 
     def test_server_generated_component_name_replaces_the_candidate_name(self) -> None:

@@ -66,6 +66,7 @@ def tbx_component(tmp_path):
             target_explanations={"en": "Target explanation", "ja": ""},
             section="Characters",
             term_row=4,
+            source_flags=("read-only",),
             note_rows=(5,),
         ),
         GlossaryTerm(
@@ -166,6 +167,31 @@ def test_tbx_parse_back_validates(tmp_path, tbx_component):
     comp, result = tbx_component
     render_component(comp, result, tmp_path)
     assert validate_rendered_component(comp, result, tmp_path) == ()
+
+
+def test_tbx_preserves_source_flags(tmp_path, tbx_component):
+    comp, result = tbx_component
+
+    paths = render_component(comp, result, tmp_path)
+    parsed = tbxfile.parsestring(paths["en"].read_bytes())
+    hero = next(unit for unit in parsed.units if unit.source == "Герой")
+
+    assert hero.xmlelement.get("weblate-flags") == "read-only"
+    assert validate_rendered_component(comp, result, tmp_path) == ()
+
+
+def test_tbx_parse_back_detects_missing_source_flags(tmp_path, tbx_component):
+    comp, result = tbx_component
+    paths = render_component(comp, result, tmp_path)
+    content = paths["en"].read_text(encoding="utf-8")
+    paths["en"].write_text(
+        content.replace(' weblate-flags="read-only"', ""),
+        encoding="utf-8",
+    )
+
+    diagnostics = validate_rendered_component(comp, result, tmp_path)
+
+    assert any(item.code == "render.flags_mismatch" for item in diagnostics)
 
 
 def test_tbx_parse_back_checks_explanations(tmp_path, tbx_component):

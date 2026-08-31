@@ -110,6 +110,7 @@ _RECORD_MAP_GRAMMAR_FIELDS = frozenset(
         "notes",
         "ignored_columns",
         "allow_empty_targets",
+        "source_flags",
     }
 )
 _IGNORED_COLUMN_FIELDS = frozenset({"column", "header"})
@@ -123,6 +124,7 @@ _RECORD_REGION_FIELDS = frozenset(
     }
 )
 _SECTION_FIELD_FIELDS = frozenset({"column", "header", "row_offset"})
+_SOURCE_FLAGS_FIELD_FIELDS = frozenset({"column", "header", "row_offset"})
 _NOTE_FIELD_FIELDS = frozenset({"scope", "column", "header", "row_offset", "language"})
 _NOTE_SCOPES = frozenset({"source", "target"})
 
@@ -180,6 +182,13 @@ class SectionField:
 
 
 @dataclass(frozen=True)
+class SourceFlagsField:
+    column: int
+    header: str
+    row_offset: int
+
+
+@dataclass(frozen=True)
 class NoteField:
     scope: str  # "source" | "target"
     column: int
@@ -212,6 +221,7 @@ class RecordMapGrammar:
     term_row_offset: int
     section_field: SectionField | None
     notes: tuple[NoteField, ...]
+    source_flags: SourceFlagsField | None
     ignored_columns: tuple[IgnoredColumn, ...] = ()
     allow_empty_targets: bool = False
 
@@ -493,6 +503,21 @@ def _parse_section_field(obj: dict[str, Any]) -> SectionField:
     return SectionField(column=column - 1, header=header, row_offset=row_offset)
 
 
+def _parse_source_flags_field(obj: dict[str, Any]) -> SourceFlagsField:
+    _check_unknown(obj, _SOURCE_FLAGS_FIELD_FIELDS, label="source_flags")
+    column = _require_int(obj, "column", label="source_flags")
+    header = _require(obj, "header", label="source_flags")
+    row_offset = _require_int(obj, "row_offset", label="source_flags", min_val=0)
+    if not isinstance(header, str):
+        msg = "profile.invalid_header"
+        raise _err(msg, f"invalid header {header!r}")
+    return SourceFlagsField(
+        column=column - 1,
+        header=header,
+        row_offset=row_offset,
+    )
+
+
 def _parse_note_field(
     obj: dict[str, Any], *, target_languages: tuple[str, ...]
 ) -> NoteField:
@@ -653,6 +678,13 @@ def _parse_record_map_grammar(
     notes = tuple(
         _parse_note_field(n, target_languages=target_languages) for n in notes_raw
     )
+    source_flags_raw = obj.get("source_flags")
+    source_flags: SourceFlagsField | None = None
+    if source_flags_raw is not None:
+        if not isinstance(source_flags_raw, dict):
+            msg = "profile.invalid_value"
+            raise _err(msg, "'source_flags' must be an object")
+        source_flags = _parse_source_flags_field(source_flags_raw)
 
     ignored_raw = obj.get("ignored_columns", [])
     if not isinstance(ignored_raw, list):
@@ -696,6 +728,13 @@ def _parse_record_map_grammar(
                     f"note field row_offset ({note.row_offset}) is out of range "
                     f"for record_stride {stride}",
                 )
+        if source_flags is not None and source_flags.row_offset >= stride:
+            msg = "profile.offset_out_of_range"
+            raise _err(
+                msg,
+                f"source_flags.row_offset ({source_flags.row_offset}) is out of "
+                f"range for record_stride {stride}",
+            )
 
     # Sort regions to check for overlap between records and section captions.
     sorted_regions = sorted(regions, key=lambda r: r.first_record_row)
@@ -739,6 +778,7 @@ def _parse_record_map_grammar(
         term_row_offset=term_row_offset,
         section_field=section_field,
         notes=notes,
+        source_flags=source_flags,
         ignored_columns=ignored_columns,
         allow_empty_targets=allow_empty_targets,
     )
@@ -772,21 +812,36 @@ def _check_record_map_field_locations(
                 f"as {locations[loc]}",
             )
         locations[loc] = f"note in column {note.column + 1}"
+    if grammar.source_flags is not None:
+        field = grammar.source_flags
+        loc = (field.row_offset, field.column)
+        if loc in locations:
+            msg = "profile.duplicate_field_location"
+            raise _err(
+                msg,
+                f"source_flags in column {field.column + 1} aliases the same cell "
+                f"as {locations[loc]}",
+            )
+        locations[loc] = f"source_flags in column {field.column + 1}"
 
     if grammar.section_field is not None:
         lang_columns = {lang.column for lang in languages}
-        note_columns = {note.column for note in grammar.notes}
-        if grammar.section_field.column in lang_columns | note_columns:
+        field_columns = {note.column for note in grammar.notes}
+        if grammar.source_flags is not None:
+            field_columns.add(grammar.source_flags.column)
+        if grammar.section_field.column in lang_columns | field_columns:
             msg = "profile.section_field_column_collision"
             raise _err(
                 msg,
                 f"section_field column {grammar.section_field.column + 1} collides "
-                "with a language or note column",
+                "with a language, note, or source_flags column",
             )
 
     if grammar.ignored_columns:
         declared = {lang.column for lang in languages}
         declared |= {note.column for note in grammar.notes}
+        if grammar.source_flags is not None:
+            declared.add(grammar.source_flags.column)
         if grammar.section_field is not None:
             declared.add(grammar.section_field.column)
         collision = sorted(
@@ -799,7 +854,7 @@ def _check_record_map_field_locations(
             raise _err(
                 msg,
                 f"ignored columns {[col + 1 for col in collision]} collide with a "
-                "declared language, note, or section column",
+                "declared language, note, source_flags, or section column",
             )
 
 

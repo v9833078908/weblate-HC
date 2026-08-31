@@ -64,6 +64,7 @@
               <th scope="col">{% translate "Source term" %}</th>
               <th scope="col">{% translate "Target terms" %}</th>
               <th scope="col">{% translate "Source note" %}</th>
+              <th scope="col">{% translate "Flags" %}</th>
             </tr>
           </thead>
           <tbody>
@@ -75,6 +76,7 @@
                   {% for code, value in term.targets.items %}{{ code }}: {{ value }}{% if not forloop.last %}<br />{% endif %}{% endfor %}
                 </td>
                 <td>{{ term.source_explanation }}</td>
+                <td>{{ term.source_flags|join:", " }}</td>
               </tr>
             {% endfor %}
           </tbody>
@@ -147,7 +149,7 @@
 
       {% if draft.target_component %}
         <p class="help-block">
-          {% translate "Only brand-new terms are added. Existing terms and their notes will not change, and blank target cells are skipped instead of clearing anything." %}
+          {% translate "Only brand-new terms are added. Existing terms, notes, and flags will not change, and blank target cells are skipped instead of clearing anything." %}
         </p>
         {% if preview.note_count %}
           <div class="alert alert-success" role="alert">

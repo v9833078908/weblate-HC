@@ -45,7 +45,7 @@ from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Permission, Role, User
 from weblate.formats.models import FILE_FORMATS
 from weblate.glossary.models import build_glossary_prompt_entry
-from weblate.glossary.tasks import sync_terminology
+from weblate.glossary.tasks import flag_glossary_terminology, sync_terminology
 from weblate.lang.models import Language
 from weblate.trans import loc_kit
 from weblate.trans.loc_kit import PREVIEW_WARNING_LIMIT
@@ -183,6 +183,7 @@ class LocKitFormatContractTest(SimpleTestCase):
                     target_explanations={"en": "Wise person"},
                     section="Characters",
                     term_row=4,
+                    source_flags=("read-only",),
                     note_rows=(5,),
                 ),
             ),
@@ -238,6 +239,16 @@ class LocKitFormatContractTest(SimpleTestCase):
         self.assertEqual(unit.target, "Sage")
         self.assertEqual(unit.source_explanation, "Источник описание")
         self.assertEqual(unit.explanation, "Wise person")
+
+    def test_tbx_carries_source_glossary_flags(self) -> None:
+        tbx_dir = self.render_tbx()
+        store = FILE_FORMATS["tbx"](
+            tbx_dir / "en.tbx", source_language="ru", language_code="en"
+        )
+
+        (unit,) = [item for item in store.all_units if item.context]
+
+        self.assertIn("read-only", unit.flags)
 
     def test_tbx_never_written_for_source_language(self) -> None:
         tbx_dir = self.render_tbx()
@@ -624,6 +635,10 @@ GLOSSARY_NOTE_CSV = (
     '"Правящая политическая партия. Во французском le Parti, мужской род."\n'
     "Самосбор,Samosbor,Samosbor,Термин вселенной.\n"
 )
+GLOSSARY_FLAGS_CSV = (
+    "ru,en,flags\nHeroCraft,HeroCraft,read-only\nСудно,Vessel,forbidden\n"
+)
+
 
 # Real terminology exports put a term on one row and its description on the
 # next, under a section caption. Inference must map the descriptions as
@@ -845,6 +860,52 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertTrue(sources)
         for unit in sources:
             self.assertIn("terminology", unit.all_flags)
+
+    @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
+    def test_source_flags_are_previewed_and_created(self) -> None:
+        self._start(
+            upload=self._csv("Terms.csv", GLOSSARY_FLAGS_CSV),
+            slug=self.slug,
+        )
+        draft = self._draft()
+        draft.refresh_from_db()
+
+        preview = json.loads(draft.preview_json)
+        self.assertEqual(preview["terms"][0]["source_flags"], ["read-only"])
+        page = self.client.get(
+            reverse("loc-kit-glossary-preview", kwargs={"token": draft.token})
+        )
+        self.assertContains(page, "read-only")
+        self.assertContains(page, "forbidden")
+
+        with (
+            patch.object(Component, "update_branch", return_value=True),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self._confirm()
+
+        component = Component.objects.get(slug=self.slug, is_glossary=True)
+        source_units = {
+            unit.source: unit for unit in component.source_translation.unit_set.all()
+        }
+        target_units = {
+            unit.source: unit
+            for unit in component.translation_set.get(
+                language__code="en"
+            ).unit_set.all()
+        }
+        self.assertIn("read-only", target_units["HeroCraft"].flags)
+        self.assertIn("forbidden", target_units["Судно"].flags)
+        read_only_entry = build_glossary_prompt_entry(target_units["HeroCraft"])
+        forbidden_entry = build_glossary_prompt_entry(target_units["Судно"])
+        self.assertIn("read-only", source_units["HeroCraft"].extra_flags)
+        self.assertIn("forbidden", source_units["Судно"].extra_flags)
+        self.assertIn("read-only", read_only_entry["flags"])
+        self.assertIn("forbidden", forbidden_entry["flags"])
+        source_units["HeroCraft"].update_extra_flags("terminology", self.user)
+        flag_glossary_terminology(component.pk)
+        source_units["HeroCraft"].refresh_from_db()
+        self.assertIn("read-only", source_units["HeroCraft"].extra_flags)
 
     @override_settings(LOC_KIT_PROFILE_ANALYSIS_ENABLED=False)
     def test_term_description_sheet_maps_descriptions_as_explanations(self) -> None:
@@ -1739,10 +1800,11 @@ def _append_preview(
     Build a validated preview straight from term rows, no UI round trip.
 
     Each term is ``{"section": str, "values": {code: str}, "notes":
-    {"source": str, "target": {code: str}}}``. The section column drives
-    the same (section, term) context the writer derives, so previews can
-    match units seeded through add_unit. Note columns exist only when a
-    term carries notes, matching the record-map shape the flow accepts.
+    {"source": str, "target": {code: str}}, "flags": tuple[str, ...]}``.
+    The section column drives the same (section, term) context the writer
+    derives, so previews can match units seeded through add_unit. Optional
+    note and flag columns exist only when a term carries them, matching the
+    record-map shape the flow accepts.
     """
     codes = [
         code
@@ -1755,6 +1817,7 @@ def _append_preview(
         for code in codes
         if any(term.get("notes", {}).get("target", {}).get(code) for term in terms)
     ]
+    has_source_flags = any(term.get("flags") for term in terms)
 
     # column 1 is the section field; languages follow.
     header = ["domain", source_language, *codes]
@@ -1783,6 +1846,15 @@ def _append_preview(
                 "row_offset": 0,
             }
         )
+        column += 1
+    source_flags_field = None
+    if has_source_flags:
+        header.append("flags")
+        source_flags_field = {
+            "column": column,
+            "header": "flags",
+            "row_offset": 0,
+        }
         column += 1
 
     languages = [
@@ -1830,6 +1902,8 @@ def _append_preview(
             }
         ],
     }
+    if source_flags_field is not None:
+        document["components"][0]["grammar"]["source_flags"] = source_flags_field
     rows = [header]
     for term in terms:
         row = [term.get("section", "Термины")]
@@ -1840,6 +1914,8 @@ def _append_preview(
             term.get("notes", {}).get("target", {}).get(code, "")
             for code in noted_targets
         )
+        if has_source_flags:
+            row.append(", ".join(term.get("flags", ())))
         rows.append(row)
     return loc_kit.validate_glossary_profile(
         profile_document=document,
@@ -1950,6 +2026,45 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
         self.assertIn("terminology", source_unit.extra_flags)
         self.assertEqual(result.languages["cs"].added, 1)
         self.assertEqual(result.languages["pl"].added, 1)
+
+    def test_new_terms_merge_source_flags_with_terminology(self) -> None:
+        preview = _append_preview(
+            {"values": {"en": "HeroCraft", "cs": "HeroCraft"}, "flags": ("read-only",)},
+            {"values": {"en": "Vessel", "cs": "Plavidlo"}, "flags": ("forbidden",)},
+            source_language="en",
+        )
+
+        self.assertEqual(preview.terms[0].source_flags, ("read-only",))
+        loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
+
+        read_only = self.glossary.source_translation.unit_set.get(source="HeroCraft")
+        forbidden = self.glossary.source_translation.unit_set.get(source="Vessel")
+        self.assertEqual(
+            set(read_only.extra_flags.split(", ")),
+            {"read-only", "terminology"},
+        )
+        self.assertEqual(
+            set(forbidden.extra_flags.split(", ")),
+            {"forbidden", "terminology"},
+        )
+
+    def test_incoming_source_flags_never_rewrite_existing_terms(self) -> None:
+        seeded = self._seed("Characters", "Hero", "Hrdina")
+        seeded.source_unit.update_extra_flags("terminology, read-only", self.user)
+        preview = _append_preview(
+            {
+                "section": "Characters",
+                "values": {"en": "Hero", "cs": "Hrdina"},
+                "flags": ("forbidden",),
+            },
+            source_language="en",
+        )
+
+        loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
+
+        seeded.source_unit.refresh_from_db()
+        self.assertIn("read-only", seeded.source_unit.extra_flags)
+        self.assertNotIn("forbidden", seeded.source_unit.extra_flags)
 
     def test_blank_target_cell_is_skipped_not_created(self) -> None:
         """Blank pl for a new term: Czech lands, Polish stays absent."""

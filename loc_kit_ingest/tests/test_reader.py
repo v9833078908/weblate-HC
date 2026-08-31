@@ -293,3 +293,47 @@ def test_ignored_column_header_matches_the_sheet(ignored_id_component):
 def test_ignored_column_header_mismatch_is_an_error(ignored_id_component, header):
     diagnostics = validate_sheet_headers(ignored_id_component, [header])
     assert [(item.code, item.row) for item in diagnostics] == [("header.mismatch", 1)]
+
+
+def test_source_flags_header_mismatch_is_an_error():
+    document = {
+        "schema_version": 2,
+        "components": [
+            {
+                "sheet": "Glossary",
+                "component": "Glossary",
+                "kind": "tbx",
+                "source_lang": "ru",
+                "header_row": 1,
+                "languages": [
+                    {"code": "ru", "xml_lang": "ru", "column": 1, "header": "ru"},
+                    {"code": "en", "xml_lang": "en", "column": 2, "header": "en"},
+                ],
+                "grammar": {
+                    "type": "record-map",
+                    "regions": [
+                        {
+                            "first_record_row": 2,
+                            "last_record_row": 2,
+                            "record_stride": 1,
+                        }
+                    ],
+                    "term_row_offset": 0,
+                    "source_flags": {
+                        "column": 3,
+                        "header": "flags",
+                        "row_offset": 0,
+                    },
+                },
+                "initial_target_languages": ["en"],
+            }
+        ],
+    }
+    component = parse_profile(document).components[0]
+
+    diagnostics = validate_sheet_headers(
+        component,
+        [["ru", "en", "status"], ["Герой", "Hero", "read-only"]],
+    )
+
+    assert [(item.code, item.row) for item in diagnostics] == [("header.mismatch", 1)]

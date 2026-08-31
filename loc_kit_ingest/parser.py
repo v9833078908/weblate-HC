@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 
 
 # --------------------------------------------------------------------------- #
+GLOSSARY_SOURCE_FLAGS = frozenset({"read-only", "forbidden"})
+
 # Helpers
 # --------------------------------------------------------------------------- #
 
@@ -653,6 +655,7 @@ def _parse_record_map(
     for note in grammar.notes:
         if note.scope == "target" and note.language is not None:
             target_notes[note.language].append(note)
+    source_flags_field = grammar.source_flags
 
     units: list[GlossaryTerm] = []
     diagnostics: list[Diagnostic] = []
@@ -810,6 +813,27 @@ def _parse_record_map(
             target_explanations = {
                 code: _join_notes(collect(target_notes[code])) for code in target_langs
             }
+            source_flags: tuple[str, ...] = ()
+            if source_flags_field is not None:
+                row_idx = base_row + source_flags_field.row_offset
+                value = _cell(rows, row_idx, source_flags_field.column)
+                consumed.add((row_idx, source_flags_field.column))
+                if not _is_blank(value):
+                    tokens = [token.strip() for token in value.split(",")]
+                    invalid = [
+                        token
+                        for token in tokens
+                        if not token or token not in GLOSSARY_SOURCE_FLAGS
+                    ]
+                    if invalid:
+                        err(
+                            "tbx.invalid_source_flag",
+                            row_idx + 1,
+                            "source glossary flags must be comma-separated values "
+                            "from 'read-only' and 'forbidden'",
+                        )
+                    else:
+                        source_flags = tuple(sorted(set(tokens)))
 
             # Any populated cell in this record that no field claimed.
             for offset in range(region.record_stride):
@@ -845,6 +869,7 @@ def _parse_record_map(
                     target_explanations=target_explanations,
                     section=section_text,
                     term_row=term_1based,
+                    source_flags=source_flags,
                     note_rows=tuple(note_rows),
                 )
             )

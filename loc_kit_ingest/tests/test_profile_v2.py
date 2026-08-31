@@ -24,6 +24,7 @@ from loc_kit_ingest.profile import (
     ProfileError,
     RecordMapGrammar,
     SectionField,
+    SourceFlagsField,
     load_profile,
     parse_profile,
 )
@@ -171,6 +172,26 @@ def test_one_row_record_map_parses():
     assert component.initial_target_languages == ("en",)
 
 
+def test_source_flags_field_parses():
+    profile = parse_profile(
+        _one_row_document(
+            grammar={
+                "source_flags": {
+                    "column": 6,
+                    "header": "flags",
+                    "row_offset": 0,
+                }
+            }
+        )
+    )
+    grammar = profile.components[0].grammar
+
+    assert isinstance(grammar, RecordMapGrammar)
+    assert grammar.source_flags == SourceFlagsField(
+        column=5, header="flags", row_offset=0
+    )
+
+
 def test_stride_two_record_map_with_caption_cells_parses():
     profile = parse_profile(_stride_two_document())
     grammar = profile.components[0].grammar
@@ -268,6 +289,41 @@ def test_both_section_styles_at_once_fails():
         }
     )
     with pytest.raises(ProfileError, match="profile.section_conflict"):
+        parse_profile(document)
+
+
+def test_source_flags_rejects_missing_field():
+    with pytest.raises(ProfileError, match="profile.missing"):
+        parse_profile(_one_row_document(grammar={"source_flags": {"column": 6}}))
+
+
+def test_source_flags_rejects_offset_outside_stride():
+    document = _one_row_document(
+        grammar={
+            "source_flags": {
+                "column": 6,
+                "header": "flags",
+                "row_offset": 1,
+            }
+        }
+    )
+
+    with pytest.raises(ProfileError, match="profile.offset_out_of_range"):
+        parse_profile(document)
+
+
+def test_source_flags_rejects_language_cell_collision():
+    document = _one_row_document(
+        grammar={
+            "source_flags": {
+                "column": 2,
+                "header": "ru",
+                "row_offset": 0,
+            }
+        }
+    )
+
+    with pytest.raises(ProfileError, match="profile.duplicate_field_location"):
         parse_profile(document)
 
 

@@ -598,6 +598,7 @@ class GlossaryTermPreview:
     targets: dict[str, str]
     source_explanation: str
     target_explanations: dict[str, str]
+    source_flags: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -801,6 +802,7 @@ def validate_glossary_profile(
             },
             source_explanation=unit.source_explanation,
             target_explanations=dict(unit.target_explanations),
+            source_flags=unit.source_flags,
         )
         for unit in glossary_terms[:PREVIEW_TERM_LIMIT]
     )
@@ -1132,6 +1134,7 @@ def append_glossary_terms(
                             )
                             flags = Flags(source_unit.extra_flags)
                             flags.merge("terminology")
+                            flags.merge(term.source_flags)
                             source_unit.update_extra_flags(flags.format(), user)
                             added_source_terms += 1
                     for term in preview.all_terms:

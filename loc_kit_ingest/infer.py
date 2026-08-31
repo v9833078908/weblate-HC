@@ -81,6 +81,8 @@ _NOTE_HEADERS = frozenset(
 
 
 _IGNORABLE_HEADERS = frozenset({"id"})
+_SOURCE_FLAGS_HEADER = "flags"
+
 # Term/description detection. A glossary term is a name, a description is
 # prose: the gap is an order of magnitude in practice. Both bounds must hold,
 # so a kit of long terms falls back to one term per row instead of guessing.
@@ -560,6 +562,60 @@ def _find_note_column(
     return col
 
 
+def _find_source_flags_column(
+    header_row: list[str],
+    populated: set[int],
+    languages: dict[int, str],
+    notes: list[str],
+) -> int | None:
+    """Return the populated source glossary flags column, if one exists."""
+    recognised = [
+        col
+        for col in range(len(header_row))
+        if col not in languages
+        and _cell(header_row, col).strip().casefold() == _SOURCE_FLAGS_HEADER
+    ]
+    populated_flags = [col for col in recognised if col in populated]
+    notes.extend(
+        f"column {col + 1} ({_cell(header_row, col)!r}) is empty; excluded"
+        for col in recognised
+        if col not in populated
+    )
+    if len(populated_flags) > 1:
+        shown = ", ".join(str(col + 1) for col in populated_flags)
+        msg = f"columns {shown} all declare source glossary flags"
+        raise InferenceError(msg)
+    if not populated_flags:
+        return None
+    col = populated_flags[0]
+    notes.append(
+        f"column {col + 1} ({_cell(header_row, col)!r}) -> source glossary flags"
+    )
+    return col
+
+
+def _reject_flags_outside_term_rows(
+    rows: list[list[str]],
+    flags_col: int,
+    content_indexes: list[int],
+    term_rows: list[int],
+) -> None:
+    """Refuse flags that no generated record-map record can read."""
+    term_row_set = set(term_rows)
+    offenders = [
+        index + 1
+        for index in content_indexes
+        if index not in term_row_set and _cell(rows[index], flags_col).strip()
+    ][:_MISSING_ROWS_SHOWN]
+    if offenders:
+        shown = ", ".join(str(row) for row in offenders)
+        msg = (
+            f"column {flags_col + 1} holds flags on non-term row(s) {shown}; "
+            "this layout needs an explicit profile"
+        )
+        raise InferenceError(msg)
+
+
 def _reject_note_outside_term_rows(
     rows: list[list[str]],
     note_col: int,
@@ -678,9 +734,12 @@ def infer_glossary_profile(
             if value.strip():
                 populated.add(col)
     note_col = _find_note_column(header_row, populated, languages, notes)
+    flags_col = _find_source_flags_column(header_row, populated, languages, notes)
     mapped = set(languages)
     if note_col is not None:
         mapped.add(note_col)
+    if flags_col is not None:
+        mapped.add(flags_col)
     ignored_cols: list[int] = []
     for col in sorted(populated - mapped):
         header_text = _cell(header_row, col)
@@ -869,6 +928,13 @@ def infer_glossary_profile(
                 "row_offset": 0,
             }
         )
+    if flags_col is not None:
+        _reject_flags_outside_term_rows(rows, flags_col, content_indexes, term_rows)
+        grammar["source_flags"] = {
+            "column": flags_col + 1,
+            "header": _cell(header_row, flags_col),
+            "row_offset": 0,
+        }
     if note_fields:
         grammar["notes"] = note_fields
 
