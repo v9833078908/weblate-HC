@@ -1059,6 +1059,19 @@ the LiteLLM endpoint before trusting the overlap numbers there.
       `327fb5dc-3e53-401c-a2ec-67e08a111773`: 36 attempts, including 10
       HTTP 500 responses from seat 2, and 13 final unparsed strings. The
       failed threshold blocks production rollout.
+      Diagnosed on 2026-08-31 to two seat configuration faults, neither in the
+      fan-out code: seat 2 sent a top-level `enable_thinking` key, which the
+      `atlas/qwen3.8-max` model group rejects
+      (`AsyncCompletions.create() got an unexpected keyword argument
+      'enable_thinking'`), so all 10 of its attempts failed. Seat 1 asked for
+      `json_object`, under which the model is free to omit `span` from an error
+      object: 20 of its 26 attempts failed `invalid-envelope` or
+      `invalid-segment`. `analysis/probes/judge-seat-config-variants.py`
+      records both failures and both fixes against the live proxy: with the
+      seat values set to `inherit` (`json_schema`, empty reasoning) each seat
+      returns HTTP 200 and parses. `dev-docker/docker-compose.yml` and
+      `deploy/environment.example` now carry the corrected pair; the canary
+      must be rerun after the dev stack is recreated under its own approval.
 - [x] Commit and push implementation
 - [x] Separate deploy approval obtained
 - [ ] Separate bounded production-run approval obtained
