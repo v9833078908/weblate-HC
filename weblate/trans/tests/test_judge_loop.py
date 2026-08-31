@@ -159,6 +159,7 @@ class JudgeSeatConnectionCleanupTest(TransactionTestCase):
             source_language="en",
             target_language="cs",
             note="",
+            explanation="",
             glossary_terms=(),
         )
         caller_id = threading.get_ident()
