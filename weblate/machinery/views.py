@@ -336,6 +336,11 @@ class EditMachineryGlobalView(MachineryGlobalMixin, EditMachineryView):
 
 
 class EditMachineryProjectView(MachineryProjectMixin, EditMachineryView):
+    def get_form_class(self):
+        return getattr(
+            self.machinery, "project_settings_form", self.machinery.settings_form
+        )
+
     @property
     def allow_private_targets(self) -> bool:
         return False

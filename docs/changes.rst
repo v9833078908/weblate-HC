@@ -16,6 +16,7 @@ Weblate 2026.8.1
 
 .. rubric:: Improvements
 
+* Project-level OpenRouter settings no longer display an API key input while preserving the configured credential.
 * The component :guilabel:`Files` menu can now download all translations as monolingual JSON files in a ZIP archive, for components with a template.
 * Project-level :ref:`automatic suggestion <machine-translation-setup>` configuration now overrides the site-wide one field by field, so a project can set its own translator persona, style, and language-specific instructions without restating credentials.
 * LLM machine translation now records per-request token usage and cost, reportable via the ``llm_usage_report`` management command.

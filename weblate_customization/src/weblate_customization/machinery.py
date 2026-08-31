@@ -102,6 +102,22 @@ class RoutedLLMMachineryForm(BaseOpenAIMachineryForm):
         return result
 
 
+class RoutedProjectOpenRouterMachineryForm(RoutedLLMMachineryForm):
+    """Project settings form without an editable OpenRouter API key."""
+
+    key = None
+
+    def clean(self) -> None:
+        if not self.errors:
+            key = self.initial.get("key")
+            if not isinstance(key, str) or not key:
+                raise ValidationError(
+                    gettext("OpenRouter API key must be configured site-wide.")
+                )
+            self.cleaned_data["key"] = key
+        super().clean()
+
+
 class RoutedLiteLLMMachineryForm(RoutedLLMMachineryForm):
     """Settings form for routing against the corporate LiteLLM proxy."""
 
@@ -123,6 +139,7 @@ class RoutedLLMTranslation(OpenAITranslation):
 
     name = "OpenRouter"
     settings_form = RoutedLLMMachineryForm
+    project_settings_form = RoutedProjectOpenRouterMachineryForm
     trusted_error_hosts: ClassVar[set[str]] = {"openrouter.ai"}
 
     def __init__(self, configuration: SettingsDict) -> None:
@@ -341,6 +358,7 @@ class RoutedLiteLLMTranslation(RoutedLLMTranslation):
 
     name = "LiteLLM"
     settings_form = RoutedLiteLLMMachineryForm
+    project_settings_form = RoutedLiteLLMMachineryForm
     trusted_error_hosts: ClassVar[set[str]] = {"hcbifrost.herocraft.com"}
     # Below the proxy's hard ~60s gateway timeout (nginx 504 past that);
     # caps one transport attempt only, inherited retries are unchanged.
