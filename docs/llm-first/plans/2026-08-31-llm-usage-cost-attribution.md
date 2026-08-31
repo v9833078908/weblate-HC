@@ -1,21 +1,23 @@
 # LLM usage cost attribution per component and target language
 
-**Дата:** 2026-08-31. **Статус:** proposed, not started.
+**Дата:** 2026-08-31. **Статус:** reviewed, proposed, not started.
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
 > implement this plan task-by-task.
 
-**Goal:** каждая строка `LLMUsageLog` знает component и target language, за
-которые провайдер выставил счёт, а `llm_usage_report` отдаёт точную сумму
-в разрезе `(project, component, target language, model, operation)`.
+**Goal:** каждая новая строка `LLMUsageLog` хранит stable service ID,
+неизменяемые project/component ID snapshots, их читаемые slug snapshots и
+target language. `llm_usage_report` отвечает одним итогом по текущему
+`(project, component, target language, service, operation)`, не теряя расход
+при rename project или component.
 
-**Architecture:** цена запроса неделима, поэтому единица атрибуции - запрос,
-а не строка. Оба платных шва (machinery HTTP seam в
-`weblate/machinery/openai.py:149` и judge client в `weblate/trans/judge.py:1073`)
-уже знают батч; в них добавляются два денормализованных поля, значения которых
-берутся только из юнитов батча и только когда батч однороден по этому измерению.
-Неоднородный батч остаётся видимо неатрибутированным (пустая строка), а не
-записывается на первый юнит.
+**Architecture:** цена запроса неделима, поэтому единица атрибуции - запрос, а
+не строка. Machinery подтверждает scope только когда каждый source несёт одну и
+ту же `Translation`; `None` или другой `translation_id` оставляет весь scope
+пустым, не назначая стоимость первому юниту и не обходя relation каждого
+юнита. Judge несёт те же ID snapshots через `JudgeRequest`. Оба платных шва
+пишут стабильный service ID (`openrouter`, `litellm`, ...), чтобы одинаковая
+model ID за разными шлюзами никогда не смешивалась.
 
 **Tech stack:** Django 5, PostgreSQL, `contextvars`, pytest, Django management
 commands.
@@ -28,17 +30,25 @@ commands.
 
 | Вопрос | Ответ | Точность |
 | --- | --- | --- |
-| Стоимость `(component, target language)` для `operation=translation` после деплоя | да | точная сумма `usage.cost`, которую вернул провайдер по записанным запросам; scope из юнитов батча (Task 2) |
-| То же для `operation=judge` | да, но только вместе с Task 3 | judge пишет свою строку сам (`weblate/trans/judge.py:1347-1394`) и `ContextVar` machinery не видит; scope приходит через `JudgeRequest` |
-| Разделение стоимости на перевод и judge | да | по полю `operation` |
-| Стоимость Need for Greed за 2026-08-17 - 2026-08-28 | нет | у старых строк поля пустые, backfill невозможен |
-| Стоимость одной строки | нет | цена запроса неделима; доступна только средняя `cost_usd / strings_asked` по группе |
+| Стоимость OpenRouter-перевода `(component, target language)` после деплоя | да, как точная сумма записанных `usage.cost` | `--service openrouter --operation translation --summary`; ledger scope полон только при `priced_complete=yes` и `attribution_complete=yes` |
+| То же для `operation=judge` | да, но только вместе с Task 3 и в пределах retention | service и immutable ID snapshots проходят через `JudgeRequest`; judge usage по умолчанию хранится 90 дней |
+| Расход компонента после rename project/component | да, для строк после миграции | current slug резолвится в immutable ID, snapshot slug остаётся историческим label |
+| Разделение расхода по OpenRouter, LiteLLM и другим шлюзам | да | по полю `service`, а не только по model ID |
+| Стоимость Need for Greed за 2026-08-17 - 2026-08-28 | нет | старые строки не содержат новых ID/service/scope полей, backfill невозможен |
+| Стоимость одной строки | нет | цена запроса неделима; доступна только средняя `cost_usd / strings_asked` по одной группе журнала |
 | Полная сверка с инвойсом OpenRouter | частично | журнал `<=` инвойс, см. "Известные пробелы" |
 
 `strings_asked` (`Sum(batch_size)`) - это оплаченные строко-запросы, включая
-повторы после отказа валидатора. Уникальные переведённые строки берутся из
-statistics Weblate, а не из журнала: сравнение двух чисел и есть измерение
-накладных расходов на retries.
+повторы после отказа валидатора. Это не число уникальных переведённых строк и
+его нельзя превращать в retry rate делением на текущую statistics Weblate:
+журнал ограничен периодом, statistics - накопленное изменяемое состояние.
+
+`--summary` возвращает одну строку после всех фильтров. `priced_complete=yes`
+значит, что у всех **включённых** rows есть provider-reported цена;
+`attribution_complete=yes` значит, что в том же service/model/operation/time
+не осталось ни одной row с неразрешимым scope. Вместе они делают `cost_usd`
+полной суммой **записанного ledger**, не заменяя ограничение об оплаченной
+попытке без тела ответа.
 
 Гарантия по построению операционная, а не общая: у machinery и у judge два
 независимых шва записи. Если Task 3 не выполнена, judge-строки остаются с
@@ -53,75 +63,122 @@ statistics Weblate, а не из журнала: сравнение двух ч�
 
 1. **Scope из первого юнита.** `_sources_project_slug`
    (`weblate/machinery/llm.py:67-77`) возвращает project первого юнита с
-   `unit is not None`. Копирование этого приёма на component и language даёт
-   ложную атрибуцию неделимой цены. Исправлено: проверка однородности по
-   каждому измерению отдельно.
+   `unit is not None`. Копирование этого приёма на component и language
+   выдумывает адресата неделимой цены.
 2. **`raise MachineTranslationError` на смешанном батче - вредно.** Это
    исключение перехватывается в
    `weblate/machinery/llm.py:2704-2727`, которое разрезает батч пополам и
-   **отправляет платные запросы снова**. То есть "защита" превратилась бы в
-   тихий сплит с дополнительными расходами. Исправлено: пустой scope плюс
-   `LOGGER.error`, без отказа перевода.
-3. **Judge не покрыт.** `operation=judge` - отдельный платный шов
-   (`weblate/trans/judge.py:1101`), до этого плана вообще не имевший
-   component и language. `JudgeRequest` (`weblate/trans/judge.py:134-144`)
-   не содержит component, а `_run_batch` получает только
-   `Sequence[JudgeRequest]` и `project_slug`
-   (`weblate/trans/judge.py:1347-1394`), поэтому `ContextVar` из machinery
-   до него не доходит принципиально: нужно новое поле dataclass, иначе
-   стоимость по компоненту будет посчитана только для перевода.
-4. **Отказ до запроса невозможен для judge.** Judge пишет usage уже после
-   платного ответа (`weblate/trans/judge.py:1391-1394`), поэтому предложенный
-   тест "смешанный батч отклоняется без HTTP-запроса" для judge принципиально
-   неверен, а отказ там означал бы потерю уже оплаченных вердиктов.
-5. **Project мог обнуляться вместе с component.** Единый кортеж scope
-   обнулял бы и project, хотя он однороден. Исправлено: три независимые
-   проверки, каждое измерение сохраняется настолько точно, насколько может.
-6. **`settings["_project"]` игнорировался.** `project_slug` берётся из
-   конфигурации сервиса, если она project-scoped
-   (`weblate/machinery/openai.py:165-166`), и это может быть не проект юнитов.
-   component и language берутся только из юнитов, никогда из настроек.
-7. **Не названы пределы точности:** `cost_usd IS NULL`, оплаченные запросы без
-   тела ответа, loc-kit анализ без записи usage. Вынесено в "Известные
-   пробелы"; без этого раздела итоговая цифра выглядела бы полнее, чем есть.
+   **отправляет платные запросы снова**. Поэтому scope остаётся пустым, а
+   перевод не отклоняется.
+3. **Judge - отдельный платный шов.** `operation=judge` пишет
+   `LLMUsageLog` в `weblate/trans/judge.py:1073-1105`; ContextVar machinery
+   туда не доходит. Component должен пройти через `JudgeRequest`.
+4. **Отказ до запроса невозможен для judge.** Usage пишется уже после
+   платного ответа (`weblate/trans/judge.py:1391-1394`), поэтому смешанный
+   batch сохраняется с пустым scope, а не отбрасывается вместе с вердиктами.
+5. **`Unit | None` и relation на каждый unit.** Пропуск `None` при обходе
+   источников приписывает общий счёт оставшемуся юниту, а
+   `unit.translation` в цикле добавляет N+1 запросов. Machinery проверяет
+   только `translation_id`; один ID даёт scope первого unit, любой другой
+   случай - пустую тройку.
+6. **`settings["_project"]` не может перезаписывать активный batch.**
+   `weblate/machinery/openai.py:165-166` сейчас предпочитает project из
+   настроек даже когда юниты говорят обратное. `None` как неактивное значение
+   `llm_batch_project` отличает вызов вне batch от активного, но
+   неатрибутированного batch.
+7. **Model ID не определяет источник счёта.** `RoutedLLMTranslation.name` -
+   `OpenRouter`, а `RoutedLiteLLMTranslation.name` - `LiteLLM`
+   (`weblate_customization/.../machinery.py:137-143,356-368`); обе службы
+   могут записать одинаковую model ID. Нужен service ID и фильтр отчёта.
+8. **Нулевой provider cost - это цена, а не отсутствие цены.** Оба шва
+   используют `Decimal(str(cost)) if cost else None`
+   (`weblate/machinery/openai.py:162-176`,
+   `weblate/trans/judge.py:1091-1104`), поэтому ответ `cost: 0` ошибочно
+   становится unpriced.
+9. **Детализация не отвечает на один денежный вопрос.** Группировка по model
+   и operation (`Task 4` прежней версии) требовала ручного сложения и могла
+   выдать частичную сумму как полную. Нужны `--summary`, `priced_complete` и
+   `attribution_complete`.
+10. **Текущий slug не является финансовой identity.** Snapshot slug нужен для
+    истории, но фильтр только по нему теряет расход после rename. Нужны
+    immutable `project_id_snapshot` и `component_id_snapshot`, а current slug
+    должен резолвиться в них перед фильтрацией.
+11. **Retention не симметричен.**
+    `cleanup_judge_observability` удаляет только judge usage
+    (`weblate/trans/tasks.py:1375-1381`), хотя translation usage не удаляет.
+    Поэтому индекс для растущего translation ledger обязателен, а judge
+    отчёт ограничен `LLM_USAGE_LOG_RETENTION_DAYS` (90 дней по умолчанию).
+12. **Пределы точности должны быть названы:** `cost_usd IS NULL`,
+    оплаченные запросы без тела ответа, неатрибутированные batch и loc-kit
+    analysis без usage-строки. Без этого итоговая цифра выглядит полнее, чем
+    есть.
+13. **Scale `DecimalField` обрезал бы provider cost.** Текущие
+    `max_digits=12, decimal_places=8`
+    (`weblate/trans/models/llm_usage.py:49-51`) сохраняются PostgreSQL как
+    `numeric(12, 8)`. Цена с девятой дробной цифрой была бы округлена до
+    отчёта; миграция расширяет scale до 18 и тестирует значение с 18 цифрами.
+14. **Migration должна предшествовать writer code.** Новые ORM kwargs на
+    непромигрированной БД вызывают исключение, которое recorder ловит и
+    логирует, но usage row теряется. Production шаг теперь требует additive
+    migration до запуска новых workers.
 
-## Инварианты, проверенные в коде
+## Что уже существует и инварианты
 
-- LLM-батч уже структурно однороден: `batch_translate`
-  (`weblate/machinery/base.py:1249-1266`) берёт `units[0].translation` для
-  plural mapping и target language, а `run_judge_batch`
-  (`weblate/trans/judge_loop.py:948`) - project первого юнита. Смешанный
-  батч был бы дефектом корректности, а не только учёта.
-- Батчи нарезаются срезами списка юнитов без группировки
-  (`weblate/trans/machinery.py:201-204`), поэтому однородность обеспечивают
-  вызывающие: `AutoTranslate.fetch_mt` работает внутри одной `Translation`
-  (`weblate/trans/autotranslate.py:574`), judge drain группирует по
-  `translation_id` (`weblate/trans/judge_loop.py:1454-1455`).
-- Единственный вызывающий со смешанными юнитами -
-  `weblate/trans/views/reports.py:324-337` (cost estimate), и он использует
-  `WeblateMemory`, то есть LLM-шва не достигает.
+- `batch_translate` (`weblate/machinery/base.py:1240-1282`) берёт
+  `units[0].translation` для language и plural mapping. `fetch_machinery_matches`
+  режет произвольный список срезами (`weblate/trans/machinery.py:199-205`),
+  поэтому scope guard не заменяет корректную группировку вызывающего: он лишь
+  отказывается финансово атрибутировать дефектный batch.
+- `translation_id` - доступное без запроса поле `Unit`; после подтверждения
+  одного ID helper читает `first_unit.translation` один раз. Это O(1), а не
+  relation-обход каждого source.
+- `BaseMachineTranslation.get_identifier()` возвращает стабильный service ID
+  из class `name` (`weblate/machinery/base.py:202-203`). Для routed services
+  это `openrouter` и `litellm`; judge уже классифицирует endpoint как
+  `openrouter`, `litellm` или `unknown`
+  (`weblate/trans/judge.py:180-186`).
 - `build_request` (`weblate/trans/judge_loop.py:92-108`) - единственный
-  конструктор `JudgeRequest` в продуктовом коде: через него идут и обычный
-  прогон (`weblate/trans/judge_loop.py:973`), и drain
-  (`weblate/trans/judge_loop.py:1295`), и аудит прогонов
-  (`weblate/trans/autotranslate.py:865`, `1197`). Поэтому одного поля в
-  `build_request` достаточно, чтобы каждая judge-строка несла scope, а тест
-  `test_request_carries_the_units_component_and_language` (Task 3) охраняет
-  этот инвариант.
-- `contextvars` безопасны при `batch_concurrency > 1`: `set` происходит внутри
-  рабочего потока в `_fetch_llm_batch`, а не в родительском.
+  конструктор `JudgeRequest` в продуктовом коде: через него идут обычный
+  прогон, drain и аудит `JudgeRun`. ID snapshots и slug в этом конструкторе
+  покрывают все judge usage-строки.
+- `ContextVar` безопасен при `batch_concurrency > 1`, если set/reset остаются
+  внутри sync/async `_fetch_llm_batch`; `None` у project означает "вне batch",
+  а `""` - "внутри, но scope недоказуем".
 - `RoutedLLMTranslation` и `RoutedLiteLLMTranslation`
   (`weblate_customization/src/weblate_customization/machinery.py:137,356`) не
   переопределяют запись usage, поэтому копирование в
   `dev-docker/data/python/` не требуется.
 
+## Поток данных и границы точности
+
+```text
+machinery Unit batch                   judge Unit
+        |                                    |
+        v                                    v
+same non-null translation_id?          build_request(ID snapshots)
+   | yes               | no                  |
+   v                   v                     v
+one Translation    blank scope       JudgeRequest(scope + service)
+   |                   |                     |
+   +----------> accounting seam <------------+
+                  | usage.cost + IDs + snapshot slugs
+                  v
+               LLMUsageLog
+                  |
+                  +--> detailed rows: service/model/snapshot scope/operation
+                  \--> --summary via current IDs
+                         |
+                         +-- priced_complete=yes
+                         \-- attribution_complete=yes
+```
+
 ---
 
-## Task 1: Поля component и target language в LLMUsageLog
+## Task 1: Поля service, stable identity и scope в LLMUsageLog
 
 **Files:**
 
-- Modify: `weblate/trans/models/llm_usage.py:15-73`
+- Modify: `weblate/trans/models/llm_usage.py:15-86`
 - Create: `weblate/trans/migrations/0113_llm_usage_scope.py` (генерируется)
 - Test: `weblate/trans/tests/test_llm_usage.py`
 
@@ -130,29 +187,50 @@ statistics Weblate, а не из журнала: сравнение двух ч�
 В `weblate/trans/tests/test_llm_usage.py`, в конец класса
 `LLMUsageLogModelTest`:
 
-```python
-    def test_scope_defaults_blank(self) -> None:
+```text
+    def test_attribution_defaults_blank(self) -> None:
         log = LLMUsageLog.objects.create(model="m", prompt_tokens=1)
+        self.assertEqual(log.service, "")
+        self.assertIsNone(log.project_id_snapshot)
+        self.assertIsNone(log.component_id_snapshot)
         self.assertEqual(log.component_slug, "")
         self.assertEqual(log.target_language_code, "")
 
-    def test_scope_is_stored(self) -> None:
+    def test_attribution_fields_are_stored(self) -> None:
         log = LLMUsageLog.objects.create(
             model="m",
+            service="openrouter",
+            project_id_snapshot=7,
             project_slug="need-for-greed",
+            component_id_snapshot=8,
             component_slug="ui",
             target_language_code="fr",
             prompt_tokens=1,
         )
         log.refresh_from_db()
+        self.assertEqual(log.service, "openrouter")
+        self.assertEqual(log.project_id_snapshot, 7)
+        self.assertEqual(log.component_id_snapshot, 8)
         self.assertEqual(log.component_slug, "ui")
         self.assertEqual(log.target_language_code, "fr")
+
+    def test_cost_preserves_provider_precision(self) -> None:
+        cost = Decimal("0.000000000123456789")
+        log = LLMUsageLog.objects.create(
+            model="m",
+            prompt_tokens=1,
+            cost_usd=cost,
+        )
+        log.refresh_from_db()
+        self.assertEqual(log.cost_usd, cost)
+        field = LLMUsageLog._meta.get_field("cost_usd")
+        self.assertEqual((field.max_digits, field.decimal_places), (24, 18))
 ```
 
 ### Step 2: Run tests to verify they fail
 
 Run: `./rundev.sh test weblate/trans/tests/test_llm_usage.py`
-Expected: FAIL `TypeError: LLMUsageLog() got unexpected keyword arguments: 'component_slug'`
+Expected: FAIL `TypeError: LLMUsageLog() got unexpected keyword argument 'service'`.
 
 Хост-вариант, если контейнер не поднят:
 
@@ -162,9 +240,12 @@ DJANGO_SETTINGS_MODULE=weblate.settings_test uv run pytest \
   weblate/trans/tests/test_llm_usage.py -q
 ```
 
-### Step 3: Add the fields
+### Step 3: Add the fields and report index
 
-В `weblate/trans/models/llm_usage.py` добавить импорт после `from django.db import models`:
+В docstring `LLMUsageLog` (`weblate/trans/models/llm_usage.py:19-24`) заменить
+утверждение "exactly what OpenRouter billed" на "provider-reported cost at the
+response seam": generic OpenAI-compatible и LiteLLM requests тоже попадают в
+эту модель. Затем добавить импорт после `from django.db import models`:
 
 ```python
 from weblate.trans.defines import COMPONENT_NAME_LENGTH, LANGUAGE_CODE_LENGTH
@@ -173,23 +254,59 @@ from weblate.trans.defines import COMPONENT_NAME_LENGTH, LANGUAGE_CODE_LENGTH
 `weblate/trans/defines.py` - модуль констант без моделей, цикла импорта нет
 (`weblate/trans/models/component.py:62` уже импортирует его так же).
 
-Сразу после `project_slug` (`weblate/trans/models/llm_usage.py:45`):
+После `model` и `project_slug` (`weblate/trans/models/llm_usage.py:44-45`):
 
-```python
-    #: Component and target language the request was billed to, denormalized
-    #: on purpose: a financial row must keep the value it was billed under
-    #: even after a rename or a delete. Blank means the request is not
-    #: attributable - it carried no unit, or it spanned several components or
-    #: target languages, and a provider bills one request as an indivisible
-    #: amount that cannot be split between them.
+```text
+    #: Stable machinery or judge endpoint ID, for example ``openrouter`` or
+    #: ``litellm``. Blank is a row written before this migration.
+    service = models.CharField(max_length=200, blank=True)
+    #: Immutable identities used for current-slug report filters. They are
+    #: deliberately scalar snapshots, not FKs: a deleted component must not
+    #: rewrite the historical financial row.
+    project_id_snapshot = models.PositiveIntegerField(null=True, blank=True)
+    component_id_snapshot = models.PositiveIntegerField(null=True, blank=True)
+    #: Human-readable labels at billing time, retained through rename/delete.
     component_slug = models.CharField(max_length=COMPONENT_NAME_LENGTH, blank=True)
     target_language_code = models.CharField(
         max_length=LANGUAGE_CODE_LENGTH, blank=True
     )
 ```
 
-Индексы не добавляются: отчёт запускается вручную по таблице с retention
-(`weblate/trans/tasks.py:1375`), а `project_slug` тоже не индексирован.
+Заменить существующее поле `cost_usd`:
+
+```text
+    cost_usd = models.DecimalField(
+        max_digits=24, decimal_places=18, null=True, blank=True
+    )
+```
+
+OpenRouter документирует `usage.cost` как число, но не фиксирует масштаб
+дробной части. PostgreSQL для текущего `DecimalField(max_digits=12,
+decimal_places=8)` создаёт `numeric(12, 8)`, то есть округляет значение с
+девятой дробной цифры. Восемнадцать дробных цифр сохраняют provider-reported
+стоимость этого типа запросов без отображаемого в плане округления и оставляют
+шесть целых цифр на один batch.
+
+В `Meta.indexes` добавить:
+
+```text
+            models.Index(
+                fields=[
+                    "project_id_snapshot",
+                    "component_id_snapshot",
+                    "target_language_code",
+                    "service",
+                    "operation",
+                    "-created_at",
+                ],
+                name="llm_usage_scope_recent_idx",
+            ),
+```
+
+Индекс обязателен: `cleanup_judge_observability` удаляет только judge rows, а
+translation ledger растёт без этого retention. Порядок полей покрывает
+обычный current-identity filter project -> component -> language -> service
+-> operation -> period; `model` остаётся измерением детализации.
 
 ### Step 4: Generate the migration
 
@@ -201,9 +318,11 @@ DJANGO_SETTINGS_MODULE=weblate.settings_test uv run ./manage.py makemigrations \
 ```
 
 Expected: создан `weblate/trans/migrations/0113_llm_usage_scope.py` с
-`dependencies = [("trans", "0112_judge_run_unit_deferred_outcome")]` и двумя
-`AddField`. БД не нужна. Существующие строки получают `""` - это и означает
-"неатрибутировано".
+`dependencies = [("trans", "0112_judge_run_unit_deferred_outcome")]`, пятью
+`AddField`, одним `AlterField(cost_usd)` и одним `AddIndex`. БД не нужна.
+Существующие строки получают `""` для service/slug scope и `NULL` для ID
+snapshots, то есть остаются видимо legacy/unattributed; прежние денежные
+значения не теряют точность при расширении decimal scale.
 
 ### Step 5: Run tests to verify they pass
 
@@ -216,17 +335,17 @@ Expected: PASS
 git add weblate/trans/models/llm_usage.py \
   weblate/trans/migrations/0113_llm_usage_scope.py \
   weblate/trans/tests/test_llm_usage.py
-git commit -m "feat(trans): record component and target language on LLM usage"
+git commit -m "feat(trans): attribute LLM usage by service and scope"
 ```
 
 ---
 
-## Task 2: Scope машинного перевода
+## Task 2: Scope, stable identity и service машинного перевода
 
 **Files:**
 
 - Modify: `weblate/machinery/llm.py:47-77`, `2774-2809`, `2899-2931`
-- Modify: `weblate/machinery/openai.py:23-28`, `165-183`
+- Modify: `weblate/machinery/openai.py:23-28`, `162-184`
 - Test: `weblate/machinery/tests.py` (класс `OpenAITranslationTest`)
 
 ### Step 1: Write the failing tests
@@ -235,7 +354,7 @@ git commit -m "feat(trans): record component and target language on LLM usage"
 существующими usage-тестами (после `test_usage_recorded_async`, около строки
 4405):
 
-```python
+```text
     def mock_chat_reply_echo(self) -> None:
         """Answer any batch correctly, with a priced usage block."""
         http_mock.register(
@@ -292,24 +411,35 @@ git commit -m "feat(trans): record component and target language on LLM usage"
         )
 
     @http_mock.activate
-    def test_usage_records_the_batch_component_and_language(self) -> None:
+    def test_usage_records_the_batch_scope_and_service(self) -> None:
         LLMUsageLog.objects.all().delete()
         self.mock_chat_reply_echo()
         unit = make_unit(code="fr", source="Alpha")
         unit.translation.component.slug = "ui"
         machine = self.get_machine()
+        machine.settings["_project"] = Mock(slug="wrong-project", pk=999)
 
         machine.download_multiple_translations(
             "en", "fr", [("Alpha", cast("Unit", unit))]
         )
 
         log = LLMUsageLog.objects.get()
-        self.assertEqual(log.project_slug, "mock")
+        self.assertEqual(log.project_slug, unit.translation.component.project.slug)
+        self.assertEqual(
+            log.project_id_snapshot, unit.translation.component.project_id
+        )
         self.assertEqual(log.component_slug, "ui")
+        self.assertEqual(log.component_id_snapshot, unit.translation.component_id)
         self.assertEqual(log.target_language_code, "fr")
+        self.assertEqual(log.service, machine.get_identifier())
+        self.assertIsNone(llm.llm_batch_project.get())
+        self.assertIsNone(llm.llm_batch_project_id.get())
+        self.assertIsNone(llm.llm_batch_component_id.get())
+        self.assertEqual(llm.llm_batch_component.get(), "")
+        self.assertEqual(llm.llm_batch_target_language.get(), "")
 
     @http_mock.activate
-    def test_usage_records_the_batch_component_and_language_async(self) -> None:
+    def test_usage_records_the_batch_scope_and_service_async(self) -> None:
         LLMUsageLog.objects.all().delete()
         self.mock_chat_reply_echo()
         unit = make_unit(code="fr", source="Alpha")
@@ -321,25 +451,28 @@ git commit -m "feat(trans): record component and target language on LLM usage"
         )
 
         log = LLMUsageLog.objects.get()
+        self.assertEqual(log.project_id_snapshot, unit.translation.component.project_id)
+        self.assertEqual(log.component_id_snapshot, unit.translation.component_id)
         self.assertEqual(log.component_slug, "ui")
         self.assertEqual(log.target_language_code, "fr")
+        self.assertEqual(log.service, machine.get_identifier())
+        self.assertIsNone(llm.llm_batch_project.get())
+        self.assertIsNone(llm.llm_batch_project_id.get())
+        self.assertIsNone(llm.llm_batch_component_id.get())
+        self.assertEqual(llm.llm_batch_component.get(), "")
+        self.assertEqual(llm.llm_batch_target_language.get(), "")
 
     @http_mock.activate
-    def test_usage_leaves_a_mixed_component_batch_unattributed(self) -> None:
-        """
-        A provider bills one request as a whole.
-
-        Charging a two-component request to whichever unit came first would
-        invent a cost per component, so the component is left blank while the
-        dimensions that are still unique are kept.
-        """
+    def test_usage_leaves_a_multi_translation_batch_unattributed(self) -> None:
         LLMUsageLog.objects.all().delete()
         self.mock_chat_reply_echo()
         first = make_unit(code="fr", source="Alpha")
-        first.translation.component.slug = "ui"
         second = make_unit(code="fr", source="Beta")
-        second.translation.component.slug = "loot"
+        # ``make_unit`` creates unsaved translations with the same synthetic
+        # primary key. Make the broken caller observable without a DB fixture.
+        second.translation_id = 2
         machine = self.get_machine()
+        machine.settings["_project"] = Mock(slug="wrong-project", pk=999)
 
         translations = machine.download_multiple_translations(
             "en",
@@ -349,174 +482,231 @@ git commit -m "feat(trans): record component and target language on LLM usage"
 
         self.assertEqual(translations["Alpha"][0]["text"], "Alpha (fr)")
         log = LLMUsageLog.objects.get()
-        self.assertEqual(log.project_slug, "mock")
-        self.assertEqual(log.component_slug, "")
-        self.assertEqual(log.target_language_code, "fr")
+        self.assertEqual(
+            (
+                log.project_id_snapshot,
+                log.project_slug,
+                log.component_id_snapshot,
+                log.component_slug,
+                log.target_language_code,
+            ),
+            (None, "", None, "", ""),
+        )
 
     @http_mock.activate
-    def test_usage_leaves_a_mixed_language_batch_unattributed(self) -> None:
+    def test_usage_leaves_a_batch_with_an_unscoped_source_unattributed(self) -> None:
         LLMUsageLog.objects.all().delete()
         self.mock_chat_reply_echo()
-        first = make_unit(code="fr", source="Alpha")
-        second = make_unit(code="de", source="Beta")
+        unit = make_unit(code="fr", source="Alpha")
         machine = self.get_machine()
 
         machine.download_multiple_translations(
             "en",
             "fr",
-            [("Alpha", cast("Unit", first)), ("Beta", cast("Unit", second))],
+            [("Alpha", cast("Unit", unit)), ("standalone", None)],
         )
 
         log = LLMUsageLog.objects.get()
-        self.assertEqual(log.project_slug, "mock")
-        self.assertEqual(log.component_slug, "mock")
-        self.assertEqual(log.target_language_code, "")
+        self.assertEqual(
+            (
+                log.project_id_snapshot,
+                log.project_slug,
+                log.component_id_snapshot,
+                log.component_slug,
+                log.target_language_code,
+            ),
+            (None, "", None, "", ""),
+        )
+
+    def test_usage_outside_a_batch_uses_service_project_identity(self) -> None:
+        LLMUsageLog.objects.all().delete()
+        machine = self.get_machine()
+        machine.settings["_project"] = Mock(slug="configured-project", pk=99)
+
+        machine.record_llm_usage(
+            {
+                "id": "direct",
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "cost": 0},
+            },
+            self.TRACE_MODEL,
+        )
+
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(
+            (log.project_id_snapshot, log.project_slug),
+            (99, "configured-project"),
+        )
+        self.assertIsNone(log.component_id_snapshot)
 ```
 
-`make_unit`, `cast`, `async_to_sync`, `re`, `json`, `httpx2`, `http_mock` и
-`LLMUsageLog` в этом файле уже импортированы (`weblate/machinery/tests.py:60-113`).
+Переименовать существующий `test_usage_cost_zero_is_unpriced`: он проверяет
+отсутствующее поле `cost`, а не ноль. Оставить его assertion `is None` и
+добавить `test_usage_zero_cost_is_stored`, где `mock_chat_usage` получает
+`{"prompt_tokens": 9, "completion_tokens": 12, "cost": 0}` и итоговый
+`cost_usd == Decimal("0")`. Это регрессия обоих смыслов поля: отсутствующая
+цена остаётся unpriced, объявленная нулевая цена - нет.
+
+`Mock`, `make_unit`, `cast`, `async_to_sync`, `re`, `json`, `httpx2`,
+`http_mock`, `llm` и `LLMUsageLog` уже импортированы
+(`weblate/machinery/tests.py:17,21,55,60-113`).
 
 ### Step 2: Run tests to verify they fail
 
-Run: `./rundev.sh test "weblate/machinery/tests.py::OpenAITranslationTest" -k scope`
-Expected: FAIL `AttributeError: 'LLMUsageLog' object has no attribute 'component_slug'`
-(если Task 1 ещё не смёржен) либо `AssertionError: '' != 'ui'`.
+Run: `./rundev.sh test "weblate/machinery/tests.py::OpenAITranslationTest" -k "scope or zero_cost"`
+Expected: FAIL: отсутствуют новые fields/ContextVars, scope берётся из
+`settings["_project"]`, а `cost: 0` превращается в `NULL`.
 
 ### Step 3: Replace the scope helper
 
-В `weblate/machinery/llm.py` заменить блок `47-53` (ContextVars project и
-unit count оставить, добавить два новых):
+В `weblate/machinery/llm.py` заменить блок `47-77`. `None` у project
+означает, что accounting seam вызван вне `_fetch_llm_batch`; пустые slug и
+`None` IDs означают активный batch без доказуемого владельца:
 
 ```python
-#: Project slug of the batch currently fetching, for usage accounting at the
-#: HTTP seam, which does not receive the batch units.
-llm_batch_project: ContextVar[str] = ContextVar("llm_batch_project", default="")
-#: Component slug and target language code of the batch currently fetching,
-#: set and reset at the same seam as llm_batch_project. Blank when the batch
-#: is not attributable in that dimension.
+#: Scope of the LLM batch currently fetching. ``None`` means no batch context;
+#: empty strings/IDs mean an active batch that cannot be attributed safely.
+llm_batch_project: ContextVar[str | None] = ContextVar(
+    "llm_batch_project", default=None
+)
+llm_batch_project_id: ContextVar[int | None] = ContextVar(
+    "llm_batch_project_id", default=None
+)
+llm_batch_component_id: ContextVar[int | None] = ContextVar(
+    "llm_batch_component_id", default=None
+)
 llm_batch_component: ContextVar[str] = ContextVar("llm_batch_component", default="")
 llm_batch_target_language: ContextVar[str] = ContextVar(
     "llm_batch_target_language", default=""
 )
-#: Source batch size of the request currently fetching, set/reset at the same
-#: seam as llm_batch_project. Reflects the exact batch sent over HTTP,
-#: including split-recovery sub-batches, not the original caller's batch.
+#: Exact strings in the HTTP request, including split-recovery sub-batches.
 llm_batch_unit_count: ContextVar[int] = ContextVar("llm_batch_unit_count", default=0)
 ```
 
-Заменить `_sources_project_slug` (`weblate/machinery/llm.py:67-77`) целиком:
+Заменить `_sources_project_slug` целиком:
 
 ```python
-def _unique(values: set[str]) -> str:
-    """The single value of a set, or a blank string when it is not single."""
-    return next(iter(values)) if len(values) == 1 else ""
-
-
 def _sources_usage_scope(
     sources: list[tuple[str, Unit | None]],
-) -> tuple[str, str, str]:
+) -> tuple[str, int | None, int | None, str, str]:
     """
-    Project, component and target language a batch is billed to.
+    Return a scope only when one Translation owns every source in a request.
 
-    A provider bills one request as an indivisible amount, so a dimension is
-    only recorded when every unit of the batch agrees on it. A dimension the
-    batch spans is left blank and stays visibly unattributed instead of being
-    charged to whichever unit came first. Each dimension is judged on its own,
-    so a two-component batch of one language still records that language.
+    ``translation_id`` is an already-loaded foreign-key value. Reading it for
+    every source avoids an N+1 relation walk; the first related Translation is
+    then read once only after all IDs agree.
     """
-    projects: set[str] = set()
-    components: set[str] = set()
-    languages: set[str] = set()
-    for _text, unit in sources:
-        if unit is None:
-            continue
-        try:
-            translation = unit.translation
-            component = translation.component
-            projects.add(component.project.slug)
-            components.add(component.slug)
-            languages.add(translation.language.code)
-        except AttributeError:
-            return "", "", ""
-    if len(components) > 1 or len(languages) > 1:
-        LOGGER.error(
-            "LLM batch spans %d components and %d target languages, "
-            "billing it to none of them",
-            len(components),
-            len(languages),
+    if not sources:
+        return "", None, None, "", ""
+    first_unit = sources[0][1]
+    if first_unit is None or first_unit.translation_id is None:
+        return "", None, None, "", ""
+    translation_id = first_unit.translation_id
+    if any(
+        unit is None or unit.translation_id != translation_id
+        for _text, unit in sources[1:]
+    ):
+        LOGGER.error("LLM batch spans unscoped or multiple translations")
+        return "", None, None, "", ""
+    try:
+        translation = first_unit.translation
+        component = translation.component
+        return (
+            component.project.slug,
+            component.project_id,
+            component.pk,
+            component.slug,
+            translation.language.code,
         )
-    return _unique(projects), _unique(components), _unique(languages)
+    except AttributeError:
+        return "", None, None, "", ""
 ```
 
-Это меняет и поведение project: батч, охватывающий два проекта, больше не
-записывается на первый из них. Осознанно - неверная атрибуция хуже пустой.
+Это намеренно не сохраняет language отдельного multi-component batch:
+финансовый вопрос адресован одной `Translation`, а не частично известному
+срезу неправильного запроса. Никакой scope не лучше выдуманной цены.
 
 ### Step 4: Set and reset the new variables at both seams
 
 В `_fetch_llm_batch` заменить `weblate/machinery/llm.py:2791-2792`:
 
-```python
-        project_slug, component_slug, target_language_code = _sources_usage_scope(
-            sources
-        )
+```text
+        (
+            project_slug,
+            project_id_snapshot,
+            component_id_snapshot,
+            component_slug,
+            target_language_code,
+        ) = _sources_usage_scope(sources)
         project_token = llm_batch_project.set(project_slug)
+        project_id_token = llm_batch_project_id.set(project_id_snapshot)
+        component_id_token = llm_batch_component_id.set(component_id_snapshot)
         component_token = llm_batch_component.set(component_slug)
         language_token = llm_batch_target_language.set(target_language_code)
         unit_count_token = llm_batch_unit_count.set(len(sources))
 ```
 
-и внутренний `finally` (`weblate/machinery/llm.py:2802-2803`):
+В существующем внутреннем `finally` после `llm_batch_project.reset` добавить
+reset `project_id`, `component_id`, component и language. Внешний `finally`
+уже reset-ит `unit_count` и `llm_usage_record`; его не менять. Повторить те же
+изменения в `_afetch_llm_batch`.
 
-```python
-            finally:
-                llm_batch_project.reset(project_token)
-                llm_batch_component.reset(component_token)
-                llm_batch_target_language.reset(language_token)
+### Step 5: Write service, zero cost and active scope at the accounting seam
+
+В `weblate/machinery/openai.py` расширить импорт новыми
+`llm_batch_project_id` и `llm_batch_component_id`, помимо component/language
+ContextVars. Затем заменить выбор project (`165-166`) и создание строки:
+
+```text
+        project_slug = llm_batch_project.get()
+        project_id_snapshot = llm_batch_project_id.get()
+        if project_slug is None:
+            project = self.settings.get("_project")
+            project_slug = project.slug if project is not None else ""
+            project_id_snapshot = project.pk if project is not None else None
 ```
 
-Точно те же две правки в `_afetch_llm_batch`
-(`weblate/machinery/llm.py:2916-2917` и `2924-2925`).
-
-### Step 5: Write the fields at the accounting seam
-
-В `weblate/machinery/openai.py` расширить импорт (`23-28`):
-
-```python
-from .llm import (
-    BaseLLMTranslation,
-    llm_batch_component,
-    llm_batch_project,
-    llm_batch_target_language,
-    llm_batch_unit_count,
-    llm_usage_record,
-)
-```
-
-и добавить два поля в `LLMUsageLog.objects.create`
-(`weblate/machinery/openai.py:170-183`), сразу после `project_slug`:
-
-```python
+```text
+        record = LLMUsageLog.objects.create(
+            model=model,
+            service=self.get_identifier(),
+            project_id_snapshot=project_id_snapshot,
+            project_slug=project_slug,
+            component_id_snapshot=llm_batch_component_id.get(),
             component_slug=llm_batch_component.get(),
             target_language_code=llm_batch_target_language.get(),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            cost_usd=Decimal(str(cost)) if cost is not None else None,
+            response_id=str(payload.get("id") or ""),
+            cached_tokens=prompt_details.get("cached_tokens") or 0,
+            reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            unit_count=llm_batch_unit_count.get() or None,
+            batch_size=batch_size,
+        )
 ```
+
+`None` даёт fallback только для прямого вызова accounting вне batch. Активный
+batch с пустым scope не может быть перезаписан project-scoped service setting.
 
 ### Step 6: Run tests to verify they pass
 
 Run: `./rundev.sh test "weblate/machinery/tests.py::OpenAITranslationTest" -k "usage or scope"`
-Expected: PASS, включая существующие `test_usage_recorded`,
-`test_usage_unit_count_reflects_split_recovery`,
-`test_usage_records_batch_size_and_outcome`.
+Expected: PASS, включая существующие split-recovery/outcome tests и новые
+проверки service, нулевой цены, `None` source, project override и sync/async
+ContextVar reset.
 
 ### Step 7: Commit
 
 ```sh
 git add weblate/machinery/llm.py weblate/machinery/openai.py weblate/machinery/tests.py
-git commit -m "feat(machinery): bill LLM requests to their component and language"
+git commit -m "feat(machinery): attribute LLM usage by service and scope"
 ```
 
 ---
 
-## Task 3: Scope judge-запросов
+## Task 3: Scope, stable identity, service и нулевая цена judge-запросов
 
 **Files:**
 
@@ -530,20 +720,27 @@ git commit -m "feat(machinery): bill LLM requests to their component and languag
 В `weblate/trans/tests/test_judge_loop.py`, класс `JudgeLoopTest`, рядом с
 `test_every_seat_bills_the_units_project` (строка 535):
 
-```python
-    def test_request_carries_the_units_component_and_language(self) -> None:
-        # Judge spend is billed per request; without these two the usage row
-        # cannot say which component and language paid for it.
+```text
+    def test_request_carries_the_units_scope_identity(self) -> None:
         unit = self.get_unit()
         request = build_request(unit)
+        self.assertEqual(request.project_id_snapshot, self.component.project_id)
+        self.assertEqual(request.component_id_snapshot, self.component.pk)
         self.assertEqual(request.component_slug, self.component.slug)
         self.assertEqual(request.target_language, unit.translation.language.code)
 ```
 
-В `weblate/trans/tests/test_judge_client.py`, после
-`test_usage_is_attributed_to_the_project` (строка 1246):
+В `weblate/trans/tests/test_judge_client.py` добавить
+`from decimal import Decimal`. После `test_usage_is_attributed_to_the_project`
+добавить:
 
-```python
+Обновить существующий `test_usage_is_attributed_to_the_project`: передать
+`replace(REQ, project_id_snapshot=101, component_id_snapshot=102,
+component_slug="ui")` вместо bare `REQ`, затем проверить оба ID snapshots.
+Иначе новый корректный scope намеренно оставит старый fixture
+неатрибутированным и регрессия станет ложной.
+
+```text
     @override_settings(
         JUDGE_ENABLED=True,
         JUDGE_API_KEY="sk-test",
@@ -551,21 +748,60 @@ git commit -m "feat(machinery): bill LLM requests to their component and languag
         JUDGE_REQUEST_SLEEP=0.0,
     )
     @http_mock.activate
-    def test_usage_is_attributed_to_the_component_and_language(self) -> None:
+    def test_usage_is_attributed_to_component_language_and_service(self) -> None:
         payload = _reply(
             [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
         )
-        payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
+        payload["usage"] = {
+            "prompt_tokens": 11,
+            "completion_tokens": 7,
+            "cost": 0.000001234567891,
+        }
         http_mock.register("POST", CHAT_URL, json=payload)
+
         request_verdicts(
-            [replace(REQ, component_slug="ui")],
+            [
+                replace(
+                    REQ,
+                    project_id_snapshot=101,
+                    component_id_snapshot=102,
+                    component_slug="ui",
+                )
+            ],
             model="vendor/model-a",
             project_slug="need-for-greed",
             persist_attempts=True,
         )
+
         row = LLMUsageLog.objects.get(model="vendor/model-a")
+        self.assertEqual(row.service, "openrouter")
+        self.assertEqual(row.project_id_snapshot, 101)
+        self.assertEqual(row.project_slug, "need-for-greed")
+        self.assertEqual(row.component_id_snapshot, 102)
         self.assertEqual(row.component_slug, "ui")
         self.assertEqual(row.target_language_code, "fr")
+        self.assertEqual(row.cost_usd, Decimal("0.000001234567891"))
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_records_zero_provider_cost(self) -> None:
+        payload = _reply(
+            [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+        )
+        payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0}
+        http_mock.register("POST", CHAT_URL, json=payload)
+
+        request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
+
+        self.assertEqual(
+            LLMUsageLog.objects.get(model="vendor/model-a").cost_usd,
+            Decimal("0"),
+        )
 
     @override_settings(
         JUDGE_ENABLED=True,
@@ -575,13 +811,6 @@ git commit -m "feat(machinery): bill LLM requests to their component and languag
     )
     @http_mock.activate
     def test_usage_leaves_a_mixed_batch_unattributed(self) -> None:
-        """
-        The judge pays before it can inspect the batch.
-
-        Usage is written after the response arrives, so a mixed batch cannot be
-        refused without discarding paid verdicts; it is recorded without a
-        component instead of being charged to one.
-        """
         payload = _reply(
             [
                 {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""},
@@ -592,105 +821,129 @@ git commit -m "feat(machinery): bill LLM requests to their component and languag
         http_mock.register("POST", CHAT_URL, json=payload)
         request_verdicts(
             [
-                replace(REQ, component_slug="ui"),
-                replace(REQ, unit_key="OTHER", component_slug="loot"),
+                replace(
+                    REQ,
+                    project_id_snapshot=101,
+                    component_id_snapshot=102,
+                    component_slug="ui",
+                ),
+                replace(
+                    REQ,
+                    unit_key="OTHER",
+                    project_id_snapshot=101,
+                    component_id_snapshot=103,
+                    component_slug="loot",
+                ),
             ],
             model="vendor/model-a",
             project_slug="need-for-greed",
             persist_attempts=True,
         )
         row = LLMUsageLog.objects.get(model="vendor/model-a")
-        self.assertEqual(row.component_slug, "")
-        self.assertEqual(row.target_language_code, "fr")
+        self.assertEqual(
+            (
+                row.project_id_snapshot,
+                row.project_slug,
+                row.component_id_snapshot,
+                row.component_slug,
+                row.target_language_code,
+            ),
+            (None, "", None, "", ""),
+        )
 ```
 
-`replace` в этом файле уже импортирован (`weblate/trans/tests/test_judge_client.py:9`),
-как и `REQ`, `CHAT_URL` и `_reply` - новых импортов не требуется.
+`replace`, `REQ`, `CHAT_URL` и `_reply` уже импортированы; новый import нужен
+только для точного `Decimal` assertion.
 
 ### Step 2: Run tests to verify they fail
 
-Run: `./rundev.sh test weblate/trans/tests/test_judge_client.py -k attributed`
-Expected: FAIL `TypeError: JudgeRequest.__init__() got an unexpected keyword argument 'component_slug'`
+Expected: FAIL: у `JudgeRequest` нет ID snapshots/component slug, usage row не
+содержит service, и `cost: 0` становится `NULL`.
 
-### Step 3: Add the dataclass field
+### Step 3: Add the dataclass fields
 
 В `weblate/trans/judge.py`, в конец `JudgeRequest` (после `target_plurals`,
 строка 144):
 
-```python
-    #: Component the unit belongs to, for per-component cost accounting. A
-    #: default keeps historical constructions valid; a blank value simply
-    #: leaves the request unattributed.
+```text
+    #: Immutable scope plus labels at billing time. Defaults preserve direct
+    #: historical constructions; any missing value leaves the whole request
+    #: unattributed.
+    project_id_snapshot: int | None = None
+    component_id_snapshot: int | None = None
     component_slug: str = ""
 ```
 
 В `weblate/trans/judge_loop.py:95-108`, в `build_request`, добавить после
 `target_language=translation.language.code`:
 
-```python
+```text
+        project_id_snapshot=translation.component.project_id,
+        component_id_snapshot=translation.component_id,
         component_slug=translation.component.slug,
 ```
 
-### Step 4: Derive and write the judge scope
+### Step 4: Derive and write judge scope, identity, service and zero cost
 
-В `weblate/trans/judge.py` добавить перед `_write_llm_usage` (строка 1073):
+В `weblate/trans/judge.py` добавить перед `_write_llm_usage`:
 
 ```python
-def _batch_usage_scope(batch: Sequence[JudgeRequest]) -> tuple[str, str]:
-    """
-    Component and target language a judge batch is billed to.
-
-    Recorded only when the whole batch agrees, per dimension: one request is
-    billed as an indivisible amount and must not be charged to one of several
-    components.
-    """
-    components = {request.component_slug for request in batch}
+def _batch_usage_scope(
+    batch: Sequence[JudgeRequest],
+    project_slug: str,
+) -> tuple[int | None, str, int | None, str, str]:
+    """Return one complete scope only when every request agrees."""
+    project_ids = {request.project_id_snapshot for request in batch}
+    component_ids = {request.component_id_snapshot for request in batch}
+    component_slugs = {request.component_slug for request in batch}
     languages = {request.target_language for request in batch}
-    if len(components) > 1 or len(languages) > 1:
-        LOGGER.error(
-            "judge batch spans %d components and %d target languages, "
-            "billing it to none of them",
-            len(components),
-            len(languages),
-        )
+    if (
+        not project_slug
+        or None in project_ids
+        or None in component_ids
+        or "" in component_slugs
+        or "" in languages
+        or len(project_ids) != 1
+        or len(component_ids) != 1
+        or len(component_slugs) != 1
+        or len(languages) != 1
+    ):
+        LOGGER.error("judge batch has an unscoped or mixed translation identity")
+        return None, "", None, "", ""
     return (
-        next(iter(components)) if len(components) == 1 else "",
-        next(iter(languages)) if len(languages) == 1 else "",
+        next(iter(project_ids)),
+        project_slug,
+        next(iter(component_ids)),
+        next(iter(component_slugs)),
+        next(iter(languages)),
     )
 ```
 
-Заменить сигнатуру и тело `_write_llm_usage` (`weblate/trans/judge.py:1073-1105`)
-так, чтобы вместо `unit_count: int` принимался батч:
+Заменить сигнатуру `_write_llm_usage` так, чтобы она принимала
+`service: str`, `model: str`, `project_slug: str`, `batch` и
+`request_attempt`. Внутри:
 
-```python
-def _write_llm_usage(
-    payload: dict,
-    model: str,
-    project_slug: str,
-    batch: Sequence[JudgeRequest],
-    request_attempt: object | None,
-) -> None:
-    usage = _usage_values(payload)
-    prompt_tokens, completion_tokens = (
-        usage.get("prompt_tokens") or 0,
-        usage.get("completion_tokens") or 0,
-    )
-    if not prompt_tokens and not completion_tokens:
-        return
-    details, completion_details = (
-        usage.get("prompt_tokens_details") or {},
-        usage.get("completion_tokens_details") or {},
-    )
-    component_slug, target_language_code = _batch_usage_scope(batch)
+```text
+    cost = usage.get("cost")
+    (
+        project_id_snapshot,
+        project_slug,
+        component_id_snapshot,
+        component_slug,
+        target_language_code,
+    ) = _batch_usage_scope(batch, project_slug)
     LLMUsageLog.objects.create(
         model=model,
+        service=service,
+        project_id_snapshot=project_id_snapshot,
         project_slug=project_slug,
+        component_id_snapshot=component_id_snapshot,
         component_slug=component_slug,
         target_language_code=target_language_code,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         total_tokens=usage.get("total_tokens") or (prompt_tokens + completion_tokens),
-        cost_usd=Decimal(str(usage["cost"])) if usage.get("cost") else None,
+        cost_usd=Decimal(str(cost)) if cost is not None else None,
         response_id=str(payload.get("id") or ""),
         cached_tokens=details.get("cached_tokens") or 0,
         reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
@@ -701,37 +954,27 @@ def _write_llm_usage(
     )
 ```
 
-`_record_usage` (`weblate/trans/judge.py:1170-1182`) принимает батч вместо
-размера:
+`_record_usage` сохраняет `project_slug` и передаёт его в
+`_write_llm_usage(payload, service, model, project_slug, batch, attempt)`.
+В единственном вызове из `_run_batch` передать:
 
-```python
-def _record_usage(
-    payload: dict | None,
-    model: str,
-    project_slug: str,
-    batch: Sequence[JudgeRequest],
-    attempt: object | None,
-) -> None:
-    if payload is None:
-        return
-    try:
-        _write_llm_usage(payload, model, project_slug, batch, attempt)
-    except Exception:
-        LOGGER.exception("Failed to record LLM usage")
-```
-
-и единственный вызов (`weblate/trans/judge.py:1391-1394`):
-
-```python
+```text
         if persistence:
             _record_usage(
-                response.payload, profile.model, project_slug, batch, attempt
+                response.payload,
+                profile.provider,
+                profile.model,
+                project_slug,
+                batch,
+                attempt,
             )
 ```
 
-`Sequence` в этом модуле импортирован в рантайме
-(`weblate/trans/judge.py:18`), так что аннотация валидна и без
-`TYPE_CHECKING`-блока.
+`project_slug` уже является scope текущего judge run; он читается один раз
+на batch, а `JudgeRequest` не загружает `component.project` для каждого unit.
+`profile.provider` классифицирует endpoint (`openrouter`, `litellm`,
+`unknown`), поэтому service не выводится из model alias и не раскрывает URL
+или ключ.
 
 ### Step 5: Run tests to verify they pass
 
@@ -743,37 +986,42 @@ Run:
 ```
 
 Expected: PASS. Существующие проверки `unit_count`
-(`test_judge_client.py:1289`, `1316`) должны остаться зелёными: `len(batch)`
-равен прежнему `size`.
+(`test_judge_client.py:1289`, `1316`) остаются зелёными: `len(batch)` равен
+прежнему `size`.
 
 ### Step 6: Commit
 
 ```sh
 git add weblate/trans/judge.py weblate/trans/judge_loop.py \
   weblate/trans/tests/test_judge_client.py weblate/trans/tests/test_judge_loop.py
-git commit -m "feat(judge): bill judge requests to their component and language"
+git commit -m "feat(judge): attribute usage by service and scope"
 ```
 
 ---
 
-## Task 4: Отчёт по запросу
+## Task 4: Отчёт с stable-identity filter, completeness и одним итогом
 
 **Files:**
 
 - Modify: `weblate/trans/management/commands/llm_usage_report.py`
-- Test: `weblate/trans/tests/test_llm_usage.py` (класс `LLMUsageReportTest`)
+- Test: `weblate/trans/tests/test_llm_usage.py`
 
 ### Step 1: Write the failing tests
 
-Заменить `setUp` класса `LLMUsageReportTest`
-(`weblate/trans/tests/test_llm_usage.py:55-78`) на строки с реальным scope и
-добавить тесты. В начало файла добавить `import csv`.
+В `weblate/trans/tests/test_llm_usage.py` добавить `import csv`,
+`from django.core.management.base import CommandError` и
+`from weblate.trans.tests.test_views import ComponentTestCase`.
 
-```python
+`LLMUsageReportTest.setUp` должен создавать synthetic rows с ID snapshots:
+
+```text
     def setUp(self) -> None:
         LLMUsageLog.objects.create(
             model="m1",
+            service="openrouter",
+            project_id_snapshot=1,
             project_slug="col4",
+            component_id_snapshot=2,
             component_slug="ui",
             target_language_code="fr",
             operation=LLMUsageLog.Operation.TRANSLATION,
@@ -781,11 +1029,14 @@ git commit -m "feat(judge): bill judge requests to their component and language"
             completion_tokens=5,
             total_tokens=15,
             batch_size=10,
-            cost_usd=Decimal("0.001"),
+            cost_usd=Decimal("0.001000000000000001"),
         )
         LLMUsageLog.objects.create(
             model="m1",
+            service="openrouter",
+            project_id_snapshot=1,
             project_slug="col4",
+            component_id_snapshot=2,
             component_slug="ui",
             target_language_code="fr",
             operation=LLMUsageLog.Operation.TRANSLATION,
@@ -795,8 +1046,26 @@ git commit -m "feat(judge): bill judge requests to their component and language"
             batch_size=5,
         )
         LLMUsageLog.objects.create(
+            model="m3",
+            service="openrouter",
+            project_id_snapshot=1,
+            project_slug="col4",
+            component_id_snapshot=2,
+            component_slug="ui",
+            target_language_code="fr",
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            prompt_tokens=3,
+            completion_tokens=2,
+            total_tokens=5,
+            batch_size=2,
+            cost_usd=Decimal("0.000000000123456789"),
+        )
+        LLMUsageLog.objects.create(
             model="m2",
+            service="litellm",
+            project_id_snapshot=3,
             project_slug="st2",
+            component_id_snapshot=4,
             component_slug="hub-1",
             target_language_code="de",
             operation=LLMUsageLog.Operation.JUDGE,
@@ -804,18 +1073,22 @@ git commit -m "feat(judge): bill judge requests to their component and language"
             completion_tokens=3,
             total_tokens=10,
             batch_size=2,
-            cost_usd=Decimal("0.0000005"),
+            cost_usd=Decimal("0.000000500000000000"),
         )
 ```
 
-```python
-    def test_csv_report_groups_by_component_and_language(self) -> None:
+Добавить:
+
+```text
+    def test_csv_report_groups_by_service_component_and_language(self) -> None:
         out = StringIO()
         call_command("llm_usage_report", "--format", "csv", stdout=out)
         rows = list(csv.reader(out.getvalue().strip().splitlines()))
+
         self.assertEqual(
             rows[0],
             [
+                "service",
                 "model",
                 "project",
                 "component",
@@ -827,62 +1100,220 @@ git commit -m "feat(judge): bill judge requests to their component and language"
                 "completion_tokens",
                 "cost_usd",
                 "unpriced",
+                "priced_complete",
+                "unattributed_requests",
+                "attribution_complete",
             ],
         )
         self.assertEqual(
             rows[1],
             [
-                "m1",
-                "col4",
-                "ui",
-                "fr",
-                "translation",
-                "2",
-                "15",
-                "14",
-                "6",
-                "0.00100000",
+                "litellm",
+                "m2",
+                "st2",
+                "hub-1",
+                "de",
+                "judge",
                 "1",
+                "2",
+                "7",
+                "3",
+                "0.000000500000000000",
+                "0",
+                "yes",
+                "",
+                "",
             ],
         )
 
-    def test_component_filter(self) -> None:
+    def test_summary_reports_pricing_and_scope_completeness(self) -> None:
         out = StringIO()
-        call_command("llm_usage_report", "--component", "hub-1", stdout=out)
-        text = out.getvalue()
-        self.assertIn("hub-1", text)
-        self.assertNotIn("ui", text)
+        call_command(
+            "llm_usage_report",
+            "--service",
+            "openrouter",
+            "--operation",
+            "translation",
+            "--summary",
+            "--format",
+            "csv",
+            stdout=out,
+        )
+        rows = list(csv.reader(out.getvalue().strip().splitlines()))
+        self.assertEqual(
+            rows[1],
+            [
+                "openrouter",
+                "*",
+                "*",
+                "*",
+                "*",
+                "translation",
+                "3",
+                "17",
+                "17",
+                "8",
+                "0.001000000123456790",
+                "1",
+                "no",
+                "0",
+                "yes",
+            ],
+        )
 
-    def test_language_filter(self) -> None:
+    def test_summary_marks_blind_scope_unknown(self) -> None:
+        LLMUsageLog.objects.create(
+            model="m4",
+            service="openrouter",
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            prompt_tokens=3,
+        )
         out = StringIO()
-        call_command("llm_usage_report", "--language", "fr", stdout=out)
-        text = out.getvalue()
-        self.assertIn("m1", text)
-        self.assertNotIn("m2", text)
+        call_command(
+            "llm_usage_report",
+            "--service",
+            "openrouter",
+            "--operation",
+            "translation",
+            "--summary",
+            "--format",
+            "csv",
+            stdout=out,
+        )
+        row = list(csv.reader(out.getvalue().strip().splitlines()))[1]
+        self.assertEqual(row[-2:], ["1", "unknown"])
 
-    def test_operation_filter(self) -> None:
+    def test_summary_marks_a_fully_priced_total_complete(self) -> None:
         out = StringIO()
-        call_command("llm_usage_report", "--operation", "judge", stdout=out)
-        text = out.getvalue()
-        self.assertIn("hub-1", text)
-        self.assertNotIn("m1", text)
+        call_command(
+            "llm_usage_report",
+            "--service",
+            "litellm",
+            "--operation",
+            "judge",
+            "--summary",
+            "--format",
+            "csv",
+            stdout=out,
+        )
+        row = list(csv.reader(out.getvalue().strip().splitlines()))[1]
+        self.assertEqual(
+            row[10:],
+            ["0.000000500000000000", "0", "yes", "0", "yes"],
+        )
+
+    def test_service_filter(self) -> None:
+        out = StringIO()
+        call_command("llm_usage_report", "--service", "litellm", stdout=out)
+        self.assertIn("hub-1", out.getvalue())
+        self.assertNotIn("col4", out.getvalue())
+
+    def test_component_requires_project(self) -> None:
+        with self.assertRaisesMessage(
+            CommandError,
+            "--component requires an existing --project.",
+        ):
+            call_command("llm_usage_report", "--component", "ui")
+
+    def test_days_must_be_positive(self) -> None:
+        with self.assertRaisesMessage(CommandError, "--days must be at least 1."):
+            call_command("llm_usage_report", "--days", "0")
 
     def test_unattributed_rows_stay_visible(self) -> None:
-        LLMUsageLog.objects.create(model="m3", project_slug="col4", prompt_tokens=3)
+        LLMUsageLog.objects.create(
+            model="m4",
+            service="openrouter",
+            project_slug="col4",
+            prompt_tokens=3,
+        )
         out = StringIO()
-        call_command("llm_usage_report", "--model", "m3", "--format", "csv", stdout=out)
+        call_command(
+            "llm_usage_report",
+            "--model",
+            "m4",
+            "--format",
+            "csv",
+            stdout=out,
+        )
         rows = list(csv.reader(out.getvalue().strip().splitlines()))
-        self.assertEqual(rows[1][1:5], ["col4", "-", "-", "-"])
+        self.assertEqual(rows[1][2:6], ["col4", "-", "-", "-"])
 ```
 
-Существующий `test_csv_report` (`weblate/trans/tests/test_llm_usage.py:90-98`)
-проверяет старый заголовок - удалить его: он полностью покрыт новым тестом.
+Добавить integration regression в новом классе:
+
+```python
+class LLMUsageReportIdentityTest(ComponentTestCase):
+    def test_current_slugs_include_cost_recorded_before_rename(self) -> None:
+        LLMUsageLog.objects.create(
+            model="m",
+            service="openrouter",
+            project_id_snapshot=self.project.pk,
+            project_slug=self.project.slug,
+            component_id_snapshot=self.component.pk,
+            component_slug=self.component.slug,
+            target_language_code=self.translation.language.code,
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            prompt_tokens=1,
+            batch_size=1,
+            cost_usd=Decimal("0.1"),
+        )
+        self.project.slug = "renamed-project"
+        self.project.save(update_fields=["slug"])
+        self.component.slug = "renamed-component"
+        self.component.save(update_fields=["slug"])
+
+        out = StringIO()
+        call_command(
+            "llm_usage_report",
+            "--project",
+            "renamed-project",
+            "--component",
+            "renamed-component",
+            "--language",
+            self.translation.language.code,
+            "--service",
+            "openrouter",
+            "--operation",
+            "translation",
+            "--summary",
+            "--format",
+            "csv",
+            stdout=out,
+        )
+
+        row = list(csv.reader(out.getvalue().strip().splitlines()))[1]
+        self.assertEqual(
+            row[10:],
+            ["0.100000000000000000", "0", "yes", "0", "yes"],
+        )
+
+    def test_unknown_current_identity_is_rejected(self) -> None:
+        with self.assertRaisesMessage(
+            CommandError,
+            'Project "missing" does not exist.',
+        ):
+            call_command("llm_usage_report", "--project", "missing")
+        with self.assertRaisesMessage(
+            CommandError,
+            'Component "missing" does not exist.',
+        ):
+            call_command(
+                "llm_usage_report",
+                "--project",
+                self.project.slug,
+                "--component",
+                "missing",
+            )
+```
+
+Удалить старый `test_csv_report`: новый контракт проверяет детализацию,
+precision, service, identity, pricing completeness и unknown scope.
 
 ### Step 2: Run tests to verify they fail
 
 Run: `./rundev.sh test weblate/trans/tests/test_llm_usage.py`
-Expected: FAIL `AssertionError: Lists differ` на заголовке и
-`CommandError: unrecognized arguments: --component`.
+Expected: FAIL на ID fields, `--summary`, stable current-slug resolution,
+`priced_complete`/`attribution_complete` и `--days 0`.
 
 ### Step 3: Rewrite the command
 
@@ -899,16 +1330,20 @@ import csv
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
+from django.core.management.base import CommandError
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
+from weblate.trans.models.component import Component
 from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.models.project import Project
 from weblate.utils.management.base import BaseCommand
 
 if TYPE_CHECKING:
     from django.core.management.base import CommandParser
 
 HEADER = [
+    "service",
     "model",
     "project",
     "component",
@@ -920,33 +1355,92 @@ HEADER = [
     "completion_tokens",
     "cost_usd",
     "unpriced",
+    "priced_complete",
+    "unattributed_requests",
+    "attribution_complete",
 ]
 
-#: Finest grouping the journal supports. A request is the billed unit, so
-#: anything finer than this would have to invent an allocation.
 GROUP_FIELDS = [
+    "service",
     "model",
+    "project_id_snapshot",
     "project_slug",
+    "component_id_snapshot",
     "component_slug",
     "target_language_code",
     "operation",
 ]
 
+TOTALS = {
+    "requests": Count("id"),
+    "strings": Sum("batch_size"),
+    "prompt": Sum("prompt_tokens"),
+    "completion": Sum("completion_tokens"),
+    "cost": Sum("cost_usd"),
+    "unpriced": Count("id", filter=Q(cost_usd__isnull=True)),
+}
+
+
+def _display(value: str) -> str:
+    return value or "-"
+
+
+def _row(
+    *,
+    service: str,
+    model: str,
+    project: str,
+    component: str,
+    language: str,
+    operation: str,
+    totals: dict,
+    unattributed_requests: int | None = None,
+) -> list[str | int]:
+    cost = totals["cost"]
+    unpriced = totals["unpriced"] or 0
+    attribution_complete = (
+        ""
+        if unattributed_requests is None
+        else "yes"
+        if unattributed_requests == 0
+        else "unknown"
+    )
+    return [
+        _display(service),
+        _display(model),
+        _display(project),
+        _display(component),
+        _display(language),
+        _display(operation),
+        totals["requests"] or 0,
+        totals["strings"] or 0,
+        totals["prompt"] or 0,
+        totals["completion"] or 0,
+        format(cost, "f") if cost is not None else "",
+        unpriced,
+        "yes" if not unpriced else "no",
+        "" if unattributed_requests is None else unattributed_requests,
+        attribution_complete,
+    ]
+
 
 class Command(BaseCommand):
     help = (
-        "reports LLM token usage and cost grouped by model, project, "
-        "component, target language and operation"
+        "reports LLM token usage and cost by service, model, project, component, "
+        "target language and operation"
     )
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--days", type=int, default=None, help="only the last N days"
         )
+        parser.add_argument("--service", default=None, help="only this service ID")
         parser.add_argument("--model", default=None, help="only this model")
-        parser.add_argument("--project", default=None, help="only this project slug")
+        parser.add_argument("--project", default=None, help="current project slug")
         parser.add_argument(
-            "--component", default=None, help="only this component slug"
+            "--component",
+            default=None,
+            help="current component slug; requires --project",
         )
         parser.add_argument(
             "--language", default=None, help="only this target language code"
@@ -957,106 +1451,261 @@ class Command(BaseCommand):
             default=None,
             help="only this operation",
         )
+        parser.add_argument(
+            "--summary",
+            action="store_true",
+            help="emit one total after filters instead of model-level rows",
+        )
         parser.add_argument("--format", choices=["table", "csv"], default="table")
 
     def handle(self, *args, **options) -> None:
         logs = LLMUsageLog.objects.all()
-        if options["days"]:
-            cutoff = timezone.now() - timedelta(days=options["days"])
-            logs = logs.filter(created_at__gte=cutoff)
-        if options["model"]:
-            logs = logs.filter(model=options["model"])
+        days = options["days"]
+        if days is not None:
+            if days < 1:
+                raise CommandError("--days must be at least 1.")
+            logs = logs.filter(created_at__gte=timezone.now() - timedelta(days=days))
+        for option, field in (
+            ("service", "service"),
+            ("model", "model"),
+            ("operation", "operation"),
+        ):
+            if options[option]:
+                logs = logs.filter(**{field: options[option]})
+
+        scope_logs = logs
+        project = None
         if options["project"]:
-            logs = logs.filter(project_slug=options["project"])
+            try:
+                project = Project.objects.only("id").get(slug=options["project"])
+            except Project.DoesNotExist as error:
+                raise CommandError(
+                    f'Project "{options["project"]}" does not exist.'
+                ) from error
+            logs = logs.filter(project_id_snapshot=project.pk)
         if options["component"]:
-            logs = logs.filter(component_slug=options["component"])
+            if project is None:
+                raise CommandError("--component requires an existing --project.")
+            try:
+                component = Component.objects.only("id").get(
+                    project_id=project.pk,
+                    slug=options["component"],
+                )
+            except Component.DoesNotExist as error:
+                raise CommandError(
+                    f'Component "{options["component"]}" does not exist.'
+                ) from error
+            logs = logs.filter(component_id_snapshot=component.pk)
         if options["language"]:
             logs = logs.filter(target_language_code=options["language"])
-        if options["operation"]:
-            logs = logs.filter(operation=options["operation"])
-        rows = list(
-            logs.values(*GROUP_FIELDS)
-            .annotate(
-                requests=Count("id"),
-                strings=Sum("batch_size"),
-                prompt=Sum("prompt_tokens"),
-                completion=Sum("completion_tokens"),
-                cost=Sum("cost_usd"),
-                unpriced=Count("id", filter=Q(cost_usd__isnull=True)),
+            scope_logs = scope_logs.filter(
+                Q(target_language_code=options["language"]) | Q(target_language_code="")
             )
-            .order_by(*GROUP_FIELDS)
-        )
-        data = [
-            [
-                row["model"],
-                row["project_slug"] or "-",
-                row["component_slug"] or "-",
-                row["target_language_code"] or "-",
-                row["operation"] or "-",
-                row["requests"],
-                row["strings"] or 0,
-                row["prompt"] or 0,
-                row["completion"] or 0,
-                f"{row['cost']:.8f}" if row["cost"] is not None else "",
-                row["unpriced"],
+
+        if options["summary"]:
+            unattributed_requests = scope_logs.filter(
+                Q(project_id_snapshot__isnull=True)
+                | Q(component_id_snapshot__isnull=True)
+                | Q(target_language_code="")
+            ).count()
+            totals = logs.aggregate(**TOTALS)
+            data = [
+                _row(
+                    service=options["service"] or "*",
+                    model=options["model"] or "*",
+                    project=options["project"] or "*",
+                    component=options["component"] or "*",
+                    language=options["language"] or "*",
+                    operation=options["operation"] or "*",
+                    totals=totals,
+                    unattributed_requests=unattributed_requests,
+                )
             ]
-            for row in rows
-        ]
+        else:
+            rows = logs.values(*GROUP_FIELDS).annotate(**TOTALS).order_by(*GROUP_FIELDS)
+            data = [
+                _row(
+                    service=row["service"],
+                    model=row["model"],
+                    project=row["project_slug"],
+                    component=row["component_slug"],
+                    language=row["target_language_code"],
+                    operation=row["operation"],
+                    totals=row,
+                )
+                for row in rows
+            ]
         if options["format"] == "csv":
             writer = csv.writer(self.stdout)
             writer.writerow(HEADER)
             writer.writerows(data)
             return
         widths = [
-            max(len(str(line[i])) for line in [HEADER, *data])
-            for i in range(len(HEADER))
+            max(len(str(line[index])) for line in [HEADER, *data])
+            for index in range(len(HEADER))
         ]
         for line in [HEADER, *data]:
             self.stdout.write(
-                "  ".join(str(cell).ljust(widths[i]) for i, cell in enumerate(line))
+                "  ".join(
+                    str(cell).ljust(widths[index]) for index, cell in enumerate(line)
+                )
             )
 ```
+
+`format(cost, "f")` намеренно не использует `:.8f`: storage и CSV не должны
+снова округлять provider-reported цену. `priced_complete` описывает только
+включённые rows. `attribution_complete=unknown` намеренно консервативен:
+любой unscoped request с теми же service/model/operation/time мог включать
+запрошенный component, даже если его project ID уже пуст.
 
 ### Step 4: Run tests to verify they pass
 
 Run: `./rundev.sh test weblate/trans/tests/test_llm_usage.py`
-Expected: PASS
+Expected: PASS.
 
 ### Step 5: Commit
 
 ```sh
 git add weblate/trans/management/commands/llm_usage_report.py \
   weblate/trans/tests/test_llm_usage.py
-git commit -m "feat(trans): report LLM cost per component and target language"
+git commit -m "feat(trans): report complete scoped LLM cost totals"
 ```
 
----
-
-## Task 5: Changelog
+## Task 5: Service- and identity-scoped observed-cost preview and changelog
 
 **Files:**
 
+- Modify: `weblate/trans/models/llm_usage.py:92-116`
+- Modify: `weblate/trans/views/edit.py:1544-1587`
 - Modify: `docs/changes.rst:22`
+- Test: `weblate/trans/tests/test_llm_usage.py` (`RecentCostRangeTest`)
+- Test: `weblate/trans/tests/test_judge_views.py`
 
-### Step 1: Edit the entry
+### Step 1: Write the failing tests
 
-Фича `llm_usage_report` ещё не выпущена (раздел 2026.8.1, "Not yet released"),
-поэтому второй пункт не добавляется - расширяется существующий:
+В `RecentCostRangeTest._create` добавить keywords
+`project_id_snapshot=1`, `service="openrouter"` и передавать оба в
+`LLMUsageLog.objects.create`. Обновить все вызовы `recent_cost_range`:
+первым аргументом теперь `1`, вторым - service. Добавить:
 
-```rst
-* LLM machine translation and LLM judge requests now record per-request token usage and cost together with the component and target language the request was billed to, reportable via the ``llm_usage_report`` management command, which can filter by project, component, target language, model, and operation.
+```text
+    def test_never_mixes_service_or_project_identity(self) -> None:
+        for _ in range(5):
+            self._create(
+                cost=Decimal("0.001"),
+                unit_count=1,
+                project_id_snapshot=1,
+                service="openrouter",
+            )
+            self._create(
+                cost=Decimal("9.000"),
+                unit_count=1,
+                project_id_snapshot=2,
+                service="openrouter",
+            )
+            self._create(
+                cost=Decimal("9.000"),
+                unit_count=1,
+                project_id_snapshot=1,
+                service="litellm",
+            )
+
+        low, high = recent_cost_range(
+            1,
+            "openrouter",
+            "m1",
+            LLMUsageLog.Operation.TRANSLATION,
+        )
+
+        self.assertEqual((low, high), (Decimal("0.001"), Decimal("0.001")))
 ```
 
-### Step 2: Lint the docs
+В `JudgeAutoTranslateViewTest.test_preview_uses_observed_judge_costs` задать
+`project_id_snapshot=self.component.project_id` и `service="openrouter"` у
+пяти полезных rows. Добавить пять rows того же model/operation, но с другим
+project ID или `service="litellm"` и ценой `9`. Ожидаемые `min == "0.12"` и
+`max == "0.24"` не меняются. Это доказывает, что view не смешивает rename-safe
+identity или service.
 
-Run: `uv run prek run --files docs/changes.rst`
-Expected: PASS
+### Step 2: Run tests to verify they fail
 
-### Step 3: Commit
+Run:
 
 ```sh
-git add docs/changes.rst
-git commit -m "docs(changes): note component and language cost attribution"
+./rundev.sh test weblate/trans/tests/test_llm_usage.py -k RecentCostRange
+./rundev.sh test weblate/trans/tests/test_judge_views.py -k observed_judge_costs
+```
+
+Expected: FAIL: `recent_cost_range` не принимает service/ID и смешивает
+одинаковую model ID от OpenRouter и LiteLLM либо от другого project ID.
+
+### Step 3: Isolate ranges and update the changelog
+
+В `weblate/trans/models/llm_usage.py` изменить сигнатуру:
+
+```text
+def recent_cost_range(
+    project_id_snapshot: int, service: str, model: str, operation: str
+) -> tuple[Decimal, Decimal] | None:
+```
+
+и заменить `project_slug=...` на
+`project_id_snapshot=project_id_snapshot`, добавив `service=service` в
+существующий `LLMUsageLog.objects.filter(...)`. Это намеренно исключает legacy
+rows с пустыми IDs/service: preview станет `available` только после пяти
+priced rows нового ledger, вместо неточной смеси до- и после-миграционных
+данных.
+
+Обновить docstring функции: range теперь требует exact
+`project_id_snapshot/service/model/operation`, а не текущий slug. Это
+сохраняет observed preview после rename проекта.
+
+В `weblate/trans/views/edit.py` заменить `project_slugs` на `project_ids`,
+полученные из `translation.component.project_id`. В обоих вызовах передать ID:
+
+```python
+recent_cost_range(
+    project_id,
+    profile.provider,
+    profile.model,
+    LLMUsageLog.Operation.JUDGE,
+)
+```
+
+```python
+recent_cost_range(
+    translation.component.project_id,
+    machine.get_identifier(),
+    model,
+    LLMUsageLog.Operation.TRANSLATION,
+)
+```
+
+Расширить существующий пункт `docs/changes.rst:22`, не создавая второй:
+
+```rst
+* LLM machine translation and LLM judge requests now record per-request token usage and provider-reported cost with stable service, project, component, and target-language attribution. The ``llm_usage_report`` management command resolves current project and component slugs, reports attribution completeness, and can emit one scoped total with ``--summary``.
+```
+
+### Step 4: Run tests and lint
+
+Run:
+
+```sh
+./rundev.sh test weblate/trans/tests/test_llm_usage.py
+./rundev.sh test weblate/trans/tests/test_judge_views.py
+uv run prek run --files docs/changes.rst
+```
+
+Expected: PASS.
+
+### Step 5: Commit
+
+```sh
+git add weblate/trans/models/llm_usage.py weblate/trans/views/edit.py \
+  weblate/trans/tests/test_llm_usage.py weblate/trans/tests/test_judge_views.py \
+  docs/changes.rst
+git commit -m "fix(trans): isolate observed LLM costs by service"
 ```
 
 ---
@@ -1068,11 +1717,12 @@ git commit -m "docs(changes): note component and language cost attribution"
 ```sh
 uv run prek run --files weblate/machinery/llm.py weblate/machinery/openai.py \
   weblate/machinery/tests.py weblate/trans/judge.py weblate/trans/judge_loop.py \
-  weblate/trans/models/llm_usage.py \
+  weblate/trans/models/llm_usage.py weblate/trans/views/edit.py \
   weblate/trans/management/commands/llm_usage_report.py \
   weblate/trans/migrations/0113_llm_usage_scope.py \
   weblate/trans/tests/test_llm_usage.py weblate/trans/tests/test_judge_client.py \
-  weblate/trans/tests/test_judge_loop.py docs/changes.rst
+  weblate/trans/tests/test_judge_loop.py weblate/trans/tests/test_judge_views.py \
+  docs/changes.rst
 ```
 
 Expected: PASS.
@@ -1082,7 +1732,7 @@ Expected: PASS.
 ```sh
 uv run pylint weblate/machinery/llm.py weblate/machinery/openai.py \
   weblate/trans/judge.py weblate/trans/judge_loop.py \
-  weblate/trans/models/llm_usage.py \
+  weblate/trans/models/llm_usage.py weblate/trans/views/edit.py \
   weblate/trans/management/commands/llm_usage_report.py
 ```
 
@@ -1107,9 +1757,9 @@ Expected: нет новых ошибок в затронутых файлах.
 ./rundev.sh test weblate/trans/tests/test_autotranslate.py
 ```
 
-Expected: PASS. `test_judge_views.py` включён потому, что предпросмотр
-стоимости читает `recent_cost_range` (`weblate/trans/views/edit.py:1551`), а он
-фильтрует по `project_slug`, `model`, `operation` и не должен меняться.
+Expected: PASS. `test_judge_views.py` теперь обязан проверить, что observed
+range фильтруется и по service, а не смешивает одинаковую model ID от разных
+шлюзов.
 
 ### Step 5: Migration check
 
@@ -1121,16 +1771,22 @@ Expected: `No changes detected`.
 
 ### Step 6: Dev smoke test
 
-Применить миграцию в дев-контейнере (без пересборки стека) и прогнать один
-реальный батч автоперевода на тестовом компоненте, затем:
+После применения миграции создать или выбрать отдельный временный компонент с
+уникальным `(project, component, language)`, прогнать один реальный batch
+OpenRouter и запросить именно его scope:
 
 ```sh
 docker exec dev-docker-weblate-1 weblate migrate
-docker exec dev-docker-weblate-1 weblate llm_usage_report --days 1 --format csv
+docker exec dev-docker-weblate-1 weblate llm_usage_report \
+  --project llm-usage-smoke --component smoke-ui --language fr \
+  --service openrouter --operation translation --summary --format csv
 ```
 
-Expected: строки с непустыми `component` и `target_language`, суммой
-`cost_usd` и ненулевым `strings_asked`.
+Expected: ровно одна summary row с `requests > 0`, непустыми current
+project/component/service, ненулевым `strings_asked` и явными
+`priced_complete`/`attribution_complete`. `priced_complete=no` или
+`attribution_complete=unknown` - не smoke failure, а сигнал не называть сумму
+полной без расследования соответствующих rows.
 
 ### Step 7: Commit and push
 
@@ -1140,79 +1796,117 @@ git push -u origin <branch>
 
 ### Step 8: Production
 
-Миграция `0113_llm_usage_scope` на прод применяется только после явного
-разрешения (AGENTS.md, "Never deploy without explicit approval"). До неё
-прод-строки продолжают писаться без scope.
+Только после явного разрешения на production:
+
+1. Применить additive migration `0113_llm_usage_scope` **до** запуска любого
+   worker/web image с новым `LLMUsageLog.objects.create(...)`. Старый код
+   совместим с новыми пустыми columns.
+2. Убедиться, что миграция завершилась успешно, затем выкатить application
+   code и дождаться reload всех writers.
+3. После первого нового LLM batch снять scoped `--summary` отчёт и сохранить
+   вывод как evidence rollout.
+
+Код нельзя выкатывать до migration: новые ORM kwargs обращаются к отсутствующим
+columns, recorder ловит DB exception и логирует её, но usage row **теряется**;
+он не записывается "без scope".
 
 ---
 
 ## Как считать стоимость языка и компонента после выкладки
 
 ```sh
-# полная разбивка проекта за период
+# детализация проекта за период, включая legacy/unattributed rows
 weblate llm_usage_report --project need-for-greed --days 30 --format csv > cost.csv
 
-# только машинный перевод одного языка
-weblate llm_usage_report --project need-for-greed --language fr --operation translation
+# один ответ: OpenRouter перевод на французский в UI
+weblate llm_usage_report \
+  --project need-for-greed --component ui --language fr \
+  --service openrouter --operation translation --summary --format csv
 
-# только judge по компоненту
-weblate llm_usage_report --project need-for-greed --component ui --operation judge
+# отдельный итог judge на том же scope; service берётся из judge detail rows
+weblate llm_usage_report \
+  --project need-for-greed --component ui --language fr \
+  --service litellm --operation judge --summary --format csv
 ```
 
-Соединение с объёмом требует осторожности: знаменатели из журнала и из
-statistics разной природы. `cost_usd` и `strings_asked` - величины за
-выбранный период и включают повторы, а `translated` в
-`GET /api/components/<project>/<component>/statistics/` - текущее
-накопленное состояние, куда входят строки, переведённые вне периода или
-человеком, и не входят строки, переведённые в периоде, а затем перезаписанные.
+`--summary` отвечает на денежный вопрос одним рядом. `--project` и
+`--component` сначала резолвятся в current immutable IDs, поэтому строка,
+записанная до rename, включается в тот же component total. Сумма является
+полной стоимостью **записанного ledger scope** только при **обоих**
+`priced_complete=yes` и `attribution_complete=yes`. `unknown` не означает
+ошибку суммы включённых rows: он означает, что рядом существует хотя бы один
+unscoped request, который журнал не может исключить из этого component.
+Оплаченная попытка без полученного тела остаётся отдельным пределом ниже.
 
-Поэтому:
+Соединение с объёмом требует осторожности: `cost_usd` и `strings_asked` -
+величины за выбранный период и включают повторы, а `translated` из
+`GET /api/components/<project>/<component>/statistics/` - текущее накопленное
+состояние. Поэтому:
 
 - `cost_usd / strings_asked` - корректная средняя цена оплаченного
-  строко-запроса; оба числа из одной строки отчёта, одного периода;
+  строко-запроса из одной summary/detail row;
 - `strings_asked / translated` и `cost_usd / translated` - только грубая
-  оценка, и она осмысленна лишь когда период отчёта покрывает всю историю
-  расхода этой группы и текущее содержимое компонента произведено именно этим
-  расходом. Иначе это деление величины за период на накопленный остаток;
-- точная цена одной строки недостижима в принципе: провайдер выставляет счёт
-  за запрос, а не за строку.
+  оценка, допустимая, лишь когда период покрывает всю историю расхода и
+  текущее содержимое компонента произведено именно этим расходом;
+- точная цена одной строки недостижима: provider выставляет счёт за запрос, а
+  не за строку.
 
-Строка без `--operation` складывает два разных шва записи. Пока Task 3 не
-выкачена, `operation=judge` даёт группы с `component = -`, поэтому сводку по
-компонентам нужно снимать с `--operation translation`, а judge-расход считать
-отдельно и на уровне проекта. После Task 3 обе операции атрибутированы
-одинаково, и суммировать их можно.
+Без `--operation` отчёт складывает translation и judge, но по-прежнему
+разделяет service и model в detailed режиме. До выкладки Task 3 брать
+component-level judge total нельзя: его scope пуст.
 
 ## Известные пробелы
 
 Их нужно называть в любом отчёте, иначе сумма выглядит полнее, чем есть:
 
-1. **История не восстанавливается.** Строки до миграции несут `""`;
-   связи между конкретным OpenRouter-запросом и изменениями строк в журнале
-   нет, поэтому Need for Greed за 2026-08-17 - 2026-08-28 остаётся
-   неатрибутированным. Приблизительный backfill сознательно не делается.
-2. **`cost_usd IS NULL`.** Провайдер иногда не отдаёт цену; такая группа -
-   нижняя граница, её видно по колонке `unpriced`.
-3. **Оплаченные запросы без тела ответа.** При transport/deadline usage-строка
-   не пишется вовсе (`weblate/trans/judge.py:1177-1178`), поэтому итог журнала
-   не превышает инвойс OpenRouter, но может быть меньше него. Для judge такие
-   вызовы видны в `JudgeRequestAttempt`; для machinery - только в логах.
-4. **loc-kit profile analysis не пишет usage.** Он ходит в OpenRouter по
-   отдельной site-wide конфигурации (`weblate/trans/loc_kit.py`) и в журнал не
-   попадает. Компонента на момент анализа ещё не существует, поэтому в этот
-   план он не входит.
-5. **Кеш Weblate.** Повторно использованный перевод не стоит ничего, поэтому
-   цена строки внутри группы неравномерна; итог группы при этом точен.
-6. **`project_slug` может приходить из настроек сервиса**, а не из юнитов
-   (`weblate/machinery/openai.py:165-166`). `component_slug` и
-   `target_language_code` берутся только из юнитов.
+1. **История не восстанавливается.** Строки до миграции несут пустые service и
+   scope; связи между конкретным OpenRouter-запросом и изменениями строк нет,
+   поэтому Need for Greed за 2026-08-17 - 2026-08-28 остаётся
+   неатрибутированным.
+2. **`cost_usd IS NULL`.** Provider иногда не отдаёт цену. Такая row делает
+   `priced_complete=no`; показанный `cost_usd` - нижняя граница включённых
+   rows.
+3. **Оплаченный запрос без тела ответа.** При transport/deadline usage row не
+   пишется вовсе, поэтому журнал может быть меньше инвойса. Для judge попытка
+   видна в `JudgeRequestAttempt`; для machinery - только в логах.
+4. **Неатрибутированный batch.** `None` source или несколько
+   `translation_id` оставляют IDs и scope пустыми. В `--summary` они дают
+   `attribution_complete=unknown` консервативно: row может относиться к
+   запрошенному component, но распределять её без выдуманной цены нельзя.
+5. **Judge retention.** `cleanup_judge_observability` удаляет judge usage
+   после `LLM_USAGE_LOG_RETENTION_DAYS` (90 дней по умолчанию). Translation
+   usage текущий cleanup не удаляет.
+6. **loc-kit profile analysis не пишет usage.** Он ходит в OpenRouter по
+   отдельной site-wide конфигурации до создания компонента и в этот ledger не
+   попадает.
+7. **Кеш Weblate.** Повторно использованный перевод не стоит ничего; цена
+   строки внутри группы неравномерна, хотя сумма записанных запросов точна.
 
 ## Out of scope
 
-- Группировка батчей по `Translation` в `fetch_machinery_matches` - смешанный
-  LLM-батч сегодня не создаёт ни один вызывающий, а если бы создавал, то ломал
-  бы plural mapping и target language (`weblate/machinery/base.py:1249-1266`),
-  то есть это отдельный дефект корректности, а не учёта.
-- UI-страница расходов. Отчёт по запросу закрывает вопрос, страница - нет.
-- Индексы под группировку отчёта и пересчёт цены по прайс-листу для
-  `cost_usd IS NULL`.
+- Группировка входных батчей по `Translation` в `fetch_machinery_matches`.
+  Guard этого плана лишь отказывается атрибутировать смешанный batch; исправить
+  его первопричину - отдельный change поведения machinery.
+- UI-страница расходов. Управляемый management command закрывает вопрос без
+  новой permissioned поверхности.
+- Изменение 90-дневного retention judge usage. Это отдельное решение о
+  финансовом хранении и объёме БД; текущий лимит явно отражён выше.
+- Запрос OpenRouter invoice/generation API для backfill или сверки пропавших
+  response bodies. Нужны отдельные credential, data-retention и reconciliation
+  правила.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+| --- | --- | --- | --- | --- | --- |
+| Eng review | User request | Architecture, correctness, tests, and performance | 1 | CLEARED | 14 findings folded into Tasks 1-6 |
+| Independent review | `reviewer` | Adversarial code-to-plan check | 1 | CLEARED | Confirmed precision and migration-order defects; both fixed |
+| CEO review | Not run | No product-scope decision remains | 0 | N/A | Backend accounting plan |
+| Design review | Not run | No UI scope | 0 | N/A | Not applicable |
+
+**VERDICT:** ENG + independent review cleared - the revised plan preserves
+stable identity across rename, distinguishes priced from attributed
+completeness, retains provider-cost precision, returns one answer, and orders
+migration before writers.
+
+NO UNRESOLVED DECISIONS
