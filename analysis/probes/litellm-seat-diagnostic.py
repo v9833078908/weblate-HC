@@ -71,15 +71,24 @@ VARIANTS: list[tuple[str, int, dict[str, object]]] = [
 
 
 def raw_body(payload: dict, profile: judge.JudgeSeatProfile) -> str:
-    """Replay one request unstreamed to show the proxy's own error text."""
-    url = f"{judge.get_judge_base_url().rstrip('/')}/chat/completions"
-    with httpx2.Client(timeout=120) as client:
+    """
+    Show the proxy's own error text for a request the judge could not parse.
+
+    The payload, endpoint and timeouts are the seat's own, so the request is
+    the one the judge sends. It is nevertheless a *second* request: the proxy
+    may answer it differently from the attempt above, and it does - a seat
+    whose streamed attempt returned 500 has answered this replay with 429 when
+    the model group cooled down in between. Read the status printed here as
+    belonging to this replay, not to the attempt above.
+    """
+    url = f"{profile.base_url.rstrip('/')}/chat/completions"
+    with httpx2.Client(timeout=judge._request_timeout(profile)) as client:
         response = client.post(
             url,
             headers={"Authorization": f"Bearer {settings.JUDGE_API_KEY}"},
-            json={**payload, "stream": False},
+            json=payload,
         )
-    return f"HTTP {response.status_code}: {response.text[:600]}"
+    return f"replay HTTP {response.status_code}: {response.text[:600]}"
 
 
 def reply_content(payload: object) -> str | None:
