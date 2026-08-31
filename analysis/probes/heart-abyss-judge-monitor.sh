@@ -24,9 +24,16 @@ JAR=$(mktemp)
 trap 'rm -f "$JAR"' EXIT
 
 api() {
-    curl -s -H "Authorization: Token $PROD_WEBLATE_API_TOKEN" \
-        -G --data-urlencode "q=$1" --data "page_size=1" \
-        "$BASE/api/translations/$SCOPE/units/" | jq -r '.count // "ERR"'
+    local count
+    count=$(
+        curl -s -H "Authorization: Token $PROD_WEBLATE_API_TOKEN" \
+            -G --data-urlencode "q=$1" --data "page_size=1" \
+            "$BASE/api/translations/$SCOPE/units/" |
+            jq -r '.count // "ERR"' 2> /dev/null
+    )
+    # A transport failure, an HTML error page or a rejected query must record
+    # ERR rather than an empty field.
+    [[ $count =~ ^[0-9]+$ ]] && echo "$count" || echo ERR
 }
 
 login() {
@@ -52,8 +59,14 @@ while true; do
         pass=$(api 'judge:pass')
         minor=$(api 'judge:minor')
         # judge:pass is severity none OR minor, so the buckets below are made
-        # disjoint: CLEAN + MINOR + FLAG + REJECT must equal JUDGED.
-        clean=$((pass - minor))
+        # disjoint: CLEAN + MINOR + FLAG + REJECT must equal JUDGED. A failed
+        # api() call yields ERR, which must stay visible rather than becoming
+        # an arithmetic 0.
+        if [[ $pass =~ ^[0-9]+$ && $minor =~ ^[0-9]+$ ]]; then
+            clean=$((pass - minor))
+        else
+            clean=ERR
+        fi
         echo "SAMPLE $(date -u +%Y-%m-%dT%H:%M:%SZ)"
         echo "UNITS_TOTAL $(api '')"
         echo "JUDGED $(api 'has:judge')"
