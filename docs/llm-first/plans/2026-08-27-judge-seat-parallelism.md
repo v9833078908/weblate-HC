@@ -2,8 +2,11 @@
 
 Date: 2026-08-27. Status: **proposed, not started.** Revised after engineering
 review on 2026-08-27; the caller-failure protocol, provider-load gate and
-thread-aware test layout below replace the unsafe first draft. Owner approval
-is still required before implementation.
+thread-aware test layout below replace the unsafe first draft. Revised again
+on 2026-08-31 against the post-remediation judge loop (c979bbc, 011c95d,
+cc3111d, 75ce50f): see "Revision: 2026-08-31 codebase drift". R1 and R3 there
+are blocking corrections to the original design; implement every task as
+amended. Owner approval is still required before implementation.
 
 Genre: implementation. Output: one two-seat fan-out helper in
 `judge_loop.py`, a deterministic thread-safe test harness, and focused tests
@@ -13,7 +16,8 @@ split between the existing `ViewTestCase` fixture and a dedicated
 Rule R3 (`docs/llm-first/vision/llm-first-product-architecture.md:686`) is not
 engaged: this plan changes neither the prompt nor either model. The logical
 batch plan also stays fixed: every uncached string is offered to the same two
-seats with the same `JUDGE_BATCH_SIZE`. Actual POST attempts, spend and parsed
+seats with each seat's own configured batch size. Actual POST attempts, spend
+and parsed
 coverage are acceptance measurements, not invariants, because simultaneous
 requests can change provider refusals and retries.
 
@@ -951,6 +955,86 @@ snapshot to the measurement record.
 - The run-specific `judge-monitor` helper.
 - A large production measurement before the bounded canary passes and receives
   its own approval.
+
+## Revision: 2026-08-31 codebase drift
+
+Written against the pre-c979bbc loop; verified against the codebase at
+2ed03f6. Design decisions D1-D6 stand, but the loop underneath changed
+(c979bbc, 011c95d, cc3111d, 75ce50f). R1 and R3 are blocking corrections;
+R2, R4 and R5 are drift the tasks must absorb.
+
+### R1. Barrier must key on request offsets, not batch ordinals (blocking)
+
+D2 assumed one shared `JUDGE_BATCH_SIZE`, so equal batch indices across
+seats. Seats now have per-seat batch sizes (`JudgeSeatProfile.batch_size`;
+`WEBLATE_JUDGE_BATCH_SIZE_SEAT_1=2` vs `..._SEAT_2=5` in both
+`dev-docker/docker-compose.yml` and `deploy/environment.example`), and
+`_adaptive_budget()` (`weblate/trans/judge.py:1303-1311`) can shrink a
+seat's whole pass down to batch size 1 from persisted adaptive state. Over
+688 requests the seats produce 344 and 138 batches: the same-index
+acknowledgement barrier deadlocks - the finer-batched seat's later indices
+wait for peer events that never come, and a successful `_SeatDone` releases
+nothing.
+
+Replace the ordinal barrier. `_BatchReady` carries the half-open request
+offset range it covers; both seats iterate the same ordered request list,
+so offsets are comparable. Release a batch's acknowledgement once every
+other active seat has persisted coverage at or beyond that batch's end
+offset, or has terminated. A successful `_SeatDone` must release every
+acknowledgement still waiting only on that seat. Drop the equal-request
+validation error only if it blocks the retry path below; the equal ordered
+request list itself still holds at every dispatch site. The lockstep test
+(Task 2, test 3) must configure unequal per-seat batch sizes so both the
+serial loop and an ordinal barrier fail it.
+
+### R2. Dispatch-site and signature drift
+
+- The serial loop is now `weblate/trans/judge_loop.py:993-1002` inside
+  `judge_units()`; the per-seat closure is `judge_seat_round()` (`:915-945`).
+- `request_verdicts()` grew `seat=`, `run=`, `persist_attempts=`,
+  `retry_budget=`, `adaptive=`, `attempt=` and `retry_deadline=`
+  (`weblate/trans/judge.py:1497-1511`). `_SeatJob` carries `seat` plus these
+  pass-throughs instead of a bare `model`; model identity is still asserted
+  on persisted `(seat, judge_model)` rows.
+- `_persist_verdict_batches` gained `request_round`, `profile`,
+  `project_context` and the `_sync_deferral` call; it stays the
+  caller-thread closure and is otherwise untouched.
+- A second dispatch site exists: the all-seats-unparsed retry rounds
+  (`weblate/trans/judge_loop.py:1003-1039`, from 011c95d). Its per-seat unit
+  lists are identical by construction; route it through `_run_seats` too.
+- The deferral drain path calls `judge_units` with `seats=(seat,)`
+  (`weblate/trans/judge_loop.py:1368-1372`) - the quorum-1 case the plan
+  already covers.
+
+### R3. `RetryBudget.spend()` needs a lock (blocking)
+
+`spend()` (`weblate/trans/judge.py:127-131`) is check-then-increment and one
+instance is shared by both seats (`weblate/trans/judge_loop.py:959-964`).
+Two workers can overspend the recovery cap. Guard `spend()` with a
+`threading.Lock`; add a two-thread spend test in the Task 1 harness commit.
+
+### R4. Worker-thread database writes broadened
+
+Workers no longer write only `LLMUsageLog`: `persist_attempts=True` inserts
+`JudgeRequestAttempt` rows and `adaptive=True` reads and writes
+`JudgeAdaptiveState`. That state is concurrency-safe by construction - one
+row per `(endpoint_fingerprint, model, seat)`, and circuit transitions run
+under `select_for_update` (`weblate/trans/judge_loop.py:592-601`) - but Task
+5 must assert `JudgeRequestAttempt` rows also commit from worker threads.
+On LiteLLM endpoints the worker additionally performs alias discovery
+(`resolve_judge_alias`, module cache `_ALIAS_CACHE`): dict reads and writes
+are GIL-atomic; the worst case is one duplicate capability GET per seat,
+which is accepted.
+
+### R5. Endpoint move to LiteLLM is orthogonal
+
+`_run_seats` sits above the transport, which already branches per provider
+(`_judge_provider`, `weblate/trans/judge.py:180-186`): LiteLLM adds alias
+resolution and strict reasoning validation, OpenRouter skips both. Moving
+the seats to LiteLLM aliases is configuration only; adaptive and circuit
+state start fresh rows keyed by the new endpoint fingerprint. The canary
+acceptance gates are per-endpoint measurements: rerun the bounded canary on
+the LiteLLM endpoint before trusting the overlap numbers there.
 
 ## Task checklist
 
