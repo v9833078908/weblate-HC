@@ -69,6 +69,10 @@ while true; do
         fi
         echo "SAMPLE $(date -u +%Y-%m-%dT%H:%M:%SZ)"
         echo "UNITS_TOTAL $(api '')"
+        # has:judge is true after the FIRST seat's verdict; seats run
+        # sequentially (judge_loop.py judge_units), so JUDGED saturates when
+        # seat 1 finishes while seat 2 is still judging. Severity counters
+        # keep shifting until every seat's pass (and repairs) complete.
         echo "JUDGED $(api 'has:judge')"
         echo "PENDING $(api 'NOT has:judge')"
         echo "PASS_INCL_MINOR $pass"
