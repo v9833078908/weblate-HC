@@ -9825,6 +9825,31 @@ class ViewsTest(FixtureTestCase):
             "weblate_customization.machinery.RoutedLLMTranslation",
         )
     )
+    def test_configure_global_openrouter_shows_api_key_field(self) -> None:
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        self.user.is_superuser = True
+        self.user.save()
+
+        response = self.client.get(
+            reverse("machinery-edit", kwargs={"machinery": "openrouter"})
+        )
+
+        self.assertContains(response, 'name="key"')
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *django_settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
     def test_configure_project_openrouter_preserves_sitewide_key(self) -> None:
         Setting.objects.create(
             category=SettingCategory.MT,
@@ -9864,6 +9889,51 @@ class ViewsTest(FixtureTestCase):
         self.assertEqual(
             project.get_machinery_settings()["openrouter"]["key"], "sitewide-key"
         )
+
+    @override_settings(
+        WEBLATE_MACHINERY=(
+            *django_settings.WEBLATE_MACHINERY,
+            "weblate_customization.machinery.RoutedLLMTranslation",
+        )
+    )
+    def test_configure_project_openrouter_preserves_project_key(self) -> None:
+        Setting.objects.create(
+            category=SettingCategory.MT,
+            name="openrouter",
+            value={
+                "key": "sitewide-key",
+                "base_url": "https://openrouter.ai/api/v1",
+                "routing": {"*": "google/gemini-2.5-flash"},
+            },
+        )
+        self.project.machinery_settings = {"openrouter": {"key": "project-key"}}
+        self.project.save(update_fields=["machinery_settings"])
+        self.make_manager()
+        edit_url = reverse(
+            "machinery-edit",
+            kwargs={"project": self.project.slug, "machinery": "openrouter"},
+        )
+
+        with patch.object(RoutedLLMTranslation, "validate_settings") as validate:
+            response = self.client.post(
+                edit_url,
+                {
+                    "base_url": "https://openrouter.ai/api/v1",
+                    "model": "",
+                    "routing": '{"*": "google/gemini-2.5-flash"}',
+                    "persona": "",
+                    "style": "",
+                    "language_instructions": "",
+                    "source_language": SourceLanguageChoices.AUTO,
+                },
+            )
+
+        self.assertRedirects(
+            response, reverse("machinery-list", kwargs={"project": self.project.slug})
+        )
+        validate.assert_called_once()
+        project = Project.objects.get(pk=self.project.pk)
+        self.assertEqual(project.machinery_settings["openrouter"]["key"], "project-key")
 
     @http_mock.activate
     def test_configure_project_can_blank_an_inherited_field(self) -> None:
