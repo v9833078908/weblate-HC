@@ -4,16 +4,18 @@
 
 from __future__ import annotations
 
+import threading
 import uuid
 from unittest import mock
 
-from django.test import override_settings
+from django.conf import settings
+from django.test import SimpleTestCase, override_settings
 
 from weblate.machinery.base import (
     MACHINERY_DEFAULT_THRESHOLD,
     MachineTranslationError,
 )
-from weblate.trans.judge import JudgeResult, resolve_judge_seat_profile
+from weblate.trans.judge import JudgeResult, RetryBudget, resolve_judge_seat_profile
 from weblate.trans.judge_loop import (
     _select_repair_texts,
     _write_verdict,
@@ -62,16 +64,75 @@ CRITICAL = result("critical", "reject")
 DEAD = JudgeResult("none", "", [], "", unparsed=True)
 
 
-def mock_request_verdicts(batches):
-    results = iter(batches)
+class MockRequestVerdicts:
+    def __init__(self, batches):
+        models = (
+            settings.JUDGE_MODEL_SEAT_1,
+            settings.JUDGE_MODEL_SEAT_2,
+        )
+        if models[0] == models[1]:
+            msg = "mock request verdicts requires distinct configured models"
+            raise ValueError(msg)
+        self._lock = threading.Lock()
+        self._results = {
+            model: iter(batches[index::2]) for index, model in enumerate(models)
+        }
+        self._recorder = mock.Mock()
 
-    def request(requests, *, on_batch, **kwargs):
-        batch_results = next(results)
-        on_batch(requests, batch_results)
+    def __call__(self, requests, *, model, on_batch, **kwargs):
+        with self._lock:
+            batch_results = next(self._results[model])
+            self._recorder(requests, model=model, on_batch=on_batch, **kwargs)
+        batch_size = resolve_judge_seat_profile(kwargs["seat"]).batch_size
+        for index in range(0, len(requests), batch_size):
+            on_batch(
+                requests[index : index + batch_size],
+                batch_results[index : index + batch_size],
+            )
         return batch_results
 
-    return mock.Mock(side_effect=request)
+    @property
+    def call_count(self):
+        return self._recorder.call_count
 
+    @property
+    def call_args_list(self):
+        return self._recorder.call_args_list
+
+    def assert_not_called(self):
+        self._recorder.assert_not_called()
+
+
+def mock_request_verdicts(batches):
+    return MockRequestVerdicts(batches)
+
+
+class JudgeRetryBudgetTest(SimpleTestCase):
+    def test_spend_never_exceeds_the_shared_maximum(self) -> None:
+        barrier = threading.Barrier(2)
+
+        class SynchronizedCounter(int):
+            def __iadd__(self, other):
+                try:
+                    barrier.wait(timeout=0.1)
+                except threading.BrokenBarrierError:
+                    pass
+                return int.__add__(self, other)
+
+        budget = RetryBudget(maximum=1, used=SynchronizedCounter(0))
+        results = []
+        workers = [
+            threading.Thread(target=lambda: results.append(budget.spend()))
+            for _ in range(2)
+        ]
+
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join()
+
+        self.assertEqual(results.count(True), 1)
+        self.assertEqual(budget.used, 1)
 
 @override_settings(
     JUDGE_ENABLED=True,
@@ -393,14 +454,14 @@ class JudgeLoopTest(ViewTestCase):
                 second.id: ["second repaired target"],
             }
         )
-        round_results = iter((MAJOR, MAJOR, PASS, PASS))
-
-        def request(requests, *, on_batch, **kwargs):
-            batch_results = [next(round_results)] * len(requests)
-            on_batch(requests, batch_results)
-            return batch_results
-
-        client = mock.Mock(side_effect=request)
+        client = mock_request_verdicts(
+            [
+                [MAJOR, MAJOR],
+                [MAJOR, MAJOR],
+                [PASS, PASS],
+                [PASS, PASS],
+            ]
+        )
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
             mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
@@ -427,14 +488,14 @@ class JudgeLoopTest(ViewTestCase):
         second.translate(self.user, ["second original target"], STATE_TRANSLATED)
         original_second_target = second.target
         repair_mock = mock.Mock(return_value={first.id: ["first repaired target"]})
-        round_results = iter((MAJOR, MAJOR, PASS, PASS))
-
-        def request(requests, *, on_batch, **kwargs):
-            batch_results = [next(round_results)] * len(requests)
-            on_batch(requests, batch_results)
-            return batch_results
-
-        client = mock.Mock(side_effect=request)
+        client = mock_request_verdicts(
+            [
+                [MAJOR, MAJOR],
+                [MAJOR, MAJOR],
+                [PASS],
+                [PASS],
+            ]
+        )
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
             mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
@@ -499,14 +560,14 @@ class JudgeLoopTest(ViewTestCase):
                 }
             }
         )
-        round_results = iter((MAJOR, MAJOR, PASS, PASS))
-
-        def request(requests, *, on_batch, **kwargs):
-            batch_results = [next(round_results)] * len(requests)
-            on_batch(requests, batch_results)
-            return batch_results
-
-        client = mock.Mock(side_effect=request)
+        client = mock_request_verdicts(
+            [
+                [MAJOR, MAJOR],
+                [MAJOR, MAJOR],
+                [PASS],
+                [PASS],
+            ]
+        )
         with (
             self.make_openrouter(engine),
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
@@ -528,9 +589,13 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(second.judge_verdicts.count(), 2)
 
     def test_each_seat_uses_its_configured_model(self) -> None:
-        _, _, client = self.run_batch([PASS, PASS])
-        models = [c.kwargs["model"] for c in client.call_args_list]
+        unit, _, client = self.run_batch([PASS, PASS])
+        models = [call.kwargs["model"] for call in client.call_args_list]
         self.assertEqual(models, ["vendor-a/model", "vendor-b/model"])
+        self.assertEqual(
+            set(unit.judge_verdicts.values_list("seat", "judge_model")),
+            {(1, "vendor-a/model"), (2, "vendor-b/model")},
+        )
 
     def test_every_seat_bills_the_units_project(self) -> None:
         # Without this the paid judge requests land in LLMUsageLog with a
@@ -949,7 +1014,7 @@ class JudgeGlossaryRepairLockTest(ViewTestCase):
     def test_glossary_explanation_change_aborts_repair(self) -> None:
         unit = self.get_unit()
         original = unit.target
-        client = mock.Mock(side_effect=[[MAJOR], [MAJOR]])
+        client = mock_request_verdicts([[MAJOR], [MAJOR]])
 
         def change_context(units, _user):
             self.source_term.explanation = "Changed while the judge was running."
@@ -987,7 +1052,7 @@ class JudgeIncrementalPersistenceTest(ViewTestCase):
             raise RuntimeError(msg)
 
         with (
-            mock.patch("weblate.trans.judge_loop.request_verdicts", side_effect=crash),
+            mock.patch("weblate.trans.judge_loop.request_verdicts", new=crash),
             self.assertRaisesRegex(RuntimeError, "simulated worker loss"),
         ):
             run_judge_batch(
