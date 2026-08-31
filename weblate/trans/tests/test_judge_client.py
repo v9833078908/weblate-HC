@@ -18,6 +18,8 @@ from weblate.trans.judge import (
     _ALIAS_CACHE,
     JudgeError,
     JudgeRequest,
+    _read_capped,
+    _read_sse,
     get_judge_base_url,
     get_judge_chat_completions_url,
     judge_configuration_ready,
@@ -95,6 +97,22 @@ def _request_segments(body: dict) -> list[dict]:
     return json.loads(payload)["segments"]
 
 
+class JudgeSSETest(SimpleTestCase):
+    def test_invalid_utf8_is_a_typed_protocol_failure(self) -> None:
+        response = httpx2.Response(200, content=b"\xff")
+
+        _, failure, _, _, _, _ = _read_sse(response, started=time.monotonic())
+
+        self.assertEqual(failure, "invalid-envelope")
+
+    def test_truncated_utf8_at_eof_is_a_typed_protocol_failure(self) -> None:
+        response = httpx2.Response(200, content=b"\xc3")
+
+        _, failure, _, _, _, _ = _read_sse(response, started=time.monotonic())
+
+        self.assertEqual(failure, "invalid-envelope")
+
+
 class SegmentGlossaryTest(SimpleTestCase):
     def test_segment_carries_the_complete_glossary_entry(self) -> None:
         # ruff: ignore[import-outside-top-level]
@@ -155,6 +173,17 @@ class JudgeClientGateTest(SimpleTestCase):
     @override_settings(
         JUDGE_ENABLED=True,
         JUDGE_API_KEY="sk-test",
+        JUDGE_REQUEST_DEADLINE=float("inf"),
+    )
+    @http_mock.activate
+    def test_nonfinite_deadline_makes_no_network_call(self) -> None:
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
         JUDGE_BATCH_SIZE=0,
     )
     @http_mock.activate
@@ -162,6 +191,15 @@ class JudgeClientGateTest(SimpleTestCase):
         with self.assertRaises(JudgeError):
             request_verdicts([REQ], model="vendor/model-a")
         self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_RETRY_BUDGET_RATIO=float("nan"),
+    )
+    def test_nonfinite_retry_budget_ratio_is_invalid(self) -> None:
+        with self.assertRaises(JudgeError):
+            validate_judge_configuration()
 
     @override_settings(
         JUDGE_ENABLED=True,
@@ -1590,6 +1628,58 @@ class JudgeLiteLLMPayloadTest(TestCase):
         with self.assertRaises(JudgeError):
             request_verdicts([REQ], model="vendor/model-a")
         self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+    )
+    @http_mock.activate
+    def test_dripping_alias_discovery_degrades_after_absolute_deadline(
+        self,
+    ) -> None:
+        info_url = "https://hcbifrost.herocraft.com/litellm/v1/model/info"
+        body = json.dumps(
+            {
+                "data": [
+                    {
+                        "model_name": "weblate-judge-deepseek-v4-pro",
+                        "litellm_params": {"model": "deepseek/upstream-a"},
+                    }
+                ]
+            }
+        ).encode()
+        http_mock.register_callback(
+            "GET",
+            info_url,
+            lambda _request: httpx2.Response(200, stream=DrippingStream(body, 0.05)),
+        )
+        http_mock.register(
+            "POST",
+            LITELLM_CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+
+        with mock.patch("weblate.trans.judge._ALIAS_INFO_TIMEOUT", 0.05):
+            started = time.monotonic()
+            profile = resolve_judge_seat_profile(1)
+            elapsed = time.monotonic() - started
+
+        # Each individual read succeeds well inside a per-op transport
+        # timeout; only an absolute wall-clock deadline on the whole
+        # discovery call can bound a slow-trickle peer.
+        self.assertLess(elapsed, 1)
+        self.assertEqual(profile.upstream_model, "weblate-judge-deepseek-v4-pro")
+        self.assertEqual(profile.alias_revision, "")
+
+    def test_capped_reader_rejects_an_oversized_chunk_without_buffering_it(
+        self,
+    ) -> None:
+        response = httpx2.Response(200, content=b"0123456789")
+
+        self.assertIsNone(_read_capped(response, cap=4))
 
     @override_settings(
         JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import timedelta
 from unittest import mock
 
@@ -17,6 +18,7 @@ from weblate.trans.judge_loop import (
     _release_judge_deferrals,
     _reserve_deferral_requests,
     _sync_deferral,
+    _write_verdict,
     build_request,
     drain_judge_deferrals,
 )
@@ -24,10 +26,25 @@ from weblate.trans.models.judge import (
     JudgeAdaptiveState,
     JudgeDeferral,
     JudgeRequestAttempt,
+    JudgeRun,
+    JudgeRunUnit,
 )
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.utils.state import STATE_FUZZY
 
 DEAD = JudgeResult("none", "", [], "", unparsed=True, failure_kind="transport")
+
+
+def mock_request_verdicts(results):
+    """Fake ``request_verdicts``: each call consumes one single-result batch."""
+    batches = iter([[item] for item in results])
+
+    def request(requests, *, on_batch, **kwargs):
+        batch = next(batches)
+        on_batch(requests, batch)
+        return batch
+
+    return request
 
 
 @override_settings(
@@ -202,3 +219,193 @@ class JudgeDeferralTest(ViewTestCase):
             state.circuit_state,
             JudgeAdaptiveState.CircuitState.HALF_OPEN,
         )
+
+    def test_expired_claim_lease_is_reclaimable_by_another_pass(self) -> None:
+        unit = self.get_unit()
+        self.defer(unit)
+        JudgeDeferral.objects.filter(unit=unit).update(
+            next_attempt_at=timezone.now() - timedelta(seconds=1)
+        )
+        first_token, first_claim = _claim_judge_deferrals()
+        self.assertEqual(len(first_claim), 1)
+        _second_token, second_claim = _claim_judge_deferrals()
+        self.assertEqual(second_claim, [])
+
+        # The lease itself expired (a worker died mid-pass without
+        # releasing): a later pass must be able to reclaim the row rather
+        # than leaving it stuck until the deferral's own backoff elapses.
+        JudgeDeferral.objects.filter(unit=unit).update(
+            claim_expires_at=timezone.now() - timedelta(seconds=1)
+        )
+        third_token, third_claim = _claim_judge_deferrals()
+        self.assertEqual(len(third_claim), 1)
+        self.assertEqual(third_claim[0].claim_token, third_token)
+        self.assertNotEqual(third_token, first_token)
+
+    @override_settings(JUDGE_REQUEST_DEADLINE=400)
+    def test_claim_that_cannot_cover_the_full_request_deadline_is_skipped(
+        self,
+    ) -> None:
+        # The lease is max(300, JUDGE_DEFERRAL_MIN_INTERVAL) seconds; a
+        # request deadline that alone exceeds the lease can never be
+        # started safely, since the retried call could still be running
+        # when another worker reclaims the same row.
+        unit = self.get_unit()
+        self.defer(unit)
+        JudgeDeferral.objects.filter(unit=unit).update(
+            next_attempt_at=timezone.now() - timedelta(seconds=1)
+        )
+
+        with mock.patch("weblate.trans.judge_loop.run_judge_batch") as run_judge_batch:
+            processed = drain_judge_deferrals()
+
+        run_judge_batch.assert_not_called()
+        self.assertEqual(processed, 0)
+        deferral = unit.judge_deferrals.get()
+        self.assertEqual(deferral.claim_token, "")
+        self.assertIsNone(deferral.claim_expires_at)
+        self.assertEqual(deferral.state, JudgeDeferral.State.QUEUED)
+
+    def test_availability_failure_trips_the_circuit(self) -> None:
+        profile = resolve_judge_seat_profile(1)
+        transport_failure = JudgeResult(
+            "none", "", [], "", unparsed=True, failure_kind="transport"
+        )
+        with override_settings(
+            JUDGE_DEFERRAL_CIRCUIT_FAILURE_THRESHOLD=1,
+            JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS=60,
+        ):
+            _record_deferral_circuit_outcome(profile, transport_failure)
+        state = JudgeAdaptiveState.objects.get(
+            endpoint_fingerprint=profile.endpoint_fingerprint,
+            model=profile.model,
+            seat=profile.seat,
+        )
+        self.assertEqual(state.circuit_state, JudgeAdaptiveState.CircuitState.OPEN)
+
+    def test_non_availability_failure_never_trips_the_circuit(self) -> None:
+        profile = resolve_judge_seat_profile(1)
+        finish_length = JudgeResult(
+            "none", "", [], "", unparsed=True, failure_kind="finish-length"
+        )
+        with override_settings(
+            JUDGE_DEFERRAL_CIRCUIT_FAILURE_THRESHOLD=1,
+            JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS=60,
+        ):
+            for _ in range(5):
+                _record_deferral_circuit_outcome(profile, finish_length)
+        state = JudgeAdaptiveState.objects.get(
+            endpoint_fingerprint=profile.endpoint_fingerprint,
+            model=profile.model,
+            seat=profile.seat,
+        )
+        self.assertEqual(state.circuit_state, JudgeAdaptiveState.CircuitState.CLOSED)
+        self.assertEqual(state.failure_streak, 0)
+
+    def test_drain_run_projects_a_recovered_critical_hold_without_mutating_target(
+        self,
+    ) -> None:
+        unit = self.change_unit("Ahoj svete!")
+        before_target = unit.get_target_plurals()
+        _write_verdict(
+            unit,
+            build_request(unit),
+            seat=2,
+            attempt=0,
+            run_id=uuid.uuid4(),
+            result=JudgeResult("none", "pass", [], ""),
+            profile=resolve_judge_seat_profile(2),
+            project_context="",
+        )
+        self.defer(unit)
+        JudgeDeferral.objects.filter(unit=unit).update(
+            next_attempt_at=timezone.now() - timedelta(seconds=1)
+        )
+        critical = JudgeResult(
+            "critical",
+            "reject",
+            [{"span": "x", "category": "terminology", "severity": "critical"}],
+            "",
+        )
+        with mock.patch(
+            "weblate.trans.judge_loop.request_verdicts",
+            mock.Mock(side_effect=mock_request_verdicts([critical])),
+        ):
+            processed = drain_judge_deferrals()
+
+        self.assertEqual(processed, 1)
+        self.assertEqual(
+            unit.judge_deferrals.get(seat=1).state, JudgeDeferral.State.CLOSED
+        )
+        run = JudgeRun.objects.get()
+        self.assertIsNone(run.actor)
+        self.assertEqual(run.scope_type, JudgeRun.ScopeType.TRANSLATION)
+        self.assertEqual(run.scope_id, str(unit.translation_id))
+        self.assertEqual(run.requested_mode, "drain")
+        self.assertEqual(run.status, JudgeRun.Status.COMPLETED)
+        run_unit = JudgeRunUnit.objects.get(run=run, unit_id_snapshot=unit.pk)
+        self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.CRITICAL)
+        self.assertTrue(run_unit.projection_succeeded)
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_FUZZY)
+        self.assertEqual(unit.get_target_plurals(), before_target)
+
+    @override_settings(JUDGE_MAX_UNPARSED_RETRY_ROUNDS=0)
+    def test_drain_run_marks_a_still_failing_unit_as_deferred_not_unparsed(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        self.defer(unit)
+        JudgeDeferral.objects.filter(unit=unit).update(
+            next_attempt_at=timezone.now() - timedelta(seconds=1)
+        )
+        with mock.patch(
+            "weblate.trans.judge_loop.request_verdicts",
+            mock.Mock(side_effect=mock_request_verdicts([DEAD])),
+        ):
+            drain_judge_deferrals()
+
+        self.assertIn(
+            unit.judge_deferrals.get(seat=1).state,
+            (JudgeDeferral.State.QUEUED, JudgeDeferral.State.SLOW),
+        )
+        run = JudgeRun.objects.get()
+        run_unit = JudgeRunUnit.objects.get(run=run, unit_id_snapshot=unit.pk)
+        self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.DEFERRED)
+
+    @override_settings(JUDGE_ENABLED=False)
+    def test_drain_closes_every_deferral_on_a_disabled_judge_scope(self) -> None:
+        with override_settings(JUDGE_ENABLED=True):
+            unit = self.get_unit()
+            self.defer(unit)
+        JudgeDeferral.objects.filter(unit=unit).update(
+            next_attempt_at=timezone.now() - timedelta(seconds=1)
+        )
+
+        processed = drain_judge_deferrals()
+
+        self.assertEqual(processed, 0)
+        deferral = unit.judge_deferrals.get(seat=1)
+        self.assertEqual(deferral.state, JudgeDeferral.State.CLOSED)
+        self.assertIsNotNone(deferral.closed_at)
+        self.assertFalse(JudgeRun.objects.exists())
+
+    def test_drain_retains_deferrals_on_a_recoverable_configuration_failure(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        self.defer(unit)
+        JudgeDeferral.objects.filter(unit=unit).update(
+            next_attempt_at=timezone.now() - timedelta(seconds=1)
+        )
+
+        with mock.patch(
+            "weblate.trans.judge_loop.resolve_judge_seat_profile",
+            side_effect=RuntimeError("boom"),
+        ):
+            processed = drain_judge_deferrals()
+
+        self.assertEqual(processed, 0)
+        deferral = unit.judge_deferrals.get(seat=1)
+        self.assertEqual(deferral.state, JudgeDeferral.State.QUEUED)
+        self.assertIsNone(deferral.closed_at)

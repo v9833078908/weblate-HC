@@ -37,6 +37,7 @@ from weblate.machinery.models import MACHINERY
 from weblate.trans.forms import configured_routed_engine
 from weblate.trans.judge import (
     JUDGE_SEATS,
+    JudgeError,
     JudgeRequest,
     JudgeResult,
     OnBatch,
@@ -49,7 +50,9 @@ from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models.judge import (
     JudgeAdaptiveState,
     JudgeDeferral,
+    JudgeRequestAttempt,
     JudgeRun,
+    JudgeRunUnit,
     JudgeVerdict,
     collegium_verdict,
     compute_context_hash,
@@ -57,10 +60,15 @@ from weblate.trans.models.judge import (
     compute_target_hash,
     compute_target_storage_hash,
     current_round,
+    current_verdict,
+    has_complete_current_evidence,
+    state_for_verdict,
 )
 from weblate.utils.state import STATE_FUZZY
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from weblate.auth.models import User
     from weblate.machinery.base import BatchMachineTranslation, UnitMemoryResultDict
     from weblate.trans.models.project import Project
@@ -248,6 +256,7 @@ def _write_verdict(
         profile_fingerprint=profile.profile_fingerprint,
         prompt_schema_version=profile.prompt_schema_version,
     )
+    storage_hash = compute_target_storage_hash(request.target)
     JudgeVerdict.objects.create(
         unit=unit,
         model_verdict=result.model_verdict,
@@ -261,7 +270,7 @@ def _write_verdict(
         attempt=attempt,
         request_round=request_round,
         target_hash=target_hash,
-        target_storage_hash=compute_target_storage_hash(request.target),
+        target_storage_hash=storage_hash,
         context_hash=context_hash,
         run_id=run_id,
         request_attempt_id=result.request_attempt_id,
@@ -272,6 +281,16 @@ def _write_verdict(
         profile_fingerprint=profile.profile_fingerprint,
         prompt_schema_version=profile.prompt_schema_version,
     )
+    # A round written before the target_storage_hash backfill (or one whose
+    # text was not current at that one-time migration) never got the field
+    # populated: the SQL status annotations, which can only match through
+    # it, silently disagree with active_round() until the same text is
+    # judged again. Self-heal opportunistically: whenever a fresh request
+    # shares that historical round's exact target, we have the same raw
+    # text in hand and can backfill every sibling missing it for free.
+    JudgeVerdict.objects.filter(
+        unit=unit, target_hash=target_hash, target_storage_hash__isnull=True
+    ).update(target_storage_hash=storage_hash)
     try:
         unit.translation.invalidate_cache()
     except Exception:
@@ -565,6 +584,11 @@ def _record_deferral_circuit_outcome(profile, result: JudgeResult) -> None:
         LOGGER.exception("Failed to update judge deferral circuit")
 
 
+_AVAILABILITY_FAILURE_KINDS = frozenset(
+    {"transport", "deadline", "http-rate-limit", "http-server", "http-other"}
+)
+
+
 def _update_deferral_circuit(profile, result: JudgeResult, now) -> None:
     """Persist a circuit state transition inside the shared-state lock."""
     with transaction.atomic():
@@ -579,7 +603,12 @@ def _update_deferral_circuit(profile, result: JudgeResult, now) -> None:
             state.last_failure_kind = ""
             state.circuit_opened_at = None
             state.circuit_open_until = None
-        elif result.unparsed:
+        elif result.unparsed and result.failure_kind in _AVAILABILITY_FAILURE_KINDS:
+            # Only an availability signal (transport loss, a request that
+            # never finished, or an upstream rate-limit/server error) says
+            # anything about endpoint health. A protocol or content defect
+            # scoped to one unit (finish-length, invalid-segment, ...) must
+            # not trip a circuit shared by every other unit and seat.
             state.failure_streak += 1
             state.last_failure_kind = result.failure_kind or "unknown"
             threshold = _deferral_int_setting(
@@ -596,7 +625,7 @@ def _update_deferral_circuit(profile, result: JudgeResult, now) -> None:
                         "JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS", 900, minimum=1
                     )
                 )
-        else:
+        elif not result.unparsed:
             state.failure_streak = 0
             state.last_failure_kind = ""
             state.circuit_state = JudgeAdaptiveState.CircuitState.CLOSED
@@ -1113,6 +1142,285 @@ def _release_judge_deferrals(token: str) -> None:
     ).update(claim_token="", claimed_at=None, claim_expires_at=None)
 
 
+_DRAIN_SEVERITY_OUTCOMES = {
+    JudgeVerdict.Severity.NONE: JudgeRunUnit.Outcome.PASSED,
+    JudgeVerdict.Severity.MINOR: JudgeRunUnit.Outcome.MINOR,
+    JudgeVerdict.Severity.MAJOR: JudgeRunUnit.Outcome.MAJOR,
+    JudgeVerdict.Severity.CRITICAL: JudgeRunUnit.Outcome.CRITICAL,
+}
+
+
+def _close_deferrals_for_disabled_judge() -> None:
+    """
+    Close every pending deferral when the judge scope is structurally invalid.
+
+    A missing model, key, or ``JUDGE_ENABLED=False`` cannot self-repair: an
+    ever-growing backoff queue for work that can never succeed again is
+    worse than a clean, auditable close an operator can see and reopen by
+    fixing the site-wide configuration (a fresh deferral is created the
+    next time a live judge run hits the same failure).
+    """
+    JudgeDeferral.objects.filter(
+        state__in=(JudgeDeferral.State.QUEUED, JudgeDeferral.State.SLOW)
+    ).update(
+        state=JudgeDeferral.State.CLOSED,
+        closed_at=timezone.now(),
+        last_failure_kind=JudgeRequestAttempt.FailureKind.HTTP_AUTH,
+        claim_token="",
+        claimed_at=None,
+        claim_expires_at=None,
+    )
+
+
+def _finalize_drain_run(
+    run: JudgeRun,
+    units: Sequence[Unit],
+    before_snapshots: dict[int, tuple[list[str], int]],
+) -> None:
+    """
+    Audit every unit this drain pass touched and project a fresh verdict.
+
+    Runs under the same per-unit lock a live judge run projects through:
+    only ``state`` may move, driven by the current-round collegium verdict,
+    and only when the unit is still exactly as it was when this pass began.
+    Target text is never written here.
+    """
+    for unit in units:
+        with transaction.atomic():
+            locked = (
+                type(unit)
+                .objects.select_for_update()
+                .prefetch()
+                .prefetch_source()
+                .get(pk=unit.pk)
+            )
+            before_target, before_state = before_snapshots[unit.id]
+            stale_conflict = (
+                locked.get_target_plurals() != before_target
+                or locked.state != before_state
+            )
+            verdict = None if stale_conflict else current_verdict(locked)
+            still_open = (
+                not stale_conflict
+                and JudgeDeferral.objects.filter(
+                    unit_id=locked.pk,
+                    state__in=(JudgeDeferral.State.QUEUED, JudgeDeferral.State.SLOW),
+                ).exists()
+            )
+            if stale_conflict:
+                outcome = JudgeRunUnit.Outcome.STALE_CONFLICT
+            elif verdict is None or verdict.unparsed:
+                outcome = (
+                    JudgeRunUnit.Outcome.DEFERRED
+                    if still_open
+                    else JudgeRunUnit.Outcome.UNPARSED
+                )
+            else:
+                outcome = _DRAIN_SEVERITY_OUTCOMES[verdict.max_severity]
+                state = state_for_verdict(
+                    verdict.verdict,
+                    enable_review=locked.translation.enable_review,
+                    may_approve=(
+                        settings.JUDGE_MAY_APPROVE
+                        and has_complete_current_evidence(locked, seats=JUDGE_SEATS)
+                    ),
+                )
+                if verdict.verdict == JudgeVerdict.Verdict.PASS and any(
+                    check.name == "max-length" for check in locked.active_checks
+                ):
+                    # A repair-exhausted over-budget candidate must not
+                    # ship just because the judge approved its content.
+                    state = STATE_FUZZY
+                if state is not None and locked.state != state:
+                    locked.translate(None, locked.get_target_plurals(), state)
+            context_hash = (
+                verdict.context_hash
+                if verdict is not None
+                else compute_context_hash(
+                    source=locked.source,
+                    note=locked.source_unit.note,
+                    glossary_terms=get_matched_glossary_prompt_entries(locked),
+                )
+            )
+            JudgeRunUnit.objects.update_or_create(
+                run=run,
+                unit_id_snapshot=locked.pk,
+                defaults={
+                    "unit": locked,
+                    "translation_id": locked.translation_id,
+                    "component_id": locked.translation.component_id,
+                    "project_id": locked.translation.component.project_id,
+                    "input_target": before_target,
+                    "input_target_hash": compute_target_hash(before_target),
+                    "context_hash": context_hash,
+                    "verdict": verdict,
+                    "outcome": outcome,
+                    "initial_severity": verdict.max_severity if verdict else "",
+                    "final_severity": verdict.max_severity if verdict else "",
+                    "before_target": before_target,
+                    "after_target": locked.get_target_plurals(),
+                    "cached": False,
+                    "projection_succeeded": not stale_conflict,
+                },
+            )
+
+
+def _select_drain_requests(
+    token: str,
+    profiles: dict[int, object],
+    deferrals: list[JudgeDeferral],
+) -> tuple[list[Unit], dict[int, list[Unit]]]:
+    """
+    Resolve one translation's claimed deferrals into per-seat requests.
+
+    A deferral whose identity no longer matches the unit's current request
+    is closed outright; one whose lease cannot cover a full request
+    deadline starting now is left alone for `_release_judge_deferrals` to
+    hand back to a later pass.
+    """
+    unit_ids = {deferral.unit_id for deferral in deferrals}
+    units = list(
+        type(deferrals[0].unit)
+        .objects.filter(pk__in=unit_ids)
+        .prefetch()
+        .prefetch_source()
+        .order_by("pk")
+    )
+    project = units[0].translation.component.project if units else None
+    if project is None:
+        return units, {}
+    project_context = judge_project_context(project)
+    requested_by_seat: dict[int, list[Unit]] = {}
+    for unit in units:
+        request = build_request(unit)
+        for deferral in (item for item in deferrals if item.unit_id == unit.id):
+            profile = profiles.get(deferral.seat)
+            if profile is None or (
+                _request_identity(unit, request, profile, project_context)
+                != deferral.request_identity
+            ):
+                JudgeDeferral.objects.filter(pk=deferral.pk, claim_token=token).update(
+                    state=JudgeDeferral.State.CLOSED,
+                    closed_at=timezone.now(),
+                    claim_token="",
+                    claimed_at=None,
+                    claim_expires_at=None,
+                )
+                continue
+            margin = timedelta(seconds=float(settings.JUDGE_REQUEST_DEADLINE))
+            if not JudgeDeferral.objects.filter(
+                pk=deferral.pk,
+                claim_token=token,
+                claim_expires_at__gt=timezone.now() + margin,
+            ).exists():
+                # A slow pass can outlive its lease, or the lease cannot
+                # cover a full request deadline for a call starting now.
+                # Leave it for `_release_judge_deferrals` so a later pass
+                # can claim it, rather than starting a call another worker
+                # may duplicate concurrently.
+                continue
+            requested_by_seat.setdefault(deferral.seat, []).append(unit)
+    return units, requested_by_seat
+
+
+def _drain_seat(
+    run: JudgeRun,
+    profiles: dict[int, object],
+    claimed: list[JudgeDeferral],
+    started: float,
+    seat: int,
+    seat_units: list[Unit],
+) -> int:
+    """Reserve capacity and judge one seat's due units within a drain pass."""
+    profile = profiles[seat]
+    requested_calls = math.ceil(len(seat_units) / profile.batch_size)
+    reserved_calls = _reserve_deferral_requests(profile, requested_calls)
+    if not reserved_calls:
+        return 0
+    seat_units = seat_units[: reserved_calls * profile.batch_size]
+    # Bound in-run retry sleeps by the earliest claimed lease: sleeping past
+    # it would let another worker reclaim and pay for the same units while
+    # this pass still holds them.
+    earliest_expiry = min(
+        (
+            deferral.claim_expires_at
+            for deferral in claimed
+            if deferral.seat == seat
+            and deferral.unit_id in {unit.id for unit in seat_units}
+            and deferral.claim_expires_at is not None
+        ),
+        default=None,
+    )
+    lease_deadline = None
+    if earliest_expiry is not None:
+        # Reserve the full request deadline for the retried call itself: a
+        # retry whose request could still run when the lease expires must
+        # not start.
+        margin = float(settings.JUDGE_REQUEST_DEADLINE)
+        remaining = (earliest_expiry - timezone.now()).total_seconds()
+        lease_deadline = started + max(0.0, remaining - margin)
+    # `run_judge_batch` persists and synchronizes the claimed rows. Empty
+    # writable IDs makes this retry strictly read-only.
+    run_judge_batch(
+        seat_units,
+        writable_ids=set(),
+        user=None,
+        run=run,
+        seats=(seat,),
+        use_cache=False,
+        retry_deadline=lease_deadline,
+    )
+    return len(seat_units)
+
+
+def _run_drain_translation(
+    profiles: dict[int, object],
+    claimed: list[JudgeDeferral],
+    started: float,
+    units: list[Unit],
+    requested_by_seat: dict[int, list[Unit]],
+) -> int:
+    """Judge one translation's due seats and audit/project the outcome."""
+    translation = units[0].translation
+    before_snapshots = {
+        unit.id: (unit.get_target_plurals(), unit.state) for unit in units
+    }
+    touched_unit_ids = {
+        unit.id for seat_units in requested_by_seat.values() for unit in seat_units
+    }
+    run = JudgeRun.objects.create(
+        actor=None,
+        started=timezone.now(),
+        status=JudgeRun.Status.RUNNING,
+        scope_type=JudgeRun.ScopeType.TRANSLATION,
+        scope_id=str(translation.pk),
+        scope_label=str(translation),
+        scope_path=translation.get_absolute_url(),
+        requested_mode="drain",
+        cap=len(touched_unit_ids),
+    )
+    processed = 0
+    try:
+        for seat, seat_units in requested_by_seat.items():
+            if time.monotonic() - started >= _DEFERRAL_MAX_ELAPSED_SECONDS:
+                break
+            processed += _drain_seat(run, profiles, claimed, started, seat, seat_units)
+        touched_units = [unit for unit in units if unit.id in touched_unit_ids]
+        _finalize_drain_run(run, touched_units, before_snapshots)
+    except Exception:
+        JudgeRun.objects.filter(pk=run.pk).update(
+            status=JudgeRun.Status.FAILED,
+            failure="Deferred retry drain pass failed.",
+            finished=timezone.now(),
+        )
+        raise
+    else:
+        JudgeRun.objects.filter(pk=run.pk).update(
+            status=JudgeRun.Status.COMPLETED, finished=timezone.now()
+        )
+    return processed
+
+
 def drain_judge_deferrals() -> int:
     """
     Rejudge due deferred seats without ever changing a translation.
@@ -1125,8 +1433,16 @@ def drain_judge_deferrals() -> int:
     try:
         validate_judge_configuration()
         profiles = {seat: resolve_judge_seat_profile(seat) for seat in JUDGE_SEATS}
+    except JudgeError:
+        # A structural misconfiguration (disabled, missing key/model) can
+        # never self-repair: close the queue rather than let it grow
+        # forever. A transient/unexpected failure below is recoverable and
+        # must leave every deferral queued for the next pass.
+        LOGGER.warning("judge deferral drain: judge scope disabled, closing queue")
+        _close_deferrals_for_disabled_judge()
+        return 0
     except Exception:
-        LOGGER.exception("judge deferral drain skipped: invalid configuration")
+        LOGGER.exception("judge deferral drain skipped: recoverable failure")
         return 0
     token, claimed = _claim_judge_deferrals()
     if not claimed:
@@ -1140,87 +1456,14 @@ def drain_judge_deferrals() -> int:
         for deferrals in by_translation.values():
             if time.monotonic() - started >= _DEFERRAL_MAX_ELAPSED_SECONDS:
                 break
-            unit_ids = {deferral.unit_id for deferral in deferrals}
-            units = list(
-                type(deferrals[0].unit)
-                .objects.filter(pk__in=unit_ids)
-                .prefetch()
-                .prefetch_source()
-                .order_by("pk")
+            units, requested_by_seat = _select_drain_requests(
+                token, profiles, deferrals
             )
-            project = units[0].translation.component.project if units else None
-            if project is None:
+            if not requested_by_seat:
                 continue
-            project_context = judge_project_context(project)
-            requested_by_seat: dict[int, list[Unit]] = {}
-            for unit in units:
-                request = build_request(unit)
-                for deferral in (item for item in deferrals if item.unit_id == unit.id):
-                    profile = profiles.get(deferral.seat)
-                    if profile is None or (
-                        _request_identity(unit, request, profile, project_context)
-                        != deferral.request_identity
-                    ):
-                        JudgeDeferral.objects.filter(
-                            pk=deferral.pk, claim_token=token
-                        ).update(
-                            state=JudgeDeferral.State.CLOSED,
-                            closed_at=timezone.now(),
-                            claim_token="",
-                            claimed_at=None,
-                            claim_expires_at=None,
-                        )
-                        continue
-                    if not JudgeDeferral.objects.filter(
-                        pk=deferral.pk,
-                        claim_token=token,
-                        claim_expires_at__gt=timezone.now(),
-                    ).exists():
-                        # A slow pass can outlive its lease. Do not spend for
-                        # a record another worker may already have reclaimed.
-                        continue
-                    requested_by_seat.setdefault(deferral.seat, []).append(unit)
-            for seat, seat_units in requested_by_seat.items():
-                if time.monotonic() - started >= _DEFERRAL_MAX_ELAPSED_SECONDS:
-                    break
-                profile = profiles[seat]
-                requested_calls = math.ceil(len(seat_units) / profile.batch_size)
-                reserved_calls = _reserve_deferral_requests(profile, requested_calls)
-                if not reserved_calls:
-                    continue
-                seat_units = seat_units[: reserved_calls * profile.batch_size]
-                # Bound in-run retry sleeps by the earliest claimed lease:
-                # sleeping past it would let another worker reclaim and pay
-                # for the same units while this pass still holds them.
-                earliest_expiry = min(
-                    (
-                        deferral.claim_expires_at
-                        for deferral in claimed
-                        if deferral.seat == seat
-                        and deferral.unit_id in {unit.id for unit in seat_units}
-                        and deferral.claim_expires_at is not None
-                    ),
-                    default=None,
-                )
-                lease_deadline = None
-                if earliest_expiry is not None:
-                    # Reserve the full request deadline for the retried
-                    # call itself: a retry whose request could still run
-                    # when the lease expires must not start.
-                    margin = float(settings.JUDGE_REQUEST_DEADLINE)
-                    remaining = (earliest_expiry - timezone.now()).total_seconds()
-                    lease_deadline = started + max(0.0, remaining - margin)
-                # `run_judge_batch` persists and synchronizes the claimed
-                # rows. Empty writable IDs makes this retry strictly read-only.
-                run_judge_batch(
-                    seat_units,
-                    writable_ids=set(),
-                    user=None,
-                    seats=(seat,),
-                    use_cache=False,
-                    retry_deadline=lease_deadline,
-                )
-                processed += len(seat_units)
+            processed += _run_drain_translation(
+                profiles, claimed, started, units, requested_by_seat
+            )
     finally:
         _release_judge_deferrals(token)
     return processed

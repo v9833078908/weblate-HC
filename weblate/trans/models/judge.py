@@ -428,6 +428,7 @@ class JudgeRunUnit(models.Model):
         MAJOR = "major"
         CRITICAL = "critical"
         UNPARSED = "unparsed"
+        DEFERRED = "deferred"
         SKIPPED = "skipped"
         STALE_CONFLICT = "stale-conflict"
 

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 
 from django.db import IntegrityError, transaction
 
@@ -12,7 +13,8 @@ from weblate.glossary.models import (
     get_glossary_terms,
     get_matched_glossary_prompt_entries,
 )
-from weblate.trans.judge_loop import build_request
+from weblate.trans.judge import JudgeResult
+from weblate.trans.judge_loop import _write_verdict, build_request
 from weblate.trans.models.judge import (
     JudgeVerdict,
     active_round,
@@ -166,6 +168,37 @@ class JudgeRoundTest(ViewTestCase):
         self.make(unit, "minor")
         type(unit).objects.filter(pk=unit.pk).update(source="Changed source")
         self.assertEqual(self.judge_status(unit)["judge_active_severity"], "minor")
+
+    def test_status_annotations_self_heal_a_legacy_missing_storage_hash(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        target_hash = compute_target_hash(unit.get_target_plurals())
+        # A round written before the target_storage_hash backfill existed:
+        # SQL annotations cannot match it until something repopulates the
+        # hash, even though active_round() already finds it via target_hash.
+        self.make(unit, "major", target_hash=target_hash, target_storage_hash=None)
+        self.assertIsNotNone(active_verdict(unit))
+        self.assertIsNone(self.judge_status(unit)["judge_active_severity"])
+
+        request = build_request(unit)
+        profile = SimpleNamespace(
+            model="vendor/model-a",
+            profile_fingerprint="pf",
+            prompt_schema_version="v1",
+        )
+        _write_verdict(
+            unit,
+            request,
+            seat=2,
+            attempt=0,
+            run_id=uuid.uuid4(),
+            result=JudgeResult("none", "pass", [], ""),
+            profile=profile,
+            project_context="",
+        )
+
+        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "major")
 
     def test_collegium_takes_the_strictest_seat(self) -> None:
         unit = self.get_unit()

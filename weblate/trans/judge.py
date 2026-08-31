@@ -220,13 +220,17 @@ def _alias_revision_hash(info: object) -> str:
     return _fingerprint(_redact_alias_config(info))
 
 
-def _read_capped(response: httpx2.Response, cap: int) -> bytes | None:
-    """Read a body incrementally; None when it exceeds the cap."""
+def _read_capped(
+    response: httpx2.Response, cap: int, *, deadline: float | None = None
+) -> bytes | None:
+    """Read a body incrementally; None when it exceeds the cap or deadline."""
     buffer = bytearray()
     for chunk in response.iter_bytes():
-        buffer.extend(chunk)
-        if len(buffer) > cap:
+        if deadline is not None and time.monotonic() > deadline:
             return None
+        if len(buffer) + len(chunk) > cap:
+            return None
+        buffer.extend(chunk)
     return bytes(buffer)
 
 
@@ -240,7 +244,11 @@ def _fetch_litellm_alias(base_url: str, model: str) -> tuple[str, str] | None:
         timeout=httpx2.Timeout(timeout=_ALIAS_INFO_TIMEOUT),
         follow_redirects=False,
     ) as response:
-        body = _read_capped(response, _MAX_ALIAS_INFO_BYTES)
+        body = _read_capped(
+            response,
+            _MAX_ALIAS_INFO_BYTES,
+            deadline=time.monotonic() + _ALIAS_INFO_TIMEOUT,
+        )
     if body is None or response.status_code != 200:
         return None
     payload = json.loads(body)
@@ -473,8 +481,10 @@ def validate_request_settings() -> None:
     ):
         raise JudgeError(_("The LLM judge is not configured."))
     get_judge_base_url()
-    if not isinstance(settings.JUDGE_REQUEST_DEADLINE, (int, float)) or (
-        settings.JUDGE_REQUEST_DEADLINE <= 0
+    if not (
+        isinstance(settings.JUDGE_REQUEST_DEADLINE, (int, float))
+        and math.isfinite(settings.JUDGE_REQUEST_DEADLINE)
+        and settings.JUDGE_REQUEST_DEADLINE > 0
     ):
         raise JudgeError(_("The LLM judge is not configured."))
 
@@ -486,6 +496,9 @@ def validate_judge_configuration() -> None:
         and settings.JUDGE_MAX_REPAIR_ATTEMPTS >= 0
         and isinstance(settings.JUDGE_MAX_UNITS_PER_RUN, int)
         and settings.JUDGE_MAX_UNITS_PER_RUN >= 0
+        and isinstance(settings.JUDGE_RETRY_BUDGET_RATIO, (int, float))
+        and math.isfinite(settings.JUDGE_RETRY_BUDGET_RATIO)
+        and settings.JUDGE_RETRY_BUDGET_RATIO >= 0
     ):
         raise JudgeError(_("The LLM judge is not configured."))
     judge_seat_profiles()
@@ -896,7 +909,18 @@ def _read_sse(
                 first_byte_ms,
                 "",
             )
-        last_byte, pending = now, pending + decoder.decode(chunk)
+        try:
+            decoded = decoder.decode(chunk)
+        except UnicodeDecodeError:
+            return (
+                None,
+                "invalid-envelope",
+                state.finish_reason,
+                response_bytes,
+                first_byte_ms,
+                "",
+            )
+        last_byte, pending = now, pending + decoded
         while "\n" in pending:
             line, pending = pending.split("\n", 1)
             if line.rstrip("\r"):
@@ -913,6 +937,17 @@ def _read_sse(
                     first_byte_ms,
                     "",
                 )
+    try:
+        pending += decoder.decode(b"", final=True)
+    except UnicodeDecodeError:
+        return (
+            None,
+            "invalid-envelope",
+            state.finish_reason,
+            response_bytes,
+            first_byte_ms,
+            "",
+        )
     return (
         *_sse_result(
             state, response_bytes, first_byte_ms, bool(pending or event_lines)
@@ -1389,7 +1424,7 @@ def _run_batch(
             retries_used += 1
             retry = True
             delay = (
-                response.retry_after
+                min(response.retry_after, settings.JUDGE_REQUEST_DEADLINE)
                 if failure == "http-rate-limit" and response.retry_after is not None
                 else _full_jitter(
                     max(settings.JUDGE_REQUEST_SLEEP, 1.0) * 2 ** (retries_used - 1)
