@@ -222,12 +222,14 @@ def judge_project_context(project: Project) -> str:
 def _write_verdict(
     unit: Unit,
     request: JudgeRequest,
+    *,
     seat: int,
     attempt: int,
     run_id: uuid.UUID,
     result,
     profile,
     project_context: str,
+    request_round: int = 0,
 ) -> None:
     target_hash = compute_target_hash(request.target_plurals or [request.target])
     context_hash = compute_context_hash(
@@ -257,6 +259,7 @@ def _write_verdict(
         judge_model=profile.model,
         seat=seat,
         attempt=attempt,
+        request_round=request_round,
         target_hash=target_hash,
         target_storage_hash=compute_target_storage_hash(request.target),
         context_hash=context_hash,
@@ -313,7 +316,7 @@ def _request_identity(
 def _cached_verdict(
     unit: Unit, request: JudgeRequest, profiles: dict[int, object], project_context: str
 ) -> JudgeVerdict | None:
-    """Reuse the newest parsed per-seat verdicts for an unchanged request."""
+    """Reuse only complete current parsed evidence for an unchanged request."""
     identities = {
         seat: _request_identity(unit, request, profile, project_context)
         for seat, profile in profiles.items()
@@ -323,13 +326,12 @@ def _cached_verdict(
         row = (
             unit.judge_verdicts.filter(
                 request_identity=identity,
-                unparsed=False,
                 seat=seat,
             )
             .order_by("-timestamp", "-pk")
             .first()
         )
-        if row is None or row.judge_model != profiles[seat].model:
+        if row is None or row.unparsed or row.judge_model != profiles[seat].model:
             return None
         rows.append(row)
     return collegium_verdict(rows)
@@ -763,6 +765,7 @@ def _persist_verdict_batches(
     *,
     seat: int,
     attempt: int,
+    request_round: int,
     run_id: uuid.UUID,
     profile,
     project_context: str,
@@ -793,12 +796,13 @@ def _persist_verdict_batches(
                 _write_verdict(
                     unit,
                     request,
-                    seat,
-                    attempt,
-                    run_id,
-                    result,
-                    profile,
-                    project_context,
+                    seat=seat,
+                    attempt=attempt,
+                    run_id=run_id,
+                    result=result,
+                    profile=profile,
+                    project_context=project_context,
+                    request_round=request_round,
                 )
                 _sync_deferral(
                     unit,
@@ -864,16 +868,18 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
         original.target = unit.target
         original.state = unit.state
 
-    def judge_seat_round(seat_units: list[Unit], seat: int, round_attempt: int) -> None:
-        """Send one seat's requests and persist every batch outcome."""
+    def judge_seat_round(
+        seat_units: list[Unit], seat: int, repair_attempt: int, request_round: int
+    ) -> None:
         profile = profiles[seat]
         requests = [round_requests[unit.id] for unit in seat_units]
         started_at = timezone.now()
         persist = _persist_verdict_batches(
             seat_units,
             seat=seat,
-            attempt=round_attempt,
+            attempt=repair_attempt,
             run_id=run_id,
+            request_round=request_round,
             profile=profile,
             project_context=project_context,
             on_batch=on_batch,
@@ -890,11 +896,12 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
             persist_attempts=True,
             retry_budget=retry_budget,
             adaptive=True,
-            attempt=round_attempt,
+            attempt=repair_attempt,
             retry_deadline=retry_deadline,
         )
 
     run_id = uuid.uuid4()
+    next_request_round = 0
     project_slug = units[0].translation.component.project.slug
     project_context = judge_project_context(units[0].translation.component.project)
     pending = list(units)
@@ -937,35 +944,34 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
             len(writable_ids),
             len(cached_ids),
         )
-        for seat in selected_seats:
-            profile = profiles[seat]
-            request_units = [unit for unit in pending if unit.id not in cached_ids]
-            if not request_units:
-                continue
-            judge_seat_round(request_units, seat, attempt)
-
-            LOGGER.info(
-                "judge run %s: seat %d done, %d strings judged with %s",
-                run_id,
-                seat,
-                len(request_units),
-                profile.model,
-            )
-        if unparsed_rounds:
+        request_units = [unit for unit in pending if unit.id not in cached_ids]
+        if request_units:
+            request_round = next_request_round
+            next_request_round += 1
+            for seat in selected_seats:
+                profile = profiles[seat]
+                judge_seat_round(request_units, seat, attempt, request_round)
+                LOGGER.info(
+                    "judge run %s: seat %d done, %d strings judged with %s",
+                    run_id,
+                    seat,
+                    len(request_units),
+                    profile.model,
+                )
+        if unparsed_rounds and request_units:
             # Retry only a round in which every selected seat failed. Use
             # its persisted rows directly: reader-side per-seat joining may
             # legitimately retain an older opinion after a transport loss,
             # but that does not make this invocation's all-dead round parsed.
             retry_round = 0
-            last_round_attempt = attempt
+            last_request_round = request_round
             while retry_round < unparsed_rounds:
                 rows_by_unit: dict[int, list[JudgeVerdict]] = {}
                 for row in JudgeVerdict.objects.filter(
-                    unit_id__in=[
-                        unit.id for unit in pending if unit.id not in cached_ids
-                    ],
+                    unit_id__in=[unit.id for unit in request_units],
                     run_id=run_id,
-                    attempt=last_round_attempt,
+                    attempt=attempt,
+                    request_round=last_request_round,
                     seat__in=selected_seats,
                 ):
                     rows_by_unit.setdefault(row.unit_id, []).append(row)
@@ -978,7 +984,8 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                 if not unparsed_ids:
                     break
                 retry_round += 1
-                last_round_attempt = attempts + 1 + retry_round
+                last_request_round = next_request_round
+                next_request_round += 1
                 LOGGER.info(
                     "judge run %s: unparsed retry round %d for %d strings",
                     run_id,
@@ -988,7 +995,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                 for seat in selected_seats:
                     seat_units = [unit for unit in pending if unit.id in unparsed_ids]
                     if seat_units:
-                        judge_seat_round(seat_units, seat, last_round_attempt)
+                        judge_seat_round(seat_units, seat, attempt, last_request_round)
         prepared = [
             _prepare_round_unit(
                 unit,

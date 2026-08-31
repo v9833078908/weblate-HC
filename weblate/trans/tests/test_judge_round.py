@@ -21,6 +21,7 @@ from weblate.trans.models.judge import (
     current_round,
     current_verdict,
     describe_latest_verdict,
+    has_complete_current_evidence,
     judge_status_annotations,
     latest_round,
 )
@@ -72,6 +73,31 @@ class JudgeRoundTest(ViewTestCase):
         self.make(unit, "minor", seat=1, run_id=run)
         self.make(unit, "critical", seat=2, run_id=run)
         self.assertEqual(self.judge_status(unit)["judge_active_severity"], "critical")
+
+    def test_request_round_keeps_transport_recovery_out_of_repair_attempts(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(
+            unit,
+            "critical",
+            seat=1,
+            run_id=run,
+            attempt=0,
+            request_round=0,
+        )
+        recovered = self.make(
+            unit,
+            "none",
+            seat=1,
+            run_id=run,
+            attempt=0,
+            request_round=1,
+        )
+
+        self.assertEqual(recovered.attempt, 0)
+        self.assertEqual(recovered.request_round, 1)
 
     def test_status_annotations_keep_parsed_fallback_after_incomplete_round(
         self,
@@ -204,6 +230,24 @@ class JudgeRoundTest(ViewTestCase):
         assert current is not None
         self.assertEqual(current.verdict, JudgeVerdict.Verdict.UNPARSED)
         self.assertEqual(current_round(unit)[0].run_id, new)
+
+    def test_current_evidence_requires_every_configured_seat_to_parse(self) -> None:
+        unit = self.get_unit()
+        context_hash = compute_context_hash(
+            source=unit.source,
+            note=unit.source_unit.note,
+            glossary_terms=[],
+        )
+        self.make(unit, "none", seat=1, context_hash=context_hash)
+        self.make(
+            unit,
+            "none",
+            seat=2,
+            unparsed=True,
+            context_hash=context_hash,
+        )
+
+        self.assertFalse(has_complete_current_evidence(unit, seats=(1, 2)))
 
     def test_a_verdict_for_other_text_is_not_active(self) -> None:
         unit = self.get_unit()

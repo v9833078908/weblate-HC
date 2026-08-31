@@ -516,9 +516,10 @@ class JudgeVerdict(models.Model):
     """
     One judge opinion about one version of one unit.
 
-    Verdicts are never overwritten: they accumulate per
-    ``(unit, run_id, attempt, seat)`` so the collegium and its repair
-    loop stay auditable. Only ``max_severity`` and ``unparsed`` are
+    ``(unit, run_id, attempt, request_round, seat)`` so the collegium and
+    its repair loop stay auditable. ``attempt`` records a translation mutation
+    cycle; ``request_round`` records transport recovery within that cycle. Only
+    ``max_severity`` and ``unparsed`` are
     stored; the verdict is derived (severity->verdict mapping was
     reopened by measurement R3 and must stay changeable without a data
     migration).
@@ -563,6 +564,7 @@ class JudgeVerdict(models.Model):
     # Place in the collegium, not seniority: seat 2 may not lower seat 1.
     seat = models.SmallIntegerField()
     attempt = models.SmallIntegerField(default=0)
+    request_round = models.PositiveSmallIntegerField(default=0)
     target_hash = models.CharField(max_length=64)
     target_storage_hash = models.CharField(  # ruff: ignore[django-nullable-model-string-field]
         max_length=32, null=True, db_index=True
@@ -633,11 +635,11 @@ class JudgeVerdict(models.Model):
         ]
         # ruff: ignore[mutable-class-default]
         constraints = [
-            # One vote per seat per round: a round is reduced to its
-            # strictest seat and must not see a seat twice.
+            # One vote per seat per request round. Transport recovery must not
+            # consume a repair attempt coordinate.
             models.UniqueConstraint(
-                fields=["unit", "run_id", "attempt", "seat"],
-                name="judge_one_vote_per_seat",
+                fields=["unit", "run_id", "attempt", "request_round", "seat"],
+                name="judge_one_vote_per_seat_round",
             ),
         ]
 
@@ -720,7 +722,9 @@ def latest_round(unit: Unit) -> list[JudgeVerdict]:
         return []
     return list(
         unit.judge_verdicts.filter(
-            run_id=newest.run_id, attempt=newest.attempt
+            run_id=newest.run_id,
+            attempt=newest.attempt,
+            request_round=newest.request_round,
         ).order_by("seat")
     )
 
@@ -833,6 +837,16 @@ def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
 def active_verdict(unit: Unit) -> JudgeVerdict | None:
     """Return the collegium verdict that still describes the stored text."""
     return collegium_verdict(active_round(unit))
+
+
+def has_complete_current_evidence(unit: Unit, *, seats: Sequence[int]) -> bool:
+    """Whether every configured seat has parsed the current snapshot."""
+    rows = current_round(unit)
+    return (
+        {row.seat for row in rows} == set(seats)
+        and len(rows) == len(seats)
+        and all(not row.unparsed for row in rows)
+    )
 
 
 @dataclass(frozen=True)

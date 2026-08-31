@@ -22,7 +22,12 @@ from weblate.trans.models.judge import (
 )
 from weblate.trans.models.unit import Unit
 from weblate.trans.tests.test_views import ViewTestCase
-from weblate.utils.state import FUZZY_STATES, STATE_FUZZY, STATE_TRANSLATED
+from weblate.utils.state import (
+    FUZZY_STATES,
+    STATE_APPROVED,
+    STATE_FUZZY,
+    STATE_TRANSLATED,
+)
 
 
 @override_settings(
@@ -112,6 +117,52 @@ class JudgeAutoTranslateTest(ViewTestCase):
         before = self.get_unit().state
         self.perform(JudgeVerdict.Verdict.UNPARSED)
         self.assertEqual(self.get_unit().state, before)
+
+    @override_settings(JUDGE_MAY_APPROVE=True)
+    def test_unparsed_configured_seat_cannot_approve_a_pass(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["some target"], STATE_TRANSLATED)
+
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+            out = {}
+            for candidate in units:
+                request = build_request(candidate)
+                kwargs = {
+                    "unit": candidate,
+                    "max_severity": "none",
+                    "judge_model": "vendor-a/model",
+                    "target_hash": compute_target_hash(request.target_plurals),
+                    "context_hash": compute_context_hash(
+                        source=request.source,
+                        note=request.note,
+                        glossary_terms=request.glossary_terms,
+                    ),
+                }
+                out[candidate.id] = JudgeVerdict.objects.create(
+                    seat=1,
+                    model_verdict=JudgeVerdict.Verdict.PASS,
+                    **kwargs,
+                )
+                JudgeVerdict.objects.create(
+                    seat=2,
+                    unparsed=True,
+                    model_verdict=JudgeVerdict.Verdict.UNPARSED,
+                    **kwargs,
+                )
+            return out
+
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q="",
+            mode="judge",
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
+        ):
+            auto.process_judge(engines=[], threshold=80)
+
+        self.assertNotEqual(self.get_unit().state, STATE_APPROVED)
 
     def test_pass_with_active_max_length_check_stays_fuzzy(self) -> None:
         unit = self.get_unit()

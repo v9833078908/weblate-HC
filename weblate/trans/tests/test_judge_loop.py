@@ -621,6 +621,35 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.PASS)
         self.assertEqual(client.call_count, 2)
 
+    def test_newer_unparsed_evidence_disables_cache_reuse(self) -> None:
+        unit, _, _ = self.run_batch([PASS, PASS], writable=False)
+        parsed = unit.judge_verdicts.get(seat=1)
+        JudgeVerdict.objects.create(
+            unit=unit,
+            model_verdict=JudgeVerdict.Verdict.UNPARSED,
+            max_severity="none",
+            unparsed=True,
+            judge_model=parsed.judge_model,
+            seat=parsed.seat,
+            attempt=parsed.attempt,
+            request_round=parsed.request_round,
+            target_hash=parsed.target_hash,
+            target_storage_hash=parsed.target_storage_hash,
+            context_hash=parsed.context_hash,
+            request_identity=parsed.request_identity,
+            project_context_hash=parsed.project_context_hash,
+            source_language=parsed.source_language,
+            target_language=parsed.target_language,
+            profile_fingerprint=parsed.profile_fingerprint,
+            prompt_schema_version=parsed.prompt_schema_version,
+        )
+        client = mock_request_verdicts([[PASS], [PASS]])
+
+        with mock.patch("weblate.trans.judge_loop.request_verdicts", client):
+            run_judge_batch([unit], writable_ids=set(), user=self.user)
+
+        self.assertEqual(client.call_count, 2)
+
     def test_profile_change_invalidates_cached_verdict(self) -> None:
         unit, _, _ = self.run_batch([PASS, PASS], writable=False)
         client = mock_request_verdicts([[PASS], [PASS]])
@@ -833,10 +862,15 @@ class JudgeUnparsedRetryRoundTest(ViewTestCase):
 
         self.assertEqual(client.call_count, 4)
         self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.PASS)
-        # The first all-unparsed round remains durable audit history; the
-        # retry writes a distinct attempt round rather than overwriting it.
-        rows = list(unit.judge_verdicts.order_by("attempt", "seat"))
+        # Transport recovery uses a new request round without consuming a
+        # repair-attempt coordinate.
+        rows = list(unit.judge_verdicts.order_by("request_round", "seat"))
         self.assertEqual(len(rows), 4)
+        self.assertEqual({row.attempt for row in rows}, {0})
+        self.assertEqual(
+            [row.request_round for row in rows],
+            [0, 0, 1, 1],
+        )
         self.assertTrue(all(row.unparsed for row in rows[:2]))
         self.assertTrue(all(not row.unparsed for row in rows[2:]))
 

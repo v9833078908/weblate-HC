@@ -21,6 +21,7 @@ from weblate.machinery.base import MachineTranslationError
 from weblate.machinery.models import MACHINERY
 from weblate.trans.actions import ActionEvents
 from weblate.trans.judge import (
+    JUDGE_SEATS,
     JudgeError,
     judge_configuration_snapshot,
     judge_initial_request_count,
@@ -44,6 +45,7 @@ from weblate.trans.models.judge import (
     compute_context_hash,
     compute_target_hash,
     current_verdict,
+    has_complete_current_evidence,
     state_for_verdict,
 )
 from weblate.trans.util import is_plural, split_plural
@@ -828,7 +830,10 @@ class AutoTranslate(BaseAutoTranslate):
                 state = state_for_verdict(
                     verdict.verdict,
                     enable_review=self.translation.enable_review,
-                    may_approve=settings.JUDGE_MAY_APPROVE,
+                    may_approve=(
+                        settings.JUDGE_MAY_APPROVE
+                        and has_complete_current_evidence(locked, seats=JUDGE_SEATS)
+                    ),
                 )
                 if verdict.verdict == JudgeVerdict.Verdict.PASS and any(
                     check.name == "max-length" for check in locked.active_checks
