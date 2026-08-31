@@ -4,19 +4,29 @@
 
 from __future__ import annotations
 
+import contextlib
 import threading
 import uuid
 from unittest import mock
 
 from django.conf import settings
-from django.test import SimpleTestCase, override_settings
+from django.db import connections
+from django.test import SimpleTestCase, TransactionTestCase, override_settings
 
 from weblate.machinery.base import (
     MACHINERY_DEFAULT_THRESHOLD,
     MachineTranslationError,
 )
-from weblate.trans.judge import JudgeResult, RetryBudget, resolve_judge_seat_profile
+from weblate.trans.judge import (
+    JudgeRequest,
+    JudgeResult,
+    RetryBudget,
+    _write_llm_usage,
+    resolve_judge_seat_profile,
+)
 from weblate.trans.judge_loop import (
+    _run_seats,
+    _SeatJob,
     _select_repair_texts,
     _write_verdict,
     build_request,
@@ -31,6 +41,7 @@ from weblate.trans.models.judge import (
     compute_target_hash,
     compute_target_storage_hash,
 )
+from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.hash import calculate_hash
 from weblate.utils.state import STATE_FUZZY, STATE_TRANSLATED
@@ -113,10 +124,8 @@ class JudgeRetryBudgetTest(SimpleTestCase):
 
         class SynchronizedCounter(int):
             def __iadd__(self, other):
-                try:
+                with contextlib.suppress(threading.BrokenBarrierError):
                     barrier.wait(timeout=0.1)
-                except threading.BrokenBarrierError:
-                    pass
                 return int.__add__(self, other)
 
         budget = RetryBudget(maximum=1, used=SynchronizedCounter(0))
@@ -133,6 +142,148 @@ class JudgeRetryBudgetTest(SimpleTestCase):
 
         self.assertEqual(results.count(True), 1)
         self.assertEqual(budget.used, 1)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class JudgeSeatConnectionCleanupTest(TransactionTestCase):
+    def _run_seats(self, worker_error=None):
+        request = JudgeRequest(
+            unit_key="cleanup",
+            source="source",
+            target="target",
+            source_language="en",
+            target_language="cs",
+            note="",
+            glossary_terms=(),
+        )
+        caller_id = threading.get_ident()
+        barrier = threading.Barrier(2, timeout=5)
+        worker_ids = set()
+        wrappers = []
+        persisted_ids = []
+        attempt_ids = []
+        finished = set()
+        lock = threading.Lock()
+
+        def persist(batch_requests, batch_results):
+            persisted_ids.append(threading.get_ident())
+
+        def request_verdicts(requests, *, model, on_batch, seat, **kwargs):
+            try:
+                wrapper = connections["default"]
+                profile = resolve_judge_seat_profile(seat)
+                attempt = JudgeRequestAttempt.objects.create(
+                    seat=seat,
+                    endpoint_fingerprint=profile.endpoint_fingerprint,
+                    model=profile.model,
+                    profile_fingerprint=profile.profile_fingerprint,
+                    prompt_schema_version=profile.prompt_schema_version,
+                    batch_digest=f"{seat:064d}",
+                    batch_size=1,
+                )
+                _write_llm_usage(
+                    {
+                        "id": f"cleanup-{seat}",
+                        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+                    },
+                    model,
+                    "judge-seat-cleanup",
+                    1,
+                    attempt,
+                )
+                with lock:
+                    worker_ids.add(threading.get_ident())
+                    wrappers.append(wrapper)
+                    attempt_ids.append(attempt.pk)
+                barrier.wait()
+                if worker_error is not None and seat == 2:
+                    raise worker_error
+                on_batch(requests, [PASS])
+                return [PASS]
+            finally:
+                with lock:
+                    finished.add(seat)
+
+        jobs = [
+            _SeatJob(
+                seat=seat,
+                model=f"vendor-{seat}/model",
+                requests=[request],
+                persist=persist,
+                run=None,
+                retry_budget=RetryBudget(),
+                attempt=0,
+                retry_deadline=None,
+            )
+            for seat in (1, 2)
+        ]
+        with mock.patch(
+            "weblate.trans.judge_loop.request_verdicts",
+            new=request_verdicts,
+        ):
+            if worker_error is None:
+                _run_seats(
+                    jobs,
+                    project_slug="judge-seat-cleanup",
+                    project_context="",
+                    run_id=uuid.uuid4(),
+                )
+            else:
+                with self.assertRaisesRegex(RuntimeError, str(worker_error)):
+                    _run_seats(
+                        jobs,
+                        project_slug="judge-seat-cleanup",
+                        project_context="",
+                        run_id=uuid.uuid4(),
+                    )
+        return {
+            "attempt_ids": attempt_ids,
+            "caller_id": caller_id,
+            "finished": finished,
+            "persisted_ids": persisted_ids,
+            "expected_persisted": 2 if worker_error is None else 1,
+            "worker_ids": worker_ids,
+            "wrappers": wrappers,
+        }
+
+    def assert_worker_connections_closed(self, outcome) -> None:
+        self.assertEqual(len(outcome["worker_ids"]), 2)
+        self.assertNotIn(outcome["caller_id"], outcome["worker_ids"])
+        self.assertEqual(outcome["finished"], {1, 2})
+        self.assertEqual(
+            set(outcome["persisted_ids"]),
+            {outcome["caller_id"]},
+        )
+        self.assertEqual(
+            len(outcome["persisted_ids"]),
+            outcome["expected_persisted"],
+        )
+        self.assertTrue(
+            all(wrapper.connection is None for wrapper in outcome["wrappers"])
+        )
+        self.assertEqual(
+            JudgeRequestAttempt.objects.filter(pk__in=outcome["attempt_ids"]).count(),
+            2,
+        )
+        self.assertEqual(
+            LLMUsageLog.objects.filter(
+                project_slug="judge-seat-cleanup",
+                request_attempt_id__in=outcome["attempt_ids"],
+            ).count(),
+            2,
+        )
+
+    def test_workers_close_database_connections_after_success(self) -> None:
+        self.assert_worker_connections_closed(self._run_seats())
+
+    def test_workers_close_database_connections_after_failure(self) -> None:
+        self.assert_worker_connections_closed(self._run_seats(RuntimeError("worker")))
+
 
 @override_settings(
     JUDGE_ENABLED=True,
@@ -165,6 +316,282 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
         self.assertEqual(client.call_count, 2)
         self.assertEqual(unit.judge_verdicts.count(), 2)
+
+    def test_both_seats_are_asked_concurrently(self) -> None:
+        barrier = threading.Barrier(2, timeout=1)
+        worker_ids = []
+        worker_lock = threading.Lock()
+        unit = self.get_unit()
+
+        def request(requests, *, on_batch, **kwargs):
+            with worker_lock:
+                worker_ids.append(threading.get_ident())
+            barrier.wait()
+            results = [PASS] * len(requests)
+            on_batch(requests, results)
+            return results
+
+        with mock.patch("weblate.trans.judge_loop.request_verdicts", new=request):
+            run_judge_batch([unit], writable_ids=set(), user=self.user)
+
+        self.assertEqual(len(set(worker_ids)), 2)
+        self.assertNotIn(threading.get_ident(), worker_ids)
+
+    def test_verdicts_and_progress_run_on_the_calling_thread(self) -> None:
+        caller_id = threading.get_ident()
+        worker_ids = set()
+        write_ids = set()
+        progress_ids = set()
+        original_write = _write_verdict
+        unit = self.get_unit()
+
+        def request(requests, *, on_batch, **kwargs):
+            worker_ids.add(threading.get_ident())
+            results = [PASS] * len(requests)
+            on_batch(requests, results)
+            return results
+
+        def write_verdict(*args, **kwargs):
+            write_ids.add(threading.get_ident())
+            return original_write(*args, **kwargs)
+
+        def progress(*args, **kwargs):
+            progress_ids.add(threading.get_ident())
+
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", new=request),
+            mock.patch(
+                "weblate.trans.judge_loop._write_verdict",
+                side_effect=write_verdict,
+            ),
+        ):
+            run_judge_batch(
+                [unit],
+                writable_ids=set(),
+                user=self.user,
+                on_batch=progress,
+            )
+
+        self.assertEqual(write_ids, {caller_id})
+        self.assertEqual(progress_ids, {caller_id})
+        self.assertEqual(len(worker_ids), 2)
+        self.assertNotIn(caller_id, worker_ids)
+
+    @override_settings(JUDGE_BATCH_SIZE_SEAT_1=1, JUDGE_BATCH_SIZE_SEAT_2=2)
+    def test_each_seat_advances_in_lockstep_and_keeps_order_and_model(self) -> None:
+        first = self.get_unit()
+        second = self.get_unit(source="Thank you for using Weblate.")
+        first_batch_ready = threading.Event()
+        seat_two_persisted = threading.Event()
+        seat_one_advanced_early = threading.Event()
+        original_write = _write_verdict
+
+        def write_verdict(*args, **kwargs):
+            verdict = original_write(*args, **kwargs)
+            if kwargs["seat"] == 2:
+                seat_two_persisted.set()
+            return verdict
+
+        def request(requests, *, on_batch, seat, **kwargs):
+            if seat == 1:
+                first_batch_ready.set()
+                on_batch(requests[:1], [MAJOR])
+                if not seat_two_persisted.is_set():
+                    seat_one_advanced_early.set()
+                on_batch(requests[1:], [PASS])
+                return [MAJOR, PASS]
+            first_batch_ready.wait(timeout=1)
+            on_batch(requests, [CRITICAL, PASS])
+            return [CRITICAL, PASS]
+
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", new=request),
+            mock.patch(
+                "weblate.trans.judge_loop._write_verdict",
+                side_effect=write_verdict,
+            ),
+        ):
+            run_judge_batch(
+                [first, second],
+                writable_ids=set(),
+                user=self.user,
+            )
+
+        self.assertFalse(seat_one_advanced_early.is_set())
+        self.assertEqual(
+            set(
+                JudgeVerdict.objects.filter(unit__in=[first, second]).values_list(
+                    "unit_id",
+                    "seat",
+                    "judge_model",
+                    "max_severity",
+                )
+            ),
+            {
+                (first.id, 1, "vendor-a/model", "major"),
+                (first.id, 2, "vendor-b/model", "critical"),
+                (second.id, 1, "vendor-a/model", "none"),
+                (second.id, 2, "vendor-b/model", "none"),
+            },
+        )
+
+    @override_settings(JUDGE_BATCH_SIZE_SEAT_1=1, JUDGE_BATCH_SIZE_SEAT_2=1)
+    def test_a_failing_seat_keeps_the_other_seats_completed_verdicts(self) -> None:
+        first = self.get_unit()
+        second = self.get_unit(source="Thank you for using Weblate.")
+        first_persisted = threading.Event()
+        seat_two_started = threading.Event()
+        batch_attempts = {1: 0, 2: 0}
+        finished = set()
+        finished_lock = threading.Lock()
+        original_write = _write_verdict
+
+        def write_verdict(*args, **kwargs):
+            verdict = original_write(*args, **kwargs)
+            if kwargs["seat"] == 1:
+                first_persisted.set()
+            return verdict
+
+        def request(requests, *, on_batch, seat, **kwargs):
+            try:
+                if seat == 1:
+                    batch_attempts[seat] += 1
+                    on_batch(requests[:1], [PASS])
+                    seat_two_started.wait(timeout=1)
+                    batch_attempts[seat] += 1
+                    on_batch(requests[1:], [PASS])
+                    return [PASS, PASS]
+                seat_two_started.set()
+                batch_attempts[seat] += 1
+                first_persisted.wait(timeout=1)
+                msg = "simulated worker failure"
+                raise RuntimeError(msg)
+            finally:
+                with finished_lock:
+                    finished.add(seat)
+
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", new=request),
+            mock.patch(
+                "weblate.trans.judge_loop._write_verdict",
+                side_effect=write_verdict,
+            ),
+            self.assertRaisesRegex(RuntimeError, "simulated worker failure"),
+        ):
+            run_judge_batch(
+                [first, second],
+                writable_ids=set(),
+                user=self.user,
+            )
+
+        self.assertEqual(batch_attempts, {1: 1, 2: 1})
+        self.assertEqual(finished, {1, 2})
+        self.assertEqual(
+            JudgeVerdict.objects.filter(unit__in=[first, second], seat=1).count(),
+            1,
+        )
+
+    @override_settings(JUDGE_BATCH_SIZE_SEAT_1=1, JUDGE_BATCH_SIZE_SEAT_2=1)
+    def test_caller_failure_stops_seats_after_their_in_flight_batch(self) -> None:
+        for failure in ("persistence", "progress"):
+            with self.subTest(failure=failure):
+                self.assert_caller_failure(failure)
+
+    def assert_caller_failure(self, failure) -> None:
+        first = self.get_unit()
+        second = self.get_unit(source="Thank you for using Weblate.")
+        run = JudgeRun.objects.create(
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(first.translation_id),
+            scope_label=str(first.translation),
+            scope_path=first.translation.get_absolute_url(),
+            requested_mode="judge",
+            cap=2,
+        )
+        barrier = threading.Barrier(2, timeout=1)
+        batch_attempts = {1: 0, 2: 0}
+        finished = set()
+        finished_lock = threading.Lock()
+        caller_error = RuntimeError(f"{failure} failure")
+        failed = False
+        original_write = _write_verdict
+
+        def request(requests, *, on_batch, seat, **kwargs):
+            try:
+                barrier.wait()
+                batch_attempts[seat] += 1
+                on_batch(requests[:1], [PASS])
+                batch_attempts[seat] += 1
+                on_batch(requests[1:], [PASS])
+                return [PASS, PASS]
+            finally:
+                with finished_lock:
+                    finished.add(seat)
+
+        def write_verdict(*args, **kwargs):
+            nonlocal failed
+            if failure == "persistence" and not failed:
+                failed = True
+                raise caller_error
+            return original_write(*args, **kwargs)
+
+        def progress(*args, **kwargs):
+            nonlocal failed
+            if failure == "progress" and not failed:
+                failed = True
+                raise caller_error
+
+        with (
+            mock.patch(
+                "weblate.trans.judge_loop.request_verdicts",
+                new=request,
+            ),
+            mock.patch(
+                "weblate.trans.judge_loop._write_verdict",
+                side_effect=write_verdict,
+            ),
+            self.assertRaisesRegex(RuntimeError, str(caller_error)),
+        ):
+            run_judge_batch(
+                [first, second],
+                writable_ids=set(),
+                user=self.user,
+                on_batch=progress,
+                use_cache=False,
+                run=run,
+            )
+
+        self.assertEqual(batch_attempts, {1: 1, 2: 1})
+        self.assertEqual(finished, {1, 2})
+        self.assertEqual(
+            JudgeVerdict.objects.filter(run_id=run.id).count(),
+            1 if failure == "persistence" else 2,
+        )
+
+    @override_settings(
+        JUDGE_MODEL_SEAT_1="vendor/model",
+        JUDGE_MODEL_SEAT_2="vendor/model",
+    )
+    def test_equal_model_ids_are_supported(self) -> None:
+        barrier = threading.Barrier(2, timeout=1)
+        unit = self.get_unit()
+
+        def request(requests, *, on_batch, **kwargs):
+            barrier.wait()
+            results = [PASS] * len(requests)
+            on_batch(requests, results)
+            return results
+
+        with mock.patch("weblate.trans.judge_loop.request_verdicts", new=request):
+            run_judge_batch([unit], writable_ids=set(), user=self.user)
+
+        self.assertEqual(
+            set(unit.judge_verdicts.values_list("seat", "judge_model", "max_severity")),
+            {
+                (1, "vendor/model", "none"),
+                (2, "vendor/model", "none"),
+            },
+        )
 
     def test_shared_judge_run_allocates_request_rounds_monotonically(self) -> None:
         unit = self.get_unit()

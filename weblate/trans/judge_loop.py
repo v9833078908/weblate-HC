@@ -18,15 +18,18 @@ from __future__ import annotations
 
 import logging
 import math
+import queue
+import threading
 import time
 import uuid
-from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connections, transaction
 from django.db.models import Max, Q
 from django.utils import timezone
 
@@ -376,6 +379,39 @@ class _PreparedRound:
     before_target: list[str]
     before_checks: set[str]
     before_state: int
+
+
+@dataclass(frozen=True)
+class _SeatJob:
+    seat: int
+    model: str
+    requests: list[JudgeRequest]
+    persist: OnBatch
+    run: JudgeRun | None
+    retry_budget: RetryBudget
+    attempt: int
+    retry_deadline: float | None
+
+
+@dataclass
+class _BatchReady:
+    seat_index: int
+    start_offset: int
+    end_offset: int
+    requests: Sequence[JudgeRequest]
+    results: Sequence[JudgeResult]
+    acknowledged: threading.Event = field(default_factory=threading.Event)
+    error: BaseException | None = None
+
+
+@dataclass(frozen=True)
+class _SeatDone:
+    seat_index: int
+    error: BaseException | None = None
+
+
+class _SeatAbortedError(Exception):
+    """Private control flow after another seat or caller failed."""
 
 
 def _apply_repair(
@@ -863,6 +899,167 @@ def _persist_verdict_batches(
     return persist
 
 
+def _log_seat_done(run_id: uuid.UUID, job: _SeatJob) -> None:
+    LOGGER.info(
+        "judge run %s: seat %d done, %d strings judged with %s",
+        run_id,
+        job.seat,
+        len(job.requests),
+        job.model,
+    )
+
+
+def _run_seats(  # ruff: ignore[complex-structure]
+    seat_jobs: list[_SeatJob],
+    *,
+    project_slug: str,
+    project_context: str,
+    run_id: uuid.UUID,
+) -> None:
+    if not seat_jobs:
+        return
+    if any(job.requests != seat_jobs[0].requests for job in seat_jobs[1:]):
+        msg = "judge seats must receive the same ordered requests"
+        raise ValueError(msg)
+
+    events: queue.Queue[_BatchReady | _SeatDone] = queue.Queue()
+
+    def judge(index: int, job: _SeatJob) -> None:
+        error: BaseException | None = None
+        offset = 0
+
+        def publish(
+            batch_requests: Sequence[JudgeRequest],
+            batch_results: Sequence[JudgeResult],
+        ) -> None:
+            nonlocal offset
+            event = _BatchReady(
+                seat_index=index,
+                start_offset=offset,
+                end_offset=offset + len(batch_requests),
+                requests=tuple(batch_requests),
+                results=tuple(batch_results),
+            )
+            offset = event.end_offset
+            events.put(event)
+            event.acknowledged.wait()
+            if event.error is not None:
+                raise _SeatAbortedError from event.error
+
+        try:
+            request_verdicts(
+                job.requests,
+                model=job.model,
+                project_slug=project_slug,
+                project_context=project_context,
+                on_batch=publish,
+                seat=job.seat,
+                run=job.run,
+                persist_attempts=True,
+                retry_budget=job.retry_budget,
+                adaptive=True,
+                attempt=job.attempt,
+                retry_deadline=job.retry_deadline,
+            )
+        except BaseException as caught:
+            error = caught
+        try:
+            connections.close_all()
+        except BaseException as caught:
+            if error is None:
+                error = caught
+        finally:
+            events.put(_SeatDone(index, error))
+        if error is not None:
+            raise error
+
+    def release(
+        batch_events: list[_BatchReady], error: BaseException | None = None
+    ) -> None:
+        for batch_event in batch_events:
+            batch_event.error = error
+            batch_event.acknowledged.set()
+
+    fatal_error: BaseException | None = None
+    pending: list[_BatchReady] = []
+    coverage = dict.fromkeys(range(len(seat_jobs)), 0)
+    successful: list[int] = []
+    completed: set[int] = set()
+
+    def abort_pending() -> None:
+        if fatal_error is not None:
+            release(pending, fatal_error)
+            pending.clear()
+
+    def release_covered() -> None:
+        for event in tuple(pending):
+            if all(
+                index == event.seat_index
+                or index in completed
+                or coverage[index] >= event.end_offset
+                for index in coverage
+            ):
+                pending.remove(event)
+                release([event])
+
+    with ThreadPoolExecutor(
+        max_workers=len(seat_jobs),
+        thread_name_prefix="judge-seat",
+    ) as pool:
+        futures = [
+            pool.submit(judge, index, job) for index, job in enumerate(seat_jobs)
+        ]
+        open_seats = len(seat_jobs)
+        while open_seats:
+            event = events.get()
+            if isinstance(event, _SeatDone):
+                open_seats -= 1
+                if (
+                    event.error is not None
+                    and not isinstance(event.error, _SeatAbortedError)
+                    and fatal_error is None
+                ):
+                    fatal_error = event.error
+                if event.error is None:
+                    successful.append(event.seat_index)
+                    completed.add(event.seat_index)
+                    coverage[event.seat_index] = len(
+                        seat_jobs[event.seat_index].requests
+                    )
+                if fatal_error is not None:
+                    abort_pending()
+                else:
+                    release_covered()
+                continue
+
+            try:
+                seat_jobs[event.seat_index].persist(event.requests, event.results)
+            except BaseException as error:
+                if fatal_error is None:
+                    fatal_error = error
+            else:
+                coverage[event.seat_index] = event.end_offset
+            pending.append(event)
+            if fatal_error is not None:
+                abort_pending()
+            else:
+                release_covered()
+
+        for future in futures:
+            try:
+                future.result()
+            except _SeatAbortedError:
+                pass
+            except BaseException as error:
+                if fatal_error is None:
+                    fatal_error = error
+
+    for index in successful:
+        _log_seat_done(run_id, seat_jobs[index])
+    if fatal_error is not None:
+        raise fatal_error
+
+
 class JudgeBatchResult(dict[int, JudgeVerdict]):  # ruff: ignore[subclass-builtin]
     """Final verdicts plus producer-run participation metadata."""
 
@@ -874,7 +1071,7 @@ class JudgeBatchResult(dict[int, JudgeVerdict]):  # ruff: ignore[subclass-builti
         self.attempt_counts: dict[int, int] = {}
 
 
-def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-statements]
+def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals]
     units: list[Unit],
     *,
     writable_ids: set[int],
@@ -912,34 +1109,28 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
         original.target = unit.target
         original.state = unit.state
 
-    def judge_seat_round(
+    def make_seat_job(
         seat_units: list[Unit], seat: int, repair_attempt: int, request_round: int
-    ) -> None:
+    ) -> _SeatJob:
         profile = profiles[seat]
-        requests = [round_requests[unit.id] for unit in seat_units]
         started_at = timezone.now()
-        persist = _persist_verdict_batches(
-            seat_units,
+        return _SeatJob(
             seat=seat,
-            attempt=repair_attempt,
-            run_id=run_id,
-            request_round=request_round,
-            profile=profile,
-            project_context=project_context,
-            on_batch=on_batch,
-            attempt_started_at=started_at,
-        )
-        request_verdicts(
-            requests,
             model=profile.model,
-            project_slug=project_slug,
-            project_context=project_context,
-            on_batch=persist,
-            seat=seat,
+            requests=[round_requests[unit.id] for unit in seat_units],
+            persist=_persist_verdict_batches(
+                seat_units,
+                seat=seat,
+                attempt=repair_attempt,
+                run_id=run_id,
+                request_round=request_round,
+                profile=profile,
+                project_context=project_context,
+                on_batch=on_batch,
+                attempt_started_at=started_at,
+            ),
             run=run,
-            persist_attempts=True,
             retry_budget=retry_budget,
-            adaptive=True,
             attempt=repair_attempt,
             retry_deadline=retry_deadline,
         )
@@ -990,16 +1181,15 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
         request_units = [unit for unit in pending if unit.id not in cached_ids]
         if request_units:
             request_round = _allocate_request_round(run_id, run)
-            for seat in selected_seats:
-                profile = profiles[seat]
-                judge_seat_round(request_units, seat, attempt, request_round)
-                LOGGER.info(
-                    "judge run %s: seat %d done, %d strings judged with %s",
-                    run_id,
-                    seat,
-                    len(request_units),
-                    profile.model,
-                )
+            _run_seats(
+                [
+                    make_seat_job(request_units, seat, attempt, request_round)
+                    for seat in selected_seats
+                ],
+                project_slug=project_slug,
+                project_context=project_context,
+                run_id=run_id,
+            )
         if unparsed_rounds and request_units:
             # Retry only a round in which every selected seat failed. Use
             # its persisted rows directly: reader-side per-seat joining may
@@ -1033,10 +1223,22 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                     retry_round,
                     len(unparsed_ids),
                 )
-                for seat in selected_seats:
-                    seat_units = [unit for unit in pending if unit.id in unparsed_ids]
-                    if seat_units:
-                        judge_seat_round(seat_units, seat, attempt, last_request_round)
+                retry_units = [unit for unit in pending if unit.id in unparsed_ids]
+                if retry_units:
+                    _run_seats(
+                        [
+                            make_seat_job(
+                                retry_units,
+                                seat,
+                                attempt,
+                                last_request_round,
+                            )
+                            for seat in selected_seats
+                        ],
+                        project_slug=project_slug,
+                        project_context=project_context,
+                        run_id=run_id,
+                    )
         prepared = [
             _prepare_round_unit(
                 unit,
