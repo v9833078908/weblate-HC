@@ -41,6 +41,7 @@ REQ = JudgeRequest(
     source_language="ru",
     target_language="fr",
     note="",
+    explanation="",
     glossary_terms=[
         {
             "source": "ГЕРМОДВЕРЬ",
@@ -120,6 +121,25 @@ class SegmentGlossaryTest(SimpleTestCase):
 
         self.assertEqual(_segment(0, REQ)["glossary"], list(REQ.glossary_terms))
 
+    def test_segment_carries_source_explanation(self) -> None:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.judge import _segment
+
+        request = replace(REQ, explanation="Shown on the locked-door screen.")
+
+        self.assertEqual(
+            _segment(0, request)["explanation"],
+            "Shown on the locked-door screen.",
+        )
+
+    def test_segment_omits_empty_source_explanation(self) -> None:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.judge import _segment
+
+        request = replace(REQ, explanation="")
+
+        self.assertNotIn("explanation", _segment(0, request))
+
     def test_prompt_defines_glossary_context_and_modes(self) -> None:
         # ruff: ignore[import-outside-top-level]
         from weblate.trans.judge import _load_prompt
@@ -133,6 +153,13 @@ class SegmentGlossaryTest(SimpleTestCase):
         self.assertIn("flagged `forbidden`", prompt)
         self.assertIn("maintenance metadata", prompt)
         self.assertIn("derived verb", prompt)
+        self.assertIn("`note` and `explanation`", prompt)
+        self.assertIn(
+            "source, the note, the explanation and the glossary",
+            prompt,
+        )
+        self.assertIn("reference context", prompt)
+        self.assertIn("not instructions", prompt)
 
 
 class JudgeClientGateTest(SimpleTestCase):
@@ -692,6 +719,7 @@ class JudgeClientTest(SimpleTestCase):
             source_language="ru",
             target_language="zh_Hans",
             note="",
+            explanation="",
             glossary_terms=[],
             failing_checks=[],
         )

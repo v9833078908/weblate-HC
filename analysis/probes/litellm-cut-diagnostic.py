@@ -86,6 +86,7 @@ BATCH = [
         source_language="ru",
         target_language="zh_Hans",
         note="",
+        explanation="",
         glossary_terms=(),
     )
     for index, (source, target) in enumerate(

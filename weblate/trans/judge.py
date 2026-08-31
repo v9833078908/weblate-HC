@@ -139,6 +139,7 @@ class JudgeRequest:
     source_language: str
     target_language: str
     note: str
+    explanation: str
     glossary_terms: Sequence[GlossaryPromptEntry]
     failing_checks: Sequence[str] = field(default_factory=tuple)
     target_plurals: Sequence[str] = field(default_factory=tuple)
@@ -544,8 +545,9 @@ def render_preview(text: str) -> str | None:
 
 NEUTRAL_PROJECT_CONTEXT = (
     "The game's setting, genre, platform and register are not specified here. "
-    "Do not\nassume any: judge the target against the source, the note and the "
-    "glossary only,\nand never argue from a setting you inferred yourself."
+    "Do not\nassume any: judge the target against the source, the note, the "
+    "explanation and the glossary only,\nand never argue from a setting you "
+    "inferred yourself."
 )
 
 
@@ -609,6 +611,8 @@ def _segment(index: int, req: JudgeRequest) -> dict:
         segment["rendered_target"] = rendered_target or req.target
     if req.note:
         segment["note"] = req.note
+    if req.explanation:
+        segment["explanation"] = req.explanation
     if req.glossary_terms:
         segment["glossary"] = [dict(entry) for entry in req.glossary_terms]
     if req.failing_checks:

@@ -59,7 +59,7 @@ def key() -> str:
 
 REQUESTS = [
     JudgeRequest(
-        "probe.clean", "Hold the gate!", "Держите ворота!", "en", "ru", "", ()
+        "probe.clean", "Hold the gate!", "Держите ворота!", "en", "ru", "", "", ()
     ),
     JudgeRequest(
         "probe.number",
@@ -67,6 +67,7 @@ REQUESTS = [
         "Наносит 150 урона за 3 секунды.",
         "en",
         "ru",
+        "",
         "",
         (),
     ),
@@ -77,15 +78,17 @@ REQUESTS = [
         "en",
         "ru",
         "",
+        "",
         (),
     ),
-    JudgeRequest("probe.load", "Loading", "Загрузка", "en", "ru", "", ()),
+    JudgeRequest("probe.load", "Loading", "Загрузка", "en", "ru", "", "", ()),
     JudgeRequest(
         "probe.ad",
         "The ad is not ready. Try again later.",
         "Реклама не готова. Попробуйте позже.",
         "en",
         "ru",
+        "",
         "",
         (),
     ),

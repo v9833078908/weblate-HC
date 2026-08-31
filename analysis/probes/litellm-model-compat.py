@@ -92,6 +92,7 @@ BATCH = [
         source_language="ru",
         target_language="zh_Hans",
         note="",
+        explanation="",
         glossary_terms=(),
     ),
     judge.JudgeRequest(
@@ -101,6 +102,7 @@ BATCH = [
         source_language="ru",
         target_language="zh_Hans",
         note="",
+        explanation="",
         glossary_terms=(),
     ),
     judge.JudgeRequest(
@@ -110,6 +112,7 @@ BATCH = [
         source_language="ru",
         target_language="zh_Hans",
         note="",
+        explanation="",
         glossary_terms=(),
     ),
     judge.JudgeRequest(
@@ -119,6 +122,7 @@ BATCH = [
         source_language="ru",
         target_language="zh_Hans",
         note="",
+        explanation="",
         glossary_terms=(),
     ),
     judge.JudgeRequest(
@@ -128,6 +132,7 @@ BATCH = [
         source_language="ru",
         target_language="zh_Hans",
         note="",
+        explanation="",
         glossary_terms=(),
     ),
 ]

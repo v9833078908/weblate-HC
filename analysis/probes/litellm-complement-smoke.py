@@ -209,6 +209,7 @@ def as_request(record: dict) -> judge.JudgeRequest:
         source_language="ru",
         target_language="fr",
         note="",
+        explanation="",
         glossary_terms=(),
     )
 

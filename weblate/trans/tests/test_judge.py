@@ -50,6 +50,7 @@ def judge_context_hash(unit) -> str:
     return compute_context_hash(
         source=request.source,
         note=request.note,
+        explanation=request.explanation,
         glossary_terms=request.glossary_terms,
     )
 
@@ -163,16 +164,37 @@ class JudgeHashTest(SimpleTestCase):
         )
 
     def test_context_hash_reacts_to_glossary_and_note(self) -> None:
-        base = compute_context_hash(source="Door", note="", glossary_terms=[])
+        base = compute_context_hash(
+            source="Door", note="", explanation="", glossary_terms=[]
+        )
         self.assertNotEqual(
-            base, compute_context_hash(source="Door", note="hall", glossary_terms=[])
+            base,
+            compute_context_hash(
+                source="Door", note="hall", explanation="", glossary_terms=[]
+            ),
         )
         self.assertNotEqual(
             base,
             compute_context_hash(
                 source="Door",
                 note="",
+                explanation="",
                 glossary_terms=[{"source": "Door", "target": "Porte"}],
+            ),
+        )
+
+    def test_context_hash_reacts_to_source_explanation(self) -> None:
+        base = compute_context_hash(
+            source="Door", note="", explanation="", glossary_terms=[]
+        )
+
+        self.assertNotEqual(
+            base,
+            compute_context_hash(
+                source="Door",
+                note="",
+                explanation="Shown on the locked-door screen.",
+                glossary_terms=[],
             ),
         )
 
@@ -180,8 +202,12 @@ class JudgeHashTest(SimpleTestCase):
         first = {"source": "Door", "target": "Porte"}
         second = {"source": "Door", "target": "Portail"}
         self.assertNotEqual(
-            compute_context_hash(source="Door", note="", glossary_terms=[first]),
-            compute_context_hash(source="Door", note="", glossary_terms=[second]),
+            compute_context_hash(
+                source="Door", note="", explanation="", glossary_terms=[first]
+            ),
+            compute_context_hash(
+                source="Door", note="", explanation="", glossary_terms=[second]
+            ),
         )
 
     def test_context_hash_reacts_to_glossary_explanations_and_flags(self) -> None:
@@ -191,13 +217,15 @@ class JudgeHashTest(SimpleTestCase):
             {**plain, "target_explanation": "Use on the battle screen."},
             {**plain, "flags": ["exact"]},
         )
-        baseline = compute_context_hash(source="Door", note="", glossary_terms=[plain])
+        baseline = compute_context_hash(
+            source="Door", note="", explanation="", glossary_terms=[plain]
+        )
         for entry in variants:
             with self.subTest(entry=entry):
                 self.assertNotEqual(
                     baseline,
                     compute_context_hash(
-                        source="Door", note="", glossary_terms=[entry]
+                        source="Door", note="", explanation="", glossary_terms=[entry]
                     ),
                 )
 
@@ -206,10 +234,10 @@ class JudgeHashTest(SimpleTestCase):
         second = {"source": "c", "target": "d"}
         self.assertEqual(
             compute_context_hash(
-                source="Door", note="", glossary_terms=[first, second]
+                source="Door", note="", explanation="", glossary_terms=[first, second]
             ),
             compute_context_hash(
-                source="Door", note="", glossary_terms=[second, first]
+                source="Door", note="", explanation="", glossary_terms=[second, first]
             ),
         )
 

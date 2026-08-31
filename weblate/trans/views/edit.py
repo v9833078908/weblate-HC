@@ -1317,6 +1317,7 @@ def _judge_view_context(
         != compute_context_hash(
             source=unit.source,
             note=unit.source_unit.note,
+            explanation=unit.source_unit.explanation,
             glossary_terms=get_matched_glossary_prompt_entries(unit),
         )
     )

@@ -158,6 +158,12 @@ same cleanup, filtering and serialization contract as LLM-based automatic
 suggestion services. Selection remains consumer-specific: the judge uses
 per-string matches, while an automatic suggestion service can use a full small
 glossary or a batch-wide union.
+Both seats also receive the source string's developer note and
+producer-authored explanation. These fields are reference context for the
+intended meaning and usage, not instructions or text to translate. Editing
+either field changes the verdict identity, so a cached verdict or in-flight
+repair made against the old context is not reused.
+
 
 Explanations scope an entry to the concept it names. For example, an entry that
 names a game mode does not require the same target word for a verb derived from
@@ -215,10 +221,10 @@ The judge is told what game it is reviewing from the project's
 ``persona`` and ``style`` fields of the engine the project uses for automatic
 translation, so the reviewer and the translator cannot hold different ideas of
 the setting and register. A project that configures neither is judged against
-the source, the string comment and the glossary alone, and the judge is
-instructed not to assume a genre; describing the project is therefore worth
-doing before a large run, because an unstated register is reported as a style
-error less often than a wrongly assumed one.
+the source, the string comment, the source explanation and the glossary, and
+the judge is instructed not to assume a genre; describing the project is
+therefore worth doing before a large run, because an unstated register is
+reported as a style error less often than a wrongly assumed one.
 
 The component :guilabel:`Release readiness` table separates pending changes
 ready for delivery from current judge coverage. It displays stale and

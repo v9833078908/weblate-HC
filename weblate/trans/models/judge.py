@@ -104,10 +104,14 @@ def compute_target_storage_hash(target: str) -> str:
 
 
 def compute_context_hash(
-    *, source: str, note: str, glossary_terms: Iterable[Mapping[str, object]]
+    *,
+    source: str,
+    note: str,
+    explanation: str,
+    glossary_terms: Iterable[Mapping[str, object]],
 ) -> str:
     """
-    Hash source, note and every prompt-visible glossary-entry field.
+    Hash source, note, explanation and every prompt-visible glossary-entry field.
 
     Neither mapping key order nor glossary order is context, so keys and
     serialized entries are both sorted: a reordered glossary must not
@@ -122,7 +126,7 @@ def compute_context_hash(
         )
         for entry in glossary_terms
     )
-    return _digest([source, note, *terms])
+    return _digest([source, note, explanation, *terms])
 
 
 def compute_judge_request_identity(
@@ -758,6 +762,7 @@ def _current_snapshot_hashes(unit: Unit) -> tuple[str, str]:
         compute_context_hash(
             source=unit.source,
             note=unit.source_unit.note,
+            explanation=unit.source_unit.explanation,
             glossary_terms=_glossary_prompt_entries(unit),
         ),
     )

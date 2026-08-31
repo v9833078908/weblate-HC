@@ -249,6 +249,7 @@ class JudgeRoundTest(ViewTestCase):
         context_hash = compute_context_hash(
             source=unit.source,
             note=unit.source_unit.note,
+            explanation=unit.source_unit.explanation,
             glossary_terms=[],
         )
         old = uuid.uuid4()
@@ -281,6 +282,7 @@ class JudgeRoundTest(ViewTestCase):
         context_hash = compute_context_hash(
             source=unit.source,
             note=unit.source_unit.note,
+            explanation=unit.source_unit.explanation,
             glossary_terms=[],
         )
         self.make(unit, "none", seat=1, context_hash=context_hash)
@@ -379,6 +381,7 @@ class JudgeRoundTest(ViewTestCase):
         context_hash = compute_context_hash(
             source=unit.source,
             note=unit.source_unit.note,
+            explanation=unit.source_unit.explanation,
             glossary_terms=[],
         )
         old = uuid.uuid4()
@@ -407,6 +410,7 @@ class JudgeRoundTest(ViewTestCase):
         context_hash = compute_context_hash(
             source=unit.source,
             note=unit.source_unit.note,
+            explanation=unit.source_unit.explanation,
             glossary_terms=[],
         )
         first, second = uuid.uuid4(), uuid.uuid4()
@@ -478,6 +482,7 @@ class JudgeGlossaryContextTest(ViewTestCase):
         context_hash = compute_context_hash(
             source=request.source,
             note=request.note,
+            explanation=request.explanation,
             glossary_terms=request.glossary_terms,
         )
         JudgeVerdict.objects.create(
@@ -542,6 +547,7 @@ class JudgeGlossaryContextTest(ViewTestCase):
             context_hash=compute_context_hash(
                 source=request.source,
                 note=request.note,
+                explanation=request.explanation,
                 glossary_terms=request.glossary_terms,
             ),
         )

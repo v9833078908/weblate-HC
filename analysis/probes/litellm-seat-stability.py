@@ -70,6 +70,7 @@ REQUESTS = [
         source_language="en",
         target_language="ru",
         note="",
+        explanation="",
         glossary_terms=(),
     ),
     judge.JudgeRequest(
@@ -79,6 +80,7 @@ REQUESTS = [
         source_language="en",
         target_language="ru",
         note="",
+        explanation="",
         glossary_terms=(),
     ),
     judge.JudgeRequest(
@@ -88,6 +90,7 @@ REQUESTS = [
         source_language="en",
         target_language="ru",
         note="",
+        explanation="",
         glossary_terms=(),
     ),
 ]

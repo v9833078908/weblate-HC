@@ -179,6 +179,36 @@ class JudgeLoopTest(ViewTestCase):
             compute_target_storage_hash(request.target),
         )
 
+    def test_request_carries_source_explanation(self) -> None:
+        unit = self.get_unit()
+        unit.source_unit.explanation = "Shown on the locked-door screen."
+        unit.source_unit.save(update_fields=["explanation"])
+
+        request = build_request(unit)
+
+        self.assertEqual(request.explanation, "Shown on the locked-door screen.")
+
+    def test_source_explanation_change_aborts_repair(self) -> None:
+        unit = self.get_unit()
+        original = unit.target
+        client = mock.Mock(side_effect=[[MAJOR], [MAJOR]])
+
+        def change_context(units, _user):
+            unit.source_unit.explanation = "Changed while the Judge was running."
+            unit.source_unit.save(update_fields=["explanation"])
+            return {unit.id: ["must not be applied"]}
+
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.repair_targets", side_effect=change_context
+            ),
+        ):
+            verdicts = run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
+
+        self.assertNotIn(unit.id, verdicts)
+        self.assertEqual(self.get_unit().target, original)
+
     def test_run_and_seat_are_logged(self) -> None:
         with self.assertLogs("weblate.trans.judge_loop", level="INFO") as logs:
             self.run_batch([PASS, PASS])
@@ -613,6 +643,7 @@ class JudgeLoopTest(ViewTestCase):
                 context_hash=compute_context_hash(
                     source=old_request.source,
                     note=old_request.note,
+                    explanation=old_request.explanation,
                     glossary_terms=old_request.glossary_terms,
                 ),
             )
@@ -645,6 +676,7 @@ class JudgeLoopTest(ViewTestCase):
                 context_hash=compute_context_hash(
                     source=request.source,
                     note=request.note,
+                    explanation=request.explanation,
                     glossary_terms=request.glossary_terms,
                 ),
             )
@@ -867,6 +899,7 @@ class JudgeLoopTest(ViewTestCase):
             context_hash=compute_context_hash(
                 source=request.source,
                 note=request.note,
+                explanation=request.explanation,
                 glossary_terms=request.glossary_terms,
             ),
         )

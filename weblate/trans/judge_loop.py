@@ -99,6 +99,7 @@ def build_request(unit: Unit) -> JudgeRequest:
         source_language=translation.component.source_language.code,
         target_language=translation.language.code,
         note=unit.source_unit.note,
+        explanation=unit.source_unit.explanation,
         glossary_terms=get_matched_glossary_prompt_entries(unit),
         # The judge's own projection is not evidence: a judge-* row is the
         # previous round's opinion, and feeding it back lets a seat cite
@@ -243,6 +244,7 @@ def _write_verdict(
     context_hash = compute_context_hash(
         source=request.source,
         note=request.note,
+        explanation=request.explanation,
         glossary_terms=request.glossary_terms,
     )
     project_context_hash = compute_target_hash([project_context])
@@ -322,6 +324,7 @@ def _request_identity(
         context_hash=compute_context_hash(
             source=request.source,
             note=request.note,
+            explanation=request.explanation,
             glossary_terms=request.glossary_terms,
         ),
         project_context_hash=compute_target_hash([project_context]),
@@ -403,11 +406,13 @@ def _apply_repair(
             or compute_context_hash(
                 source=locked.source,
                 note=locked.source_unit.note,
+                explanation=locked.source_unit.explanation,
                 glossary_terms=get_matched_glossary_prompt_entries(locked),
             )
             != compute_context_hash(
                 source=request.source,
                 note=request.note,
+                explanation=request.explanation,
                 glossary_terms=request.glossary_terms,
             )
         ):
@@ -477,6 +482,7 @@ def _deferral_values(
     context_hash = compute_context_hash(
         source=request.source,
         note=request.note,
+        explanation=request.explanation,
         glossary_terms=request.glossary_terms,
     )
     project_context_hash = compute_target_hash([project_context])
@@ -1239,6 +1245,7 @@ def _finalize_drain_run(
                 else compute_context_hash(
                     source=locked.source,
                     note=locked.source_unit.note,
+                    explanation=locked.source_unit.explanation,
                     glossary_terms=get_matched_glossary_prompt_entries(locked),
                 )
             )

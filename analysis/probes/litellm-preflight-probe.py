@@ -231,6 +231,7 @@ requests = [
         source_language="en",
         target_language="ru",
         note="",
+        explanation="",
         glossary_terms=(),
     ),
     JudgeRequest(
@@ -240,6 +241,7 @@ requests = [
         source_language="en",
         target_language="ru",
         note="",
+        explanation="",
         glossary_terms=(),
     ),
 ]

@@ -672,6 +672,7 @@ class JudgeReleaseAdvisoryHoldsCommandTest(ComponentTestCase):
             context_hash=compute_context_hash(
                 source=request.source,
                 note=request.note,
+                explanation=request.explanation,
                 glossary_terms=request.glossary_terms,
             ),
             resolution=resolution,

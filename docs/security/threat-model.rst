@@ -265,10 +265,11 @@ repository state, background tasks, outbound requests, and rendered UI.
      - An automatic translation run in judge mode becomes a batched outbound
        request only when :setting:`JUDGE_ENABLED`, the site-wide key, and
        both seat models are configured. Each batch carries the selected
-       strings' source, target, glossary terms, and failing check names to
-       the provider host configured by :setting:`JUDGE_BASE_URL` under
-       separate site-wide credentials; users cannot supply an endpoint,
-       key, or model. The provider response is
+       strings' source, target, developer note, producer-authored source
+       explanation, glossary terms, and failing check names to the provider
+       host configured by :setting:`JUDGE_BASE_URL` under separate site-wide
+       credentials; users cannot supply an endpoint, key, or model. The
+       provider response is
        untrusted input parsed against a strict schema; a batch that exceeds
        :setting:`JUDGE_REQUEST_DEADLINE`, or is malformed, is recorded as
        unparsed and never treated as a favorable verdict. *(documented)*
@@ -944,10 +945,10 @@ Known misuse patterns
 * Enabling the LLM judge and running it over strings from a confidential or
   sensitive component without treating the configured provider as a data
   recipient. This is unsafe because every judged string's source, target,
-  and matching glossary terms are transmitted to the two configured seat
-  models. Keep the judge disabled for components whose content must not
-  leave the instance. *(documented)* (source: :ref:`llm-judge`,
-  :doc:`/admin/config`)
+  developer note, producer-authored source explanation, and matching glossary
+  terms are transmitted to the two configured seat models. Keep the judge
+  disabled for components whose content must not leave the instance.
+  *(documented)* (source: :ref:`llm-judge`, :doc:`/admin/config`)
 * Importing project backups from untrusted sources as an administrative
   convenience. This is unsafe because backups carry project metadata,
   translation content, and repository state. Keep import limits enabled and

@@ -105,6 +105,7 @@ class JudgeCheckTest(ViewTestCase):
             context_hash=compute_context_hash(
                 source=unit.source,
                 note="the note as it was when the judge ran",
+                explanation="",
                 glossary_terms=[],
             ),
         )
