@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import uuid
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 
 from weblate.glossary.models import (
     get_glossary_terms,
@@ -101,7 +101,7 @@ class JudgeRoundTest(ViewTestCase):
         self.assertEqual(recovered.attempt, 0)
         self.assertEqual(recovered.request_round, 1)
         self.assertIsNone(repair_evidence(unit, active=active_verdict(unit)))
-        with self.assertRaises(IntegrityError):
+        with transaction.atomic(), self.assertRaises(IntegrityError):
             self.make(
                 unit,
                 "none",
