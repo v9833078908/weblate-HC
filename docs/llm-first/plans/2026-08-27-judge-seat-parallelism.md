@@ -1,7 +1,7 @@
 # Plan: judge both seats in parallel
 
-Date: 2026-08-27. Status: **implementation verified; dev canary and rollout
-pending.** Revised after engineering review on 2026-08-27; the caller-failure
+Date: 2026-08-27. Status: **deployed; dev canary failed; production rollout
+blocked.** Revised after engineering review on 2026-08-27; the caller-failure
 protocol, provider-load gate and thread-aware test layout below replace the
 unsafe first draft. Revised again on 2026-08-31 against the post-remediation
 judge loop (c979bbc, 011c95d, cc3111d, 75ce50f): see "Revision: 2026-08-31
@@ -1051,9 +1051,16 @@ the LiteLLM endpoint before trusting the overlap numbers there.
       seat/model identity, caller-failure acknowledgement and worker-connection
       cleanup tests detect their intended faults
 - [x] Verification steps 1-6 recorded using the isolated host test database
-- [ ] Dev canary passes every transport, overlap and progress threshold
-- [ ] Commit and push implementation
-- [ ] Separate deploy approval obtained
+- [ ] Dev canary passes every transport, overlap and progress threshold -
+      **failed 2026-08-31** for `col4/data/fr`, 25 exact units,
+      `overwrite_existing=false`. Preview matched/processed 25 with zero
+      remaining and writable units, planning 18 initial calls. Task
+      `a8173a85-a55d-4871-8372-9037b642c569`, judge run
+      `327fb5dc-3e53-401c-a2ec-67e08a111773`: 36 attempts, including 10
+      HTTP 500 responses from seat 2, and 13 final unparsed strings. The
+      failed threshold blocks production rollout.
+- [x] Commit and push implementation
+- [x] Separate deploy approval obtained
 - [ ] Separate bounded production-run approval obtained
 - [ ] Bounded production canary passes
 - [ ] Comparable production measurement approved and recorded
@@ -1068,8 +1075,10 @@ the LiteLLM endpoint before trusting the overlap numbers there.
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | N/A | No UI change |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | NOT RUN | Not required |
 
-**VERDICT:** Engineering cleared; implementation is verified.
+**VERDICT:** Engineering cleared; implementation is verified. The dev canary
+failed, so production rollout is blocked.
 
 **PENDING GATES:**
 
-- Run the dev canary after the branch is integrated with the shared dev stack.
+- Diagnose and correct the dev canary failure before another canary or any
+  production judge run.
