@@ -129,6 +129,10 @@ scope. Вместе они делают `cost_usd` полной суммой **�
     seam должны parse-ить raw JSON сразу в `Decimal`, а тесты обязаны передать
     literal с 18 значимыми дробными цифрами через `content=`, не через
     `json=`.
+16. **DecimalValidator не проверяет смысл цены.** Он разрешает отрицательное
+    число в пределах `max_digits`/`decimal_places`. `parse_provider_cost`
+    должен принимать только finite `cost >= 0`; иначе malformed provider
+    response может сделать `priced_complete=yes` при отрицательной сумме.
 
 ## Что уже существует и инварианты
 
@@ -238,11 +242,15 @@ one Translation    blank scope       JudgeRequest(scope + service)
         self.assertIsNone(
             parse_provider_cost(Decimal("0.1234567891234567891"))
         )
+
+    def test_negative_cost_is_unpriced(self) -> None:
+        self.assertIsNone(parse_provider_cost(Decimal("-0.01")))
 ```
 
 Расширить существующий import `LLMUsageLog` также на `parse_provider_cost`.
-Тест фиксирует безопасную границу: provider numeric, который БД не может
-сохранить без округления, оставляет row unpriced вместо ложной точной суммы.
+Тесты фиксируют безопасную границу: provider numeric, который БД не может
+сохранить без округления или который отрицателен, оставляет row unpriced
+вместо ложной точной суммы.
 
 ### Step 2: Run tests to verify they fail
 
@@ -340,7 +348,7 @@ def parse_provider_cost(value: object) -> Decimal | None:
         cost = Decimal(str(value))
     except (InvalidOperation, ValueError):
         return None
-    if not cost.is_finite():
+    if not cost.is_finite() or cost < 0:
         return None
     try:
         _cost_usd_validator(cost)
@@ -349,9 +357,10 @@ def parse_provider_cost(value: object) -> Decimal | None:
     return cost
 ```
 
-Writer сохраняет `None`, если provider numeric не влезает в `numeric(24, 18)`.
-Так `unpriced` и `priced_complete=no` честно показывают отсутствие точной
-суммы, вместо того чтобы PostgreSQL молча округлил стоимость.
+Writer сохраняет `None`, если provider numeric не влезает в `numeric(24, 18)`,
+не finite или отрицателен. Так `unpriced` и `priced_complete=no` честно
+показывают отсутствие точной суммы, вместо того чтобы PostgreSQL молча
+округлил или summary включил некорректную отрицательную стоимость.
 
 В `Meta.indexes` добавить:
 
@@ -2085,8 +2094,9 @@ component-level judge total нельзя: его scope пуст.
    попадает.
 7. **Кеш Weblate.** Повторно использованный перевод не стоит ничего; цена
    строки внутри группы неравномерна, хотя сумма записанных запросов точна.
-8. **Граница decimal schema.** Provider numeric с более чем 24 digits или 18
-   дробными places не округляется: `parse_provider_cost` сохраняет `NULL`, и
+8. **Граница decimal schema и знака.** Provider numeric с более чем 24 digits,
+   18 дробными places, не finite значением или отрицательным знаком не
+   округляется и не суммируется: `parse_provider_cost` сохраняет `NULL`, и
    `priced_complete=no` запрещает назвать summary точной. Это безопаснее
    неявного PostgreSQL rounding; расширение schema потребует отдельной
    миграции и новых доказательных tests.
@@ -2108,15 +2118,15 @@ component-level judge total нельзя: его scope пуст.
 
 | Review | Trigger | Why | Runs | Status | Findings |
 | --- | --- | --- | --- | --- | --- |
-| Eng review | User request | Architecture, correctness, tests, and performance | 1 | CLEARED | 15 findings folded into Tasks 1-6 |
+| Eng review | User request | Architecture, correctness, tests, and performance | 1 | CLEARED | 16 findings folded into Tasks 1-6 |
 | Independent review | `reviewer` | Adversarial code-to-plan check | 1 | CLEARED | Confirmed precision and migration-order defects; both fixed |
-| Precision follow-up | System advisory | Raw JSON numeric precision at both response seams | 1 | CLEARED | Added Decimal parsers and bounded-cost guard |
+| Precision follow-up | System advisory | Raw JSON numeric precision and cost-sign validation | 2 | CLEARED | Added Decimal parsers plus scale and nonnegative-cost guards |
 | CEO review | Not run | No product-scope decision remains | 0 | N/A | Backend accounting plan |
 | Design review | Not run | No UI scope | 0 | N/A | Not applicable |
 
 **VERDICT:** ENG, independent and precision follow-up reviews cleared - the
 revised plan preserves stable identity across rename, distinguishes priced from
-attributed completeness, preserves raw JSON decimal values within declared
-schema limits, returns one answer, and orders migration before writers.
+attributed completeness, preserves nonnegative raw JSON decimal values within
+declared schema limits, returns one answer, and orders migration before writers.
 
 NO UNRESOLVED DECISIONS
