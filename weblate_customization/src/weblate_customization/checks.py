@@ -21,10 +21,12 @@ from operator import itemgetter
 from typing import NamedTuple
 
 import regex
-from django.utils.translation import gettext_lazy, ngettext
+from django.utils.html import format_html
+from django.utils.translation import gettext, gettext_lazy, ngettext
 
 from weblate.checks.base import Highlight, TargetCheck
 from weblate.checks.chars import MaxLengthCheck
+from weblate.checks.parser import single_value_flag
 from weblate.checks.source import SourceMaxLengthCheck
 from weblate.trans.protected_tokens import (
     MARKUP,
@@ -801,6 +803,8 @@ def _visible_length(text: str) -> int:
 # Expansion is not linear: a one-word button legitimately doubles where a full
 # sentence grows by a third. Tiers follow the loc-industry guidance; the floor
 # keeps a tiny source ("OK", "+{0}") from firing on a reasonable short target.
+# They are the default only: a component whose slot is actually measured states
+# its own budget with ``game-length:<percent of the source>``.
 # This is a character proxy for a rendered width: it catches gross overflow,
 # not a pixel-perfect fit. For that, use max-size with the game font.
 _LENGTH_TIERS = (
@@ -810,6 +814,11 @@ _LENGTH_TIERS = (
     (80, 1.5, 90),
 )
 _LENGTH_MAX_RATIO = 1.35
+
+# A plain class attribute would bind as a method when the flag registry reads
+# it off the check instance, and the parser would receive the check itself as
+# its value. Upstream parametrized checks expose a property for that reason.
+_PERCENT_FLAG_PARSER = single_value_flag(int)
 
 
 class GameLengthCheck(TargetCheck):
@@ -825,6 +834,24 @@ class GameLengthCheck(TargetCheck):
     # Always on: an overflowing label clips in the running game.
     default_disabled = False
 
+    # An explicit percentage of the source replaces the tiers and their floors
+    # for the strings that carry it, so the stated budget means what it says.
+    @property
+    def param_type(self):
+        return _PERCENT_FLAG_PARSER
+
+    def _percent(self, unit) -> int | None:
+        """Return the budget the unit states as a percentage of the source."""
+        if unit is None:
+            return None
+        flags = unit.all_flags
+        if not flags.has_value(self.enable_string):
+            return None
+        # Parsed here rather than through Flags.get_value, which resolves the
+        # parser through the check registry and raises KeyError wherever this
+        # check is not in CHECK_LIST. A check must be able to read its own flag.
+        return _PERCENT_FLAG_PARSER(flags.get_value_raw(self.enable_string))
+
     def check_single(self, source: str, target: str, unit) -> bool:
         if not source or not target:
             return False
@@ -832,10 +859,31 @@ class GameLengthCheck(TargetCheck):
         target_len = _visible_length(target)
         if source_len == 0 or target_len == 0:
             return False
+        try:
+            percent = self._percent(unit)
+        except ValueError:
+            # The budget is stated but unreadable. Reporting it beats silently
+            # falling back to the tiers it was written to replace.
+            return True
+        if percent is not None:
+            return target_len * 100 > source_len * percent
         for max_source, ratio, minimum in _LENGTH_TIERS:
             if source_len <= max_source:
                 return target_len > minimum and target_len > source_len * ratio
         return target_len > source_len * _LENGTH_MAX_RATIO
+
+    def get_description(self, check_obj):
+        try:
+            percent = self._percent(check_obj.unit)
+        except ValueError as error:
+            return format_html(
+                gettext("Could not parse {} flag: {}"), self.enable_string, error
+            )
+        if percent is None:
+            return super().get_description(check_obj)
+        return gettext(
+            "Translation must not exceed %(percent)d%% of the source length."
+        ) % {"percent": percent}
 
 
 class GameMaxLengthCheck(MaxLengthCheck):

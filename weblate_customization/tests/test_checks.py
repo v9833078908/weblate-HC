@@ -763,6 +763,63 @@ class GameLengthCheckTest(CheckTestCase):
     def test_an_empty_target_passes(self) -> None:
         self.assertFalse(self.check.check_single("Claim reward", "", None))
 
+    def test_stated_budget_is_relative_to_each_source(self) -> None:
+        # One flag value, a different character budget per string: 110% of a
+        # 9-character source is 9.9, of a 19-character one 20.9.
+        unit = make_unit(flags="game-length:110")
+        self.assertFalse(self.check.check_single("Применить", "Apply", unit))
+        self.assertTrue(self.check.check_single("Гараж", "Garage", unit))
+        self.assertFalse(
+            self.check.check_single("Настройки сохранены", "Settings saved", unit)
+        )
+
+    def test_stated_budget_replaces_the_tier_ratio(self) -> None:
+        # 16 -> 30 is 1.88x: under the 2.0x tier, over a stated 120%.
+        source, target = "Storage capacity", "Permanente Lagerkapazitat x1x2"
+        self.assertFalse(self.check.check_single(source, target, None))
+        self.assertTrue(
+            self.check.check_single(source, target, make_unit(flags="game-length:120"))
+        )
+
+    def test_stated_budget_replaces_the_minimum_length_floor(self) -> None:
+        # 7 -> 25 is 3.6x but under the 28-character floor, so the tiers pass
+        # it; a stated budget is literal and has no floor to hide behind.
+        source, target = "Storage", "Almacenamiento permanente"
+        self.assertFalse(self.check.check_single(source, target, None))
+        self.assertTrue(
+            self.check.check_single(source, target, make_unit(flags="game-length:110"))
+        )
+
+    def test_stated_budget_measures_visible_text_only(self) -> None:
+        # 5 -> 7 visible characters is within 150%, while the raw target is 30
+        # characters and would blow any budget if the tags were counted.
+        unit = make_unit(flags="game-length:150")
+        self.assertFalse(
+            self.check.check_single("Space", "<color=#E3BA59>Espacio</color>", unit)
+        )
+
+    def test_unreadable_budget_is_reported(self) -> None:
+        unit = make_unit(flags="game-length:*")
+        self.assertTrue(self.check.check_single("Select item", "Elemento", unit))
+
+    def test_description_reports_the_stated_budget(self) -> None:
+        unit = make_unit(flags="game-length:110")
+        check_row = make_check(unit, self.check)
+        self.assertIn("110%", str(self.check.get_description(check_row)))
+
+    def test_description_reports_an_unreadable_budget(self) -> None:
+        unit = make_unit(flags="game-length:*")
+        check_row = make_check(unit, self.check)
+        self.assertIn(
+            "Could not parse game-length flag:",
+            str(self.check.get_description(check_row)),
+        )
+
+    def test_description_without_a_budget_keeps_the_tier_message(self) -> None:
+        unit = make_unit()
+        check_row = make_check(unit, self.check)
+        self.assertIn("overflows", str(self.check.get_description(check_row)))
+
 
 class GameMaxLengthCheckTest(SimpleTestCase):
     def setUp(self) -> None:
@@ -852,6 +909,9 @@ class _FakeActiveCheck:
 
     def get_description(self):
         return self._check.get_description(self)
+
+    def get_machine_description(self):
+        return self._check.get_machine_description(self)
 
 
 class GameMaxLengthCheckPromptContextTest(SimpleTestCase):
