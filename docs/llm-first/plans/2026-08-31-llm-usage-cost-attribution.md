@@ -30,7 +30,7 @@ commands.
 
 | Вопрос | Ответ | Точность |
 | --- | --- | --- |
-| Стоимость OpenRouter-перевода `(component, target language)` после деплоя | да, как точная сумма записанных `usage.cost` | `--service openrouter --operation translation --summary`; ledger scope полон только при `priced_complete=yes` и `attribution_complete=yes` |
+| Стоимость OpenRouter-перевода `(component, target language)` после деплоя | да, как точная сумма сохранённых `usage.cost` в поддерживаемой decimal scale | `--service openrouter --operation translation --summary`; ledger scope полон только при `priced_complete=yes` и `attribution_complete=yes` |
 | То же для `operation=judge` | да, но только вместе с Task 3 и в пределах retention | service и immutable ID snapshots проходят через `JudgeRequest`; judge usage по умолчанию хранится 90 дней |
 | Расход компонента после rename project/component | да, для строк после миграции | current slug резолвится в immutable ID, snapshot slug остаётся историческим label |
 | Разделение расхода по OpenRouter, LiteLLM и другим шлюзам | да | по полю `service`, а не только по model ID |
@@ -44,11 +44,12 @@ commands.
 журнал ограничен периодом, statistics - накопленное изменяемое состояние.
 
 `--summary` возвращает одну строку после всех фильтров. `priced_complete=yes`
-значит, что у всех **включённых** rows есть provider-reported цена;
-`attribution_complete=yes` значит, что в том же service/model/operation/time
-не осталось ни одной row с неразрешимым scope. Вместе они делают `cost_usd`
-полной суммой **записанного ledger**, не заменяя ограничение об оплаченной
-попытке без тела ответа.
+значит, что у всех **включённых** rows есть provider-reported цена, которую
+ledger сохранил в точной поддерживаемой schema scale; numeric вне
+`numeric(24, 18)` становится `NULL`. `attribution_complete=yes` значит, что в
+том же service/model/operation/time не осталось ни одной row с неразрешимым
+scope. Вместе они делают `cost_usd` полной суммой **записанного ledger**, не
+заменяя ограничение об оплаченной попытке без тела ответа.
 
 Гарантия по построению операционная, а не общая: у machinery и у judge два
 независимых шва записи. Если Task 3 не выполнена, judge-строки остаются с
@@ -121,6 +122,13 @@ commands.
     непромигрированной БД вызывают исключение, которое recorder ловит и
     логирует, но usage row теряется. Production шаг теперь требует additive
     migration до запуска новых workers.
+15. **Default JSON parsing теряет decimal lexeme до `Decimal`.**
+    `response.json()` в machinery и `json.loads(...)` в judge без
+    `parse_float=Decimal` сначала создают binary `float`; последующий
+    `Decimal(str(cost))` сохраняет уже округленное значение. Оба response
+    seam должны parse-ить raw JSON сразу в `Decimal`, а тесты обязаны передать
+    literal с 18 значимыми дробными цифрами через `content=`, не через
+    `json=`.
 
 ## Что уже существует и инварианты
 
@@ -215,7 +223,7 @@ one Translation    blank scope       JudgeRequest(scope + service)
         self.assertEqual(log.target_language_code, "fr")
 
     def test_cost_preserves_provider_precision(self) -> None:
-        cost = Decimal("0.000000000123456789")
+        cost = Decimal("0.123456789123456789")
         log = LLMUsageLog.objects.create(
             model="m",
             prompt_tokens=1,
@@ -225,7 +233,16 @@ one Translation    blank scope       JudgeRequest(scope + service)
         self.assertEqual(log.cost_usd, cost)
         field = LLMUsageLog._meta.get_field("cost_usd")
         self.assertEqual((field.max_digits, field.decimal_places), (24, 18))
+
+    def test_cost_beyond_supported_scale_is_unpriced(self) -> None:
+        self.assertIsNone(
+            parse_provider_cost(Decimal("0.1234567891234567891"))
+        )
 ```
+
+Расширить существующий import `LLMUsageLog` также на `parse_provider_cost`.
+Тест фиксирует безопасную границу: provider numeric, который БД не может
+сохранить без округления, оставляет row unpriced вместо ложной точной суммы.
 
 ### Step 2: Run tests to verify they fail
 
@@ -240,12 +257,32 @@ DJANGO_SETTINGS_MODULE=weblate.settings_test uv run pytest \
   weblate/trans/tests/test_llm_usage.py -q
 ```
 
-### Step 3: Add the fields and report index
+### Step 3: Add fields, exact-cost guard and report index
 
 В docstring `LLMUsageLog` (`weblate/trans/models/llm_usage.py:19-24`) заменить
-утверждение "exactly what OpenRouter billed" на "provider-reported cost at the
-response seam": generic OpenAI-compatible и LiteLLM requests тоже попадают в
-эту модель. Затем добавить импорт после `from django.db import models`:
+утверждение "exactly what OpenRouter billed" на "validated provider cost at the
+raw response seam": generic OpenAI-compatible и LiteLLM requests тоже попадают
+в эту модель. Перенести `Decimal` из `TYPE_CHECKING` в runtime import и добавить:
+
+```python
+from decimal import Decimal, InvalidOperation
+
+from django.core.exceptions import ValidationError
+from django.core.validators import DecimalValidator
+```
+
+После imports, до `LLMUsageLog`:
+
+```python
+COST_USD_MAX_DIGITS = 24
+COST_USD_DECIMAL_PLACES = 18
+_cost_usd_validator = DecimalValidator(
+    max_digits=COST_USD_MAX_DIGITS,
+    decimal_places=COST_USD_DECIMAL_PLACES,
+)
+```
+
+Затем добавить импорт:
 
 ```python
 from weblate.trans.defines import COMPONENT_NAME_LENGTH, LANGUAGE_CODE_LENGTH
@@ -276,16 +313,45 @@ from weblate.trans.defines import COMPONENT_NAME_LENGTH, LANGUAGE_CODE_LENGTH
 
 ```text
     cost_usd = models.DecimalField(
-        max_digits=24, decimal_places=18, null=True, blank=True
+        max_digits=COST_USD_MAX_DIGITS,
+        decimal_places=COST_USD_DECIMAL_PLACES,
+        null=True,
+        blank=True,
     )
 ```
 
 OpenRouter документирует `usage.cost` как число, но не фиксирует масштаб
 дробной части. PostgreSQL для текущего `DecimalField(max_digits=12,
 decimal_places=8)` создаёт `numeric(12, 8)`, то есть округляет значение с
-девятой дробной цифры. Восемнадцать дробных цифр сохраняют provider-reported
-стоимость этого типа запросов без отображаемого в плане округления и оставляют
-шесть целых цифр на один batch.
+девятой дробной цифры. Восемнадцать дробных цифр - явный поддерживаемый
+предел ledger, а не обещание неограниченной точности. Tasks 2-3 parse-ят
+numeric literal JSON через `parse_float=Decimal`, поэтому в пределах этого
+предела не возникает потери через binary `float`; шесть целых цифр остаются
+на один batch.
+
+После `LLMUsageLog`, до `recent_cost_range`, добавить:
+
+```python
+def parse_provider_cost(value: object) -> Decimal | None:
+    """Return a cost that the ledger can store without rounding."""
+    if value is None:
+        return None
+    try:
+        cost = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+    if not cost.is_finite():
+        return None
+    try:
+        _cost_usd_validator(cost)
+    except ValidationError:
+        return None
+    return cost
+```
+
+Writer сохраняет `None`, если provider numeric не влезает в `numeric(24, 18)`.
+Так `unpriced` и `priced_complete=no` честно показывают отсутствие точной
+суммы, вместо того чтобы PostgreSQL молча округлил стоимость.
 
 В `Meta.indexes` добавить:
 
@@ -355,7 +421,7 @@ git commit -m "feat(trans): attribute LLM usage by service and scope"
 4405):
 
 ```text
-    def mock_chat_reply_echo(self) -> None:
+    def mock_chat_reply_echo(self, cost: str = "0.123456789123456789") -> None:
         """Answer any batch correctly, with a priced usage block."""
         http_mock.register(
             "GET",
@@ -367,43 +433,48 @@ git commit -m "feat(trans): attribute LLM usage by service and scope"
         )
 
         def chat_callback(request):
-            payload = json.loads(request.content)
-            strings = json.loads(payload["messages"][-1]["content"])["strings"]
+            request_payload = json.loads(request.content)
+            strings = json.loads(
+                request_payload["messages"][-1]["content"]
+            )["strings"]
+            response_payload = {
+                "id": "chatcmpl-scope",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": json.dumps(
+                                [
+                                    {
+                                        "id": item["id"],
+                                        "parts": [
+                                            {
+                                                "type": "text",
+                                                "text": f"{item['source']} (fr)",
+                                            }
+                                        ],
+                                    }
+                                    for item in strings
+                                ]
+                            ),
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 9,
+                    "completion_tokens": 12,
+                    "total_tokens": 21,
+                    "cost": "__COST__",
+                },
+            }
             return httpx2.Response(
                 200,
                 headers={},
-                json={
-                    "id": "chatcmpl-scope",
-                    "choices": [
-                        {
-                            "index": 0,
-                            "message": {
-                                "role": "assistant",
-                                "content": json.dumps(
-                                    [
-                                        {
-                                            "id": item["id"],
-                                            "parts": [
-                                                {
-                                                    "type": "text",
-                                                    "text": f"{item['source']} (fr)",
-                                                }
-                                            ],
-                                        }
-                                        for item in strings
-                                    ]
-                                ),
-                            },
-                            "finish_reason": "stop",
-                        }
-                    ],
-                    "usage": {
-                        "prompt_tokens": 9,
-                        "completion_tokens": 12,
-                        "total_tokens": 21,
-                        "cost": 0.001,
-                    },
-                },
+                content=json.dumps(response_payload).replace(
+                    '"__COST__"', cost
+                ),
             )
 
         http_mock.register_callback(
@@ -432,6 +503,7 @@ git commit -m "feat(trans): attribute LLM usage by service and scope"
         self.assertEqual(log.component_id_snapshot, unit.translation.component_id)
         self.assertEqual(log.target_language_code, "fr")
         self.assertEqual(log.service, machine.get_identifier())
+        self.assertEqual(log.cost_usd, Decimal("0.123456789123456789"))
         self.assertIsNone(llm.llm_batch_project.get())
         self.assertIsNone(llm.llm_batch_project_id.get())
         self.assertIsNone(llm.llm_batch_component_id.get())
@@ -456,11 +528,24 @@ git commit -m "feat(trans): attribute LLM usage by service and scope"
         self.assertEqual(log.component_slug, "ui")
         self.assertEqual(log.target_language_code, "fr")
         self.assertEqual(log.service, machine.get_identifier())
+        self.assertEqual(log.cost_usd, Decimal("0.123456789123456789"))
         self.assertIsNone(llm.llm_batch_project.get())
         self.assertIsNone(llm.llm_batch_project_id.get())
         self.assertIsNone(llm.llm_batch_component_id.get())
         self.assertEqual(llm.llm_batch_component.get(), "")
         self.assertEqual(llm.llm_batch_target_language.get(), "")
+
+    @http_mock.activate
+    def test_usage_marks_out_of_scale_cost_unpriced(self) -> None:
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_reply_echo("0.1234567891234567891")
+        unit = make_unit(code="fr", source="Alpha")
+
+        self.get_machine().download_multiple_translations(
+            "en", "fr", [("Alpha", cast("Unit", unit))]
+        )
+
+        self.assertIsNone(LLMUsageLog.objects.get().cost_usd)
 
     @http_mock.activate
     def test_usage_leaves_a_multi_translation_batch_unattributed(self) -> None:
@@ -539,6 +624,11 @@ git commit -m "feat(trans): attribute LLM usage by service and scope"
         self.assertIsNone(log.component_id_snapshot)
 ```
 
+`mock_chat_reply_echo` передаёт cost через raw `content=`, а не `json=`.
+Literal `0.123456789123456789` обязан дойти до обоих sync/async ledger rows
+без превращения в binary `float`; это регрессия response parser, не только
+storage field.
+
 Переименовать существующий `test_usage_cost_zero_is_unpriced`: он проверяет
 отсутствующее поле `cost`, а не ноль. Оставить его assertion `is None` и
 добавить `test_usage_zero_cost_is_stored`, где `mock_chat_usage` получает
@@ -547,7 +637,7 @@ git commit -m "feat(trans): attribute LLM usage by service and scope"
 цена остаётся unpriced, объявленная нулевая цена - нет.
 
 `Mock`, `make_unit`, `cast`, `async_to_sync`, `re`, `json`, `httpx2`,
-`http_mock`, `llm` и `LLMUsageLog` уже импортированы
+`http_mock`, `llm`, `Decimal` и `LLMUsageLog` уже импортированы
 (`weblate/machinery/tests.py:17,21,55,60-113`).
 
 ### Step 2: Run tests to verify they fail
@@ -650,11 +740,31 @@ reset `project_id`, `component_id`, component и language. Внешний `final
 уже reset-ит `unit_count` и `llm_usage_record`; его не менять. Повторить те же
 изменения в `_afetch_llm_batch`.
 
-### Step 5: Write service, zero cost and active scope at the accounting seam
+### Step 5: Parse raw responses, then write service, cost and active scope
 
-В `weblate/machinery/openai.py` расширить импорт новыми
-`llm_batch_project_id` и `llm_batch_component_id`, помимо component/language
-ContextVars. Затем заменить выбор project (`165-166`) и создание строки:
+В `weblate/machinery/openai.py` `Decimal` уже импортирован. В обоих
+`fetch_llm_translations` и `afetch_llm_translations` заменить
+`payload = response.json()`:
+
+```python
+payload = response.json(parse_float=Decimal)
+```
+
+`httpx2.Response.json(**kwargs)` передаёт keyword arguments в
+`json.loads(self.content, **kwargs)`, сохраняя существующий parser response и
+вместе с `parse_float=Decimal` - decimal значение `usage.cost` до
+`record_llm_usage`. Расширить существующий local import:
+
+```python
+from weblate.trans.models.llm_usage import LLMUsageLog, parse_provider_cost
+```
+
+`parse_provider_cost` сохраняет `int`/`str` direct-call fixture и возвращает
+`None` для numeric, который не влезает в `numeric(24, 18)`.
+
+Затем расширить import новыми `llm_batch_project_id` и
+`llm_batch_component_id`, помимо component/language ContextVars. Заменить
+выбор project (`165-166`) и создание строки:
 
 ```text
         project_slug = llm_batch_project.get()
@@ -677,7 +787,7 @@ ContextVars. Затем заменить выбор project (`165-166`) и со�
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
-            cost_usd=Decimal(str(cost)) if cost is not None else None,
+            cost_usd=parse_provider_cost(cost),
             response_id=str(payload.get("id") or ""),
             cached_tokens=prompt_details.get("cached_tokens") or 0,
             reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
@@ -694,8 +804,8 @@ batch с пустым scope не может быть перезаписан proj
 
 Run: `./rundev.sh test "weblate/machinery/tests.py::OpenAITranslationTest" -k "usage or scope"`
 Expected: PASS, включая существующие split-recovery/outcome tests и новые
-проверки service, нулевой цены, `None` source, project override и sync/async
-ContextVar reset.
+проверки raw decimal numeric, service, нулевой цены, `None` source, project
+override и sync/async ContextVar reset.
 
 ### Step 7: Commit
 
@@ -710,7 +820,7 @@ git commit -m "feat(machinery): attribute LLM usage by service and scope"
 
 **Files:**
 
-- Modify: `weblate/trans/judge.py:134-144`, `1073-1105`, `1170-1182`, `1391-1394`
+- Modify: `weblate/trans/judge.py:134-144`, `786-800`, `959-972`, `1073-1105`, `1170-1182`, `1391-1394`
 - Modify: `weblate/trans/judge_loop.py:92-108`
 - Test: `weblate/trans/tests/test_judge_client.py`
 - Test: `weblate/trans/tests/test_judge_loop.py`
@@ -731,8 +841,8 @@ git commit -m "feat(machinery): attribute LLM usage by service and scope"
 ```
 
 В `weblate/trans/tests/test_judge_client.py` добавить
-`from decimal import Decimal`. После `test_usage_is_attributed_to_the_project`
-добавить:
+`from decimal import Decimal` и `_decode_non_stream` в import из
+`weblate.trans.judge`. После `test_usage_is_attributed_to_the_project` добавить:
 
 Обновить существующий `test_usage_is_attributed_to_the_project`: передать
 `replace(REQ, project_id_snapshot=101, component_id_snapshot=102,
@@ -755,9 +865,15 @@ component_slug="ui")` вместо bare `REQ`, затем проверить о�
         payload["usage"] = {
             "prompt_tokens": 11,
             "completion_tokens": 7,
-            "cost": 0.000001234567891,
+            "cost": "__COST__",
         }
-        http_mock.register("POST", CHAT_URL, json=payload)
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            content=json.dumps(payload).replace(
+                '"__COST__"', "0.123456789123456789"
+            ),
+        )
 
         request_verdicts(
             [
@@ -780,7 +896,7 @@ component_slug="ui")` вместо bare `REQ`, затем проверить о�
         self.assertEqual(row.component_id_snapshot, 102)
         self.assertEqual(row.component_slug, "ui")
         self.assertEqual(row.target_language_code, "fr")
-        self.assertEqual(row.cost_usd, Decimal("0.000001234567891"))
+        self.assertEqual(row.cost_usd, Decimal("0.123456789123456789"))
 
     @override_settings(
         JUDGE_ENABLED=True,
@@ -801,6 +917,36 @@ component_slug="ui")` вместо bare `REQ`, затем проверить о�
         self.assertEqual(
             LLMUsageLog.objects.get(model="vendor/model-a").cost_usd,
             Decimal("0"),
+        )
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_marks_out_of_scale_cost_unpriced(self) -> None:
+        payload = _reply(
+            [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+        )
+        payload["usage"] = {
+            "prompt_tokens": 11,
+            "completion_tokens": 7,
+            "cost": "__COST__",
+        }
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            content=json.dumps(payload).replace(
+                '"__COST__"', "0.1234567891234567891"
+            ),
+        )
+
+        request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
+
+        self.assertIsNone(
+            LLMUsageLog.objects.get(model="vendor/model-a").cost_usd
         )
 
     @override_settings(
@@ -852,8 +998,44 @@ component_slug="ui")` вместо bare `REQ`, затем проверить о�
         )
 ```
 
-`replace`, `REQ`, `CHAT_URL` и `_reply` уже импортированы; новый import нужен
-только для точного `Decimal` assertion.
+В `JudgeSSETest` добавить coverage обоих parser путей. Каждый response
+передаёт literal `0.123456789123456789` как raw bytes, а не Python float:
+
+```text
+    def test_non_stream_preserves_usage_decimal(self) -> None:
+        response = httpx2.Response(
+            200,
+            content=(
+                b'{"usage":{"cost":0.123456789123456789},'
+                b'"choices":[{"message":{"content":"{}"},"finish_reason":"stop"}]}'
+            ),
+        )
+        payload, failure, *_ = _decode_non_stream(response, time.monotonic())
+        self.assertEqual(failure, "")
+        assert payload is not None
+        self.assertEqual(
+            payload["usage"]["cost"], Decimal("0.123456789123456789")
+        )
+
+    def test_stream_preserves_usage_decimal(self) -> None:
+        response = httpx2.Response(
+            200,
+            content=(
+                b'data: {"usage":{"cost":0.123456789123456789},'
+                b'"choices":[{"delta":{"content":"{}"},"finish_reason":"stop"}]}\n\n'
+                b"data: [DONE]\n\n"
+            ),
+        )
+        payload, failure, *_ = _read_sse(response, started=time.monotonic())
+        self.assertEqual(failure, "")
+        assert payload is not None
+        self.assertEqual(
+            payload["usage"]["cost"], Decimal("0.123456789123456789")
+        )
+```
+
+`replace`, `REQ`, `CHAT_URL`, `_reply`, `json`, `httpx2` и `_read_sse` уже
+импортированы; новые imports нужны только для точных Decimal parser assertions.
 
 ### Step 2: Run tests to verify they fail
 
@@ -883,9 +1065,30 @@ Expected: FAIL: у `JudgeRequest` нет ID snapshots/component slug, usage row 
         component_slug=translation.component.slug,
 ```
 
-### Step 4: Derive and write judge scope, identity, service and zero cost
+### Step 4: Parse raw judge responses, then derive and write scope
 
-В `weblate/trans/judge.py` добавить перед `_write_llm_usage`:
+В `weblate/trans/judge.py` `json` и `Decimal` уже импортированы. Чтобы
+`usage.cost` не прошёл через binary `float`, заменить оба parser вызова:
+
+```python
+# _consume_sse_event
+event = json.loads(data, parse_float=Decimal)
+
+# _decode_non_stream
+payload = json.loads(raw, parse_float=Decimal)
+```
+
+Так stream и non-stream response сохраняют тот же decimal numeric literal до
+`_write_llm_usage`. Расширить import на:
+
+```python
+from weblate.trans.models.llm_usage import LLMUsageLog, parse_provider_cost
+```
+
+`parse_provider_cost` оставляет не помещающийся numeric `NULL`, поэтому
+`priced_complete=no` вместо ложной суммы с rounding.
+
+Затем добавить перед `_write_llm_usage`:
 
 ```python
 def _batch_usage_scope(
@@ -943,7 +1146,7 @@ def _batch_usage_scope(
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         total_tokens=usage.get("total_tokens") or (prompt_tokens + completion_tokens),
-        cost_usd=Decimal(str(cost)) if cost is not None else None,
+        cost_usd=parse_provider_cost(cost),
         response_id=str(payload.get("id") or ""),
         cached_tokens=details.get("cached_tokens") or 0,
         reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
@@ -985,7 +1188,8 @@ Run:
 ./rundev.sh test weblate/trans/tests/test_judge_loop.py
 ```
 
-Expected: PASS. Существующие проверки `unit_count`
+Expected: PASS. Новые raw Decimal tests покрывают stream, non-stream и
+persisted usage; существующие проверки `unit_count`
 (`test_judge_client.py:1289`, `1316`) остаются зелёными: `len(batch)` равен
 прежнему `size`.
 
@@ -1552,8 +1756,8 @@ class Command(BaseCommand):
             )
 ```
 
-`format(cost, "f")` намеренно не использует `:.8f`: storage и CSV не должны
-снова округлять provider-reported цену. `priced_complete` описывает только
+`format(cost, "f")` намеренно не использует `:.8f`: CSV не должен снова
+округлять уже проверенную storage цену. `priced_complete` описывает только
 включённые rows. `attribution_complete=unknown` намеренно консервативен:
 любой unscoped request с теми же service/model/operation/time мог включать
 запрошенный component, даже если его project ID уже пуст.
@@ -1881,6 +2085,11 @@ component-level judge total нельзя: его scope пуст.
    попадает.
 7. **Кеш Weblate.** Повторно использованный перевод не стоит ничего; цена
    строки внутри группы неравномерна, хотя сумма записанных запросов точна.
+8. **Граница decimal schema.** Provider numeric с более чем 24 digits или 18
+   дробными places не округляется: `parse_provider_cost` сохраняет `NULL`, и
+   `priced_complete=no` запрещает назвать summary точной. Это безопаснее
+   неявного PostgreSQL rounding; расширение schema потребует отдельной
+   миграции и новых доказательных tests.
 
 ## Out of scope
 
@@ -1899,14 +2108,15 @@ component-level judge total нельзя: его scope пуст.
 
 | Review | Trigger | Why | Runs | Status | Findings |
 | --- | --- | --- | --- | --- | --- |
-| Eng review | User request | Architecture, correctness, tests, and performance | 1 | CLEARED | 14 findings folded into Tasks 1-6 |
+| Eng review | User request | Architecture, correctness, tests, and performance | 1 | CLEARED | 15 findings folded into Tasks 1-6 |
 | Independent review | `reviewer` | Adversarial code-to-plan check | 1 | CLEARED | Confirmed precision and migration-order defects; both fixed |
+| Precision follow-up | System advisory | Raw JSON numeric precision at both response seams | 1 | CLEARED | Added Decimal parsers and bounded-cost guard |
 | CEO review | Not run | No product-scope decision remains | 0 | N/A | Backend accounting plan |
 | Design review | Not run | No UI scope | 0 | N/A | Not applicable |
 
-**VERDICT:** ENG + independent review cleared - the revised plan preserves
-stable identity across rename, distinguishes priced from attributed
-completeness, retains provider-cost precision, returns one answer, and orders
-migration before writers.
+**VERDICT:** ENG, independent and precision follow-up reviews cleared - the
+revised plan preserves stable identity across rename, distinguishes priced from
+attributed completeness, preserves raw JSON decimal values within declared
+schema limits, returns one answer, and orders migration before writers.
 
 NO UNRESOLVED DECISIONS
