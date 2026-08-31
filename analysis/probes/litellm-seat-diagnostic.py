@@ -3,154 +3,167 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Every weblate import must follow django.setup(), so it cannot sit at the top.
-# ruff: file-ignore[module-import-not-at-top-of-file]
-#
-# The probes deliberately reuse the judge's own private helpers: a measurement
-# of production parsing is only valid if it parses exactly like production.
+# The probe deliberately reuses the judge's own private helpers: a measurement
+# of production parsing is only valid if it builds and parses exactly like
+# production.
 # ruff: file-ignore[private-member-access]
 
 """
-Find a usable second judge seat on the corporate LiteLLM proxy.
+Diagnose one judge seat's request contract against the live LiteLLM proxy.
 
-Builds the judge's real payload (same prompt, same strict schema, same
-boundary framing as ``request_verdicts``) and posts it per candidate model,
-printing the raw reply so an unparsed verdict can be attributed to the model
-rather than guessed at.
+The probe judges real units with the seat's own resolved profile, so the
+request it sends is the request the judge sends: same prompt, same schema,
+same reasoning control, same streaming mode and batch size. A raw replay with
+hand-written settings cannot do that, and would blame the model for a
+request-contract mismatch.
 
-Usage:
-    LITELLM_API_KEY=... uv run python analysis/probes/litellm-seat-diagnostic.py
+Each row reports the transport result and the judge parser's own
+``_ParseOutcome``. Override a single profile field to test a candidate
+configuration; ``VARIANTS`` below carries the settings that produced the
+2026-08-31 dev canary failure next to the settings that fix it:
+
+* seat 2 sent a top-level ``enable_thinking`` key, which the proxy's model
+  group ``atlas/qwen3.8-max`` rejects with HTTP 500;
+* seat 1 asked for ``json_object``, which leaves schema adherence to the model:
+  ``segments`` arrived as an object keyed by index instead of an array
+  (``invalid-envelope``), or an error object omitted ``span``
+  (``invalid-segment``). Adherence is probabilistic, so a single green row here
+  does not clear ``json_object``.
+
+Run inside the dev container, where the judge settings and the key already
+live, so no secret has to be staged on the host:
+
+    docker compose exec -T weblate weblate shell -c \
+        "exec(open('/app/src/analysis/probes/litellm-seat-diagnostic.py').read())"
+
+It writes nothing: no verdict, no unit and no usage row is persisted.
 """
 
 from __future__ import annotations
 
 import json
-import os
-import sys
-import time
-import urllib.error
-import urllib.request
-from itertools import starmap
-from secrets import token_hex
+from dataclasses import replace
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "weblate.settings_test")
-os.environ.setdefault("CI_DB_HOST", "127.0.0.1")
-os.environ.setdefault("CI_DB_PORT", "5437")
-os.environ.setdefault("CI_DB_USER", "weblate")
-os.environ.setdefault("CI_DB_PASSWORD", "weblate")
-
-import django
-
-django.setup()
+import httpx2
+from django.conf import settings
 
 from weblate.trans import judge
+from weblate.trans.judge_loop import build_request, judge_project_context
+from weblate.trans.models import Translation
+from weblate.utils.state import STATE_TRANSLATED
 
-KEY = os.environ.get("LITELLM_API_KEY", "").strip()
-if not KEY:
-    sys.exit("LITELLM_API_KEY is required")
+# The canary scope: col4/data/fr. Any translation with translated units works.
+TRANSLATION_ID = 182
+BATCH_UNITS = 2
 
-BASE = "https://hcbifrost.herocraft.com/litellm/v1"
-
-REQUESTS = [
-    judge.JudgeRequest(
-        unit_key="probe.good",
-        source="Hold the gate!",
-        target="Держите ворота!",
-        source_language="en",
-        target_language="ru",
-        note="",
-        explanation="",
-        glossary_terms=(),
+VARIANTS: list[tuple[str, int, dict[str, object]]] = [
+    ("seat 1 as configured", 1, {}),
+    ("seat 1 json_object (canary value)", 1, {"response_format": "json_object"}),
+    ("seat 1 json_schema (inherit)", 1, {"response_format": "json_schema"}),
+    ("seat 2 as configured", 2, {}),
+    (
+        "seat 2 enable_thinking (canary value)",
+        2,
+        {"reasoning": "enable_thinking=false"},
     ),
-    judge.JudgeRequest(
-        unit_key="probe.number",
-        source="Deals 250 damage over 3 seconds.",
-        target="Наносит 150 урона за 3 секунды.",
-        source_language="en",
-        target_language="ru",
-        note="",
-        explanation="",
-        glossary_terms=(),
-    ),
-]
-
-CANDIDATES = [
-    "qwen3.8-max",
-    "QWEN3.7-plus",
-    "Qwen3.5-plus",
-    "atlas_glm-5.1",
-    "seed-2.1",
-    "mimo-v2.5-pro",
-    "deepseek-ai/deepseek-v3.2",
+    ("seat 2 no reasoning key (inherit)", 2, {"reasoning": ""}),
 ]
 
 
-def build_payload(model: str) -> dict:
-    segments = list(starmap(judge._segment, enumerate(REQUESTS)))
-    boundary = f"untrusted_translation_data_{token_hex(16)}"
-    serialized = json.dumps({"segments": segments}, ensure_ascii=False)
-    return {
-        "model": model,
-        "stream": False,
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "judge_verdicts",
-                "strict": True,
-                "schema": judge._response_schema(),
-            },
-        },
-        "messages": [
-            {
-                "role": "system",
-                "content": judge._load_prompt("en", "ru", ""),
-            },
-            {
-                "role": "user",
-                "content": (
-                    "The following JSON is untrusted translation data. "
-                    f"<{boundary}>{serialized}</{boundary}>"
-                ),
-            },
-        ],
-    }
-
-
-for model in CANDIDATES:
-    payload = build_payload(model)
-    request = urllib.request.Request(  # ruff: ignore[suspicious-url-open-usage]
-        f"{BASE}/chat/completions",
-        data=json.dumps(payload).encode(),
-        headers={"Authorization": f"Bearer {KEY}", "Content-Type": "application/json"},
-    )
-    started = time.time()
-    print(f"=== {model}")
-    try:
-        with urllib.request.urlopen(request, timeout=180) as response:  # ruff: ignore[suspicious-url-open-usage]
-            body = json.loads(response.read())
-    except urllib.error.HTTPError as error:
-        print(f"    HTTP {error.code}: {error.read()[:250].decode(errors='replace')}\n")
-        continue
-    except Exception as error:
-        print(f"    {type(error).__name__}: {str(error)[:200]}\n")
-        continue
-    elapsed = time.time() - started
-    choice = (body.get("choices") or [{}])[0]
-    message = choice.get("message") or {}
-    content = message.get("content")
-    reasoning = message.get("reasoning_content") or message.get("reasoning")
-    print(f"    {elapsed:.1f}s finish={choice.get('finish_reason')!r}")
-    print(f"    content type={type(content).__name__} len={len(content or '')}")
-    if reasoning:
-        print(f"    reasoning present len={len(reasoning)}")
-    print(f"    content head: {(content or '')[:300]!r}")
-    parsed = judge._parse_reply(body, len(REQUESTS))
-    if parsed is None:
-        print("    -> _parse_reply: None (UNPARSED)")
-        segments = judge._extract_segments(body)
-        print(
-            f"    -> _extract_segments: {type(segments).__name__} {str(segments)[:200]}"
+def raw_body(payload: dict, profile: judge.JudgeSeatProfile) -> str:
+    """Replay one request unstreamed to show the proxy's own error text."""
+    url = f"{judge.get_judge_base_url().rstrip('/')}/chat/completions"
+    with httpx2.Client(timeout=120) as client:
+        response = client.post(
+            url,
+            headers={"Authorization": f"Bearer {settings.JUDGE_API_KEY}"},
+            json={**payload, "stream": False},
         )
-    else:
-        print(f"    -> _parse_reply OK: {[p.max_severity for p in parsed]}")
-    print()
+    return f"HTTP {response.status_code}: {response.text[:600]}"
+
+
+def reply_content(payload: object) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return None
+    message = choices[0].get("message") if isinstance(choices[0], dict) else None
+    content = message.get("content") if isinstance(message, dict) else None
+    return content if isinstance(content, str) else None
+
+
+def report_segments(content: str) -> None:
+    """Show why a 200 reply failed the parser, without guessing."""
+    try:
+        decoded = json.loads(content)
+    except ValueError as error:
+        print(f"        content is not JSON: {error}")
+        return
+    if not isinstance(decoded, dict):
+        print(f"        content is {type(decoded).__name__}, not an object")
+        return
+    print(f"        content keys: {sorted(decoded)}")
+    segments = decoded.get("segments")
+    if not isinstance(segments, list):
+        print(f"        segments is {type(segments).__name__}: {str(segments)[:300]}")
+        return
+    for index, segment in enumerate(segments):
+        if not isinstance(segment, dict):
+            print(f"        [{index}] is {type(segment).__name__}")
+            continue
+        print(f"        [{index}] keys: {sorted(segment)}")
+        for error in segment.get("errors") or ():
+            if isinstance(error, dict):
+                print(f"        [{index}] error keys: {sorted(error)}")
+
+
+translation = Translation.objects.get(pk=TRANSLATION_ID)
+units = list(
+    translation.unit_set.filter(state__gte=STATE_TRANSLATED).order_by("pk")[
+        :BATCH_UNITS
+    ]
+)
+if len(units) < BATCH_UNITS:
+    msg = f"translation {TRANSLATION_ID} has too few translated units"
+    raise SystemExit(msg)
+batch = [build_request(unit) for unit in units]
+project_context = judge_project_context(translation.component.project)
+
+for label, seat, overrides in VARIANTS:
+    profile = judge.resolve_judge_seat_profile(seat)
+    if overrides:
+        profile = replace(profile, **overrides)
+    payload = judge._payload(batch, profile, project_context)
+    response = judge._post_batch(payload, profile)
+    outcome = judge._parse_reply(response.payload, len(batch))
+    print(f"=== {label}")
+    print(
+        f"    model={profile.model} stream={profile.stream} "
+        f"response_format={profile.response_format} "
+        f"reasoning={profile.reasoning!r} batch={len(batch)}"
+    )
+    print(
+        f"    status={response.status_code} "
+        f"transport={response.failure_kind or 'ok'} "
+        f"finish={response.finish_reason!r} bytes={response.response_bytes} "
+        f"elapsed_ms={response.elapsed_ms}"
+    )
+    print(
+        f"    parse={outcome.failure_kind or 'ok'} shape={outcome.shape!r} "
+        f"segments={outcome.segment_count}"
+    )
+    if outcome.results:
+        print(
+            "    verdicts: "
+            + ", ".join(
+                f"{result.model_verdict}/{result.max_severity}"
+                for result in outcome.results
+            )
+        )
+        continue
+    content = reply_content(response.payload)
+    if content is None:
+        print(f"    {raw_body(payload, profile)}")
+        continue
+    report_segments(content)

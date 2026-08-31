@@ -132,8 +132,11 @@ WEBLATE_JUDGE_RETRY_BUDGET_RATIO=0.2
 WEBLATE_JUDGE_MAY_APPROVE=0
 # Legacy global profile settings. Seat values inherit these when set to
 # `inherit`; explicit seat settings below define the LiteLLM production pair.
-# Seat 1 inherits `json_schema`: under `json_object` the model is free to omit
-# `span` from an error object, and most replies then fail `invalid-segment`.
+# Seat 1 inherits `json_schema`: `json_object` leaves schema adherence to the
+# model. On 2026-08-31 that cost 20 of 26 attempts in two ways - 15
+# `invalid-envelope`, where `segments` arrived as an object keyed by index
+# instead of an array, and 5 `invalid-segment`, where an error object omitted
+# `span`.
 # Seat 2 inherits the empty reasoning control: the `atlas/qwen3.8-max` model
 # group rejects a top-level `enable_thinking` key with HTTP 500.
 WEBLATE_JUDGE_REASONING_EFFORT=

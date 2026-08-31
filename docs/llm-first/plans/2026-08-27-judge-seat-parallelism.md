@@ -1059,19 +1059,29 @@ the LiteLLM endpoint before trusting the overlap numbers there.
       `327fb5dc-3e53-401c-a2ec-67e08a111773`: 36 attempts, including 10
       HTTP 500 responses from seat 2, and 13 final unparsed strings. The
       failed threshold blocks production rollout.
-      Diagnosed on 2026-08-31 to two seat configuration faults, neither in the
-      fan-out code: seat 2 sent a top-level `enable_thinking` key, which the
+      Diagnosed on 2026-08-31 to two seat request settings, neither in the
+      fan-out code. Seat 2 sent a top-level `enable_thinking` key, which the
       `atlas/qwen3.8-max` model group rejects
       (`AsyncCompletions.create() got an unexpected keyword argument
-      'enable_thinking'`), so all 10 of its attempts failed. Seat 1 asked for
-      `json_object`, under which the model is free to omit `span` from an error
-      object: 20 of its 26 attempts failed `invalid-envelope` or
-      `invalid-segment`. `analysis/probes/judge-seat-config-variants.py`
-      records both failures and both fixes against the live proxy: with the
-      seat values set to `inherit` (`json_schema`, empty reasoning) each seat
-      returns HTTP 200 and parses. `dev-docker/docker-compose.yml` and
-      `deploy/environment.example` now carry the corrected pair; the canary
-      must be rerun after the dev stack is recreated under its own approval.
+      'enable_thinking'`); all 10 of its attempts failed, and the 500 is
+      reproducible on demand. Seat 1 asked for `json_object`, which leaves
+      schema adherence to the model instead of constraining it: 20 of its 26
+      attempts failed in two distinct ways - 15 `invalid-envelope`, where
+      `segments` arrived as an object keyed by index instead of an array, and
+      5 `invalid-segment`, where an error object omitted `span`. Both
+      reproduce under `json_object` and neither does under `json_schema`, but
+      adherence is probabilistic rather than deterministic: one probe batch
+      parsed under `json_object` too. `json_schema` parsed in every observed
+      probe, so the seat now inherits it.
+      `analysis/probes/litellm-seat-diagnostic.py` reproduces
+      each setting against the live proxy using the seat's own resolved
+      profile and reports the parser's own outcome.
+      `dev-docker/docker-compose.yml` and `deploy/environment.example` now
+      carry the corrected pair; the canary must be rerun after the dev stack
+      is recreated under its own approval. Note for that rerun: the
+      `atlas/qwen3.8-max` group answered `429 No deployments available` later
+      the same day, which is an availability fault independent of these
+      settings and would fail a canary on its own.
 - [x] Commit and push implementation
 - [x] Separate deploy approval obtained
 - [ ] Separate bounded production-run approval obtained
