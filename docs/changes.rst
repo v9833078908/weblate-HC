@@ -21,6 +21,7 @@ Weblate 2026.8.1
 * Project-level :ref:`automatic suggestion <machine-translation-setup>` configuration now overrides the site-wide one field by field, so a project can set its own translator persona, style, and language-specific instructions without restating credentials.
 * LLM machine translation now records per-request token usage and cost, reportable via the ``llm_usage_report`` management command.
 * Large language model machine translation services now receive the note left by developers for a string, see :ref:`llm-translation-context`.
+* LLM judge requests now receive the producer-authored source string explanation as well as the developer note, and changing either context invalidates cached verdicts and stale repairs.
 * LLM judge runs now show capped scope and observed-cost previews, record per-unit judge usage, and keep delivery state separate from advisory AI evidence.
 * Added optional :ref:`TBX glossary import from CSV, TSV, and XLSX tables <uploading-glossary-tables>`, with a locally validated profile proposal path.
 * Glossary tables with only language columns are now mapped deterministically without contacting the automatic analyzer, and the sheet-selection step is skipped for single-sheet uploads, see :ref:`uploading-glossary-tables`.
@@ -28,6 +29,7 @@ Weblate 2026.8.1
 * Glossary table import now recognises a column of term notes by its header and imports it as the source term explanation, which automatic suggestion services receive as context, see :ref:`uploading-glossary-tables`.
 * Glossary table import now trims leading and trailing whitespace from a term or its description instead of refusing the table, and reports every trim as a warning.
 * Glossaries imported from a loc-kit table now mark their terms as terminology, so the terms appear in every glossary language.
+* Glossary table import now accepts an exact ``flags`` column for source-scoped ``read-only`` and ``forbidden`` terms, shows the flags in the preview, and preserves them through glossary creation and append-only updates.
 * Glossary table import now trims leading and trailing whitespace from a term description instead of refusing the table, and reports the trim as a warning; whitespace around a term itself remains an error.
 * Glossary table import now detects the CSV delimiter, recognises vendor Chinese codes such as ``zh-TC``, skips a declared technical identifier column, and imports partially translated languages as untranslated terms, see :ref:`uploading-glossary-tables`.
 * An existing glossary can now receive an append-only batch of new terms from a loc-kit table: existing terms, their targets, and their descriptions are never changed, and a non-empty column for a language the glossary does not yet have creates that language, see :ref:`uploading-glossary-tables`.

@@ -10,18 +10,20 @@
 
 **Design:** `docs/product/designs/2026-08-31-02-loc-kit-glossary-source-flags.md`.
 
-**Status:** Approved; implementation pending.
+**Status (2026-08-31): implemented and verified at `721e058`.** The standalone
+loc-kit suite passes. The two focused Weblate loc-kit files passed 135 tests;
+three unrelated VCS fixture failures from that run passed when rerun alone.
 
 ---
 
-### Task 1: Add the source flag field to profile v2
+## Task 1: Add the source flag field to profile v2
 
 **Files:**
 
 - Modify: `loc_kit_ingest/profile.py`
 - Test: `loc_kit_ingest/tests/test_profile_v2.py`
 
-**Step 1: Write failing profile tests**
+### Step 1: Write failing profile tests
 
 Cover a valid field:
 
@@ -31,7 +33,7 @@ Cover a valid field:
 
 Also cover wrong types, missing keys, an offset outside `record_stride`, and a cell collision with a language, section, or note field.
 
-**Step 2: Verify red**
+### Step 2: Verify red
 
 ```bash
 cd loc_kit_ingest && uv run pytest tests/test_profile_v2.py -k source_flags -q
@@ -39,17 +41,17 @@ cd loc_kit_ingest && uv run pytest tests/test_profile_v2.py -k source_flags -q
 
 Expected: FAIL because `source_flags` is an unknown record-map field.
 
-**Step 3: Implement the closed schema**
+### Step 3: Implement the closed schema
 
 Add an immutable `SourceFlagsField(column, header, row_offset)`, parse it with exact header and one-based-to-zero-based column conversion, validate its offset against every region stride, and include it in `_check_record_map_field_locations`. Keep it optional and v2-only.
 
-**Step 4: Verify green**
+### Step 4: Verify green
 
 Run the command from Step 2.
 
 Expected: PASS.
 
-**Step 5: Commit**
+### Step 5: Commit
 
 ```bash
 git add loc_kit_ingest/profile.py loc_kit_ingest/tests/test_profile_v2.py
@@ -58,7 +60,7 @@ git commit -m "feat(loc-kit): define glossary source flag field"
 
 ---
 
-### Task 2: Infer and parse the closed flag vocabulary
+## Task 2: Infer and parse the closed flag vocabulary
 
 **Files:**
 
@@ -69,7 +71,7 @@ git commit -m "feat(loc-kit): define glossary source flag field"
 - Test: `loc_kit_ingest/tests/test_parser_tbx.py`
 - Test: `loc_kit_ingest/tests/test_model.py`
 
-**Step 1: Write failing inference and parser tests**
+### Step 1: Write failing inference and parser tests
 
 Cover:
 
@@ -81,7 +83,7 @@ Cover:
 - rejection of populated flag cells on non-term rows;
 - preservation on `GlossaryTerm.source_flags`.
 
-**Step 2: Verify red**
+### Step 2: Verify red
 
 ```bash
 cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py tests/test_parser_tbx.py tests/test_model.py -k "source_flags or flags_column" -q
@@ -89,7 +91,7 @@ cd loc_kit_ingest && uv run pytest tests/test_infer_glossary.py tests/test_parse
 
 Expected: FAIL because inference rejects the non-language column and `GlossaryTerm` has no source flags.
 
-**Step 3: Implement minimal inference and parsing**
+### Step 3: Implement minimal inference and parsing
 
 - Recognize only the normalized header `flags`.
 - Emit `grammar.source_flags` with `row_offset: 0`.
@@ -97,13 +99,13 @@ Expected: FAIL because inference rejects the non-language column and `GlossaryTe
 - Split non-empty cells on commas, trim tokens, reject empty/unknown/parameterized tokens, and store a sorted tuple from `{"read-only", "forbidden"}`.
 - Keep `terminology`, `exact`, `not-applicable`, and arbitrary Weblate flags outside this contract.
 
-**Step 4: Verify green**
+### Step 4: Verify green
 
 Run the command from Step 2.
 
 Expected: PASS.
 
-**Step 5: Commit**
+### Step 5: Commit
 
 ```bash
 git add loc_kit_ingest/infer.py loc_kit_ingest/model.py loc_kit_ingest/parser.py loc_kit_ingest/tests/test_infer_glossary.py loc_kit_ingest/tests/test_parser_tbx.py loc_kit_ingest/tests/test_model.py
@@ -112,7 +114,7 @@ git commit -m "feat(loc-kit): parse glossary source flags"
 
 ---
 
-### Task 3: Preserve flags through TBX publication
+## Task 3: Preserve flags through TBX publication
 
 **Files:**
 
@@ -120,11 +122,11 @@ git commit -m "feat(loc-kit): parse glossary source flags"
 - Test: `loc_kit_ingest/tests/test_writer.py`
 - Test: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
 
-**Step 1: Write failing writer and Weblate import tests**
+### Step 1: Write failing writer and Weblate import tests
 
 Prove the rendered TBX contains `termEntry@weblate-flags`, parse-back returns the same flags, and a created Weblate glossary source unit exposes `read-only` or `forbidden` in `extra_flags` and in `build_glossary_prompt_entry`.
 
-**Step 2: Verify red**
+### Step 2: Verify red
 
 ```bash
 cd loc_kit_ingest && uv run pytest tests/test_writer.py -k source_flags -q
@@ -133,17 +135,17 @@ cd loc_kit_ingest && uv run pytest tests/test_writer.py -k source_flags -q
 
 Expected: FAIL because the writer does not serialize flags.
 
-**Step 3: Implement TBX serialization and parse-back validation**
+### Step 3: Implement TBX serialization and parse-back validation
 
 Set `weblate-flags` on each emitted `termEntry` when `source_flags` is non-empty. Extend `_validate_tbx` to compare the parsed flag set with `GlossaryTerm.source_flags`, preserving the existing render-then-parse publication gate.
 
-**Step 4: Verify green**
+### Step 4: Verify green
 
 Run the commands from Step 2.
 
 Expected: PASS.
 
-**Step 5: Commit**
+### Step 5: Commit
 
 ```bash
 git add loc_kit_ingest/writer.py loc_kit_ingest/tests/test_writer.py weblate/trans/tests/test_loc_kit_ingest_contract.py
@@ -152,7 +154,7 @@ git commit -m "feat(loc-kit): persist glossary flags in TBX"
 
 ---
 
-### Task 4: Show and apply flags in Weblate
+## Task 4: Show and apply flags in Weblate
 
 **Files:**
 
@@ -162,7 +164,7 @@ git commit -m "feat(loc-kit): persist glossary flags in TBX"
 - Test: `weblate/trans/tests/test_loc_kit_profile_suggester.py`
 - Test: `weblate/trans/tests/test_loc_kit_ingest_contract.py`
 
-**Step 1: Write failing preview and append tests**
+### Step 1: Write failing preview and append tests
 
 Cover:
 
@@ -171,7 +173,7 @@ Cover:
 - a new appended source unit merges imported flags with `terminology`;
 - replaying or colliding with an existing term does not alter its flags.
 
-**Step 2: Verify red**
+### Step 2: Verify red
 
 ```bash
 ./rundev.sh test weblate/trans/tests/test_loc_kit_profile_suggester.py weblate/trans/tests/test_loc_kit_ingest_contract.py -k "source_flags or glossary_flags" -n0
@@ -179,17 +181,17 @@ Cover:
 
 Expected: FAIL because the preview and append service omit source flags.
 
-**Step 3: Implement preview and append behavior**
+### Step 3: Implement preview and append behavior
 
 Add `source_flags` to `GlossaryTermPreview`, the bounded preview JSON, and the preview table. When `append_glossary_terms` creates a source term, merge every imported source flag and `terminology` into the source unit's existing flags before one `update_extra_flags` call. Leave the existing-term branch unchanged.
 
-**Step 4: Verify green**
+### Step 4: Verify green
 
 Run the command from Step 2.
 
 Expected: PASS.
 
-**Step 5: Commit**
+### Step 5: Commit
 
 ```bash
 git add weblate/trans/loc_kit.py weblate/trans/views/create.py weblate/templates/trans/loc_kit_glossary_preview.html weblate/trans/tests/test_loc_kit_profile_suggester.py weblate/trans/tests/test_loc_kit_ingest_contract.py
@@ -198,14 +200,14 @@ git commit -m "feat(loc-kit): apply glossary source flags"
 
 ---
 
-### Task 5: Document the producer template and verify the full contract
+## Task 5: Document the producer template and verify the full contract
 
 **Files:**
 
 - Modify: `docs/guides/loc-kit-ingest.md`
 - Modify: `docs/changes.rst`
 
-**Step 1: Update the guide**
+### Step 1: Update the guide
 
 Add the canonical table:
 
@@ -217,7 +219,7 @@ Vessel,,never use this wording; use Ship,forbidden
 
 Document the exact header, closed values, comma separation, preview, append-only behavior, automatic `terminology`, and the per-language flag non-goals. Remove statements that glossary flags are unsupported. Add a concise entry to the current unreleased changelog section.
 
-**Step 2: Run standalone and Weblate regressions**
+### Step 2: Run standalone and Weblate regressions
 
 ```bash
 cd loc_kit_ingest && uv run pytest
@@ -226,7 +228,7 @@ cd loc_kit_ingest && uv run pytest
 
 Expected: PASS.
 
-**Step 3: Run scoped lint**
+### Step 3: Run scoped lint
 
 ```bash
 uv run prek run --files loc_kit_ingest/profile.py loc_kit_ingest/infer.py loc_kit_ingest/model.py loc_kit_ingest/parser.py loc_kit_ingest/writer.py loc_kit_ingest/tests/test_profile_v2.py loc_kit_ingest/tests/test_infer_glossary.py loc_kit_ingest/tests/test_parser_tbx.py loc_kit_ingest/tests/test_model.py loc_kit_ingest/tests/test_writer.py weblate/trans/loc_kit.py weblate/trans/views/create.py weblate/templates/trans/loc_kit_glossary_preview.html weblate/trans/tests/test_loc_kit_profile_suggester.py weblate/trans/tests/test_loc_kit_ingest_contract.py docs/guides/loc-kit-ingest.md docs/changes.rst
@@ -234,7 +236,7 @@ uv run prek run --files loc_kit_ingest/profile.py loc_kit_ingest/infer.py loc_ki
 
 Expected: PASS.
 
-**Step 4: Commit**
+### Step 4: Commit
 
 ```bash
 git add docs/guides/loc-kit-ingest.md docs/changes.rst
