@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import uuid
 
+from django.db import IntegrityError
+
 from weblate.glossary.models import (
     get_glossary_terms,
     get_matched_glossary_prompt_entries,
@@ -24,6 +26,7 @@ from weblate.trans.models.judge import (
     has_complete_current_evidence,
     judge_status_annotations,
     latest_round,
+    repair_evidence,
 )
 from weblate.trans.models.variant import Variant
 from weblate.trans.tests.test_views import ViewTestCase
@@ -95,9 +98,18 @@ class JudgeRoundTest(ViewTestCase):
             attempt=0,
             request_round=1,
         )
-
         self.assertEqual(recovered.attempt, 0)
         self.assertEqual(recovered.request_round, 1)
+        self.assertIsNone(repair_evidence(unit, active=active_verdict(unit)))
+        with self.assertRaises(IntegrityError):
+            self.make(
+                unit,
+                "none",
+                seat=1,
+                run_id=run,
+                attempt=0,
+                request_round=1,
+            )
 
     def test_status_annotations_keep_parsed_fallback_after_incomplete_round(
         self,
