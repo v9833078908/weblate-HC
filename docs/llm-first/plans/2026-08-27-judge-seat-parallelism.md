@@ -1051,15 +1051,31 @@ the LiteLLM endpoint before trusting the overlap numbers there.
       seat/model identity, caller-failure acknowledgement and worker-connection
       cleanup tests detect their intended faults
 - [x] Verification steps 1-6 recorded using the isolated host test database
-- [ ] Dev canary passes every transport, overlap and progress threshold -
-      **failed 2026-08-31** for `col4/data/fr`, 25 exact units,
+- [x] Dev canary passes every transport, overlap and progress threshold -
+      **passed 2026-08-31** for `col4/data/fr`, units 177726-177750,
       `overwrite_existing=false`. Preview matched/processed 25 with zero
-      remaining and writable units, planning 18 initial calls. Task
+      remaining and writable units, planning 26 initial calls. Task
+      `b796098d-12c7-4b40-9456-4faad6b98acc`, judge run
+      `725c62d9-71b7-41b6-ab73-5c398a9fffba`: 38 attempts, every one HTTP 200,
+      no transport failure kind, all parsed; 50 verdicts, 25 per seat, zero
+      unparsed; all 25 units judged by both seats; run report `16 passed,
+      2 minor, 5 major, 2 critical`; 51 usage rows across both models.
+      Seat 2 ran at an effective batch of 1 because the previous failed
+      canary had shrunk its adaptive budget, which recovered to 2 by the end
+      of the run. Its measured single-string latency is heavy-tailed - median
+      21s, maximum 103s against the 120s request deadline - so batch 2 would
+      exceed the deadline often, and a cut batch costs every verdict in it.
+      Both configuration files therefore pin seat 2 to batch 1, which is the
+      configuration this canary actually exercised.
+      An earlier attempt on 2026-08-31 **failed** and is kept here because it
+      is what produced the diagnosis:
+      for `col4/data/fr`, units 177676-177700, `overwrite_existing=false`.
+      Preview matched/processed 25 with zero remaining and writable units,
+      planning 18 initial calls. Task
       `a8173a85-a55d-4871-8372-9037b642c569`, judge run
       `327fb5dc-3e53-401c-a2ec-67e08a111773`: 36 attempts, including 10
-      HTTP 500 responses from seat 2, and 13 final unparsed strings. The
-      failed threshold blocks production rollout.
-      Diagnosed on 2026-08-31 to two seat request settings, neither in the
+      HTTP 500 responses from seat 2, and 13 final unparsed strings.
+      Diagnosed on 2026-08-31 to three seat request settings, none in the
       fan-out code. Seat 2 sent a top-level `enable_thinking` key, which the
       `atlas/qwen3.8-max` model group rejects
       (`AsyncCompletions.create() got an unexpected keyword argument
@@ -1072,14 +1088,24 @@ the LiteLLM endpoint before trusting the overlap numbers there.
       reproduce under `json_object` and neither does under `json_schema`, but
       adherence is probabilistic rather than deterministic: one probe batch
       parsed under `json_object` too. `json_schema` parsed in every observed
-      probe, so the seat now inherits it.
+      probe, so the seat now sets it explicitly.
       `analysis/probes/litellm-seat-diagnostic.py` reproduces
       each setting against the live proxy using the seat's own resolved
       profile and reports the parser's own outcome.
+      The third fault appeared only once the first two were fixed: seat 2's
+      batch of 5 was cut at the 120s request deadline on all five attempts,
+      losing every verdict it should have produced. Batch size is now pinned
+      per the latency measurement above.
+      Seat settings are written explicitly rather than as `inherit`, because
+      `inherit` resolves against a legacy global an operator can retarget: the
+      dev stack's local `docker-compose.override.yml` sets
+      `WEBLATE_JUDGE_REASONING_EFFORT=none`, which the LiteLLM profile
+      resolver rejects outright, so `inherit` there left the judge
+      unconfigured entirely.
       `dev-docker/docker-compose.yml` and `deploy/environment.example` now
-      carry the corrected pair; the canary must be rerun after the dev stack
-      is recreated under its own approval. Both corrected settings were then
-      confirmed on the wire, each returning HTTP 200 and parsing into
+      carry the corrected settings; the canary was rerun after the dev stack
+      was recreated under its own approval. Each corrected setting was also
+      confirmed on the wire, returning HTTP 200 and parsing into
       verdicts. The `429 No deployments available` seen while diagnosing was
       self-inflicted, not an availability fault: a rejected request puts the
       model group's deployments into the proxy's cooldown list, after which

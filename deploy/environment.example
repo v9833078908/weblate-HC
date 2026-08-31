@@ -130,14 +130,17 @@ WEBLATE_JUDGE_TRANSIENT_HTTP_RETRIES=1
 WEBLATE_JUDGE_MAX_UNPARSED_RETRY_ROUNDS=1
 WEBLATE_JUDGE_RETRY_BUDGET_RATIO=0.2
 WEBLATE_JUDGE_MAY_APPROVE=0
-# Legacy global profile settings. Seat values inherit these when set to
-# `inherit`; explicit seat settings below define the LiteLLM production pair.
-# Seat 1 inherits `json_schema`: `json_object` leaves schema adherence to the
+# Legacy global profile settings. The seat settings below are explicit rather
+# than `inherit`, because a paid request contract must not depend on a global
+# an operator can retarget: the dev stack's local override sets
+# `WEBLATE_JUDGE_REASONING_EFFORT=none`, which `inherit` resolves to and the
+# LiteLLM profile resolver then rejects outright.
+# Seat 1 uses `json_schema`: `json_object` leaves schema adherence to the
 # model. On 2026-08-31 that cost 20 of 26 attempts in two ways - 15
 # `invalid-envelope`, where `segments` arrived as an object keyed by index
 # instead of an array, and 5 `invalid-segment`, where an error object omitted
 # `span`.
-# Seat 2 inherits the empty reasoning control: the `atlas/qwen3.8-max` model
+# Seat 2 sends no reasoning control at all: the `atlas/qwen3.8-max` model
 # group rejects a top-level `enable_thinking` key with HTTP 500.
 WEBLATE_JUDGE_REASONING_EFFORT=
 WEBLATE_JUDGE_RESPONSE_FORMAT=json_schema
@@ -145,15 +148,19 @@ WEBLATE_JUDGE_STREAM=0
 WEBLATE_JUDGE_TEMPERATURE=0
 WEBLATE_JUDGE_MAX_TOKENS=0
 WEBLATE_JUDGE_REASONING_EFFORT_SEAT_1=thinking.disabled
-WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_1=inherit
+WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_1=json_schema
 WEBLATE_JUDGE_STREAM_SEAT_1=true
 WEBLATE_JUDGE_BATCH_SIZE_SEAT_1=2
 WEBLATE_JUDGE_TEMPERATURE_SEAT_1=0
 WEBLATE_JUDGE_MAX_TOKENS_SEAT_1=0
-WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2=inherit
+WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2=
 WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_2=json_schema
 WEBLATE_JUDGE_STREAM_SEAT_2=true
-WEBLATE_JUDGE_BATCH_SIZE_SEAT_2=5
+# Measured 2026-08-31 over 25 single-string requests to `atlas/qwen3.8-max`:
+# median 21s, maximum 103s against a 120s request deadline. A cut batch costs
+# every verdict in it, and at batch 5 every batch was cut. Raise this only
+# with a fresh latency measurement for the seat's own model.
+WEBLATE_JUDGE_BATCH_SIZE_SEAT_2=1
 WEBLATE_JUDGE_TEMPERATURE_SEAT_2=0
 WEBLATE_JUDGE_MAX_TOKENS_SEAT_2=0
 # Keep automatic deferred draining disabled until the production canary.
