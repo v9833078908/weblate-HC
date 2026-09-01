@@ -30,10 +30,12 @@ is a first-increment requirement. The smallest safe increment therefore
 contains Solution 1, the one-unit re-check substrate from Solution 2, and the
 stored-candidate lifecycle from Solution 3.
 
-**Status:** approved 2026-09-01, amended 2026-09-01 to cover `FLAG`, ready for
-implementation. No new page and no new domain model.
-One migration is expected for the `candidate-stored` audit choice on the
-existing `JudgeRunUnit.repair_status` field.
+**Status:** implemented on branch `feat/judge-producer-triage` (Tasks 1-11
+complete, all 11 commits), full targeted regression green (1075 passed, 33
+subtests; the 2 unrelated `botocore` machinery failures pre-date this branch).
+Not yet merged to `main` or deployed. One migration shipped for the
+`candidate-stored` audit choice on the existing `JudgeRunUnit.repair_status`
+field (`0114_judge_run_unit_candidate_stored`).
 
 **Known regression accepted with this amendment:** unattended self-healing of
 majors ends. Today an ignored major is sometimes machine-repaired with no human
