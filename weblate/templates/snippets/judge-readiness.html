@@ -19,6 +19,12 @@
           </li>
         </ul>
       {% endif %}
+      {% if judge_queue.hand_off_ready %}
+        <p class="list-group-item-text">
+          {% translate "Every judged string is clean and current: this component looks ready to hand off." %}
+        </p>
+        <a class="btn btn-sm btn-success" href="{{ judge_queue.download_url }}">{% translate "Download for hand-off" %}</a>
+      {% endif %}
       <a class="btn btn-sm btn-outline-secondary" href="{{ judge_queue.breakdown_url }}">{% translate "Breakdown by check" %}</a>
       <a class="btn btn-sm btn-outline-primary" href="{{ judge_queue.run_url }}">{% translate "Run the judge" %}</a>
       {% if judge_queue.last_run %}

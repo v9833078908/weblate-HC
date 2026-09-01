@@ -58,6 +58,7 @@ from weblate.trans.forms import (
     get_new_unit_form,
     get_upload_form,
 )
+from weblate.glossary.models import get_matched_glossary_prompt_entries
 from weblate.trans.judge import judge_configuration_ready, judge_request_upper_bound
 from weblate.trans.models import (
     Category,
@@ -67,12 +68,14 @@ from weblate.trans.models import (
     JudgeVerdict,
     Project,
     Translation,
+    Unit,
 )
 from weblate.trans.models.component import (
     ComponentLink,
     prefetch_tasks,
     translation_prefetch_tasks,
 )
+from weblate.trans.models.judge import active_verdict, compute_context_hash
 from weblate.trans.models.project import prefetch_project_flags
 from weblate.trans.models.translation import GhostTranslation
 from weblate.trans.util import render, sort_unicode, translation_percent
@@ -698,6 +701,64 @@ def show_category(request: AuthenticatedHttpRequest, obj: Category) -> HttpRespo
     )
 
 
+def _judge_hand_off_blocked(translations: list[Translation]) -> bool:
+    """
+    Whether any unit's *live* judge state still blocks hand-off (Task 9).
+
+    Only called once the cached counts already read clean: a scope that is
+    not already candidate-clean never pays for this. Two passes, cheapest
+    first:
+
+    1. One indexed query per translation through the same ``judge:*``
+       search vocabulary the filter dropdown and the cached counts use:
+       an unresolved reject, any escalation, a stale (target-drifted)
+       round, or an incomplete (unparsed) latest attempt. This re-reads
+       severity/resolution live rather than trusting the cached
+       ``TranslationStats`` row, which can lag the database.
+    2. Context freshness (glossary/note drift) has no SQL shortcut: it
+       needs the same glossary lookup a live judge round would use, which
+       cannot be expressed as a single aggregate across a queryset. It
+       therefore only walks units that actually have judge history
+       (``has:judge``), never the whole corpus, and only runs after step 1
+       already reads clean.
+
+    A stored repair candidate is a ``Suggestion``, not a ``JudgeVerdict``
+    field: it never appears in ``judge_active_severity``/
+    ``judge_active_resolution`` and so never clears a blocking critical
+    here, by construction.
+    """
+    blocking_query = (
+        "(judge:reject AND NOT judge:resolved) OR judge:escalated "
+        "OR judge:stale OR judge:unparsed"
+    )
+    for translation in translations:
+        if not isinstance(translation, Translation) or translation.is_source:
+            continue
+        if translation.unit_set.search(blocking_query).exists():
+            return True
+    for translation in translations:
+        if not isinstance(translation, Translation) or translation.is_source:
+            continue
+        judged_units = translation.unit_set.search("has:judge").prefetch_full()
+        for unit in judged_units:
+            # active_verdict matches target only (invariant: a glossary/
+            # note drift must not unproject a check); current_verdict
+            # would already filter out a context-mismatched row instead
+            # of returning it, so it can never be used to detect drift.
+            verdict = active_verdict(unit)
+            if verdict is None:
+                continue
+            context_hash = compute_context_hash(
+                source=unit.source,
+                note=unit.source_unit.note,
+                explanation=unit.source_unit.explanation,
+                glossary_terms=get_matched_glossary_prompt_entries(unit),
+            )
+            if verdict.context_hash != context_hash:
+                return True
+    return False
+
+
 def judge_queue_strip_context(
     user: User,
     obj: Component | Project | Workspace,
@@ -711,7 +772,8 @@ def judge_queue_strip_context(
     per-language list for a component page. Project and workspace pages omit
     it: a scope spanning several source languages has no single arithmetic
     expression that stays exact for every one of them, so those pages render
-    the controls without the three counts.
+    the controls without the three counts, and hand-off readiness (which
+    needs those same counts) is never offered outside a component page.
 
     The plan's "Linked queue" column names the query each count is *defined*
     by (verified directly against ``Unit.objects.filter(parse_query(...))``
@@ -721,6 +783,15 @@ def judge_queue_strip_context(
     ``check_id``; ``browse``/``translate`` never accept ``Component``).
     Building one is outside this task's file list. The two real, exactly
     corresponding links are ``breakdown_url`` and ``run_url`` below.
+
+    ``hand_off_ready`` (Task 9) is deliberately conservative: cached counts
+    decide *display* only. The CTA itself only ever appears when the cached
+    counts already read clean (no critical, no escalation, every string
+    reviewed, no unparsed attempt) *and* the authoritative, uncached
+    ``_judge_hand_off_blocked`` re-check - which also catches target and
+    context drift the cache does not track - agrees. It links the existing
+    per-component download control; it never performs a release action
+    itself.
     """
     if isinstance(obj, Component) and obj.is_glossary:
         return None
@@ -733,8 +804,9 @@ def judge_queue_strip_context(
     if not can_run:
         return None
     counts = None
+    hand_off_ready = False
     if translations is not None:
-        needs_human = not_reviewed = unparsed = 0
+        needs_human = not_reviewed = unparsed = judge_total = 0
         for translation in translations:
             if not isinstance(translation, Translation) or translation.is_source:
                 continue
@@ -742,17 +814,25 @@ def judge_queue_strip_context(
             needs_human += stats.judge_needs_human
             not_reviewed += stats.judge_total - stats.judge_evaluated
             unparsed += stats.judge_unparsed
+            judge_total += stats.judge_total
         counts = {
             "needs_human": needs_human,
             "not_reviewed": not_reviewed,
             "unparsed": unparsed,
         }
+        cached_clean = judge_total > 0 and not (
+            needs_human or not_reviewed or unparsed
+        )
+        if cached_clean:
+            hand_off_ready = not _judge_hand_off_blocked(translations)
     run_query = urlencode({"mode": "judge", "q": "NOT has:judge"})
     return {
         "breakdown_url": reverse("checks", kwargs={"path": obj.get_url_path()}),
         "run_url": f"{obj.get_absolute_url()}?{run_query}#auto",
         "counts": counts,
         "last_run": last_judge_run(obj, actor=user),
+        "hand_off_ready": hand_off_ready,
+        "download_url": reverse("download", kwargs={"path": obj.get_url_path()}),
     }
 
 

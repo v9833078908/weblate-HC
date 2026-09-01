@@ -1687,6 +1687,139 @@ class JudgeQueueStripViewTest(ViewTestCase):
         response = self.client.get(self.translation.get_absolute_url())
         self.assertEqual(response.context["judge_last_run"].pk, own_run.pk)
 
+    # -- Task 9: conservative hand-off readiness ---------------------------
+
+    def judge_all_units(self, severity="none") -> None:
+        """Give every non-source, non-readonly unit a fresh PASS verdict."""
+        for translation in self.component.translation_set.all():
+            if translation.is_source:
+                continue
+            for unit in translation.unit_set.exclude(state=STATE_READONLY):
+                self.make_verdict(unit, severity)
+
+    def test_hand_off_absent_with_zero_history(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+        self.assertNotContains(response, "ready to hand off")
+
+    def test_hand_off_absent_with_partial_coverage(self) -> None:
+        self.enable_review()
+        # Only one of several units judged: not_reviewed stays above zero.
+        self.make_verdict(self.get_unit(), "none")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertGreater(
+            response.context["judge_queue"]["counts"]["not_reviewed"], 0
+        )
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_hand_off_absent_with_unresolved_critical(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        self.make_verdict(self.get_unit(), "critical")
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_hand_off_absent_with_escalated_major(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        verdict.resolution = "escalated"
+        verdict.save(update_fields=["resolution"])
+        self.refresh_stats(unit.translation)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_hand_off_absent_with_stale_target(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Drifted away"], STATE_TRANSLATED)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_hand_off_absent_with_unparsed_attempt(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        self.make_verdict(self.get_unit(), "none", unparsed=True)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_hand_off_visible_when_fully_clean(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+        self.assertEqual(counts["needs_human"], 0)
+        self.assertEqual(counts["not_reviewed"], 0)
+        self.assertEqual(counts["unparsed"], 0)
+        self.assertTrue(response.context["judge_queue"]["hand_off_ready"])
+        self.assertContains(response, "ready to hand off")
+        self.assertContains(response, response.context["judge_queue"]["download_url"])
+
+    def test_candidate_presence_never_clears_critical(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        Suggestion.objects.add(
+            unit,
+            ["A repaired translation"],
+            request=self.get_request(),
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": judge_context_hash(unit),
+                "engine": "openrouter",
+            },
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_context_drift_blocks_even_when_cache_reads_clean(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        unit = self.get_unit()
+        # Same target hash (still current), but a context hash the unit's
+        # live source/note/explanation/glossary no longer produce: the
+        # cache never tracks this, so every cached count stays zero.
+        JudgeVerdict.objects.filter(unit=unit).update(context_hash="0" * 64)
+        response = self.client.get(self.component.get_absolute_url())
+        counts = response.context["judge_queue"]["counts"]
+        self.assertEqual(counts["needs_human"], 0)
+        self.assertEqual(counts["not_reviewed"], 0)
+        self.assertEqual(counts["unparsed"], 0)
+        self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
+
+    def test_hand_off_query_count_stays_bounded(self) -> None:
+        self.enable_review()
+        self.judge_all_units()
+        with CaptureQueriesContext(connection) as clean:
+            self.client.get(self.component.get_absolute_url())
+        self.assertTrue(clean.captured_queries)
+
+        # A blocking critical short-circuits before the expensive per-unit
+        # context pass ever runs: strictly fewer queries than the clean
+        # scope, which must run that pass to confirm readiness.
+        self.make_verdict(self.get_unit(), "critical")
+        with CaptureQueriesContext(connection) as blocked:
+            self.client.get(self.component.get_absolute_url())
+        self.assertLess(len(blocked.captured_queries), len(clean.captured_queries))
+
+    def test_download_url_targets_the_component(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(
+            response.context["judge_queue"]["download_url"],
+            reverse("download", kwargs={"path": self.component.get_url_path()}),
+        )
+
 
 @override_settings(JUDGE_ENABLED=True, JUDGE_API_KEY="sk-test")
 class JudgeRunReportViewTest(ViewTestCase):
