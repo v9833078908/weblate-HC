@@ -53,7 +53,9 @@ the producer explicitly re-checks it.
 7. Metadata contains IDs, hashes, route identity, and schema version only. It
    never contains prompts, responses, credentials, or endpoint URLs.
 8. One verdict has at most one active candidate and one queued/running re-check.
-9. Major/max-length automatic repair behavior is unchanged.
+9. Normal batch major/max-length automatic repair behavior is unchanged. A
+   producer one-unit re-check is evidence-only: it projects pass/major directly
+   and never mutates an accepted target through the major repair loop.
 10. Cached stats may display counts but may not enable hand-off; the CTA needs a
     fresh target/context readiness check.
 
@@ -64,12 +66,15 @@ the producer explicitly re-checks it.
 | Current immediate critical repair | 2 judge + 1 repair MT + 2 re-judge = 5 |
 | New critical before producer action | 2 judge + 1 repair MT = 3 |
 | Producer keeps current text | 3 total |
-| Producer applies candidate | 3 + 2 one-unit re-judge = 5 total |
+| Producer applies candidate; re-check is pass/major | 3 + 2 judge = 5 total |
+| Producer applies candidate; re-check is critical | 3 + 2 judge + 1 new repair MT = 6 total |
 | Producer asks for another candidate | +1 repair MT |
 
 The saving comes from deferring the second judge round until acceptance. Keeping
-the current text avoids two judge calls. Applying the candidate costs the same
-five baseline calls as today's automatic repair, but gives the producer control.
+the current text avoids two judge calls. An accepted candidate that passes or
+returns admissible major costs the same five baseline calls as today's automatic
+repair, but gives the producer control. A repeated critical costs one additional
+repair MT call to persist its new candidate.
 The candidate is generated once per fresh verdict and reused on every render.
 Tests assert request counts; exact dollar attribution of judge-repair MT remains
 out of scope because current usage rows classify those calls as translation.
@@ -97,8 +102,8 @@ producer card
               +-- STATE_FUZZY + audited Change
               +-- consume candidate
               +-- queued JudgeRun after commit
-                    +-- judge current text, no phase-1 MT
-                    +-- critical -> held + new candidate
+                    +-- judge current text, no phase-1 MT or mutating repair
+                    +-- pass/major -> project state; critical -> held + new candidate
 ```
 
 ## Task 1: Define candidate persistence and audit
@@ -198,16 +203,26 @@ Commit: `feat(judge): persist critical repair candidates`.
 
 Tests cover both permissions, two rapid POSTs dispatching once, queued/running
 badge, completed/failed retry, dispatch failure, and a fuzzy Unit re-check that
-judges current target without phase-1 MT. Worker start must reuse the pre-created
-JudgeRun. Generation tests cover first generation, existing-candidate no-op,
-explicit Generate another, duplicate POST, failure preserving the old candidate,
-and drift discarding the paid output.
+judges current target without phase-1 MT or the major repair loop. A pass or
+admissible major must use exactly two seat calls, make no repair MT call, and
+project the accepted target to its release state. A repeated critical must use
+two seat calls, keep the target held, and make one repair MT call only to store
+the next candidate. Worker start must reuse the pre-created JudgeRun. Generation
+tests cover first generation, existing-candidate no-op, explicit Generate
+another, duplicate POST, failure preserving the old candidate, and drift
+discarding the paid output.
 
-Add task-internal `judge_run_id` and `judge_pretranslate=True` to
-`auto_translate`, `BatchAutoTranslate`, and `AutoTranslate`. One-unit re-check
-passes `unit_ids=[unit.id]`, `mode="judge"`, the run ID, and
-`judge_pretranslate=False`. Only phase-1 MT is skipped; both seats, permissions,
-cache identity, projections, audit, and major repair remain.
+Add task-internal `judge_run_id`, `judge_pretranslate=True`, and
+`judge_mutating_repairs=True` to `auto_translate`, `BatchAutoTranslate`, and
+`AutoTranslate`. One-unit re-check passes `unit_ids=[unit.id]`, `mode="judge"`,
+the run ID, `judge_pretranslate=False`, and
+`judge_mutating_repairs=False`.
+
+The re-check flag passes `writable_ids=set()` into the existing judge loop so
+major cannot trigger `_apply_repair` or another judge round. Task 2 candidate
+generation is independent of `writable_ids`, so a repeated critical still
+stores exactly one new hash-bound candidate. Both seats, permissions, cache
+identity, projections, and audit remain enabled.
 
 Under the Unit lock, reuse an active QUEUED/RUNNING re-check or create one
 `JudgeRun(scope_type=TRANSLATION, requested_mode="recheck",
@@ -393,10 +408,13 @@ Browser/Selenium flows:
 1. Fresh candidate: preview, apply, auto-advance.
 2. Pending re-check: Re-checking and duplicate suppression.
 3. Re-check pass: candidate consumed, blocker gone.
-4. Re-check critical: new candidate, blocker remains.
-5. Context drift: candidate blocked, only Re-check.
-6. Missing candidate: Generate and failed retry preserving the old candidate.
-7. Major/minor cards and component readiness.
+4. Re-check admissible major: exactly two seat calls, no repair MT, accepted
+   target becomes release-ready with advisory evidence.
+5. Re-check critical: exactly two seat calls plus one candidate MT, new
+   candidate appears, blocker remains.
+6. Context drift: candidate blocked, only Re-check.
+7. Missing candidate: Generate and failed retry preserving the old candidate.
+8. Normal-batch major repair and component readiness.
 
 Use deterministic fixtures/mocked provider responses to avoid unapproved spend.
 Use the dev surface at port 3001 only if already running; rebuilding the shared
@@ -410,8 +428,10 @@ stack needs approval.
 3. Acceptance cannot ship before a fresh one-unit re-check.
 4. Drift blocks every UI/API/internal acceptance route.
 5. Generation, regeneration, and re-check dedupe retries/double-clicks.
-6. Major automatic repair is unchanged.
-7. Tests prove the 3-call pre-decision and 5-call accepted paths.
+6. Normal-batch major repair is unchanged; producer one-unit re-check never
+   repairs or re-judges an admissible major.
+7. Tests prove the 3-call pre-decision, 5-call pass/major, and 6-call
+   repeated-critical paths.
 8. Readiness cannot report a false zero from cache or target-only freshness.
 9. UI is translatable and keyboard accessible.
 10. No secret, prompt, or response body is persisted.
