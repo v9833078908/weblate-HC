@@ -166,10 +166,14 @@ service, а не по запрошенному компоненту, поэто�
     его из класса (`get_identifier()`), judge - из хоста, поэтому
     нестандартный `JUDGE_BASE_URL` даёт `unknown`, а `--service litellm`
     молча теряет полностью атрибутированные judge-строки.
-22. **`attribution_complete` считается по всему ledger данного service.**
-    `scope_logs` не фильтруется по project/component, поэтому без `--days` и
-    `--service` флаг описывает историю инстанса, а не запрошенный scope; а
-    translation usage не удаляется никаким cleanup.
+22. **`attribution_complete` считался по всему ledger данного service.**
+    `scope_logs` сужался только по language, но не по project и component,
+    хотя правило «кандидат = совпадает ИЛИ пусто» одинаково применимо ко всем
+    трём измерениям. Из-за этого один платный probe `validate_settings()`
+    постороннего проекта держал бы изолированный scope в `unknown`, то есть
+    жёсткий гейт Task 6 Step 6 был бы недетерминированным. Плюс без `--days` и
+    `--service` флаг описывает историю инстанса, а translation usage не
+    удаляется никаким cleanup.
 23. **Smoke-тест сам себя обесценивал.** Task 6 Step 6 объявлял
     `priced_complete=no` и `attribution_complete=unknown` не провалом. Это
     единственный шаг, который проводит настоящее тело ответа провайдера через
@@ -1669,6 +1673,75 @@ class LLMUsageReportIdentityTest(ComponentTestCase):
             ["0.100000000000000000", "0", "yes", "0", "yes"],
         )
 
+    def _scoped_row(self) -> None:
+        LLMUsageLog.objects.create(
+            model="m",
+            service="openrouter",
+            project_id_snapshot=self.project.pk,
+            project_slug=self.project.slug,
+            component_id_snapshot=self.component.pk,
+            component_slug=self.component.slug,
+            target_language_code=self.translation.language.code,
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            prompt_tokens=1,
+            batch_size=1,
+            cost_usd=Decimal("0.1"),
+        )
+
+    def _summary_row(self) -> list[str]:
+        out = StringIO()
+        call_command(
+            "llm_usage_report",
+            "--project",
+            self.project.slug,
+            "--component",
+            self.component.slug,
+            "--language",
+            self.translation.language.code,
+            "--service",
+            "openrouter",
+            "--operation",
+            "translation",
+            "--days",
+            "1",
+            "--summary",
+            "--format",
+            "csv",
+            stdout=out,
+        )
+        return list(csv.reader(out.getvalue().strip().splitlines()))[1]
+
+    def test_another_projects_probe_is_not_a_candidate(self) -> None:
+        # validate_settings() pays for a unit-less probe owned by the
+        # service's own project. It provably cannot belong to this component,
+        # so it must not make an isolated scope permanently "unknown".
+        self._scoped_row()
+        LLMUsageLog.objects.create(
+            model="m",
+            service="openrouter",
+            project_id_snapshot=self.project.pk + 1000,
+            project_slug="other-project",
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            prompt_tokens=1,
+        )
+
+        self.assertEqual(self._summary_row()[-2:], ["0", "yes"])
+
+    def test_own_projects_probe_keeps_the_component_unknown(self) -> None:
+        # The same probe inside this project carries no component, and the
+        # ledger cannot prove it was not about this one.
+        self._scoped_row()
+        LLMUsageLog.objects.create(
+            model="m",
+            service="openrouter",
+            project_id_snapshot=self.project.pk,
+            project_slug=self.project.slug,
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            prompt_tokens=1,
+        )
+
+        self.assertEqual(self._summary_row()[-2:], ["1", "unknown"])
+
     def test_unknown_current_identity_is_rejected(self) -> None:
         with self.assertRaisesMessage(
             CommandError,
@@ -1865,6 +1938,14 @@ class Command(BaseCommand):
                     f'Project "{options["project"]}" does not exist.'
                 ) from error
             logs = logs.filter(project_id_snapshot=project.pk)
+            # A completeness candidate is a row that *could* belong to the
+            # requested scope: it either matches the requested identity or is
+            # blank on that dimension. A row owned by a different project
+            # provably cannot, so counting it would make every isolated scope
+            # permanently "unknown".
+            scope_logs = scope_logs.filter(
+                Q(project_id_snapshot=project.pk) | Q(project_id_snapshot__isnull=True)
+            )
         if options["component"]:
             if project is None:
                 raise CommandError("--component requires an existing --project.")
@@ -1878,6 +1959,10 @@ class Command(BaseCommand):
                     f'Component "{options["component"]}" does not exist.'
                 ) from error
             logs = logs.filter(component_id_snapshot=component.pk)
+            scope_logs = scope_logs.filter(
+                Q(component_id_snapshot=component.pk)
+                | Q(component_id_snapshot__isnull=True)
+            )
         if options["language"]:
             logs = logs.filter(target_language_code=options["language"])
             scope_logs = scope_logs.filter(
@@ -1940,24 +2025,36 @@ class Command(BaseCommand):
 любой unscoped request с теми же service/model/operation/time мог включать
 запрошенный component, даже если его project ID уже пуст.
 
-Отсюда два свойства, которые обязаны быть в документации команды, иначе флаг
-бесполезен:
+Ключевое свойство `scope_logs` - «может ли эта row относиться к запрошенному
+scope», и оно применяется ко всем трём измерениям одинаково: `требуемый ID ИЛИ
+пусто`. Строка с *другим* известным project или component заведомо не может
+принадлежать запрошенному, поэтому в кандидаты не входит; строка с пустым
+измерением - входит, потому что исключить её нельзя. Без сужения по project и
+component один платный probe `validate_settings()` любого постороннего проекта
+держал бы изолированный scope в `unknown` навсегда, и жёсткий гейт Task 6
+Step 6 стал бы недетерминированным. Симметрия обязательна: language уже
+сужается этим же способом, project и component должны вести себя так же.
 
-- `scope_logs` берётся **после** days/service/model/operation, но **до**
-  project/component. Поэтому `attribution_complete` описывает окно и service,
-  а не запрошенный компонент. Без `--days` он описывает всю историю, а без
-  `--service` - ещё и legacy-строки до миграции, которые несут `service=""` и
-  никогда не удаляются (`cleanup_judge_observability` чистит только judge,
-  `weblate/trans/tasks.py:1375-1381`). `--service` исключает их по построению;
-  это пинится тестом `test_legacy_rows_do_not_block_attribution_complete`.
-- detail-режим группирует и по ID, и по snapshot slug, поэтому переименованный
-  компонент даёт две строки с одним `component_id_snapshot`. Это осознанно:
-  slug - исторический label. Единственный полный итог по такому компоненту -
-  `--summary`, который резолвит current slug в ID.
+Что при этом остаётся правдой и что надо назвать в документации команды:
 
-В `help` команды добавить одну строку: "attribution completeness is computed
-over the filtered window and service, not over the requested project; pass
---service and --days for a meaningful flag."
+- **`--service` и `--days` по-прежнему нужны.** Измерения, которые не заданы,
+  не сужают кандидатов. Legacy-строки до миграции несут `service=""`, поэтому
+  `--service openrouter` их исключает по построению, а вызов без `--service`
+  держит флаг в `unknown`, пока такие строки существуют - translation usage не
+  удаляется никаким cleanup (`cleanup_judge_observability` чистит только
+  judge, `weblate/trans/tasks.py:1375-1381`). Это пинится тестом
+  `test_legacy_rows_do_not_block_attribution_complete`.
+- **`unknown` внутри своего проекта остаётся честным.** Probe того же проекта
+  несёт project ID и пустой component, поэтому в component-scoped summary он
+  кандидат: журнал не может доказать, что он был не про этот компонент.
+- **detail-режим группирует и по ID, и по snapshot slug**, поэтому
+  переименованный компонент даёт две строки с одним `component_id_snapshot`.
+  Это осознанно: slug - исторический label. Единственный полный итог по такому
+  компоненту - `--summary`, который резолвит current slug в ID.
+
+В `help` команды добавить одну строку: "attribution completeness counts only
+rows that could belong to the selected scope (matching or blank identity);
+pass --service and --days so unfiltered dimensions cannot widen it."
 
 ### Step 4: Run tests to verify they pass
 
@@ -2200,10 +2297,16 @@ Expected - жёсткий гейт, а не наблюдение: ровно о�
 есть blank-scope row того же service/operation, то есть unit-less или смешанный
 batch. Оба случая - отказ Tasks 1-2, а не свойство данных.
 
-`--days 1` обязателен: `attribution_complete` считается по `scope_logs`,
-который намеренно не фильтруется по project/component (Task 4, Step 3). Без
-окна флаг описывает весь ledger этого service, а не этот прогон, и «yes»
-становится либо недостижимым, либо бессмысленным.
+`--days 1` обязателен. Кандидаты в `attribution_complete` сужены по project и
+component («совпадает ИЛИ пусто», Task 4 Step 3), поэтому чужие проекты гейт
+не роняют; но незаданные измерения не сужают ничего, и без окна флаг
+описывает весь ledger этого service за всю историю.
+
+Предусловие прогона: настройки OpenRouter для этого проекта должны быть
+сохранены **до** начала окна. Платный probe `validate_settings()` несёт project
+без component, поэтому внутри своего проекта он законный кандидат и честно
+даёт `unknown` - это не дефект отчёта, а неустранимая неоднозначность такой
+строки.
 
 Это единственный шаг плана, который проводит **настоящее** тело ответа
 провайдера через `parse_float=Decimal`, `numeric(24, 18)` и вывод scope. Моки
@@ -2302,11 +2405,14 @@ unscoped request, который журнал не может исключить
 разделяет service и model в detailed режиме. До выкладки Task 3 брать
 component-level judge total нельзя: его scope пуст.
 
-Два правила, без которых `--summary` вводит в заблуждение:
+Три правила, без которых `--summary` вводит в заблуждение:
 
-- **всегда указывать `--service` и `--days`.** `attribution_complete` считается
-  по строкам того же service/model/operation/окна с пустым scope, без фильтра
-  по project и component. Legacy-строки до миграции несут `service=""`, поэтому
+- **кандидаты сужены только по заданным измерениям.** `attribution_complete`
+  считает строки, которые *могли бы* принадлежать запрошенному scope: по
+  каждому из project, component и language - «совпадает ИЛИ пусто». Чужой
+  известный project или component в кандидаты не входит.
+- **всегда указывать `--service` и `--days`.** Незаданное измерение не сужает
+  ничего. Legacy-строки до миграции несут `service=""`, поэтому
   `--service openrouter` их исключает по построению, а вызов без `--service`
   держит флаг в `unknown`, пока такие строки существуют - а translation usage
   текущий cleanup не удаляет никогда.
@@ -2359,9 +2465,10 @@ component-level judge total нельзя: его scope пуст.
 10. **Unit-less платный запрос.** `validate_settings()`
     (`weblate/machinery/base.py:168-186`) шлёт один платный `("test", None)`
     при сохранении настроек службы. Он атрибутируется на project из настроек
-    (Task 2, Step 3), но component и language у него пустые: в
-    component-scoped summary он не попадает, а в project-scoped даёт
-    `attribution_complete=unknown`.
+    (Task 2, Step 3), но component и language у него пустые. В сумму
+    component-scoped summary он не входит, для чужого проекта кандидатом не
+    является, а внутри своего проекта даёт `attribution_complete=unknown`:
+    доказать, что он был не про этот компонент, журнал не может.
 11. **Detail-строки после rename.** Группировка сохраняет и immutable ID, и
     snapshot slug, поэтому переименованный компонент виден двумя строками.
     Это сознательно: slug - исторический label биллинга. Итог берут из
@@ -2393,9 +2500,10 @@ component-level judge total нельзя: его scope пуст.
 
 **VERDICT:** ENG, independent, precision follow-up and code-grounded re-review
 cleared - the revised plan preserves stable identity across rename,
-distinguishes priced from attributed completeness, keeps the settings-project
-owner of a unit-less paid probe, normalizes before rejecting a provider
-decimal, returns one answer, orders migration before writers, and gates
-rollout on both completeness flags rather than reporting them.
+distinguishes priced from attributed completeness, counts completeness
+candidates only within the selected scope, keeps the settings-project owner of
+a unit-less paid probe, normalizes before rejecting a provider decimal,
+returns one answer, orders migration before writers, and gates rollout on both
+completeness flags rather than reporting them.
 
 NO UNRESOLVED DECISIONS
