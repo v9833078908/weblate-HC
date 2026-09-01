@@ -17,9 +17,11 @@ from django.test import SimpleTestCase, TestCase, override_settings
 
 from weblate.trans.judge import (
     _ALIAS_CACHE,
+    FAILURE_KINDS,
     JudgeError,
     JudgeRequest,
     _decode_non_stream,
+    _failure_for_http,
     _read_capped,
     _read_sse,
     _request_timeout,
@@ -33,6 +35,7 @@ from weblate.trans.judge import (
     resolve_judge_seat_profile,
     validate_judge_configuration,
 )
+from weblate.trans.judge_loop import _AVAILABILITY_FAILURE_KINDS
 from weblate.trans.models.judge import JudgeRequestAttempt
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.tests import http_mock
@@ -2252,3 +2255,44 @@ class JudgeLiteLLMPayloadTest(TestCase):
         self.assertEqual(body["reasoning"], {"effort": "none", "exclude": True})
         self.assertNotIn("enable_thinking", body)
         self.assertNotIn("thinking", body)
+
+
+class JudgeHttpFailureMappingTest(SimpleTestCase):
+    """The whole safety argument for refusals lives in this table."""
+
+    REQUEST_INVALID = {400, 404, 405, 406, 415, 422}
+    SIZE_DEPENDENT = {413, 431}
+
+    def test_failure_for_http_table(self) -> None:
+        for status in sorted(self.REQUEST_INVALID):
+            with self.subTest(status=status):
+                self.assertEqual(_failure_for_http(status), "http-request-invalid")
+        for status in sorted(self.SIZE_DEPENDENT):
+            with self.subTest(status=status):
+                self.assertEqual(_failure_for_http(status), "http-other")
+        # Unclassified 4xx keep today's behaviour.
+        for status in (402, 409, 418, 451):
+            with self.subTest(status=status):
+                self.assertEqual(_failure_for_http(status), "http-other")
+        # Unchanged kinds.
+        self.assertEqual(_failure_for_http(401), "http-auth")
+        self.assertEqual(_failure_for_http(403), "http-auth")
+        self.assertEqual(_failure_for_http(429), "http-rate-limit")
+        for status in (500, 502, 503):
+            with self.subTest(status=status):
+                self.assertEqual(_failure_for_http(status), "http-server")
+        self.assertEqual(_failure_for_http(None), "")
+        self.assertEqual(_failure_for_http(200), "")
+
+    def test_request_invalid_is_a_declared_kind(self) -> None:
+        self.assertIn("http-request-invalid", FAILURE_KINDS)
+        self.assertEqual(
+            JudgeRequestAttempt.FailureKind.HTTP_REQUEST_INVALID,
+            "http-request-invalid",
+        )
+
+    def test_request_invalid_is_not_an_availability_failure(self) -> None:
+        # A rejected request is not evidence about endpoint health and must
+        # not open the shared circuit.
+        self.assertNotIn("http-request-invalid", _AVAILABILITY_FAILURE_KINDS)
+        self.assertIn("http-other", _AVAILABILITY_FAILURE_KINDS)

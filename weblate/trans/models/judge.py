@@ -243,6 +243,7 @@ class JudgeRequestAttempt(models.Model):
         HTTP_AUTH = "http-auth"
         HTTP_RATE_LIMIT = "http-rate-limit"
         HTTP_SERVER = "http-server"
+        HTTP_REQUEST_INVALID = "http-request-invalid"
         HTTP_OTHER = "http-other"
         EMPTY_RESPONSE = "empty-response"
         INVALID_JSON = "invalid-json"

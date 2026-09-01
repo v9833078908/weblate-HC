@@ -55,6 +55,7 @@ FAILURE_KINDS = frozenset(
         "http-auth",
         "http-rate-limit",
         "http-server",
+        "http-request-invalid",
         "http-other",
         "empty-response",
         "invalid-json",
@@ -1109,6 +1110,10 @@ def _failure_for_http(status: int | None) -> str:
         return "http-rate-limit"
     if status is not None and status >= 500:
         return "http-server"
+    # A request the endpoint will refuse every time: wrong shape, model name
+    # or parameter. Retrying or resending it anywhere is waste.
+    if status in {400, 404, 405, 406, 415, 422}:
+        return "http-request-invalid"
     if status is not None and status >= 400:
         return "http-other"
     return ""
