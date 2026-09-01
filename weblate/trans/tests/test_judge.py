@@ -332,20 +332,6 @@ class JudgeResolutionTest(ViewTestCase):
             )
         self.assertEqual(cm.exception.code, "stale")
 
-    def test_unresolved_major_cannot_be_accepted_directly(self) -> None:
-        self.enable_review()
-        unit = self.get_unit()
-        verdict = self.make_verdict(unit, "major")
-        with self.assertRaises(JudgeResolutionError) as cm:
-            resolve_verdict(
-                unit=unit,
-                expected_verdict_id=verdict.pk,
-                actor=self.user,
-                resolution=JudgeVerdict.Resolution.ACCEPTED_AS_IS,
-                reason="already ships",
-            )
-        self.assertEqual(cm.exception.code, "invalid_transition")
-
     def test_critical_escalation_keeps_state_fuzzy(self) -> None:
         self.enable_review()
         unit = self.get_unit()
@@ -406,6 +392,31 @@ class JudgeResolutionTest(ViewTestCase):
         )
         refreshed = self.get_unit()
         self.assertEqual(refreshed.state, STATE_NEEDS_CHECKING)
+
+    def test_fresh_flag_can_be_accepted_as_is_directly(self) -> None:
+        # Task 7: a fresh FLAG no longer needs the escalate-then-accept
+        # round trip; Keep as is is reachable in one step, same as Reject.
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        unit.run_checks()
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+            reason="acceptable in context",
+        )
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.resolution, JudgeVerdict.Resolution.ACCEPTED_AS_IS)
+        changes = Change.objects.filter(unit=unit, action=ActionEvents.JUDGE_RESOLUTION)
+        self.assertEqual(changes.count(), 1)
+        self.assertEqual(changes[0].details["old_resolution"], "")
+        self.assertEqual(changes[0].details["new_resolution"], "accepted_as_is")
 
     def test_escalated_major_can_be_accepted_with_both_changes_preserved(
         self,

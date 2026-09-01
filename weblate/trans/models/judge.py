@@ -1122,6 +1122,11 @@ ALLOWED_RESOLUTION_TRANSITIONS = {
     ),
     (
         JudgeVerdict.Verdict.FLAG,
+        "",
+        JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+    ),
+    (
+        JudgeVerdict.Verdict.FLAG,
         JudgeVerdict.Resolution.ESCALATED,
         JudgeVerdict.Resolution.ACCEPTED_AS_IS,
     ),

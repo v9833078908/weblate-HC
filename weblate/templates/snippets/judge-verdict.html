@@ -78,6 +78,14 @@
           {% endif %}
           {% if judge_verdict.max_severity == "minor" %}
             {% include "snippets/judge-verdict-evidence.html" with seats=judge_seats %}
+            {% if user_can_use_machinery %}
+              <a class="btn btn-link"
+                 data-bs-target="#machinery"
+                 data-bs-toggle="tab"
+                 data-load="machinery"
+                 href="#"
+                 title="{% translate "Computer-aided translation suggestions" %}">{% translate "Automatic suggestions" %}</a>
+            {% endif %}
           {% endif %}
         </div>
       {% endif %}

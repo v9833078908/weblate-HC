@@ -1054,12 +1054,22 @@ class JudgeResolutionViewTest(ViewTestCase):
         self.assertEqual(verdict.resolution, "")
 
     def test_invalid_transition_shows_an_error_without_a_crash(self) -> None:
+        # A fresh FLAG can be accepted as-is directly since Task 7; a
+        # *terminal* accepted_as_is re-requesting escalated is still the
+        # invalid transition this view must reject cleanly.
         self.enable_review()
         unit = self.get_unit()
         verdict = self.make_verdict(unit, "major")
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+            reason="already ships",
+        )
         response = self.client.post(
             self.resolve_url(verdict),
-            {"resolution": "accepted_as_is", "reason": "already ships"},
+            {"resolution": "escalated", "reason": "second thoughts"},
             follow=True,
         )
         self.assertEqual(response.status_code, 200)
@@ -2645,4 +2655,35 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "Repaired since the original verdict")
         self.assertContains(response, "Broken tag in the translation.")
+
+    # -- Task 7: naming remaining outcomes ---------------------------------
+
+    def test_fresh_flag_offers_keep_as_is_and_escalate_directly(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Record decision")
+        form = response.context["judge_resolution_form"]
+        choices = {value for value, _label in form.fields["resolution"].choices}
+        self.assertEqual(
+            choices,
+            {JudgeVerdict.Resolution.ESCALATED, JudgeVerdict.Resolution.ACCEPTED_AS_IS},
+        )
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+
+    def test_minor_shows_ai_variants_fallback_but_no_resolution_form(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "minor")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Computer-aided translation suggestions")
+        self.assertNotContains(response, "Record decision")
+        self.assertNotContains(response, "Use suggested fix")
+        self.assertNotContains(response, "Generate suggested fix")
+
+    def test_minor_ai_variants_fallback_needs_machinery_permission(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "minor")
+        self.grant_only(["unit.review", "translation.auto"])
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Computer-aided translation suggestions")
 
