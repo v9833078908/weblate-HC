@@ -90,7 +90,7 @@ voting/autoaccept.
 | History | Аудит trail; молчаливых переходов нет (инвариант 4.1.8) |
 | ZIP download файлов | `[документ]` Шаг 11 producer guide - забор переводов в игру; замена на Create release package - P2 |
 
-## Применение (2026-09-01, dev-инстанс)
+## Применение (2026-09-01)
 
 `WEBLATE_REGISTRATION_OPEN: 0` и `WEBLATE_ENABLE_SHARING: 0` добавлены в
 `dev-docker/docker-compose.yml` (commit `c326243`); контейнер пересоздан
@@ -130,6 +130,22 @@ health 200. Add-on Automatic translation не установлен ни на о�
   `weblate-translation-memory` и `openrouter`, проектные настройки col4 -
   `litellm` и `openrouter`, выпадение сконфигурированного сервиса не
   произошло.
+
+### Прод (`l10n.herocraft.com`, 2026-09-01, по явному одобрению)
+
+Те же три переменные (`WEBLATE_ENABLE_SHARING=0`, `WEBLATE_REMOVE_FORMATS`,
+`WEBLATE_REMOVE_MACHINERY`) добавлены в `/srv/hcgameloc/deploy/.env`
+(бэкап `.env.bak-20260901-180808`) и в шаблон `deploy/environment.example`;
+контейнер пересоздан `docker compose up -d weblate`. Замер до изменения
+`[live]`: 22 компонента используют только `json`, `po-mono`, `tbx`,
+MT-настроек в БД нет вообще (`Setting.objects.filter(name='mt')` пуст),
+`suggestion_voting`/`suggestion_autoaccept` нулевые,
+`REGISTRATION_OPEN` уже был False - то есть ни один используемый формат и ни
+один сконфигурированный сервис под трим не попали. После пересоздания `[live]`:
+форматов 14, `used-ok True`, machinery `['litellm', 'openrouter', 'weblate',
+'weblate-translation-memory']`, `ENABLE_SHARING=False`, контейнер healthy,
+`/healthz/` 200 и `/accounts/login/` 200 на 127.0.0.1:8081 (порт, который
+проксирует vhost `l10n`).
 
 ## Открытые пункты
 
