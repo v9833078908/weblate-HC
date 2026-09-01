@@ -1,284 +1,433 @@
-# Producer triage for judge verdicts, Solution 1 implementation plan
+# Producer triage with a stored judge repair candidate implementation plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
 > implement this plan task-by-task.
 
-**Goal:** Make the embedded judge card a usable producer triage surface for
-every verdict severity (critical/`judge-reject`, major/`judge-flag`,
-minor/`judge-note`): pin the existing context-freshness gate with tests and
-give drifted cards an action, compress the two-seat evidence, name the
-actions by outcome, auto-advance the queue, and give the component page a
-conservative release CTA. No new pages, no new models, no migrations.
+**Goal:** Make the embedded judge card a complete producer triage surface:
+every fresh critical verdict arrives with one persisted judge-guided repair
+candidate that the producer can preview and apply in one click, and the
+accepted text stays blocked until a fresh one-unit judge run completes.
 
-**Architecture:** Templates, `_judge_view_context`, the resolution
-transition table, and the readiness strip only. The verdict stays
-immutable; the existing readers already guarantee a resolution is recorded
-only against a verdict whose target *and* context still match the unit -
-this plan adds no second hash computation anywhere. The release CTA reads
-existing per-translation stats
-(`judge_reject`/`judge_stale`/`judge_unparsed`) and never invents a new
-counter.
+**Architecture:** Keep the existing translate page, verdict card, native
+`Suggestion`, `JudgeRun`, and `auto_translate(mode="judge")` pipeline. Replace
+the critical branch of the current immediate repair loop with a persisted
+`Suggestion` bound to the representative verdict and target/context hashes.
+Major and max-length repair behavior remains unchanged. Every candidate
+acceptance path checks freshness under the Unit lock, writes the candidate as
+`STATE_FUZZY`, and queues a current-text-only one-unit re-check.
 
-**Tech stack:** Python 3.14, Django templates (Bootstrap/jQuery), pytest,
-Docker Compose dev instance.
+**Tech stack:** Python 3.14, Django/PostgreSQL, Celery, Django templates
+(Bootstrap/jQuery), pytest, Docker Compose dev instance.
 
-**Research:** `docs/llm-first/research/2026-09-01-judge-producer-triage-embed-research.md`
-(sections 5-7). Deviation from that document's Task 3: the "Edit manually"
-button and its state-switching JS are dropped per producer decision
-2026-09-01 - the existing editor flow already covers manual fixes.
+**Research:**
+`docs/llm-first/research/2026-09-01-judge-producer-triage-embed-research.md`.
+Product decision 2026-09-01 supersedes that document's sequencing: Solution 3
+is a first-increment requirement. The smallest safe increment therefore
+contains Solution 1, the one-unit re-check substrate from Solution 2, and the
+stored-candidate lifecycle from Solution 3.
 
-**Status:** proposed, awaiting approval. Out of scope: per-unit re-check
-endpoint (Solution 2), stored repair candidate as `Suggestion` (Solution 3).
+**Status:** proposed, awaiting approval. No new page and no new domain model.
+One migration is expected for the `candidate-stored` audit choice on the
+existing `JudgeRunUnit.repair_status` field.
+
+**Out of scope:** multiple simultaneous candidates, score/ranking UI, judge
+prompt/schema changes, automatic acceptance, and a new export pipeline. The
+previously rejected dedicated "Edit manually" button remains out of scope; the
+normal editor already covers manual fixes. A manual save remains stale until
+the producer explicitly re-checks it.
 
 ---
 
-## Task 1: Pin the freshness invariant; give drifted cards an action
+## Invariants
 
-No gate is missing - verified against the code: `current_round` filters
-rows by the unit's current target *and* context hashes
-(`_current_snapshot_hashes`, `weblate/trans/models/judge.py:759-769`),
-`_judge_view_context` builds resolution choices only from
-`judge_current_verdict = current_verdict(unit)`
-(`weblate/trans/views/edit.py:1324-1331`), and `resolve_verdict` re-reads
-`current_verdict` under the Unit lock and raises `stale` when drift made it
-None (`weblate/trans/models/judge.py:1072-1093`). When
-`judge_context_changed` is true, the displayed verdict is the target-only
-fallback (`active_verdict`) and the current verdict is by construction
-None, so the form and the drift note are already mutually exclusive.
+1. Generation never mutates the Unit target.
+2. A candidate is active only for the current unresolved critical verdict with
+   matching target/context hashes.
+3. Verdict card, suggestions UI, API, votes, bulk operations, and internal
+   callers enforce one judge-specific acceptance guard.
+4. Acceptance writes `STATE_FUZZY`; only a fresh re-check may make it shippable.
+5. Generate, regenerate, accept, and re-check require `unit.review` and
+   `translation.auto`; `suggestion.accept` alone is insufficient.
+6. Stale/context-drift cards show only "Re-check this string".
+7. Metadata contains IDs, hashes, route identity, and schema version only. It
+   never contains prompts, responses, credentials, or endpoint URLs.
+8. One verdict has at most one active candidate and one queued/running re-check.
+9. Major/max-length automatic repair behavior is unchanged.
+10. Cached stats may display counts but may not enable hand-off; the CTA needs a
+    fresh target/context readiness check.
 
-What is missing is coverage pinning that invariant and any producer action
-on a drifted/stale card: today the card shows only an explanatory footnote
-with nothing to click.
+## Cost contract
 
-**Files:**
+| Path | Baseline paid calls |
+| --- | ---: |
+| Current immediate critical repair | 2 judge + 1 repair MT + 2 re-judge = 5 |
+| New critical before producer action | 2 judge + 1 repair MT = 3 |
+| Producer keeps current text | 3 total |
+| Producer applies candidate | 3 + 2 one-unit re-judge = 5 total |
+| Producer asks for another candidate | +1 repair MT |
 
-- Modify: `weblate/trans/tests/test_judge_views.py`
-- Modify: `weblate/trans/tests/test_judge.py`
-- Modify: `weblate/templates/snippets/judge-verdict.html`
+The saving comes from deferring the second judge round until acceptance. Keeping
+the current text avoids two judge calls. Applying the candidate costs the same
+five baseline calls as today's automatic repair, but gives the producer control.
+The candidate is generated once per fresh verdict and reused on every render.
+Tests assert request counts; exact dollar attribution of judge-repair MT remains
+out of scope because current usage rows classify those calls as translation.
 
-### Step 1: Write tests pinning the existing invariant
+## Target flow
 
-- View: after a glossary/note change that flips `judge_context_changed`,
-  the unit page renders the drift note and no resolution form
-  (`judge_can_resolve` false), for critical and major verdicts alike.
-- Model: `resolve_verdict` with the drifted verdict's pk raises
-  `JudgeResolutionError("stale", ...)`; the resolution row stays
-  untouched. These tests document behavior that already holds - they
-  must pass without production changes and guard against regression.
+```text
+judge seats
+  +-- pass/minor ----------------------> existing projection
+  +-- major/max-length ----------------> existing repair + re-judge
+  +-- critical
+        +-- run_checks -> repair_targets once
+        +-- snapshot lock
+        +-- native Suggestion(verdict/run/target/context/engine)
+            target remains unchanged and held
 
-### Step 2: Implement the drift-card action
+producer card
+  +-- stale/context drift ------------> Re-check only
+  +-- current critical, no candidate -> Generate / normal editor
+  +-- current candidate
+        +-- Keep as is ---------------> existing resolution
+        +-- Use suggested fix
+              +-- Unit -> Suggestion -> verdict locks
+              +-- freshness + permission checks
+              +-- STATE_FUZZY + audited Change
+              +-- consume candidate
+              +-- queued JudgeRun after commit
+                    +-- judge current text, no phase-1 MT
+                    +-- critical -> held + new candidate
+```
 
-Template only: on `judge_context_changed` (and on the `judge_stale`
-branch, `judge-verdict.html:23-32`), next to the existing note render one
-action - a "Re-judge this string" link to the automatic translation page
-prefilled with `mode=judge&q=id:{unit.pk}` (the
-`judge_queue_strip_context` run-URL pattern,
-`weblate/trans/views/basic.py:750`). This is the Solution 1 stand-in for
-the per-unit re-check endpoint. Add a rendering test for both branches.
-
-### Step 3: Verify GREEN
-
-`uv run pytest weblate/trans/tests/test_judge_views.py weblate/trans/tests/test_judge.py`
-(or `./rundev.sh test ...`).
-
-## Task 2: Compress the two-seat card for every severity
-
-The reject (`judge-verdict.html:33-64`), flag (`:65-89`), minor-pass
-(`:90-115`), and repair-evidence (`:117-138`) branches each duplicate the
-per-seat error loop, producing four to eight paragraphs of model prose per
-card.
-
-**Files:**
-
-- Modify: `weblate/templates/snippets/judge-verdict.html`
-- Modify: `weblate/trans/tests/test_judge_views.py`
-
-### Step 1: Write failing tests
-
-Rendered card contains exactly one visible summary line per verdict
-(severity badge + first error description) and a `<details>` element
-holding the full per-seat evidence (model names, timestamps, every
-error, back-translations); repeated for reject, flag, and minor cards.
-
-### Step 2: Implement
-
-Extract one shared seat-evidence loop into the snippet used by all four
-branches: visible part is the severity badge, ship/hold badge, and a
-single merged one-line summary; everything else moves under native
-`<details>/<summary>` (keyboard-accessible, per `ACCESSIBILITY.md` -
-no JS). Keep the existing badges and i18n strings; keep Zen untouched
-(the card does not render there).
-
-### Step 3: Verify GREEN
-
-Same suites as Task 1 plus `uv run prek run djlint-django --files weblate/templates/snippets/judge-verdict.html`.
-
-## Task 3: Outcome-named actions per severity
-
-Today a fresh major cannot be kept: `ALLOWED_RESOLUTION_TRANSITIONS`
-(`weblate/trans/models/judge.py:1010-1036`) allows FLAG only
-`"" -> escalated` and `escalated -> accepted_as_is`; the direct
-`"" -> accepted_as_is` exists only for REJECT. A minor verdict is
-represented by verdict `pass` with `max_severity == "minor"` and has no
-transitions - correctly, since it never blocks anything.
+## Task 1: Define candidate persistence and audit
 
 **Files:**
 
-- Modify: `weblate/trans/tests/test_judge.py`
-- Modify: `weblate/trans/tests/test_judge_views.py`
-- Modify: `weblate/trans/models/judge.py`
-- Modify: `weblate/templates/snippets/judge-verdict.html`
+- `weblate/trans/models/suggestion.py`
+- `weblate/trans/models/judge.py`
+- `weblate/trans/models/__init__.py`
+- `weblate/trans/tests/test_models.py`
+- `weblate/trans/tests/test_judge.py`
 
-### Step 1: Write failing tests
+Write failing tests for this closed metadata shape in `Suggestion.userdetails`
+and matching immutable Change details:
 
-- Model: `resolve_verdict` accepts `(FLAG, "", accepted_as_is)`; the unit
-  stays/returns `STATE_TRANSLATED` (already handled by the
-  `new_state = STATE_TRANSLATED` branch, `models/judge.py:1118-1119`); a
-  `JUDGE_RESOLUTION` Change is written; `(PASS, ...)` transitions remain
-  absent.
-- View: a fresh flag card offers both "Accepted as is" and "Escalated"
-  choices; a minor card offers no resolution form but does render the
-  compact evidence.
+```text
+kind="judge-repair", schema=1, judge_verdict_id, judge_run_id,
+target_hash, context_hash, engine
+```
 
-### Step 2: Implement
+Cover valid parsing, missing/wrong-typed fields, unknown metadata, secret-free
+validation, plural/max-length/autofix behavior, idempotence, and unchanged normal
+suggestions. An identical human suggestion must not be reclassified or block the
+separate judge candidate. A new verdict replaces the old active candidate.
 
-- Add `(JudgeVerdict.Verdict.FLAG, "", JudgeVerdict.Resolution.ACCEPTED_AS_IS)`
-  to `ALLOWED_RESOLUTION_TRANSITIONS`.
-- Card action row, driven by the already-filtered form choices (no new
-  gating logic): "Keep as is" / "Escalate" submit the existing resolution
-  form; add an "AI variants" link that activates the existing machinery
-  tab (`translate.html:344-352`, plain `data-bs-toggle` targeting
-  `#machinery` - no new JS); present on reject, flag, and minor cards.
+Implement a versioned parser/constructor in `models/judge.py`. Extend
+`SuggestionManager.add` only with trusted internal `userdetails` and
+`change_details`; defaults remain unchanged. Scope deduplication to the judge
+namespace. Use automation/anonymous authorship and render provenance from
+`kind`, not from the launcher. Preserve candidate text in the existing
+Suggestion Change and provenance in `Change.details`.
 
-### Step 3: Verify GREEN
+Verify:
 
-Same suites as Task 1.
+```bash
+./rundev.sh test weblate/trans/tests/test_models.py weblate/trans/tests/test_judge.py
+```
 
-## Task 4: Auto-advance the queue after a resolution
+Commit: `feat(judge): define stored repair candidate contract`.
 
-The resolution form posts `next={{ this_unit_url }}`
-(`judge-verdict.html:159`), so recording a decision reloads the same unit
-even though it just left the `check:judge-*` filter. A plain template
-switch to `next_unit_url` is wrong: every branch of
-`resolve_judge_verdict` - invalid form, `JudgeResolutionError`, success -
-redirects through the same `request.POST.get("next")`
-(`weblate/trans/views/edit.py:1846-1864`), so failures would advance too
-and the error message would land on the wrong unit.
+## Task 2: Persist critical candidates instead of mutating
 
 **Files:**
 
-- Modify: `weblate/templates/snippets/judge-verdict.html`
-- Modify: `weblate/trans/views/edit.py`
-- Modify: `weblate/trans/tests/test_judge_views.py`
+- `weblate/trans/judge_loop.py`
+- `weblate/trans/autotranslate.py`
+- `weblate/trans/models/judge.py`
+- `weblate/trans/migrations/0113_alter_judgerununit_repair_status.py`
+- `weblate/trans/tests/test_judge_loop.py`
+- `weblate/trans/tests/test_judge_autotranslate.py`
+- `weblate/trans/tests/test_judge_round.py`
 
-### Step 1: Write failing test
+Tests first:
 
-- A successful `resolve-judge-verdict` POST from the unit page redirects
-  to `next_unit_url` (offset + 1 of the same search), not back to the
-  resolved unit.
-- A failed POST (blank reason) and a `JudgeResolutionError` (stale pk)
-  both return to the same unit, message attached.
+- first-round critical makes two seat requests and one repair call, stores one
+  candidate, never calls `_apply_repair`, and leaves target unchanged;
+- translated/non-writable criticals also get candidates;
+- provider failure, unusable plurals, and target/state/context drift store
+  nothing and leave the target held;
+- cache/retry reuses the candidate without a second repair MT call;
+- major/max-length still use `_apply_repair` and retain request counts;
+- a repaired major that ends critical stores a final candidate;
+- audit distinguishes `candidate-stored`, `no-candidate`, `applied`, and
+  `rolled-back`.
 
-### Step 2: Implement
+Split `_PreparedRound.needs_repair` into `needs_candidate` and
+`needs_mutating_repair`. Critical candidate generation ignores writable state
+and remaining repair attempts. Major/max-length mutation keeps current ownership
+and attempt rules. Batch `repair_targets` over the union, persist critical
+outputs under the `_apply_repair` snapshot check, and send only mutable outputs
+to `_apply_repair`. Criticals never enter `next_pending`. Add
+`RepairStatus.CANDIDATE_STORED` and its `AlterField` migration. Delete obsolete
+critical auto-apply branches.
 
-- Template: keep `next` as `{{ this_unit_url }}` (the error return) and
-  add a second hidden field `success_next` set to `{{ next_unit_url }}`
-  (already in the include context, `translate.html:272`); update the
-  snippet's requires comment (line 1).
-- View: only the success branch (`edit.py:1863-1864`) prefers
-  `request.POST.get("success_next")`, falling back to `next`; both error
-  branches keep using `next`. `redirect_next` already sanitizes the URL.
+Verify:
 
-### Step 3: Verify GREEN
+```bash
+./rundev.sh test weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_judge_autotranslate.py \
+  weblate/trans/tests/test_judge_round.py
+```
 
-`uv run pytest weblate/trans/tests/test_judge_views.py`.
+Commit: `feat(judge): persist critical repair candidates`.
 
-## Task 5: Readiness counters and a conservative ship CTA
-
-The strip (`weblate/templates/snippets/judge-readiness.html`,
-`judge_queue_strip_context` at `weblate/trans/views/basic.py:701-756`)
-shows needs-human/not-reviewed/unparsed but names no release decision and
-links no counter to a queue. Constraint, documented in the docstring
-(`basic.py:716-723`): no existing view lists units across every language
-of a component filtered by an arbitrary query, so each counter must link
-to a destination that actually exists. Two do:
-
-- `check:judge-reject` / `check:judge-flag` are projected Check rows, and
-  the per-check `CheckList` accepts a Component path
-  (`reverse("checks", kwargs={"name": "judge-reject", "path": ...})`,
-  `weblate/urls.py:819-823`); its per-language rows redirect straight into
-  the translate queue (`weblate/checks/views.py:290-294`).
-- `judge:stale` / `judge:unparsed` are not checks and have no
-  component-wide listing. Their destinations are per-language translate
-  URLs `translation.get_translate_url()?q=judge:stale` (the `judge:`
-  search field exists, `weblate/utils/search.py:816-828`), rendered as a
-  per-language sub-list in the strip - the strip already iterates the
-  prefetched `translations` on component pages, so nonzero per-language
-  counts are free.
-
-No new listing view is added.
+## Task 3: Add generation retry and one-unit re-check
 
 **Files:**
 
-- Modify: `weblate/trans/views/basic.py`
-- Modify: `weblate/templates/snippets/judge-readiness.html`
-- Modify: `weblate/trans/tests/test_judge_views.py`
+- `weblate/trans/tasks.py`
+- `weblate/trans/autotranslate.py`
+- `weblate/trans/models/judge.py`
+- `weblate/trans/views/edit.py`
+- `weblate/urls.py`
+- `weblate/trans/tests/test_judge_autotranslate.py`
+- `weblate/trans/tests/test_judge_views.py`
+- `weblate/trans/tests/test_tasks.py`
 
-### Step 1: Write failing tests
+Tests cover both permissions, two rapid POSTs dispatching once, queued/running
+badge, completed/failed retry, dispatch failure, and a fuzzy Unit re-check that
+judges current target without phase-1 MT. Worker start must reuse the pre-created
+JudgeRun. Generation tests cover first generation, existing-candidate no-op,
+explicit Generate another, duplicate POST, failure preserving the old candidate,
+and drift discarding the paid output.
 
-- Counts include `blocked` (sum of `stats.judge_reject`), `stale`
-  (`judge_stale`), `questionable` (`judge_flag`).
-- Destinations: `blocked`/`questionable` link to the component-scoped
-  per-check `CheckList` for `judge-reject`/`judge-flag`; `stale` and
-  `unparsed` render one `translate?q=judge:stale` / `?q=judge:unparsed`
-  link per non-source translation with a nonzero count, and none for a
-  zero count.
-- The "Ready to hand off" CTA renders only when
-  `judge_reject == 0 and judge_stale == 0 and judge_unparsed == 0` and
-  `judge_total > 0`; majors and minors never block it (product
-  semantics: `docs/admin/checks.rst` - a major ships with evidence).
-- Any nonzero blocker keeps the CTA absent and shows the counters
-  instead.
+Add task-internal `judge_run_id` and `judge_pretranslate=True` to
+`auto_translate`, `BatchAutoTranslate`, and `AutoTranslate`. One-unit re-check
+passes `unit_ids=[unit.id]`, `mode="judge"`, the run ID, and
+`judge_pretranslate=False`. Only phase-1 MT is skipped; both seats, permissions,
+cache identity, projections, audit, and major repair remain.
 
-### Step 2: Implement
+Under the Unit lock, reuse an active QUEUED/RUNNING re-check or create one
+`JudgeRun(scope_type=TRANSLATION, requested_mode="recheck",
+requested_query="id:<unit-id>", cap=1)`. Dispatch on commit, store the Celery ID,
+and mark broker failures FAILED. Worker validates scope/query/status before
+RUNNING.
 
-Extend `judge_queue_strip_context` counts and the URLs above from the
-existing per-translation stats (invalidation already happens on
-resolution, `models/judge.py:1157`); render the CTA as links to the
-existing download menu and repository tab of the component - no new
-release pipeline. Non-color severity distinction per `ACCESSIBILITY.md`.
+Add an asynchronous candidate-generation task. It re-reads the unresolved
+critical, runs checks, calls `repair_targets([unit], actor)` once, and persists
+only if verdict/target/context still match. Deduplicate with a bounded cache key
+over Unit and verdict ID, cleared in `finally` with a recovery TTL. GET never
+calls the provider. Generate returns an existing candidate; only Generate
+another replaces it, after successful snapshot validation.
 
-### Step 3: Verify GREEN
+Commit: `feat(judge): add one-unit recheck orchestration`.
 
-`uv run pytest weblate/trans/tests/test_judge_views.py`.
-
-## Task 6: Documentation and changelog
+## Task 4: Guard acceptance across every path
 
 **Files:**
 
-- Modify: `docs/admin/checks.rst` (resolution semantics: a fresh major can
-  now be accepted as-is directly; context drift blocks resolutions)
-- Modify: `docs/changes.rst` (one entry in the unreleased section)
-- Modify: `docs/guides/producer-guide-weblate.md` (triage walkthrough:
-  queue -> card -> keep/escalate/AI variants -> auto-advance -> CTA;
-  this file only, never `producer-guide.md`)
+- `weblate/trans/models/judge.py`
+- `weblate/trans/models/suggestion.py`
+- `weblate/trans/views/edit.py`
+- `weblate/trans/tasks.py`
+- `weblate/api/views.py`
+- `weblate/templates/snippets/suggestions.html`
+- `weblate/urls.py`
+- `weblate/trans/tests/test_judge.py`
+- `weblate/trans/tests/test_judge_views.py`
+- `weblate/trans/tests/test_suggestions.py`
+- `weblate/api/tests.py`
+- `weblate/trans/tests/test_bulk_suggestions.py`
 
-## Task 7: Verification
+Tests cover success and target drift, context drift, another verdict, resolved
+verdict, malformed metadata, stale ID, missing access, and either missing
+permission. Failure changes neither target/state nor task count. Success writes
+`STATE_FUZZY`, records `ActionEvents.ACCEPT` with provenance, consumes once,
+queues once, applies deterministic autofixes, and redirects through
+`success_next`.
 
-1. `uv run pytest weblate/trans/tests/test_judge_views.py weblate/trans/tests/test_judge.py weblate/checks/tests/test_judge.py`
-   plus the judge regression set
-   (`weblate/trans/tests/test_judge_loop.py`, `test_judge_round.py`,
-   `test_judge_autotranslate.py`, `test_judge_form.py`).
-2. `uv run prek run --files <touched files>`.
-3. Browser smoke on the dev instance (port 3001), one pass per queue
-   (`q=check:judge-reject`, `check:judge-flag`, `check:judge-note`):
-   - drifted verdict: no resolution form, single "Re-judge" link;
-   - fresh critical: compact card, "Keep as is"/"Escalate"/"AI variants",
-     resolution auto-advances to the next unit;
-   - fresh major: direct "Keep as is" available;
-   - minor: compact evidence, no resolution form;
-   - component page: counters link to the queues; CTA appears only when
-     blocked/stale/unparsed are all zero.
+Exercise the card, normal suggestion accept, API accept, vote autoaccept, and
+bulk accept. Judge candidates never autoaccept from votes; bulk excludes them;
+generic clone/vote/accept/approve/edit controls do not render.
 
-Deployment to production is not part of this plan and needs explicit
+Implement typed `JudgeCandidateError` and one `accept_judge_candidate` service:
+
+1. Check `unit.review` and `translation.auto`.
+2. Lock Unit, Suggestion, then representative JudgeVerdict.
+3. Require unresolved REJECT and matching verdict/target/context metadata.
+4. Write `STATE_FUZZY`, `ActionEvents.ACCEPT`, `propagate=False`, and provenance.
+5. Delete the candidate.
+6. Create the deduplicated queued re-check and dispatch on commit.
+
+`Suggestion.accept` detects trusted judge metadata and delegates. Web/API
+callers translate the typed error. Voting skips judge autoaccept. Bulk filters
+judge candidates. The normal suggestions snippet renders a read-only diff and
+link to the verdict card without generic actions.
+
+Commit: `feat(judge): guard repair candidate acceptance`.
+
+## Task 5: Render the embedded flow
+
+**Files:**
+
+- `weblate/trans/views/edit.py`
+- `weblate/templates/snippets/judge-verdict.html`
+- `weblate/trans/tests/test_judge_views.py`
+
+Render-test mutually exclusive states:
+
+- stale/context drift: only Re-check;
+- queued/running: Re-checking, no duplicate submit;
+- current candidate: diff, provenance, Use suggested fix, Generate another,
+  Keep as is, and normal editor access;
+- no candidate: Generate suggested fix, Keep as is, normal editor, and an
+  explicitly generic Automatic suggestions fallback;
+- generation pending: no second submit;
+- resolved/consumed/stale/wrong-verdict candidate never active;
+- major/minor never inherit a critical candidate.
+
+`_judge_view_context` resolves at most one candidate for
+`judge_current_verdict` and exposes queued/generation state. Preserve the
+`current_verdict`/`active_verdict` freshness split. GET reads only; paid actions
+are CSRF POSTs. Use native unit-target formatting and semantic controls. All
+strings are translatable. Keep Zen and the decision to omit an Edit manually
+button unchanged.
+
+Verify view tests and djLint for `judge-verdict.html` and `suggestions.html`.
+
+Commit: `feat(judge): embed repair candidate triage`.
+
+## Task 6: Compress two-seat evidence
+
+**Files:** `judge-verdict.html`, `test_judge_views.py`.
+
+For reject, flag, minor-pass, and repair evidence, test one visible summary and
+one native `<details>` containing all errors, models, timestamps, and
+back-translations. Implement one shared path; keep severity and ship/hold badges
+visible. No JavaScript. Preserve accessibility and i18n.
+
+Commit: `refactor(judge): compress verdict evidence`.
+
+## Task 7: Name remaining outcomes
+
+**Files:** `models/judge.py`, `judge-verdict.html`, `test_judge.py`,
+`test_judge_views.py`.
+
+Test and add `(FLAG, "", accepted_as_is)` with immutable `JUDGE_RESOLUTION`
+history. PASS/minor transitions remain absent. Fresh flag shows Keep as is and
+Escalate; minor has evidence without resolution. AI variants remains a generic
+machinery-tab link for major/minor and the critical fallback; never label it as
+the stored judge candidate.
+
+Commit: `feat(judge): name producer triage outcomes`.
+
+## Task 8: Auto-advance only after success
+
+**Files:** `judge-verdict.html`, `views/edit.py`, `test_judge_views.py`.
+
+Test successful resolution and candidate acceptance using
+`success_next=next_unit_url`. Blank reason, stale verdict/candidate, invalid
+form, and permission failure return to `next=this_unit_url`. Preserve URL
+sanitization and last-item fallback. Generate and Re-check do not advance merely
+because work was queued.
+
+Commit: `feat(judge): advance successful triage decisions`.
+
+## Task 9: Add conservative readiness
+
+**Files:** `views/basic.py`, `judge-readiness.html`, `test_judge_views.py`.
+
+Test critical, major, stale/context-changed, and unparsed counters and only real
+destinations. Candidate presence never clears critical. CTA is absent for any
+critical, target stale, context drift, unparsed current round, or zero history.
+Use cached stats for display only. When cached blockers are zero, run the
+authoritative fresh target/context blocker check. Add query-count coverage. CTA
+links existing download/repository controls; it is not a release action.
+
+Commit: `feat(judge): add conservative hand-off readiness`.
+
+## Task 10: Documentation and security
+
+**Files:**
+
+- `docs/admin/checks.rst`
+- `docs/changes.rst`
+- `docs/guides/producer-guide-weblate.md`
+- review and modify if required: `docs/security/threat-model.rst`
+
+Document that this is judge-guided repair MT, not literal text from a judge
+seat; freshness; one-click apply; fuzzy hold; re-check; recovery; permissions;
+cost; direct major accepted-as-is; and stale manual edits blocking readiness.
+Edit only `producer-guide-weblate.md`. Review the threat model because the
+change adds paid authenticated endpoints and an AI write path; update it if its
+authorization/freshness claims change.
+
+Commit: `docs(judge): document stored repair triage`.
+
+## Task 11: Verification
+
+Run the judge, model, suggestion, API, bulk, task, and Selenium modules touched
+above, including:
+
+```bash
+./rundev.sh test \
+  weblate/trans/tests/test_judge.py \
+  weblate/trans/tests/test_judge_views.py \
+  weblate/trans/tests/test_judge_loop.py \
+  weblate/trans/tests/test_judge_round.py \
+  weblate/trans/tests/test_judge_autotranslate.py \
+  weblate/trans/tests/test_judge_form.py \
+  weblate/trans/tests/test_models.py \
+  weblate/trans/tests/test_suggestions.py \
+  weblate/trans/tests/test_bulk_suggestions.py \
+  weblate/api/tests.py \
+  weblate/checks/tests/test_judge.py
+uv run prek run --files <all-touched-files>
+DJANGO_SETTINGS_MODULE=weblate.settings_test uv run ./manage.py makemigrations --check
+```
+
+Browser/Selenium flows:
+
+1. Fresh candidate: preview, apply, auto-advance.
+2. Pending re-check: Re-checking and duplicate suppression.
+3. Re-check pass: candidate consumed, blocker gone.
+4. Re-check critical: new candidate, blocker remains.
+5. Context drift: candidate blocked, only Re-check.
+6. Missing candidate: Generate and failed retry preserving the old candidate.
+7. Major/minor cards and component readiness.
+
+Use deterministic fixtures/mocked provider responses to avoid unapproved spend.
+Use the dev surface at port 3001 only if already running; rebuilding the shared
+stack needs approval.
+
+## Acceptance criteria
+
+1. Every current critical target stays untouched and has at most one current
+   native judge candidate.
+2. Producer previews and applies it from the card in one click.
+3. Acceptance cannot ship before a fresh one-unit re-check.
+4. Drift blocks every UI/API/internal acceptance route.
+5. Generation, regeneration, and re-check dedupe retries/double-clicks.
+6. Major automatic repair is unchanged.
+7. Tests prove the 3-call pre-decision and 5-call accepted paths.
+8. Readiness cannot report a false zero from cache or target-only freshness.
+9. UI is translatable and keyboard accessible.
+10. No secret, prompt, or response body is persisted.
+
+Deployment to production is not part of this plan and requires explicit
 approval.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope and strategy | 0 | NOT RUN | - |
+| Codex Review | `/codex review` | Independent second opinion | 0 | NOT RUN | - |
+| Eng Review | `/plan-eng-review` | Architecture and tests | 1 | CLEAR | 1 blocking scope gap resolved; full candidate lifecycle added |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | NOT RUN | - |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | NOT RUN | - |
+
+**VERDICT:** ENG CLEARED - ready for implementation approval.
+
+NO UNRESOLVED DECISIONS
