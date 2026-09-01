@@ -62,9 +62,7 @@ class LLMUsageLog(models.Model):
     component_id_snapshot = models.PositiveIntegerField(null=True, blank=True)
     #: Human-readable labels at billing time, retained through rename/delete.
     component_slug = models.CharField(max_length=COMPONENT_NAME_LENGTH, blank=True)
-    target_language_code = models.CharField(
-        max_length=LANGUAGE_CODE_LENGTH, blank=True
-    )
+    target_language_code = models.CharField(max_length=LANGUAGE_CODE_LENGTH, blank=True)
     prompt_tokens = models.IntegerField(default=0)
     completion_tokens = models.IntegerField(default=0)
     total_tokens = models.IntegerField(default=0)
@@ -126,32 +124,33 @@ class LLMUsageLog(models.Model):
 
 
 def recent_cost_range(
-    project_slug: str, model: str, operation: str
+    project_id_snapshot: int, service: str, model: str, operation: str
 ) -> tuple[Decimal, Decimal] | None:
     """
     Observed per-unit cost range for the newest priced requests.
 
-    Exact project/model/operation match, newest 20 rows with a stored cost
-    and a positive unit count. Below 5 samples returns None so a thin
-    history never implies a precision the data does not support.
+    Exact project identity/service/model/operation match, newest 20 rows with
+    a stored cost and a positive unit count. Below 5 samples returns None so a
+    thin history never implies a precision the data does not support.
     """
     per_unit = [
         cost / unit_count
         for cost, unit_count in LLMUsageLog.objects.filter(
-            project_slug=project_slug,
+            project_id_snapshot=project_id_snapshot,
+            service=service,
             model=model,
             operation=operation,
             cost_usd__isnull=False,
             unit_count__gt=0,
         )
         .order_by("-created_at", "-pk")[:20]
-
-
         .values_list("cost_usd", "unit_count")
     ]
     if len(per_unit) < 5:
         return None
     return min(per_unit), max(per_unit)
+
+
 def parse_provider_cost(value: object) -> Decimal | None:
     """Return a cost that the ledger can store without rounding."""
     if value is None:

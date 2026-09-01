@@ -92,7 +92,9 @@ class LLMUsageLogModelTest(TestCase):
         )
         log.refresh_from_db()
         self.assertEqual(log.cost_usd, cost)
-        field = LLMUsageLog._meta.get_field("cost_usd")
+        field = LLMUsageLog._meta.get_field(  # ruff: ignore[private-member-access]
+            "cost_usd"
+        )
         self.assertEqual((field.max_digits, field.decimal_places), (24, 18))
 
     def test_cost_beyond_supported_scale_is_unpriced(self) -> None:
@@ -477,6 +479,7 @@ class LLMUsageReportIdentityTest(ComponentTestCase):
                 "missing",
             )
 
+
 class RecentCostRangeTest(TestCase):
     def _create(
         self,
@@ -484,12 +487,16 @@ class RecentCostRangeTest(TestCase):
         cost,
         unit_count,
         model="m1",
+        project_id_snapshot=1,
+        service="openrouter",
         project_slug="col4",
         operation=LLMUsageLog.Operation.TRANSLATION,
     ) -> None:
         LLMUsageLog.objects.create(
             model=model,
+            project_id_snapshot=project_id_snapshot,
             project_slug=project_slug,
+            service=service,
             operation=operation,
             unit_count=unit_count,
             cost_usd=cost,
@@ -500,7 +507,7 @@ class RecentCostRangeTest(TestCase):
         for _ in range(4):
             self._create(cost=Decimal("0.001"), unit_count=1)
         self.assertIsNone(
-            recent_cost_range("col4", "m1", LLMUsageLog.Operation.TRANSLATION)
+            recent_cost_range(1, "openrouter", "m1", LLMUsageLog.Operation.TRANSLATION)
         )
 
     def test_returns_min_max_per_unit_at_five_samples(self) -> None:
@@ -513,7 +520,9 @@ class RecentCostRangeTest(TestCase):
         ]
         for cost in costs:
             self._create(cost=cost, unit_count=2)
-        low, high = recent_cost_range("col4", "m1", LLMUsageLog.Operation.TRANSLATION)
+        low, high = recent_cost_range(
+            1, "openrouter", "m1", LLMUsageLog.Operation.TRANSLATION
+        )
         self.assertEqual(low, Decimal("0.0005"))
         self.assertEqual(high, Decimal("0.005"))
 
@@ -523,7 +532,9 @@ class RecentCostRangeTest(TestCase):
         self._create(cost=None, unit_count=3)
         self._create(cost=Decimal("0.5"), unit_count=0)
         self._create(cost=Decimal("0.5"), unit_count=None)
-        low, high = recent_cost_range("col4", "m1", LLMUsageLog.Operation.TRANSLATION)
+        low, high = recent_cost_range(
+            1, "openrouter", "m1", LLMUsageLog.Operation.TRANSLATION
+        )
         self.assertEqual(low, Decimal("0.001"))
         self.assertEqual(high, Decimal("0.001"))
 
@@ -531,7 +542,9 @@ class RecentCostRangeTest(TestCase):
         self._create(cost=Decimal("50.000"), unit_count=1)
         for _ in range(20):
             self._create(cost=Decimal("0.001"), unit_count=1)
-        low, high = recent_cost_range("col4", "m1", LLMUsageLog.Operation.TRANSLATION)
+        low, high = recent_cost_range(
+            1, "openrouter", "m1", LLMUsageLog.Operation.TRANSLATION
+        )
         self.assertEqual(low, Decimal("0.001"))
         self.assertEqual(high, Decimal("0.001"))
 
@@ -547,7 +560,39 @@ class RecentCostRangeTest(TestCase):
         for _ in range(5):
             self._create(cost=Decimal("9.000"), unit_count=1, model="m2")
         for _ in range(5):
-            self._create(cost=Decimal("9.000"), unit_count=1, project_slug="st2")
-        low, high = recent_cost_range("col4", "m1", LLMUsageLog.Operation.TRANSLATION)
+            self._create(cost=Decimal("9.000"), unit_count=1, project_id_snapshot=2)
+        low, high = recent_cost_range(
+            1, "openrouter", "m1", LLMUsageLog.Operation.TRANSLATION
+        )
         self.assertEqual(low, Decimal("0.001"))
         self.assertEqual(high, Decimal("0.001"))
+
+    def test_never_mixes_service_or_project_identity(self) -> None:
+        for _ in range(5):
+            self._create(
+                cost=Decimal("0.001"),
+                unit_count=1,
+                project_id_snapshot=1,
+                service="openrouter",
+            )
+            self._create(
+                cost=Decimal("9.000"),
+                unit_count=1,
+                project_id_snapshot=2,
+                service="openrouter",
+            )
+            self._create(
+                cost=Decimal("9.000"),
+                unit_count=1,
+                project_id_snapshot=1,
+                service="litellm",
+            )
+
+        low, high = recent_cost_range(
+            1,
+            "openrouter",
+            "m1",
+            LLMUsageLog.Operation.TRANSLATION,
+        )
+
+        self.assertEqual((low, high), (Decimal("0.001"), Decimal("0.001")))
