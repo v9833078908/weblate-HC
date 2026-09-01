@@ -120,8 +120,12 @@ class Command(BaseCommand):
             reclassified = JudgeRunUnit.objects.filter(
                 verdict_id__in=verdict_ids, outcome=JudgeRunUnit.Outcome.UNPARSED
             ).update(outcome=JudgeRunUnit.Outcome.REFUSED)
-            JudgeVerdict.objects.filter(pk__in=verdict_ids).delete()
+            _total, by_model = JudgeVerdict.objects.filter(pk__in=verdict_ids).delete()
+        # Report what the database actually removed, never the pre-transaction
+        # snapshot: an operator auditing a destructive run must not be told a
+        # count that a concurrent delete already made wrong.
+        deleted = by_model.get(JudgeVerdict._meta.label, 0)  # ruff: ignore[private-member-access]
         self.stdout.write(
-            f"{count} verdicts deleted, {reclassified} run-unit rows reclassified "
+            f"{deleted} verdicts deleted, {reclassified} run-unit rows reclassified "
             "to refused (attempt ledger kept)"
         )

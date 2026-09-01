@@ -1812,6 +1812,10 @@ class JudgeCloseRefusedVerdictsCommandTest(ComponentTestCase):
             stdout=output,
         )
         self.assertFalse(JudgeVerdict.objects.filter(pk=verdict.pk).exists())
+        # The reported number is the database result, not the pre-transaction
+        # snapshot an operator would have no way to audit.
+        self.assertIn("1 verdicts deleted", output.getvalue())
+        self.assertIn("1 run-unit rows reclassified", output.getvalue())
         # The attempt ledger survives as the diagnostic record.
         self.assertTrue(JudgeRequestAttempt.objects.filter(pk=attempt.pk).exists())
         run_unit.refresh_from_db()
