@@ -38,7 +38,15 @@ translation_path: /projects/need-for-greed/ui/es/
 language pair: en -> es
 units in translation: 466 (465 translated)
 units with no parsed verdict before the run: 275
-unit_ids: 25 exact IDs from the 356401-356435 range
+selection: the first 25 units by ascending pk among those with no parsed
+  verdict, with state >= translated; the set is pinned, not a query re-evaluated
+  at execution time, and it is not contiguous
+overwrite_existing: false
+unit_ids (25 exact IDs, recoverable from JudgeVerdict.run_id):
+  356401,356402,356403,356404,356405,
+  356411,356412,356413,356414,356415,356416,356417,356418,356419,356420,
+  356421,356422,356423,356424,356425,
+  356431,356432,356433,356434,356435
 usage_log_start_pk: 5737
 attempt_start_pk: 469
 judge run (model-call identity): 5d4f7727-0aa4-47c9-9006-7e8f628babf7
@@ -153,5 +161,14 @@ more reliable endpoint.
 ## Verdict
 
 **Passed.** Both seats served `need-for-greed/ui/es` through LiteLLM with zero
-unparsed results, zero retries, true two-seat overlap, first-byte p95 far inside
-the envelope, and no production data change.
+unparsed results, zero retries, true two-seat overlap, and first-byte p95 far
+inside the envelope.
+
+"Read-only" here means precisely: no unit target, no unit state, no repair and
+no approval changed, verified by comparing all 25 units against a pre-run
+snapshot (0 changed). It does **not** mean the database was untouched. The run
+added 50 `JudgeVerdict` rows, 38 `JudgeRequestAttempt` rows and 38
+`LLMUsageLog` rows, and updated `JudgeAdaptiveState` counters. Those are judge
+diagnostics rather than translation content, but the verdict rows are now the
+current evidence for these 25 units, so a later producer run will treat them as
+judged. That is the intended product behaviour, not a side effect to undo.

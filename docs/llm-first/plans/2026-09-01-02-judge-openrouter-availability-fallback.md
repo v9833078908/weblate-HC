@@ -70,11 +70,18 @@ parallel seat barrier (`weblate/trans/judge_loop.py:918-1068`), and the durable
 Two facts that shape the design and must not be re-litigated during
 implementation:
 
-1. **Cache identity already separates endpoints.** `profile_fingerprint` is
-   computed from `endpoint_fingerprint` first
-   (`weblate/trans/judge.py:422-427`), so a fallback verdict can never satisfy a
-   primary-configured cache lookup. D5 of the superseded plan needs no work; add
-   a regression test, not a mechanism.
+1. **Cache identity discriminates by endpoint, but only if the *serving*
+   fingerprint is what gets stored.** `profile_fingerprint` is computed from
+   `endpoint_fingerprint` first (`weblate/trans/judge.py:422-427`), so two
+   endpoints can never collide. That is necessary and not sufficient:
+   `_write_verdict` stores the fingerprint of the profile the seat job was
+   *created* with, which is always the primary
+   (`weblate/trans/judge_loop.py:254-287`, bound at `:1121-1133`). A naive
+   fallback would therefore file OpenRouter's answer under LiteLLM's identity
+   and `_cached_verdict` would reuse it. D5 of the superseded plan is
+   consequently **not** free: Task 3 has to thread the serving profile through
+   persistence, and the regression test is on cache reuse, not on the
+   fingerprint function.
 2. **Provenance by join is not guaranteed.** `JudgeVerdict.request_attempt` is
    `null=True` with `SET_NULL` (`weblate/trans/models/judge.py:582-589`), so a
    denormalized provider column is required to answer "which endpoint produced
@@ -97,6 +104,62 @@ implementation:
   `cost_usd=None`); OpenRouter does. The fallback therefore improves cost
   visibility by accident and worsens nothing, but reconciliation stays with the
   LLM usage cost attribution plan.
+
+## Deliberately not in this plan: per-run seat demotion
+
+A draft of this plan carried an eighth task adding
+`JUDGE_FALLBACK_DEMOTE_AFTER`: after N consecutive batches on one seat had
+failed over, the remaining batches of that seat in that run would start at the
+fallback and skip the primary entirely. It is recorded here as rejected, with
+the reasoning, so it is not reinvented.
+
+The motivating concern is real. During a total primary outage every batch pays
+one failed primary attempt before the fallback answers. On seat 2 at batch size
+1 with a 150 s deadline, a 466-unit component could spend many hours on attempts
+that cannot succeed.
+
+It was rejected for three reasons, in increasing order of weight:
+
+1. It sits against the spirit of retained D2
+   (`docs/llm-first/plans/2026-08-26-judge-provider-failover.md:81-95`), which
+   rejects run-level failover. Demotion is admittedly not the alternative D2
+   names - it uses no health probe and every batch still receives a fallback
+   attempt, so no batch is lost - but it does move the failover decision from
+   the batch to the run.
+2. It contradicts this plan's own architecture statement that a fallback attempt
+   happens only after the primary failed **that batch**. Under demotion later
+   batches get zero primary attempts, so the invariant "the fallback serves only
+   what the primary failed to serve" would no longer be literally true, and the
+   trigger table of Task 4 would stop being a complete account of when the
+   fallback is used.
+3. It would be a second, weaker mechanism for endpoint health beside one that
+   already exists in the right shape. `JudgeAdaptiveState` keeps a circuit
+   breaker per `(endpoint_fingerprint, model, seat)` in the database
+   (`weblate/trans/models/judge.py:312-351`), which survives restarts and is
+   shared by every worker - strictly better than a counter local to one run.
+
+**What is genuinely still missing, stated plainly.** That circuit is
+drain-scoped, not global. It is written only by `_update_deferral_circuit`,
+which returns early unless `JUDGE_DEFERRAL_ENABLED`
+(`weblate/trans/judge_loop.py:621-622`, `:634-676`), and it is read only by
+`_reserve_deferral_requests_locked` on the path from `_drain_seat`
+(`weblate/trans/judge_loop.py:679-707`, `:1546`). No code in
+`weblate/trans/judge.py` consults `circuit_state`. Enabling the flag in Rollout
+step 4 therefore makes the circuit *record* producer-run outcomes but does not
+make any producer run *obey* it. The obstacle is not only the flag; the consult
+site in the producer request path does not exist.
+
+So after this plan a sustained primary outage still costs one failed primary
+attempt per batch for a whole producer run, with no ceiling but the run's batch
+count, and the adaptive batch budget cannot help seat 2 because it already runs
+at width 1. That is a known, accepted and monitored gap, not a solved problem.
+
+The hours figure above is an extrapolation from single-request latencies, not a
+measurement. Rollout step 5 measures the real failover rate and the observed
+per-batch outage cost. The follow-up that should then be scoped is integrating
+the existing circuit breaker into the producer request path - one shared
+mechanism, endpoint-scoped and durable - not a per-run demotion counter and not
+a new configurable routing mode.
 
 ---
 
@@ -242,11 +305,26 @@ Run the Task 2 selection plus the full `test_judge_client.py`.
 feat(judge): configure and validate a fallback judge endpoint
 ```
 
-## Task 3: Record verdict provenance
+## Task 3: Persist the serving identity, not the requesting seat's
+
+**This task is load-bearing for correctness, not just for reporting.**
+`_write_verdict` (`weblate/trans/judge_loop.py:234-288`) takes one `profile`
+argument and derives from it `judge_model` (`:273`), `profile_fingerprint`
+(`:286`), `prompt_schema_version` (`:287`) and `request_identity` (`:254-263`).
+That profile is bound once in `make_seat_job` as `profiles[seat]`
+(`weblate/trans/judge_loop.py:1121-1133`), before any request is sent, so it is
+always the **primary**. Adding a provider column alone would therefore store a
+fallback verdict under the primary's model name and the primary's fingerprint,
+and `_cached_verdict` would later reuse it as though LiteLLM had produced it.
+That is a silent R3 violation and strictly worse than having no fallback. The
+endpoint being inside `profile_fingerprint` (`weblate/trans/judge.py:422-427`)
+does not help here: the fingerprint that gets written is the primary's whoever
+served the batch.
 
 **Files:**
 
 - Modify: `weblate/trans/tests/test_judge_loop.py`
+- Modify: `weblate/trans/tests/test_judge_client.py`
 - Modify: `weblate/trans/models/judge.py`
 - Create: `weblate/trans/migrations/0113_judge_verdict_provider.py`
 - Modify: `weblate/trans/judge.py`
@@ -254,40 +332,63 @@ feat(judge): configure and validate a fallback judge endpoint
 
 ### Step 1: Write failing tests
 
-- Every new `JudgeVerdict` carries `judge_provider` equal to the serving
-  endpoint's provider, for a primary-served and a fallback-served batch.
-- An unparsed verdict also carries the provider of the endpoint that was asked
-  last, so a post-hoc report can attribute failures.
-- Existing rows keep `judge_provider=""`, which reads as "before failover
-  existed"; no data migration.
-- The cached-verdict predicate is unchanged and a fallback verdict is not
-  reusable while the primary pair is configured. Assert this through
-  `profile_fingerprint`, which already contains the endpoint
-  (`weblate/trans/judge.py:422-427`) - this test documents an existing
-  guarantee.
+Use a primary and a fallback whose model names **and** fingerprints differ, so a
+mislabel cannot pass by coincidence. Assert, for a batch served by the fallback:
+
+- `judge_model` is the fallback model, never the primary's.
+- `profile_fingerprint` and `prompt_schema_version` are the serving profile's.
+- `request_identity` is computed from the serving profile's fingerprint.
+- `judge_provider` is the serving provider.
+- `JudgeVerdict.request_attempt` points at the fallback attempt, whose
+  `endpoint_fingerprint` and `provider` already describe the fallback.
+
+And for cache behaviour, which is the reason this task exists:
+
+- A fallback verdict written while LiteLLM is the configured primary is **not**
+  reused by a later primary-configured run for the same unit and text. Assert it
+  by re-running with the primary healthy and observing a fresh paid request.
+- The mirror case: a primary verdict is not reused by a fallback-configured run.
+- An unparsed verdict carries the identity of the endpoint asked last, so a
+  post-hoc report can attribute failures.
+- Existing rows keep `judge_provider=""`, reading as "before failover existed";
+  no data migration.
 
 ### Step 2: Verify RED
 
 ```text
-uv run pytest weblate/trans/tests/test_judge_loop.py -k provider
+uv run pytest weblate/trans/tests/test_judge_loop.py -k "provider or serving_identity"
 ```
+
+Expect the serving-identity assertions to fail with the primary's model name and
+fingerprint, which is the defect this task fixes.
 
 ### Step 3: Implement
 
 - Add `judge_provider = models.CharField(max_length=32, blank=True)` to
-  `JudgeVerdict` with an additive migration. Do not touch the cache index: the
-  fingerprint already discriminates.
-- Return the serving provider inside `JudgeResult` next to the existing attempt
-  id, and write it in `_write_verdict`.
+  `JudgeVerdict` with an additive migration. The cache index needs no change
+  once the written fingerprint is the serving one.
+- Carry immutable serving metadata out of the request layer inside `JudgeResult`
+  beside the existing attempt id: serving model, provider,
+  `profile_fingerprint` and `prompt_schema_version`. It must be the resolved
+  profile actually used for the call that produced the result, set in one place
+  in `_run_batch`, never recomputed by the caller from settings.
+- Make `_write_verdict` prefer that serving metadata for `judge_model`,
+  `judge_provider`, `profile_fingerprint`, `prompt_schema_version` and
+  `request_identity`, falling back to its `profile` argument only when the
+  result carries none, which keeps every existing non-failover path identical.
+- Keep the `profile` argument: Task 5 needs the **primary** profile for deferral
+  identity, so the two must stay distinguishable at this seam rather than one
+  overwriting the other.
 
 ### Step 4: Verify GREEN
 
-Run the Task 3 selection plus `test_judge_loop.py` and the migration check.
+Run the Task 3 selection, then `test_judge_loop.py`, `test_judge_client.py` and
+the migration check.
 
 ### Step 5: Commit
 
 ```text
-feat(judge): record the serving provider on every verdict
+fix(judge): persist the serving endpoint identity on each verdict
 ```
 
 ## Task 4: Fail over once per batch per seat
@@ -338,9 +439,22 @@ sets differ in both directions and each difference is load-bearing:
   (`docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md:257-261`) -
   still holds for the primary: the existing adaptive halving must still be
   applied to the primary's budget, and the fallback attempt is additional, not a
-  substitute. Cost of a deadline failover is bounded by Task 5's demotion, so a
-  stalled primary burns at most `JUDGE_FALLBACK_DEMOTE_AFTER` deadlines per seat
-  per run.
+  substitute. **The per-batch cost of a sustained primary outage is not bounded
+  by anything today, and this plan does not bound it.** Two mechanisms look like
+  they would and do not: the adaptive batch budget halves on a deadline
+  (`weblate/trans/judge.py:1323-1340`) but cannot go below one, so it does
+  nothing at all for seat 2, which runs at batch size 1 in production; and the
+  shared circuit breaker is drain-scoped, written only by
+  `_update_deferral_circuit` under `JUDGE_DEFERRAL_ENABLED` and read only by
+  `_reserve_deferral_requests_locked` from `_drain_seat`
+  (`weblate/trans/judge_loop.py:634-707`, `:1546`). Nothing in
+  `weblate/trans/judge.py` consults `circuit_state`, so a producer run never
+  sees it. Concretely: while the primary is down, a producer run pays one failed
+  primary attempt for **every** batch, up to its seat deadline each time, and the
+  only limit is how many batches the run has. Integrating the circuit into the
+  producer request path is the correct fix and is a deliberate follow-up, not
+  part of this plan - see "Deliberately not in this plan". Rollout step 5
+  measures the real rate before that work is scoped.
 
 A test must assert the two frozensets' exact symmetric difference, so a future
 edit to either one cannot silently widen the other.
@@ -409,61 +523,7 @@ Run the Task 4 selection, then all of `test_judge_client.py` and
 feat(judge): fail over one batch per seat to the fallback endpoint
 ```
 
-## Task 5: Stop paying the primary's timeout on every batch of an outage
-
-**Files:**
-
-- Modify: `weblate/trans/tests/test_judge_client.py`
-- Modify: `weblate/trans/defaults.py`
-- Modify: `weblate/trans/models/_conf.py`
-- Modify: `weblate/settings_example.py`
-- Modify: `weblate/settings_docker.py`
-- Modify: `weblate/trans/judge.py`
-
-### Step 1: Write failing tests
-
-Without this task a full LiteLLM outage costs one failed primary attempt per
-batch. On seat 2 at batch size 1 with a 150 s deadline, a 466-unit component
-would burn up to 19 hours of wall time before the fallback ever answers.
-
-Add `JUDGE_FALLBACK_DEMOTE_AFTER`, default `2`, `0` disables. Assert:
-
-- After N consecutive batches on one seat failed over, the remaining batches of
-  that seat **in that run** start at the fallback, with no primary attempt.
-- The counter is per seat and per `request_verdicts` invocation only. It is not
-  shared state, not persisted, and does not touch `JudgeAdaptiveState`, whose
-  circuit is gated on `JUDGE_DEFERRAL_ENABLED`
-  (`weblate/trans/judge_loop.py:621-622`) and therefore cannot carry this
-  decision.
-- One parsed primary batch resets the counter to zero.
-- `0` disables demotion: every batch tries the primary first.
-- A demoted seat still records attempts with the fallback provider, and a
-  demoted batch that fails on the fallback is `unparsed`, not re-sent to the
-  primary.
-
-### Step 2: Verify RED
-
-```text
-uv run pytest weblate/trans/tests/test_judge_client.py -k demote
-```
-
-### Step 3: Implement
-
-A single integer counter local to the seat's loop in `request_verdicts`,
-consulted before choosing the endpoint for a batch.
-
-### Step 4: Verify GREEN
-
-Run the Task 5 selection plus the Task 4 selection, to prove demotion did not
-weaken the trigger table.
-
-### Step 5: Commit
-
-```text
-feat(judge): demote a seat to the fallback after repeated failover
-```
-
-## Task 6: Make the terminal contract hold with the fallback
+## Task 5: Make the terminal contract hold with the fallback
 
 **Files:**
 
@@ -504,7 +564,7 @@ profile threaded through explicitly rather than taken from the serving profile.
 
 ### Step 4: Verify GREEN
 
-Run the Task 6 selection, then the full judge suite:
+Run the Task 5 selection, then the full judge suite:
 
 ```text
 uv run pytest weblate/trans/tests/test_judge_client.py \
@@ -520,7 +580,7 @@ uv run pytest weblate/trans/tests/test_judge_client.py \
 fix(judge): keep deferral identity on the primary endpoint
 ```
 
-## Task 7: Document the fallback
+## Task 6: Document the fallback
 
 **Files:**
 
@@ -533,7 +593,7 @@ fix(judge): keep deferral identity on the primary endpoint
 
 ### Step 1: Settings reference
 
-Add the nine settings to the existing alphabetical `JUDGE_*` run in
+Add the eight settings to the existing alphabetical `JUDGE_*` run in
 `docs/admin/config.rst` (the block around `:1760-1935`), matching the
 surrounding style: `.. setting::`, `.. versionadded::`, `:setting:`
 cross-references. State in prose: the fallback is an availability mechanism
@@ -566,7 +626,7 @@ the settings documentation rather than explaining the mechanism.
 
 ### Step 4: Deployment templates
 
-Add the nine commented `WEBLATE_JUDGE_FALLBACK_*` entries to
+Add the eight commented `WEBLATE_JUDGE_FALLBACK_*` entries to
 `deploy/environment.example` beside the existing judge block, and to the
 `weblate` service environment in `dev-docker/docker-compose.yml`. Remember that
 the compose environment block is baked in at container creation, so a dev
@@ -587,43 +647,68 @@ and stays unchanged.
 docs(judge): document the fallback judge endpoint
 ```
 
-## Task 8: Prove it against a live endpoint in dev
+## Task 7: Prove it against a live endpoint in dev
 
 **Files:**
 
 - Modify: `analysis/probes/litellm-seat-diagnostic.py` or create a sibling probe
 - Create: `docs/llm-first/measurements/<date>-judge-fallback-forced-smoke.md`
 
-### Step 1: Forced-failover arm
+### Step 1: Forced-failover arm, using a permitted trigger
 
-On the dev container, with the fallback configured to today's OpenRouter values
-and the primary's `JUDGE_MODEL_SEAT_1` set to a deliberately wrong model so the
-primary returns a real `http-other` or `http-auth`, run one small judge scope.
-Expected: seat 1 attempts show the primary failure followed by exactly one
-fallback attempt with the OpenRouter provider; verdicts exist; `judge_provider`
-is `openrouter` for seat 1 and `litellm` for seat 2; the run completes.
+On the dev container, with the fallback configured to today's OpenRouter values,
+replace the **primary** `JUDGE_API_KEY` with an invalid credential so the proxy
+answers 401 or 403. That maps to `http-auth`
+(`weblate/trans/judge.py:1099-1101`), which is a permitted failover trigger.
+Run one small judge scope.
 
-### Step 2: Healthy control arm
+Do **not** force this arm with a deliberately wrong `JUDGE_MODEL_SEAT_1`: a
+bad model name returns 400 or 404, which maps to `http-other`, and Task 4
+deliberately refuses to fail over on it. That configuration belongs to Step 2 as
+a negative control, not here.
 
-Same scope, correct primary configuration. Expected: zero fallback attempts,
-zero `judge_provider="openrouter"` rows. The control matters as much as the
-forced arm: a fallback that fires when it should not is a worse defect than one
-that never fires.
+Expected: for each seat, the primary attempt records `http-auth`, is followed by
+exactly one fallback attempt with `provider="openrouter"`, and no further primary
+attempt. Verdicts exist for every unit. Each verdict's `judge_model`,
+`profile_fingerprint` and `judge_provider` are the fallback's, which is the live
+proof of Task 3. The run completes without a warning about unjudged strings.
 
-### Step 3: OpenRouter rollback smoke
+An endpoint-level credential cannot fail one seat while sparing the other, so
+seat isolation stays a Task 4 unit test rather than a live arm.
+
+### Step 2: Negative arm - a client error must not fail over
+
+Restore the primary key and instead set `JUDGE_MODEL_SEAT_1` to a model the
+primary does not serve, so it returns `http-other`. Run the same scope.
+
+Expected: seat 1 records the `http-other` attempt, **zero** fallback attempts,
+and its batch ends `unparsed` (or `deferred` once the queue is on). Seat 2 is
+unaffected and parses normally. This is the arm that guards the real 2026-09-01
+incident, where 50 `http-other` attempts came from a misconfiguration that a
+fallback would have masked while doubling the bill.
+
+### Step 3: Healthy control arm
+
+Same scope, fully correct primary configuration. Expected: zero fallback
+attempts, zero `judge_provider="openrouter"` rows. The control matters as much as
+the forced arm: a fallback that fires when it should not is a worse defect than
+one that never fires.
+
+### Step 4: OpenRouter rollback smoke
 
 Point the primary at OpenRouter with the historical pair and run the same scope
 on the new code. This is the readiness proof for the manual rollback path, and
 `docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md:447-450` refuses
-to declare rollback ready without it.
+to declare rollback ready without it. It is also the only arm that exercises the
+D6 reasoning-effort resolution against a live OpenRouter endpoint.
 
-### Step 4: Record
+### Step 5: Record
 
-Write the measurement with the three arms, attempt counts, failure kinds,
-providers per verdict and latency. Do not claim availability improvements from a
-forced arm: it proves wiring, not proxy reliability.
+Write the measurement with all four arms, attempt counts, failure kinds,
+providers and identities per verdict, and latency. Do not claim availability
+improvements from a forced arm: it proves wiring, not proxy reliability.
 
-### Step 5: Commit
+### Step 6: Commit
 
 ```text
 test(judge): record the forced fallback smoke
@@ -658,9 +743,15 @@ implementation.
    done for `JudgeRequestAttempt` and `LLMUsageLog`, because a queue plus
    indefinite retries grows the database without cleanup. After enabling, watch
    one full drain interval and assert the queue reaches zero.
-5. Watch the failover rate over a full production run. A high rate means the
-   primary is unhealthy; the correct response is to investigate the proxy or
-   revert the primary, never to widen retry budgets.
+5. Watch two numbers over a full production run, not one: the failover rate per
+   seat, and the wall time spent on failed primary attempts. The second matters
+   because no mechanism bounds it - a sustained outage pays one failed primary
+   attempt per batch for the whole run, and seat 2's batch size of 1 makes the
+   adaptive budget inert (see "Deliberately not in this plan"). A high failover
+   rate means the primary is unhealthy; the correct responses are to investigate
+   the proxy, revert the primary, or scope the producer-path circuit follow-up -
+   never to widen retry budgets. Record both numbers in a dated measurement so
+   the follow-up is argued from data.
 6. Manual rollback stays one setting: repoint `WEBLATE_JUDGE_BASE_URL`,
    `WEBLATE_JUDGE_API_KEY` and both `WEBLATE_JUDGE_MODEL_SEAT_*` at OpenRouter
    and recreate the container.
@@ -668,9 +759,10 @@ implementation.
 Stop conditions: any unknown failure kind, any terminal unparsed unit after the
 queue is enabled, any fallback attempt on a failure kind outside
 `_FAILOVER_FAILURE_KINDS` (a protocol failure or an `http-other` 4xx), any
-`401`/`403`
-that produces more than one fallback call, or a reappearance of the ~30 s
-first-byte reset recorded in
+`401`/`403` that produces more than one fallback call, a run in which more than
+half of one seat's batches failed over (the primary is unhealthy and the
+unbounded per-batch outage cost is being paid in full), or a reappearance of the
+~30 s first-byte reset recorded in
 `docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md`.
 
 ## Risks
