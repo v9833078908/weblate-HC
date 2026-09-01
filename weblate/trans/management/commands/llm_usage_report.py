@@ -143,7 +143,8 @@ class Command(BaseCommand):
         days = options["days"]
         if days is not None:
             if days < 1:
-                raise CommandError("--days must be at least 1.")
+                msg = "--days must be at least 1."
+                raise CommandError(msg)
             logs = logs.filter(created_at__gte=timezone.now() - timedelta(days=days))
         for option, field in (
             ("service", "service"),
@@ -159,25 +160,24 @@ class Command(BaseCommand):
             try:
                 project = Project.objects.only("id").get(slug=options["project"])
             except Project.DoesNotExist as error:
-                raise CommandError(
-                    f'Project "{options["project"]}" does not exist.'
-                ) from error
+                msg = f'Project "{options["project"]}" does not exist.'
+                raise CommandError(msg) from error
             logs = logs.filter(project_id_snapshot=project.pk)
             scope_logs = scope_logs.filter(
                 Q(project_id_snapshot=project.pk) | Q(project_id_snapshot__isnull=True)
             )
         if options["component"]:
             if project is None:
-                raise CommandError("--component requires an existing --project.")
+                msg = "--component requires an existing --project."
+                raise CommandError(msg)
             try:
                 component = Component.objects.only("id").get(
                     project_id=project.pk,
                     slug=options["component"],
                 )
             except Component.DoesNotExist as error:
-                raise CommandError(
-                    f'Component "{options["component"]}" does not exist.'
-                ) from error
+                msg = f'Component "{options["component"]}" does not exist.'
+                raise CommandError(msg) from error
             logs = logs.filter(component_id_snapshot=component.pk)
             scope_logs = scope_logs.filter(
                 Q(component_id_snapshot=component.pk)

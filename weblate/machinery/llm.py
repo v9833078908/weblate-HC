@@ -107,7 +107,7 @@ def _sources_usage_scope(
     try:
         translation = first_unit.translation
         component = translation.component
-        return (
+        return (  # ruff: ignore[try-consider-else]
             component.project.slug,
             component.project_id,
             component.pk,

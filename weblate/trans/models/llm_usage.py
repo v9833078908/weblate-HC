@@ -133,9 +133,9 @@ def recent_cost_range(
     a stored cost and a positive unit count. Below 5 samples returns None so a
     thin history never implies a precision the data does not support.
     """
-    per_unit = [
-        cost / unit_count
-        for cost, unit_count in LLMUsageLog.objects.filter(
+    per_unit: list[Decimal] = []
+    for cost, unit_count in (
+        LLMUsageLog.objects.filter(
             project_id_snapshot=project_id_snapshot,
             service=service,
             model=model,
@@ -145,7 +145,9 @@ def recent_cost_range(
         )
         .order_by("-created_at", "-pk")[:20]
         .values_list("cost_usd", "unit_count")
-    ]
+    ):
+        if cost is not None and unit_count is not None:
+            per_unit.append(cost / unit_count)
     if len(per_unit) < 5:
         return None
     return min(per_unit), max(per_unit)

@@ -117,7 +117,6 @@ class JudgeSSETest(SimpleTestCase):
         _, failure, _, _, _, _ = _read_sse(response, started=time.monotonic())
         self.assertEqual(failure, "invalid-envelope")
 
-
     def test_non_stream_preserves_usage_decimal(self) -> None:
         response = httpx2.Response(
             200,
@@ -126,14 +125,10 @@ class JudgeSSETest(SimpleTestCase):
                 b'"choices":[{"message":{"content":"{}"},"finish_reason":"stop"}]}'
             ),
         )
-        payload, failure, *_ = _decode_non_stream(
-            response, started=time.monotonic()
-        )
+        payload, failure, *_ = _decode_non_stream(response, started=time.monotonic())
         self.assertEqual(failure, "")
         assert payload is not None
-        self.assertEqual(
-            payload["usage"]["cost"], Decimal("0.123456789123456789")
-        )
+        self.assertEqual(payload["usage"]["cost"], Decimal("0.123456789123456789"))
 
     def test_stream_preserves_usage_decimal(self) -> None:
         response = httpx2.Response(
@@ -147,9 +142,7 @@ class JudgeSSETest(SimpleTestCase):
         payload, failure, *_ = _read_sse(response, started=time.monotonic())
         self.assertEqual(failure, "")
         assert payload is not None
-        self.assertEqual(
-            payload["usage"]["cost"], Decimal("0.123456789123456789")
-        )
+        self.assertEqual(payload["usage"]["cost"], Decimal("0.123456789123456789"))
 
 
 class SegmentGlossaryTest(SimpleTestCase):
@@ -1435,9 +1428,7 @@ class JudgeUsageLogTest(TestCase):
         http_mock.register(
             "POST",
             CHAT_URL,
-            content=json.dumps(payload).replace(
-                '"__COST__"', "0.123456789123456789"
-            ),
+            content=json.dumps(payload).replace('"__COST__"', "0.123456789123456789"),
         )
 
         request_verdicts(
@@ -1481,7 +1472,7 @@ class JudgeUsageLogTest(TestCase):
 
         self.assertEqual(
             LLMUsageLog.objects.get(model="vendor/model-a").cost_usd,
-            Decimal("0"),
+            Decimal(0),
         )
 
     @override_settings(
@@ -1503,16 +1494,12 @@ class JudgeUsageLogTest(TestCase):
         http_mock.register(
             "POST",
             CHAT_URL,
-            content=json.dumps(payload).replace(
-                '"__COST__"', "0.1234567891234567891"
-            ),
+            content=json.dumps(payload).replace('"__COST__"', "0.1234567891234567891"),
         )
 
         request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
 
-        self.assertIsNone(
-            LLMUsageLog.objects.get(model="vendor/model-a").cost_usd
-        )
+        self.assertIsNone(LLMUsageLog.objects.get(model="vendor/model-a").cost_usd)
 
     @override_settings(
         JUDGE_ENABLED=True,

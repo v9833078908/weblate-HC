@@ -4417,9 +4417,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
         def chat_callback(request):
             request_payload = json.loads(request.content)
-            strings = json.loads(
-                request_payload["messages"][-1]["content"]
-            )["strings"]
+            strings = json.loads(request_payload["messages"][-1]["content"])["strings"]
             response_payload = {
                 "id": "chatcmpl-scope",
                 "choices": [
@@ -4477,9 +4475,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
         log = LLMUsageLog.objects.get()
         self.assertEqual(log.project_slug, unit.translation.component.project.slug)
-        self.assertEqual(
-            log.project_id_snapshot, unit.translation.component.project_id
-        )
+        self.assertEqual(log.project_id_snapshot, unit.translation.component.project_id)
         self.assertEqual(log.component_slug, "ui")
         self.assertEqual(log.component_id_snapshot, unit.translation.component_id)
         self.assertEqual(log.target_language_code, "fr")
@@ -4536,7 +4532,7 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         second = make_unit(code="fr", source="Beta")
         second_translation = second.translation
         second.translation_id = 2
-        second._state.fields_cache["translation"] = second_translation
+        second._state.fields_cache["translation"] = second_translation  # ruff: ignore[private-member-access]
         machine = self.get_machine()
         machine.settings["_project"] = Mock(slug="wrong-project", pk=999)
 
@@ -4757,11 +4753,9 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
     @http_mock.activate
     def test_usage_zero_cost_is_stored(self) -> None:
         LLMUsageLog.objects.all().delete()
-        self.mock_chat_usage(
-            {"prompt_tokens": 9, "completion_tokens": 12, "cost": 0}
-        )
+        self.mock_chat_usage({"prompt_tokens": 9, "completion_tokens": 12, "cost": 0})
         self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
-        self.assertEqual(LLMUsageLog.objects.get().cost_usd, Decimal("0"))
+        self.assertEqual(LLMUsageLog.objects.get().cost_usd, Decimal(0))
 
     @http_mock.activate
     def test_usage_missing_means_no_record(self) -> None:

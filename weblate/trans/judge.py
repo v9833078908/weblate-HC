@@ -1121,6 +1121,11 @@ def _usage_values(payload: dict | None) -> dict[str, object]:
         else {}
     )
 
+def _usage_integer(value: object) -> int:
+    return value if isinstance(value, int) else 0
+
+
+
 
 def _batch_usage_scope(
     batch: Sequence[JudgeRequest],
@@ -1131,16 +1136,15 @@ def _batch_usage_scope(
     component_ids = {request.component_id_snapshot for request in batch}
     component_slugs = {request.component_slug for request in batch}
     languages = {request.target_language for request in batch}
+    scopes = (project_ids, component_ids, component_slugs, languages)
+    if not project_slug or any(len(scope) != 1 for scope in scopes):
+        LOGGER.error("judge batch has an unscoped or mixed translation identity")
+        return None, "", None, "", ""
     if (
-        not project_slug
-        or None in project_ids
+        None in project_ids
         or None in component_ids
         or "" in component_slugs
         or "" in languages
-        or len(project_ids) != 1
-        or len(component_ids) != 1
-        or len(component_slugs) != 1
-        or len(languages) != 1
     ):
         LOGGER.error("judge batch has an unscoped or mixed translation identity")
         return None, "", None, "", ""
@@ -1159,19 +1163,19 @@ def _write_llm_usage(
     model: str,
     project_slug: str,
     batch: Sequence[JudgeRequest],
-    request_attempt: object | None,
+    request_attempt: JudgeRequestAttempt | None,
 ) -> None:
     usage = _usage_values(payload)
-    prompt_tokens, completion_tokens = (
-        usage.get("prompt_tokens") or 0,
-        usage.get("completion_tokens") or 0,
-    )
+    prompt_tokens = _usage_integer(usage.get("prompt_tokens"))
+    completion_tokens = _usage_integer(usage.get("completion_tokens"))
     if not prompt_tokens and not completion_tokens:
         return
-    details, completion_details = (
-        usage.get("prompt_tokens_details") or {},
-        usage.get("completion_tokens_details") or {},
-    )
+    details = usage.get("prompt_tokens_details")
+    completion_details = usage.get("completion_tokens_details")
+    if not isinstance(details, dict):
+        details = {}
+    if not isinstance(completion_details, dict):
+        completion_details = {}
     (
         project_id_snapshot,
         project_slug,
@@ -1189,11 +1193,12 @@ def _write_llm_usage(
         target_language_code=target_language_code,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
-        total_tokens=usage.get("total_tokens") or (prompt_tokens + completion_tokens),
+        total_tokens=_usage_integer(usage.get("total_tokens"))
+        or (prompt_tokens + completion_tokens),
         cost_usd=parse_provider_cost(usage.get("cost")),
         response_id=str(payload.get("id") or ""),
-        cached_tokens=details.get("cached_tokens") or 0,
-        reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
+        cached_tokens=_usage_integer(details.get("cached_tokens")),
+        reasoning_tokens=_usage_integer(completion_details.get("reasoning_tokens")),
         operation=LLMUsageLog.Operation.JUDGE,
         unit_count=len(batch),
         batch_size=len(batch),
@@ -1269,7 +1274,7 @@ def _record_usage(
     model: str,
     project_slug: str,
     batch: Sequence[JudgeRequest],
-    attempt: object | None,
+    attempt: JudgeRequestAttempt | None,
 ) -> None:
     if payload is None:
         return
@@ -1492,7 +1497,7 @@ def _run_batch(
                 profile.model,
                 project_slug,
                 batch,
-                attempt,
+                cast(JudgeRequestAttempt | None, attempt),
             )
         last_attempt, last_failure = attempt, failure
         _log_attempt(
