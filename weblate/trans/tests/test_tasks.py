@@ -17,8 +17,10 @@ from django.utils import timezone
 from weblate.auth.models import User
 from weblate.checks.tasks import finalize_component_checks
 from weblate.trans.models import Category, Component, PendingUnitChange, Suggestion
+from weblate.trans.models.judge import JudgeDeferral
 from weblate.trans.models.project import CommitPolicyChoices
 from weblate.trans.tasks import (
+    cleanup_judge_observability,
     cleanup_repos,
     cleanup_stale_repos,
     cleanup_suggestions,
@@ -545,3 +547,95 @@ class TasksTest(ComponentTestCase):
                 language=self.component.source_language
             ).exists()
         )
+
+
+class JudgeDeferralCleanupTest(ComponentTestCase):
+    """The observability cleanup prunes only expired closed deferrals."""
+
+    def make_deferral(self, state, closed_at=None, identity="a"):
+        unit = self.get_unit()
+        return JudgeDeferral.objects.create(
+            unit=unit,
+            request_identity=identity * 64,
+            target_hash="t" * 64,
+            context_hash="c" * 64,
+            project_context_hash="p" * 64,
+            source_language="en",
+            target_language="cs",
+            profile_fingerprint="f" * 64,
+            prompt_schema_version="v1",
+            seat=1,
+            state=state,
+            next_attempt_at=timezone.now(),
+            closed_at=closed_at,
+        )
+
+    def test_only_expired_closed_rows_are_deleted(self) -> None:
+        now = timezone.now()
+        expired = self.make_deferral(
+            JudgeDeferral.State.CLOSED,
+            closed_at=now - timedelta(days=91),
+            identity="1",
+        )
+        recent = self.make_deferral(
+            JudgeDeferral.State.CLOSED,
+            closed_at=now - timedelta(days=1),
+            identity="2",
+        )
+        old_queued = self.make_deferral(JudgeDeferral.State.QUEUED, identity="3")
+        old_slow = self.make_deferral(JudgeDeferral.State.SLOW, identity="4")
+
+        cleanup_judge_observability()
+
+        alive = set(JudgeDeferral.objects.values_list("pk", flat=True))
+        self.assertNotIn(expired.pk, alive)
+        self.assertEqual(alive, {recent.pk, old_queued.pk, old_slow.pk})
+
+    @override_settings(JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS=0)
+    def test_zero_purges_all_closed_rows(self) -> None:
+        now = timezone.now()
+        closed = self.make_deferral(
+            JudgeDeferral.State.CLOSED, closed_at=now, identity="5"
+        )
+        queued = self.make_deferral(JudgeDeferral.State.QUEUED, identity="6")
+
+        cleanup_judge_observability()
+
+        self.assertFalse(JudgeDeferral.objects.filter(pk=closed.pk).exists())
+        self.assertTrue(JudgeDeferral.objects.filter(pk=queued.pk).exists())
+
+    def test_closed_index_exists_in_schema(self) -> None:
+        """The retention delete is index-backed; verified by DB introspection."""
+        table = JudgeDeferral._meta.db_table  # ruff: ignore[private-member-access]
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT indexdef FROM pg_indexes WHERE tablename = %s", [table]
+            )
+            definitions = [row[0] for row in cursor.fetchall()]
+        self.assertTrue(
+            any(
+                "judge_deferral_closed_idx" in definition
+                and "(state, closed_at)" in definition
+                for definition in definitions
+            ),
+            definitions,
+        )
+
+    @override_settings(JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS="nonsense")
+    def test_invalid_value_falls_back_to_default(self) -> None:
+        now = timezone.now()
+        within_default = self.make_deferral(
+            JudgeDeferral.State.CLOSED,
+            closed_at=now - timedelta(days=89),
+            identity="7",
+        )
+        beyond_default = self.make_deferral(
+            JudgeDeferral.State.CLOSED,
+            closed_at=now - timedelta(days=91),
+            identity="8",
+        )
+
+        cleanup_judge_observability()
+
+        self.assertTrue(JudgeDeferral.objects.filter(pk=within_default.pk).exists())
+        self.assertFalse(JudgeDeferral.objects.filter(pk=beyond_default.pk).exists())

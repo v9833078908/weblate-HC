@@ -66,6 +66,8 @@ Weblate 2026.8.1
 
 * An LLM judge request the endpoint refuses every time (HTTP 400, 404, 405, 406, 415, 422) now fails the run fast as ``http-request-invalid`` instead of writing a fake unparsed verdict and paying for retries or deferrals of a request that can never succeed; the refused attempt stays in the ledger as the diagnostic, see :setting:`JUDGE_REQUEST_SLEEP`. A guarded ``judge_close_refused_verdicts`` command reclassifies the historical false-unparsed verdicts written by that behaviour.
 
+* Closed rows of the durable deferred judge queue are now removed by the observability cleanup after :setting:`JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS` days (default 90), so enabling the queue no longer grows that table forever; live ``queued`` and ``slow`` rows are never deleted automatically. All eleven queue settings are now documented and accepted as ``WEBLATE_*`` environment variables.
+
 .. rubric:: Bug fixes
 
 * French punctuation spacing and automatic translation no longer modify syntax in Hero Craft conditional game placeholders.

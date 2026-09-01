@@ -2396,6 +2396,38 @@ LLM judge
        * :setting:`JUDGE_MAY_APPROVE`
        * :setting:`JUDGE_REASONING_EFFORT`
 
+.. envvar:: WEBLATE_JUDGE_DEFERRAL_ENABLED
+.. envvar:: WEBLATE_JUDGE_DEFERRAL_MIN_INTERVAL
+.. envvar:: WEBLATE_JUDGE_DEFERRAL_MAX_INTERVAL
+.. envvar:: WEBLATE_JUDGE_DEFERRAL_SLOW_AFTER
+.. envvar:: WEBLATE_JUDGE_DEFERRAL_MAX_UNITS_PER_PASS
+.. envvar:: WEBLATE_JUDGE_DEFERRAL_CIRCUIT_FAILURE_THRESHOLD
+.. envvar:: WEBLATE_JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS
+.. envvar:: WEBLATE_JUDGE_DEFERRAL_TOKEN_BUCKET_CAPACITY
+.. envvar:: WEBLATE_JUDGE_DEFERRAL_TOKEN_BUCKET_REFILL_PER_SECOND
+.. envvar:: WEBLATE_JUDGE_DEFERRAL_OPERATOR_STOPPED
+.. envvar:: WEBLATE_JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS
+
+    .. versionadded:: 2026.8.1
+
+    Configure the durable deferred judge queue and its closed-row retention.
+    Changing :envvar:`WEBLATE_JUDGE_DEFERRAL_ENABLED` requires recreating the
+    Celery beat process; see :setting:`JUDGE_DEFERRAL_ENABLED`.
+
+    .. seealso::
+
+       * :setting:`JUDGE_DEFERRAL_ENABLED`
+       * :setting:`JUDGE_DEFERRAL_MIN_INTERVAL`
+       * :setting:`JUDGE_DEFERRAL_MAX_INTERVAL`
+       * :setting:`JUDGE_DEFERRAL_SLOW_AFTER`
+       * :setting:`JUDGE_DEFERRAL_MAX_UNITS_PER_PASS`
+       * :setting:`JUDGE_DEFERRAL_CIRCUIT_FAILURE_THRESHOLD`
+       * :setting:`JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS`
+       * :setting:`JUDGE_DEFERRAL_TOKEN_BUCKET_CAPACITY`
+       * :setting:`JUDGE_DEFERRAL_TOKEN_BUCKET_REFILL_PER_SECOND`
+       * :setting:`JUDGE_DEFERRAL_OPERATOR_STOPPED`
+       * :setting:`JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS`
+
 
 Changing enabled apps, checks, formats, add-ons, machinery, or autofixes
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

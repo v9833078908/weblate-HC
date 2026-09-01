@@ -412,6 +412,10 @@ class JudgeDeferral(models.Model):
                 fields=["unit", "seat", "-created_at"],
                 name="judge_deferral_unit_idx",
             ),
+            models.Index(
+                fields=["state", "closed_at"],
+                name="judge_deferral_closed_idx",
+            ),
         ]
         # ruff: ignore[mutable-class-default]
         constraints = [
