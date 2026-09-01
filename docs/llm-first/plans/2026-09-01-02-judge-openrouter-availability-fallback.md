@@ -37,20 +37,29 @@ decisions of 2026-09-01 settled the design questions below but did not authorise
 implementation. Every production step in Rollout then needs its own separate
 approval on top of that.
 
-**Strict implementation order:** Start only after branch
-`docs/llm-usage-attribution-plan` has been implemented and merged to `main`,
-with Tasks 1-5 of
-`docs/llm-first/plans/2026-08-31-llm-usage-cost-attribution.md` green and
-additive migration `0113_llm_usage_scope` present. Rebase this work on that
-merge, not as a stacked or cherry-picked change against today's `main`: the
-attribution code adds scope to `JudgeRequest` and owns the judge's single
-`LLMUsageLog` response seam that fallback must reuse. Before coding, re-ground
-every `file:line` reference in Tasks 1-5, preserve those scope fields in all
-direct request fixtures, and generate
-`0114_judge_verdict_provider` depending on `0113_llm_usage_scope`. If another
-migration lands between them, rebase and regenerate the next migration rather
-than hand-editing a conflicting number. Production rollout starts only after
-the attribution plan's own migration and scoped smoke are green on the target.
+**Dependency gate: satisfied 2026-09-01.** Branch
+`docs/llm-usage-attribution-plan` is merged to `main` as `0011d3c`, Tasks 1-5 of
+`docs/llm-first/plans/2026-08-31-llm-usage-cost-attribution.md` are implemented
+there, and additive migration `0113_llm_usage_scope` is present and is the
+latest `weblate/trans` migration, so `0114_judge_verdict_provider` is the next
+free number. Every `file:line` reference in this plan was re-grounded against
+that merge on 2026-09-01; the merge moved most judge anchors (for example
+`_failure_for_http` 1099 -> 1105, `RetryBudget` 88 -> 122, the `http-auth`
+raise 1455 -> 1516, `_write_verdict` 234 -> 237). Re-ground again if another
+commit touches `weblate/trans/judge.py` or `weblate/trans/judge_loop.py` before
+implementation starts. The attribution merge also confirmed three design facts
+this plan depends on: `JudgeRequestAttempt` already carries `provider`
+(`weblate/trans/models/judge.py:265`) and `endpoint_fingerprint` (`:266`), so
+Task 4 needs no migration; the single usage seam attributes by serving profile
+(`_record_usage(payload, profile.provider, profile.model, ...)`,
+`weblate/trans/judge.py:1494-1500`), so a fallback profile attributes its own
+`LLMUsageLog` row without a second writer; and the new `JudgeRequest` scope
+fields (`weblate/trans/judge.py:155-157`) are absent from
+`compute_judge_request_identity`, so cache identity is unchanged. Preserve
+those scope fields in all direct request fixtures. If another migration lands
+before this work, rebase and regenerate the next migration rather than
+hand-editing a conflicting number. Production rollout starts only after the
+attribution plan's own migration and scoped smoke are green on the target.
 
 ---
 
@@ -66,32 +75,32 @@ for both seats, in parallel, and it is stable today:
 | Seat 2 `atlas/qwen3.8-max`, batch 1, stream, 150 s, `json_schema` | production container environment |
 | 38/38 attempts HTTP 200, zero failure kinds, zero retries, 50 verdicts over 25 units, zero unparsed, 50.15% overlap | `docs/llm-first/measurements/2026-09-01-03-judge-litellm-nfg-es-canary.md` |
 | First-byte p95 5.705 s / 2.746 s against a 20 s envelope | same |
-| `JUDGE_DEFERRAL_ENABLED=0`, so no unit is ever queued and an unparsed unit is terminally unjudged | production container environment, `weblate/trans/judge_loop.py:754-756` |
-| No fallback exists: no `JUDGE_FALLBACK_*` setting, no second-endpoint resend, no `judge_provider` on `JudgeVerdict` | repo-wide search; `weblate/trans/judge.py:173-197` is the only endpoint resolver |
+| `JUDGE_DEFERRAL_ENABLED=0`, so no unit is ever queued and an unparsed unit is terminally unjudged | production container environment, `weblate/trans/judge_loop.py:758-759` |
+| No fallback exists: no `JUDGE_FALLBACK_*` setting, no second-endpoint resend, no `judge_provider` on `JudgeVerdict` | repo-wide search; `weblate/trans/judge.py:178-199` is the only endpoint resolver, with one `settings.JUDGE_BASE_URL` reader |
 
 Already implemented and reused unchanged by this plan, so none of it is work
-here: typed `failure_kind` taxonomy (`weblate/trans/judge.py:49-69`),
+here: typed `failure_kind` taxonomy (`weblate/trans/judge.py:49-67`),
 `JudgeRequestAttempt` per HTTP call including `provider` and
 `endpoint_fingerprint` (`weblate/trans/models/judge.py:231-308`), SSE reader
-with per-seat absolute and idle deadlines (`weblate/trans/judge.py:735-824`),
+with per-seat absolute and idle deadlines (`weblate/trans/judge.py:901-1001`),
 bounded transport/transient/protocol retries and width-one isolation
-(`weblate/trans/judge.py:1280-1432`), database-backed adaptive batch budget and
+(`weblate/trans/judge.py:1449-1601`), database-backed adaptive batch budget and
 circuit breaker (`weblate/trans/models/judge.py:312-351`), per-seat immutable
-profiles with `inherit` semantics (`weblate/trans/judge.py:329-450`), the
-parallel seat barrier (`weblate/trans/judge_loop.py:918-1068`), and the durable
+profiles with `inherit` semantics (`weblate/trans/judge.py:358-460`), the
+parallel seat barrier (`weblate/trans/judge_loop.py:921-1069`), and the durable
 `JudgeDeferral` queue with its read-only drain
-(`weblate/trans/judge_loop.py:754-825`, `:1569-1580`).
+(`weblate/trans/judge_loop.py:747-834`, `:1636-1681`).
 
 Two facts that shape the design and must not be re-litigated during
 implementation:
 
 1. **Cache identity discriminates by endpoint, but only if the *serving*
    fingerprint is what gets stored.** `profile_fingerprint` is computed from
-   `endpoint_fingerprint` first (`weblate/trans/judge.py:422-427`), so two
+   `endpoint_fingerprint` first (`weblate/trans/judge.py:427-441`), so two
    endpoints can never collide. That is necessary and not sufficient:
    `_write_verdict` stores the fingerprint of the profile the seat job was
    *created* with, which is always the primary
-   (`weblate/trans/judge_loop.py:254-287`, bound at `:1121-1133`). A naive
+   (`weblate/trans/judge_loop.py:257-266`, bound at `:1121-1140`). A naive
    fallback would therefore file OpenRouter's answer under LiteLLM's identity
    and `_cached_verdict` would reuse it. D5 of the superseded plan is
    consequently **not** free: Task 3 has to thread the serving profile through
@@ -158,10 +167,11 @@ It was rejected for three reasons, in increasing order of weight:
 
 **What is genuinely still missing, stated plainly.** That circuit is
 drain-scoped, not global. It is written only by `_update_deferral_circuit`,
-which returns early unless `JUDGE_DEFERRAL_ENABLED`
-(`weblate/trans/judge_loop.py:621-622`, `:634-676`), and it is read only by
+reached only through `_record_deferral_circuit_outcome`, which returns early
+unless `JUDGE_DEFERRAL_ENABLED`
+(`weblate/trans/judge_loop.py:622-629`, `:637-679`), and it is read only by
 `_reserve_deferral_requests_locked` on the path from `_drain_seat`
-(`weblate/trans/judge_loop.py:679-707`, `:1546`). No code in
+(`weblate/trans/judge_loop.py:700-744`, `:1549`). No code in
 `weblate/trans/judge.py` consults `circuit_state`. Enabling the flag in Rollout
 step 4 therefore makes the circuit *record* producer-run outcomes but does not
 make any producer run *obey* it. The obstacle is not only the flag; the consult
@@ -337,18 +347,18 @@ feat(judge): configure and validate a fallback judge endpoint
 ## Task 3: Persist the serving identity, not the requesting seat's
 
 **This task is load-bearing for correctness, not just for reporting.**
-`_write_verdict` (`weblate/trans/judge_loop.py:234-288`) takes one `profile`
-argument and derives from it `judge_model` (`:273`), `profile_fingerprint`
-(`:286`), `prompt_schema_version` (`:287`) and `request_identity` (`:254-263`).
+`_write_verdict` (`weblate/trans/judge_loop.py:237-291`) takes one `profile`
+argument and derives from it `judge_model` (`:276`), `profile_fingerprint`
+(`:289`), `prompt_schema_version` (`:290`) and `request_identity` (`:257-266`).
 That profile is bound once in `make_seat_job` as `profiles[seat]`
-(`weblate/trans/judge_loop.py:1121-1133`), before any request is sent, so it is
-always the **primary**. Adding a provider column alone would therefore store a
-fallback verdict under the primary's model name and the primary's fingerprint,
-and `_cached_verdict` would later reuse it as though LiteLLM had produced it.
-That is a silent R3 violation and strictly worse than having no fallback. The
-endpoint being inside `profile_fingerprint` (`weblate/trans/judge.py:422-427`)
-does not help here: the fingerprint that gets written is the primary's whoever
-served the batch.
+(`weblate/trans/judge_loop.py:1121-1140`, bound at `:1124`), before any request
+is sent, so it is always the **primary**. Adding a provider column alone would
+therefore store a fallback verdict under the primary's model name and the
+primary's fingerprint, and `_cached_verdict` would later reuse it as though
+LiteLLM had produced it. That is a silent R3 violation and strictly worse than
+having no fallback. The endpoint being inside `profile_fingerprint`
+(`weblate/trans/judge.py:427-441`) does not help here: the fingerprint that
+gets written is the primary's whoever served the batch.
 
 **Files:**
 
@@ -436,7 +446,7 @@ fix(judge): persist the serving endpoint identity on each verdict
 
 The trigger set is the safety argument of this whole feature, so it is a table
 of tests, not a comment. Define it **independently** in
-`weblate/trans/judge.py` beside the taxonomy at `:49-69`:
+`weblate/trans/judge.py` beside the taxonomy at `:49-67`:
 
 ```python
 _FAILOVER_FAILURE_KINDS = frozenset(
@@ -445,11 +455,11 @@ _FAILOVER_FAILURE_KINDS = frozenset(
 ```
 
 It is deliberately **not** derived from `_AVAILABILITY_FAILURE_KINDS`
-(`weblate/trans/judge_loop.py:629-631`), which the circuit breaker owns. The two
+(`weblate/trans/judge_loop.py:632-634`), which the circuit breaker owns. The two
 sets differ in both directions and each difference is load-bearing:
 
 - `http-other` is in the availability set but **not** here.
-  `_failure_for_http` (`weblate/trans/judge.py:1099-1108`) maps every 4xx that
+  `_failure_for_http` (`weblate/trans/judge.py:1105-1114`) maps every 4xx that
   is not 401/403/429 to `http-other`, so it means 400, 404 or 422: our request
   is wrong for that endpoint, which is a configuration defect, not
   unavailability. Failing it over would double every batch's calls while hiding
@@ -463,7 +473,7 @@ sets differ in both directions and each difference is load-bearing:
   failure is unavailability **of that endpoint**, and the fallback presents a
   different key to a different provider, so exactly one fallback call is
   warranted. Note this kind does not currently reach the retry logic at all: it
-  raises immediately (`weblate/trans/judge.py:1455-1456`). See Step 3.
+  raises immediately (`weblate/trans/judge.py:1516-1517`). See Step 3.
 - `deadline` is in both, and it is included here on purpose: it means the
   endpoint produced no complete answer inside the seat's absolute bound, which
   is unavailability for that request. The known objection - that a deadline
@@ -480,7 +490,7 @@ sets differ in both directions and each difference is load-bearing:
   configured retry. The shared circuit breaker is drain-scoped, written only by
   `_update_deferral_circuit` under `JUDGE_DEFERRAL_ENABLED` and read only by
   `_reserve_deferral_requests_locked` from `_drain_seat`
-  (`weblate/trans/judge_loop.py:634-707`, `:1546`). Nothing in
+  (`weblate/trans/judge_loop.py:637-679`, `:700-744`, `:1549`). Nothing in
   `weblate/trans/judge.py` consults `circuit_state`, so a producer run never
   sees it. Integrating the circuit into the producer request path is the
   correct fix and is a deliberate follow-up, not part of this plan - see
@@ -512,7 +522,7 @@ Also assert:
 - Exactly one fallback attempt per batch per seat, even when the primary failed
   every retry: no fallback retry budget of its own.
 - The fallback attempt is **not** charged to `RetryBudget`
-  (`weblate/trans/judge.py:88-105`, gate at `:1378-1385`), and fires even when
+  (`weblate/trans/judge.py:122-137`, gate at `:1551-1555`), and fires even when
   that budget is exhausted. Rationale, to be stated in the code comment: that
   budget caps same-endpoint retry amplification, while the fallback is a
   different endpoint serving the batch for the first time; amplification stays
@@ -530,7 +540,7 @@ Also assert:
   seat 2, and the parallel barrier still releases per batch offset.
 - A fallback that itself fails yields `unparsed`, never an exception, and does
   not abort the run.
-- Width-one isolation (`:1390-1432`) is never applied to a fallback batch,
+- Width-one isolation (`:1561-1593`) is never applied to a fallback batch,
   because protocol failures do not fail over.
 - With `JUDGE_FALLBACK_BASE_URL` empty, call counts are byte-for-byte today's.
 
@@ -554,7 +564,7 @@ can be double-counted or filed as LiteLLM spend.
 
 **`http-auth` needs care: today it does not mark a batch, it raises.**
 `_run_batch` raises `JudgeError("The LLM judge is not configured.")` the moment
-it sees `http-auth` (`weblate/trans/judge.py:1455-1456`), before any retry
+it sees `http-auth` (`weblate/trans/judge.py:1516-1517`), before any retry
 branch, and that exception propagates out through the seat worker and aborts the
 whole run rather than costing one batch. The fallback attempt must therefore be
 inserted **before** that raise, and the raise must survive only for the case
@@ -646,7 +656,7 @@ fix(judge): keep deferral identity on the primary endpoint
 ### Step 1: Settings reference
 
 Add the eight settings to the existing alphabetical `JUDGE_*` run in
-`docs/admin/config.rst` (the block around `:1760-1935`), matching the
+`docs/admin/config.rst` (the block around `:1742-1952`), matching the
 surrounding style: `.. setting::`, `.. versionadded::`, `:setting:`
 cross-references. State in prose: the fallback is an availability mechanism
 only; an HTTP 200 whose body fails validation is never retried elsewhere; a
@@ -660,14 +670,14 @@ cannot be both primary and fallback, and leaving the fallback configured makes
 validation reject the rollback before any request.
 
 Add the `WEBLATE_JUDGE_FALLBACK_*` envvars to
-`docs/admin/install/docker.rst` around `:2368-2395`. While there, add the
+`docs/admin/install/docker.rst` around `:2366-2376`. While there, add the
 existing undocumented `WEBLATE_JUDGE_*` per-seat entries if any are still
 missing, as recorded at
 `docs/llm-first/plans/2026-08-27-judge-reliability-hardening.md:789-793`.
 
 ### Step 2: Threat model
 
-`docs/security/threat-model.rst:130-134` and `:273-276` describe the outbound
+`docs/security/threat-model.rst:129-133` and `:270-276` describe the outbound
 judge request as going to `JUDGE_BASE_URL`. A second outbound destination with a
 second credential is a change to an outbound integration class, which
 `AGENTS.md` requires be recorded in the same change. Record: a judge batch may
@@ -716,7 +726,7 @@ docs(judge): document the fallback judge endpoint
 On the dev container, with the fallback configured to today's OpenRouter values,
 replace the **primary** `JUDGE_API_KEY` with an invalid credential so the proxy
 answers 401 or 403. That maps to `http-auth`
-(`weblate/trans/judge.py:1099-1101`), which is a permitted failover trigger.
+(`weblate/trans/judge.py:1105-1107`), which is a permitted failover trigger.
 Run one small judge scope.
 
 Do **not** force this arm with a deliberately wrong `JUDGE_MODEL_SEAT_1`: a
@@ -749,7 +759,7 @@ estimating the missing LiteLLM cost.
 Baseline worth capturing first, on the unmodified code with no fallback
 configured: the same invalid key aborts the entire run with "Automatic
 translation failed: The LLM judge is not configured", because `http-auth` raises
-rather than marking a batch (`weblate/trans/judge.py:1455-1456`). Recording that
+rather than marking a batch (`weblate/trans/judge.py:1516-1517`). Recording that
 before/after pair is the clearest single demonstration of what this plan buys.
 
 An endpoint-level credential cannot fail one seat while sparing the other, so
