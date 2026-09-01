@@ -1,0 +1,19 @@
+{# requires 'seats' (verdict rows with judge_model, timestamp, errors, back_translation) #}
+{% load humanize i18n %}
+
+<details class="list-group-item-text">
+  <summary>{% translate "Judge details" %}</summary>
+  {% for seat in seats %}
+    <p class="list-group-item-text text-muted">
+      {% blocktranslate with model=seat.judge_model when=seat.timestamp|naturaltime %}{{ model }} · {{ when }}{% endblocktranslate %}
+    </p>
+    {% for error in seat.errors %}
+      <p class="list-group-item-text">
+        <strong>{{ error.category }}/{{ error.severity }}</strong>: {{ error.description }}
+      </p>
+    {% endfor %}
+    {% if seat.back_translation %}
+      <p class="list-group-item-text text-muted">{% translate "Back-translation:" %} {{ seat.back_translation }}</p>
+    {% endif %}
+  {% endfor %}
+</details>

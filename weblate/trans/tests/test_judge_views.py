@@ -2539,3 +2539,110 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         # path and remain available.
         self.assertContains(response, "Re-check this string")
 
+    # -- Task 6: compressed two-seat evidence ------------------------------
+
+    def test_reject_evidence_is_collapsed_into_one_details_element(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(
+            unit,
+            "critical",
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "Wrong term used for the key item.",
+                }
+            ],
+            back_translation="This is the reverse-translated text.",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        content = response.content.decode()
+        self.assertEqual(content.count("<details"), 1)
+        self.assertIn("<summary>", content)
+        self.assertContains(response, "Wrong term used for the key item.")
+        self.assertContains(response, "vendor/model-a")
+        self.assertContains(response, "This is the reverse-translated text.")
+        self.assertContains(response, "Back-translation:")
+        # Severity/ship-hold badges stay outside (before) the details.
+        self.assertLess(content.index("Will not ship"), content.index("<details"))
+
+    def test_flag_evidence_also_collapses_into_one_details_element(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(
+            unit,
+            "major",
+            errors=[
+                {
+                    "category": "tone",
+                    "severity": "major",
+                    "description": "Overly formal register.",
+                }
+            ],
+        )
+        response = self.client.get(unit.get_absolute_url())
+        content = response.content.decode()
+        self.assertEqual(content.count("<details"), 1)
+        self.assertContains(response, "Overly formal register.")
+        self.assertLess(
+            content.index("Ships with evidence"), content.index("<details")
+        )
+
+    def test_minor_pass_evidence_also_collapses_into_one_details_element(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        self.make_verdict(
+            unit,
+            "minor",
+            errors=[
+                {
+                    "category": "style",
+                    "severity": "minor",
+                    "description": "Slightly awkward phrasing.",
+                }
+            ],
+        )
+        response = self.client.get(unit.get_absolute_url())
+        content = response.content.decode()
+        self.assertEqual(content.count("<details"), 1)
+        self.assertContains(response, "Slightly awkward phrasing.")
+
+    def test_repair_evidence_also_collapses_into_a_details_element(self) -> None:
+        unit = self.get_unit()
+        run_id = uuid.uuid4()
+        # attempt 0: the originally judged (pre-repair) text and its errors.
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="critical",
+            seat=1,
+            judge_model="vendor/model-a",
+            run_id=run_id,
+            attempt=0,
+            target_hash="0" * 64,
+            target_storage_hash="x" * 32,
+            context_hash="0" * 64,
+            errors=[
+                {
+                    "category": "markup",
+                    "severity": "critical",
+                    "description": "Broken tag in the translation.",
+                }
+            ],
+        )
+        # attempt 1: the current, repaired text - matches the unit as it
+        # stands now, so it becomes the active/current verdict.
+        JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="minor",
+            seat=1,
+            judge_model="vendor/model-a",
+            run_id=run_id,
+            attempt=1,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(unit.target),
+            context_hash=judge_context_hash(unit),
+        )
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Repaired since the original verdict")
+        self.assertContains(response, "Broken tag in the translation.")
+

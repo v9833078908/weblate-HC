@@ -41,26 +41,15 @@
               <span class="badge text-bg-danger">{% translate "Will not ship" %}</span>
             {% endif %}
           </h5>
-          <p class="list-group-item-text text-muted">
-            {% blocktranslate with model=judge_verdict.judge_model when=judge_verdict.timestamp|naturaltime %}{{ model }} · {{ when }}{% endblocktranslate %}
-          </p>
           {% if judge_context_changed %}
             <p class="list-group-item-text">
               {% translate "The context changed (glossary or note updated) since this verdict was recorded." %}
             </p>
           {% endif %}
-          {% for seat in judge_seats %}
-            {% for error in seat.errors %}
-              <p class="list-group-item-text">
-                <strong>{{ error.category }}/{{ error.severity }}</strong>
-                ({% blocktranslate with model=seat.judge_model %}seat {{ model }}{% endblocktranslate %}):
-                {{ error.description }}
-              </p>
-            {% endfor %}
-          {% endfor %}
           {% if judge_seats|length > 1 %}
             <p class="list-group-item-text text-muted">{% translate "Both judges reviewed this string independently." %}</p>
           {% endif %}
+          {% include "snippets/judge-verdict-evidence.html" with seats=judge_seats %}
         </div>
       {% elif judge_verdict and judge_verdict.verdict == "flag" %}
         <div class="list-group-item check">
@@ -69,23 +58,12 @@
             {% translate "Questionable" %}
             <span class="badge text-bg-warning">{% translate "Ships with evidence" %}</span>
           </h5>
-          <p class="list-group-item-text text-muted">
-            {% blocktranslate with model=judge_verdict.judge_model when=judge_verdict.timestamp|naturaltime %}{{ model }} · {{ when }}{% endblocktranslate %}
-          </p>
           {% if judge_context_changed %}
             <p class="list-group-item-text">
               {% translate "The context changed (glossary or note updated) since this verdict was recorded." %}
             </p>
           {% endif %}
-          {% for seat in judge_seats %}
-            {% for error in seat.errors %}
-              <p class="list-group-item-text">
-                <strong>{{ error.category }}/{{ error.severity }}</strong>
-                ({% blocktranslate with model=seat.judge_model %}seat {{ model }}{% endblocktranslate %}):
-                {{ error.description }}
-              </p>
-            {% endfor %}
-          {% endfor %}
+          {% include "snippets/judge-verdict-evidence.html" with seats=judge_seats %}
         </div>
       {% elif judge_verdict and not judge_verdict.unparsed %}
         <div class="list-group-item check">
@@ -93,24 +71,13 @@
             <span class="green">{% icon "check.svg" %}</span>
             {% translate "Accepted" %}
           </h5>
-          <p class="list-group-item-text">
-            {% blocktranslate with model=judge_verdict.judge_model when=judge_verdict.timestamp|naturaltime %}{{ model }} · {{ when }}{% endblocktranslate %}
-          </p>
           {% if judge_context_changed %}
             <p class="list-group-item-text">
               {% translate "The context changed (glossary or note updated) since this verdict was recorded." %}
             </p>
           {% endif %}
           {% if judge_verdict.max_severity == "minor" %}
-            {% for seat in judge_seats %}
-              {% for error in seat.errors %}
-                <p class="list-group-item-text">
-                  <strong>{{ error.category }}/{{ error.severity }}</strong>
-                  ({% blocktranslate with model=seat.judge_model %}seat {{ model }}{% endblocktranslate %}):
-                  {{ error.description }}
-                </p>
-              {% endfor %}
-            {% endfor %}
+            {% include "snippets/judge-verdict-evidence.html" with seats=judge_seats %}
           {% endif %}
         </div>
       {% endif %}
@@ -121,15 +88,7 @@
             {% translate "Repaired since the original verdict" %}
           </h5>
           <p class="list-group-item-text text-muted">{% translate "What the judge originally flagged:" %}</p>
-          {% for seat in judge_repair_evidence.original_seats %}
-            {% for error in seat.errors %}
-              <p class="list-group-item-text">
-                <strong>{{ error.category }}/{{ error.severity }}</strong>
-                ({% blocktranslate with model=seat.judge_model %}seat {{ model }}{% endblocktranslate %}):
-                {{ error.description }}
-              </p>
-            {% endfor %}
-          {% endfor %}
+          {% include "snippets/judge-verdict-evidence.html" with seats=judge_repair_evidence.original_seats %}
           {% if judge_repair_evidence.previous_target %}
             <p class="list-group-item-text text-muted">{% translate "Text before the repair:" %}</p>
             {% format_unit_target unit value=unit.target diff=judge_repair_evidence.previous_target %}
