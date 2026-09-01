@@ -42,12 +42,14 @@ class JudgePersistenceTest(SimpleTestCase):
                     "provider": "litellm",
                     "endpoint_fingerprint": "a" * 64,
                     "profile_fingerprint": "b" * 64,
+                    "request_deadline": [120.0, 180.0],
                 }
             ),
             {
                 "provider": "litellm",
                 "endpoint_fingerprint": "a" * 64,
                 "profile_fingerprint": "b" * 64,
+                "request_deadline": [120.0, 180.0],
             },
         )
         with self.assertRaisesRegex(ValueError, "api_key"):
