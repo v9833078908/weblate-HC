@@ -28,6 +28,7 @@ from weblate.trans.models.judge import (
     JudgeRequestAttempt,
     JudgeRun,
     JudgeRunUnit,
+    JudgeVerdict,
 )
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.state import STATE_FUZZY
@@ -97,6 +98,97 @@ class JudgeDeferralTest(ViewTestCase):
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0].state, JudgeDeferral.State.CLOSED)
         self.assertEqual(rows[1].state, JudgeDeferral.State.QUEUED)
+
+    def test_both_endpoints_failing_creates_one_deferral_keyed_to_primary(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        primary_profile = resolve_judge_seat_profile(1)
+        fallback_also_failed = JudgeResult(
+            "none",
+            "",
+            [],
+            "",
+            unparsed=True,
+            failure_kind="http-server",
+            served_model="fallback/model",
+            served_provider="openrouter",
+            served_profile_fingerprint="f" * 64,
+        )
+        self.defer(unit, fallback_also_failed)
+
+        self.assertEqual(unit.judge_deferrals.count(), 1)
+        deferral = unit.judge_deferrals.get()
+        self.assertEqual(deferral.state, JudgeDeferral.State.QUEUED)
+        # The drain must retry the primary first: a transient outage cannot
+        # pin a unit to the fallback forever.
+        self.assertEqual(
+            deferral.profile_fingerprint, primary_profile.profile_fingerprint
+        )
+        self.assertNotEqual(deferral.profile_fingerprint, "f" * 64)
+
+    def test_a_fallback_judged_unit_closes_an_existing_deferral(self) -> None:
+        unit = self.get_unit()
+        self.defer(unit)
+        self.assertTrue(unit.judge_deferrals.exists())
+        fallback_pass = JudgeResult(
+            "none",
+            "pass",
+            [],
+            "",
+            served_model="fallback/model",
+            served_provider="openrouter",
+        )
+        self.defer(unit, fallback_pass)
+        self.assertEqual(
+            unit.judge_deferrals.get().state, JudgeDeferral.State.CLOSED
+        )
+
+    def test_a_protocol_failure_on_the_primary_still_queues(self) -> None:
+        unit = self.get_unit()
+        protocol_failure = JudgeResult(
+            "none", "", [], "", unparsed=True, failure_kind="invalid-json"
+        )
+        self.defer(unit, protocol_failure)
+        deferral = unit.judge_deferrals.get()
+        self.assertEqual(deferral.state, JudgeDeferral.State.QUEUED)
+        self.assertEqual(deferral.last_failure_kind, "invalid-json")
+
+    def test_drain_may_fail_over_and_stays_read_only(self) -> None:
+        unit = self.get_unit()
+        before_target = unit.get_target_plurals()
+        before_state = unit.state
+        self.defer(unit)
+        JudgeDeferral.objects.filter(unit=unit).update(
+            next_attempt_at=timezone.now() - timedelta(seconds=1)
+        )
+        fallback_served = JudgeResult(
+            "none",
+            "pass",
+            [],
+            "",
+            served_model="fallback/model",
+            served_provider="openrouter",
+        )
+        with mock.patch(
+            "weblate.trans.judge_loop.request_verdicts",
+            mock.Mock(side_effect=mock_request_verdicts([fallback_served])),
+        ):
+            processed = drain_judge_deferrals()
+
+        self.assertEqual(processed, 1)
+        drained = (
+            JudgeVerdict.objects.filter(unit=unit, seat=1)
+            .order_by("-timestamp")
+            .first()
+        )
+        self.assertIsNotNone(drained)
+        self.assertFalse(drained.unparsed)
+        self.assertEqual(drained.judge_provider, "openrouter")
+        self.assertEqual(drained.judge_model, "fallback/model")
+        refreshed = type(unit).objects.get(pk=unit.pk)
+        self.assertEqual(refreshed.get_target_plurals(), before_target)
+        self.assertEqual(refreshed.state, before_state)
 
     def test_late_response_does_not_close_newer_different_identity(self) -> None:
         unit = self.get_unit()
