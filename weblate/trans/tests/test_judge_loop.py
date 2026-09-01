@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import threading
 import uuid
 from unittest import mock
@@ -13,11 +14,14 @@ from django.conf import settings
 from django.db import connections
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
 
+from weblate.auth.models import Group, setup_project_groups
 from weblate.machinery.base import (
     MACHINERY_DEFAULT_THRESHOLD,
     MachineTranslationError,
 )
 from weblate.trans.judge import (
+    JUDGE_SEATS,
+    JudgeError,
     JudgeRequest,
     JudgeResult,
     RetryBudget,
@@ -34,17 +38,21 @@ from weblate.trans.judge_loop import (
     run_judge_batch,
 )
 from weblate.trans.models.judge import (
+    JudgeDeferral,
     JudgeRequestAttempt,
     JudgeRun,
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
     compute_target_storage_hash,
+    has_complete_current_evidence,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.trans.tests.utils import RepoTestMixin, create_test_user
 from weblate.utils.hash import calculate_hash
 from weblate.utils.state import STATE_FUZZY, STATE_TRANSLATED
+from weblate.utils.tests import http_mock
 
 
 def result(severity, verdict, **kw):
@@ -1634,3 +1642,133 @@ class JudgeMaxLengthRepairTest(ViewTestCase):
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
         self.assertEqual(repair_mock.call_count, 0)
         self.assertEqual(client.call_count, 2)
+
+
+def _seat_reply() -> dict:
+    content = json.dumps(
+        {
+            "segments": [
+                {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}
+            ]
+        }
+    )
+    return {"choices": [{"message": {"content": content}}]}
+
+
+CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_BATCH_SIZE_SEAT_1=1,
+    JUDGE_BATCH_SIZE_SEAT_2=1,
+    JUDGE_REQUEST_SLEEP=0.0,
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+    JUDGE_MAX_UNPARSED_RETRY_ROUNDS=0,
+    JUDGE_DEFERRAL_ENABLED=True,
+)
+class JudgeRefusedSeatTest(RepoTestMixin, TransactionTestCase):
+    """
+    A seat refusal must abort the run with no verdict and no deferral.
+
+    The seats POST from worker threads that write their attempt rows on
+    their own committed connections, which an outer TestCase transaction
+    could neither see cleanly nor roll back - hence TransactionTestCase,
+    mirroring JudgeSeatConnectionCleanupTest.
+    """
+
+    def setUp(self) -> None:
+        self.clone_test_repos()
+        super().setUp()
+        component = self.create_component()
+        component.create_path()
+        self.project = component.project
+        setup_project_groups(self, self.project)
+        self.translation = component.translation_set.get(language_code="cs")
+        self.user = create_test_user()
+        self.user.groups.add(Group.objects.get(name="Users"))
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+
+    def get_unit(self):
+        return self.translation.unit_set.get(source="Hello, world!\n")
+
+    @http_mock.activate
+    def test_refusal_aborts_the_run_with_no_verdict_or_deferral(self) -> None:
+        http_mock.register("POST", CHAT_URL, status_code=400, json={})
+        unit = self.get_unit()
+        with (
+            mock.patch("weblate.trans.judge_loop.repair_targets") as repair_mock,
+            self.assertRaises(JudgeError) as ctx,
+        ):
+            run_judge_batch([unit], writable_ids={unit.id}, user=self.user, seats=(1,))
+        self.assertIn("refused the request (HTTP 400)", str(ctx.exception))
+        self.assertEqual(
+            JudgeVerdict.objects.filter(unit=unit).count(),
+            0,
+            "a refused request must never become a verdict",
+        )
+        self.assertEqual(
+            JudgeDeferral.objects.filter(unit=unit).count(),
+            0,
+            "a refused seat must not be queued for a paid drain retry",
+        )
+        attempt = JudgeRequestAttempt.objects.get()
+        self.assertEqual(attempt.failure_kind, "http-request-invalid")
+        self.assertEqual(attempt.http_status, 400)
+        repair_mock.assert_not_called()
+
+    @http_mock.activate
+    def test_refused_seat_stops_the_other_seat_without_a_paid_retry(self) -> None:
+        refused = http_mock.register(
+            "POST",
+            CHAT_URL,
+            status_code=400,
+            json={},
+            match=[
+                lambda request: (
+                    json.loads(request.content)["model"] == "vendor-a/model",
+                    "not the refused model",
+                )
+            ],
+        )
+        peer = http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_seat_reply(),
+            match=[
+                lambda request: (
+                    json.loads(request.content)["model"] == "vendor-b/model",
+                    "not the peer model",
+                )
+            ],
+        )
+        unit = self.get_unit()
+        with self.assertRaises(JudgeError) as ctx:
+            run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
+        self.assertIn("HTTP 400", str(ctx.exception))
+        # Exactly one paid call for the refused seat: the abort precedes the
+        # retry branch.
+        self.assertEqual(len(refused.calls), 1)
+        self.assertEqual(
+            JudgeVerdict.objects.filter(unit=unit, seat=1).count(),
+            0,
+        )
+        self.assertEqual(
+            JudgeDeferral.objects.filter(unit=unit, seat=1).count(),
+            0,
+        )
+        # A valid peer result may have been persisted before the abort; if so,
+        # it must not project a two-seat decision.
+        peer_verdicts = list(JudgeVerdict.objects.filter(unit=unit, seat=2))
+        if peer_verdicts:
+            self.assertEqual(len(peer_verdicts), 1)
+            self.assertFalse(peer_verdicts[0].unparsed)
+        self.assertFalse(
+            has_complete_current_evidence(unit, seats=JUDGE_SEATS),
+            "a refusal must not satisfy complete current evidence",
+        )
+        self.assertGreaterEqual(len(peer.calls), 1)

@@ -1361,7 +1361,7 @@ def cleanup_judge_observability() -> None:
     audit value while removing high-volume request diagnostics.
     """
     # ruff: ignore[import-outside-top-level]
-    from weblate.trans.models import JudgeRequestAttempt, LLMUsageLog
+    from weblate.trans.models import JudgeDeferral, JudgeRequestAttempt, LLMUsageLog
 
     now = timezone.now()
     JudgeRequestAttempt.objects.filter(
@@ -1377,6 +1377,17 @@ def cleanup_judge_observability() -> None:
         created_at__lt=now
         - timedelta(
             days=_judge_observability_retention_days("LLM_USAGE_LOG_RETENTION_DAYS")
+        ),
+    ).delete()
+    # Closed deferrals are history; queued and slow rows are live work and are
+    # never deleted automatically, no matter their age.
+    JudgeDeferral.objects.filter(
+        state=JudgeDeferral.State.CLOSED,
+        closed_at__lt=now
+        - timedelta(
+            days=_judge_observability_retention_days(
+                "JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS"
+            )
         ),
     ).delete()
 

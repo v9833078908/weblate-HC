@@ -19,6 +19,7 @@ from weblate.trans.models.judge import (
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
+    has_complete_current_evidence,
 )
 from weblate.trans.models.unit import Unit
 from weblate.trans.tests.test_views import ViewTestCase
@@ -683,6 +684,64 @@ class JudgeAutoTranslateTest(ViewTestCase):
         assert auto.judge_summary is not None
         self.assertEqual(auto.judge_summary.evaluated, 0)
         self.assertEqual(calls, [[unit1.id]])
+
+    def test_refused_request_fails_the_run_without_a_fake_verdict(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["some target"], STATE_TRANSLATED)
+
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+            out = {}
+            for candidate in units:
+                request = build_request(candidate)
+                # The peer seat answered before the other seat was refused.
+                out[candidate.id] = JudgeVerdict.objects.create(
+                    unit=candidate,
+                    seat=2,
+                    max_severity="none",
+                    model_verdict=JudgeVerdict.Verdict.PASS,
+                    judge_model="vendor-b/model",
+                    target_hash=compute_target_hash(request.target_plurals),
+                    context_hash=compute_context_hash(
+                        source=request.source,
+                        note=request.note,
+                        explanation=request.explanation,
+                        glossary_terms=request.glossary_terms,
+                    ),
+                )
+            raise JudgeError("The LLM judge endpoint refused the request (HTTP 400).")
+
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="judge",
+            unit_ids=[unit.id],
+            enforce_permissions=False,
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch", side_effect=fake_batch
+        ):
+            message = batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+        self.assertIn("refused the request (HTTP 400)", message)
+        run = JudgeRun.objects.get()
+        self.assertEqual(run.status, JudgeRun.Status.FAILED)
+        self.assertIn("refused the request (HTTP 400)", run.failure)
+        # The refusal itself contributes no unparsed verdict.
+        self.assertEqual(
+            JudgeVerdict.objects.filter(unit=unit, unparsed=True).count(), 0
+        )
+        # The peer row survives, but one seat is not a two-seat decision.
+        self.assertEqual(JudgeVerdict.objects.filter(unit=unit).count(), 1)
+        self.assertFalse(
+            has_complete_current_evidence(unit, seats=(1, 2)),
+            "a single surviving seat must not read as complete evidence",
+        )
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
 
     @override_settings(JUDGE_MAX_REPAIR_ATTEMPTS=0)
     def test_judge_progress_reports_judging_phase(self) -> None:

@@ -39,6 +39,9 @@ from weblate.trans.management.commands.judge_release_advisory_holds import (
 from weblate.trans.management.commands.reapply_autofixes import Command
 from weblate.trans.models import Change, Component, Project, Translation, Unit
 from weblate.trans.models.judge import (
+    JudgeRequestAttempt,
+    JudgeRun,
+    JudgeRunUnit,
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
@@ -1723,4 +1726,160 @@ class ReapplyAutofixesTest(ViewTestCase):
         )
         self.assertTrue(
             PendingUnitChange.objects.filter(pk=late_pending_ids[0]).exists()
+        )
+
+
+class JudgeCloseRefusedVerdictsCommandTest(ComponentTestCase):
+    """The legacy refused-verdict cleanup command guards every deletion."""
+
+    def make_attempt(self, **kwargs) -> JudgeRequestAttempt:
+        kwargs.setdefault("seat", 1)
+        kwargs.setdefault("endpoint_fingerprint", "e" * 64)
+        kwargs.setdefault("model", "vendor/model-a")
+        kwargs.setdefault("profile_fingerprint", "p" * 64)
+        kwargs.setdefault("prompt_schema_version", "v1")
+        kwargs.setdefault("batch_digest", "b" * 64)
+        kwargs.setdefault("batch_size", 1)
+        return JudgeRequestAttempt.objects.create(**kwargs)
+
+    def make_verdict(self, unit, attempt=None, **kwargs) -> JudgeVerdict:
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", "c")
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        kwargs.setdefault("unparsed", True)
+        return JudgeVerdict.objects.create(unit=unit, request_attempt=attempt, **kwargs)
+
+    def make_run_unit(self, unit, verdict, outcome) -> JudgeRunUnit:
+        run = JudgeRun.objects.create(
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(self.translation.pk),
+            scope_label="test/test",
+            scope_path="test/test",
+            requested_mode="observe",
+            cap=100,
+        )
+        return JudgeRunUnit.objects.create(
+            run=run,
+            unit=unit,
+            unit_id_snapshot=unit.pk,
+            translation_id=unit.translation_id,
+            component_id=unit.translation.component_id,
+            project_id=unit.translation.component.project_id,
+            input_target=unit.get_target_plurals(),
+            input_target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash="c",
+            outcome=outcome,
+            verdict=verdict,
+        )
+
+    def test_dry_run_lists_candidates_by_status(self) -> None:
+        unit = self.get_unit()
+        refused_400 = self.make_attempt(http_status=400, failure_kind="http-other")
+        refused_401 = self.make_attempt(http_status=401, failure_kind="http-auth")
+        v400 = self.make_verdict(unit, refused_400)
+        v401 = self.make_verdict(unit, refused_401, seat=2)
+        run_unit = self.make_run_unit(unit, v400, JudgeRunUnit.Outcome.UNPARSED)
+
+        output = StringIO()
+        call_command(
+            "judge_close_refused_verdicts",
+            "--expected-count",
+            "2",
+            stdout=output,
+        )
+        text = output.getvalue()
+        self.assertIn("total: 2", text)
+        self.assertIn("400", text)
+        self.assertIn("401", text)
+        # Dry-run deletes nothing and reclassifies nothing.
+        self.assertTrue(JudgeVerdict.objects.filter(pk__in=[v400.pk, v401.pk]).exists())
+        run_unit.refresh_from_db()
+        self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.UNPARSED)
+
+    def test_confirm_deletes_and_reclassifies(self) -> None:
+        unit = self.get_unit()
+        attempt = self.make_attempt(http_status=400, failure_kind="http-other")
+        verdict = self.make_verdict(unit, attempt)
+        run_unit = self.make_run_unit(unit, verdict, JudgeRunUnit.Outcome.UNPARSED)
+
+        output = StringIO()
+        call_command(
+            "judge_close_refused_verdicts",
+            "--expected-count",
+            "1",
+            "--confirm",
+            stdout=output,
+        )
+        self.assertFalse(JudgeVerdict.objects.filter(pk=verdict.pk).exists())
+        # The reported number is the database result, not the pre-transaction
+        # snapshot an operator would have no way to audit.
+        self.assertIn("1 verdicts deleted", output.getvalue())
+        self.assertIn("1 run-unit rows reclassified", output.getvalue())
+        # The attempt ledger survives as the diagnostic record.
+        self.assertTrue(JudgeRequestAttempt.objects.filter(pk=attempt.pk).exists())
+        run_unit.refresh_from_db()
+        self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.REFUSED)
+        self.assertIsNone(run_unit.verdict_id)
+
+    def test_confirm_refuses_on_count_mismatch(self) -> None:
+        unit = self.get_unit()
+        attempt = self.make_attempt(http_status=400, failure_kind="http-other")
+        verdict = self.make_verdict(unit, attempt)
+
+        with self.assertRaises(CommandError) as captured:
+            call_command(
+                "judge_close_refused_verdicts",
+                "--expected-count",
+                "7",
+                "--confirm",
+            )
+        self.assertIn("candidate count changed", str(captured.exception))
+        self.assertTrue(JudgeVerdict.objects.filter(pk=verdict.pk).exists())
+
+    def test_exclusions_are_never_touched(self) -> None:
+        unit = self.get_unit()
+        # 413 is size-dependent, not a refusal: keep it (plan Task 4).
+        oversized = self.make_attempt(
+            http_status=413, failure_kind="response-too-large"
+        )
+        v_oversized = self.make_verdict(unit, oversized)
+        # A real HTTP 500 under http-other: keep it.
+        server = self.make_attempt(http_status=500, failure_kind="http-other")
+        v_server = self.make_verdict(unit, server)
+        # A 120-second deadline attempt: http_status NULL, keep it (historical control).
+        deadline = self.make_attempt(failure_kind="deadline")
+        v_deadline = self.make_verdict(unit, deadline)
+        # A transport attempt: http_status NULL, keep it.
+        transport = self.make_attempt(failure_kind="transport")
+        v_transport = self.make_verdict(unit, transport)
+        # No attempt at all: keep it.
+        v_noattempt = self.make_verdict(unit, None)
+        # Parsed verdict linked to a 400 attempt: keep it.
+        ok_attempt = self.make_attempt(http_status=400, failure_kind="http-other")
+        v_parsed = self.make_verdict(unit, ok_attempt, unparsed=False)
+        keep = [
+            v_oversized.pk,
+            v_server.pk,
+            v_deadline.pk,
+            v_transport.pk,
+            v_noattempt.pk,
+            v_parsed.pk,
+        ]
+        # Only a 400 refusal is a candidate.
+        refused = self.make_attempt(http_status=400, failure_kind="http-other")
+        v_refused = self.make_verdict(unit, refused)
+
+        output = StringIO()
+        call_command(
+            "judge_close_refused_verdicts",
+            "--expected-count",
+            "1",
+            "--confirm",
+            stdout=output,
+        )
+        self.assertFalse(JudgeVerdict.objects.filter(pk=v_refused.pk).exists())
+        self.assertEqual(
+            set(JudgeVerdict.objects.filter(pk__in=keep).values_list("pk", flat=True)),
+            set(keep),
         )

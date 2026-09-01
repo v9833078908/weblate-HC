@@ -243,6 +243,7 @@ class JudgeRequestAttempt(models.Model):
         HTTP_AUTH = "http-auth"
         HTTP_RATE_LIMIT = "http-rate-limit"
         HTTP_SERVER = "http-server"
+        HTTP_REQUEST_INVALID = "http-request-invalid"
         HTTP_OTHER = "http-other"
         EMPTY_RESPONSE = "empty-response"
         INVALID_JSON = "invalid-json"
@@ -411,6 +412,10 @@ class JudgeDeferral(models.Model):
                 fields=["unit", "seat", "-created_at"],
                 name="judge_deferral_unit_idx",
             ),
+            models.Index(
+                fields=["state", "closed_at"],
+                name="judge_deferral_closed_idx",
+            ),
         ]
         # ruff: ignore[mutable-class-default]
         constraints = [
@@ -434,6 +439,7 @@ class JudgeRunUnit(models.Model):
         CRITICAL = "critical"
         UNPARSED = "unparsed"
         DEFERRED = "deferred"
+        REFUSED = "refused"
         SKIPPED = "skipped"
         STALE_CONFLICT = "stale-conflict"
 
