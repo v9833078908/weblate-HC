@@ -1868,3 +1868,90 @@ class JudgeRefusedSeatTest(RepoTestMixin, TransactionTestCase):
             "a refusal must not satisfy complete current evidence",
         )
         self.assertGreaterEqual(len(peer.calls), 1)
+
+
+_FAILOVER_LITELLM_URL = "https://hcbifrost.herocraft.com/litellm/v1/chat/completions"
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_BATCH_SIZE_SEAT_1=1,
+    JUDGE_BATCH_SIZE_SEAT_2=1,
+    JUDGE_REQUEST_SLEEP=0.0,
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+    JUDGE_MAX_UNPARSED_RETRY_ROUNDS=0,
+    JUDGE_TRANSPORT_RETRIES=0,
+    JUDGE_TRANSIENT_HTTP_RETRIES=0,
+    JUDGE_PROTOCOL_RETRIES=0,
+    JUDGE_FALLBACK_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+    JUDGE_FALLBACK_API_KEY="sk-fallback",
+    JUDGE_FALLBACK_MODEL_SEAT_1="vendor-c/model",
+    JUDGE_FALLBACK_MODEL_SEAT_2="vendor-d/model",
+    JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1="",
+    JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2="",
+    JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1="json_schema",
+    JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2="json_schema",
+)
+class JudgeFailoverSeatIsolationTest(RepoTestMixin, TransactionTestCase):
+    """Seat 1 failing over must not change which endpoint serves seat 2."""
+
+    def setUp(self) -> None:
+        self.clone_test_repos()
+        super().setUp()
+        component = self.create_component()
+        component.create_path()
+        self.project = component.project
+        setup_project_groups(self, self.project)
+        self.translation = component.translation_set.get(language_code="cs")
+        self.user = create_test_user()
+        self.user.groups.add(Group.objects.get(name="Users"))
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+
+    def get_unit(self):
+        return self.translation.unit_set.get(source="Hello, world!\n")
+
+    @http_mock.activate
+    def test_seat_one_failover_does_not_affect_seat_two(self) -> None:
+        def match_model(model_name, message):
+            return [
+                lambda request: (
+                    json.loads(request.content)["model"] == model_name,
+                    message,
+                )
+            ]
+
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            status_code=500,
+            json={},
+            match=match_model("vendor-a/model", "not seat1 primary"),
+        )
+        seat_one_fallback = http_mock.register(
+            "POST",
+            _FAILOVER_LITELLM_URL,
+            json=_seat_reply(),
+            match=match_model("vendor-c/model", "not seat1 fallback"),
+        )
+        seat_two_primary = http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_seat_reply(),
+            match=match_model("vendor-b/model", "not seat2 primary"),
+        )
+        unit = self.get_unit()
+        run_judge_batch([unit], writable_ids={unit.id}, user=self.user)
+        self.assertGreaterEqual(len(seat_one_fallback.calls), 1)
+        self.assertGreaterEqual(len(seat_two_primary.calls), 1)
+        seat1_verdict = JudgeVerdict.objects.get(unit=unit, seat=1)
+        seat2_verdict = JudgeVerdict.objects.get(unit=unit, seat=2)
+        self.assertFalse(seat1_verdict.unparsed)
+        self.assertFalse(seat2_verdict.unparsed)
+        self.assertEqual(seat1_verdict.judge_provider, "litellm")
+        self.assertEqual(seat1_verdict.judge_model, "vendor-c/model")
+        self.assertEqual(seat2_verdict.judge_provider, "openrouter")
+        self.assertEqual(seat2_verdict.judge_model, "vendor-b/model")

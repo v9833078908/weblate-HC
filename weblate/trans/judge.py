@@ -66,6 +66,17 @@ FAILURE_KINDS = frozenset(
         "unknown",
     }
 )
+# Deliberately independent of `_AVAILABILITY_FAILURE_KINDS`
+# (weblate/trans/judge_loop.py), which the circuit breaker owns. The two
+# differ in both directions and each difference is load-bearing:
+# `http-other` means the request itself is wrong for this endpoint (a
+# configuration defect), so failing it over would double every batch's
+# calls while hiding the defect; `http-auth` is here because a different
+# key presented to a different provider is exactly one warranted fallback
+# call, even though it raises before reaching the retry branch below.
+_FAILOVER_FAILURE_KINDS = frozenset(
+    {"transport", "deadline", "http-rate-limit", "http-server", "http-auth"}
+)
 CATEGORIES = (
     "terminology",
     "mistranslation",
@@ -627,13 +638,15 @@ def resolve_judge_fallback_seat_profile(
     return _resolve_fallback_profile(seat, primary, endpoint)
 
 
-_FALLBACK_SETTING_NAMES = (
+# Reasoning effort is deliberately excluded: like the primary's own
+# `JUDGE_REASONING_EFFORT`, "" is a valid, common value ("send no reasoning
+# parameter"), not a missing setting. `_resolve_fallback_profile` still
+# requires it to be a string and applies the same per-provider allowlist.
+_FALLBACK_REQUIRED_SETTING_NAMES = (
     "JUDGE_FALLBACK_BASE_URL",
     "JUDGE_FALLBACK_API_KEY",
     "JUDGE_FALLBACK_MODEL_SEAT_1",
     "JUDGE_FALLBACK_MODEL_SEAT_2",
-    "JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1",
-    "JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2",
     "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1",
     "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2",
 )
@@ -645,7 +658,9 @@ def _validate_fallback_configuration(
     """Validate the fallback pair with the same rules as the primary."""
     configured = [
         isinstance(value, str) and bool(value.strip())
-        for value in (getattr(settings, name) for name in _FALLBACK_SETTING_NAMES)
+        for value in (
+            getattr(settings, name) for name in _FALLBACK_REQUIRED_SETTING_NAMES
+        )
     ]
     if not any(configured):
         return
@@ -1659,7 +1674,7 @@ def _update_adaptive(profile: JudgeSeatProfile, enabled: bool, failure: str) -> 
         LOGGER.exception("Failed to update judge adaptive state")
 
 
-def _run_batch(
+def _run_batch(  # ruff: ignore[complex-structure]
     batch: Sequence[JudgeRequest],
     *,
     profile: JudgeSeatProfile,
@@ -1674,13 +1689,18 @@ def _run_batch(
     retry_deadline: float | None = None,
 ) -> list[JudgeResult]:
     payload = _payload(batch, profile, project_context)
+    fallback_profile = resolve_judge_fallback_seat_profile(profile.seat, profile)
     transport_left = _setting_retries("JUDGE_TRANSPORT_RETRIES", 1)
     transient_left = _setting_retries("JUDGE_TRANSIENT_HTTP_RETRIES", 1)
     protocol_left = _setting_retries("JUDGE_PROTOCOL_RETRIES", 1)
-    last_failure, last_attempt = "unknown", None
+    last_failure, last_attempt, last_profile = "unknown", None, profile
     retries_used = 0
-    while True:
-        response = _post_batch(payload, profile)
+
+    def send_once(
+        target_profile: JudgeSeatProfile, target_payload: dict, target_ordinal: int
+    ) -> tuple[_BatchResponse, str, _ParseOutcome, object | None, bool]:
+        """POST once, persist the attempt and usage, and classify the outcome."""
+        response = _post_batch(target_payload, target_profile)
         failure = _failure_for_http(response.status_code) or response.failure_kind
         outcome = _ParseOutcome(None, failure)
         if not failure and response.payload is not None:
@@ -1692,53 +1712,119 @@ def _run_batch(
         attempt = _persist_attempt(
             enabled=persistence,
             run=run,
-            profile=profile,
+            profile=target_profile,
             batch=batch,
-            ordinal=ordinal,
+            ordinal=target_ordinal,
             response=response,
             parsed=parsed,
             failure_kind=failure,
             segment_count=outcome.segment_count,
             response_shape=(
-                f"{'stream' if profile.stream else 'chat'}:{outcome.shape or 'raw'}"
+                f"{'stream' if target_profile.stream else 'chat'}:"
+                f"{outcome.shape or 'raw'}"
             ),
         )
         if persistence:
             _record_usage(
                 response.payload,
-                profile.provider,
-                profile.model,
+                target_profile.provider,
+                target_profile.model,
                 project_slug,
                 batch,
                 cast(JudgeRequestAttempt | None, attempt),
             )
-        last_attempt, last_failure = attempt, failure
         _log_attempt(
             response,
-            profile=profile,
+            profile=target_profile,
             batch_size=len(batch),
             parsed=parsed,
             failure_kind=failure,
         )
+        return response, failure, outcome, attempt, parsed
+
+    def served(result: JudgeResult, target_profile: JudgeSeatProfile) -> JudgeResult:
+        return replace(
+            result,
+            served_model=target_profile.model,
+            served_provider=target_profile.provider,
+            served_profile_fingerprint=target_profile.profile_fingerprint,
+            served_prompt_schema_version=target_profile.prompt_schema_version,
+        )
+
+    def try_fallback(
+        target_ordinal: int,
+    ) -> tuple[list[JudgeResult] | None, str, object | None, bool]:
+        """
+        One additional attempt on the fallback endpoint, never retried itself.
+
+        Returns ``(results, failure, attempt, attempted)``. ``results`` is set
+        only when the fallback parsed. ``attempted`` distinguishes "no
+        fallback is configured" from "the fallback attempt was not persisted"
+        (``attempt`` is ``None`` in both, since persistence can be off).
+        """
+        if fallback_profile is None:
+            return None, "", None, False
+        fallback_payload = _payload(batch, fallback_profile, project_context)
+        response, failure, outcome, attempt, parsed = send_once(
+            fallback_profile, fallback_payload, target_ordinal
+        )
+        if not parsed:
+            return None, failure, attempt, True
+        return (
+            [
+                served(
+                    replace(result, request_attempt_id=getattr(attempt, "pk", None)),
+                    fallback_profile,
+                )
+                for result in outcome.results
+            ],
+            failure,
+            attempt,
+            True,
+        )
+
+    while True:
+        response, failure, outcome, attempt, parsed = send_once(profile, payload, ordinal)
+        last_attempt, last_failure, last_profile = attempt, failure, profile
         if parsed:
             _update_adaptive(profile, adaptive, "")
             return [
-                replace(
-                    result,
-                    request_attempt_id=getattr(attempt, "pk", None),
-                    served_model=profile.model,
-                    served_provider=profile.provider,
-                    served_profile_fingerprint=profile.profile_fingerprint,
-                    served_prompt_schema_version=profile.prompt_schema_version,
+                served(
+                    replace(result, request_attempt_id=getattr(attempt, "pk", None)),
+                    profile,
                 )
                 for result in outcome.results
             ]
         if failure == "http-auth":
-            raise JudgeError(_("The LLM judge is not configured."))
+            # The fallback attempt must run before this raises: a different
+            # key presented to a different provider is exactly one warranted
+            # call, even though `http-auth` never reaches the retry branch.
+            fb_results, fb_failure, fb_attempt, fb_attempted = try_fallback(
+                ordinal + 1
+            )
+            if fb_results is not None:
+                return fb_results
+            if not fb_attempted:
+                raise JudgeError(_("The LLM judge is not configured."))
+            if fb_failure == "http-auth":
+                # Both endpoints reject our credentials: a real configuration
+                # error, not unavailability. Fail fast without a third call.
+                raise JudgeError(_("The LLM judge is not configured."))
+            return [
+                served(
+                    replace(
+                        UNPARSED,
+                        request_attempt_id=getattr(fb_attempt, "pk", None),
+                        failure_kind=fb_failure,
+                    ),
+                    fallback_profile,
+                )
+                for _ in batch
+            ]
         if failure == "http-request-invalid":
             # The endpoint will refuse this request every time: no verdict,
-            # no paid retry, no deferral. The attempt row above is the
-            # operator-visible diagnostic.
+            # no paid retry, no deferral, no fallback. The attempt row above
+            # is the operator-visible diagnostic.
             raise JudgeError(
                 _("The LLM judge endpoint refused the request (HTTP %s).")
                 % response.status_code
@@ -1785,25 +1871,38 @@ def _run_batch(
             ordinal += 1
             continue
         break
-    _update_adaptive(profile, adaptive, last_failure)
+    # The primary's own outcome, kept for adaptive/circuit bookkeeping and for
+    # the width-one isolation trigger below: a fallback attempt (whichever
+    # way it goes) must never corrupt what the primary itself observed.
+    primary_failure = last_failure
+    _update_adaptive(profile, adaptive, primary_failure)
+    if primary_failure in _FAILOVER_FAILURE_KINDS:
+        fb_results, fb_failure, fb_attempt, fb_attempted = try_fallback(ordinal + 1)
+        if fb_results is not None:
+            return fb_results
+        if fb_attempted:
+            last_attempt, last_failure, last_profile = (
+                fb_attempt,
+                fb_failure,
+                fallback_profile,
+            )
     if (
         isolate
         and len(batch) > 1
-        and last_failure
+        and primary_failure
         in {"invalid-json", "invalid-envelope", "segment-count", "invalid-segment"}
     ):
         results: list[JudgeResult] = []
         for request in batch:
             if not retry_budget.spend():
                 results.append(
-                    replace(
-                        UNPARSED,
-                        request_attempt_id=getattr(last_attempt, "pk", None),
-                        failure_kind=last_failure,
-                        served_model=profile.model,
-                        served_provider=profile.provider,
-                        served_profile_fingerprint=profile.profile_fingerprint,
-                        served_prompt_schema_version=profile.prompt_schema_version,
+                    served(
+                        replace(
+                            UNPARSED,
+                            request_attempt_id=getattr(last_attempt, "pk", None),
+                            failure_kind=last_failure,
+                        ),
+                        last_profile,
                     )
                 )
                 continue
@@ -1824,14 +1923,13 @@ def _run_batch(
             )
         return results
     return [
-        replace(
-            UNPARSED,
-            request_attempt_id=getattr(last_attempt, "pk", None),
-            failure_kind=last_failure,
-            served_model=profile.model,
-            served_provider=profile.provider,
-            served_profile_fingerprint=profile.profile_fingerprint,
-            served_prompt_schema_version=profile.prompt_schema_version,
+        served(
+            replace(
+                UNPARSED,
+                request_attempt_id=getattr(last_attempt, "pk", None),
+                failure_kind=last_failure,
+            ),
+            last_profile,
         )
         for _ in batch
     ]
