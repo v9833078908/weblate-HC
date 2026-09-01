@@ -2296,3 +2296,64 @@ class JudgeHttpFailureMappingTest(SimpleTestCase):
         # not open the shared circuit.
         self.assertNotIn("http-request-invalid", _AVAILABILITY_FAILURE_KINDS)
         self.assertIn("http-other", _AVAILABILITY_FAILURE_KINDS)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test-do-not-leak",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_BATCH_SIZE=5,
+    JUDGE_REQUEST_SLEEP=0.0,
+)
+class JudgeRefusedRequestTest(TestCase):
+    """A refused request must never become a verdict or a paid retry."""
+
+    @http_mock.activate
+    def test_refused_request_raises_before_any_retry(self) -> None:
+        http_mock.register("POST", CHAT_URL, status_code=400, json={})
+        on_batch = mock.Mock()
+        with self.assertRaises(JudgeError) as ctx:
+            request_verdicts(
+                [REQ],
+                model="vendor/model-a",
+                persist_attempts=True,
+                on_batch=on_batch,
+            )
+        self.assertEqual(len(http_mock.calls), 1)
+        on_batch.assert_not_called()
+        message = str(ctx.exception)
+        self.assertIn("refused the request (HTTP 400)", message)
+        self.assertNotIn("sk-test-do-not-leak", message)
+        self.assertNotIn("openrouter.ai", message)
+        self.assertNotIn("model-a", message)
+
+    @http_mock.activate
+    def test_refusal_without_persistence_still_aborts(self) -> None:
+        # The abort is not a persistence side effect: a caller that asked for
+        # no ledger row must still not receive an unparsed opinion.
+        http_mock.register("POST", CHAT_URL, status_code=404, json={})
+        with self.assertRaises(JudgeError) as ctx:
+            request_verdicts([REQ], model="vendor/model-a")
+        self.assertIn("HTTP 404", str(ctx.exception))
+        self.assertEqual(len(http_mock.calls), 1)
+
+    @http_mock.activate
+    def test_refused_attempt_row_survives_the_abort(self) -> None:
+        http_mock.register("POST", CHAT_URL, status_code=422, json={})
+        with self.assertRaises(JudgeError):
+            request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
+        attempt = JudgeRequestAttempt.objects.get()
+        self.assertEqual(attempt.failure_kind, "http-request-invalid")
+        self.assertFalse(attempt.parsed)
+        self.assertFalse(attempt.transport_succeeded)
+        self.assertEqual(attempt.http_status, 422)
+
+    @http_mock.activate
+    def test_size_dependent_413_is_not_a_refusal(self) -> None:
+        # 413 stays http-other: adaptive halving must still get its chance.
+        http_mock.register("POST", CHAT_URL, status_code=413, json={})
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+        self.assertTrue(result.unparsed)
+        self.assertEqual(result.failure_kind, "http-other")
+

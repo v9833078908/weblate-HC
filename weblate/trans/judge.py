@@ -1520,6 +1520,14 @@ def _run_batch(
             ]
         if failure == "http-auth":
             raise JudgeError(_("The LLM judge is not configured."))
+        if failure == "http-request-invalid":
+            # The endpoint will refuse this request every time: no verdict,
+            # no paid retry, no deferral. The attempt row above is the
+            # operator-visible diagnostic.
+            raise JudgeError(
+                _("The LLM judge endpoint refused the request (HTTP %s).")
+                % response.status_code
+            )
         retry = False
         delay = 0.0
         if failure == "transport" and transport_left:
