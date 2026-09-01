@@ -258,16 +258,157 @@ non-current - the resolution stays on the historical row.
 | memoQ | View pane by the grid: "Correct text as suggested", "View or dispute" with a comment, Hide false positive, Convert to LQA | Re-run/filter QA; no explicit stale contract documented | Errors block export; warnings do not | "Error" filter + auto-jump to the next after confirmation |
 | Unbabel | Side panel; AI edit as strikethrough + blue replacement, "Accept" button, "Report bad suggestion"; recalculation after edits | Recalculate after a correction; no auto-stale | Suggestions are recommendations; ignoring does not affect delivery (weaker than our requirement) | Counter + arrows over flagged segments only |
 
-Sources: support.crowdin.com/online-editor/, /project-settings/qa-checks/,
-/enterprise/custom-qa-checks/; support.phrase.com articles 5709694857372
-(QA Pane), 25865045974300 (Quality Profiles), 14313477218588 (Auto LQA,
-deprecated 2026-06-30); help.smartling.com articles 10447325366043,
-49428460628507; docs.lokalise.com articles 7945761, 11631905;
-help.transifex.com articles 6318944, 12088096, 6241755, 14287841;
-docs.memoq.com mqw-view-pane, go-to-next-segment;
-help.unbabel.com articles 29736962824343, 24499549061527.
+Sources (all verified during this research):
 
-### 4.2 Transferable patterns (ranked by fit)
+- <https://support.crowdin.com/online-editor/>
+- <https://support.crowdin.com/project-settings/qa-checks/>
+- <https://support.crowdin.com/enterprise/custom-qa-checks/>
+- <https://support.phrase.com/hc/en-us/articles/5709694857372-Quality-Assurance-Pane-QA-TMS>
+- <https://support.phrase.com/hc/en-us/articles/25865045974300-Quality-Profiles>
+- <https://support.phrase.com/hc/en-us/articles/14313477218588-Auto-LQA-TMS> (deprecated 2026-06-30, historical evidence only)
+- <https://support.phrase.com/hc/en-us/articles/5709720416796-Filtering-TMS>
+- <https://help.smartling.com/hc/en-us/articles/10447325366043-Quality-Checks-On-Your-Work>
+- <https://help.smartling.com/hc/en-us/articles/49428460628507-LQA-Agent-AI-Powered-Quality-Assurance>
+- <https://help.smartling.com/hc/en-us/articles/1260806372849-Translation-Quality-Features-Overview>
+- <https://docs.lokalise.com/en/articles/7945761-ai-lqa>
+- <https://docs.lokalise.com/en/articles/11631905-scoring-translation-quality>
+- <https://help.transifex.com/en/articles/6318944-additional-tools-in-the-transifex-editor>
+- <https://help.transifex.com/en/articles/12088096-tqi-tasks>
+- <https://help.transifex.com/en/articles/6241755-translation-checks-behavior>
+- <https://help.transifex.com/en/articles/14287841-transifex-editor-filters-reference>
+- <https://docs.memoq.com/current/en/memoQWeb-help/mqw-view-pane.html>
+- <https://docs.memoq.com/current/en/memoQWeb-help/mqw-translation-editor.html>
+- <https://docs.memoq.com/current/en/Workspace/go-to-next-segment.html>
+- <https://help.unbabel.com/hc/en-us/articles/29736962824343-Translator-Copilot>
+- <https://help.unbabel.com/hc/en-us/articles/24499549061527-AI-Quality-Suggestions>
+
+### 4.2 Four evaluated interaction patterns (researcher's per-option analysis)
+
+The researcher evaluated four concrete interaction patterns against this
+fork's Bootstrap/jQuery server-rendered stack before the transferable
+patterns below were distilled.
+
+#### Option A - Crowdin-style inline QA banner with executable fix
+
+One compact verdict block next to the target editor: severity, one-line
+evidence, explicit action row. Fresh reject offers "Use suggested fix",
+"Keep as-is", "Edit manually"; stale offers only "Re-check". A candidate is
+a preview until explicitly applied and saved.
+
+- **Stack fit:** highest - extends the already embedded card
+  (`translate.html:706`, `judge-verdict.html:33-189`) with ordinary Django
+  POST forms; preserves save/skip navigation.
+- **Pros:** inline banner with severity-driven save blocking ("Save Anyway"
+  for warnings); per-issue Autofix / "Fix (N)" when a check returns
+  executable fix data; custom checks return message + span replacements - a
+  model for a stored candidate instead of an opaque instruction; QA filter +
+  auto-advance matches the producer queue directly.
+- **Cons / risks:** Crowdin's autofix suits deterministic replacements - an
+  LLM candidate is semantically unsafe without preview + explicit save;
+  Crowdin freshness is a manual project-wide "Revalidate", not a per-segment
+  stale gate; a candidate lifecycle is medium complexity here because repair
+  is currently immediate mutation/rollback with no stored object
+  (`judge_loop.py:438-468`).
+- **Effort / reversibility:** M; highly reversible (localized to the
+  snippet, context assembly, and POST endpoints).
+
+#### Option B - Phrase/Smartling-style side QA pane with explicit disposition
+
+Treat the right-column judge card as a quality pane: compact severity badge
+and summary by default, expandable evidence; "Keep as-is" with a required
+reason, "Use fix" only when a current candidate exists, "Edit manually",
+"Escalate"; "Re-check" as the sole action when stale.
+
+- **Stack fit:** high - the existing card and list-group idiom already match
+  a pane; existing transitions require a reason and preserve evidence
+  (`models/judge.py:1006-1058`); the stale form is hidden in the already
+  assembled context (`edit.py:1310-1337`) with no client-side routing.
+- **Pros:** Phrase's pane highlights the affected segment per issue and
+  distinguishes ignorable from unignorable warnings (the latter block
+  confirmation); "Run AI checks" re-evaluates and replaces prior results;
+  Smartling separates hard/soft severity (high blocks save/submit, medium is
+  an explicit "save with errors", low warns); Smartling's LQA Agent records
+  MQM errors without modifying the translation and routes failures to a
+  human step - a strong precedent for the safe manual-edit fallback.
+- **Cons / risks:** Phrase's current behavior leaves AI issues attached
+  after a segment changes until a manual rerun - unsafe here unless
+  freshness is a hard UI and server-side gate; Phrase's older Auto LQA docs
+  are deprecated (historical evidence only); a pane with several
+  dispositions becomes another dense dashboard unless summaries stay one
+  line and evidence stays collapsed.
+- **Effort / reversibility:** M; highly reversible (reshapes the existing
+  snippet and guards existing form visibility).
+
+#### Option C - Lokalise/Transifex score plus variants in the editor
+
+A compact quality score/status next to the target, an expandable
+issue/variant panel with "Use this" per candidate; freshness invalidates the
+score/candidates and shows "Pending re-check" until recomputed.
+
+- **Stack fit:** medium - rendering is easy, but the data model has no
+  stored suggestion object and repair is direct (`judge_loop.py:438-468`),
+  so this adds more persistence and state than a verdict card.
+- **Pros:** Transifex embeds TQI Insights with signals/issues/variants and a
+  "Use this" action that replaces the target; Lokalise gives a per-string
+  score with an issues drill-down and threshold-based routing; both carry a
+  strong freshness invariant (Transifex removes TQI on source/target change
+  until recalculation; Lokalise shows pending/recalculation).
+- **Cons / risks:** a scalar score obscures why a critical was rejected -
+  this fork needs severity/category/evidence first, not score-first;
+  storing multiple variants is more scope than the producer's three
+  outcomes require; both products lean on workflow/task routing, which
+  would recreate the separate queue surface this design explicitly avoids.
+- **Effort / reversibility:** L; moderately reversible once candidate/score
+  persistence and invalidation semantics exist.
+
+#### Option D - memoQ/Unbabel correction and dispute panel
+
+A small action column under the verdict summary: "Apply correction" for a
+current candidate, "Keep as-is"/"Dispute" with a reason, focus-the-editor
+for manual work; "Recalculate" replaces the result; a compact counter plus
+previous/next controls over flagged segments only.
+
+- **Stack fit:** high for actions and navigation - Bootstrap list-group
+  items map to memoQ's pane; Unbabel's arrows map to the existing
+  `next_unit_url`/`prev_unit_url` (`edit.py:1446-1480`); requires a stored
+  candidate only for "Apply correction", no global score.
+- **Pros:** memoQ exposes "Correct text as suggested", "View or dispute",
+  comments, hide-false-positive, convert-warning-to-LQA; filtered "Error"
+  navigation with auto-jump after confirmation; Unbabel highlights AI
+  changes as strikethrough + replacement with an explicit "Accept", a
+  bad-suggestion report, and recalculation after acceptance; its
+  counter/arrows over flagged segments only are a direct precedent for
+  queue completion without a new page.
+- **Cons / risks:** Unbabel treats suggestions as non-blocking
+  recommendations - weaker than the required critical release gate; memoQ's
+  reviewer actions include delete/dispute, while this fork must keep the
+  verdict immutable and record a producer resolution instead of deleting
+  evidence; neither documents an explicit source/context stale contract, so
+  the fork enforces it itself.
+- **Effort / reversibility:** M; reversible while the candidate and
+  recalculation endpoints stay narrow.
+
+#### Researcher's comparison and recommendation
+
+| Option | Effort | Risk | Stack fit | Maintenance | Key tradeoff |
+|---|---|---|---|---|---|
+| A. Crowdin inline banner + executable fix | M | Medium: candidate safety and stale invalidation must be server-enforced | Very high | Low-Medium | Fastest one-click fixes, but AI text must not be equated with deterministic autofix |
+| B. Phrase/Smartling side QA pane | M | Low-Medium: clear severity gates, but the pane can become dense | High | Low | Strongest balance of compact evidence, explicit disposition, and release semantics |
+| C. Lokalise/Transifex score + variants | L | Medium-High: score/candidate persistence and invalidation | Medium | Medium-High | Best prioritization and variant UX, but more state than the three outcomes need |
+| D. memoQ/Unbabel correction/dispute panel | M | Medium: dispute/delete patterns need immutable-audit adaptation | High | Low-Medium | Best navigation and correction affordances, weakest built-in release gate precedent |
+
+The researcher's recommendation: **Option B as the base, plus Option A's
+explicit candidate-application affordance and Option D's flagged-segment
+navigation** - keep the embedded card, severity + one-line evidence with
+expandable detail, exactly three fresh-verdict outcomes, "Re-check" as the
+only stale action, filtered query + existing next-unit navigation, and a
+queue that reaches zero only when no unresolved critical remains. This
+avoids Phrase's stale-result hazard, Unbabel's non-blocking release
+behavior, and Lokalise/Transifex's extra score/task state. The three
+solutions in section 5 are this recommendation cut into shippable
+increments.
+
+### 4.3 Transferable patterns (ranked by fit)
 
 1. **One embedded quality card, not a triage page** - in all 7 products the
    panel lives next to the segment editor.
@@ -362,6 +503,54 @@ conservative ship CTA). Solution 3 is a separate phase after observing
 producer behavior: if "edit manually" consistently dominates over accepting
 variants from the tab, the stored candidate will pay off.
 
-The implementation decision is to be recorded in a separate plan under
-`docs/llm-first/plans/` (as of this document's date no plan has been created
-or approved).
+## 7. Proposed next steps
+
+1. **Product decision (owner: producer/PM).** Approve Solutions 1+2 as one
+   increment; defer Solution 3. Confirm two spend rules: who may press
+   per-unit "Re-check" (2 baseline judge calls per press) and whether it is
+   offered to every reviewer or only to holders of `unit.review`.
+2. **Write the implementation plan** at
+   `docs/llm-first/plans/2026-09-01-judge-producer-triage-embed.md` and get
+   it approved before editing (working agreement). Proposed task cut:
+   - Task 1, stale gate: `_judge_view_context` sets `judge_can_resolve=False`
+     on `judge_stale` or `judge_context_changed`; the stale/drift card
+     renders one status line and a single "Re-check" affordance
+     (`judge-verdict.html:23-32,167-189`). Tests: card branch rendering and
+     a POST to `resolve_judge_verdict` rejected for a drifted verdict.
+   - Task 2, card compression: merged one-line two-seat summary +
+     `<details>` disclosure with full per-seat evidence, models, timestamps
+     (`judge-verdict.html:33-64`).
+   - Task 3, outcome actions on a fresh critical: "Keep as is" (existing
+     resolution form), "Edit manually" (focus editor; JS flips the review
+     radio to translated so a manual fix does not stay FUZZY-writable,
+     `editor/base.js`), "AI variants" (activates the existing machinery
+     tab).
+   - Task 4, queue auto-advance: the resolution form posts `next_unit_url`
+     instead of `this_unit_url` (`judge-verdict.html:176-181`).
+   - Task 5, readiness strip + conservative ship CTA: "Blocked for release:
+     N" link to the filter; CTA enabled only when fresh
+     `judge_reject == 0 AND judge_stale == 0 AND judge_unparsed == 0`
+     (`snippets/judge-readiness.html`, `trans/views/basic.py:701-747`),
+     pointing at the existing download menu and repository push.
+   - Task 6, per-unit re-check (Solution 2): POST endpoint + celery wrapper
+     over `auto_translate(unit_ids=[unit.id], mode="judge")`
+     (`tasks.py:975-1087`) so permissions, `JudgeRun`, state projection,
+     and audit are reused; a per-unit "task already running" guard plus
+     `use_cache` against double payment; a "re-checking" badge on the card;
+     the button appears on stale/drift cards and after a manual save.
+   - Task 7, verification: judge view/loop test suites
+     (`weblate/trans/tests/test_judge*.py`, `weblate/checks/tests/test_judge.py`),
+     template lint (djLint via prek), and a browser smoke pass on the dev
+     instance (port 3001) over a `q=check:judge-reject` queue: stale card
+     shows only "Re-check", fresh card shows the three outcomes,
+     resolution auto-advances, CTA stays disabled until the three counters
+     are zero.
+3. **Rollout.** Dev instance first (`./rundev.sh`); production deployment
+   only with explicit approval (working agreement). No migrations are
+   required for Solutions 1+2.
+4. **Measure before Solution 3.** From `JudgeRun`/`JudgeRunUnit` history and
+   resolution Changes, count per week: accepted_as_is, manual edits followed
+   by re-check, machinery-tab acceptances. If manual edits dominate and
+   producers rarely accept tab variants, implement Solution 3 (stored
+   candidate as a native `Suggestion` with provenance, freshness-guarded
+   accept, expiry on drift) as its own plan.
