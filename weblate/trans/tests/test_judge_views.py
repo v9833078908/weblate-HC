@@ -16,6 +16,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from weblate.trans.actions import ActionEvents
+from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Permission, Role
 from weblate.trans.judge_loop import (
     _generation_lock_key,
@@ -31,6 +32,7 @@ from weblate.trans.models.judge import (
     compute_context_hash,
     compute_target_hash,
     compute_target_storage_hash,
+    resolve_verdict,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.models.unit import Unit
@@ -2333,3 +2335,207 @@ class JudgeProducerTriageViewTest(ViewTestCase):
         )
         self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
         self.assertEqual(self.get_unit().target, "Drifted away\n")
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
+class JudgeVerdictCardRenderTest(ViewTestCase):
+    """Task 5: the embedded triage states the verdict card renders."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def grant_only(self, codenames) -> None:
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        # Clear default/baseline group membership too: otherwise a
+        # basic-tier permission such as machinery.view leaks in from the
+        # user's normal "Users" group and this helper can no longer prove
+        # a permission's absence, only its presence.
+        self.user.groups.clear()
+        role = Role.objects.create(name="Card render permissions")
+        for codename in codenames:
+            role.permissions.add(Permission.objects.get(codename=codename))
+        # project_selection/language_selection default to SELECTION_MANUAL
+        # (applies to nothing until projects/languages are added
+        # explicitly); SELECTION_ALL makes the grant apply everywhere,
+        # which is what a scopeless test role needs.
+        group = Group.objects.create(
+            name="Card render testers",
+            project_selection=SELECTION_ALL,
+            language_selection=SELECTION_ALL,
+        )
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault(
+            "target_storage_hash", compute_target_storage_hash(unit.target)
+        )
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        return verdict
+
+    def make_candidate(self, unit, verdict, target="Better translation"):
+        suggestion, _result = Suggestion.objects.add(
+            unit,
+            [target],
+            request=self.get_request(),
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": judge_context_hash(unit),
+                "engine": "openrouter",
+            },
+        )
+        return suggestion
+
+    def _completed_recheck(self, unit) -> JudgeRun:
+        translation = unit.translation
+        return JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(translation.pk),
+            scope_label=str(translation),
+            scope_path=translation.get_absolute_url(),
+            requested_query=recheck_query(unit.pk),
+            requested_mode="recheck",
+            cap=1,
+            status=JudgeRun.Status.QUEUED,
+        )
+
+    def test_stale_shows_only_recheck(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        unit.translate(self.user, ["Manually edited away"], STATE_TRANSLATED)
+        response = self.client.get(self.get_unit().get_absolute_url())
+        self.assertContains(response, "Re-check this string")
+        self.assertNotContains(response, "Use suggested fix")
+        self.assertNotContains(response, "Generate suggested fix")
+        self.assertNotContains(response, "Record decision")
+
+    def test_queued_recheck_shows_status_not_button(self) -> None:
+        unit = self.get_unit()
+        # A recheck-pending state needs the card itself to render, which
+        # needs at least one existing verdict/round.
+        self.make_verdict(unit, "critical")
+        self._completed_recheck(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Re-checking this string")
+        self.assertNotContains(response, "Re-check this string<")
+
+    def test_current_candidate_shows_diff_provenance_and_actions(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.make_candidate(unit, verdict, target="A much better translation")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Suggested fix")
+        self.assertContains(response, "A much better translation")
+        self.assertContains(response, "Use suggested fix")
+        self.assertContains(response, "Generate another")
+        # normal editor access is untouched
+        self.assertContains(response, 'name="target_0"')
+
+    def test_no_candidate_shows_generate_and_resolution(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Generate suggested fix")
+        self.assertContains(response, "Record decision")
+        # "Automatic suggestions" alone also matches an unrelated keyboard
+        # shortcuts help entry always present on the page.
+        self.assertContains(response, "Computer-aided translation suggestions")
+        self.assertNotContains(response, "Use suggested fix")
+
+    def test_automatic_suggestions_fallback_needs_machinery_permission(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        self.grant_only(["unit.review", "translation.auto"])
+        self.assertFalse(self.user.has_perm("machinery.view", unit.translation))
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Generate suggested fix")
+        # "Automatic suggestions" alone also matches an unrelated keyboard
+        # shortcuts help entry always present on the page; the card's
+        # fallback link is uniquely identified by its title text.
+        self.assertNotContains(
+            response, "Computer-aided translation suggestions"
+        )
+
+    def test_generation_pending_hides_generate_button(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Generating a suggested fix")
+        self.assertNotContains(response, "Generate suggested fix<")
+
+    def test_resolved_verdict_never_shows_candidate_controls(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.make_candidate(unit, verdict)
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ESCALATED,
+            reason="needs a human look",
+        )
+        response = self.client.get(self.get_unit().get_absolute_url())
+        self.assertNotContains(response, "Use suggested fix")
+        self.assertNotContains(response, "Generate suggested fix")
+        self.assertContains(response, "Escalated for review")
+
+    def test_minor_never_shows_candidate_controls(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "minor")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Use suggested fix")
+        self.assertNotContains(response, "Generate suggested fix")
+
+    def test_flag_renders_same_candidate_controls_as_reject(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+        self.make_candidate(unit, verdict)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Ships with evidence")
+        self.assertContains(response, "Use suggested fix")
+        self.assertContains(response, "Generate another")
+
+    def test_active_max_length_hides_candidate_and_generate(self) -> None:
+        unit = self.get_unit()
+        unit.extra_flags = "max-length:5"
+        unit.save(update_fields=["extra_flags"], same_content=True)
+        unit.translate(self.user, ["a much longer raw target"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        unit.run_checks()
+        self.assertTrue(unit.has_check("max-length"))
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Use suggested fix")
+        self.assertNotContains(response, "Generate suggested fix")
+        # Re-check and the resolution form are unrelated to the mutating
+        # path and remain available.
+        self.assertContains(response, "Re-check this string")
+

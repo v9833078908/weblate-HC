@@ -1356,6 +1356,26 @@ def _judge_view_context(
             for choice in judge_resolution_form.fields["resolution"].choices
             if choice[0] in judge_resolution_choices
         ]
+    # Generate, regenerate, accept, and re-check all require both
+    # permissions (invariant 5) - stronger than plain unit.review, which
+    # only gates the resolution form above.
+    judge_can_triage = request.user.has_perm(
+        "unit.review", unit
+    ) and request.user.has_perm("translation.auto", unit.translation)
+    # A fresh, unresolved REJECT/FLAG for the current text is the only
+    # state that owns candidate/generate controls; minor/pass never has
+    # one and a resolved verdict already shows its own badge above.
+    judge_active_verdict = judge_current_verdict is not None and (
+        not judge_current_verdict.resolution
+        and judge_current_verdict.verdict
+        in {JudgeVerdict.Verdict.REJECT, JudgeVerdict.Verdict.FLAG}
+    )
+    # While max-length is active the unit is still on the deterministic
+    # mutating-repair path (invariant 9): no candidate is ever stored for
+    # it, and Generate must not offer one either.
+    judge_active_max_length = any(
+        check.name == "max-length" for check in unit.active_checks
+    )
     return {
         "judge_round": judge_round,
         "judge_verdict": judge_verdict,
@@ -1381,6 +1401,9 @@ def _judge_view_context(
             judge_current_verdict is not None
             and generation_pending(unit.pk, judge_current_verdict.pk)
         ),
+        "judge_can_triage": judge_can_triage,
+        "judge_active_verdict": judge_active_verdict,
+        "judge_active_max_length": judge_active_max_length,
     }
 
 

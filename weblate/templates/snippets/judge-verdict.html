@@ -1,4 +1,4 @@
-{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed', 'judge_current_verdict', 'judge_can_resolve', 'judge_resolution_form', 'judge_repair_evidence', 'this_unit_url' in context #}
+{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed', 'judge_current_verdict', 'judge_can_resolve', 'judge_resolution_form', 'judge_repair_evidence', 'judge_candidate', 'judge_recheck_pending', 'judge_generation_pending', 'judge_can_triage', 'judge_active_verdict', 'judge_active_max_length', 'this_unit_url' in context #}
 
 {% load humanize i18n icons translations %}
 
@@ -150,6 +150,61 @@
           </p>
         </div>
       {% endif %}
+      {% if judge_active_max_length %}
+        {# The unit is still on the deterministic mutating-repair path
+           (invariant 9): no candidate is stored while max-length is
+           active, so there is nothing to preview here. The failing check
+           itself is shown elsewhere on the page. #}
+      {% elif judge_candidate %}
+        <div class="list-group-item check">
+          <h5 class="list-group-item-heading">
+            {% icon "wrench.svg" %}
+            {% translate "Suggested fix" %}
+          </h5>
+          <p class="list-group-item-text text-muted">
+            {% blocktranslate with when=judge_candidate.timestamp|naturaltime %}Judge-guided repair · {{ when }}{% endblocktranslate %}
+          </p>
+          {% format_unit_target unit value=judge_candidate.target diff=unit.target %}
+          {% if judge_can_triage %}
+            <form method="post"
+                  action="{% url 'judge-accept-candidate' pk=judge_candidate.pk %}"
+                  class="form-inline">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ this_unit_url }}" />
+              <button type="submit" class="btn btn-success">{% translate "Use suggested fix" %}</button>
+            </form>
+            <form method="post"
+                  action="{% url 'judge-generate-candidate' pk=judge_current_verdict.pk %}"
+                  class="form-inline">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ this_unit_url }}" />
+              <input type="hidden" name="replace" value="1" />
+              <button type="submit" class="btn btn-link">{% translate "Generate another" %}</button>
+            </form>
+          {% endif %}
+        </div>
+      {% elif judge_active_verdict %}
+        <div class="list-group-item check">
+          {% if judge_generation_pending %}
+            <p class="list-group-item-text">{% translate "Generating a suggested fix…" %}</p>
+          {% elif judge_can_triage %}
+            <form method="post"
+                  action="{% url 'judge-generate-candidate' pk=judge_current_verdict.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ this_unit_url }}" />
+              <button type="submit" class="btn btn-primary">{% translate "Generate suggested fix" %}</button>
+            </form>
+          {% endif %}
+          {% if user_can_use_machinery %}
+            <a class="btn btn-link"
+               data-bs-target="#machinery"
+               data-bs-toggle="tab"
+               data-load="machinery"
+               href="#"
+               title="{% translate "Computer-aided translation suggestions" %}">{% translate "Automatic suggestions" %}</a>
+          {% endif %}
+        </div>
+      {% endif %}
       {% if judge_can_resolve %}
         <div class="list-group-item check">
           <form method="post"
@@ -171,6 +226,19 @@
           </form>
         </div>
       {% endif %}
+      {% if judge_can_triage %}
+        <div class="list-group-item check">
+          {% if judge_recheck_pending %}
+            <p class="list-group-item-text">{% translate "Re-checking this string…" %}</p>
+          {% else %}
+            <form method="post" action="{% url 'judge-recheck' pk=unit.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ this_unit_url }}" />
+              <button type="submit" class="btn btn-link">{% translate "Re-check this string" %}</button>
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
     </div>
   </div>
 {% elif judge_round %}
@@ -188,6 +256,19 @@
           {% translate "The judge did not return a usable answer for this string. This is a transport failure, not an opinion about the translation." %}
         </p>
       </div>
+      {% if judge_can_triage %}
+        <div class="list-group-item check">
+          {% if judge_recheck_pending %}
+            <p class="list-group-item-text">{% translate "Re-checking this string…" %}</p>
+          {% else %}
+            <form method="post" action="{% url 'judge-recheck' pk=unit.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ this_unit_url }}" />
+              <button type="submit" class="btn btn-link">{% translate "Re-check this string" %}</button>
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
     </div>
   </div>
 {% endif %}
