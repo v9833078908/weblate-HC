@@ -1893,11 +1893,12 @@ def resolve_judge_verdict(request: AuthenticatedHttpRequest, pk):
     )
     unit = verdict_obj.unit
     fallback_url = unit.get_absolute_url()
+    next_url = request.POST.get("next")
 
     form = JudgeResolutionForm(request.POST)
     if not form.is_valid():
         messages.error(request, gettext("Could not record the decision."))
-        return redirect_next(request.POST.get("next"), fallback_url)
+        return redirect_next(next_url, fallback_url)
 
     try:
         resolve_verdict(
@@ -1909,10 +1910,12 @@ def resolve_judge_verdict(request: AuthenticatedHttpRequest, pk):
         )
     except JudgeResolutionError as error:
         messages.error(request, str(error))
-        return redirect_next(request.POST.get("next"), fallback_url)
+        return redirect_next(next_url, fallback_url)
 
     messages.info(request, gettext("The decision has been recorded."))
-    return redirect_next(request.POST.get("next"), fallback_url)
+    # Auto-advance only on success (Task 8): a resolved verdict is a
+    # completed decision, so the producer moves on to the next string.
+    return redirect_next(request.POST.get("success_next") or next_url, fallback_url)
 
 
 @login_required
@@ -2028,6 +2031,7 @@ def judge_accept_candidate(request: AuthenticatedHttpRequest, pk):
     )
     unit = candidate.unit
     fallback_url = unit.get_absolute_url()
+    next_url = request.POST.get("next")
 
     if not request.user.has_perm("unit.review", unit) or not request.user.has_perm(
         "translation.auto", unit.translation
@@ -2038,7 +2042,7 @@ def judge_accept_candidate(request: AuthenticatedHttpRequest, pk):
         candidate.accept(request)
     except JudgeCandidateError as error:
         messages.error(request, str(error))
-        return redirect_next(request.POST.get("next"), fallback_url)
+        return redirect_next(next_url, fallback_url)
 
     messages.success(
         request,
@@ -2046,7 +2050,9 @@ def judge_accept_candidate(request: AuthenticatedHttpRequest, pk):
             "The suggested fix has been applied and held for a fresh re-check."
         ),
     )
-    return redirect_next(request.POST.get("next"), fallback_url)
+    # Auto-advance only on success (Task 8): applying the candidate is a
+    # completed decision, so the producer moves on to the next string.
+    return redirect_next(request.POST.get("success_next") or next_url, fallback_url)
 
 
 def get_zen_unitdata(

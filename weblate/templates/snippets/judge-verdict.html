@@ -138,6 +138,7 @@
                   class="form-inline">
               {% csrf_token %}
               <input type="hidden" name="next" value="{{ this_unit_url }}" />
+              <input type="hidden" name="success_next" value="{{ next_unit_url }}" />
               <button type="submit" class="btn btn-success">{% translate "Use suggested fix" %}</button>
             </form>
             <form method="post"
@@ -179,6 +180,7 @@
                 id="id_judge_resolution_form">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ this_unit_url }}" />
+            <input type="hidden" name="success_next" value="{{ next_unit_url }}" />
             <div class="form-group">
               {{ judge_resolution_form.resolution.label_tag }}
               {{ judge_resolution_form.resolution }}

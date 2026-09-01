@@ -1101,6 +1101,102 @@ class JudgeResolutionViewTest(ViewTestCase):
         self.assertContains(response, "Escalated for review")
         self.assertContains(response, "flagged for a human")
 
+    # -- Task 8: auto-advance only after success ---------------------------
+
+    def _next_urls(self, unit):
+        page = self.client.get(unit.get_absolute_url())
+        return page.context["this_unit_url"], page.context["next_unit_url"]
+
+    def test_successful_resolution_advances_to_the_next_unit(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {
+                "resolution": "accepted_as_is",
+                "reason": "acceptable in context",
+                "next": this_unit_url,
+                "success_next": next_unit_url,
+            },
+        )
+        self.assertRedirects(response, next_unit_url, fetch_redirect_response=False)
+
+    def test_blank_reason_stays_on_the_current_unit(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {
+                "resolution": "accepted_as_is",
+                "reason": "   ",
+                "next": this_unit_url,
+                "success_next": next_unit_url,
+            },
+        )
+        self.assertRedirects(response, this_unit_url, fetch_redirect_response=False)
+
+    def test_stale_verdict_stays_on_the_current_unit(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {
+                "resolution": "accepted_as_is",
+                "reason": "acceptable in context",
+                "next": this_unit_url,
+                "success_next": next_unit_url,
+            },
+        )
+        # Second, stale request for the already-resolved verdict.
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {
+                "resolution": "escalated",
+                "reason": "changed my mind",
+                "next": this_unit_url,
+                "success_next": next_unit_url,
+            },
+        )
+        self.assertRedirects(response, this_unit_url, fetch_redirect_response=False)
+
+    def test_invalid_form_stays_on_the_current_unit(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {
+                "resolution": "not-a-real-choice",
+                "reason": "acceptable in context",
+                "next": this_unit_url,
+                "success_next": next_unit_url,
+            },
+        )
+        self.assertRedirects(response, this_unit_url, fetch_redirect_response=False)
+
+    def test_success_next_is_sanitized_like_next(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        this_unit_url, _next_unit_url = self._next_urls(unit)
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {
+                "resolution": "accepted_as_is",
+                "reason": "acceptable in context",
+                "next": this_unit_url,
+                "success_next": "http://evil.example.com/",
+            },
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+
 
 @override_settings(
     JUDGE_ENABLED=True,
@@ -2345,6 +2441,78 @@ class JudgeProducerTriageViewTest(ViewTestCase):
         )
         self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
         self.assertEqual(self.get_unit().target, "Drifted away\n")
+
+    # -- Task 8: auto-advance only after success ---------------------------
+
+    def _next_urls(self, unit):
+        page = self.client.get(unit.get_absolute_url())
+        return page.context["this_unit_url"], page.context["next_unit_url"]
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_successful_accept_advances_to_the_next_unit(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-1"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+                {"next": this_unit_url, "success_next": next_unit_url},
+            )
+        self.assertRedirects(response, next_unit_url, fetch_redirect_response=False)
+
+    def test_failed_accept_stays_on_the_current_unit(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        unit.translate(self.user, ["Drifted away"], STATE_TRANSLATED)
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            {"next": this_unit_url, "success_next": next_unit_url},
+        )
+        self.assertRedirects(response, this_unit_url, fetch_redirect_response=False)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_generate_never_advances_even_on_success(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate",
+            return_value="generated",
+        ):
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                # A generate form never submits success_next, but even a
+                # crafted request carrying one must not advance: queued
+                # work is not a completed decision.
+                {"next": this_unit_url, "success_next": next_unit_url},
+            )
+        self.assertRedirects(response, this_unit_url, fetch_redirect_response=False)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_recheck_never_advances_even_when_queued(self) -> None:
+        unit = self.get_unit()
+        this_unit_url, next_unit_url = self._next_urls(unit)
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-1"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                reverse("judge-recheck", kwargs={"pk": unit.pk}),
+                {"next": this_unit_url, "success_next": next_unit_url},
+            )
+        self.assertRedirects(response, this_unit_url, fetch_redirect_response=False)
 
 
 @override_settings(
