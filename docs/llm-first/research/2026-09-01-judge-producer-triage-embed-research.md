@@ -464,9 +464,14 @@ judge_stale == 0 AND judge_unparsed == 0` over a fresh query, not the cache.
 - POST endpoint -> a celery wrapper `auto_translate(unit_ids=[id],
   mode="judge")`: permissions, JudgeRun, state projection, audit - all
   existing.
-- A button on the stale/drift card and after a manual save; a "re-checking"
-  badge; on completion the string either honestly leaves the filter or returns
-  with a fresh verdict.
+- The explicit "Re-check" button exists only on pre-existing stale/context-
+  drift cards. The manual-edit path cannot use a button: after save the unit
+  immediately leaves `check:judge-reject` and the handler redirects to the
+  next unit, so its card is never shown again. The triage save therefore
+  enqueues the per-unit re-check automatically before redirecting; a
+  "re-checking" badge shows if the producer navigates back while the task is
+  pending. On completion the string either honestly leaves the filter or
+  returns with a fresh verdict.
 - Cost: 2 baseline judge calls per string. Double-payment gate: disable the
   button while a task is unfinished + `use_cache`.
 - **Together with Solution 1 this forms the minimum viable release workflow**:
@@ -536,15 +541,21 @@ variants from the tab, the stored candidate will pay off.
      over `auto_translate(unit_ids=[unit.id], mode="judge")`
      (`tasks.py:975-1087`) so permissions, `JudgeRun`, state projection,
      and audit are reused; a per-unit "task already running" guard plus
-     `use_cache` against double payment; a "re-checking" badge on the card;
-     the button appears on stale/drift cards and after a manual save.
+     `use_cache` against double payment; a "re-checking" badge on the card
+     while the task is pending. The explicit button appears only on
+     pre-existing stale/context-drift cards; for the triage manual-edit
+     path the save handler enqueues the re-check automatically before its
+     redirect, because the saved unit leaves `check:judge-reject` at once
+     and its card is never rendered again (`handle_translate`,
+     `edit.py:956-980`).
    - Task 7, verification: judge view/loop test suites
      (`weblate/trans/tests/test_judge*.py`, `weblate/checks/tests/test_judge.py`),
      template lint (djLint via prek), and a browser smoke pass on the dev
      instance (port 3001) over a `q=check:judge-reject` queue: stale card
      shows only "Re-check", fresh card shows the three outcomes,
-     resolution auto-advances, CTA stays disabled until the three counters
-     are zero.
+     resolution auto-advances, a manual save enqueues the automatic
+     re-check (string reappears in `judge_stale`/pending until judged),
+     CTA stays disabled until the three counters are zero.
 3. **Rollout.** Dev instance first (`./rundev.sh`); production deployment
    only with explicit approval (working agreement). No migrations are
    required for Solutions 1+2.
