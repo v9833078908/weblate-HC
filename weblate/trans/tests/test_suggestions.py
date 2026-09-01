@@ -23,7 +23,7 @@ from weblate.trans.models.judge import (
     compute_target_storage_hash,
 )
 from weblate.trans.tests.test_views import ViewTestCase
-from weblate.utils.state import STATE_FUZZY, STATE_READONLY, STATE_TRANSLATED
+from weblate.utils.state import STATE_FUZZY, STATE_READONLY
 
 
 class SuggestionsTest(ViewTestCase):

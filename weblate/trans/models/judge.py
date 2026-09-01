@@ -132,16 +132,21 @@ class JudgeCandidateMetadata:
 
     def __init__(self, details: Mapping[str, object]) -> None:
         if not isinstance(details, Mapping):
-            raise JudgeCandidateError("metadata must be an object")
+            msg = "metadata must be an object"
+            raise JudgeCandidateError(msg)
         if set(details) != set(_CANDIDATE_METADATA_FIELDS):
-            raise JudgeCandidateError("metadata keys do not match the contract")
+            msg = "metadata keys do not match the contract"
+            raise JudgeCandidateError(msg)
         if details["kind"] != "judge-repair":
-            raise JudgeCandidateError("unknown candidate kind")
+            msg = "unknown candidate kind"
+            raise JudgeCandidateError(msg)
         if details["schema"] != _CANDIDATE_METADATA_SCHEMA:
-            raise JudgeCandidateError("unsupported candidate schema")
+            msg = "unsupported candidate schema"
+            raise JudgeCandidateError(msg)
         verdict_id = details["judge_verdict_id"]
         if not isinstance(verdict_id, int) or isinstance(verdict_id, bool):
-            raise JudgeCandidateError("judge_verdict_id must be an integer")
+            msg = "judge_verdict_id must be an integer"
+            raise JudgeCandidateError(msg)
         run_id = details["judge_run_id"]
         if isinstance(run_id, uuid.UUID):
             parsed_run = run_id
@@ -149,7 +154,8 @@ class JudgeCandidateMetadata:
             try:
                 parsed_run = uuid.UUID(str(run_id))
             except (AttributeError, TypeError, ValueError) as error:
-                raise JudgeCandidateError("judge_run_id must be a UUID") from error
+                msg = "judge_run_id must be a UUID"
+                raise JudgeCandidateError(msg) from error
         for field in ("target_hash", "context_hash"):
             value = details[field]
             if (
@@ -157,10 +163,12 @@ class JudgeCandidateMetadata:
                 or len(value) != 64
                 or any(char not in "0123456789abcdef" for char in value)
             ):
-                raise JudgeCandidateError(f"{field} must be a hex sha256")
+                msg = f"{field} must be a hex sha256"
+                raise JudgeCandidateError(msg)
         engine = details["engine"]
         if not isinstance(engine, str) or not engine or len(engine) > 100:
-            raise JudgeCandidateError("engine must be a non-empty identifier")
+            msg = "engine must be a non-empty identifier"
+            raise JudgeCandidateError(msg)
         object.__setattr__(self, "verdict_id", verdict_id)
         object.__setattr__(self, "run_id", parsed_run)
         object.__setattr__(self, "target_hash", details["target_hash"])

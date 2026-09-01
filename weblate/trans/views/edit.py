@@ -85,7 +85,6 @@ from weblate.trans.models import (
 from weblate.trans.models.judge import (
     ALLOWED_RESOLUTION_TRANSITIONS,
     JudgeCandidateError,
-    JudgeRun,
     JudgeResolutionError,
     active_round,
     active_verdict,
@@ -1941,14 +1940,16 @@ def judge_recheck(request: AuthenticatedHttpRequest, pk):
         messages.error(request, str(error))
         return redirect_next(request.POST.get("next"), fallback_url)
 
-    run, created = queue_judge_recheck(unit, request.user)
+    _run, created = queue_judge_recheck(unit, request.user)
     if created:
         messages.info(
             request,
             gettext("The re-check has been queued; the page updates when it finishes."),
         )
     else:
-        messages.info(request, gettext("A re-check for this string is already running."))
+        messages.info(
+            request, gettext("A re-check for this string is already running.")
+        )
     return redirect_next(request.POST.get("next"), fallback_url)
 
 
@@ -1970,10 +1971,14 @@ def judge_generate_candidate(request: AuthenticatedHttpRequest, pk):
     ):
         raise PermissionDenied
 
-    if verdict_obj.verdict not in {
-        JudgeVerdict.Verdict.REJECT,
-        JudgeVerdict.Verdict.FLAG,
-    } or verdict_obj.resolution:
+    if (
+        verdict_obj.verdict
+        not in {
+            JudgeVerdict.Verdict.REJECT,
+            JudgeVerdict.Verdict.FLAG,
+        }
+        or verdict_obj.resolution
+    ):
         messages.error(request, gettext("This verdict no longer expects a candidate."))
         return redirect_next(request.POST.get("next"), fallback_url)
 
@@ -2046,9 +2051,7 @@ def judge_accept_candidate(request: AuthenticatedHttpRequest, pk):
 
     messages.success(
         request,
-        gettext(
-            "The suggested fix has been applied and held for a fresh re-check."
-        ),
+        gettext("The suggested fix has been applied and held for a fresh re-check."),
     )
     # Auto-advance only on success (Task 8): applying the candidate is a
     # completed decision, so the producer moves on to the next string.

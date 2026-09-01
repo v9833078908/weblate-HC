@@ -285,7 +285,7 @@ class BaseAutoTranslate:
 
 
 class AutoTranslate(BaseAutoTranslate):
-    def __init__(
+    def __init__(  # ruff: ignore[too-many-arguments]
         self,
         *,
         translation: Translation,
@@ -1006,7 +1006,7 @@ class AutoTranslate(BaseAutoTranslate):
 class BatchAutoTranslate(BaseAutoTranslate):
     translations: QuerySet[Translation] | Sequence[Translation]
 
-    def __init__(
+    def __init__(  # ruff: ignore[too-many-arguments]
         self,
         obj: Translation | Component | Category | Project | ProjectLanguage | Workspace,
         *,
@@ -1201,9 +1201,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
             msg = gettext("The re-check run is no longer available.")
             raise ValueError(msg)
         expected_unit = (
-            self.unit_ids[0]
-            if self.unit_ids and len(self.unit_ids) == 1
-            else None
+            self.unit_ids[0] if self.unit_ids and len(self.unit_ids) == 1 else None
         )
         if expected_unit is None or run.requested_query != f"id:{expected_unit}":
             run.status = JudgeRun.Status.FAILED

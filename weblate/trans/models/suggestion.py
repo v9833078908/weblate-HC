@@ -44,7 +44,7 @@ class SuggestionAddResult(StrEnum):
 
 
 class SuggestionManager(models.Manager["Suggestion"]):
-    def add(
+    def add(  # ruff: ignore[complex-structure]
         self,
         unit: Unit,
         target: list[str],
@@ -55,7 +55,8 @@ class SuggestionManager(models.Manager["Suggestion"]):
         userdetails: dict[str, object] | None = None,
         change_details: dict[str, object] | None = None,
     ) -> tuple[Suggestion | None, SuggestionAddResult]:
-        """Create new suggestion for this unit.
+        """
+        Create new suggestion for this unit.
 
         ``userdetails`` and ``change_details`` are trusted internal-only
         arguments: they are never taken from user input. A mapping passed
@@ -65,7 +66,9 @@ class SuggestionManager(models.Manager["Suggestion"]):
         """
         # ruff: ignore[import-outside-top-level]
         from weblate.auth.models import get_anonymous
-        from weblate.trans.models.judge import JudgeCandidateMetadata
+        from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
+            JudgeCandidateMetadata,
+        )
 
         judge_metadata = JudgeCandidateMetadata.parse(userdetails)
 
@@ -157,9 +160,7 @@ class SuggestionManager(models.Manager["Suggestion"]):
         # Update suggestion stats: candidates are automation-authored and
         # must not move a human profile.
         if judge_metadata is None:
-            user.profile.watch_on_contribution(
-                unit.translation.component.project
-            )
+            user.profile.watch_on_contribution(unit.translation.component.project)
             user.profile.increase_count("suggested")
 
         unit.invalidate_related_cache()

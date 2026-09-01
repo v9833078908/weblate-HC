@@ -17,6 +17,7 @@ from django.utils import timezone
 
 from weblate.auth.models import User
 from weblate.checks.tasks import finalize_component_checks
+from weblate.trans.judge_loop import _generation_lock_key, build_request
 from weblate.trans.models import (
     Category,
     Component,
@@ -24,7 +25,6 @@ from weblate.trans.models import (
     Suggestion,
     Unit,
 )
-from weblate.trans.judge_loop import _generation_lock_key, build_request
 from weblate.trans.models.judge import (
     JudgeCandidateMetadata,
     JudgeVerdict,
@@ -34,12 +34,12 @@ from weblate.trans.models.judge import (
 from weblate.trans.models.project import CommitPolicyChoices
 from weblate.trans.tasks import (
     cleanup_repos,
-    generate_judge_candidate,
     cleanup_stale_repos,
     cleanup_suggestions,
     commit_pending,
     component_alerts,
     daily_update_checks,
+    generate_judge_candidate,
     perform_commit,
     update_checks,
     update_remotes,
@@ -600,7 +600,9 @@ class JudgeCandidateGenerationTest(ComponentTestCase):
 
     def outcome(self, unit, verdict, *, replace=False):
         return generate_judge_candidate(
-            unit_id=unit.pk, verdict_id=verdict.pk, user_id=self.user.pk,
+            unit_id=unit.pk,
+            verdict_id=verdict.pk,
+            user_id=self.user.pk,
             replace=replace,
         )
 
@@ -718,9 +720,7 @@ class JudgeCandidateGenerationTest(ComponentTestCase):
             return_value={unit.pk: ["previous candidate"]},
         ):
             self.assertEqual(self.outcome(unit, verdict), "generated")
-        with mock.patch(
-            "weblate.trans.judge_loop.repair_targets", return_value={}
-        ):
+        with mock.patch("weblate.trans.judge_loop.repair_targets", return_value={}):
             self.assertEqual(self.outcome(unit, verdict, replace=True), "failed")
         candidates = Unit.objects.get(pk=unit.pk).suggestion_set.filter(
             userdetails__kind="judge-repair"

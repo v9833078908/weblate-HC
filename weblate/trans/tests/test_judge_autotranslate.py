@@ -13,10 +13,8 @@ from django.test import override_settings
 from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
 from weblate.trans.judge import JudgeError, JudgeResult
 from weblate.trans.judge_loop import (
-    DEFAULT_CANDIDATE_SEVERITIES,
     build_request,
     recheck_query,
-    run_judge_batch,
 )
 from weblate.trans.models.judge import (
     JudgeRun,
@@ -1162,7 +1160,6 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertIsNone(row.verdict)
         self.assertEqual(row.unit_id_snapshot, unit.id)
 
-
     # -- Task 3: producer one-unit re-check -------------------------------
 
     def _make_queued_recheck_run(self, unit, *, query=None, status=None):
@@ -1213,7 +1210,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         unit.translate(self.user, ["Good translation"], STATE_TRANSLATED)
         passed = JudgeResult("none", "pass", [], "")
         client = mock.Mock(
-            side_effect=lambda requests, *, on_batch, **kwargs: (
+            side_effect=lambda requests, *, on_batch, **_kwargs: (
                 on_batch(requests, [passed]),
                 [passed],
             )[-1]
@@ -1247,7 +1244,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         unit.translate(self.user, ["Tolerable translation"], STATE_TRANSLATED)
         major = JudgeResult("major", "flag", [], "")
         client = mock.Mock(
-            side_effect=lambda requests, *, on_batch, **kwargs: (
+            side_effect=lambda requests, *, on_batch, **_kwargs: (
                 on_batch(requests, [major]),
                 [major],
             )[-1]
@@ -1280,7 +1277,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         unit.translate(self.user, ["Failing translation"], STATE_TRANSLATED)
         critical = JudgeResult("critical", "reject", [], "")
         client = mock.Mock(
-            side_effect=lambda requests, *, on_batch, **kwargs: (
+            side_effect=lambda requests, *, on_batch, **_kwargs: (
                 on_batch(requests, [critical]),
                 [critical],
             )[-1]

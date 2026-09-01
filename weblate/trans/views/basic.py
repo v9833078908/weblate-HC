@@ -29,6 +29,7 @@ from django.views.decorators.cache import never_cache
 from django.views.generic import RedirectView
 
 from weblate.formats.models import EXPORTERS
+from weblate.glossary.models import get_matched_glossary_prompt_entries
 from weblate.lang.models import Language
 from weblate.trans.actions import ActionEvents
 from weblate.trans.exceptions import FileParseError
@@ -58,7 +59,6 @@ from weblate.trans.forms import (
     get_new_unit_form,
     get_upload_form,
 )
-from weblate.glossary.models import get_matched_glossary_prompt_entries
 from weblate.trans.judge import judge_configuration_ready, judge_request_upper_bound
 from weblate.trans.models import (
     Category,
@@ -68,7 +68,6 @@ from weblate.trans.models import (
     JudgeVerdict,
     Project,
     Translation,
-    Unit,
 )
 from weblate.trans.models.component import (
     ComponentLink,
@@ -820,9 +819,7 @@ def judge_queue_strip_context(
             "not_reviewed": not_reviewed,
             "unparsed": unparsed,
         }
-        cached_clean = judge_total > 0 and not (
-            needs_human or not_reviewed or unparsed
-        )
+        cached_clean = judge_total > 0 and not (needs_human or not_reviewed or unparsed)
         if cached_clean:
             hand_off_ready = not _judge_hand_off_blocked(translations)
     run_query = urlencode({"mode": "judge", "q": "NOT has:judge"})

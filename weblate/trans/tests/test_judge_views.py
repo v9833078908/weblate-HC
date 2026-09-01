@@ -9,22 +9,22 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest import mock
 
+from django.core.cache import cache
 from django.db import connection
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
-from weblate.trans.actions import ActionEvents
 from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Permission, Role
+from weblate.trans.actions import ActionEvents
 from weblate.trans.judge_loop import (
     _generation_lock_key,
     build_request,
     recheck_query,
 )
 from weblate.trans.models.change import Change
-from weblate.trans.models.suggestion import Suggestion
 from weblate.trans.models.judge import (
     JudgeRun,
     JudgeRunUnit,
@@ -35,10 +35,9 @@ from weblate.trans.models.judge import (
     resolve_verdict,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.models.suggestion import Suggestion
 from weblate.trans.models.unit import Unit
 from weblate.trans.tests.test_views import ViewTestCase
-from django.core.cache import cache
-
 from weblate.utils.state import (
     STATE_FUZZY,
     STATE_NEEDS_CHECKING,
@@ -1708,9 +1707,7 @@ class JudgeQueueStripViewTest(ViewTestCase):
         # Only one of several units judged: not_reviewed stays above zero.
         self.make_verdict(self.get_unit(), "none")
         response = self.client.get(self.component.get_absolute_url())
-        self.assertGreater(
-            response.context["judge_queue"]["counts"]["not_reviewed"], 0
-        )
+        self.assertGreater(response.context["judge_queue"]["counts"]["not_reviewed"], 0)
         self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
 
     def test_hand_off_absent_with_unresolved_critical(self) -> None:
@@ -2431,9 +2428,7 @@ class JudgeProducerTriageViewTest(ViewTestCase):
                 reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
                 follow=True,
             )
-        self.assertContains(
-            response, "previous candidate remains", status_code=200
-        )
+        self.assertContains(response, "previous candidate remains", status_code=200)
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
     def test_generate_non_eager_dispatches_with_kwargs(self) -> None:
@@ -2789,9 +2784,7 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         # "Automatic suggestions" alone also matches an unrelated keyboard
         # shortcuts help entry always present on the page; the card's
         # fallback link is uniquely identified by its title text.
-        self.assertNotContains(
-            response, "Computer-aided translation suggestions"
-        )
+        self.assertNotContains(response, "Computer-aided translation suggestions")
 
     def test_generation_pending_hides_generate_button(self) -> None:
         unit = self.get_unit()
@@ -2894,9 +2887,7 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         content = response.content.decode()
         self.assertEqual(content.count("<details"), 1)
         self.assertContains(response, "Overly formal register.")
-        self.assertLess(
-            content.index("Ships with evidence"), content.index("<details")
-        )
+        self.assertLess(content.index("Ships with evidence"), content.index("<details"))
 
     def test_minor_pass_evidence_also_collapses_into_one_details_element(
         self,
@@ -2987,4 +2978,3 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         self.grant_only(["unit.review", "translation.auto"])
         response = self.client.get(unit.get_absolute_url())
         self.assertNotContains(response, "Computer-aided translation suggestions")
-

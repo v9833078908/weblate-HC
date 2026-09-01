@@ -849,7 +849,9 @@ class JudgeCandidateMetadataTest(SimpleTestCase):
     def test_valid_metadata_round_trips(self) -> None:
         candidate = JudgeCandidateMetadata(CANDIDATE_METADATA)
         self.assertEqual(candidate.verdict_id, 1)
-        self.assertEqual(candidate.run_id, uuid.UUID(CANDIDATE_METADATA["judge_run_id"]))
+        self.assertEqual(
+            candidate.run_id, uuid.UUID(CANDIDATE_METADATA["judge_run_id"])
+        )
         self.assertEqual(candidate.context_hash, "b" * 64)
         self.assertEqual(candidate.engine, "openrouter")
         self.assertEqual(candidate.as_dict(), CANDIDATE_METADATA)
@@ -933,7 +935,9 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
         kwargs.setdefault("context_hash", judge_context_hash(unit))
         kwargs.setdefault("judge_model", "vendor/model-a")
         kwargs.setdefault("seat", 1)
-        verdict = JudgeVerdict.objects.create(unit=unit, max_severity=severity, **kwargs)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
         unit.run_checks()
         return verdict
 
@@ -1112,4 +1116,3 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
 
         with self.assertRaises(JudgeCandidateError):
             self.accept_as(candidate)
-

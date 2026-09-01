@@ -488,7 +488,6 @@ def _apply_repair(
     return _RepairOutcome(locked, changed=True)
 
 
-
 def _store_candidate(
     unit: Unit,
     request: JudgeRequest,
@@ -506,7 +505,9 @@ def _store_candidate(
     when the judged target/state/context still owns the unit. The unit
     target itself is never mutated (invariant 1).
     """
-    from weblate.trans.models.suggestion import Suggestion
+    from weblate.trans.models.suggestion import (  # ruff: ignore[import-outside-top-level]
+        Suggestion,
+    )
 
     with transaction.atomic():
         locked = (
@@ -1178,7 +1179,7 @@ class JudgeBatchResult(dict[int, JudgeVerdict]):  # ruff: ignore[subclass-builti
         self.attempt_counts: dict[int, int] = {}
 
 
-def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals]
+def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-statements]
     units: list[Unit],
     *,
     writable_ids: set[int],
@@ -1374,18 +1375,14 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals]
         repairable_units = [
             item.unit
             for item in prepared
-            if item is not None
-            and (item.needs_candidate or item.needs_mutating_repair)
+            if item is not None and (item.needs_candidate or item.needs_mutating_repair)
         ]
         repairs = repair_targets(repairable_units, user) if repairable_units else {}
         candidate_engine = (
             configured_routed_engine(
                 units[0].translation.component.project.get_machinery_settings()
             )
-            if any(
-                item is not None and item.needs_candidate
-                for item in prepared
-            )
+            if any(item is not None and item.needs_candidate for item in prepared)
             else None
         )
         next_pending = []
@@ -1830,6 +1827,7 @@ def drain_judge_deferrals() -> int:
         _release_judge_deferrals(token)
     return processed
 
+
 # --- Producer single-unit flows: re-check and candidate generation ---------
 
 # A generation that never completed (a crashed worker) unlocks after this
@@ -1838,19 +1836,23 @@ GENERATION_LOCK_TTL_SECONDS = 900
 
 
 def recheck_query(unit_id: int) -> str:
-    """The exact-one-string query a producer re-check run carries."""
+    """Return the exact-one-string query a producer re-check run carries."""
     return f"id:{unit_id}"
 
 
 def active_recheck_run(unit: Unit) -> JudgeRun | None:
-    """The queued or running re-check for this unit, if one is in flight."""
-    return JudgeRun.objects.filter(
-        scope_type=JudgeRun.ScopeType.TRANSLATION,
-        scope_id=str(unit.translation_id),
-        requested_mode="recheck",
-        requested_query=recheck_query(unit.pk),
-        status__in=[JudgeRun.Status.QUEUED, JudgeRun.Status.RUNNING],
-    ).order_by("-created").first()
+    """Return the queued or running re-check for this unit, if in flight."""
+    return (
+        JudgeRun.objects.filter(
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(unit.translation_id),
+            requested_mode="recheck",
+            requested_query=recheck_query(unit.pk),
+            status__in=[JudgeRun.Status.QUEUED, JudgeRun.Status.RUNNING],
+        )
+        .order_by("-created")
+        .first()
+    )
 
 
 def _unit_context_hash(unit: Unit) -> str:
@@ -1871,7 +1873,9 @@ def active_judge_candidate(unit: Unit, verdict: JudgeVerdict | None):
     Malformed metadata is never a candidate; an identical-text human
     suggestion is not reclassified either.
     """
-    from weblate.trans.models.suggestion import Suggestion
+    from weblate.trans.models.suggestion import (  # ruff: ignore[import-outside-top-level]
+        Suggestion,
+    )
 
     if (
         verdict is None
@@ -1907,7 +1911,10 @@ def queue_judge_recheck(unit: Unit, actor: User) -> tuple[JudgeRun, bool]:
     two runs (invariant 8). The task is dispatched on commit; a broker
     failure marks the run FAILED rather than leaving it queued forever.
     """
+    # ruff: ignore[import-outside-top-level]
     from weblate.trans.models import Unit as UnitModel
+
+    # ruff: ignore[import-outside-top-level]
     from weblate.trans.tasks import auto_translate
 
     query = recheck_query(unit.pk)
@@ -1979,7 +1986,10 @@ def accept_judge_candidate(
     a producer-facing message; callers translate it into their own response
     shape.
     """
+    # ruff: ignore[import-outside-top-level]
     from weblate.trans.models import Unit as UnitModel
+
+    # ruff: ignore[import-outside-top-level]
     from weblate.trans.models.suggestion import Suggestion as SuggestionModel
 
     user = request.user
@@ -2008,7 +2018,8 @@ def accept_judge_candidate(
             ) from None
         metadata = JudgeCandidateMetadata.parse(locked_candidate.userdetails)
         if metadata is None:
-            raise JudgeCandidateError("not a judge repair candidate")
+            msg = "not a judge repair candidate"
+            raise JudgeCandidateError(msg)
         try:
             verdict = JudgeVerdict.objects.select_for_update().get(
                 pk=metadata.verdict_id
@@ -2061,7 +2072,7 @@ def _generation_lock_key(unit_id: int, verdict_id: int) -> str:
 
 def generation_pending(unit_id: int, verdict_id: int) -> bool:
     """Whether a generation task is currently in flight for this verdict."""
-    from django.core.cache import cache
+    from django.core.cache import cache  # ruff: ignore[import-outside-top-level]
 
     return bool(cache.get(_generation_lock_key(unit_id, verdict_id)))
 
@@ -2078,7 +2089,7 @@ def generate_candidate_for_verdict(
     no-engine / busy / failed / drift. A paid output that no longer matches
     the judged snapshot is discarded, keeping any older candidate.
     """
-    from django.core.cache import cache
+    from django.core.cache import cache  # ruff: ignore[import-outside-top-level]
 
     key = _generation_lock_key(unit_id, verdict_id)
     if not cache.add(key, "1", timeout=GENERATION_LOCK_TTL_SECONDS):
@@ -2094,7 +2105,9 @@ def generate_candidate_for_verdict(
 def _generate_candidate(
     *, unit_id: int, verdict_id: int, user: User | None, replace: bool
 ) -> str:
-    from weblate.trans.models import Unit as UnitModel
+    from weblate.trans.models import (  # ruff: ignore[import-outside-top-level]
+        Unit as UnitModel,
+    )
 
     unit = UnitModel.objects.filter(pk=unit_id).prefetch_full().first()
     if unit is None:

@@ -878,9 +878,7 @@ class JudgeLoopTest(ViewTestCase):
         # text is never mutated, so there is nothing to re-judge.
         self.enable_repair_engine()
         original = self.get_unit().target
-        unit, verdict, client = self.run_batch(
-            [MAJOR, MAJOR], repair=["fixed text"]
-        )
+        unit, verdict, client = self.run_batch([MAJOR, MAJOR], repair=["fixed text"])
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
         self.assertEqual(verdict.attempt, 0)
         self.assertEqual(client.call_count, 2)
@@ -890,9 +888,7 @@ class JudgeLoopTest(ViewTestCase):
 
     def test_one_flag_round_ends_after_storing_the_candidate(self) -> None:
         self.enable_repair_engine()
-        unit, verdict, client = self.run_batch(
-            [MAJOR, MAJOR], repair=["still wrong"]
-        )
+        unit, verdict, client = self.run_batch([MAJOR, MAJOR], repair=["still wrong"])
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
         self.assertEqual(verdict.attempt, 0)
         self.assertEqual(client.call_count, 2)
@@ -963,15 +959,11 @@ class JudgeLoopTest(ViewTestCase):
             {"candidate-stored"},
         )
         self.assertEqual(
-            first.suggestion_set.get(
-                userdetails__kind="judge-repair"
-            ).target.strip(),
+            first.suggestion_set.get(userdetails__kind="judge-repair").target.strip(),
             "first repaired target",
         )
         self.assertEqual(
-            second.suggestion_set.get(
-                userdetails__kind="judge-repair"
-            ).target.strip(),
+            second.suggestion_set.get(userdetails__kind="judge-repair").target.strip(),
             "second repaired target",
         )
 
@@ -1084,9 +1076,7 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(client.call_count, 2)
         self.assertEqual(verdicts[second.id].verdict, JudgeVerdict.Verdict.FLAG)
         self.assertEqual(
-            first.suggestion_set.get(
-                userdetails__kind="judge-repair"
-            ).target.strip(),
+            first.suggestion_set.get(userdetails__kind="judge-repair").target.strip(),
             "first repaired target",
         )
         self.assertFalse(
@@ -1417,9 +1407,7 @@ class JudgeLoopTest(ViewTestCase):
         )
         self.assertNotEqual(self.get_unit().target, "MACHINE OVERWRITE")
         self.assertEqual(
-            unit.suggestion_set.get(
-                userdetails__kind="judge-repair"
-            ).target.strip(),
+            unit.suggestion_set.get(userdetails__kind="judge-repair").target.strip(),
             "MACHINE OVERWRITE",
         )
 
