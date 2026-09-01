@@ -181,6 +181,13 @@ class JudgeResult:
     unparsed: bool = False
     request_attempt_id: int | None = None
     failure_kind: str = ""
+    #: The profile that actually produced this result, which the requesting
+    #: seat's bound profile may differ from after a fallback attempt. Blank
+    #: means "use the caller's profile argument" (every pre-failover path).
+    served_model: str = ""
+    served_provider: str = ""
+    served_profile_fingerprint: str = ""
+    served_prompt_schema_version: str = ""
 
 
 UNPARSED = JudgeResult("none", "", [], "", unparsed=True, failure_kind="unknown")
@@ -1716,7 +1723,14 @@ def _run_batch(
         if parsed:
             _update_adaptive(profile, adaptive, "")
             return [
-                replace(result, request_attempt_id=getattr(attempt, "pk", None))
+                replace(
+                    result,
+                    request_attempt_id=getattr(attempt, "pk", None),
+                    served_model=profile.model,
+                    served_provider=profile.provider,
+                    served_profile_fingerprint=profile.profile_fingerprint,
+                    served_prompt_schema_version=profile.prompt_schema_version,
+                )
                 for result in outcome.results
             ]
         if failure == "http-auth":
@@ -1786,6 +1800,10 @@ def _run_batch(
                         UNPARSED,
                         request_attempt_id=getattr(last_attempt, "pk", None),
                         failure_kind=last_failure,
+                        served_model=profile.model,
+                        served_provider=profile.provider,
+                        served_profile_fingerprint=profile.profile_fingerprint,
+                        served_prompt_schema_version=profile.prompt_schema_version,
                     )
                 )
                 continue
@@ -1810,6 +1828,10 @@ def _run_batch(
             UNPARSED,
             request_attempt_id=getattr(last_attempt, "pk", None),
             failure_kind=last_failure,
+            served_model=profile.model,
+            served_provider=profile.provider,
+            served_profile_fingerprint=profile.profile_fingerprint,
+            served_prompt_schema_version=profile.prompt_schema_version,
         )
         for _ in batch
     ]

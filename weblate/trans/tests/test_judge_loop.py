@@ -8,6 +8,7 @@ import contextlib
 import json
 import threading
 import uuid
+from dataclasses import replace
 from unittest import mock
 
 from django.conf import settings
@@ -329,6 +330,36 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
         self.assertEqual(client.call_count, 2)
         self.assertEqual(unit.judge_verdicts.count(), 2)
+
+    def test_a_primary_verdict_is_still_reused_by_the_next_healthy_primary_run(
+        self,
+    ) -> None:
+        self.run_batch([PASS, PASS])
+        _unit2, _verdict2, client2 = self.run_batch([PASS, PASS])
+        self.assertEqual(
+            client2.call_count,
+            0,
+            "an unchanged primary verdict must still be cached",
+        )
+
+    def test_a_fallback_served_verdict_is_not_reused_by_a_healthy_primary_run(
+        self,
+    ) -> None:
+        seat_two_profile = resolve_judge_seat_profile(2)
+        fallback_result = replace(
+            PASS,
+            served_model="fallback/model",
+            served_provider="openrouter",
+            served_profile_fingerprint="f" * 64,
+            served_prompt_schema_version=seat_two_profile.prompt_schema_version,
+        )
+        self.run_batch([fallback_result, PASS])
+        _unit2, _verdict2, client2 = self.run_batch([PASS, PASS])
+        self.assertEqual(
+            client2.call_count,
+            2,
+            "a fallback-served verdict must not be cached as the primary's",
+        )
 
     def test_both_seats_are_asked_concurrently(self) -> None:
         barrier = threading.Barrier(2, timeout=1)
@@ -1421,6 +1452,71 @@ class JudgeLoopTest(ViewTestCase):
         self.assertIn("judge-flag", unit.all_checks_names)
         self.assertNotIn("judge-flag", build_request(unit).failing_checks)
 
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class JudgeServingIdentityPersistenceTest(ViewTestCase):
+    """`_write_verdict` stores the identity of the endpoint that actually served."""
+
+    def test_write_verdict_prefers_the_results_serving_metadata(self) -> None:
+        unit = self.get_unit()
+        request = build_request(unit)
+        primary_profile = resolve_judge_seat_profile(1)
+        fallback_result = replace(
+            PASS,
+            served_model="fallback/model",
+            served_provider="openrouter",
+            served_profile_fingerprint="f" * 64,
+            served_prompt_schema_version="p" * 64,
+        )
+        _write_verdict(
+            unit,
+            request,
+            seat=1,
+            attempt=0,
+            run_id=uuid.uuid4(),
+            result=fallback_result,
+            profile=primary_profile,
+            project_context="",
+        )
+        verdict = JudgeVerdict.objects.get(unit=unit, seat=1)
+        self.assertEqual(verdict.judge_model, "fallback/model")
+        self.assertEqual(verdict.judge_provider, "openrouter")
+        self.assertEqual(verdict.profile_fingerprint, "f" * 64)
+        self.assertEqual(verdict.prompt_schema_version, "p" * 64)
+        self.assertNotEqual(
+            verdict.profile_fingerprint, primary_profile.profile_fingerprint
+        )
+
+    def test_write_verdict_falls_back_to_the_profile_argument_when_absent(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        request = build_request(unit)
+        primary_profile = resolve_judge_seat_profile(1)
+        _write_verdict(
+            unit,
+            request,
+            seat=1,
+            attempt=0,
+            run_id=uuid.uuid4(),
+            result=PASS,
+            profile=primary_profile,
+            project_context="",
+        )
+        verdict = JudgeVerdict.objects.get(unit=unit, seat=1)
+        self.assertEqual(verdict.judge_model, primary_profile.model)
+        self.assertEqual(verdict.judge_provider, primary_profile.provider)
+        self.assertEqual(
+            verdict.profile_fingerprint, primary_profile.profile_fingerprint
+        )
+        self.assertEqual(
+            verdict.prompt_schema_version, primary_profile.prompt_schema_version
+        )
 
 @override_settings(
     JUDGE_ENABLED=True,

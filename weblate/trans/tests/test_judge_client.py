@@ -598,6 +598,55 @@ class JudgeFallbackConfigurationTest(SimpleTestCase):
 
 @override_settings(
     JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_BATCH_SIZE=5,
+    JUDGE_REQUEST_SLEEP=0.0,
+)
+class JudgeServingIdentityTest(TestCase):
+    """Every result carries the identity of the profile that actually served it."""
+
+    @http_mock.activate
+    def test_a_successful_primary_result_carries_its_own_serving_identity(
+        self,
+    ) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        profile = resolve_judge_seat_profile(1)
+        [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+        self.assertEqual(result.served_model, profile.model)
+        self.assertEqual(result.served_provider, profile.provider)
+        self.assertEqual(
+            result.served_profile_fingerprint, profile.profile_fingerprint
+        )
+        self.assertEqual(
+            result.served_prompt_schema_version, profile.prompt_schema_version
+        )
+
+    @override_settings(JUDGE_TRANSIENT_HTTP_RETRIES=0)
+    @http_mock.activate
+    def test_an_unparsed_result_carries_the_identity_of_the_endpoint_asked_last(
+        self,
+    ) -> None:
+        http_mock.register("POST", CHAT_URL, status_code=500, json={})
+        profile = resolve_judge_seat_profile(1)
+        [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
+        self.assertTrue(result.unparsed)
+        self.assertEqual(result.served_provider, profile.provider)
+        self.assertEqual(result.served_model, profile.model)
+        self.assertEqual(
+            result.served_profile_fingerprint, profile.profile_fingerprint
+        )
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test-do-not-leak",
     JUDGE_BATCH_SIZE=5,
     JUDGE_REQUEST_SLEEP=0.0,

@@ -581,6 +581,9 @@ class JudgeVerdict(models.Model):
     back_translation = models.TextField(blank=True)
     instruction = models.TextField(blank=True)
     judge_model = models.CharField(max_length=200)
+    # The endpoint that actually served this verdict. Blank on every row
+    # written before the availability fallback existed; no data migration.
+    judge_provider = models.CharField(max_length=32, blank=True)
     # Place in the collegium, not seniority: seat 2 may not lower seat 1.
     seat = models.SmallIntegerField()
     attempt = models.SmallIntegerField(default=0)
