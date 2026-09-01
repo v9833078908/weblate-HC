@@ -68,8 +68,11 @@ the producer explicitly re-checks it.
 8. One verdict has at most one active candidate and one queued/running re-check.
 9. `FLAG` no longer mutates the target automatically: its repair becomes the
    same opt-in stored candidate as `REJECT`. `max-length` mutating repair is
-   unchanged. A producer one-unit re-check is evidence-only: it projects
-   pass/major directly and never re-enters the mutating repair loop.
+   unchanged and takes precedence: while a unit has an active `max-length`
+   check, that unit is mutated and never stores a candidate, because a preview
+   that still overflows is not applicable. A producer one-unit re-check is
+   evidence-only: it projects pass/major directly and never re-enters the
+   mutating repair loop.
 10. Cached stats may display counts but may not enable hand-off; the CTA needs a
     fresh target/context readiness check.
 11. Severity gating is unchanged: an unresolved `FLAG` still ships at
@@ -86,6 +89,7 @@ the producer explicitly re-checks it.
 | Producer keeps current text | 3 total |
 | Producer applies candidate; re-check is pass/major | 3 + 2 judge = 5 total |
 | Producer applies candidate; re-check is critical | 3 + 2 judge + 1 new repair MT = 6 total |
+| Critical or major with active `max-length` | 2 judge + 1 repair MT + 2 re-judge = 5, plus 1 repair MT if a later round stores a candidate |
 | Producer asks for another candidate | +1 repair MT |
 
 The saving comes from deferring the second judge round until acceptance. Today
@@ -187,15 +191,25 @@ Tests first:
 - provider failure, unusable plurals, and target/state/context drift store
   nothing and leave the target unchanged;
 - cache/retry reuses the candidate without a second repair MT call;
-- `max-length` still uses `_apply_repair` and retains request counts;
+- `max-length` still uses `_apply_repair` and retains request counts, including
+  when the same round is `REJECT` or `FLAG`: the unit is mutated, enters
+  `next_pending`, and stores no candidate;
+- once `max-length` clears, a still-negative later round stores a candidate even
+  though repair attempts are exhausted;
+- a unit whose `max-length` survives the mutation round stores no candidate and
+  keeps today's behavior;
 - `minor` never stores a candidate;
 - audit distinguishes `candidate-stored`, `no-candidate`, `applied`, and
   `rolled-back`.
 
 Split `_PreparedRound.needs_repair` into `needs_candidate` and
-`needs_mutating_repair`. `REJECT` and `FLAG` take the candidate path, ignoring
-writable state and remaining repair attempts; `max-length` keeps current
-ownership and attempt rules. Batch `repair_targets` over the union, persist
+`needs_mutating_repair`, evaluated in that precedence order:
+`_has_active_check(current, "max-length")` (`judge_loop.py:496-504`) selects
+mutation and suppresses `needs_candidate` for that round; otherwise `REJECT` and
+`FLAG` select the candidate path, ignoring writable state and remaining repair
+attempts. The two are mutually exclusive per unit per round, so one
+`repair_targets` output has exactly one destination. `max-length` mutation keeps
+current ownership and attempt rules. Batch `repair_targets` over the union, persist
 candidate outputs under the `_apply_repair` snapshot check (`judge_loop.py:441-458`),
 and send only mutable outputs to `_apply_repair`. Candidate units never enter
 `next_pending`. Add `RepairStatus.CANDIDATE_STORED` and its `AlterField`
@@ -262,6 +276,10 @@ between the two run kinds:
 | Normal batch | store candidate | store candidate | mutating repair |
 | Producer one-unit re-check | store candidate | project directly, no candidate | no mutation |
 
+`max-length` is a precedence column, not an independent one: when a unit is
+both `max-length` and `REJECT`/`FLAG`, the mutating repair wins for that round
+and no candidate is stored.
+
 Without this split an accepted candidate whose re-check returns major would pay
 another repair MT and contradict the 5-call pass/major path. The re-check flag
 also passes `writable_ids=set()` so nothing can trigger `_apply_repair` or
@@ -275,8 +293,9 @@ and mark broker failures FAILED. Worker validates scope/query/status before
 RUNNING.
 
 Add an asynchronous candidate-generation task. It re-reads the unresolved
-critical, runs checks, calls `repair_targets([unit], actor)` once, and persists
-only if verdict/target/context still match. Deduplicate with a bounded cache key
+`REJECT` or `FLAG`, runs checks, calls `repair_targets([unit], actor)` once, and
+persists only if verdict/target/context still match and no `max-length` check is
+active. Deduplicate with a bounded cache key
 over Unit and verdict ID, cleared in `finally` with a recovery TTL. GET never
 calls the provider. Generate returns an existing candidate; only Generate
 another replaces it, after successful snapshot validation.
@@ -354,7 +373,9 @@ Render-test mutually exclusive states:
 - `minor` never inherits a candidate, and a candidate never crosses verdicts;
 - a fresh `FLAG` renders the same candidate controls as `REJECT`, with a
   ships-with-evidence badge instead of a hold badge, so the producer can see it
-  is optional.
+  is optional;
+- active `max-length`: no candidate controls and no Generate; the deterministic
+  check is shown instead, because that unit is still on the mutating path.
 
 `_judge_view_context` resolves at most one candidate for
 `judge_current_verdict` and exposes queued/generation state. Preserve the
@@ -472,7 +493,8 @@ Browser/Selenium flows:
 7. Missing candidate: Generate and failed retry preserving the old candidate.
 8. Fresh major card: candidate controls with a ships-with-evidence badge, one
    click applies, ignoring it leaves the human text at `STATE_TRANSLATED`.
-9. `max-length` mutating repair and component readiness unchanged.
+9. `max-length` mutating repair and component readiness unchanged, including a
+   critical unit that also fails `max-length`: it is mutated, not previewed.
 
 Use deterministic fixtures/mocked provider responses to avoid unapproved spend.
 Use the dev surface at port 3001 only if already running; rebuilding the shared
@@ -481,13 +503,16 @@ stack needs approval.
 ## Acceptance criteria
 
 1. Every current critical and major target stays untouched by the batch and has
-   at most one current native judge candidate.
+   at most one current native judge candidate. The single exemption is an active
+   `max-length` check, which keeps today's mutating repair and stores no
+   candidate.
 2. Producer previews and applies it from the card in one click.
 3. Acceptance cannot ship before a fresh one-unit re-check.
 4. Drift blocks every UI/API/internal acceptance route.
 5. Generation, regeneration, and re-check dedupe retries/double-clicks.
-6. `FLAG` no longer auto-mutates; `max-length` repair is unchanged; a producer
-   one-unit re-check never repairs or re-judges an admissible major.
+6. `FLAG` no longer auto-mutates; `max-length` repair is unchanged and takes
+   precedence over candidate storage; a producer one-unit re-check never repairs
+   or re-judges an admissible major.
 7. Tests prove the 3-call pre-decision, 5-call pass/major, and 6-call
    repeated-critical paths.
 8. Readiness cannot report a false zero from cache or target-only freshness.
