@@ -384,17 +384,27 @@ def bulk_accept_user_suggestions(
     request = AuthenticatedHttpRequest()
     request.user = user
 
-    suggestions = Suggestion.objects.filter(
-        unit__translation=translation, user=target_user
-    ).select_related("unit")
-    total = suggestions.count()
+    # Bulk accept is a per-human-author convenience action: it never
+    # touches automation-authored judge repair candidates, which have
+    # their own guarded acceptance path (invariant 5). The namespace check
+    # must happen in Python: a JSON key exclusion in the query would also
+    # drop every row where "kind" is absent, i.e. every human suggestion
+    # (matches the same trap SuggestionManager.add's dedup check avoids).
+    suggestions = [
+        suggestion
+        for suggestion in Suggestion.objects.filter(
+            unit__translation=translation, user=target_user
+        ).select_related("unit")
+        if not suggestion.is_judge_candidate
+    ]
+    total = len(suggestions)
     accepted = 0
     failed = 0
     processed = 0
 
     report_bulk_accept_user_suggestions_progress(processed, total)
 
-    for suggestion in suggestions.iterator(chunk_size=100):
+    for suggestion in suggestions:
         processed += 1
 
         if (
@@ -993,6 +1003,10 @@ def auto_translate(
     activity_log_task_count: int | None = None,
     enforce_permissions: bool = True,
     overwrite_existing: bool = False,
+    judge_run_id: str | None = None,
+    judge_pretranslate: bool = True,
+    judge_mutating_repairs: bool = True,
+    judge_candidate_severities: tuple[str, ...] = ("critical", "major"),
 ) -> dict[str, Any]:
     result: dict[str, Any] = {"warnings": []}
     user = User.objects.get(pk=user_id) if user_id else None
@@ -1027,6 +1041,10 @@ def auto_translate(
             unit_ids=unit_ids,
             enforce_permissions=enforce_permissions,
             overwrite_existing=overwrite_existing,
+            judge_run_id=judge_run_id,
+            judge_pretranslate=judge_pretranslate,
+            judge_mutating_repairs=judge_mutating_repairs,
+            judge_candidate_severities=judge_candidate_severities,
         )
         try:
             message = auto.perform(
@@ -1392,6 +1410,26 @@ def drain_judge_deferrals() -> int:
     from weblate.trans.judge_loop import drain_judge_deferrals as drain
 
     return drain()
+
+
+@app.task(trail=False)
+def generate_judge_candidate(
+    *, unit_id: int, verdict_id: int, user_id: int | None, replace: bool
+) -> str:
+    """
+    Generate one repair candidate for a held unit's current verdict.
+
+    Runs outside the page request: a provider call takes seconds and must
+    never happen during GET (invariant 4). The result is stored as a
+    candidate suggestion, never as an applied target.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.judge_loop import generate_candidate_for_verdict
+
+    user = User.objects.get(pk=user_id) if user_id else None
+    return generate_candidate_for_verdict(
+        unit_id=unit_id, verdict_id=verdict_id, user=user, replace=replace
+    )
 
 
 @app.task(trail=False)

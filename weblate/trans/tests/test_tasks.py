@@ -7,6 +7,7 @@ import time
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 from unittest.mock import patch
 
 from django.core.cache import cache
@@ -16,10 +17,24 @@ from django.utils import timezone
 
 from weblate.auth.models import User
 from weblate.checks.tasks import finalize_component_checks
-from weblate.trans.models import Category, Component, PendingUnitChange, Suggestion
+from weblate.trans.models import (
+    Category,
+    Component,
+    PendingUnitChange,
+    Suggestion,
+    Unit,
+)
+from weblate.trans.judge_loop import _generation_lock_key, build_request
+from weblate.trans.models.judge import (
+    JudgeCandidateMetadata,
+    JudgeVerdict,
+    compute_context_hash,
+    compute_target_hash,
+)
 from weblate.trans.models.project import CommitPolicyChoices
 from weblate.trans.tasks import (
     cleanup_repos,
+    generate_judge_candidate,
     cleanup_stale_repos,
     cleanup_suggestions,
     commit_pending,
@@ -545,3 +560,183 @@ class TasksTest(ComponentTestCase):
                 language=self.component.source_language
             ).exists()
         )
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
+class JudgeCandidateGenerationTest(ComponentTestCase):
+    """generate_judge_candidate outcomes for a held verdict (Task 3)."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.project.save(update_fields=["machinery_settings"])
+
+    def critical_verdict(self, *, target="existing translation"):
+        unit = self.translation.unit_set.first()
+        unit.translate(self.user, [target], STATE_TRANSLATED)
+        unit = Unit.objects.get(pk=unit.pk)
+        request = build_request(unit)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="critical",
+            seat=1,
+            judge_model="vendor-a/model",
+            target_hash=compute_target_hash(request.target_plurals),
+            context_hash=compute_context_hash(
+                source=request.source,
+                note=request.note,
+                explanation=request.explanation,
+                glossary_terms=request.glossary_terms,
+            ),
+        )
+        unit.run_checks()
+        return unit, verdict
+
+    def outcome(self, unit, verdict, *, replace=False):
+        return generate_judge_candidate(
+            unit_id=unit.pk, verdict_id=verdict.pk, user_id=self.user.pk,
+            replace=replace,
+        )
+
+    def test_generates_and_stores_a_candidate(self) -> None:
+        unit, verdict = self.critical_verdict()
+        with mock.patch(
+            "weblate.trans.judge_loop.repair_targets",
+            return_value={unit.pk: ["better translation"]},
+        ):
+            result = self.outcome(unit, verdict)
+        self.assertEqual(result, "generated")
+        refreshed = Unit.objects.get(pk=unit.pk)
+        self.assertEqual(refreshed.target.strip(), "existing translation")
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+        candidate = refreshed.suggestion_set.get(userdetails__kind="judge-repair")
+        self.assertEqual(candidate.target.strip(), "better translation")
+        self.assertEqual(
+            JudgeCandidateMetadata.parse(candidate.userdetails).verdict_id, verdict.pk
+        )
+
+    def test_a_second_click_reports_existing(self) -> None:
+        unit, verdict = self.critical_verdict()
+        with mock.patch(
+            "weblate.trans.judge_loop.repair_targets",
+            return_value={unit.pk: ["better translation"]},
+        ):
+            self.assertEqual(self.outcome(unit, verdict), "generated")
+            self.assertEqual(self.outcome(unit, verdict), "existing")
+
+    def test_replace_regenerates_over_the_existing_candidate(self) -> None:
+        unit, verdict = self.critical_verdict()
+        with mock.patch(
+            "weblate.trans.judge_loop.repair_targets",
+            side_effect=[
+                {unit.pk: ["first candidate"]},
+                {unit.pk: ["second candidate"]},
+            ],
+        ) as repair:
+            self.assertEqual(self.outcome(unit, verdict), "generated")
+            self.assertEqual(self.outcome(unit, verdict, replace=True), "generated")
+        self.assertEqual(repair.call_count, 2)
+        candidates = Unit.objects.get(pk=unit.pk).suggestion_set.filter(
+            userdetails__kind="judge-repair"
+        )
+        self.assertEqual(candidates.count(), 1)
+        self.assertEqual(candidates.get().target.strip(), "second candidate")
+
+    def test_in_flight_generation_is_busy(self) -> None:
+        unit, verdict = self.critical_verdict()
+        cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        with mock.patch("weblate.trans.judge_loop.repair_targets") as repair:
+            self.assertEqual(self.outcome(unit, verdict), "busy")
+        repair.assert_not_called()
+
+    def test_a_stale_target_is_not_generated_for(self) -> None:
+        unit, verdict = self.critical_verdict()
+        unit.translate(self.user, ["someone edited"], STATE_TRANSLATED)
+        with mock.patch("weblate.trans.judge_loop.repair_targets") as repair:
+            self.assertEqual(self.outcome(unit, verdict), "stale")
+        repair.assert_not_called()
+
+    def test_a_pass_verdict_is_not_generated_for(self) -> None:
+        unit = self.translation.unit_set.first()
+        unit.translate(self.user, ["fine"], STATE_TRANSLATED)
+        unit = Unit.objects.get(pk=unit.pk)
+        request = build_request(unit)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity="none",
+            seat=1,
+            judge_model="vendor-a/model",
+            target_hash=compute_target_hash(request.target_plurals),
+            context_hash=compute_context_hash(
+                source=request.source,
+                note=request.note,
+                explanation=request.explanation,
+                glossary_terms=request.glossary_terms,
+            ),
+        )
+        unit.run_checks()
+        with mock.patch("weblate.trans.judge_loop.repair_targets") as repair:
+            self.assertEqual(self.outcome(unit, verdict), "invalid-verdict")
+        repair.assert_not_called()
+
+    def test_a_resolved_verdict_is_not_generated_for(self) -> None:
+        unit, verdict = self.critical_verdict()
+        verdict.resolution = JudgeVerdict.Resolution.ESCALATED
+        verdict.save(update_fields=["resolution"])
+        with mock.patch("weblate.trans.judge_loop.repair_targets") as repair:
+            self.assertEqual(self.outcome(unit, verdict), "resolved")
+        repair.assert_not_called()
+
+    def test_max_length_suppresses_the_candidate(self) -> None:
+        unit, verdict = self.critical_verdict()
+        unit = Unit.objects.get(pk=unit.pk)
+        unit.extra_flags = "max-length:5"
+        unit.save(update_fields=["extra_flags"])
+        unit.run_checks()
+        with mock.patch("weblate.trans.judge_loop.repair_targets") as repair:
+            self.assertEqual(self.outcome(unit, verdict), "max-length")
+        repair.assert_not_called()
+
+    def test_no_engine_configured_is_reported(self) -> None:
+        unit, verdict = self.critical_verdict()
+        self.project.machinery_settings = {}
+        self.project.save(update_fields=["machinery_settings"])
+        with mock.patch("weblate.trans.judge_loop.repair_targets") as repair:
+            self.assertEqual(self.outcome(unit, verdict), "no-engine")
+        repair.assert_not_called()
+
+    def test_a_missing_engine_output_keeps_the_previous_candidate(self) -> None:
+        unit, verdict = self.critical_verdict()
+        with mock.patch(
+            "weblate.trans.judge_loop.repair_targets",
+            return_value={unit.pk: ["previous candidate"]},
+        ):
+            self.assertEqual(self.outcome(unit, verdict), "generated")
+        with mock.patch(
+            "weblate.trans.judge_loop.repair_targets", return_value={}
+        ):
+            self.assertEqual(self.outcome(unit, verdict, replace=True), "failed")
+        candidates = Unit.objects.get(pk=unit.pk).suggestion_set.filter(
+            userdetails__kind="judge-repair"
+        )
+        self.assertEqual(candidates.count(), 1)
+        self.assertEqual(candidates.get().target.strip(), "previous candidate")
+
+    def test_a_target_edited_during_generation_discards_the_output(self) -> None:
+        unit, verdict = self.critical_verdict()
+
+        def drift(requests, user):
+            Unit.objects.filter(pk=unit.pk).update(target="concurrent edit")
+            return {unit.pk: ["paid output"]}
+
+        with mock.patch("weblate.trans.judge_loop.repair_targets", side_effect=drift):
+            self.assertEqual(self.outcome(unit, verdict), "drift")
+        refreshed = Unit.objects.get(pk=unit.pk)
+        self.assertEqual(refreshed.target.strip(), "concurrent edit")
+        self.assertEqual(refreshed.suggestion_set.count(), 0)

@@ -231,6 +231,21 @@ class Suggestion(models.Model, UserDisplayMixin):
         super().__init__(*args, **kwargs)
         self.fixups: list[str] = []
 
+    @property
+    def is_judge_candidate(self) -> bool:
+        """
+        Whether this row is a stored judge repair candidate.
+
+        A lenient, presentation-only check: any ``kind``-tagged row is
+        treated as a candidate even if the rest of its metadata turns out to
+        be malformed, so a broken row never falls back to rendering generic
+        human-suggestion controls (clone/vote/accept/edit).
+        """
+        return (
+            isinstance(self.userdetails, dict)
+            and self.userdetails.get("kind") == "judge-repair"
+        )
+
     @transaction.atomic
     def accept(
         self,
@@ -238,6 +253,24 @@ class Suggestion(models.Model, UserDisplayMixin):
         permission: str = "suggestion.accept",
         state=STATE_TRANSLATED,
     ) -> None:
+        from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
+            JudgeCandidateMetadata,
+        )
+
+        # A judge repair candidate carries its own, stronger guard
+        # (unit.review + translation.auto, freshness, single active
+        # candidate) that overrides whatever permission/state the caller
+        # asked for (invariant 5). This is the one choke point every
+        # acceptance surface goes through: the card, the classic suggestion
+        # list, the API, vote autoaccept, and bulk accept.
+        if JudgeCandidateMetadata.parse(self.userdetails) is not None:
+            from weblate.trans.judge_loop import (  # ruff: ignore[import-outside-top-level]
+                accept_judge_candidate,
+            )
+
+            accept_judge_candidate(self, request)
+            return
+
         if not request.user.has_perm(permission, self.unit):
             messages.error(request, gettext("Could not accept suggestion!"))
             return
@@ -307,7 +340,11 @@ class Suggestion(models.Model, UserDisplayMixin):
             vote.value = value
             vote.save()
 
-        # Automatic accepting
+        # Automatic accepting. A judge repair candidate never autoaccepts
+        # from votes: acceptance is always an explicit producer decision
+        # made through the guarded card/API path (invariant 5).
+        if self.is_judge_candidate:
+            return
         required_votes = self.unit.translation.suggestion_autoaccept
         if required_votes and self.get_num_votes(override=True) >= required_votes:
             self.accept(request, "suggestion.vote")

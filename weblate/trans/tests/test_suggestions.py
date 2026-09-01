@@ -4,14 +4,26 @@
 
 """Tests for suggestion views."""
 
+from types import SimpleNamespace
+from unittest import mock
+
 from django.conf import settings
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from weblate.auth.models import Group, Permission, Role
 from weblate.auth.results import Denied
-from weblate.trans.models import Suggestion, WorkflowSetting
+from weblate.trans.judge_loop import build_request
+from weblate.trans.models import Suggestion, Vote, WorkflowSetting
+from weblate.trans.models.judge import (
+    JudgeCandidateError,
+    JudgeVerdict,
+    compute_context_hash,
+    compute_target_hash,
+    compute_target_storage_hash,
+)
 from weblate.trans.tests.test_views import ViewTestCase
-from weblate.utils.state import STATE_READONLY
+from weblate.utils.state import STATE_FUZZY, STATE_READONLY, STATE_TRANSLATED
 
 
 class SuggestionsTest(ViewTestCase):
@@ -524,3 +536,151 @@ class SuggestionModelTest(TestCase):
 
         suggestion_empty = Suggestion(target="")
         self.assertEqual(suggestion_empty.target_list, [""])
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class JudgeCandidateSuggestionTest(ViewTestCase):
+    """Task 4: Suggestion.accept() delegates for stored judge candidates."""
+
+    def enable_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def grant(self, codenames) -> None:
+        role = Role.objects.create(name="Custom accept")
+        for codename in codenames:
+            role.permissions.add(Permission.objects.get(codename=codename))
+        group = Group.objects.create(name="Custom accepters")
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+    def make_verdict(self, unit, severity="critical"):
+        request = build_request(unit)
+        return JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity=severity,
+            seat=1,
+            judge_model="vendor/model-a",
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(unit.target),
+            context_hash=compute_context_hash(
+                source=request.source,
+                note=request.note,
+                explanation=request.explanation,
+                glossary_terms=request.glossary_terms,
+            ),
+        )
+
+    def make_candidate(self, unit, verdict, target="Better translation"):
+        request = build_request(unit)
+        suggestion, _result = Suggestion.objects.add(
+            unit,
+            [target],
+            request=None,
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": compute_context_hash(
+                    source=request.source,
+                    note=request.note,
+                    explanation=request.explanation,
+                    glossary_terms=request.glossary_terms,
+                ),
+                "engine": "openrouter",
+            },
+        )
+        return suggestion
+
+    def test_is_judge_candidate_true_for_metadata_tagged_row(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit)
+        candidate = self.make_candidate(unit, verdict)
+        self.assertTrue(candidate.is_judge_candidate)
+
+    def test_is_judge_candidate_false_for_human_suggestion(self) -> None:
+        unit = self.get_unit()
+        suggestion = Suggestion.objects.create(
+            unit=unit, target="Human text", user=self.user
+        )
+        self.assertFalse(suggestion.is_judge_candidate)
+
+    def test_is_judge_candidate_true_even_when_metadata_is_malformed(self) -> None:
+        unit = self.get_unit()
+        suggestion = Suggestion.objects.create(
+            unit=unit, target="Broken", userdetails={"kind": "judge-repair"}
+        )
+        self.assertTrue(suggestion.is_judge_candidate)
+
+    def test_accept_delegates_to_the_guarded_service(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit)
+        candidate = self.make_candidate(unit, verdict)
+        request = self.get_request()
+        request.user = self.user
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-1"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            candidate.accept(request)
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_FUZZY)
+        self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_without_review_permission_raises_and_is_untouched(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit)
+        candidate = self.make_candidate(unit, verdict)
+        request = self.get_request()
+        request.user = self.user
+        with self.assertRaises(JudgeCandidateError):
+            candidate.accept(request)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_classic_accept_by_id_view_reports_the_typed_error(self) -> None:
+        # suggestion.accept alone is not enough for a judge candidate
+        # (invariant 5): the classic per-suggestion accept form must
+        # surface the guard's message instead of crashing.
+        self.grant(["suggestion.accept"])
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit)
+        candidate = self.make_candidate(unit, verdict)
+        response = self.edit_unit(
+            unit.source, unit.target, accept=candidate.pk, follow=True
+        )
+        self.assertContains(response, "permission", status_code=200)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+        self.assertNotEqual(self.get_unit().state, STATE_FUZZY)
+
+    def test_vote_never_autoaccepts_a_judge_candidate(self) -> None:
+        self.enable_review()
+        self.component.suggestion_voting = True
+        self.component.suggestion_autoaccept = 1
+        self.component.save(
+            update_fields=["suggestion_voting", "suggestion_autoaccept"]
+        )
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit)
+        candidate = self.make_candidate(unit, verdict)
+        request = self.get_request()
+        request.user = self.user
+        candidate.add_vote(request, Vote.POSITIVE)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+        self.assertEqual(candidate.get_num_votes(override=True), 1)
+        self.assertNotEqual(self.get_unit().state, STATE_FUZZY)

@@ -32,11 +32,13 @@ from django.conf import settings
 from django.db import IntegrityError, connections, transaction
 from django.db.models import Max, Q
 from django.utils import timezone
+from django.utils.translation import gettext
 
 from weblate.checks.judge import JUDGE_CHECKS
 from weblate.glossary.models import get_matched_glossary_prompt_entries
 from weblate.machinery.base import MACHINERY_DEFAULT_THRESHOLD, MachineTranslationError
 from weblate.machinery.models import MACHINERY
+from weblate.trans.actions import ActionEvents
 from weblate.trans.forms import configured_routed_engine
 from weblate.trans.judge import (
     JUDGE_SEATS,
@@ -45,6 +47,7 @@ from weblate.trans.judge import (
     JudgeResult,
     OnBatch,
     RetryBudget,
+    judge_configuration_snapshot,
     request_verdicts,
     resolve_judge_seat_profile,
     validate_judge_configuration,
@@ -52,6 +55,8 @@ from weblate.trans.judge import (
 from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models.judge import (
     JudgeAdaptiveState,
+    JudgeCandidateError,
+    JudgeCandidateMetadata,
     JudgeDeferral,
     JudgeRequestAttempt,
     JudgeRun,
@@ -72,9 +77,10 @@ from weblate.utils.state import STATE_FUZZY
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from weblate.auth.models import User
+    from weblate.auth.models import AuthenticatedHttpRequest, User
     from weblate.machinery.base import BatchMachineTranslation, UnitMemoryResultDict
     from weblate.trans.models.project import Project
+    from weblate.trans.models.suggestion import Suggestion
     from weblate.trans.models.unit import Unit
 
 # Verdicts whose round produces a stored producer candidate instead of a
@@ -84,6 +90,16 @@ _CANDIDATE_VERDICTS = frozenset(
         JudgeVerdict.Verdict.REJECT,
         JudgeVerdict.Verdict.FLAG,
     }
+)
+# A run purpose names candidate severities, not verdicts: critical selects
+# REJECT and major selects FLAG (models/judge.py severity vocabulary).
+_CANDIDATE_VERDICT_BY_SEVERITY = {
+    JudgeVerdict.Severity.CRITICAL: JudgeVerdict.Verdict.REJECT,
+    JudgeVerdict.Severity.MAJOR: JudgeVerdict.Verdict.FLAG,
+}
+DEFAULT_CANDIDATE_SEVERITIES: tuple[str, ...] = (
+    JudgeVerdict.Severity.CRITICAL,
+    JudgeVerdict.Severity.MAJOR,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -552,6 +568,8 @@ def _prepare_round_unit(
     writable_ids: set[int],
     attempt: int,
     attempts: int,
+    candidate_verdicts: frozenset[str] = _CANDIDATE_VERDICTS,
+    mutating_repairs: bool = True,
 ) -> _PreparedRound | None:
     """Project a round and describe its repair inputs without fetching them."""
     current = _refresh_unit(unit)
@@ -567,16 +585,19 @@ def _prepare_round_unit(
         return None
     # Precedence: an active max-length check selects the mutating path and
     # suppresses candidate storage for the round (a preview that still
-    # overflows is not applicable). Otherwise REJECT and FLAG select the
-    # candidate path regardless of writable state or remaining attempts.
+    # overflows is not applicable). Otherwise the run purpose's candidate
+    # verdicts select the candidate path regardless of writable state or
+    # remaining attempts. A producer re-check turns mutating repairs off
+    # entirely, so max-length there neither mutates nor stores.
     needs_mutating_repair = (
-        verdict.verdict != JudgeVerdict.Verdict.UNPARSED
+        mutating_repairs
+        and verdict.verdict != JudgeVerdict.Verdict.UNPARSED
         and _has_active_check(current, "max-length")
         and attempt < attempts
         and unit.id in writable_ids
     )
     needs_candidate = (
-        verdict.verdict in _CANDIDATE_VERDICTS and not needs_mutating_repair
+        verdict.verdict in candidate_verdicts and not needs_mutating_repair
     )
     return _PreparedRound(
         unit=current,
@@ -1167,6 +1188,8 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals]
     seats: tuple[int, ...] | None = None,
     use_cache: bool = True,
     retry_deadline: float | None = None,
+    candidate_severities: tuple[str, ...] = DEFAULT_CANDIDATE_SEVERITIES,
+    mutating_repairs: bool = True,
 ) -> JudgeBatchResult:
     """
     Judge every unit with both seats; repair writable defects.
@@ -1175,7 +1198,15 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals]
     ``run`` exists only to keep the producer-run boundary explicit to callers.
     ``retry_deadline`` (monotonic seconds) bounds how long an in-run retry
     may sleep, so a drain pass can never sleep past its deferral lease.
+    ``candidate_severities`` names the severities whose verdict stores a
+    producer candidate; a producer one-unit re-check narrows it to critical
+    and turns ``mutating_repairs`` off, which makes the run evidence-only.
     """
+    candidate_verdicts = frozenset(
+        _CANDIDATE_VERDICT_BY_SEVERITY[severity]
+        for severity in candidate_severities
+        if severity in _CANDIDATE_VERDICT_BY_SEVERITY
+    )
     if not units:
         return JudgeBatchResult()
     validate_judge_configuration()
@@ -1335,6 +1366,8 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals]
                 ),
                 attempt=attempt,
                 attempts=attempts,
+                candidate_verdicts=candidate_verdicts,
+                mutating_repairs=mutating_repairs,
             )
             for unit in pending
         ]
@@ -1796,3 +1829,310 @@ def drain_judge_deferrals() -> int:
     finally:
         _release_judge_deferrals(token)
     return processed
+
+# --- Producer single-unit flows: re-check and candidate generation ---------
+
+# A generation that never completed (a crashed worker) unlocks after this
+# TTL; a healthy task clears the key in `finally`.
+GENERATION_LOCK_TTL_SECONDS = 900
+
+
+def recheck_query(unit_id: int) -> str:
+    """The exact-one-string query a producer re-check run carries."""
+    return f"id:{unit_id}"
+
+
+def active_recheck_run(unit: Unit) -> JudgeRun | None:
+    """The queued or running re-check for this unit, if one is in flight."""
+    return JudgeRun.objects.filter(
+        scope_type=JudgeRun.ScopeType.TRANSLATION,
+        scope_id=str(unit.translation_id),
+        requested_mode="recheck",
+        requested_query=recheck_query(unit.pk),
+        status__in=[JudgeRun.Status.QUEUED, JudgeRun.Status.RUNNING],
+    ).order_by("-created").first()
+
+
+def _unit_context_hash(unit: Unit) -> str:
+    return compute_context_hash(
+        source=unit.source,
+        note=unit.source_unit.note,
+        explanation=unit.source_unit.explanation,
+        glossary_terms=get_matched_glossary_prompt_entries(unit),
+    )
+
+
+def active_judge_candidate(unit: Unit, verdict: JudgeVerdict | None):
+    """
+    Return the active stored candidate for a verdict, or None.
+
+    Active means: the verdict is a current unresolved REJECT/FLAG, and the
+    candidate's own target/context hashes still match the unit (invariant 2).
+    Malformed metadata is never a candidate; an identical-text human
+    suggestion is not reclassified either.
+    """
+    from weblate.trans.models.suggestion import Suggestion
+
+    if (
+        verdict is None
+        or verdict.resolution
+        or verdict.verdict not in _CANDIDATE_VERDICTS
+    ):
+        return None
+    target_hash = compute_target_hash(unit.get_target_plurals())
+    context_hash = _unit_context_hash(unit)
+    for suggestion in Suggestion.objects.filter(unit=unit).order_by("-timestamp"):
+        try:
+            metadata = JudgeCandidateMetadata.parse(suggestion.userdetails)
+        except JudgeCandidateError:
+            continue
+        if metadata is None:
+            continue
+        if (
+            metadata.verdict_id == verdict.pk
+            and metadata.target_hash == target_hash
+            and metadata.context_hash == context_hash
+        ):
+            return suggestion
+    return None
+
+
+def queue_judge_recheck(unit: Unit, actor: User) -> tuple[JudgeRun, bool]:
+    """
+    Reuse or create the one queued/running re-check run for this unit.
+
+    Returns the run and whether it was newly created; the view needs the
+    distinction for its message while both callers must never dispatch a
+    second paid run. Under the Unit lock so two rapid POSTs cannot queue
+    two runs (invariant 8). The task is dispatched on commit; a broker
+    failure marks the run FAILED rather than leaving it queued forever.
+    """
+    from weblate.trans.models import Unit as UnitModel
+    from weblate.trans.tasks import auto_translate
+
+    query = recheck_query(unit.pk)
+    translation = unit.translation
+    with transaction.atomic():
+        UnitModel.objects.select_for_update().get(pk=unit.pk)
+        existing = active_recheck_run(unit)
+        if existing is not None:
+            return existing, False
+        run = JudgeRun.objects.create(
+            actor=actor,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(translation.pk),
+            scope_label=str(translation),
+            scope_path=translation.get_absolute_url(),
+            requested_query=query,
+            requested_mode="recheck",
+            cap=1,
+            status=JudgeRun.Status.QUEUED,
+            configuration_snapshot=judge_configuration_snapshot(),
+        )
+
+    def dispatch() -> None:
+        try:
+            task = auto_translate.delay(
+                user_id=actor.pk,
+                mode="judge",
+                q=query,
+                auto_source="mt",
+                source_component_id=None,
+                engines=[],
+                threshold=MACHINERY_DEFAULT_THRESHOLD,
+                translation_id=translation.pk,
+                unit_ids=[unit.pk],
+                judge_run_id=str(run.pk),
+                judge_pretranslate=False,
+                judge_mutating_repairs=False,
+                judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
+            )
+        except Exception:
+            LOGGER.exception("Failed to dispatch a judge re-check run")
+            JudgeRun.objects.filter(pk=run.pk).update(
+                status=JudgeRun.Status.FAILED,
+                finished=timezone.now(),
+                failure="The re-check could not be queued for execution.",
+            )
+            return
+        JudgeRun.objects.filter(pk=run.pk).update(task_id=task.id)
+
+    transaction.on_commit(dispatch)
+    return run, True
+
+
+def accept_judge_candidate(
+    candidate: Suggestion, request: AuthenticatedHttpRequest
+) -> None:
+    """
+    Accept a stored judge repair candidate under every acceptance guard.
+
+    Stronger than a plain ``suggestion.accept``: requires both unit.review
+    and translation.auto (invariant 5). Locks Unit, Suggestion, then the
+    representative JudgeVerdict, in that order (matching _store_candidate's
+    and queue_judge_recheck's lock order), and only proceeds while that
+    verdict is still the current unresolved REJECT/FLAG for this exact
+    target/context (invariant 2). Writes STATE_FUZZY with ActionEvents.ACCEPT
+    provenance and propagate=False (invariant 4), consumes the candidate, and
+    queues the one paid re-check that alone can make the string shippable
+    again (invariant 8). Every guard failure raises JudgeCandidateError with
+    a producer-facing message; callers translate it into their own response
+    shape.
+    """
+    from weblate.trans.models import Unit as UnitModel
+    from weblate.trans.models.suggestion import Suggestion as SuggestionModel
+
+    user = request.user
+    unit = candidate.unit
+    if not user.has_perm("unit.review", unit) or not user.has_perm(
+        "translation.auto", unit.translation
+    ):
+        raise JudgeCandidateError(
+            gettext("You do not have permission to accept this candidate.")
+        )
+
+    with transaction.atomic():
+        locked_unit = (
+            UnitModel.objects.select_for_update()
+            .prefetch()
+            .prefetch_source()
+            .get(pk=unit.pk)
+        )
+        try:
+            locked_candidate = SuggestionModel.objects.select_for_update().get(
+                pk=candidate.pk
+            )
+        except SuggestionModel.DoesNotExist:
+            raise JudgeCandidateError(
+                gettext("This candidate has already been handled.")
+            ) from None
+        metadata = JudgeCandidateMetadata.parse(locked_candidate.userdetails)
+        if metadata is None:
+            raise JudgeCandidateError("not a judge repair candidate")
+        try:
+            verdict = JudgeVerdict.objects.select_for_update().get(
+                pk=metadata.verdict_id
+            )
+        except JudgeVerdict.DoesNotExist:
+            raise JudgeCandidateError(
+                gettext("The verdict behind this candidate no longer exists.")
+            ) from None
+        # Checked before verdict identity: current_verdict() is itself
+        # hash-matched, so a target/context drift and "another verdict
+        # superseded this one" would otherwise both surface as the same
+        # "no longer current" outcome. Producers need the more specific
+        # message when the text itself is what moved (invariant 2).
+        if metadata.target_hash != compute_target_hash(
+            locked_unit.get_target_plurals()
+        ) or metadata.context_hash != _unit_context_hash(locked_unit):
+            raise JudgeCandidateError(
+                gettext("This candidate no longer matches the current text.")
+            )
+        current = current_verdict(locked_unit)
+        if (
+            verdict.resolution
+            or verdict.verdict not in _CANDIDATE_VERDICTS
+            or current is None
+            or current.pk != verdict.pk
+        ):
+            raise JudgeCandidateError(
+                gettext("The verdict is no longer current for this string.")
+            )
+
+        locked_unit.translate(
+            user,
+            locked_candidate.target_list,
+            STATE_FUZZY,
+            change_action=ActionEvents.ACCEPT,
+            propagate=False,
+            change_details={
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+            },
+        )
+        locked_candidate.delete()
+
+    queue_judge_recheck(locked_unit, user)
+
+
+def _generation_lock_key(unit_id: int, verdict_id: int) -> str:
+    return f"judge-candidate-generation:{unit_id}:{verdict_id}"
+
+
+def generation_pending(unit_id: int, verdict_id: int) -> bool:
+    """Whether a generation task is currently in flight for this verdict."""
+    from django.core.cache import cache
+
+    return bool(cache.get(_generation_lock_key(unit_id, verdict_id)))
+
+
+def generate_candidate_for_verdict(
+    *, unit_id: int, verdict_id: int, user: User | None, replace: bool
+) -> str:
+    """
+    Generate one stored candidate for the unit's current unresolved verdict.
+
+    Calls the repair engine exactly once, writes nothing but a candidate,
+    and never mutates the target (invariant 1). Outcome codes are stable:
+    generated / existing / stale / resolved / invalid-verdict / max-length /
+    no-engine / busy / failed / drift. A paid output that no longer matches
+    the judged snapshot is discarded, keeping any older candidate.
+    """
+    from django.core.cache import cache
+
+    key = _generation_lock_key(unit_id, verdict_id)
+    if not cache.add(key, "1", timeout=GENERATION_LOCK_TTL_SECONDS):
+        return "busy"
+    try:
+        return _generate_candidate(
+            unit_id=unit_id, verdict_id=verdict_id, user=user, replace=replace
+        )
+    finally:
+        cache.delete(key)
+
+
+def _generate_candidate(
+    *, unit_id: int, verdict_id: int, user: User | None, replace: bool
+) -> str:
+    from weblate.trans.models import Unit as UnitModel
+
+    unit = UnitModel.objects.filter(pk=unit_id).prefetch_full().first()
+    if unit is None:
+        return "stale"
+    unit.invalidate_checks_cache()
+    unit.clear_checks_cache()
+    unit.run_checks()
+    verdict = current_verdict(unit)
+    if verdict is None or verdict.pk != verdict_id:
+        return "stale"
+    if verdict.verdict not in _CANDIDATE_VERDICTS:
+        return "invalid-verdict"
+    if verdict.resolution:
+        return "resolved"
+    if _has_active_check(unit, "max-length"):
+        # That unit stays on the deterministic mutating path; a preview of
+        # an overflowing text is not a usable candidate.
+        return "max-length"
+    if not replace and active_judge_candidate(unit, verdict) is not None:
+        return "existing"
+    engine = configured_routed_engine(
+        unit.translation.component.project.get_machinery_settings()
+    )
+    if engine is None:
+        return "no-engine"
+    repairs = repair_targets([unit], user)
+    new_target = repairs.get(unit.pk)
+    if new_target is None:
+        return "failed"
+    request = build_request(unit)
+    stored = _store_candidate(
+        unit,
+        request,
+        unit.get_target_plurals(),
+        unit.state,
+        new_target,
+        verdict,
+        engine,
+        user,
+    )
+    return "generated" if stored else "drift"

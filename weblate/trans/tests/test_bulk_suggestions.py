@@ -9,13 +9,20 @@ from django.contrib.messages import get_messages
 from django.test import override_settings
 from django.urls import reverse
 
-from weblate.auth.models import User
+from weblate.auth.models import User, get_anonymous
+from weblate.trans.judge_loop import build_request
 from weblate.trans.models import Suggestion
+from weblate.trans.models.judge import (
+    JudgeVerdict,
+    compute_context_hash,
+    compute_target_hash,
+    compute_target_storage_hash,
+)
 from weblate.trans.tasks import (
     bulk_accept_user_suggestions as bulk_accept_user_suggestions_task,
 )
 from weblate.trans.tests.test_views import ViewTestCase
-from weblate.utils.state import STATE_APPROVED
+from weblate.utils.state import STATE_APPROVED, STATE_FUZZY
 
 
 class BulkAcceptSuggestionsTest(ViewTestCase):
@@ -614,3 +621,101 @@ class BulkAcceptSuggestionsTest(ViewTestCase):
             call.kwargs["meta"]["progress"] for call in task.update_state.call_args_list
         ]
         self.assertEqual(progress_values, [0, 50, 100])
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class BulkAcceptExcludesJudgeCandidatesTest(ViewTestCase):
+    """Task 4: bulk accept never sweeps up a stored judge repair candidate."""
+
+    def setUp(self):
+        super().setUp()
+        self.translation = self.component.translation_set.get(language_code="cs")
+        self.unit = self.translation.unit_set.get(source="Hello, world!\n")
+        self.project.add_user(self.user, "Administration")
+
+    def make_verdict(self, severity="critical"):
+        request = build_request(self.unit)
+        return JudgeVerdict.objects.create(
+            unit=self.unit,
+            max_severity=severity,
+            seat=1,
+            judge_model="vendor/model-a",
+            target_hash=compute_target_hash(self.unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(self.unit.target),
+            context_hash=compute_context_hash(
+                source=request.source,
+                note=request.note,
+                explanation=request.explanation,
+                glossary_terms=request.glossary_terms,
+            ),
+        )
+
+    def make_candidate(self, verdict, target="Better translation"):
+        request = build_request(self.unit)
+        suggestion, _result = Suggestion.objects.add(
+            self.unit,
+            [target],
+            request=None,
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(self.unit.get_target_plurals()),
+                "context_hash": compute_context_hash(
+                    source=request.source,
+                    note=request.note,
+                    explanation=request.explanation,
+                    glossary_terms=request.glossary_terms,
+                ),
+                "engine": "openrouter",
+            },
+        )
+        return suggestion
+
+    def test_bulk_accept_excludes_judge_candidates(self) -> None:
+        # A judge candidate is always authored by the anonymous automation
+        # user (invariant 7); bulk-accepting "from anonymous" must not
+        # sweep it up alongside genuinely anonymous human suggestions.
+        verdict = self.make_verdict()
+        candidate = self.make_candidate(verdict)
+        anonymous = get_anonymous()
+        self.assertEqual(candidate.user_id, anonymous.pk)
+
+        result = bulk_accept_user_suggestions_task(
+            translation_id=self.translation.pk,
+            target_user_id=anonymous.pk,
+            user_id=self.user.pk,
+            approve=False,
+            return_url="",
+        )
+
+        self.assertEqual(result["total"], 0)
+        self.assertEqual(result["accepted"], 0)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+        self.unit.refresh_from_db()
+        self.assertNotEqual(self.unit.state, STATE_FUZZY)
+
+    def test_bulk_accept_still_accepts_a_genuine_anonymous_suggestion(self) -> None:
+        anonymous = get_anonymous()
+        Suggestion.objects.create(
+            unit=self.unit, target="Genuine anonymous suggestion\n", user=anonymous
+        )
+
+        result = bulk_accept_user_suggestions_task(
+            translation_id=self.translation.pk,
+            target_user_id=anonymous.pk,
+            user_id=self.user.pk,
+            approve=False,
+            return_url="",
+        )
+
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(result["accepted"], 1)

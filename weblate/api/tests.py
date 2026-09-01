@@ -71,6 +71,7 @@ from weblate.trans.component_copy import (
     replace_component_checkout,
 )
 from weblate.trans.exceptions import FailedCommitError, FileParseError
+from weblate.trans.judge_loop import build_request
 from weblate.trans.models import (
     Announcement,
     Category,
@@ -85,6 +86,13 @@ from weblate.trans.models import (
     WorkflowSetting,
 )
 from weblate.trans.models.component import ComponentQuerySet
+from weblate.trans.models.judge import (
+    JudgeRun,
+    JudgeVerdict,
+    compute_context_hash,
+    compute_target_hash,
+    compute_target_storage_hash,
+)
 from weblate.trans.tests.utils import (
     RepoTestMixin,
     clear_users_cache,
@@ -101,6 +109,7 @@ from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.state import (
     STATE_APPROVED,
     STATE_EMPTY,
+    STATE_FUZZY,
     STATE_NEEDS_CHECKING,
     STATE_NEEDS_REWRITING,
     STATE_READONLY,
@@ -13309,6 +13318,103 @@ class SuggestionAPITest(APIBaseTest):
         self.assertFalse(unit.suggestion_set.exists())
         unit.refresh_from_db()
         self.assertEqual(unit.target, "Navrh\n")
+
+    # -- Task 4: judge repair candidates go through the guarded service ---
+
+    def _make_judge_verdict(self, unit, severity="critical"):
+        request = build_request(unit)
+        return JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity=severity,
+            seat=1,
+            judge_model="vendor/model-a",
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(unit.target),
+            context_hash=compute_context_hash(
+                source=request.source,
+                note=request.note,
+                explanation=request.explanation,
+                glossary_terms=request.glossary_terms,
+            ),
+        )
+
+    def _make_judge_candidate(self, unit, verdict, target="Navrh"):
+        request = build_request(unit)
+        suggestion, _result = Suggestion.objects.add(
+            unit,
+            [target],
+            request=None,
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": compute_context_hash(
+                    source=request.source,
+                    note=request.note,
+                    explanation=request.explanation,
+                    glossary_terms=request.glossary_terms,
+                ),
+                "engine": "openrouter",
+            },
+        )
+        return suggestion
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_accept_judge_candidate_holds_fuzzy_and_queues_recheck(self) -> None:
+        self.project.translation_review = True
+        self.project.save(update_fields=["translation_review"])
+        unit = self._get_unit()
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        with (
+            patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-1"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.do_request(
+                "api:suggestion-accept",
+                kwargs={"pk": candidate.pk},
+                method="post",
+                superuser=True,
+                code=200,
+            )
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_FUZZY)
+        self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
+        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 1)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor-a/model",
+        JUDGE_MODEL_SEAT_2="vendor-b/model",
+    )
+    def test_accept_judge_candidate_without_review_returns_typed_error(self) -> None:
+        unit = self._get_unit()
+        verdict = self._make_judge_verdict(unit)
+        candidate = self._make_judge_candidate(unit, verdict)
+        response = self.do_request(
+            "api:suggestion-accept",
+            kwargs={"pk": candidate.pk},
+            method="post",
+            code=400,
+        )
+        self.assertEqual(response.data["result"], "error")
+        self.assertIn("permission", response.data["detail"].lower())
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+        unit.refresh_from_db()
+        self.assertNotEqual(unit.state, STATE_FUZZY)
 
 
 class ScreenshotAPITest(APIBaseTest):

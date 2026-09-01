@@ -167,6 +167,7 @@ from weblate.trans.models import (
     SuggestionAddResult,
     Unit,
 )
+from weblate.trans.models.judge import JudgeCandidateError
 from weblate.trans.models.project import ProjectQuerySet, prefetch_project_flags
 from weblate.trans.models.translation import Translation, TranslationQuerySet
 from weblate.trans.tasks import (
@@ -4085,10 +4086,16 @@ class SuggestionViewSet(viewsets.ReadOnlyModelViewSet, DestroyModelMixin):
                     request, getattr(review_permission, "reason", None)
                 )
 
-        suggestion.accept(
-            request,
-            state=STATE_APPROVED if approve else STATE_TRANSLATED,
-        )
+        try:
+            suggestion.accept(
+                request,
+                state=STATE_APPROVED if approve else STATE_TRANSLATED,
+            )
+        except JudgeCandidateError as error:
+            return Response(
+                data={"result": "error", "detail": str(error)},
+                status=HTTP_400_BAD_REQUEST,
+            )
         return Response(data={"result": "accepted"}, status=HTTP_200_OK)
 
     @extend_schema(

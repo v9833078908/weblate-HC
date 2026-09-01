@@ -477,6 +477,21 @@ real_patterns = [
         weblate.trans.views.edit.resolve_judge_verdict,
         name="resolve-judge-verdict",
     ),
+    path(
+        "judge-candidate/<int:pk>/generate/",
+        weblate.trans.views.edit.judge_generate_candidate,
+        name="judge-generate-candidate",
+    ),
+    path(
+        "judge-recheck/<int:pk>/",
+        weblate.trans.views.edit.judge_recheck,
+        name="judge-recheck",
+    ),
+    path(
+        "judge-candidate/<int:pk>/accept/",
+        weblate.trans.views.edit.judge_accept_candidate,
+        name="judge-accept-candidate",
+    ),
     # VCS manipulation - commit
     path(
         "commit/<object_path:path>/",

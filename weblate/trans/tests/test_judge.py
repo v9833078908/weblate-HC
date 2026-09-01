@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import threading
 import uuid
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.exceptions import PermissionDenied
@@ -15,18 +16,20 @@ from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.utils import translation
 from django.utils.translation import gettext
 
-from weblate.auth.models import Group, setup_project_groups
+from weblate.auth.models import Group, Permission, Role, setup_project_groups
 from weblate.trans.actions import ActionEvents
 from weblate.trans.change_display import RenderJudgeResolution
 from weblate.trans.forms import JudgeResolutionForm
 from weblate.trans.judge import judge_request_upper_bound
-from weblate.trans.judge_loop import build_request
+from weblate.trans.judge_loop import accept_judge_candidate, build_request
+from weblate.trans.models import Suggestion
 from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
     SEVERITY_RANK,
     JudgeCandidateError,
     JudgeCandidateMetadata,
     JudgeResolutionError,
+    JudgeRun,
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
@@ -881,3 +884,221 @@ class JudgeCandidateMetadataTest(SimpleTestCase):
         broken["judge_run_id"] = "not-a-uuid"
         with self.assertRaises(JudgeCandidateError):
             JudgeCandidateMetadata(broken)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class JudgeCandidateAcceptanceTest(ViewTestCase):
+    """Direct tests for accept_judge_candidate (Task 4 acceptance guard)."""
+
+    def enable_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def grant(self, codenames) -> None:
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+        role = Role.objects.create(name="Candidate acceptance")
+        for codename in codenames:
+            role.permissions.add(Permission.objects.get(codename=codename))
+        group = Group.objects.create(name="Candidate accepters")
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault(
+            "target_storage_hash", compute_target_storage_hash(unit.target)
+        )
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(unit=unit, max_severity=severity, **kwargs)
+        unit.run_checks()
+        return verdict
+
+    def make_candidate(self, unit, verdict, target="Better translation"):
+        metadata = {
+            "kind": "judge-repair",
+            "schema": 1,
+            "judge_verdict_id": verdict.pk,
+            "judge_run_id": str(verdict.run_id),
+            "target_hash": compute_target_hash(unit.get_target_plurals()),
+            "context_hash": judge_context_hash(unit),
+            "engine": "openrouter",
+        }
+        suggestion, _result = Suggestion.objects.add(
+            unit,
+            [target],
+            request=None,
+            vote=False,
+            raise_exception=False,
+            userdetails=metadata,
+        )
+        return suggestion
+
+    def accept_as(self, candidate, user=None) -> None:
+        request = self.get_request()
+        request.user = user or self.user
+        with (
+            patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-1"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            accept_judge_candidate(candidate, request)
+
+    def test_accept_holds_fuzzy_consumes_candidate_and_queues_recheck(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+
+        self.accept_as(candidate)
+
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_FUZZY)
+        self.assertEqual(refreshed.target, "Better translation\n")
+        self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
+        runs = JudgeRun.objects.filter(
+            requested_mode="recheck", scope_id=str(unit.translation_id)
+        )
+        self.assertEqual(runs.count(), 1)
+        change = (
+            Change.objects.filter(unit=unit, action=ActionEvents.ACCEPT)
+            .order_by("-pk")
+            .first()
+        )
+        self.assertIsNotNone(change)
+        self.assertEqual(change.details.get("judge_verdict_id"), verdict.pk)
+        self.assertEqual(change.details.get("judge_run_id"), str(verdict.run_id))
+
+    def test_accept_denied_without_unit_review(self) -> None:
+        self.grant(["translation.auto"])
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        before_target = unit.target
+
+        with self.assertRaises(JudgeCandidateError):
+            self.accept_as(candidate)
+
+        self.assertEqual(self.get_unit().target, before_target)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+        self.assertFalse(JudgeRun.objects.filter(requested_mode="recheck").exists())
+
+    def test_accept_denied_without_translation_auto(self) -> None:
+        self.grant(["unit.review"])
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        before_target = unit.target
+
+        with self.assertRaises(JudgeCandidateError):
+            self.accept_as(candidate)
+
+        self.assertEqual(self.get_unit().target, before_target)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_fails_on_target_drift(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        unit.translate(self.user, ["Manually edited"], STATE_TRANSLATED)
+
+        with self.assertRaises(JudgeCandidateError):
+            self.accept_as(candidate)
+
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.target, "Manually edited\n")
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+        self.assertFalse(JudgeRun.objects.filter(requested_mode="recheck").exists())
+
+    def test_accept_fails_on_context_drift(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        source_unit = unit.source_unit
+        source_unit.explanation = "a fresh glossary note"
+        source_unit.save(update_fields=["explanation"])
+
+        with self.assertRaises(JudgeCandidateError):
+            self.accept_as(candidate)
+
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_fails_when_another_verdict_is_now_current(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        # A second row for the SAME seat and the SAME target/context (e.g. a
+        # deferral retry) supersedes the verdict the candidate was minted
+        # for: _seat_round_rows always takes each seat's newest row.
+        newer = self.make_verdict(unit, "critical", seat=verdict.seat)
+        self.assertNotEqual(newer.pk, verdict.pk)
+        self.assertEqual(current_verdict(unit).pk, newer.pk)
+
+        with self.assertRaises(JudgeCandidateError):
+            self.accept_as(candidate)
+
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_fails_on_resolved_verdict(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ESCALATED,
+            reason="needs a human look",
+        )
+
+        with self.assertRaises(JudgeCandidateError):
+            self.accept_as(candidate)
+
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_fails_on_malformed_metadata(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        candidate = Suggestion.objects.create(
+            unit=unit,
+            target="Broken candidate",
+            userdetails={"kind": "judge-repair", "schema": 1},
+        )
+
+        with self.assertRaises(JudgeCandidateError):
+            self.accept_as(candidate)
+
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_fails_on_stale_suggestion_id(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        stale_pk = candidate.pk
+        candidate.delete()
+        # A dangling reference to a Python object whose row is already gone
+        # under lock: the concurrent-handling case.
+        candidate.pk = stale_pk
+
+        with self.assertRaises(JudgeCandidateError):
+            self.accept_as(candidate)
+

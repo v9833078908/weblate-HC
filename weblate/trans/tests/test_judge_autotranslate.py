@@ -12,7 +12,12 @@ from django.test import override_settings
 
 from weblate.trans.autotranslate import AutoTranslate, BatchAutoTranslate
 from weblate.trans.judge import JudgeError, JudgeResult
-from weblate.trans.judge_loop import build_request
+from weblate.trans.judge_loop import (
+    DEFAULT_CANDIDATE_SEVERITIES,
+    build_request,
+    recheck_query,
+    run_judge_batch,
+)
 from weblate.trans.models.judge import (
     JudgeRun,
     JudgeRunUnit,
@@ -63,7 +68,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         attempt=0,
         unit_ids=None,
     ):
-        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             out = {}
             for u in units:
                 request = build_request(u)
@@ -124,7 +129,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         unit = self.get_unit()
         unit.translate(self.user, ["some target"], STATE_TRANSLATED)
 
-        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             out = {}
             for candidate in units:
                 request = build_request(candidate)
@@ -369,7 +374,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             unit_ids=[unit.id],
         )
 
-        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             current = units[0]
             request = build_request(current)
             verdict = JudgeVerdict.objects.create(
@@ -412,7 +417,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             auto.progress_steps = 1
             auto.set_progress(1)
 
-        def fake_judge(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_judge(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             if on_batch is not None:
                 on_batch([object()], [object()])
             return {}
@@ -448,7 +453,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         auto.progress_range = (0, 100)
         reported: list[int] = []
 
-        def fake_judge(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_judge(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             # One string, two seats, one repair attempt: four batches, which a
             # denominator sized to a single round would clamp into a plateau.
             for _ in range(2 * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)):
@@ -540,7 +545,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         assert unit1 is not None
         assert unit2 is not None
 
-        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             out = {}
             for u in units:
                 request = build_request(u)
@@ -627,7 +632,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         assert unit2 is not None
         calls: list[list[int]] = []
 
-        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             calls.append([unit.id for unit in units])
             if units[0].id == unit1.id:
                 msg = "boom"
@@ -704,7 +709,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         auto.progress_range = (0, 100)
         reported: list[tuple[str | None, int | None, int | None]] = []
 
-        def fake_judge(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_judge(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             for _ in range(2):
                 on_batch([object()], [object()])
             return {}
@@ -744,7 +749,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         auto.progress_range = (0, 100)
         reported: list[tuple[str | None, int | None, int | None]] = []
 
-        def fake_judge(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_judge(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             for _ in range(2 * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)):
                 on_batch([object()], [object()])
             return {}
@@ -803,7 +808,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
 
         seen_runs: list[JudgeRun | None] = []
 
-        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             seen_runs.append(run)
             verdicts = {}
             for unit in units:
@@ -859,7 +864,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         units = [translation.unit_set.first() for translation in translations]
         self.assertTrue(all(units))
 
-        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             unit = units[0]
             request = build_request(unit)
             return {
@@ -936,7 +941,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         unit = self.get_unit()
         unit.translate(self.user, ["original"], STATE_TRANSLATED)
 
-        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             current = units[0]
             request = build_request(current)
             verdict = JudgeVerdict.objects.create(
@@ -1108,7 +1113,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
     def test_deleted_unit_and_verdict_leave_a_safe_dangling_row(self) -> None:
         unit = self.get_unit()
 
-        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None):
+        def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             current = units[0]
             request = build_request(current)
             return {
@@ -1156,3 +1161,235 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertIsNone(row.unit)
         self.assertIsNone(row.verdict)
         self.assertEqual(row.unit_id_snapshot, unit.id)
+
+
+    # -- Task 3: producer one-unit re-check -------------------------------
+
+    def _make_queued_recheck_run(self, unit, *, query=None, status=None):
+        translation = unit.translation
+        return JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(translation.pk),
+            scope_label=str(translation),
+            scope_path=translation.get_absolute_url(),
+            requested_query=query or recheck_query(unit.pk),
+            requested_mode="recheck",
+            cap=1,
+            status=status or JudgeRun.Status.QUEUED,
+            configuration_snapshot={},
+        )
+
+    def test_recheck_skips_pretranslation_and_mutating_path(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Existing translation"], STATE_TRANSLATED)
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q=recheck_query(unit.pk),
+            mode="judge",
+            unit_ids=[unit.pk],
+            overwrite_existing=True,
+            judge_pretranslate=False,
+            judge_mutating_repairs=False,
+            judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
+        )
+        with (
+            mock.patch.object(auto, "process_mt") as mt,
+            mock.patch(
+                "weblate.trans.autotranslate.run_judge_batch", return_value={}
+            ) as run,
+        ):
+            auto.process_judge(engines=[], threshold=80)
+        mt.assert_not_called()
+        kwargs = run.call_args.kwargs
+        self.assertEqual(kwargs["writable_ids"], set())
+        self.assertIs(kwargs["mutating_repairs"], False)
+        self.assertEqual(kwargs["candidate_severities"], ("critical",))
+        self.assertEqual(self.get_unit().target.strip(), "Existing translation")
+
+    def test_recheck_pass_projects_without_any_repair(self) -> None:
+        unit = self.get_unit()
+        unit.translate(self.user, ["Good translation"], STATE_TRANSLATED)
+        passed = JudgeResult("none", "pass", [], "")
+        client = mock.Mock(
+            side_effect=lambda requests, *, on_batch, **kwargs: (
+                on_batch(requests, [passed]),
+                [passed],
+            )[-1]
+        )
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q=recheck_query(unit.pk),
+            mode="judge",
+            unit_ids=[unit.pk],
+            judge_pretranslate=False,
+            judge_mutating_repairs=False,
+            judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
+        )
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets") as repair,
+        ):
+            auto.process_judge(engines=[], threshold=80)
+        self.assertEqual(client.call_count, 2)
+        repair.assert_not_called()
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.target.strip(), "Good translation")
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+        self.assertEqual(refreshed.suggestion_set.count(), 0)
+
+    def test_recheck_major_projects_directly_without_a_candidate(self) -> None:
+        # The re-check's candidate set is critical-only: an admissible major
+        # projects to its release state and pays no repair MT call.
+        unit = self.get_unit()
+        unit.translate(self.user, ["Tolerable translation"], STATE_TRANSLATED)
+        major = JudgeResult("major", "flag", [], "")
+        client = mock.Mock(
+            side_effect=lambda requests, *, on_batch, **kwargs: (
+                on_batch(requests, [major]),
+                [major],
+            )[-1]
+        )
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q=recheck_query(unit.pk),
+            mode="judge",
+            unit_ids=[unit.pk],
+            judge_pretranslate=False,
+            judge_mutating_repairs=False,
+            judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
+        )
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets") as repair,
+        ):
+            auto.process_judge(engines=[], threshold=80)
+        self.assertEqual(client.call_count, 2)
+        repair.assert_not_called()
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+        self.assertEqual(refreshed.suggestion_set.count(), 0)
+
+    def test_recheck_critical_holds_target_and_stores_one_candidate(self) -> None:
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Failing translation"], STATE_TRANSLATED)
+        critical = JudgeResult("critical", "reject", [], "")
+        client = mock.Mock(
+            side_effect=lambda requests, *, on_batch, **kwargs: (
+                on_batch(requests, [critical]),
+                [critical],
+            )[-1]
+        )
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q=recheck_query(unit.pk),
+            mode="judge",
+            unit_ids=[unit.pk],
+            judge_pretranslate=False,
+            judge_mutating_repairs=False,
+            judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
+        )
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.repair_targets",
+                return_value={unit.pk: ["Better translation"]},
+            ) as repair,
+        ):
+            auto.process_judge(engines=[], threshold=80)
+        self.assertEqual(client.call_count, 2)
+        self.assertEqual(repair.call_count, 1)
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.target.strip(), "Failing translation")
+        self.assertEqual(refreshed.state, STATE_FUZZY)
+        self.assertEqual(
+            refreshed.suggestion_set.get(
+                userdetails__kind="judge-repair"
+            ).target.strip(),
+            "Better translation",
+        )
+
+    def test_worker_adopts_the_queued_recheck_run(self) -> None:
+        unit = self.get_unit()
+        run = self._make_queued_recheck_run(unit)
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q=recheck_query(unit.pk),
+            mode="judge",
+            unit_ids=[unit.pk],
+            enforce_permissions=False,
+            judge_run_id=str(run.pk),
+            judge_pretranslate=False,
+            judge_mutating_repairs=False,
+            judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
+        )
+        with mock.patch(
+            "weblate.trans.autotranslate.run_judge_batch", return_value={}
+        ) as run_batch:
+            batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+        run.refresh_from_db()
+        self.assertEqual(run.status, JudgeRun.Status.COMPLETED)
+        self.assertIsNotNone(run.finished)
+        # The batch received the adopted run, not a newly created one.
+        self.assertEqual(run_batch.call_args.kwargs["run"].pk, run.pk)
+        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 1)
+
+    def test_worker_refuses_a_run_that_is_not_queued(self) -> None:
+        unit = self.get_unit()
+        run = self._make_queued_recheck_run(unit, status=JudgeRun.Status.RUNNING)
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q=recheck_query(unit.pk),
+            mode="judge",
+            unit_ids=[unit.pk],
+            enforce_permissions=False,
+            judge_run_id=str(run.pk),
+            judge_pretranslate=False,
+        )
+        with self.assertRaises(ValueError):
+            batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+        run.refresh_from_db()
+        # Someone else's RUNNING run must not be failed by this worker.
+        self.assertEqual(run.status, JudgeRun.Status.RUNNING)
+
+    def test_worker_fails_a_run_whose_query_mismatches(self) -> None:
+        unit = self.get_unit()
+        run = self._make_queued_recheck_run(unit, query="state:empty")
+        batch = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="state:empty",
+            mode="judge",
+            unit_ids=[unit.pk],
+            enforce_permissions=False,
+            judge_run_id=str(run.pk),
+            judge_pretranslate=False,
+        )
+        with self.assertRaises(ValueError):
+            batch.perform(
+                auto_source="mt",
+                engines=[],
+                threshold=80,
+                source_component_ids=None,
+            )
+        run.refresh_from_db()
+        self.assertEqual(run.status, JudgeRun.Status.FAILED)
+        self.assertTrue(run.failure)

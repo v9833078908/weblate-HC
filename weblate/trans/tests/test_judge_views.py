@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
+from types import SimpleNamespace
+from unittest import mock
 
 from django.db import connection
 from django.test import override_settings
@@ -14,8 +16,14 @@ from django.urls import reverse
 from django.utils import timezone
 
 from weblate.trans.actions import ActionEvents
-from weblate.trans.judge_loop import build_request
+from weblate.auth.models import Group, Permission, Role
+from weblate.trans.judge_loop import (
+    _generation_lock_key,
+    build_request,
+    recheck_query,
+)
 from weblate.trans.models.change import Change
+from weblate.trans.models.suggestion import Suggestion
 from weblate.trans.models.judge import (
     JudgeRun,
     JudgeRunUnit,
@@ -27,6 +35,8 @@ from weblate.trans.models.judge import (
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.models.unit import Unit
 from weblate.trans.tests.test_views import ViewTestCase
+from django.core.cache import cache
+
 from weblate.utils.state import (
     STATE_FUZZY,
     STATE_NEEDS_CHECKING,
@@ -1877,3 +1887,449 @@ class JudgeRunReportViewTest(ViewTestCase):
             self.client.get(self.report_url(run2))
 
         self.assertEqual(len(small), len(large))
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
+class JudgeProducerTriageViewTest(ViewTestCase):
+    """Producer one-unit re-check and candidate-generation endpoints."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        # unit.review is gated on review being enabled for the language:
+        # without it every denial comes from the feature switch, not the
+        # permission the tests are about.
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def grant(self, codenames) -> None:
+        # Two custom roles mirror the built-in split the form gate relies
+        # on: review on the unit, automatic translation on the language.
+        # Drop superuser: otherwise the denial tests would pass through
+        # the backstop rather than the role being probed.
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        role = Role.objects.create(name="Producer triage")
+        for codename in codenames:
+            role.permissions.add(Permission.objects.get(codename=codename))
+        group = Group.objects.create(name="Producer triagers")
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        return verdict
+
+    # -- permissions ------------------------------------------------------
+
+    def test_recheck_denied_without_permissions(self) -> None:
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        unit = self.get_unit()
+        response = self.client.post(
+            reverse("judge-recheck", kwargs={"pk": unit.pk}), follow=True
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_recheck_denied_with_review_only(self) -> None:
+        self.grant(["unit.review"])
+        unit = self.get_unit()
+        response = self.client.post(
+            reverse("judge-recheck", kwargs={"pk": unit.pk}), follow=True
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_generate_denied_with_auto_only(self) -> None:
+        self.grant(["translation.auto"])
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 403)
+
+    # -- re-check queueing -------------------------------------------------
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_two_rapid_posts_queue_one_run(self) -> None:
+        unit = self.get_unit()
+        url = reverse("judge-recheck", kwargs={"pk": unit.pk})
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-1"),
+            ) as delay,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            first = self.client.post(url, follow=True)
+            second = self.client.post(url, follow=True)
+        runs = JudgeRun.objects.filter(requested_mode="recheck")
+        self.assertEqual(runs.count(), 1)
+        run = runs.get()
+        self.assertEqual(run.status, JudgeRun.Status.QUEUED)
+        self.assertEqual(run.requested_query, recheck_query(unit.pk))
+        self.assertEqual(run.cap, 1)
+        self.assertEqual(run.task_id, "task-1")
+        self.assertEqual(delay.call_count, 1)
+        self.assertContains(first, "re-check has been queued", status_code=200)
+        self.assertContains(second, "already running", status_code=200)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_recheck_after_a_finished_run_queues_a_new_one(self) -> None:
+        unit = self.get_unit()
+        run = self._completed_recheck(unit)
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-2"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.client.post(
+                reverse("judge-recheck", kwargs={"pk": unit.pk}), follow=True
+            )
+        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 2)
+        self.assertNotEqual(
+            JudgeRun.objects.exclude(pk=run.pk).get().status, JudgeRun.Status.COMPLETED
+        )
+
+    def _completed_recheck(self, unit) -> JudgeRun:
+        translation = unit.translation
+        return JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(translation.pk),
+            scope_label=str(translation),
+            scope_path=translation.get_absolute_url(),
+            requested_query=recheck_query(unit.pk),
+            requested_mode="recheck",
+            cap=1,
+            status=JudgeRun.Status.COMPLETED,
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_broker_failure_marks_the_run_failed(self) -> None:
+        unit = self.get_unit()
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                side_effect=RuntimeError("broker down"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                reverse("judge-recheck", kwargs={"pk": unit.pk}), follow=True
+            )
+        run = JudgeRun.objects.get(requested_mode="recheck")
+        self.assertEqual(run.status, JudgeRun.Status.FAILED)
+        self.assertTrue(run.failure)
+        self.assertContains(response, "re-check has been queued", status_code=200)
+
+    def test_recheck_get_is_rejected(self) -> None:
+        unit = self.get_unit()
+        response = self.client.get(reverse("judge-recheck", kwargs={"pk": unit.pk}))
+        self.assertEqual(response.status_code, 405)
+
+    # -- unit-page badge context ------------------------------------------
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_unit_page_reports_a_pending_recheck(self) -> None:
+        unit = self.get_unit()
+        self._completed_recheck(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertIsNone(response.context["judge_recheck_pending"])
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-3"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.client.post(reverse("judge-recheck", kwargs={"pk": unit.pk}))
+        response = self.client.get(unit.get_absolute_url())
+        run = response.context["judge_recheck_pending"]
+        self.assertIsNotNone(run)
+        self.assertEqual(run.requested_mode, "recheck")
+
+    def test_unit_page_exposes_the_active_candidate(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertIsNone(response.context["judge_candidate"])
+        Suggestion.objects.add(
+            unit,
+            ["better text"],
+            request=self.get_request(),
+            vote=False,
+            user=self.user,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": judge_context_hash(unit),
+                "engine": "openrouter",
+            },
+        )
+        unit = self.get_unit()
+        response = self.client.get(unit.get_absolute_url())
+        candidate = response.context["judge_candidate"]
+        self.assertIsNotNone(candidate)
+        self.assertEqual(candidate.target.strip(), "better text")
+        self.assertFalse(response.context["judge_generation_pending"])
+
+    def test_candidate_disappears_with_a_stale_target_hash(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        Suggestion.objects.add(
+            unit,
+            ["better text"],
+            request=self.get_request(),
+            vote=False,
+            user=self.user,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": "0" * 64,
+                "context_hash": judge_context_hash(unit),
+                "engine": "openrouter",
+            },
+        )
+        response = self.client.get(self.get_unit().get_absolute_url())
+        self.assertIsNone(response.context["judge_candidate"])
+
+    # -- candidate generation ---------------------------------------------
+
+    def test_generate_pass_verdict_is_refused(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "none")
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate"
+        ) as generate:
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                follow=True,
+            )
+        generate.assert_not_called()
+        self.assertContains(response, "no longer expects a candidate", status_code=200)
+
+    def test_generate_resolved_verdict_is_refused(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        verdict.resolution = JudgeVerdict.Resolution.ESCALATED
+        verdict.save(update_fields=["resolution"])
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate"
+        ) as generate:
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                follow=True,
+            )
+        generate.assert_not_called()
+        self.assertContains(response, "no longer expects a candidate", status_code=200)
+
+    def test_generate_pending_lock_reports_busy(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate"
+        ) as generate:
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                follow=True,
+            )
+        generate.assert_not_called()
+        self.assertContains(response, "already being generated", status_code=200)
+
+    def test_generate_eager_success_reports_stored(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate",
+            return_value="generated",
+        ) as generate:
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                follow=True,
+            )
+        generate.assert_called_once_with(
+            unit_id=unit.pk, verdict_id=verdict.pk, user_id=self.user.pk, replace=False
+        )
+        self.assertContains(response, "candidate has been stored", status_code=200)
+
+    def test_generate_eager_failure_keeps_previous_candidate(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "major")
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate",
+            return_value="failed",
+        ):
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                follow=True,
+            )
+        self.assertContains(
+            response, "previous candidate remains", status_code=200
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_generate_non_eager_dispatches_with_kwargs(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate.delay"
+        ) as delay:
+            response = self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                {"replace": "1"},
+                follow=True,
+            )
+        delay.assert_called_once_with(
+            unit_id=unit.pk, verdict_id=verdict.pk, user_id=self.user.pk, replace=True
+        )
+        self.assertContains(response, "generation has been queued", status_code=200)
+
+    def test_generate_replace_bypasses_the_pending_gate(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        with mock.patch(
+            "weblate.trans.views.edit.generate_judge_candidate",
+            return_value="generated",
+        ) as generate:
+            self.client.post(
+                reverse("judge-generate-candidate", kwargs={"pk": verdict.pk}),
+                {"replace": "1"},
+            )
+        self.assertTrue(generate.call_args.kwargs["replace"])
+
+    # -- candidate acceptance ----------------------------------------------
+
+    def make_candidate(self, unit, verdict, target="Better translation"):
+        suggestion, _result = Suggestion.objects.add(
+            unit,
+            [target],
+            request=self.get_request(),
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": judge_context_hash(unit),
+                "engine": "openrouter",
+            },
+        )
+        return suggestion
+
+    def test_accept_denied_without_permissions(self) -> None:
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_accept_denied_with_review_only(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        self.grant(["unit.review"])
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_accept_denied_with_auto_only(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        self.grant(["translation.auto"])
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_accept_missing_suggestion_is_404(self) -> None:
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": 999999}),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_accept_get_is_rejected(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        response = self.client.get(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk})
+        )
+        self.assertEqual(response.status_code, 405)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_accept_success_holds_fuzzy_queues_recheck_and_redirects(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-1"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+                follow=True,
+            )
+        self.assertContains(response, "suggested fix has been applied", status_code=200)
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_FUZZY)
+        self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
+        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 1)
+
+    def test_accept_stale_target_shows_error_and_keeps_candidate(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        unit.translate(self.user, ["Drifted away"], STATE_TRANSLATED)
+        response = self.client.post(
+            reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+            follow=True,
+        )
+        self.assertContains(
+            response, "no longer matches the current text", status_code=200
+        )
+        self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
+        self.assertEqual(self.get_unit().target, "Drifted away\n")

@@ -4,16 +4,29 @@
   {% for suggestion in suggestions %}
     <div class="row history-row">
       <div class="col-sm-2 history-event">
-        <strong>{{ suggestion.get_user_display }}</strong>
-        <p class="text-muted">{% translate "Suggestion added" %}</p>
-        {% if user_can_vote_suggestion %}
-          <p class="help-block">
-            {% blocktranslate count count=suggestion.get_num_votes %}{{ count }} vote{% plural %}{{ count }} votes{% endblocktranslate %}
-          </p>
+        {% if suggestion.is_judge_candidate %}
+          <strong>{% translate "AI judge" %}</strong>
+          <p class="text-muted">{% translate "Repair candidate" %}</p>
+        {% else %}
+          <strong>{{ suggestion.get_user_display }}</strong>
+          <p class="text-muted">{% translate "Suggestion added" %}</p>
+          {% if user_can_vote_suggestion %}
+            <p class="help-block">
+              {% blocktranslate count count=suggestion.get_num_votes %}{{ count }} vote{% plural %}{{ count }} votes{% endblocktranslate %}
+            </p>
+          {% endif %}
         {% endif %}
       </div>
       <div class="col-sm-10 history-data">
-        {% if multi_unit %}
+        {% if suggestion.is_judge_candidate %}
+          {# A judge repair candidate is triaged from the verdict card only:
+             no clone/vote/accept/approve/edit controls here (invariant 3). #}
+          <div class="btn-float">
+            <a href="{{ suggestion.unit.get_absolute_url }}#id_judge_card"
+               class="btn btn-link"
+               title="{% translate "View in the AI judge verdict card" %}">{% icon "link.svg" %}</a>
+          </div>
+        {% elif multi_unit %}
           <div class="btn-float">
             <a href="{{ suggestion.unit.get_absolute_url }}#suggestions"
                class="btn btn-link green"

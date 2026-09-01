@@ -59,7 +59,17 @@ from weblate.trans.forms import (
     ZenTranslationForm,
     get_new_unit_form,
 )
-from weblate.trans.judge import judge_seat_profiles
+from weblate.trans.judge import (
+    JudgeError,
+    judge_seat_profiles,
+    validate_judge_configuration,
+)
+from weblate.trans.judge_loop import (
+    active_judge_candidate,
+    active_recheck_run,
+    generation_pending,
+    queue_judge_recheck,
+)
 from weblate.trans.models import (
     Category,
     Comment,
@@ -74,6 +84,8 @@ from weblate.trans.models import (
 )
 from weblate.trans.models.judge import (
     ALLOWED_RESOLUTION_TRANSITIONS,
+    JudgeCandidateError,
+    JudgeRun,
     JudgeResolutionError,
     active_round,
     active_verdict,
@@ -86,7 +98,7 @@ from weblate.trans.models.judge import (
 )
 from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
 from weblate.trans.models.unit import fill_in_source_translation
-from weblate.trans.tasks import auto_translate
+from weblate.trans.tasks import auto_translate, generate_judge_candidate
 from weblate.trans.templatetags.translations import (
     try_linkify_filename,
     unit_state_class,
@@ -1108,14 +1120,18 @@ def handle_suggestions(
         or "accept_edit" in request.POST
         or "accept_approve" in request.POST
     ):
-        suggestion.accept(
-            request,
-            state=STATE_APPROVED
-            if "accept_approve" in request.POST
-            else STATE_TRANSLATED,
-        )
-        if "accept_edit" not in request.POST:
-            redirect_url = next_unit_url
+        try:
+            suggestion.accept(
+                request,
+                state=STATE_APPROVED
+                if "accept_approve" in request.POST
+                else STATE_TRANSLATED,
+            )
+        except JudgeCandidateError as error:
+            messages.error(request, str(error))
+        else:
+            if "accept_edit" not in request.POST:
+                redirect_url = next_unit_url
     elif "delete" in request.POST or "spam" in request.POST:
         rejection_reason = request.POST.get("rejection", "")
         if len(rejection_reason) > SUGGESTION_REJECTION_REASON_LENGTH:
@@ -1359,6 +1375,12 @@ def _judge_view_context(
         "judge_can_resolve": judge_can_resolve,
         "judge_resolution_form": judge_resolution_form,
         "judge_repair_evidence": repair_evidence(unit, active=judge_verdict),
+        "judge_candidate": active_judge_candidate(unit, judge_current_verdict),
+        "judge_recheck_pending": active_recheck_run(unit),
+        "judge_generation_pending": (
+            judge_current_verdict is not None
+            and generation_pending(unit.pk, judge_current_verdict.pk)
+        ),
     }
 
 
@@ -1867,6 +1889,140 @@ def resolve_judge_verdict(request: AuthenticatedHttpRequest, pk):
         return redirect_next(request.POST.get("next"), fallback_url)
 
     messages.info(request, gettext("The decision has been recorded."))
+    return redirect_next(request.POST.get("next"), fallback_url)
+
+
+@login_required
+@require_POST
+def judge_recheck(request: AuthenticatedHttpRequest, pk):
+    """Queue a paid one-unit re-check of the current translation."""
+    unit = get_object_or_404(
+        Unit.objects.filter_access(request.user).select_related(
+            "translation", "translation__component", "translation__language"
+        ),
+        pk=pk,
+    )
+    fallback_url = unit.get_absolute_url()
+
+    if not request.user.has_perm("unit.review", unit) or not request.user.has_perm(
+        "translation.auto", unit.translation
+    ):
+        raise PermissionDenied
+
+    try:
+        validate_judge_configuration()
+    except JudgeError as error:
+        messages.error(request, str(error))
+        return redirect_next(request.POST.get("next"), fallback_url)
+
+    run, created = queue_judge_recheck(unit, request.user)
+    if created:
+        messages.info(
+            request,
+            gettext("The re-check has been queued; the page updates when it finishes."),
+        )
+    else:
+        messages.info(request, gettext("A re-check for this string is already running."))
+    return redirect_next(request.POST.get("next"), fallback_url)
+
+
+@login_required
+@require_POST
+def judge_generate_candidate(request: AuthenticatedHttpRequest, pk):
+    """Ask the repair engine for one candidate for a held verdict."""
+    verdict_obj = get_object_or_404(
+        JudgeVerdict.objects.filter(
+            unit__in=Unit.objects.filter_access(request.user)
+        ).select_related("unit", "unit__translation"),
+        pk=pk,
+    )
+    unit = verdict_obj.unit
+    fallback_url = unit.get_absolute_url()
+
+    if not request.user.has_perm("unit.review", unit) or not request.user.has_perm(
+        "translation.auto", unit.translation
+    ):
+        raise PermissionDenied
+
+    if verdict_obj.verdict not in {
+        JudgeVerdict.Verdict.REJECT,
+        JudgeVerdict.Verdict.FLAG,
+    } or verdict_obj.resolution:
+        messages.error(request, gettext("This verdict no longer expects a candidate."))
+        return redirect_next(request.POST.get("next"), fallback_url)
+
+    replace = request.POST.get("replace") == "1"
+    if not replace and generation_pending(unit.pk, verdict_obj.pk):
+        messages.info(request, gettext("A candidate is already being generated."))
+        return redirect_next(request.POST.get("next"), fallback_url)
+
+    def report(outcome: str) -> None:
+        if outcome == "generated":
+            messages.success(request, gettext("A new candidate has been stored."))
+        elif outcome == "existing":
+            messages.info(request, gettext("This verdict already has a candidate."))
+        elif outcome == "busy":
+            messages.info(request, gettext("A candidate is already being generated."))
+        elif outcome in {"stale", "resolved", "invalid-verdict"}:
+            messages.error(
+                request, gettext("The verdict is no longer current for this string.")
+            )
+        else:
+            messages.error(
+                request,
+                gettext("Candidate generation failed; the previous candidate remains."),
+            )
+
+    if settings.CELERY_TASK_ALWAYS_EAGER:
+        report(
+            generate_judge_candidate(
+                unit_id=unit.pk,
+                verdict_id=verdict_obj.pk,
+                user_id=request.user.pk,
+                replace=replace,
+            )
+        )
+    else:
+        generate_judge_candidate.delay(
+            unit_id=unit.pk,
+            verdict_id=verdict_obj.pk,
+            user_id=request.user.pk,
+            replace=replace,
+        )
+        messages.info(request, gettext("Candidate generation has been queued."))
+    return redirect_next(request.POST.get("next"), fallback_url)
+
+
+@login_required
+@require_POST
+def judge_accept_candidate(request: AuthenticatedHttpRequest, pk):
+    """Apply a stored judge repair candidate from the verdict card."""
+    candidate = get_object_or_404(
+        Suggestion.objects.filter(
+            unit__in=Unit.objects.filter_access(request.user)
+        ).select_related("unit", "unit__translation"),
+        pk=pk,
+    )
+    unit = candidate.unit
+    fallback_url = unit.get_absolute_url()
+
+    if not request.user.has_perm("unit.review", unit) or not request.user.has_perm(
+        "translation.auto", unit.translation
+    ):
+        raise PermissionDenied
+
+    try:
+        candidate.accept(request)
+    except JudgeCandidateError as error:
+        messages.error(request, str(error))
+        return redirect_next(request.POST.get("next"), fallback_url)
+
+    messages.success(
+        request,
+        gettext(
+            "The suggested fix has been applied and held for a fresh re-check."
+        ),
+    )
     return redirect_next(request.POST.get("next"), fallback_url)
 
 
