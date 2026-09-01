@@ -1,41 +1,51 @@
-# Zero unparsed on the LiteLLM judge seats
+# Prevent false and terminal retriable judge failures
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
 > implement this plan task-by-task.
 
-**Goal:** A producer-launched judge run leaves no string silently unjudged. Two
-causes, in the order they matter:
+**Goal:** A producer-launched judge run must not turn an endpoint refusal into
+an opinion about a translation, and every nonterminal unparsed result must
+remain durably queued until a later drain can judge it. This is deliberately
+not a promise that the database contains zero historical `unparsed` rows:
+a timed-out live request records one provisional unparsed result before its
+`JudgeDeferral` is drained, and `finish-length` remains a terminal case. It is
+a plan for no **false** unparsed verdict and no silently terminal retriable
+failure.
 
 1. **A refused request must never become a verdict.** No `JudgeVerdict` may be
-   written for a request the endpoint refused; a permanent refusal stops the run
-   immediately with an operator-visible error, exactly as `http-auth` already
-   does, instead of being paid for once per batch and recorded as an opinion
-   about a translation. Tasks 1-5.
-2. **A string lost to a timeout must come back.** With the refusal path closed,
-   the durable queue can finally be enabled, so a `deadline` or `transport` unit
-   is retried by the drain instead of being terminally unjudged. Tasks 6-7.
+   written for the refused request. A permanent refusal stops the run immediately
+   with an operator-visible error, exactly as `http-auth` already does, instead
+   of being paid for once per batch and recorded as an opinion. Tasks 1-5.
+2. **A nonterminal unparsed result must be retried durably.** After the refusal
+   path is closed, enable the existing `JudgeDeferral` queue. It queues every
+   unparsed result except `finish-length`, including deadline, transport,
+   rate-limit, server and parser failures. The producer run honestly records its
+   provisional unparsed result; the queue keeps the missing seat retriable until
+   a later drain writes a parsed result or the operator investigates a `slow`
+   record. Tasks 6-7.
 
-**Architecture:** No new mechanism. Keep the closed `failure_kind` taxonomy, the
-attempt ledger, the retry budget, the adaptive batch state and the existing
-`JudgeDeferral` queue with its drain. Split the one kind that today conflates
-two unrelated things - a request the endpoint will refuse every time, and a
-request that is merely too large - route the first to the existing fail-fast
-path, then turn the queue on with its settings documented.
+**Architecture:** Reuse the closed `failure_kind` taxonomy, the attempt ledger,
+the retry budget, the adaptive batch state and the existing `JudgeDeferral`
+queue with its drain. Split the one kind that today conflates two unrelated
+things - a request the endpoint will refuse every time, and a request that is
+merely too large - and route the first to the existing fail-fast path. Before
+enabling the queue, add bounded cleanup for closed queue rows and document every
+operator setting.
 
-**Tech stack:** Python 3.14, Django settings, Celery periodic tasks, httpx2
-streaming, pytest.
+**Tech stack:** Python 3.14, Django settings and migrations, Celery periodic
+tasks, httpx2 streaming, pytest.
 
-**Status:** proposed, awaiting approval. This edits `weblate/trans/judge.py`,
-`weblate/trans/judge_loop.py` and adds a migration, so `AGENTS.md` requires
-explicit approval before any code is edited. Task 7 changes a running instance
-and needs its own separate approval on top of that.
+**Status:** proposed, awaiting approval. Tasks 1-6 change code and migrations,
+so `AGENTS.md` requires explicit approval before any code is edited. Task 7
+changes a running instance and needs separate explicit approval on top of that.
 
 **Evidence this is needed:**
-`docs/llm-first/measurements/2026-09-01-04-judge-unparsed-attribution.md`. 101 of
-the 102 diagnosable unparsed verdicts in production came from HTTP 400 or 401.
-The run of 2026-09-01 05:59 (`48bfbd72`) *completed successfully* after 50
-consecutive refused batches, writing 50 unparsed verdicts across two request
-rounds.
+`docs/llm-first/measurements/2026-09-01-04-judge-unparsed-attribution.md`
+identifies HTTP 400/401 refusals as the dominant diagnosable incident and records
+the 05:59 run (`48bfbd72`) completing after 50 refused batches. Its aggregate
+mixes attempt and verdict facts: it also records that the 401 attempt at 06:05
+created no verdict. Task 4 therefore derives the cleanup count from its guarded
+production dry-run rather than asserting the contradictory historic total.
 
 ---
 
@@ -58,12 +68,14 @@ treated as an endpoint-health signal and as a request defect.
 
 ## Non-goals
 
-- Any change to models, prompt, JSON schema, severity rubric, batch sizes or
-  deadlines.
+- Any change to provider models, prompt, JSON schema, severity rubric, batch
+  sizes or per-seat deadlines.
 - The availability fallback. A refused request must not be sent anywhere else.
-- Enabling the deferral queue. This plan only unblocks that decision.
-- Making `deadline` or `transport` unparsed impossible. That is response length
-  and endpoint health, tracked by the per-seat deadline work and the queue.
+- Making `finish-length` retriable. It remains a terminal unparsed outcome until
+  separately designed. Parser failures are not terminal: the existing queue
+  retries them like every other unparsed result.
+- Claiming a historical database with zero `unparsed` rows. The queue preserves
+  provisional history while a retriable request is pending.
 
 ## Task 1: Separate a permanent refusal from a size-dependent one
 
@@ -71,8 +83,9 @@ treated as an endpoint-health signal and as a request defect.
 
 - Modify: `weblate/trans/judge.py`
 - Modify: `weblate/trans/models/judge.py`
-- Create: `weblate/trans/migrations/<next>_judge_request_invalid_kind.py`
+- Create: `weblate/trans/migrations/0114_judge_request_invalid_kind.py`
 - Modify: `weblate/trans/tests/test_judge_client.py`
+- Modify: `weblate/trans/tests/test_judge_loop.py`
 
 ### Step 1: Write failing tests
 
@@ -102,10 +115,14 @@ uv run pytest weblate/trans/tests/test_judge_client.py -k failure_for_http
 ### Step 3: Implement
 
 Add the kind to `FAILURE_KINDS` (`weblate/trans/judge.py:49-67`) and to
-`JudgeRequestAttempt.FailureKind`, extend `_failure_for_http`, and generate the
-choices-only migration. Remove nothing from `_AVAILABILITY_FAILURE_KINDS`
-except the newly split statuses' effect: `http-other` stays in that set, since
-413 and an unclassified 4xx remain plausible transient endpoint states.
+`JudgeRequestAttempt.FailureKind`. Generate every migration operation implied by
+that enum: `JudgeRequestAttempt.failure_kind`,
+`JudgeAdaptiveState.last_failure_kind`, and `JudgeDeferral.last_failure_kind`
+all use its choices. Do not hand-write a partial one-field migration.
+
+Remove nothing from `_AVAILABILITY_FAILURE_KINDS` except the newly split
+statuses' effect: `http-other` stays in that set, since 413 and an unclassified
+4xx remain plausible transient endpoint states.
 
 ### Step 4: Verify GREEN
 
@@ -119,7 +136,7 @@ uv run pytest weblate/trans/tests/test_judge_client.py
 feat(judge): classify a refused request separately
 ```
 
-## Task 2: Fail fast, before any verdict is written
+## Task 2: Fail fast without writing a refused verdict
 
 **Files:**
 
@@ -130,19 +147,22 @@ feat(judge): classify a refused request separately
 ### Step 1: Write failing tests
 
 1. One `http-request-invalid` response raises `JudgeError` from `_run_batch`
-   before the retry branch, with no second HTTP call: assert the request count
-   is exactly one.
+   before the retry branch, with no second HTTP call for that seat: assert that
+   seat's request count is exactly one.
 2. The `JudgeRequestAttempt` row is still persisted, with
    `failure_kind="http-request-invalid"`, `parsed=False`,
    `transport_succeeded=False` and the HTTP status - diagnostics must survive
    the abort, because that row is how an operator learns what was refused.
-3. **Zero `JudgeVerdict` rows** are created for the batch, and zero
-   `JudgeDeferral` rows even with `JUDGE_DEFERRAL_ENABLED=True`. This is the
-   test that would have failed on 2026-09-01: the incident wrote 50 verdicts.
-4. The error propagates out of the seat worker and fails the run, releasing the
-   parallel barrier exactly as the `http-auth` path already does, and the run
-   ends `failed` rather than `completed`.
-5. The message names the status and no credential:
+3. **No `JudgeVerdict` points at the refused attempt**, and no
+   `JudgeDeferral` is created for that seat even with
+   `JUDGE_DEFERRAL_ENABLED=True`.
+4. A parsed peer-seat result may already have reached the main persistence
+   thread before the refusal arrives. Preserve that valid evidence; assert only
+   that it cannot make the producer run completed, repair a translation, or
+   satisfy `has_complete_current_evidence()` after the run aborts.
+5. The error propagates out of the seat worker and fails the run, releasing the
+   parallel barrier exactly as the `http-auth` path already does.
+6. The message names the status and no credential:
    `The LLM judge endpoint refused the request (HTTP 400).` It is translatable
    and must not contain the base URL, key or model.
 
@@ -157,9 +177,12 @@ uv run pytest weblate/trans/tests/test_judge_loop.py -k refused
 
 Extend the existing fail-fast branch at `weblate/trans/judge.py:1516-1517` to
 cover both kinds. Keep it after `_persist_attempt` and before the retry
-decision, so the ledger row exists and no paid retry follows. Use a distinct
-message from the configuration error: "not configured" is wrong when the
-endpoint is reachable, authenticated and simply refusing this request.
+decision, so the ledger row exists and no paid retry follows. Do not add a
+cross-seat rollback: `_run_seats` intentionally persists a valid peer result
+when it arrives, and a refusal must not erase evidence from a different,
+successful request. Use a distinct message from the configuration error: "not
+configured" is wrong when the endpoint is reachable, authenticated and simply
+refusing this request.
 
 ### Step 4: Verify GREEN
 
@@ -173,52 +196,73 @@ uv run pytest weblate/trans/tests/test_judge_client.py weblate/trans/tests/test_
 fix(judge): stop a run on a refused request
 ```
 
-## Task 3: Make the producer-visible outcome honest
+## Task 3: Prove the existing producer report stays honest
 
 **Files:**
 
-- Modify: `weblate/trans/views/judge.py`
+- Modify: `weblate/trans/tests/test_judge_autotranslate.py`
 - Modify: `weblate/trans/tests/test_judge_views.py`
 
-### Step 1: Write failing tests
+No production view change is expected. `BatchAutoTranslate.perform()` already
+stores an exception as a failed `JudgeRun`
+(`weblate/trans/autotranslate.py:1271-1284`) and `judge-run.html` already
+renders `run.failure` for a failed run (`weblate/templates/judge-run.html:61-65`).
 
-A run that aborted on a refusal must present the reason, not silence: the run
-report shows the run as failed with the refusal message, and a unit touched by
-that run shows **no** verdict card change - no "answer was not parsed" banner,
-because nothing was judged. Assert against a unit that has no prior verdict and
-against one that has a valid historical verdict; neither may gain an unparsed
-round.
+Add an end-to-end regression with the refusal `JudgeError`: the run is failed,
+the stored message is shown in its report, and the refusal itself contributes no
+unparsed verdict. If a peer seat had already persisted a valid result, the test
+must accept that row but prove it does not project a two-seat decision.
 
-### Step 2: Verify RED, Step 3: Implement, Step 4: Verify GREEN
+### Verify
 
 ```text
+uv run pytest weblate/trans/tests/test_judge_autotranslate.py -k refused
 uv run pytest weblate/trans/tests/test_judge_views.py -k refused
 ```
 
-### Step 5: Commit
+### Commit
 
 ```text
-fix(judge): report a refused run without a fake verdict
+test(judge): report a refused run without a fake verdict
 ```
 
-## Task 4: Decide the 101 existing polluted rows
+## Task 4: Correct the historical refused outcomes without over-deleting
 
 **Files:**
 
+- Modify: `weblate/trans/models/judge.py`
+- Create: `weblate/trans/migrations/0115_judge_run_unit_refused_outcome.py`
 - Create: `weblate/trans/management/commands/judge_close_refused_verdicts.py`
-- Create: `weblate/trans/tests/test_commands.py` additions
+- Modify: `weblate/trans/tests/test_commands.py`
 
-The 101 unparsed verdicts already in production were written for refused
-requests against dead profiles. They are not evidence about any translation and
-they drive the verdict card. A guarded, explicit command - never automatic, never
-part of a migration - deletes exactly the verdict rows whose linked
-`JudgeRequestAttempt` has a refusal kind, requires `--confirm`, prints the
-count per model and profile fingerprint first, and refuses to touch a row with
-no attempt row (the 756 OpenRouter ones, whose cause cannot be established).
+The new `http-request-invalid` kind is not retroactive: the historical HTTP 400
+attempts remain `http-other` and the 401 attempt remains `http-auth`. Therefore
+the command must select legacy rows through their linked attempt, never through
+the new kind:
 
-Rationale for deleting rather than keeping: `JudgeVerdict` is the record of
-opinions about translations, and these rows are not opinions. The attempt ledger
-keeps the diagnostic history, so nothing is lost.
+```text
+JudgeVerdict.unparsed=True
+request_attempt.http_status IN (400, 401)
+```
+
+It requires `--expected-count=N` and a separate `--confirm`. Dry-run prints the
+candidate count per HTTP status, model and profile fingerprint; `--confirm`
+refuses to run unless its count still equals `N`. The dry-run count is the
+production authority, not the stale "101" figure in earlier prose: the measured
+401 attempt itself wrote no verdict, while the 120-second deadline verdict must
+remain.
+
+For every deleted verdict, reclassify each linked
+`JudgeRunUnit(outcome="unparsed")` as a new explicit `refused` outcome. Otherwise
+the report would retain a dangling, misleading "Unparsed" row after the verdict
+was removed. The attempt ledger remains the diagnostic record. Do not touch a
+row with no attempt, `unparsed=False`, status 413/431, any other `http-other`
+status, or a deadline/transport attempt.
+
+Tests cover dry-run, confirmation, expected-count mismatch, and every exclusion
+above, including an unparsed 413 and the historical deadline control. Assert the
+linked run-unit outcome becomes `refused`. Run the command before the 90-day
+attempt cleanup can null the foreign-key evidence.
 
 ### Verify
 
@@ -229,7 +273,7 @@ uv run pytest weblate/trans/tests/test_commands.py -k refused
 ### Commit
 
 ```text
-feat(judge): add a guarded refused-verdict cleanup command
+fix(judge): remove false refused verdicts from history
 ```
 
 ## Task 5: Document and prove it on dev
@@ -249,13 +293,15 @@ Dev proof, three arms on the dev container, all read-only
 
 1. **Refused arm.** Set `JUDGE_MODEL_SEAT_1` to a model the endpoint does not
    serve so it answers 400 or 404. Expected: exactly one attempt for that seat,
-   `failure_kind="http-request-invalid"`, run `failed`, zero verdicts, zero
-   deferrals, the message visible to the producer.
+   `failure_kind="http-request-invalid"`, a failed run, no verdict linked to the
+   refused attempt, and no deferral for that seat. A valid peer-seat verdict may
+   exist if it arrived before the refusal.
 2. **Size arm.** Force a 413 if the proxy can produce one, or assert by test
    double if it cannot. Expected: unchanged behaviour - `http-other`, adaptive
    halving, no abort.
-3. **Healthy control.** Correct configuration, same scope. Expected: zero
-   refusals, verdicts for every unit, byte-for-byte today's call counts.
+3. **Healthy control.** Correct configuration and the same fixed scope.
+   Expected: zero refusals and the previously measured number of calls for that
+   scope. Do not compare incidental bytes, timestamps or model text.
 
 ### Commit
 
@@ -263,118 +309,151 @@ Dev proof, three arms on the dev container, all read-only
 test(judge): record the refused-request fail-fast
 ```
 
-## Task 6: Document the queue before anyone can tune it
+## Task 6: Bound and document the durable queue
 
 **Files:**
 
+- Modify: `weblate/trans/defaults.py`
+- Modify: `weblate/trans/models/_conf.py`
+- Modify: `weblate/settings_docker.py`
+- Modify: `weblate/settings_example.py`
+- Modify: `weblate/trans/models/judge.py`
+- Create: `weblate/trans/migrations/0116_judge_deferral_closed_retention.py`
+- Modify: `weblate/trans/tasks.py`
+- Modify: `weblate/trans/tests/test_tasks.py`
 - Modify: `docs/admin/config.rst`
 - Modify: `docs/admin/install/docker.rst`
+- Modify: `deploy/environment.example`
 - Modify: `docs/changes.rst`
 
-Ten deferral settings exist in `weblate/trans/defaults.py:95-104` and in
-`deploy/environment.example`, and **none** of them appears in
-`docs/admin/config.rst` or `docs/admin/install/docker.rst`. Enabling a paid
-background loop whose pacing, circuit and token-bucket knobs are undocumented is
-not an option, so this task precedes Task 7.
+The existing ten `JUDGE_DEFERRAL_*` settings are present in
+`weblate/trans/defaults.py:95-104` and in `deploy/environment.example`, but
+none appears in `docs/admin/config.rst` or `docs/admin/install/docker.rst`.
+More importantly, `cleanup_judge_observability()` only cleans attempts and
+usage rows; no code deletes a closed `JudgeDeferral`. Since every changed target
+closes the old identity, enabling the queue without closed-row retention makes
+that table grow forever.
 
-Document, in the existing alphabetical `JUDGE_*` run and matching the
-surrounding style: `JUDGE_DEFERRAL_ENABLED`, `JUDGE_DEFERRAL_MIN_INTERVAL`,
-`JUDGE_DEFERRAL_MAX_INTERVAL`, `JUDGE_DEFERRAL_SLOW_AFTER`,
-`JUDGE_DEFERRAL_MAX_UNITS_PER_PASS`,
-`JUDGE_DEFERRAL_CIRCUIT_FAILURE_THRESHOLD`,
-`JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS`,
-`JUDGE_DEFERRAL_TOKEN_BUCKET_CAPACITY`,
-`JUDGE_DEFERRAL_TOKEN_BUCKET_REFILL_PER_SECOND`,
-`JUDGE_DEFERRAL_OPERATOR_STOPPED`, plus the matching `WEBLATE_JUDGE_DEFERRAL_*`
-envvars. State three things in prose that the defaults do not reveal:
+Add `JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS=90`, parsed from
+`WEBLATE_JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS`, and an index on
+`(state, closed_at)`. Extend `cleanup_judge_observability()` to delete only
+`JudgeDeferral(state="closed", closed_at < cutoff)`. It must never delete
+`queued` or `slow` rows: those are live work, not history. A value of zero
+purges all closed rows at the next scheduled cleanup; an invalid value falls
+back to 90, matching the existing retention helper.
 
-- The drain task is registered only when the flag is true at worker startup
-  (`weblate/trans/tasks.py:1581-1586`), so the flag needs a container recreate,
-  not a settings reload.
-- `JUDGE_DEFERRAL_OPERATOR_STOPPED` is the kill switch: it stops the loop
-  without losing the queued rows.
-- Retention is already scheduled and independent of the flag:
-  `cleanup_judge_observability` runs every
-  `JUDGE_OBSERVABILITY_CLEANUP_INTERVAL` seconds, default 86400
-  (`weblate/trans/tasks.py:1355-1380`, `:1572-1580`), and trims
-  `JudgeRequestAttempt` and judge `LLMUsageLog` rows, so the queue cannot grow
-  the observability tables without cleanup. This closes the prerequisite the
-  fallback plan used to demand before enabling.
+Tests create old and recent closed rows plus old `queued` and `slow` controls,
+then assert that only the expired closed record is deleted. Verify the index
+migration through database introspection, not a source-text assertion. The
+existing attempt and usage cleanup tests must remain green.
+
+Document the eleven queue settings in the existing alphabetical `JUDGE_*` run,
+with their matching `WEBLATE_*` environment variables. State:
+
+- The drain is registered by Celery application finalization and runs only when
+  the beat process starts with the flag true
+  (`weblate/trans/tasks.py:1541-1586`). Changing a Docker environment variable
+  requires recreating the process; a settings reload does not add the schedule.
+- `JUDGE_DEFERRAL_OPERATOR_STOPPED` blocks paid drain calls and preserves queued
+  rows. The periodic task still wakes, claims and releases rows; it does not
+  stop running.
+- Attempt and usage retention already runs independently of the queue flag;
+  closed deferral retention added here does the same. No live queue row is ever
+  deleted automatically.
+- `_sync_deferral` does not currently filter failure kinds: it queues every
+  `result.unparsed` except `finish-length`
+  (`weblate/trans/judge_loop.py:779-829`). A refusal must fail fast before it
+  reaches that function; parser failures remain intentionally eligible.
 
 ### Commit
 
 ```text
-docs(judge): document the deferral queue settings
+feat(judge): retain closed deferred judge requests
 ```
 
-## Task 7: Enable the queue and prove it drains
+## Task 7: Enable the queue and prove the full lifecycle
 
 **Files:**
 
 - Create: `docs/llm-first/measurements/<date>-judge-deferral-queue-enabled.md`
 
 Production change, separate explicit approval. Preconditions, each verified
-before the flag moves: Tasks 1-5 deployed; the dev refused arm proved zero
-verdicts and zero deferrals for a refusal; Task 6 merged.
+before the flag moves: Tasks 1-6 deployed; the dev refusal arm proved zero
+verdicts for the refused attempt and zero deferrals for its seat; the production
+queue baseline is zero.
 
-### Step 1: Dev arm first
+### Step 1: Dev lifecycle
 
-On the dev container with `JUDGE_DEFERRAL_ENABLED=1`, force a `deadline` on one
-seat by lowering that seat's `JUDGE_REQUEST_DEADLINE_SEAT_*` to a value the
-model cannot meet. Expected: the unit gets a `JudgeDeferral` row in `queued`,
-the run report shows the unit as `DEFERRED` rather than unparsed, the next drain
-pass with the deadline restored closes the row and writes a parsed verdict.
+Set `JUDGE_DEFERRAL_ENABLED=1` and recreate the dev Celery process so its beat
+schedule includes `judge-deferral-drain`. For this single lifecycle proof, set
+`JUDGE_MAX_UNPARSED_RETRY_ROUNDS=0` and force a deadline on one seat with a
+positive value safely below the measured first-byte latency. The producer run
+must create exactly one provisional unparsed verdict and one
+`JudgeDeferral(state="queued")`; it is not yet a `DEFERRED` producer-run outcome.
 
-Then repeat with a refusal instead of a timeout. Expected: **zero** deferral
-rows - the refusal aborted the run before any result existed. That is the
-regression this whole plan exists for; assert it against the live queue, not
-only in tests.
+Restore the normal deadline, invoke the drain, and assert the row closes, the
+fresh verdict is parsed, and the drain run is recorded under the system actor
+without modifying target text. The drain may project `Unit.state` from the
+recovered two-seat verdict (`weblate/trans/judge_loop.py:1431-1446`); record and
+assert that intended transition. Then repeat with a refusal: zero deferrals for
+the refused seat, one failed producer run, and no verdict linked to the refused
+attempt.
 
-### Step 2: Production enable
+### Step 2: Production enable and scheduler proof
 
-Set `WEBLATE_JUDGE_DEFERRAL_ENABLED=1` and recreate the container so the
-periodic task registers. Watch one full `JUDGE_DEFERRAL_MIN_INTERVAL` (900 s by
-default) and assert: the drain runs, the queue reaches zero or shrinks
-monotonically, no row reaches `slow`, and the judge ledger shows only the calls
-the drain actually needed.
+Set `WEBLATE_JUDGE_DEFERRAL_ENABLED=1` and recreate the production Celery
+process. Verify the beat schedule contains `judge-deferral-drain`, the initial
+queue depth is zero, and record the active state-projection behavior. This does
+not prove draining, because an empty queue has nothing to drain.
 
-### Step 3: Record
+### Step 3: Controlled production drain proof
 
-Write the measurement with the dev arms, the production window, queue depth over
-time, drain call counts, and the per-seat unparsed rate before and after.
+Requires a second, explicit production approval. Use one designated test unit
+whose state may change, with a temporarily low positive deadline for one seat.
+Restore the measured production deadline immediately, recreate the process, and
+wait until that row's `next_attempt_at` plus one full drain interval and the
+seat deadline. Expected: the row closes with a parsed verdict, the drain run is
+complete, target text is unchanged, and any state transition is the documented
+two-seat projection on that designated unit. No other queue row may exist. If
+this cannot be approved, record the scheduler proof only and do not claim the
+production drain path is verified.
 
-### Step 4: Commit
+### Step 4: Record
+
+Write the measurement with the dev lifecycle, production scheduler and drain
+proofs, queue depth over time, drain call counts, and the per-seat unparsed rate
+separated into provisional, parsed-after-drain and terminal categories.
+
+### Step 5: Commit
 
 ```text
 test(judge): record the deferral queue rollout
 ```
 
-**Rollback:** `WEBLATE_JUDGE_DEFERRAL_OPERATOR_STOPPED=1` stops the loop while
-keeping the queued rows for inspection; clearing
-`WEBLATE_JUDGE_DEFERRAL_ENABLED` and recreating the container removes the
-periodic task entirely.
+**Rollback:** Set `WEBLATE_JUDGE_DEFERRAL_OPERATOR_STOPPED=1` and recreate the
+Celery process to block further paid drain calls while preserving the queued
+rows. Clearing `WEBLATE_JUDGE_DEFERRAL_ENABLED` and recreating the process
+removes the periodic schedule entirely; it does not delete the rows.
 
 ## Rollout
 
-Each step needs its own explicit approval.
+Each production step needs its own explicit approval.
 
-1. Deploy the code and the choices-only migration.
-2. Run the dev three-arm proof and record it.
-3. Run one bounded read-only production canary on a component that already has
-   parsed verdicts; assert zero refusals and unchanged call counts.
-4. Run the cleanup command with `--confirm` for the 101 rows, after reading its
-   dry-run output.
-5. Document the queue settings (Task 6) and enable the queue (Task 7). This is
-   the step that
-   `docs/llm-first/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`
-   used to carry as its Rollout step 4; it belongs here, because it completes
-   "no unparsed" and has nothing to do with the availability fallback.
+1. Deploy Tasks 1-6 and their migrations.
+2. Run the dev refusal, size and healthy-control proofs and record them.
+3. Run one bounded production canary on a component that already has parsed
+   verdicts; assert zero refusals and the expected call count.
+4. Run the historical-cleanup command dry-run. Record its count, rerun it with
+   that exact `--expected-count`, then add `--confirm`.
+5. Enable and verify the queue through Task 7. The controlled production drain
+   proof is an additional approval, not implied by activation.
 
-**Stop conditions:** any refusal in the healthy control arm; any run that aborts
-on a 413 or on an unclassified 4xx; any verdict row written for a refused
-request; the cleanup command reporting a count other than the 101 rows its
-dry-run showed; any `JudgeDeferral` row created for a refusal; a queue that does
-not shrink over two consecutive drain intervals; any row reaching `slow`.
+**Stop conditions:** any refusal in the healthy control arm; a run that aborts
+on a 413 or unclassified 4xx; a verdict linked to a refused attempt; a cleanup
+candidate outside `unparsed=True` plus HTTP 400/401; an expected-count mismatch;
+a queued record created for a refusal; a controlled drain that does not close;
+a target-text change during a drain; or a state change outside the designated
+canary unit or not justified by its recorded two-seat verdict.
 
 ## Risks
 
@@ -382,19 +461,23 @@ not shrink over two consecutive drain intervals; any row reaching `slow`.
   proxy uses it for an unprocessable request body, but a gateway could use it
   transiently. The mitigation is that the taxonomy is one function with one test
   table, so a correction is one line and one row.
-- **Fail-fast turns a partial run into no run.** Today a refusal costs one batch
-  and the rest of the run proceeds; after this change the run stops. That is the
-  intent - the alternative is paying for every batch and recording 50 false
-  unparsed verdicts - but a producer who previously got 90% of a run will now
-  get an error, which is why Task 3 exists.
-- **The cleanup is a production deletion.** It is guarded, dry-run first,
-  scoped by linked attempt kind, and never touches a row whose cause is unknown.
+- **A refusal can race a successful peer seat.** The parallel barrier prevents
+  either seat from running ahead, not from persisting a peer result already
+  received by the main thread. Preserving valid peer evidence is safer than a
+  cross-seat delete; it must not be projected as a complete decision.
+- **The cleanup is a production deletion.** It is guarded by dry-run,
+  `--expected-count`, and `--confirm`; it reclassifies run history rather than
+  leaving dangling unparsed outcomes, and refuses broad or unattached rows.
 - **The queue spends money without a human.** That is its purpose - a timed-out
-  string has to be re-judged - but it is why Task 7 is gated on the refusal path
-  being closed, on the settings being documented, and on a dev arm proving that
-  a refusal produces zero queued rows. The kill switch is
-  `JUDGE_DEFERRAL_OPERATOR_STOPPED`.
-- **Enabling the flag needs a container recreate.** The periodic task is
-  registered at worker startup (`weblate/trans/tasks.py:1581-1586`), so an
-  operator who only edits the environment will see no drain and may conclude the
-  queue is broken.
+  string has to be re-judged - but it is gated on the refusal path, closed-row
+  retention, documented settings, and a dev lifecycle proof. The operator stop
+  blocks paid calls but does not stop Celery wake-ups.
+- **A drain is not state-read-only.** `writable_ids=set()` prevents repair text
+  writes, but `_finalize_drain_run()` intentionally projects a recovered
+  two-seat verdict to `Unit.state`. Production proof therefore uses a designated
+  unit with an approved state transition and treats any target-text mutation as
+  a stop condition.
+- **A drain needs more than one scheduler interval to prove.** A newly queued
+  row cannot run before `next_attempt_at`; after restoring the normal deadline,
+  the acceptance window is that time plus the next scheduled drain and one seat
+  deadline. An empty production queue proves scheduling only, not recovery.
