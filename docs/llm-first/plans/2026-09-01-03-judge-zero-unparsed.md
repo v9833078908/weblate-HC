@@ -35,9 +35,11 @@ operator setting.
 **Tech stack:** Python 3.14, Django settings and migrations, Celery periodic
 tasks, httpx2 streaming, pytest.
 
-**Status:** proposed, awaiting approval. Tasks 1-6 change code and migrations,
-so `AGENTS.md` requires explicit approval before any code is edited. Task 7
-changes a running instance and needs separate explicit approval on top of that.
+**Status:** Tasks 1-6 implemented and verified on branch `feat/judge-zero-unparsed`
+(`0f83dc5`..`4f47faa`); see
+`docs/llm-first/measurements/2026-09-01-05-judge-refused-request-fail-fast.md`.
+The Task 5 dev-container arms and Task 7 change a running instance and still
+need separate explicit approval.
 
 **Evidence this is needed:**
 `docs/llm-first/measurements/2026-09-01-04-judge-unparsed-attribution.md`
