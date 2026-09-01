@@ -184,18 +184,27 @@ A ``critical`` verdict holds the string automatically at :ref:`needs editing
 <states>`; only an authorized reviewer can ship it, by recording an
 ``accepted_as_is`` decision. A ``major`` verdict ships as
 :ref:`translated <states>` with ``judge-flag`` evidence attached: it does not
-block delivery on its own. A ``minor`` verdict is non-blocking evidence,
-visible as ``judge-note``; no action is expected. Either parsed negative
-verdict on a writable string is eligible for one repair through the
-project's configured machine translation engine, followed by another
-two-seat judgment. A repaired ``pass`` ships as translated; an unresolved
-``major`` or ``critical`` stays in the human queue, where the reviewer can
-also escalate it (``escalated``) to request a second opinion without
-changing what it currently blocks. This is not an automatic guarantee that a
-broken translation never ships: verify with your own held-out sample before
-relying on it, and note that a ``pass`` verdict does not, on its own, move a
-string to :ref:`approved <states>` unless the site additionally sets
-:setting:`JUDGE_MAY_APPROVE`.
+block delivery on its own, and a reviewer can accept it as-is directly,
+without first escalating it. A ``minor`` verdict is non-blocking evidence,
+visible as ``judge-note``; no action is expected.
+
+A fresh, unresolved ``critical`` or ``major`` on a writable string gets one
+stored, previewable repair candidate through the project's configured
+machine translation engine - a suggestion, never an automatic edit to the
+string. The verdict card shows the candidate's diff and provenance;
+:guilabel:`Use suggested fix` applies it, holding the string at
+:ref:`needs editing <states>` until a fresh, producer-triggered one-string
+re-check confirms it, and :guilabel:`Generate another` discards it for a
+new attempt. The one exception is a string with an active ``max-length``
+check: only editing the stored text can satisfy that check, so it keeps
+the repair-then-rejudge behavior instead and never gets a candidate. Either
+way, an unresolved ``major`` or ``critical`` stays in the human queue,
+where the reviewer can also escalate it (``escalated``) to request a
+second opinion without changing what it currently blocks. This is not an
+automatic guarantee that a broken translation never ships: verify with
+your own held-out sample before relying on it, and note that a ``pass``
+verdict does not, on its own, move a string to :ref:`approved <states>`
+unless the site additionally sets :setting:`JUDGE_MAY_APPROVE`.
 
 Recording a decision on a verdict requires the :guilabel:`Review strings`
 permission (the same :guilabel:`unit.review` boundary the resolution form
@@ -212,9 +221,12 @@ string and an AI-clean string are tracked as two separate facts, not one.
 
 A string with an existing translation is judged, not rewritten, unless the
 run explicitly turns on the :guilabel:`Overwrite the existing translation`
-checkbox; that same checkbox also gates whether a confirmed defect is
-repaired through the project's configured machine translation engine before
-being judged again.
+checkbox; that same checkbox also gates whether a string with an active
+``max-length`` check is repaired through the project's configured machine
+translation engine before being judged again. It has no effect on the
+stored-candidate path above: reviewing and applying a candidate is always
+a separate, explicit producer action, on writable and non-writable strings
+alike.
 
 The judge is told what game it is reviewing from the project's
 :ref:`machine translation configuration <machine-translation-setup>`: the
@@ -226,11 +238,18 @@ the judge is instructed not to assume a genre; describing the project is
 therefore worth doing before a large run, because an unstated register is
 reported as a style error less often than a wrongly assumed one.
 
-The component :guilabel:`Release readiness` table separates pending changes
-ready for delivery from current judge coverage. It displays stale and
-incomplete attempts as evidence that needs attention, never as a release
-decision. Only users with automatic translation and review permissions see
-evaluation actions; machinery configuration remains restricted to its
+The component page shows an :guilabel:`AI judge` summary with the same
+``needs a human``, ``not reviewed``, and ``unparsed`` counts described
+above, plus links to the checks breakdown and to the launch's own run
+history. A :guilabel:`Download for hand-off` action appears only once
+those cached counts read zero *and* an authoritative, uncached recheck
+agrees: no current critical, no stale target, no glossary or explanation
+drift the cache never tracked, and no unparsed attempt anywhere in the
+component. It links the component's existing download control and is not
+itself a release action; a single manual edit made after its own string's
+verdict was recorded is enough to hide it again until that string is
+re-checked. Only users with automatic translation and review permissions
+see evaluation actions; machinery configuration remains restricted to its
 management permission.
 
 Judge previews use observed, project- and model-specific request costs only

@@ -117,12 +117,27 @@ Scope and intended use
        a decision on a held or escalated verdict is a separate,
        CSRF-protected POST gated by the same :guilabel:`unit.review`
        permission; it makes no outbound request and is refused against
-       stale, superseded, or already-resolved evidence. Reading a
-       producer's durable run report, and running the guarded
-       :wladmin:`judge_release_advisory_holds` cleanup command, are both
-       local, read/local-write operations gated by the same automatic
-       translation and review permissions, re-checked for the requesting
-       user or operator rather than trusted from the run's stored actor
+       stale, superseded, or already-resolved evidence. A fresh, unresolved
+       reject or major on a writable string instead gets one stored repair
+       candidate - a native ``Suggestion``, never a direct edit to the live
+       target - through the already-modelled, project-configured
+       machine-translation data flow. Applying it
+       (:guilabel:`Use suggested fix`) is a separate CSRF-protected POST
+       requiring both :guilabel:`unit.review` and automatic-translation
+       permission together (stronger than plain suggestion acceptance),
+       writes the string to Fuzzy, is refused under the same
+       stale/superseded/already-resolved guard, and makes no outbound
+       request itself. Producer-triggered candidate (re)generation and a
+       one-string re-check are each a separate CSRF-protected POST gated by
+       the same two permissions and deduplicated - a cache lock for
+       generation, a capped queued run for re-check - so repeated clicks
+       cannot multiply outbound spend, and neither can be aimed at more than
+       the one requesting string. Reading a producer's durable run report,
+       and running the guarded :wladmin:`judge_release_advisory_holds`
+       cleanup command, are both local, read/local-write operations gated by
+       the same automatic translation and review permissions, re-checked for
+       the requesting user or operator rather than trusted from the run's
+       stored actor
      - Database (verdicts; each resolution transition permanently appends
        its own history entry, though the verdict's current resolution can
        move again through an allowed transition, and bounded request-attempt
@@ -131,17 +146,23 @@ Scope and intended use
        :setting:`JUDGE_REQUEST_DEADLINE` when enabled. Attempts retain only
        status, timing, response shape, hashes, and token counters, never
        source/target text, prompts, completions, reasoning, headers, or keys.
-       A durable run and its per-string outcomes are database-only records
-       with no outbound leg, readable only through the permission-checked
-       report page; the report never renders a cost figure or an identity
-       hash that could confirm a known translation
+       A stored candidate's ``Suggestion.userdetails`` records only its
+       verdict id, run id, target/context hashes, and engine identifier,
+       never prompt or response text. A durable run and its per-string
+       outcomes are database-only records with no outbound leg, readable
+       only through the permission-checked report page; the report never
+       renders a cost figure or an identity hash that could confirm a known
+       translation
      - In scope. The outbound request is an operator-configured-host,
        site-wide-credentialed review only; provider behavior is out of scope.
-       Decision recording is a local, permissioned, audited mutation with no
-       outbound leg. The run report and the cleanup command are local reads
-       and a guarded, dry-run-by-default local write; neither makes an
-       outbound request. *(documented)* (source: :ref:`llm-judge`,
-       :doc:`/admin/config`, :doc:`/admin/management`)
+       Decision recording and candidate acceptance are local, permissioned,
+       audited mutations with no outbound leg of their own; candidate
+       generation and re-check execution reuse the already-scoped judge and
+       machine-translation outbound legs above. The run report and the
+       cleanup command are local reads and a guarded, dry-run-by-default
+       local write; neither makes an outbound request. *(documented)*
+       (source: :ref:`llm-judge`, :doc:`/admin/config`,
+       :doc:`/admin/management`)
    * - Machine translation and outbound integrations
      - Machine translation, avatars, status reporting, telemetry, error
        reporting, VCS hosts, GitHub App connections, CDN add-on, Fedora
@@ -343,7 +364,14 @@ Reachability preconditions:
   data flow, but is reachable only for strings the run explicitly marked
   writable (empty, needing editing, or with the overwrite checkbox on). An
   end user cannot choose its endpoint, key, or model; a run without the
-  checkbox never rewrites an existing human translation, judges it instead.
+  checkbox never rewrites an existing human translation, judges it instead,
+  storing a previewable repair candidate rather than an automatic rewrite.
+  Applying a stored candidate is refused unless it is still the current
+  verdict's own suggestion for the unit's exact current target and context,
+  and requires unit-review and automatic-translation permission together; a
+  plain suggestion-accept permission alone cannot reach it, and the classic
+  suggestion list, vote autoaccept, and bulk-accept surfaces exclude a judge
+  candidate from their own accept paths for the same reason.
   *(documented)* (source: :ref:`llm-judge`, :doc:`/admin/config`)
 
 Environment assumptions
