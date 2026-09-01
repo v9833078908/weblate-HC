@@ -1,7 +1,8 @@
 # LLM-first producer mode: отключение избыточного функционала UI
 
-Дата: 2026-09-01. Статус: дизайн-предложение; P0-часть применена на dev-инстансе
-в тот же день (см. «Применение P0»), P1/P2 не реализованы.
+Дата: 2026-09-01. Статус: дизайн-предложение; P0-часть и реестровые тримы
+(formats, machinery) применены на dev-инстансе в тот же день (см. «Применение»),
+P1/P2 не реализованы.
 
 Продолжение `docs/llm-first/vision/2026-08-15-producer-first-product-research.md`
 (раздел 6 «Что скрыть или сделать неактивным»). Документ проверяет предложения
@@ -70,7 +71,7 @@ voting/autoaccept.
 |---|---|---|
 | Вкладка Automatic suggestions (machinery) в редакторе | скрыть в Producer mode, показывать только в Advanced | `[код]` Ленивый ручной вызов LLM (путь A) - инструмент переводчика; продюсер не переводит, а двойной платный вызов рядом с judge-режимом не нужен |
 | Translation memory в Operations | убрать из навигации продюсера | `[код]` Повторы закрывает кэш machinery и полный глоссарий (<=300) в промпте; TM остается backend-fallback. P1 документа |
-| Десятки MT-провайдеров в настройках проекта | показывать только routed-движки | `[код]` `ROUTED_ENGINES`/`configured_routed_engine` уже выбирают один движок проектом; остальные ~25 классов (`weblate/machinery/`) - админская зона |
+| Десятки MT-провайдеров в настройках проекта | ~~показывать только routed-движки~~ - применено env-тримом | `[код]` `ROUTED_ENGINES`/`configured_routed_engine` выбирают один движок проектом; остальные дефолтные классы удалены из реестра `WEBLATE_REMOVE_MACHINERY` (см. «Применение»), в реестре 4 сервиса |
 | Search and replace, Bulk edit | скрыть | `[код]` Массовая правка текста человеком, который не читает целевой язык, - прямой риск; инструменты Advanced |
 | Translator reports (Insights) | скрыть | `[код]` Отчет по вкладу переводчиков без переводчиков - пустой артефакт; место стоимости - LLM usage report (админ) |
 | Вкладки Similar keys, Variants, Other occurrences, Other languages | скрыть для продюсера | `[код]` Переводческая навигация; контекст соседей продюсеру дает судья (плечо H2), back-translation - в карточке. P2 документа |
@@ -89,7 +90,7 @@ voting/autoaccept.
 | History | Аудит trail; молчаливых переходов нет (инвариант 4.1.8) |
 | ZIP download файлов | `[документ]` Шаг 11 producer guide - забор переводов в игру; замена на Create release package - P2 |
 
-## Применение P0 (2026-09-01, dev-инстанс)
+## Применение (2026-09-01, dev-инстанс)
 
 `WEBLATE_REGISTRATION_OPEN: 0` и `WEBLATE_ENABLE_SHARING: 0` добавлены в
 `dev-docker/docker-compose.yml` (commit `c326243`); контейнер пересоздан
@@ -110,6 +111,25 @@ voting/autoaccept.
 (`web_url` проекта col4 = `http://localhost:3001/projects/col4/`), API отвечает,
 health 200. Add-on Automatic translation не установлен ни на одном компоненте
 (`Addon.objects.all()` пуст - проверено `manage.py shell` в контейнере).
+
+### Реестровые тримы (парето: один механизм - несколько env-списков)
+
+`WEBLATE_REMOVE_FORMATS` и `WEBLATE_REMOVE_MACHINERY` добавлены в
+`dev-docker/docker-compose.yml` рядом с уже используемым `WEBLATE_REMOVE_CHECK`
+(тот же `modify_env_list`, exact class path, код не меняется). Контейнер
+пересоздан; проверка на живом инстансе `[live]`:
+
+- форматов в реестре было 69, стало 14: `po`, `po-mono`, `tbx`, `xlsx`, `json`,
+  `xliff`(plainxliff), `csv`, `txt`, `yaml`, `properties`, `resx`, `strings`,
+  `aresource`, `ts` - пять используемых компонентом формата плюс ходовые;
+  все используемые форматы компонент остались (`used-ok: True`), страницы
+  проектов, компонент и zen-режим открываются с 200;
+- сервисов в реестре machinery: ровно 4 - `openrouter`, `litellm`, `weblate`
+  (внутренний TM), `weblate-translation-memory` (память переводов); site-wide
+  MT-настройки при этом ссылаются только на `weblate`,
+  `weblate-translation-memory` и `openrouter`, проектные настройки col4 -
+  `litellm` и `openrouter`, выпадение сконфигурированного сервиса не
+  произошло.
 
 ## Открытые пункты
 
