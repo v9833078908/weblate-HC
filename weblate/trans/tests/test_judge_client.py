@@ -20,9 +20,12 @@ from weblate.trans.judge import (
     JudgeRequest,
     _read_capped,
     _read_sse,
+    _request_timeout,
     get_judge_base_url,
     get_judge_chat_completions_url,
     judge_configuration_ready,
+    judge_configuration_snapshot,
+    judge_seat_profiles,
     render_preview,
     request_verdicts,
     resolve_judge_seat_profile,
@@ -206,6 +209,23 @@ class JudgeClientGateTest(SimpleTestCase):
     def test_nonfinite_deadline_makes_no_network_call(self) -> None:
         with self.assertRaises(JudgeError):
             request_verdicts([REQ], model="vendor/model-a")
+        self.assertEqual(len(http_mock.calls), 0)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_MODEL_SEAT_1="vendor/model-a",
+        JUDGE_MODEL_SEAT_2="vendor/model-b",
+    )
+    @http_mock.activate
+    def test_invalid_per_seat_deadline_makes_no_network_call(self) -> None:
+        for value in (0, -1, float("inf"), True, "invalid"):
+            with (
+                self.subTest(value=value),
+                override_settings(JUDGE_REQUEST_DEADLINE_SEAT_2=value),
+                self.assertRaises(JudgeError),
+            ):
+                validate_judge_configuration()
         self.assertEqual(len(http_mock.calls), 0)
 
     @override_settings(
@@ -1097,6 +1117,59 @@ class JudgeRequestDeadlineTest(TestCase):
 
         self.assertFalse(result.unparsed)
 
+    @override_settings(
+        JUDGE_REQUEST_DEADLINE=3,
+        JUDGE_REQUEST_DEADLINE_SEAT_1="0.05",
+        JUDGE_REQUEST_DEADLINE_SEAT_2="3",
+        JUDGE_MODEL_SEAT_1="vendor/model-a",
+        JUDGE_MODEL_SEAT_2="vendor/model-b",
+    )
+    @http_mock.activate
+    def test_each_seat_uses_its_own_absolute_deadline(self) -> None:
+        for _ in range(2):
+            http_mock.register_callback(
+                "POST",
+                CHAT_URL,
+                lambda _request: self._dripping_response(),
+            )
+
+        [first] = request_verdicts([REQ], seat=1)
+        [second] = request_verdicts([REQ], seat=2)
+
+        self.assertTrue(first.unparsed)
+        self.assertEqual(first.failure_kind, "deadline")
+        self.assertFalse(second.unparsed)
+
+    @override_settings(
+        JUDGE_REQUEST_DEADLINE=120,
+        JUDGE_REQUEST_DEADLINE_SEAT_1="7",
+        JUDGE_REQUEST_DEADLINE_SEAT_2="300",
+        JUDGE_MODEL_SEAT_1="vendor/model-a",
+        JUDGE_MODEL_SEAT_2="vendor/model-b",
+    )
+    @mock.patch("weblate.trans.judge.time.sleep")
+    @http_mock.activate
+    def test_rate_limit_sleep_is_capped_by_the_seat_deadline(self, sleep) -> None:
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            status_code=429,
+            headers={"Retry-After": "60"},
+            json={},
+        )
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+
+        [result] = request_verdicts([REQ], seat=1)
+
+        self.assertFalse(result.unparsed)
+        sleep.assert_called_once_with(7)
+
     @override_settings(JUDGE_BATCH_SIZE=5, JUDGE_REQUEST_DEADLINE=30)
     @mock.patch("weblate.trans.judge.MAX_BATCH_RESPONSE_BYTES", 32)
     @http_mock.activate
@@ -1945,6 +2018,30 @@ class JudgeLiteLLMPayloadTest(TestCase):
         self.assertEqual(profile.batch_size, 3)
         self.assertEqual(profile.temperature, 0.25)
         self.assertEqual(profile.max_tokens, 123)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://openrouter.ai/api/v1",
+        JUDGE_MODEL_SEAT_1="vendor/model-a",
+        JUDGE_MODEL_SEAT_2="vendor/model-b",
+        JUDGE_REQUEST_DEADLINE=120,
+        JUDGE_REQUEST_DEADLINE_SEAT_1="inherit",
+        JUDGE_REQUEST_DEADLINE_SEAT_2="300",
+    )
+    def test_per_seat_deadlines_resolve_without_invalidating_cache(self) -> None:
+        first, second = judge_seat_profiles()
+
+        self.assertEqual(first.request_deadline, 120)
+        self.assertEqual(second.request_deadline, 300)
+        self.assertEqual(
+            judge_configuration_snapshot()["request_deadline"],
+            [120, 300],
+        )
+        self.assertEqual(_request_timeout(first).connect, 120)
+        self.assertEqual(_request_timeout(second).connect, 300)
+
+        with override_settings(JUDGE_REQUEST_DEADLINE_SEAT_2="240"):
+            changed = resolve_judge_seat_profile(2)
+        self.assertEqual(second.profile_fingerprint, changed.profile_fingerprint)
 
     @override_settings(
         JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",

@@ -266,6 +266,59 @@ class JudgeDeferralTest(ViewTestCase):
         self.assertIsNone(deferral.claim_expires_at)
         self.assertEqual(deferral.state, JudgeDeferral.State.QUEUED)
 
+    @override_settings(
+        JUDGE_REQUEST_DEADLINE=120,
+        JUDGE_REQUEST_DEADLINE_SEAT_2="400",
+    )
+    def test_claim_uses_the_deferred_seats_request_deadline(self) -> None:
+        unit = self.get_unit()
+        _sync_deferral(
+            unit,
+            build_request(unit),
+            seat=2,
+            profile=resolve_judge_seat_profile(2),
+            project_context="",
+            result=DEAD,
+        )
+        JudgeDeferral.objects.filter(unit=unit).update(
+            next_attempt_at=timezone.now() - timedelta(seconds=1)
+        )
+
+        with mock.patch("weblate.trans.judge_loop.run_judge_batch") as run_judge_batch:
+            processed = drain_judge_deferrals()
+
+        run_judge_batch.assert_not_called()
+        self.assertEqual(processed, 0)
+
+    @override_settings(
+        JUDGE_REQUEST_DEADLINE=120,
+        JUDGE_REQUEST_DEADLINE_SEAT_2="200",
+    )
+    def test_retry_lease_reserves_the_deferred_seats_request_deadline(self) -> None:
+        unit = self.get_unit()
+        _sync_deferral(
+            unit,
+            build_request(unit),
+            seat=2,
+            profile=resolve_judge_seat_profile(2),
+            project_context="",
+            result=DEAD,
+        )
+        now = timezone.now()
+        JudgeDeferral.objects.filter(unit=unit).update(
+            next_attempt_at=now - timedelta(seconds=1)
+        )
+
+        with (
+            mock.patch("weblate.trans.judge_loop.time.monotonic", return_value=100),
+            mock.patch("weblate.trans.judge_loop.timezone.now", return_value=now),
+            mock.patch("weblate.trans.judge_loop.run_judge_batch") as run_judge_batch,
+        ):
+            processed = drain_judge_deferrals()
+
+        self.assertEqual(processed, 1)
+        self.assertAlmostEqual(run_judge_batch.call_args.kwargs["retry_deadline"], 200)
+
     def test_availability_failure_trips_the_circuit(self) -> None:
         profile = resolve_judge_seat_profile(1)
         transport_failure = JudgeResult(

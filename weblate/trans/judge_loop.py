@@ -1516,7 +1516,7 @@ def _select_drain_requests(
                     claim_expires_at=None,
                 )
                 continue
-            margin = timedelta(seconds=float(settings.JUDGE_REQUEST_DEADLINE))
+            margin = timedelta(seconds=profile.request_deadline)
             if not JudgeDeferral.objects.filter(
                 pk=deferral.pk,
                 claim_token=token,
@@ -1565,7 +1565,7 @@ def _drain_seat(
         # Reserve the full request deadline for the retried call itself: a
         # retry whose request could still run when the lease expires must
         # not start.
-        margin = float(settings.JUDGE_REQUEST_DEADLINE)
+        margin = profile.request_deadline
         remaining = (earliest_expiry - timezone.now()).total_seconds()
         lease_deadline = started + max(0.0, remaining - margin)
     # `run_judge_batch` persists and synchronizes the claimed rows. Empty
