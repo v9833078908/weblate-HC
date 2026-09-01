@@ -111,6 +111,47 @@ implementation:
    denormalized provider column is required to answer "which endpoint produced
    this verdict" after attempt retention expires.
 
+## Owner acceptance, stated 2026-09-01, and what actually delivers it
+
+The owner described the target state as: LiteLLM judges enabled in production, a
+fallback in place, launched from the interface, two seats judging in parallel, a
+visible verdict, stable, and no unparsed. Four of those six are already live and
+are not work here; the remaining two are delivered by *different* mechanisms,
+and conflating them is the main risk in reading this plan.
+
+| Owner criterion | Delivered by | State |
+|---|---|---|
+| LiteLLM judges enabled in production | `WEBLATE_JUDGE_ENABLED=1`, `WEBLATE_JUDGE_BASE_URL=https://hcbifrost.herocraft.com/litellm/v1` on `hcgameloc-weblate-1` | live |
+| Launched from the interface | `AutoForm` mode "Add as translation with an LLM judge", offered when `judge_configuration_ready()` (`weblate/trans/forms.py:1369-1372`); `overwrite_existing` judges already-translated strings (`:1392-1398`) | live |
+| Two seats judging in parallel | `JUDGE_SEATS = (1, 2)` with the seat barrier (`weblate/trans/judge_loop.py:921-1069`); measured 50.15% window overlap | live |
+| Visible verdict | inline card `weblate/templates/snippets/judge-verdict.html` on the translate page, plus the run report `weblate/templates/judge-run.html` | live |
+| Fallback in place | Tasks 1-7 of this plan | not started |
+| No unparsed | **not the fallback.** Bounded unparsed retry rounds (`JUDGE_MAX_UNPARSED_RETRY_ROUNDS`, default 1) plus the durable `JudgeDeferral` queue and its drain, gated by `JUDGE_DEFERRAL_ENABLED` | queue exists in code, **disabled in production** (`WEBLATE_JUDGE_DEFERRAL_ENABLED=0`) |
+
+**The fallback does not reduce unparsed, by design.** `_FAILOVER_FAILURE_KINDS`
+(Task 4) excludes every protocol failure: `invalid-json`, `invalid-envelope`,
+`segment-count`, `invalid-segment`, `empty-response`, `finish-length` and
+`unknown` all terminate as `unparsed` on the primary and are never resent
+elsewhere. The fallback converts one class of loss - endpoint unavailability -
+into a verdict from the other endpoint. A model that answers 200 with an
+unusable body is a quality problem, and answering it with a second paid call to
+a different model would silently average two configurations, which R3 forbids.
+
+**So "no unparsed" as a durable property needs Rollout step 4, not Tasks 1-7.**
+Today, with the queue off, an unparsed unit is terminally unjudged: `_sync_deferral`
+returns immediately (`weblate/trans/judge_loop.py:758-759`). With the queue on,
+that unit is persisted per seat, retried by the periodic drain, and the run
+report shows it as `DEFERRED` rather than silently unparsed. That flag starts a
+Celery task which spends money without a human present and is the single most
+consequential step in this plan; it keeps its own approval.
+
+**Scale caveat.** The zero-unparsed evidence is 25 units on
+`need-for-greed/ui/es`, read-only. It is not evidence for a 466-unit component
+or for the 275-unit backlog on that same language, which the Non-goals below
+exclude on purpose. A producer-visible "stable, no unparsed" claim at real scope
+needs the queue enabled and one full drain interval observed reaching zero
+(Rollout step 4).
+
 ## Non-goals
 
 - Any change to models, prompt, JSON schema, severity rubric, batch sizes or
