@@ -10,7 +10,11 @@ from io import StringIO
 from django.core.management import call_command
 from django.test import TestCase
 
-from weblate.trans.models.llm_usage import LLMUsageLog, recent_cost_range
+from weblate.trans.models.llm_usage import (
+    LLMUsageLog,
+    parse_provider_cost,
+    recent_cost_range,
+)
 
 
 class LLMUsageLogModelTest(TestCase):
@@ -49,6 +53,56 @@ class LLMUsageLogModelTest(TestCase):
         log = LLMUsageLog.objects.create(model="gpt-5.4-nano", prompt_tokens=5)
         self.assertEqual(log.operation, "")
         self.assertIsNone(log.unit_count)
+
+    def test_attribution_defaults_blank(self) -> None:
+        log = LLMUsageLog.objects.create(model="m", prompt_tokens=1)
+        self.assertEqual(log.service, "")
+        self.assertIsNone(log.project_id_snapshot)
+        self.assertIsNone(log.component_id_snapshot)
+        self.assertEqual(log.component_slug, "")
+        self.assertEqual(log.target_language_code, "")
+
+    def test_attribution_fields_are_stored(self) -> None:
+        log = LLMUsageLog.objects.create(
+            model="m",
+            service="openrouter",
+            project_id_snapshot=7,
+            project_slug="need-for-greed",
+            component_id_snapshot=8,
+            component_slug="ui",
+            target_language_code="fr",
+            prompt_tokens=1,
+        )
+        log.refresh_from_db()
+        self.assertEqual(log.service, "openrouter")
+        self.assertEqual(log.project_id_snapshot, 7)
+        self.assertEqual(log.component_id_snapshot, 8)
+        self.assertEqual(log.component_slug, "ui")
+        self.assertEqual(log.target_language_code, "fr")
+
+    def test_cost_preserves_provider_precision(self) -> None:
+        cost = Decimal("0.123456789123456789")
+        log = LLMUsageLog.objects.create(
+            model="m",
+            prompt_tokens=1,
+            cost_usd=cost,
+        )
+        log.refresh_from_db()
+        self.assertEqual(log.cost_usd, cost)
+        field = LLMUsageLog._meta.get_field("cost_usd")
+        self.assertEqual((field.max_digits, field.decimal_places), (24, 18))
+
+    def test_cost_beyond_supported_scale_is_unpriced(self) -> None:
+        self.assertIsNone(parse_provider_cost(Decimal("0.1234567891234567891")))
+
+    def test_negative_cost_is_unpriced(self) -> None:
+        self.assertIsNone(parse_provider_cost(Decimal("-0.01")))
+
+    def test_cost_with_padded_zeros_is_stored(self) -> None:
+        self.assertEqual(
+            parse_provider_cost(Decimal("0.000010000000000000000000")),
+            Decimal("0.00001"),
+        )
 
 
 class LLMUsageReportTest(TestCase):
