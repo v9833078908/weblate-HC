@@ -31,6 +31,7 @@ from weblate.checks.source import SourceMaxLengthCheck
 from weblate.trans.protected_tokens import (
     MARKUP,
     PLACEHOLDER_PATTERN,
+    TAG_PATTERN,
     markup_tokens,
     placeholder_sequence,
 )
@@ -355,6 +356,26 @@ def _conditional_length_text(text: str) -> str:
         previous = end
     result.append(text[previous:])
     return "".join(result)
+
+
+def _length_budget_text(text: str) -> str:
+    """
+    Return the text a character budget measures: what the player reads.
+
+    Unity rich-text tags render to zero width, so they never consume a slot
+    and are removed first. Engine placeholders are deliberately kept: one
+    renders to a real runtime value, and stock ``replacements:`` is how a
+    producer declares that width. This is why the budget checks do not reuse
+    ``_visible_length()``, which also drops placeholders because
+    ``game-length`` compares a ratio where they cancel out on both sides.
+
+    Tags are dropped before the conditional collapse, not after: that collapse
+    keeps the longest top-level branch by length, and a short branch wrapped in
+    a tag would otherwise outweigh a genuinely longer plain one, understating
+    the worst case. It also removes any ``|`` sitting inside a tag attribute,
+    which is not a branch separator.
+    """
+    return _conditional_length_text(TAG_PATTERN.sub("", text))
 
 
 class GameMarkupCheck(TargetCheck):
@@ -889,7 +910,7 @@ class GameLengthCheck(TargetCheck):
 class GameMaxLengthCheck(MaxLengthCheck):
     def get_replacement_function(self, unit):
         replace = super().get_replacement_function(unit)
-        return lambda text: _conditional_length_text(replace(text))
+        return lambda text: _length_budget_text(replace(text))
 
     def get_description(self, check_obj):
         try:
@@ -906,4 +927,4 @@ class GameMaxLengthCheck(MaxLengthCheck):
 class GameSourceMaxLengthCheck(SourceMaxLengthCheck):
     def get_replacement_function(self, unit):
         replace = super().get_replacement_function(unit)
-        return lambda text: _conditional_length_text(replace(text))
+        return lambda text: _length_budget_text(replace(text))

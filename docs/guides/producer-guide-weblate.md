@@ -378,16 +378,22 @@ Source "Он ушёл" with existing translation "Il est parti." must produce "I
 
 ### Interface limits
 
-`max-length:N` defines a static character budget for one string. Set it at
-project or component scope only when the same limit fits every string; use a
-source-file or unit flag for a specific UI slot. A narrower flag overrides a
-broader one.
+`max-length:N` defines a static character budget for one string, counted over
+the text the player actually reads: Unity rich-text tags (`<color=#RRGGBB>`,
+`<b>`, `<sprite name="fire">`) render to zero width and do not spend the
+budget. Set it at project or component scope only when the same limit fits
+every string; use a source-file or unit flag for a specific UI slot. A narrower
+flag overrides a broader one.
 
 `replacements:` defines a placeholder width scenario before the check runs. For
 a timer formula, use the maximum values for that scenario, for example
 `replacements:{hours}:9:{minutes}:9`. Use the complete `{hours}` placeholder,
 not the `hours:cond:` condition header. This does not run the game engine: the
 check uses the conservative longest branch of every conditional block.
+
+Engine placeholders do spend the budget by their own characters, because one
+renders to a real value at runtime. Declare that value's width with
+`replacements:` instead of assuming the placeholder is free.
 
 When a source intentionally fills a fixed slot, add
 `ignore-source-max-length` only to that unit; otherwise the source check keeps
@@ -397,7 +403,6 @@ the budget cannot be met.
 
 Одна строка стабильно переводится неверно из-за неоднозначности исходника -
 пишем пояснение и перезапускаем автоперевод только по ней.
-
 
 ## Шаг 8. Запустить автоматический перевод
 

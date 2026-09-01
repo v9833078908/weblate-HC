@@ -62,6 +62,8 @@ Weblate 2026.8.1
 
 * LLM judge seats can now use independent absolute request deadlines, so a model with a measured heavy latency tail no longer forces every other seat to wait under the same ceiling.
 
+* The ``max-length`` and ``source-max-length`` budgets now count only the characters the player reads: Unity rich-text tags such as ``<color=#RRGGBB>`` render to zero width and no longer spend the budget, so a translation that fits its slot is no longer reported. Engine placeholders keep counting their own characters, because each renders to a real value at runtime; declare that width with ``replacements:``. See :ref:`check-max-length`.
+
 .. rubric:: Bug fixes
 
 * French punctuation spacing and automatic translation no longer modify syntax in Hero Craft conditional game placeholders.

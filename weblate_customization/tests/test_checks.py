@@ -63,6 +63,15 @@ ALTERNATE = "{value:cond:>0?{value}x|much-longer}"
 SEQUENTIAL = "{hours:cond:>0?{hours}h |}{minutes:cond:>0?{minutes}m |}"
 NESTED = "{outer:cond:>0?{inner:cond:>0?x|}y|}"
 TIMER_FLAGS = "max-length:11, replacements:{hours}:9:{minutes}:9:{seconds}:9"
+# A real production string from need-for-greed/ui: three colour tags spend 69
+# of its 136 characters, so the player reads 67 against a budget of 110.
+TAGGED_SENTENCE_RU = (
+    "Можно <color=#E3BA59>продать</color> у торговца, использовать в "
+    "<color=#E3BA59>Плавильне</color> или <color=#E3BA59>Супер слоте</color>."
+)
+# The longest branch by raw length is the tagged one (25 characters around 2
+# visible); the longest branch the player can read is the plain one, 11.
+TAG_BRANCH_CONDITIONAL = "{v:cond:>0?<color=#FFFFFF>hi</color>|hello there}"
 
 
 class ConditionalDslSyntaxSpansTest(SimpleTestCase):
@@ -849,6 +858,48 @@ class GameMaxLengthCheckTest(SimpleTestCase):
             str(self.check.get_description(check_row)),
         )
 
+    def test_tags_do_not_consume_the_budget(self) -> None:
+        unit = make_unit(flags="max-length:110")
+        self.assertFalse(
+            self.check.check_target_params(
+                [TAGGED_SENTENCE_RU], [TAGGED_SENTENCE_RU], unit, 110
+            )
+        )
+
+    def test_visible_text_over_the_budget_still_fails(self) -> None:
+        unit = make_unit(flags="max-length:60")
+        self.assertTrue(
+            self.check.check_target_params(
+                [TAGGED_SENTENCE_RU], [TAGGED_SENTENCE_RU], unit, 60
+            )
+        )
+
+    def test_placeholders_keep_consuming_the_budget(self) -> None:
+        # A placeholder renders to a real runtime value, so it is not
+        # invisible; `replacements:` stays the way to declare its width.
+        unit = make_unit(flags="max-length:10")
+        target = "x" * 8 + "{0}"
+        self.assertTrue(self.check.check_target_params([target], [target], unit, 10))
+
+    def test_tags_are_removed_before_the_conditional_collapse(self) -> None:
+        unit = make_unit(flags="max-length:11")
+        self.assertFalse(
+            self.check.check_target_params(
+                [TAG_BRANCH_CONDITIONAL], [TAG_BRANCH_CONDITIONAL], unit, 11
+            )
+        )
+        self.assertTrue(
+            self.check.check_target_params(
+                [TAG_BRANCH_CONDITIONAL], [TAG_BRANCH_CONDITIONAL], unit, 10
+            )
+        )
+
+    def test_replacements_expand_before_tags_are_removed(self) -> None:
+        unit = make_unit(flags='max-length:10, replacements:%s:"0123456789"')
+        target = "<color=#FFFFFF>%s</color>"
+        self.assertFalse(self.check.check_target_params([target], [target], unit, 10))
+        self.assertTrue(self.check.check_target_params([target], [target], unit, 9))
+
 
 class GameSourceMaxLengthCheckTest(TestCase):
     def setUp(self) -> None:
@@ -893,6 +944,16 @@ class GameSourceMaxLengthCheckTest(TestCase):
         unit = self.get_unit('max-length:100, replacements:%s:"very long text"')
         self.assertFalse(self.check.check_source(["x" * 82], unit))
         self.assertTrue(self.check.check_source(["x" * 82 + "%s"], unit))
+
+    def test_tags_do_not_consume_the_source_budget(self) -> None:
+        unit = self.get_unit("max-length:100")
+        tagged = "<color=#E3BA59>" + "x" * 85 + "</color>"
+        self.assertFalse(self.check.check_source([tagged], unit))
+
+    def test_visible_source_over_the_headroom_still_fails(self) -> None:
+        unit = self.get_unit("max-length:100")
+        tagged = "<color=#E3BA59>" + "x" * 86 + "</color>"
+        self.assertTrue(self.check.check_source([tagged], unit))
 
 
 class _FakeActiveCheck:
