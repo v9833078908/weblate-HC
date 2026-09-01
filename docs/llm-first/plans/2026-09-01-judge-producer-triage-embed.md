@@ -4,17 +4,21 @@
 > implement this plan task-by-task.
 
 **Goal:** Make the embedded judge card a complete producer triage surface:
-every fresh critical verdict arrives with one persisted judge-guided repair
-candidate that the producer can preview and apply in one click, and the
+every fresh critical or major verdict arrives with one persisted judge-guided
+repair candidate that the producer can preview and apply in one click, and the
 accepted text stays blocked until a fresh one-unit judge run completes.
 
 **Architecture:** Keep the existing translate page, verdict card, native
 `Suggestion`, `JudgeRun`, and `auto_translate(mode="judge")` pipeline. Replace
-the critical branch of the current immediate repair loop with a persisted
-`Suggestion` bound to the representative verdict and target/context hashes.
-Major and max-length repair behavior remains unchanged. Every candidate
+the `REJECT` and `FLAG` branches of the current immediate repair loop with a
+persisted `Suggestion` bound to the representative verdict and target/context
+hashes. `max-length` repair behavior remains unchanged. Every candidate
 acceptance path checks freshness under the Unit lock, writes the candidate as
 `STATE_FUZZY`, and queues a current-text-only one-unit re-check.
+
+Producer control replaces automatic rewriting for both severities. Severity
+gating itself does not move: an unresolved `FLAG` still ships with evidence, an
+unresolved `REJECT` is still held.
 
 **Tech stack:** Python 3.14, Django/PostgreSQL, Celery, Django templates
 (Bootstrap/jQuery), pytest, Docker Compose dev instance.
@@ -26,10 +30,18 @@ is a first-increment requirement. The smallest safe increment therefore
 contains Solution 1, the one-unit re-check substrate from Solution 2, and the
 stored-candidate lifecycle from Solution 3.
 
-**Status:** approved 2026-09-01, ready for implementation. No new page and no
-new domain model.
+**Status:** approved 2026-09-01, amended 2026-09-01 to cover `FLAG`, ready for
+implementation. No new page and no new domain model.
 One migration is expected for the `candidate-stored` audit choice on the
 existing `JudgeRunUnit.repair_status` field.
+
+**Known regression accepted with this amendment:** unattended self-healing of
+majors ends. Today an ignored major is sometimes machine-repaired with no human
+involved; from now on it keeps the human text and its `judge-flag` evidence.
+The net quality sign is empirical and measurable without new spend from existing
+`JudgeRunUnit` rows: `repair_status` distribution among `FLAG` outcomes plus
+`initial_severity` versus `final_severity` for `applied` majors. Run that query
+before widening this policy to any other severity.
 
 **Out of scope:** multiple simultaneous candidates, score/ranking UI, judge
 prompt/schema changes, automatic acceptance, and a new export pipeline. The
@@ -42,8 +54,9 @@ the producer explicitly re-checks it.
 ## Invariants
 
 1. Generation never mutates the Unit target.
-2. A candidate is active only for the current unresolved critical verdict with
-   matching target/context hashes.
+2. A candidate is active only for the current unresolved `REJECT` or `FLAG`
+   verdict with matching target/context hashes. `minor` maps to `PASS`
+   (`models/judge.py:677`) and never has a candidate.
 3. Verdict card, suggestions UI, API, votes, bulk operations, and internal
    callers enforce one judge-specific acceptance guard.
 4. Acceptance writes `STATE_FUZZY`; only a fresh re-check may make it shippable.
@@ -53,28 +66,35 @@ the producer explicitly re-checks it.
 7. Metadata contains IDs, hashes, route identity, and schema version only. It
    never contains prompts, responses, credentials, or endpoint URLs.
 8. One verdict has at most one active candidate and one queued/running re-check.
-9. Normal batch major/max-length automatic repair behavior is unchanged. A
-   producer one-unit re-check is evidence-only: it projects pass/major directly
-   and never mutates an accepted target through the major repair loop.
+9. `FLAG` no longer mutates the target automatically: its repair becomes the
+   same opt-in stored candidate as `REJECT`. `max-length` mutating repair is
+   unchanged. A producer one-unit re-check is evidence-only: it projects
+   pass/major directly and never re-enters the mutating repair loop.
 10. Cached stats may display counts but may not enable hand-off; the CTA needs a
     fresh target/context readiness check.
+11. Severity gating is unchanged: an unresolved `FLAG` still ships at
+    `STATE_TRANSLATED` with `judge-flag` evidence, and readiness counters still
+    count only blockers. Adding a major card adds no blocker.
 
 ## Cost contract
 
 | Path | Baseline paid calls |
 | --- | ---: |
-| Current immediate critical repair | 2 judge + 1 repair MT + 2 re-judge = 5 |
-| New critical before producer action | 2 judge + 1 repair MT = 3 |
+| Current critical or major, repair applied | 2 judge + 1 repair MT + 2 re-judge = 5 |
+| Current critical or major, repair rolled back or absent | 2 judge + 1 repair MT = 3 |
+| New critical or major before producer action | 2 judge + 1 repair MT = 3 |
 | Producer keeps current text | 3 total |
 | Producer applies candidate; re-check is pass/major | 3 + 2 judge = 5 total |
 | Producer applies candidate; re-check is critical | 3 + 2 judge + 1 new repair MT = 6 total |
 | Producer asks for another candidate | +1 repair MT |
 
-The saving comes from deferring the second judge round until acceptance. Keeping
-the current text avoids two judge calls. An accepted candidate that passes or
-returns admissible major costs the same five baseline calls as today's automatic
-repair, but gives the producer control. A repeated critical costs one additional
-repair MT call to persist its new candidate.
+The saving comes from deferring the second judge round until acceptance. Today
+every applied repair pays all five calls whether or not anyone wanted the
+rewrite (`judge_loop.py:1300-1303` re-queues it, `:1278-1286` and `:1304-1307`
+stop at three). Keeping the current text now costs three. An accepted candidate
+costs the same five as today's automatic repair, but the producer chose it. A
+repeated critical costs one additional repair MT call to persist its new
+candidate.
 The candidate is generated once per fresh verdict and reused on every render.
 Tests assert request counts; exact dollar attribution of judge-repair MT remains
 out of scope because current usage rows classify those calls as translation.
@@ -84,16 +104,16 @@ out of scope because current usage rows classify those calls as translation.
 ```text
 judge seats
   +-- pass/minor ----------------------> existing projection
-  +-- major/max-length ----------------> existing repair + re-judge
-  +-- critical
+  +-- max-length ----------------------> existing repair + re-judge
+  +-- critical or major
         +-- run_checks -> repair_targets once
         +-- snapshot lock
         +-- native Suggestion(verdict/run/target/context/engine)
-            target remains unchanged and held
+            target remains unchanged; critical held, major ships with evidence
 
 producer card
   +-- stale/context drift ------------> Re-check only
-  +-- current critical, no candidate -> Generate / normal editor
+  +-- current critical/major, no candidate -> Generate / normal editor
   +-- current candidate
         +-- Keep as is ---------------> existing resolution
         +-- Use suggested fix
@@ -144,7 +164,7 @@ Verify:
 
 Commit: `feat(judge): define stored repair candidate contract`.
 
-## Task 2: Persist critical candidates instead of mutating
+## Task 2: Persist blocking and flag candidates instead of mutating
 
 **Files:**
 
@@ -160,23 +180,37 @@ Tests first:
 
 - first-round critical makes two seat requests and one repair call, stores one
   candidate, never calls `_apply_repair`, and leaves target unchanged;
-- translated/non-writable criticals also get candidates;
+- first-round major behaves identically and keeps `STATE_TRANSLATED`: no
+  `_apply_repair`, no `next_pending`, exactly two seat calls and one repair MT,
+  down from today's five calls (`judge_loop.py:1300-1303`);
+- translated/non-writable criticals and majors also get candidates;
 - provider failure, unusable plurals, and target/state/context drift store
-  nothing and leave the target held;
+  nothing and leave the target unchanged;
 - cache/retry reuses the candidate without a second repair MT call;
-- major/max-length still use `_apply_repair` and retain request counts;
-- a repaired major that ends critical stores a final candidate;
+- `max-length` still uses `_apply_repair` and retains request counts;
+- `minor` never stores a candidate;
 - audit distinguishes `candidate-stored`, `no-candidate`, `applied`, and
   `rolled-back`.
 
 Split `_PreparedRound.needs_repair` into `needs_candidate` and
-`needs_mutating_repair`. Critical candidate generation ignores writable state
-and remaining repair attempts. Major/max-length mutation keeps current ownership
-and attempt rules. Batch `repair_targets` over the union, persist critical
-outputs under the `_apply_repair` snapshot check, and send only mutable outputs
-to `_apply_repair`. Criticals never enter `next_pending`. Add
-`RepairStatus.CANDIDATE_STORED` and its `AlterField` migration. Delete obsolete
-critical auto-apply branches.
+`needs_mutating_repair`. `REJECT` and `FLAG` take the candidate path, ignoring
+writable state and remaining repair attempts; `max-length` keeps current
+ownership and attempt rules. Batch `repair_targets` over the union, persist
+candidate outputs under the `_apply_repair` snapshot check (`judge_loop.py:441-458`),
+and send only mutable outputs to `_apply_repair`. Candidate units never enter
+`next_pending`. Add `RepairStatus.CANDIDATE_STORED` and its `AlterField`
+migration. Delete the obsolete critical and flag auto-apply branches.
+
+Removing automatic `FLAG` mutation is the point, not a side effect. Today a
+major rewrite lands on a shipping human translation, guarded only by
+deterministic-check regression (`judge_loop.py:466-471`) and a second opinion
+from the same seats that raised the flag, on a signal whose measured precision
+at `>=major` is 0.51-0.54
+(`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:68-79`).
+The severity policy already states majors are mostly false positives or matters
+of taste and should ship with evidence rather than be blocked
+(`models/judge.py:702-707`); auto-rewriting them contradicts that rationale.
+An ignored major now keeps the human text, which is the conservative outcome.
 
 Verify:
 
@@ -203,26 +237,36 @@ Commit: `feat(judge): persist critical repair candidates`.
 
 Tests cover both permissions, two rapid POSTs dispatching once, queued/running
 badge, completed/failed retry, dispatch failure, and a fuzzy Unit re-check that
-judges current target without phase-1 MT or the major repair loop. A pass or
-admissible major must use exactly two seat calls, make no repair MT call, and
-project the accepted target to its release state. A repeated critical must use
+judges current target without phase-1 MT or the mutating repair loop. A pass or
+admissible major must use exactly two seat calls, make no repair MT call, store
+no new candidate, and project the accepted target to its release state. A
+repeated critical must use
 two seat calls, keep the target held, and make one repair MT call only to store
 the next candidate. Worker start must reuse the pre-created JudgeRun. Generation
 tests cover first generation, existing-candidate no-op, explicit Generate
 another, duplicate POST, failure preserving the old candidate, and drift
 discarding the paid output.
 
-Add task-internal `judge_run_id`, `judge_pretranslate=True`, and
-`judge_mutating_repairs=True` to `auto_translate`, `BatchAutoTranslate`, and
-`AutoTranslate`. One-unit re-check passes `unit_ids=[unit.id]`, `mode="judge"`,
-the run ID, `judge_pretranslate=False`, and
-`judge_mutating_repairs=False`.
+Add task-internal `judge_run_id`, `judge_pretranslate=True`,
+`judge_mutating_repairs=True`, and `judge_candidate_severities=("critical",
+"major")` to `auto_translate`, `BatchAutoTranslate`, and `AutoTranslate`. One-unit
+re-check passes `unit_ids=[unit.id]`, `mode="judge"`, the run ID,
+`judge_pretranslate=False`, `judge_mutating_repairs=False`, and
+`judge_candidate_severities=("critical",)`.
 
-The re-check flag passes `writable_ids=set()` into the existing judge loop so
-major cannot trigger `_apply_repair` or another judge round. Task 2 candidate
-generation is independent of `writable_ids`, so a repeated critical still
-stores exactly one new hash-bound candidate. Both seats, permissions, cache
-identity, projections, and audit remain enabled.
+Run purpose decides candidate generation, and this is the only difference
+between the two run kinds:
+
+| Run | `REJECT` | `FLAG` | `max-length` |
+| --- | --- | --- | --- |
+| Normal batch | store candidate | store candidate | mutating repair |
+| Producer one-unit re-check | store candidate | project directly, no candidate | no mutation |
+
+Without this split an accepted candidate whose re-check returns major would pay
+another repair MT and contradict the 5-call pass/major path. The re-check flag
+also passes `writable_ids=set()` so nothing can trigger `_apply_repair` or
+another judge round. Both seats, permissions, cache identity, projections, and
+audit remain enabled.
 
 Under the Unit lock, reuse an active QUEUED/RUNNING re-check or create one
 `JudgeRun(scope_type=TRANSLATION, requested_mode="recheck",
@@ -271,7 +315,8 @@ Implement typed `JudgeCandidateError` and one `accept_judge_candidate` service:
 
 1. Check `unit.review` and `translation.auto`.
 2. Lock Unit, Suggestion, then representative JudgeVerdict.
-3. Require unresolved REJECT and matching verdict/target/context metadata.
+3. Require an unresolved `REJECT` or `FLAG` and matching verdict/target/context
+   metadata.
 4. Write `STATE_FUZZY`, `ActionEvents.ACCEPT`, `propagate=False`, and provenance.
 5. Delete the candidate.
 6. Create the deduplicated queued re-check and dispatch on commit.
@@ -306,7 +351,10 @@ Render-test mutually exclusive states:
   Automatic suggestions control appears;
 - generation pending: no second submit;
 - resolved/consumed/stale/wrong-verdict candidate never active;
-- major/minor never inherit a critical candidate.
+- `minor` never inherits a candidate, and a candidate never crosses verdicts;
+- a fresh `FLAG` renders the same candidate controls as `REJECT`, with a
+  ships-with-evidence badge instead of a hold badge, so the producer can see it
+  is optional.
 
 `_judge_view_context` resolves at most one candidate for
 `judge_current_verdict` and exposes queued/generation state. Preserve the
@@ -336,9 +384,10 @@ Commit: `refactor(judge): compress verdict evidence`.
 `test_judge_views.py`.
 
 Test and add `(FLAG, "", accepted_as_is)` with immutable `JUDGE_RESOLUTION`
-history. PASS/minor transitions remain absent. Fresh flag shows Keep as is and
-Escalate; minor has evidence without resolution. AI variants remains a generic
-machinery-tab link for major/minor and the critical fallback, rendered only
+history. PASS/minor transitions remain absent. Fresh flag shows candidate
+controls plus Keep as is and Escalate; minor has evidence without resolution.
+AI variants remains a generic machinery-tab link for minor and the
+critical/major no-candidate fallback, rendered only
 under `user_can_use_machinery` (`translate.html:343,502`) and tested for
 absence without `machinery.view`; never label it as the stored judge
 candidate.
@@ -421,7 +470,9 @@ Browser/Selenium flows:
    candidate appears, blocker remains.
 6. Context drift: candidate blocked, only Re-check.
 7. Missing candidate: Generate and failed retry preserving the old candidate.
-8. Normal-batch major repair and component readiness.
+8. Fresh major card: candidate controls with a ships-with-evidence badge, one
+   click applies, ignoring it leaves the human text at `STATE_TRANSLATED`.
+9. `max-length` mutating repair and component readiness unchanged.
 
 Use deterministic fixtures/mocked provider responses to avoid unapproved spend.
 Use the dev surface at port 3001 only if already running; rebuilding the shared
@@ -429,14 +480,14 @@ stack needs approval.
 
 ## Acceptance criteria
 
-1. Every current critical target stays untouched and has at most one current
-   native judge candidate.
+1. Every current critical and major target stays untouched by the batch and has
+   at most one current native judge candidate.
 2. Producer previews and applies it from the card in one click.
 3. Acceptance cannot ship before a fresh one-unit re-check.
 4. Drift blocks every UI/API/internal acceptance route.
 5. Generation, regeneration, and re-check dedupe retries/double-clicks.
-6. Normal-batch major repair is unchanged; producer one-unit re-check never
-   repairs or re-judges an admissible major.
+6. `FLAG` no longer auto-mutates; `max-length` repair is unchanged; a producer
+   one-unit re-check never repairs or re-judges an admissible major.
 7. Tests prove the 3-call pre-decision, 5-call pass/major, and 6-call
    repeated-critical paths.
 8. Readiness cannot report a false zero from cache or target-only freshness.
