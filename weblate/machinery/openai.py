@@ -22,7 +22,11 @@ from .base import (
 from .forms import AzureOpenAIMachineryForm, MistralMachineryForm, OpenAIMachineryForm
 from .llm import (
     BaseLLMTranslation,
+    llm_batch_component,
+    llm_batch_component_id,
     llm_batch_project,
+    llm_batch_project_id,
+    llm_batch_target_language,
     llm_batch_unit_count,
     llm_usage_record,
 )
@@ -102,7 +106,7 @@ class BaseOpenAITranslation(BaseLLMTranslation):
                 model, prompt, content, previous_content, previous_response
             ),
         )
-        payload = response.json()
+        payload = response.json(parse_float=Decimal)
         self.record_llm_usage(payload, model, self.batch_string_count(content))
         return self.parse_chat_response(payload)
 
@@ -117,7 +121,7 @@ class BaseOpenAITranslation(BaseLLMTranslation):
                 model, prompt, content, previous_content, previous_response
             ),
         )
-        payload = response.json()
+        payload = response.json(parse_float=Decimal)
         await sync_to_async(self.record_llm_usage, thread_sensitive=True)(
             payload, model, self.batch_string_count(content)
         )
@@ -162,18 +166,27 @@ class BaseOpenAITranslation(BaseLLMTranslation):
         cost = usage.get("cost")
         prompt_details = usage.get("prompt_tokens_details") or {}
         completion_details = usage.get("completion_tokens_details") or {}
-        project = self.settings.get("_project")
-        project_slug = project.slug if project is not None else llm_batch_project.get()
+        project_slug = llm_batch_project.get()
+        project_id_snapshot = llm_batch_project_id.get()
+        if project_slug is None:
+            project = self.settings.get("_project")
+            project_slug = project.slug if project is not None else ""
+            project_id_snapshot = project.pk if project is not None else None
         # ruff: ignore[import-outside-top-level]
-        from weblate.trans.models.llm_usage import LLMUsageLog
+        from weblate.trans.models.llm_usage import LLMUsageLog, parse_provider_cost
 
         record = LLMUsageLog.objects.create(
             model=model,
-            project_slug=project_slug if isinstance(project_slug, str) else "",
+            service=self.get_identifier(),
+            project_id_snapshot=project_id_snapshot,
+            project_slug=project_slug,
+            component_id_snapshot=llm_batch_component_id.get(),
+            component_slug=llm_batch_component.get(),
+            target_language_code=llm_batch_target_language.get(),
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
-            cost_usd=Decimal(str(cost)) if cost else None,
+            cost_usd=parse_provider_cost(cost),
             response_id=str(payload.get("id") or ""),
             cached_tokens=prompt_details.get("cached_tokens") or 0,
             reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
