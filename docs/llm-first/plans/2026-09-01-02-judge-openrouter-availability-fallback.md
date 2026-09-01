@@ -431,7 +431,8 @@ sets differ in both directions and each difference is load-bearing:
 - `http-auth` is here but not in the availability set. Per D3, an entitlement
   failure is unavailability **of that endpoint**, and the fallback presents a
   different key to a different provider, so exactly one fallback call is
-  warranted while the primary keeps its fail-fast behaviour.
+  warranted. Note this kind does not currently reach the retry logic at all: it
+  raises immediately (`weblate/trans/judge.py:1455-1456`). See Step 3.
 - `deadline` is in both, and it is included here on purpose: it means the
   endpoint produced no complete answer inside the seat's absolute bound, which
   is unavailability for that request. The known objection - that a deadline
@@ -508,9 +509,19 @@ uv run pytest weblate/trans/tests/test_judge_client.py -k failover
 In `_run_batch`, after the primary's transport, transient-HTTP and protocol
 budgets are spent and the final `failure_kind` is in `_FAILOVER_FAILURE_KINDS`,
 re-send the identical batch once to the fallback seat profile. Log one line with
-the seat, the trigger kind, both models and the batch position. `http-auth` on
-the primary keeps its existing fail-fast behaviour for the primary and gains
-exactly this one fallback call.
+the seat, the trigger kind, both models and the batch position.
+
+**`http-auth` needs care: today it does not mark a batch, it raises.**
+`_run_batch` raises `JudgeError("The LLM judge is not configured.")` the moment
+it sees `http-auth` (`weblate/trans/judge.py:1455-1456`), before any retry
+branch, and that exception propagates out through the seat worker and aborts the
+whole run rather than costing one batch. The fallback attempt must therefore be
+inserted **before** that raise, and the raise must survive only for the case
+where the fallback also answers `http-auth`: both endpoints rejecting our
+credentials genuinely is a configuration error and must still fail fast without
+further paid calls. A test must cover all three states: primary auth-fails and
+fallback succeeds (run completes), both auth-fail (`JudgeError`, no third call),
+and no fallback configured (today's immediate `JudgeError`).
 
 ### Step 4: Verify GREEN
 
@@ -672,6 +683,12 @@ exactly one fallback attempt with `provider="openrouter"`, and no further primar
 attempt. Verdicts exist for every unit. Each verdict's `judge_model`,
 `profile_fingerprint` and `judge_provider` are the fallback's, which is the live
 proof of Task 3. The run completes without a warning about unjudged strings.
+
+Baseline worth capturing first, on the unmodified code with no fallback
+configured: the same invalid key aborts the entire run with "Automatic
+translation failed: The LLM judge is not configured", because `http-auth` raises
+rather than marking a batch (`weblate/trans/judge.py:1455-1456`). Recording that
+before/after pair is the clearest single demonstration of what this plan buys.
 
 An endpoint-level credential cannot fail one seat while sparing the other, so
 seat isolation stays a Task 4 unit test rather than a live arm.
