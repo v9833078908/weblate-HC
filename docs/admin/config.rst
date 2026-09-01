@@ -1894,9 +1894,13 @@ JUDGE_REQUEST_DEADLINE
 
 .. versionadded:: 2026.8.1
 
-Maximum wall-clock seconds for one judge batch request. Defaults to 300. A
+Maximum wall-clock seconds for one judge batch request. Defaults to 120. A
 batch exceeding the deadline is recorded unparsed instead of holding a worker
-indefinitely.
+indefinitely. ``WEBLATE_JUDGE_REQUEST_DEADLINE_SEAT_1`` and
+``WEBLATE_JUDGE_REQUEST_DEADLINE_SEAT_2`` can set positive finite bounds for
+individual seats; each defaults to ``inherit`` and therefore uses the global
+value. A per-seat deadline changes only the transport bound and does not
+invalidate an already parsed cached verdict.
 
 .. seealso::
 

@@ -86,16 +86,18 @@ services:
       WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_1: json_schema
       WEBLATE_JUDGE_STREAM_SEAT_1: 'true'
       WEBLATE_JUDGE_BATCH_SIZE_SEAT_1: '2'
+      WEBLATE_JUDGE_REQUEST_DEADLINE_SEAT_1: '120'
       WEBLATE_JUDGE_TEMPERATURE_SEAT_1: '0'
       WEBLATE_JUDGE_MAX_TOKENS_SEAT_1: '0'
       WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2: ''
       WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_2: json_schema
       WEBLATE_JUDGE_STREAM_SEAT_2: 'true'
-      # atlas/qwen3.8-max is slow and heavy-tailed: over 25 single-string
-      # requests the median was 21s but one took 103s, so any batch of 2 has a
-      # high chance of exceeding the 120s request deadline, and a cut batch
-      # costs every verdict in it. Batch 1 is what the green canary ran.
+      # Production measurement over 25 single-string requests: median 16.740s,
+      # p95 100.594s and maximum 108.473s. The 150s deadline is the maximum
+      # plus 25%, rounded up to the next 30s. Batch 1 keeps each tail request
+      # from discarding another string's verdict.
       WEBLATE_JUDGE_BATCH_SIZE_SEAT_2: '1'
+      WEBLATE_JUDGE_REQUEST_DEADLINE_SEAT_2: '150'
       WEBLATE_JUDGE_TEMPERATURE_SEAT_2: '0'
       WEBLATE_JUDGE_MAX_TOKENS_SEAT_2: '0'
       WEBLATE_JUDGE_DEFERRAL_ENABLED: 0

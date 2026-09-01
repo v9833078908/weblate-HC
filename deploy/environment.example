@@ -151,16 +151,18 @@ WEBLATE_JUDGE_REASONING_EFFORT_SEAT_1=thinking.disabled
 WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_1=json_schema
 WEBLATE_JUDGE_STREAM_SEAT_1=true
 WEBLATE_JUDGE_BATCH_SIZE_SEAT_1=2
+WEBLATE_JUDGE_REQUEST_DEADLINE_SEAT_1=120
 WEBLATE_JUDGE_TEMPERATURE_SEAT_1=0
 WEBLATE_JUDGE_MAX_TOKENS_SEAT_1=0
 WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2=
 WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_2=json_schema
 WEBLATE_JUDGE_STREAM_SEAT_2=true
-# Measured 2026-08-31 over 25 single-string requests to `atlas/qwen3.8-max`:
-# median 21s, maximum 103s against a 120s request deadline. A cut batch costs
-# every verdict in it, and at batch 5 every batch was cut. Raise this only
-# with a fresh latency measurement for the seat's own model.
+# Measured 2026-09-01 over 25 single-string production requests to
+# `atlas/qwen3.8-max`: median 16.740s, p95 100.594s and maximum 108.473s
+# under a 300s diagnostic ceiling. The 150s absolute deadline is the measured
+# maximum plus 25%, rounded up to the next 30s.
 WEBLATE_JUDGE_BATCH_SIZE_SEAT_2=1
+WEBLATE_JUDGE_REQUEST_DEADLINE_SEAT_2=150
 WEBLATE_JUDGE_TEMPERATURE_SEAT_2=0
 WEBLATE_JUDGE_MAX_TOKENS_SEAT_2=0
 # Keep automatic deferred draining disabled until the production canary.

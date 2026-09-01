@@ -60,6 +60,8 @@ Weblate 2026.8.1
 * The ``game-markup`` check now also compares the syntax of Hero Craft conditional placeholders such as ``{hours:cond:>0?{hours}h. |}``: a space inserted inside a conditional header, a lost or added ``|``, a separator moved across a protected placeholder, and a changed identifier, comparison or nested placeholder are reported, while the text of a conditional branch stays translatable.
 * Hero Craft conditional placeholders now use their worst-case visible branch when evaluating ``max-length`` and ``source-max-length`` budgets. Judge-mode automatic translations that exceed an opted-in ``max-length`` budget are retried with the concrete limit and remain pending when the limit cannot be met.
 
+* LLM judge seats can now use independent absolute request deadlines, so a model with a measured heavy latency tail no longer forces every other seat to wait under the same ceiling.
+
 .. rubric:: Bug fixes
 
 * French punctuation spacing and automatic translation no longer modify syntax in Hero Craft conditional game placeholders.
