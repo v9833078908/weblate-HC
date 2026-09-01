@@ -451,8 +451,9 @@ Templates + `_judge_view_context` + minor JS only:
   resolution), "Edit manually" (focus the editor + JS switches the radio to
   "Waiting for review" - protection against overwrite by the next run),
   "AI variants" (activates the existing suggestions tab).
-- Auto-advance: the resolution form posts `next_unit_url` instead of
-  `this_unit_url`.
+- Auto-advance: the resolution form gains a `success_next=next_unit_url`
+  field used only by the success branch of `resolve_judge_verdict`;
+  failures keep returning to the same unit via `next`.
 - Readiness strip: "Blocked for release: N" (link to the filter) + a
   "Download / Push" CTA over the existing menus.
 
@@ -538,8 +539,10 @@ variants from the tab, the stored candidate will pay off.
      radio to translated so a manual fix does not stay FUZZY-writable,
      `editor/base.js`), "AI variants" (activates the existing machinery
      tab).
-   - Task 4, queue auto-advance: the resolution form posts `next_unit_url`
-     instead of `this_unit_url` (`judge-verdict.html:176-181`).
+   - Task 4, queue auto-advance: a `success_next=next_unit_url` hidden
+     field consumed only by the success branch of `resolve_judge_verdict`
+     (`edit.py:1863-1864`); the error branches keep `next=this_unit_url`
+     so a failed decision stays on the failed unit.
    - Task 5, readiness strip + conservative ship CTA: "Blocked for release:
      N" link to the filter; CTA enabled only when fresh
      `judge_reject == 0 AND judge_stale == 0 AND judge_unparsed == 0`

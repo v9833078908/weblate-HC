@@ -158,25 +158,36 @@ Same suites as Task 1.
 
 The resolution form posts `next={{ this_unit_url }}`
 (`judge-verdict.html:159`), so recording a decision reloads the same unit
-even though it just left the `check:judge-*` filter.
+even though it just left the `check:judge-*` filter. A plain template
+switch to `next_unit_url` is wrong: every branch of
+`resolve_judge_verdict` - invalid form, `JudgeResolutionError`, success -
+redirects through the same `request.POST.get("next")`
+(`weblate/trans/views/edit.py:1846-1864`), so failures would advance too
+and the error message would land on the wrong unit.
 
 **Files:**
 
 - Modify: `weblate/templates/snippets/judge-verdict.html`
+- Modify: `weblate/trans/views/edit.py`
 - Modify: `weblate/trans/tests/test_judge_views.py`
 
 ### Step 1: Write failing test
 
-A successful `resolve-judge-verdict` POST from the unit page redirects to
-`next_unit_url` (offset + 1 of the same search), not back to the resolved
-unit. A failed POST (blank reason) still returns to the same unit.
+- A successful `resolve-judge-verdict` POST from the unit page redirects
+  to `next_unit_url` (offset + 1 of the same search), not back to the
+  resolved unit.
+- A failed POST (blank reason) and a `JudgeResolutionError` (stale pk)
+  both return to the same unit, message attached.
 
 ### Step 2: Implement
 
-Change the hidden `next` value to `{{ next_unit_url }}` (already in the
-include context, `translate.html:272`); update the snippet's requires
-comment (line 1). `resolve_judge_verdict` already redirects through
-`redirect_next` - no view change.
+- Template: keep `next` as `{{ this_unit_url }}` (the error return) and
+  add a second hidden field `success_next` set to `{{ next_unit_url }}`
+  (already in the include context, `translate.html:272`); update the
+  snippet's requires comment (line 1).
+- View: only the success branch (`edit.py:1863-1864`) prefers
+  `request.POST.get("success_next")`, falling back to `next`; both error
+  branches keep using `next`. `redirect_next` already sanitizes the URL.
 
 ### Step 3: Verify GREEN
 
