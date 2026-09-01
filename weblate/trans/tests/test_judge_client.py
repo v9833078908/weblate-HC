@@ -18,6 +18,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from weblate.trans.judge import (
     _ALIAS_CACHE,
     FAILURE_KINDS,
+    JudgeEndpoint,
     JudgeError,
     JudgeRequest,
     _decode_non_stream,
@@ -25,10 +26,12 @@ from weblate.trans.judge import (
     _read_capped,
     _read_sse,
     _request_timeout,
+    _resolve_profile,
     get_judge_base_url,
     get_judge_chat_completions_url,
     judge_configuration_ready,
     judge_configuration_snapshot,
+    judge_primary_endpoint,
     judge_seat_profiles,
     render_preview,
     request_verdicts,
@@ -377,6 +380,63 @@ class JudgeEndpointResolutionTest(SimpleTestCase):
             get_judge_chat_completions_url(),
             "https://openrouter.ai/api/v1/chat/completions",
         )
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class JudgeExplicitEndpointTest(SimpleTestCase):
+    """An endpoint is a value threaded through resolution, not a global read."""
+
+    def test_primary_endpoint_is_an_explicit_value(self) -> None:
+        primary = judge_primary_endpoint()
+        self.assertEqual(primary.role, "primary")
+        self.assertEqual(primary.provider, "litellm")
+        self.assertEqual(primary.base_url, "https://hcbifrost.herocraft.com/litellm/v1")
+        self.assertEqual(primary.api_key, "sk-test")
+
+    def test_resolve_seat_profile_accepts_an_explicit_endpoint(self) -> None:
+        primary = judge_primary_endpoint()
+        profile = resolve_judge_seat_profile(1, endpoint=primary)
+        self.assertEqual(profile.base_url, primary.base_url)
+        self.assertEqual(profile.api_key, primary.api_key)
+        self.assertEqual(profile.provider, "litellm")
+
+    def test_explicit_primary_endpoint_matches_the_implicit_default(self) -> None:
+        default_profile = resolve_judge_seat_profile(1)
+        explicit_profile = resolve_judge_seat_profile(
+            1, endpoint=judge_primary_endpoint()
+        )
+        self.assertEqual(default_profile, explicit_profile)
+
+    def test_seat_profiles_still_return_the_primary_pair_unchanged(self) -> None:
+        first, second = judge_seat_profiles()
+        self.assertEqual(first.model, "vendor-a/model")
+        self.assertEqual(second.model, "vendor-b/model")
+        self.assertEqual(first.base_url, "https://hcbifrost.herocraft.com/litellm/v1")
+
+    def test_two_endpoints_never_collide_on_fingerprint(self) -> None:
+        primary = judge_primary_endpoint()
+        other = JudgeEndpoint(
+            role="fallback",
+            base_url="https://openrouter.ai/api/v1",
+            api_key="sk-other",
+            provider="openrouter",
+        )
+        first = resolve_judge_seat_profile(1, endpoint=primary)
+        second = resolve_judge_seat_profile(1, endpoint=other)
+        self.assertNotEqual(first.endpoint_fingerprint, second.endpoint_fingerprint)
+        self.assertNotEqual(first.profile_fingerprint, second.profile_fingerprint)
+
+    def test_legacy_no_seat_profile_still_resolves_global_values(self) -> None:
+        profile = _resolve_profile(0, legacy_model="vendor/model-a")
+        self.assertEqual(profile.model, "vendor/model-a")
+        self.assertEqual(profile.base_url, "https://hcbifrost.herocraft.com/litellm/v1")
+        self.assertEqual(profile.api_key, "sk-test")
 
 
 @override_settings(

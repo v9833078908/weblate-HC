@@ -98,12 +98,23 @@ class JudgeError(Exception):
 
 
 @dataclass(frozen=True)
+class JudgeEndpoint:
+    """An explicit, immutable outbound Judge endpoint: role, URL, credential."""
+
+    role: str
+    base_url: str
+    api_key: str
+    provider: str
+
+
+@dataclass(frozen=True)
 class JudgeSeatProfile:
     """An immutable, fully resolved request profile for one judge seat."""
 
     seat: int
     model: str
     base_url: str
+    api_key: str
     provider: str
     response_format: str
     reasoning: str
@@ -176,15 +187,19 @@ UNPARSED = JudgeResult("none", "", [], "", unparsed=True, failure_kind="unknown"
 type OnBatch = Callable[[Sequence[JudgeRequest], Sequence[JudgeResult]], None]
 
 
-def get_judge_base_url() -> str:
-    """Validate and return the configured endpoint without making a request."""
-    base_url = settings.JUDGE_BASE_URL
+def _validate_base_url(base_url: object) -> str:
+    """Validate an endpoint URL shape without making a request."""
     if not isinstance(base_url, str) or not base_url.strip():
         raise JudgeError(_("The LLM judge is not configured."))
     parsed = urlsplit(base_url)
     if parsed.scheme != "https" or not parsed.netloc:
         raise JudgeError(_("The LLM judge is not configured."))
     return base_url
+
+
+def get_judge_base_url() -> str:
+    """Validate and return the configured endpoint without making a request."""
+    return _validate_base_url(settings.JUDGE_BASE_URL)
 
 
 def get_judge_chat_completions_url() -> str:
@@ -198,6 +213,17 @@ def _judge_provider(base_url: str) -> str:
     if hostname == _LITELLM_HOST or hostname.endswith(f".{_LITELLM_HOST}"):
         return "litellm"
     return "unknown"
+
+
+def judge_primary_endpoint() -> JudgeEndpoint:
+    """Return the configured primary endpoint as an explicit value."""
+    base_url = get_judge_base_url()
+    return JudgeEndpoint(
+        role="primary",
+        base_url=base_url,
+        api_key=settings.JUDGE_API_KEY,
+        provider=_judge_provider(base_url),
+    )
 
 
 def _redact_alias_config(value: object, depth: int = 0) -> object:
@@ -248,13 +274,15 @@ def _read_capped(
     return bytes(buffer)
 
 
-def _fetch_litellm_alias(base_url: str, model: str) -> tuple[str, str] | None:
+def _fetch_litellm_alias(
+    base_url: str, model: str, api_key: str
+) -> tuple[str, str] | None:
     """Fetch one LiteLLM alias's resolved model and redacted revision hash."""
     with stream_validated_url(
         "GET",
         f"{base_url.rstrip('/')}/model/info",
         params={"model": model},
-        headers={"Authorization": f"Bearer {settings.JUDGE_API_KEY}"},
+        headers={"Authorization": f"Bearer {api_key}"},
         timeout=httpx2.Timeout(timeout=_ALIAS_INFO_TIMEOUT),
         follow_redirects=False,
     ) as response:
@@ -288,7 +316,7 @@ def _fetch_litellm_alias(base_url: str, model: str) -> tuple[str, str] | None:
     return upstream, _alias_revision_hash(entry)
 
 
-def resolve_judge_alias(base_url: str, model: str) -> tuple[str, str]:
+def resolve_judge_alias(base_url: str, model: str, api_key: str) -> tuple[str, str]:
     """
     Return ``(resolved_upstream_model, revision_hash)`` for an alias.
 
@@ -307,7 +335,7 @@ def resolve_judge_alias(base_url: str, model: str) -> tuple[str, str]:
     resolved, revision = model, ""
     cache_ttl = _ALIAS_CACHE_FAILURE_TTL
     try:
-        alias = _fetch_litellm_alias(base_url, model)
+        alias = _fetch_litellm_alias(base_url, model, api_key)
     except Exception:
         # A capability outage must degrade, not block, judging.
         LOGGER.debug("Judge alias resolution failed for %s", model)
@@ -356,11 +384,18 @@ def _profile_number(value: object, converter: Callable[[str], object]) -> object
         return value
 
 
-def _resolve_profile(seat: int, *, legacy_model: str | None = None) -> JudgeSeatProfile:
+def _resolve_profile(
+    seat: int,
+    *,
+    legacy_model: str | None = None,
+    endpoint: JudgeEndpoint | None = None,
+) -> JudgeSeatProfile:
     if seat not in JUDGE_SEATS and seat != 0:
         raise JudgeError(_("The LLM judge is not configured."))
-    base_url = get_judge_base_url()
-    provider = _judge_provider(base_url)
+    if endpoint is None:
+        endpoint = judge_primary_endpoint()
+    base_url = endpoint.base_url
+    provider = endpoint.provider
     if seat:
         model = getattr(settings, f"JUDGE_MODEL_SEAT_{seat}", "")
         reasoning = _profile_value(
@@ -424,7 +459,9 @@ def _resolve_profile(seat: int, *, legacy_model: str | None = None) -> JudgeSeat
         "enable_thinking=false",
     }:
         raise JudgeError(_("The LLM judge is not configured."))
-    upstream_model, alias_revision = resolve_judge_alias(base_url, model)
+    upstream_model, alias_revision = resolve_judge_alias(
+        base_url, model, endpoint.api_key
+    )
     endpoint_fingerprint = _fingerprint(base_url)
     model_fingerprint = _fingerprint(model, upstream_model, alias_revision)
     profile_fingerprint = _fingerprint(
@@ -444,6 +481,7 @@ def _resolve_profile(seat: int, *, legacy_model: str | None = None) -> JudgeSeat
         seat=seat,
         model=model,
         base_url=base_url,
+        api_key=endpoint.api_key,
         provider=provider,
         response_format=response_format,
         reasoning=reasoning,
@@ -461,8 +499,16 @@ def _resolve_profile(seat: int, *, legacy_model: str | None = None) -> JudgeSeat
     )
 
 
-def resolve_judge_seat_profile(seat: int) -> JudgeSeatProfile:
-    """Return one profile after validating both paid seats atomically."""
+def resolve_judge_seat_profile(
+    seat: int, *, endpoint: JudgeEndpoint | None = None
+) -> JudgeSeatProfile:
+    """Return one profile, validating both paid seats atomically for the primary."""
+    if endpoint is not None:
+        return (
+            _resolve_profile(seat, endpoint=endpoint)
+            if seat in JUDGE_SEATS
+            else _raise_configuration()
+        )
     profiles = judge_seat_profiles()
     return profiles[seat - 1] if seat in JUDGE_SEATS else _raise_configuration()
 
@@ -1045,7 +1091,7 @@ def _post_response(
         "POST",
         f"{profile.base_url.rstrip('/')}/chat/completions",
         headers={
-            "Authorization": f"Bearer {settings.JUDGE_API_KEY}",
+            "Authorization": f"Bearer {profile.api_key}",
             "Content-Type": "application/json",
         },
         json=payload,
