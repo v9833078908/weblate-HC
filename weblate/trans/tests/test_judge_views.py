@@ -1717,6 +1717,20 @@ class JudgeRunReportViewTest(ViewTestCase):
         self.assertEqual(response.context["page_obj"].paginator.count, 1)
         self.assertContains(response, "cached")
 
+    def test_refused_run_shows_the_refusal_and_no_unparsed_row(self) -> None:
+        self.enable_review()
+        run = self.create_run(status=JudgeRun.Status.FAILED)
+        run.failure = "The LLM judge endpoint refused the request (HTTP 400)."
+        run.save(update_fields=["failure"])
+        response = self.client.get(self.report_url(run))
+        self.assertContains(response, "refused the request (HTTP 400)")
+        stats = {key: count for key, _label, count in response.context["stats"]}
+        self.assertEqual(
+            stats["unparsed"],
+            0,
+            "a refused run must not report fake unparsed opinions",
+        )
+
     def test_unit_in_older_and_newer_run_appears_only_in_requested_report(
         self,
     ) -> None:
