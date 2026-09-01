@@ -64,6 +64,8 @@ Weblate 2026.8.1
 
 * The ``max-length`` and ``source-max-length`` budgets now count only the characters the player reads: Unity rich-text tags such as ``<color=#RRGGBB>`` render to zero width and no longer spend the budget, so a translation that fits its slot is no longer reported. Engine placeholders keep counting their own characters, because each renders to a real value at runtime; declare that width with ``replacements:``. See :ref:`check-max-length`.
 
+* An LLM judge request the endpoint refuses every time (HTTP 400, 404, 405, 406, 415, 422) now fails the run fast as ``http-request-invalid`` instead of writing a fake unparsed verdict and paying for retries or deferrals of a request that can never succeed; the refused attempt stays in the ledger as the diagnostic, see :setting:`JUDGE_REQUEST_SLEEP`. A guarded ``judge_close_refused_verdicts`` command reclassifies the historical false-unparsed verdicts written by that behaviour.
+
 .. rubric:: Bug fixes
 
 * French punctuation spacing and automatic translation no longer modify syntax in Hero Craft conditional game placeholders.

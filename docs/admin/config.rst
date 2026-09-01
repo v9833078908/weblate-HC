@@ -1879,8 +1879,13 @@ JUDGE_REQUEST_SLEEP
 
 Seconds to sleep between judge batches. Defaults to 0.0. Raise this on a
 provider or model that throttles a low-latency run; a batch that receives an
-HTTP 429 or 403 response is retried once with a longer sleep before its
-strings are marked unparsed.
+HTTP 429 response is retried once with a longer sleep before its strings are
+marked unparsed. Requests the endpoint refuses every time are classified
+separately: HTTP 400, 404, 405, 406, 415, and 422 abort the run as
+``http-request-invalid``, because resending them anywhere is paid waste, and
+no verdict or deferral is recorded for a refused request. HTTP 401 and 403
+abort as a configuration error. Any other status (413, an unclassified 4xx,
+5xx) keeps the previous retry-or-unparsed behaviour.
 
 .. seealso::
 
