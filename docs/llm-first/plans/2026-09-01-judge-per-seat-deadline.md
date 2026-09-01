@@ -10,7 +10,7 @@
 
 **Design:** `docs/llm-first/designs/2026-09-01-judge-per-seat-deadline.md`.
 
-**Status:** approved 2026-09-01; implementation in progress.
+**Status:** completed and deployed 2026-09-01; production canary and comparable measurement passed. Evidence: `docs/llm-first/measurements/2026-09-01-02-judge-seat-parallelism-production.md`.
 
 ---
 

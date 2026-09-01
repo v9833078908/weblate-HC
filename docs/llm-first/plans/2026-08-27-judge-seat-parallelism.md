@@ -1,8 +1,8 @@
 # Plan: judge both seats in parallel
 
-Date: 2026-08-27. Status: **deployed; dev canary passed 2026-08-31;
-production rollout awaiting its own approvals.** Revised after engineering
-review on 2026-08-27; the caller-failure
+Date: 2026-08-27. Status: **deployed and verified in production
+2026-09-01.** Revised after engineering review on 2026-08-27; the
+caller-failure
 protocol, provider-load gate and thread-aware test layout below replace the
 unsafe first draft. Revised again on 2026-08-31 against the post-remediation
 judge loop (c979bbc, 011c95d, cc3111d, 75ce50f): see "Revision: 2026-08-31
@@ -1126,9 +1126,10 @@ the LiteLLM endpoint before trusting the overlap numbers there.
       one variant for exactly that measurement.
 - [x] Commit and push implementation
 - [x] Separate deploy approval obtained
-- [ ] Separate bounded production-run approval obtained
-- [ ] Bounded production canary passes
-- [ ] Comparable production measurement approved and recorded
+- [x] Separate bounded production-run approval obtained
+- [x] Bounded production canary passed on 25 exact uncached units
+- [x] Comparable production measurement approved and recorded:
+      `docs/llm-first/measurements/2026-09-01-02-judge-seat-parallelism-production.md`
 
 ## GSTACK REVIEW REPORT
 
@@ -1140,11 +1141,9 @@ the LiteLLM endpoint before trusting the overlap numbers there.
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | N/A | No UI change |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | NOT RUN | Not required |
 
-**VERDICT:** Engineering cleared; implementation is verified and the dev
-canary passes. Production rollout is blocked only on its own approvals.
+**VERDICT:** Engineering cleared; implementation, dev canary, strict bounded
+production canary, and comparable production measurement all pass. Parallel
+judge seats are deployed on production with measured per-seat request
+deadlines.
 
-**PENDING GATES:**
-
-- Approval naming the bounded production canary scope, then the canary itself.
-- Production seat settings must carry the corrected pair before any production
-  judge run: the seat faults this canary found came from the same template.
+**PENDING GATES:** None.
