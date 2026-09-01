@@ -71,6 +71,7 @@ def result(severity, verdict, **kw):
 
 PASS = result("none", "pass")
 MAJOR = result("major", "flag")
+MINOR = result("minor", "pass")
 CRITICAL = result("critical", "reject")
 DEAD = JudgeResult("none", "", [], "", unparsed=True)
 
@@ -299,6 +300,11 @@ class JudgeSeatConnectionCleanupTest(TransactionTestCase):
     JUDGE_MAX_UNPARSED_RETRY_ROUNDS=0,
 )
 class JudgeLoopTest(ViewTestCase):
+    def enable_repair_engine(self) -> None:
+        # The routed repair engine resolves the candidate metadata engine.
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
+
     def run_batch(self, seat_results, repair=None, writable=True):
         # seat_results: list of results, consumed in order, one per call.
         client = mock_request_verdicts([[result] for result in seat_results])
@@ -867,22 +873,30 @@ class JudgeLoopTest(ViewTestCase):
         _, verdict, _ = self.run_batch([MAJOR, CRITICAL], repair=None)
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
 
-    def test_flag_triggers_one_repair_judged_by_both_seats(self) -> None:
-        _unit, verdict, client = self.run_batch(
-            [MAJOR, MAJOR, PASS, PASS], repair=["fixed text"]
-        )
-        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
-        self.assertEqual(verdict.attempt, 1)
-        self.assertEqual(self.get_unit().target.strip(), "fixed text")
-        self.assertEqual(client.call_count, 4)
-
-    def test_exhausted_flag_repair_keeps_the_last_flag(self) -> None:
-        _unit, verdict, client = self.run_batch(
-            [MAJOR, MAJOR, MAJOR, MAJOR], repair=["still wrong"]
+    def test_flag_stores_a_candidate_without_a_second_round(self) -> None:
+        # The flagged round generates one candidate and ends: the judged
+        # text is never mutated, so there is nothing to re-judge.
+        self.enable_repair_engine()
+        original = self.get_unit().target
+        unit, verdict, client = self.run_batch(
+            [MAJOR, MAJOR], repair=["fixed text"]
         )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
-        self.assertEqual(verdict.attempt, 1)
-        self.assertEqual(client.call_count, 4)
+        self.assertEqual(verdict.attempt, 0)
+        self.assertEqual(client.call_count, 2)
+        self.assertEqual(self.get_unit().target, original)
+        candidate = unit.suggestion_set.get(userdetails__kind="judge-repair")
+        self.assertEqual(candidate.target.strip(), "fixed text")
+
+    def test_one_flag_round_ends_after_storing_the_candidate(self) -> None:
+        self.enable_repair_engine()
+        unit, verdict, client = self.run_batch(
+            [MAJOR, MAJOR], repair=["still wrong"]
+        )
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+        self.assertEqual(verdict.attempt, 0)
+        self.assertEqual(client.call_count, 2)
+        self.assertEqual(unit.suggestion_set.count(), 1)
 
     def test_repair_fetch_failure_does_not_crash_the_batch(self) -> None:
         # 2026-08-25 judge-repair-loop measurement: a malformed producer reply
@@ -906,10 +920,12 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(self.get_unit().target, original_target)
         self.assertEqual(unit.judge_verdicts.count(), 2)
 
-    def test_a_negative_round_fetches_every_repair_in_one_call(self) -> None:
+    def test_a_negative_round_fetches_every_candidate_in_one_call(self) -> None:
+        self.enable_repair_engine()
         first = self.get_unit()
         second = self.get_unit(source="Thank you for using Weblate.")
         second.translate(self.user, ["second original target"], STATE_TRANSLATED)
+        first_target = first.target
         repair_mock = mock.Mock(
             return_value={
                 first.id: ["first repaired target"],
@@ -920,42 +936,6 @@ class JudgeLoopTest(ViewTestCase):
             [
                 [MAJOR, MAJOR],
                 [MAJOR, MAJOR],
-                [PASS, PASS],
-                [PASS, PASS],
-            ]
-        )
-        with (
-            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
-            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
-        ):
-            run_judge_batch(
-                [first, second],
-                writable_ids={first.id, second.id},
-                user=self.user,
-            )
-        repair_mock.assert_called_once()
-        self.assertEqual(
-            [unit.id for unit in repair_mock.call_args.args[0]],
-            [first.id, second.id],
-        )
-        first.refresh_from_db()
-        second.refresh_from_db()
-        self.assertEqual(first.target.strip(), "first repaired target")
-        self.assertEqual(second.target, "second repaired target")
-        self.assertEqual(client.call_count, 4)
-
-    def test_a_partial_repair_result_leaves_its_sibling_final(self) -> None:
-        first = self.get_unit()
-        second = self.get_unit(source="Thank you for using Weblate.")
-        second.translate(self.user, ["second original target"], STATE_TRANSLATED)
-        original_second_target = second.target
-        repair_mock = mock.Mock(return_value={first.id: ["first repaired target"]})
-        client = mock_request_verdicts(
-            [
-                [MAJOR, MAJOR],
-                [MAJOR, MAJOR],
-                [PASS],
-                [PASS],
             ]
         )
         with (
@@ -968,11 +948,65 @@ class JudgeLoopTest(ViewTestCase):
                 user=self.user,
             )
         repair_mock.assert_called_once()
+        self.assertEqual(
+            [unit.id for unit in repair_mock.call_args.args[0]],
+            [first.id, second.id],
+        )
         first.refresh_from_db()
         second.refresh_from_db()
-        self.assertEqual(first.target.strip(), "first repaired target")
+        # One paid generation for both, no re-judge round, no mutation.
+        self.assertEqual(client.call_count, 2)
+        self.assertEqual(first.target, first_target)
+        self.assertEqual(second.target, "second original target")
+        self.assertEqual(
+            {verdicts.repair_status[pk] for pk in (first.id, second.id)},
+            {"candidate-stored"},
+        )
+        self.assertEqual(
+            first.suggestion_set.get(
+                userdetails__kind="judge-repair"
+            ).target.strip(),
+            "first repaired target",
+        )
+        self.assertEqual(
+            second.suggestion_set.get(
+                userdetails__kind="judge-repair"
+            ).target.strip(),
+            "second repaired target",
+        )
+
+    def test_a_missing_candidate_output_leaves_its_sibling_final(self) -> None:
+        self.enable_repair_engine()
+        first = self.get_unit()
+        second = self.get_unit(source="Thank you for using Weblate.")
+        second.translate(self.user, ["second original target"], STATE_TRANSLATED)
+        original_first_target = first.target
+        original_second_target = second.target
+        repair_mock = mock.Mock(return_value={first.id: ["first repaired target"]})
+        client = mock_request_verdicts(
+            [
+                [MAJOR, MAJOR],
+                [MAJOR, MAJOR],
+            ]
+        )
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+        ):
+            verdicts = run_judge_batch(
+                [first, second],
+                writable_ids={first.id, second.id},
+                user=self.user,
+            )
+        repair_mock.assert_called_once()
+        self.assertEqual(client.call_count, 2)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.target, original_first_target)
         self.assertEqual(second.target, original_second_target)
         self.assertEqual(verdicts[second.id].verdict, JudgeVerdict.Verdict.FLAG)
+        self.assertEqual(verdicts.repair_status[first.id], "candidate-stored")
+        self.assertEqual(verdicts.repair_status[second.id], "no-candidate")
         self.assertEqual(second.judge_verdicts.count(), 2)
 
     def test_a_failed_repair_batch_leaves_every_unit_final(self) -> None:
@@ -1006,10 +1040,14 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(first.judge_verdicts.count(), 2)
         self.assertEqual(second.judge_verdicts.count(), 2)
 
-    def test_a_partial_repair_batch_rejudges_only_answered_units(self) -> None:
+    def test_a_partial_candidate_fetch_stores_only_answered_units(self) -> None:
+        # The repair call answers only the first unit. The new semantics do
+        # not re-judge a candidate, so the round ends after one fetch: the
+        # answered unit gets a stored candidate, its sibling stays final.
         first = self.get_unit()
         second = self.get_unit(source="Thank you for using Weblate.")
         second.translate(self.user, ["second original target"], STATE_TRANSLATED)
+        original_first_target = first.target
         original_second_target = second.target
         engine = mock.Mock()
         engine.return_value.batch_size = 10
@@ -1026,8 +1064,6 @@ class JudgeLoopTest(ViewTestCase):
             [
                 [MAJOR, MAJOR],
                 [MAJOR, MAJOR],
-                [PASS],
-                [PASS],
             ]
         )
         with (
@@ -1043,12 +1079,19 @@ class JudgeLoopTest(ViewTestCase):
         fetch.assert_called_once()
         first.refresh_from_db()
         second.refresh_from_db()
-        self.assertEqual(first.target.strip(), "first repaired target")
+        self.assertEqual(first.target, original_first_target)
         self.assertEqual(second.target, original_second_target)
-        self.assertEqual(verdicts[first.id].verdict, JudgeVerdict.Verdict.PASS)
+        self.assertEqual(client.call_count, 2)
         self.assertEqual(verdicts[second.id].verdict, JudgeVerdict.Verdict.FLAG)
-        self.assertEqual(first.judge_verdicts.count(), 4)
-        self.assertEqual(second.judge_verdicts.count(), 2)
+        self.assertEqual(
+            first.suggestion_set.get(
+                userdetails__kind="judge-repair"
+            ).target.strip(),
+            "first repaired target",
+        )
+        self.assertFalse(
+            second.suggestion_set.filter(userdetails__kind="judge-repair").exists()
+        )
 
     def test_each_seat_uses_its_configured_model(self) -> None:
         unit, _, client = self.run_batch([PASS, PASS])
@@ -1277,27 +1320,42 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdict.request_attempt_id, attempt.pk)
         self.assertEqual(verdict.instruction, "")
 
-    def test_confirmed_defect_triggers_one_repair_judged_by_both_seats(self) -> None:
-        _unit, verdict, client = self.run_batch(
-            [CRITICAL, CRITICAL, PASS, PASS], repair=["fixed text"]
-        )
-        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.PASS)
-        self.assertEqual(verdict.attempt, 1)
-        self.assertEqual(client.call_count, 4)
-
-    def test_exhausted_loop_returns_the_last_negative_verdict(self) -> None:
-        _, verdict, _ = self.run_batch(
-            [CRITICAL, CRITICAL, CRITICAL, CRITICAL], repair=["still wrong"]
+    def test_confirmed_defect_stores_a_candidate_without_rewriting(self) -> None:
+        # A confirmed defect gets one candidate, not an applied rewrite:
+        # the round ends there and a human accepts it through the UI.
+        self.enable_repair_engine()
+        original = self.get_unit().target
+        unit, verdict, client = self.run_batch(
+            [CRITICAL, CRITICAL], repair=["fixed text"]
         )
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+        self.assertEqual(verdict.attempt, 0)
+        self.assertEqual(client.call_count, 2)
+        self.assertEqual(self.get_unit().target, original)
+        self.assertEqual(
+            unit.suggestion_set.get(userdetails__kind="judge-repair").target.strip(),
+            "fixed text",
+        )
+
+    def test_one_negative_round_ends_after_storing_the_candidate(self) -> None:
+        self.enable_repair_engine()
+        _, verdict, client = self.run_batch(
+            [CRITICAL, CRITICAL], repair=["still wrong"]
+        )
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+        self.assertEqual(client.call_count, 2)
 
     def test_repair_that_changes_nothing_stops_the_loop(self) -> None:
         _, _verdict, client = self.run_batch([CRITICAL, CRITICAL], repair=None)
         self.assertEqual(client.call_count, 2)
 
     def test_repair_is_rolled_back_when_it_adds_a_deterministic_check(self) -> None:
-        unit = self.get_unit()
-        original = unit.target
+        # Only the max-length path mutates the target; the rollback guard
+        # belongs to that path now that REJECT stores a candidate instead.
+        unit = self.change_unit("a much longer raw target")
+        unit.extra_flags = "max-length:5"
+        unit.save(update_fields=["extra_flags"], same_content=True)
+        original = self.get_unit().target
         client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
@@ -1314,7 +1372,9 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(self.get_unit().target, original)
 
     def test_rollback_is_recorded_in_the_batch_repair_status(self) -> None:
-        unit = self.get_unit()
+        unit = self.change_unit("a much longer raw target")
+        unit.extra_flags = "max-length:5"
+        unit.save(update_fields=["extra_flags"], same_content=True)
         client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
@@ -1331,7 +1391,9 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdicts.repair_status[unit.id], "rolled-back")
 
     def test_applied_repair_is_recorded_in_the_batch_repair_status(self) -> None:
-        unit = self.get_unit()
+        unit = self.change_unit("a much longer raw target")
+        unit.extra_flags = "max-length:5"
+        unit.save(update_fields=["extra_flags"], same_content=True)
         client = mock_request_verdicts([[CRITICAL], [CRITICAL], [PASS], [PASS]])
         with (
             mock.patch("weblate.trans.judge_loop.request_verdicts", client),
@@ -1345,13 +1407,21 @@ class JudgeLoopTest(ViewTestCase):
 
     def test_a_human_string_is_not_repaired_when_not_writable(self) -> None:
         # D3/A3: overwrite off => the unit is not in writable_ids => a
-        # false critical never rewrites the human translation.
+        # false critical never rewrites the human translation. Candidates
+        # are still offered for human review - they never touch the target.
+        self.enable_repair_engine()
         unit = self.get_unit()
         unit.translate(self.user, ["Human translation"], STATE_TRANSLATED)
         _, _verdict, _client = self.run_batch(
             [CRITICAL, CRITICAL], repair=["MACHINE OVERWRITE"], writable=False
         )
         self.assertNotEqual(self.get_unit().target, "MACHINE OVERWRITE")
+        self.assertEqual(
+            unit.suggestion_set.get(
+                userdetails__kind="judge-repair"
+            ).target.strip(),
+            "MACHINE OVERWRITE",
+        )
 
     def test_repair_sees_the_round_verdict_projected(self) -> None:
         # Ordering guard: run_checks() projects the round's Check row before
@@ -1374,16 +1444,18 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(seen, [{"judge-reject"}])
 
     def test_every_verdict_of_one_run_shares_the_run_id(self) -> None:
-        unit, _, _ = self.run_batch([CRITICAL, CRITICAL, PASS, PASS], repair=["fixed"])
+        unit, _, _ = self.run_batch([CRITICAL, CRITICAL], repair=["fixed"])
         self.assertEqual(
             len(set(unit.judge_verdicts.values_list("run_id", flat=True))), 1
         )
 
     def test_each_seat_votes_once_per_round(self) -> None:
-        unit, _, _ = self.run_batch([CRITICAL, CRITICAL, PASS, PASS], repair=["fixed"])
+        # The negative round ends with the stored candidate: one paid vote
+        # per seat, no mutating re-judge attempt.
+        unit, _, _ = self.run_batch([CRITICAL, CRITICAL], repair=["fixed"])
         self.assertEqual(
             set(unit.judge_verdicts.values_list("attempt", "seat")),
-            {(0, 1), (0, 2), (1, 1), (1, 2)},
+            {(0, 1), (0, 2)},
         )
 
     def test_the_judges_own_projection_is_not_sent_back_as_evidence(self) -> None:
@@ -1484,7 +1556,11 @@ class JudgeGlossaryRepairLockTest(ViewTestCase):
         )
         glossary.invalidate_cache()
 
-    def test_glossary_explanation_change_aborts_repair(self) -> None:
+    def test_glossary_explanation_change_aborts_candidate_storage(self) -> None:
+        # Context drift during the repair call: the candidate is discarded
+        # and the round's verdict is no longer trusted.
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
         unit = self.get_unit()
         original = unit.target
         client = mock_request_verdicts([[MAJOR], [MAJOR]])

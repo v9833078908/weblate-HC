@@ -313,7 +313,11 @@ class JudgeAutoTranslateTest(ViewTestCase):
         judged_units = run.call_args.args[0]
         self.assertEqual(judged_units[0].target.strip(), "machine target")
 
-    def test_major_repair_passes_through_the_operator_path(self) -> None:
+    def test_major_candidate_passes_through_the_operator_path(self) -> None:
+        # A flagged operator round generates exactly one candidate and does
+        # not re-judge: the target stays untouched for the producer to accept.
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
         unit = self.get_unit()
         unit.translate(self.user, ["existing translation"], STATE_TRANSLATED)
         auto = AutoTranslate(
@@ -325,8 +329,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             unit_ids=[unit.id],
         )
         major = JudgeResult("major", "flag", [], "")
-        passed = JudgeResult("none", "pass", [], "")
-        results = iter([[major], [major], [passed], [passed]])
+        results = iter([[major], [major]])
 
         def request(requests, *, on_batch, **kwargs):
             batch_results = next(results)
@@ -344,12 +347,16 @@ class JudgeAutoTranslateTest(ViewTestCase):
         ):
             auto.process_judge(engines=[], threshold=80)
         stored = self.get_unit()
-        self.assertEqual(stored.target.strip(), "repaired translation")
+        self.assertEqual(stored.target.strip(), "existing translation")
         self.assertEqual(stored.state, STATE_TRANSLATED)
         self.assertEqual(
-            stored.judge_verdicts.latest("pk").verdict, JudgeVerdict.Verdict.PASS
+            stored.judge_verdicts.latest("pk").verdict, JudgeVerdict.Verdict.FLAG
         )
-        self.assertEqual(client.call_count, 4)
+        self.assertEqual(client.call_count, 2)
+        self.assertEqual(
+            stored.suggestion_set.get(userdetails__kind="judge-repair").target.strip(),
+            "repaired translation",
+        )
 
     def test_final_state_write_skips_a_target_changed_after_judging(self) -> None:
         unit = self.get_unit()

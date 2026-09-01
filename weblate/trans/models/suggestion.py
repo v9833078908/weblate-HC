@@ -94,6 +94,10 @@ class SuggestionManager(models.Manager["Suggestion"]):
 
         if user is None:
             user = request.user if request else get_anonymous()
+        if judge_metadata is not None:
+            # Automation authorship: the launcher never owns the candidate
+            # (invariant 7); provenance renders from the metadata kind.
+            user = get_anonymous()
 
         if unit.translated and unit.target == target_merged:
             if raise_exception:
@@ -150,9 +154,13 @@ class SuggestionManager(models.Manager["Suggestion"]):
         if vote:
             suggestion.add_vote(request, Vote.POSITIVE)
 
-        # Update suggestion stats
-        user.profile.watch_on_contribution(unit.translation.component.project)
-        user.profile.increase_count("suggested")
+        # Update suggestion stats: candidates are automation-authored and
+        # must not move a human profile.
+        if judge_metadata is None:
+            user.profile.watch_on_contribution(
+                unit.translation.component.project
+            )
+            user.profile.increase_count("suggested")
 
         unit.invalidate_related_cache()
 

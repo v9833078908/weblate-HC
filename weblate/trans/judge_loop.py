@@ -77,13 +77,12 @@ if TYPE_CHECKING:
     from weblate.trans.models.project import Project
     from weblate.trans.models.unit import Unit
 
-# A round is left alone (no repair attempt) when it did not confirm a
-# defect: PASS needs no fix, UNPARSED is a transport failure, not an
-# opinion to act on.
-_NON_REPAIRABLE_VERDICTS = frozenset(
+# Verdicts whose round produces a stored producer candidate instead of a
+# mutating repair. minor maps to PASS and never has a candidate.
+_CANDIDATE_VERDICTS = frozenset(
     {
-        JudgeVerdict.Verdict.PASS,
-        JudgeVerdict.Verdict.UNPARSED,
+        JudgeVerdict.Verdict.REJECT,
+        JudgeVerdict.Verdict.FLAG,
     }
 )
 
@@ -381,7 +380,8 @@ class _PreparedRound:
     unit: Unit
     request: JudgeRequest
     verdict: JudgeVerdict
-    needs_repair: bool
+    needs_candidate: bool
+    needs_mutating_repair: bool
     before_target: list[str]
     before_checks: set[str]
     before_state: int
@@ -472,6 +472,78 @@ def _apply_repair(
     return _RepairOutcome(locked, changed=True)
 
 
+
+def _store_candidate(
+    unit: Unit,
+    request: JudgeRequest,
+    before_target: list[str],
+    before_state,
+    new_target: list[str],
+    verdict: JudgeVerdict,
+    engine: str,
+    user: User | None,
+) -> bool:
+    """
+    Persist a repair candidate as a native Suggestion under the unit lock.
+
+    Mirrors the _apply_repair snapshot check: the candidate is stored only
+    when the judged target/state/context still owns the unit. The unit
+    target itself is never mutated (invariant 1).
+    """
+    from weblate.trans.models.suggestion import Suggestion
+
+    with transaction.atomic():
+        locked = (
+            type(unit)
+            .objects.select_for_update()
+            .prefetch()
+            .prefetch_source()
+            .get(pk=unit.pk)
+        )
+        if (
+            compute_target_hash(locked.get_target_plurals())
+            != compute_target_hash(before_target)
+            or locked.state != before_state
+            or compute_context_hash(
+                source=locked.source,
+                note=locked.source_unit.note,
+                explanation=locked.source_unit.explanation,
+                glossary_terms=get_matched_glossary_prompt_entries(locked),
+            )
+            != compute_context_hash(
+                source=request.source,
+                note=request.note,
+                explanation=request.explanation,
+                glossary_terms=request.glossary_terms,
+            )
+        ):
+            return False
+        metadata = {
+            "kind": "judge-repair",
+            "schema": 1,
+            "judge_verdict_id": verdict.pk,
+            "judge_run_id": str(verdict.run_id),
+            "target_hash": compute_target_hash(locked.get_target_plurals()),
+            "context_hash": compute_context_hash(
+                source=locked.source,
+                note=locked.source_unit.note,
+                explanation=locked.source_unit.explanation,
+                glossary_terms=get_matched_glossary_prompt_entries(locked),
+            ),
+            "engine": engine,
+        }
+        Suggestion.objects.add(
+            locked,
+            new_target,
+            request=None,
+            vote=False,
+            user=user,
+            raise_exception=False,
+            userdetails=metadata,
+        )
+    return True
+
+
 def _prepare_round_unit(
     unit: Unit,
     request: JudgeRequest,
@@ -493,20 +565,25 @@ def _prepare_round_unit(
         # A changed target/context or an all-unparsed round must not fall
         # back to an older opinion for repair or finalization.
         return None
-    needs_repair = (
+    # Precedence: an active max-length check selects the mutating path and
+    # suppresses candidate storage for the round (a preview that still
+    # overflows is not applicable). Otherwise REJECT and FLAG select the
+    # candidate path regardless of writable state or remaining attempts.
+    needs_mutating_repair = (
         verdict.verdict != JudgeVerdict.Verdict.UNPARSED
-        and (
-            verdict.verdict not in _NON_REPAIRABLE_VERDICTS
-            or _has_active_check(current, "max-length")
-        )
+        and _has_active_check(current, "max-length")
         and attempt < attempts
         and unit.id in writable_ids
+    )
+    needs_candidate = (
+        verdict.verdict in _CANDIDATE_VERDICTS and not needs_mutating_repair
     )
     return _PreparedRound(
         unit=current,
         request=request,
         verdict=verdict,
-        needs_repair=needs_repair,
+        needs_candidate=needs_candidate,
+        needs_mutating_repair=needs_mutating_repair,
         before_target=current.get_target_plurals(),
         before_checks=_deterministic_checks(current),
         before_state=current.state,
@@ -1262,9 +1339,22 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals]
             for unit in pending
         ]
         repairable_units = [
-            item.unit for item in prepared if item is not None and item.needs_repair
+            item.unit
+            for item in prepared
+            if item is not None
+            and (item.needs_candidate or item.needs_mutating_repair)
         ]
         repairs = repair_targets(repairable_units, user) if repairable_units else {}
+        candidate_engine = (
+            configured_routed_engine(
+                units[0].translation.component.project.get_machinery_settings()
+            )
+            if any(
+                item is not None and item.needs_candidate
+                for item in prepared
+            )
+            else None
+        )
         next_pending = []
         for unit, item in zip(pending, prepared, strict=True):
             if item is None:
@@ -1274,14 +1364,41 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals]
             verdicts[unit.id] = item.verdict
             verdicts.initial_severity.setdefault(unit.id, item.verdict.max_severity)
             verdicts.attempt_counts[unit.id] = attempt + 1
-            new_target = repairs.get(unit.id) if item.needs_repair else None
+            wants_repair = item.needs_candidate or item.needs_mutating_repair
+            new_target = repairs.get(unit.id) if wants_repair else None
             if new_target is None:
-                if item.needs_repair:
+                if wants_repair:
                     verdicts.repair_status[unit.id] = "no-candidate"
                 if unit.id in cached_ids:
                     verdicts.cached_unit_ids.add(unit.id)
                 else:
                     verdicts.cached_unit_ids.discard(unit.id)
+                record_final_snapshot(item.unit)
+                continue
+            if item.needs_candidate:
+                if candidate_engine is None:
+                    verdicts.repair_status[unit.id] = "no-candidate"
+                    record_final_snapshot(item.unit)
+                    continue
+                stored = _store_candidate(
+                    item.unit,
+                    item.request,
+                    item.before_target,
+                    item.before_state,
+                    new_target,
+                    item.verdict,
+                    candidate_engine,
+                    user,
+                )
+                if not stored:
+                    # The judged snapshot no longer owns the unit: discard
+                    # the output and stop trusting the round's projection.
+                    verdicts.repair_status[unit.id] = "no-candidate"
+                    verdicts.pop(unit.id, None)
+                    verdicts.cached_unit_ids.discard(unit.id)
+                    continue
+                verdicts.repair_status[unit.id] = "candidate-stored"
+                verdicts.cached_unit_ids.discard(unit.id)
                 record_final_snapshot(item.unit)
                 continue
             outcome = _apply_repair(

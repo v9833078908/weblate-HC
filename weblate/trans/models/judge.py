@@ -535,6 +535,7 @@ class JudgeRunUnit(models.Model):
     class RepairStatus(models.TextChoices):
         NOT_ATTEMPTED = "not-attempted"
         NO_CANDIDATE = "no-candidate"
+        CANDIDATE_STORED = "candidate-stored"
         APPLIED = "applied"
         ROLLED_BACK = "rolled-back"
 
