@@ -1,7 +1,8 @@
 # Plan: judge both seats in parallel
 
-Date: 2026-08-27. Status: **deployed; dev canary failed; production rollout
-blocked.** Revised after engineering review on 2026-08-27; the caller-failure
+Date: 2026-08-27. Status: **deployed; dev canary passed 2026-08-31;
+production rollout awaiting its own approvals.** Revised after engineering
+review on 2026-08-27; the caller-failure
 protocol, provider-load gate and thread-aware test layout below replace the
 unsafe first draft. Revised again on 2026-08-31 against the post-remediation
 judge loop (c979bbc, 011c95d, cc3111d, 75ce50f): see "Revision: 2026-08-31
@@ -1139,10 +1140,11 @@ the LiteLLM endpoint before trusting the overlap numbers there.
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | N/A | No UI change |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | NOT RUN | Not required |
 
-**VERDICT:** Engineering cleared; implementation is verified. The dev canary
-failed, so production rollout is blocked.
+**VERDICT:** Engineering cleared; implementation is verified and the dev
+canary passes. Production rollout is blocked only on its own approvals.
 
 **PENDING GATES:**
 
-- Diagnose and correct the dev canary failure before another canary or any
-  production judge run.
+- Approval naming the bounded production canary scope, then the canary itself.
+- Production seat settings must carry the corrected pair before any production
+  judge run: the seat faults this canary found came from the same template.
