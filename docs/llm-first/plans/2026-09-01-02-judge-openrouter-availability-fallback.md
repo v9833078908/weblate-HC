@@ -31,11 +31,17 @@ and deadline plans). It also overrides one sentence of
 is not a quality resolver, and a disliked verdict can never be replaced by a
 second opinion.
 
-**Status:** proposed, awaiting approval. This is a multi-module feature change,
-so `AGENTS.md` requires explicit approval before any code is edited. The owner
-decisions of 2026-09-01 settled the design questions below but did not authorise
-implementation. Every production step in Rollout then needs its own separate
-approval on top of that.
+**Status:** Tasks 1-6 implemented and verified on branch
+`feat/judge-openrouter-fallback` (`30b2464`..`9aaba16`); full judge suite green
+(400 passed, 32 subtests, one pre-existing unrelated failure in
+`test_judge_persistence.py` traced to the `feat/judge-zero-unparsed` merge, not
+this change), mypy/pylint/ruff clean on the changed files. Task 7's dev-container
+live arms are prepared as `analysis/probes/judge-fallback-forced-smoke.py` but
+not run: per `AGENTS.md`, touching the shared dev-docker stack needs its own
+explicit approval, and the arms need real primary/fallback credentials this
+session does not hold. No measurement document was written, to avoid recording
+fabricated data. Every production step in Rollout still needs its own separate
+approval on top of implementation approval.
 
 **Dependency gate: satisfied 2026-09-01.** Branch
 `docs/llm-usage-attribution-plan` is merged to `main` as `0011d3c`, Tasks 1-5 of
