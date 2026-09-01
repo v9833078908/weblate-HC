@@ -26,7 +26,8 @@ is a first-increment requirement. The smallest safe increment therefore
 contains Solution 1, the one-unit re-check substrate from Solution 2, and the
 stored-candidate lifecycle from Solution 3.
 
-**Status:** proposed, awaiting approval. No new page and no new domain model.
+**Status:** approved 2026-09-01, ready for implementation. No new page and no
+new domain model.
 One migration is expected for the `candidate-stored` audit choice on the
 existing `JudgeRunUnit.repair_status` field.
 
@@ -428,6 +429,6 @@ approval.
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | NOT RUN | - |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | NOT RUN | - |
 
-**VERDICT:** ENG CLEARED - ready for implementation approval.
+**VERDICT:** APPROVED + ENG CLEARED - ready for implementation.
 
 NO UNRESOLVED DECISIONS
