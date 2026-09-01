@@ -75,6 +75,7 @@ Weblate 2026.8.1
 * :ref:`check-duplicate` no longer reports a number whose digits are grouped with spaces, such as ``100 000 000``, when the source groups them with a comma.
 * :ref:`check-multiple-failures` no longer counts a dismissed check, so a source string is reported only while its translations still have checks awaiting a decision.
 * :ref:`check-prohibited-initial-character` no longer reports a translation, only the glossary term it translates, so a translation shortened for a narrow interface can start with a character such as ``%``.
+* An LLM judge run whose batch is too large to answer within :setting:`JUDGE_REQUEST_DEADLINE` now reduces the batch for the rest of that run, instead of repeating the same oversized batch until the run ends. A slow model previously lost every verdict of the run this way, because the reduction was recorded but only applied to the next run.
 
 .. rubric:: Compatibility
 

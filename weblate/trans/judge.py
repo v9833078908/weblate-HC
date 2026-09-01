@@ -1535,9 +1535,13 @@ def request_verdicts(
     if not requests:
         return []
     budget = retry_budget or RetryBudget()
-    batch_size = _adaptive_budget(profile, adaptive)
     results: list[JudgeResult] = []
-    for position, start in enumerate(range(0, len(requests), batch_size)):
+    start = 0
+    while start < len(requests):
+        # Re-read the budget per batch: a transport or deadline failure shrinks
+        # it, and a run whose first batch is too large for the deadline must not
+        # keep sending that size until the run ends.
+        batch_size = _adaptive_budget(profile, adaptive)
         batch = list(requests[start : start + batch_size])
         batch_results = _run_batch(
             batch,
@@ -1555,9 +1559,7 @@ def request_verdicts(
         results.extend(batch_results)
         if on_batch is not None:
             on_batch(batch, batch_results)
-        if (
-            position < (len(requests) - 1) // batch_size
-            and settings.JUDGE_REQUEST_SLEEP
-        ):
+        start += batch_size
+        if start < len(requests) and settings.JUDGE_REQUEST_SLEEP:
             time.sleep(settings.JUDGE_REQUEST_SLEEP)
     return results

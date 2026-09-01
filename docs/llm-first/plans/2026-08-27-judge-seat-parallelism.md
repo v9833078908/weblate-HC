@@ -1067,6 +1067,15 @@ the LiteLLM endpoint before trusting the overlap numbers there.
       exceed the deadline often, and a cut batch costs every verdict in it.
       Both configuration files therefore pin seat 2 to batch 1, which is the
       configuration this canary actually exercised.
+      The failed canary also exposed a real defect in `request_verdicts`,
+      the only code fault this canary found: `batch_size` was resolved once
+      before the batch loop, so the adaptive shrink that a deadline records
+      could not take effect until the *next* run. That is why all five of
+      seat 2's batches were sent at size 5 after the first one was already
+      cut. The budget is now re-read per batch, covered by
+      `JudgeRequestDeadlineTest.
+      test_a_deadline_shrinks_the_batch_for_the_rest_of_the_same_run`, which
+      asserts sizes `4, 2, 1, 1` where the old code sent `4, 4`.
       An earlier attempt on 2026-08-31 **failed** and is kept here because it
       is what produced the diagnosis:
       for `col4/data/fr`, units 177676-177700, `overwrite_existing=false`.

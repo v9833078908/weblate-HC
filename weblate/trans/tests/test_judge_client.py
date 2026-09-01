@@ -1115,6 +1115,37 @@ class JudgeRequestDeadlineTest(TestCase):
         self.assertTrue(any("response-too-large" in line for line in logs.output))
         self.assertEqual(LLMUsageLog.objects.count(), 0)
 
+    @override_settings(
+        JUDGE_BATCH_SIZE=4,
+        JUDGE_REQUEST_DEADLINE=0.1,
+        JUDGE_MODEL_SEAT_1="vendor/model-a",
+        JUDGE_MODEL_SEAT_2="vendor/model-b",
+    )
+    @http_mock.activate
+    def test_a_deadline_shrinks_the_batch_for_the_rest_of_the_same_run(self) -> None:
+        """
+        A slow seat must not spend a whole run on batches it cannot finish.
+
+        On 2026-08-31 a dev canary lost every verdict of one seat this way: all
+        five of its batches were cut at the deadline, because the batch size
+        was fixed before the loop and the adaptive shrink recorded after the
+        first cut could not take effect until the next run.
+        """
+        http_mock.register_callback(
+            "POST",
+            CHAT_URL,
+            lambda _request: self._dripping_response(),
+        )
+
+        request_verdicts([REQ] * 8, seat=1, adaptive=True)
+
+        sizes = [
+            len(_request_segments(json.loads(call.request.content)))
+            for call in http_mock.calls
+        ]
+        self.assertEqual(sizes[0], 4)
+        self.assertEqual(sizes[1:], [2, 1, 1])
+
 
 @override_settings(
     JUDGE_ENABLED=True,
