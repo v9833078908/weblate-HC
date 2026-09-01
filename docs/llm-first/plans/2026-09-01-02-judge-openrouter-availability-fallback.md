@@ -780,17 +780,28 @@ provider-semantic primary profile with the recorded OpenRouter profile:
 `JUDGE_BASE_URL`, `JUDGE_API_KEY`, both `JUDGE_MODEL_SEAT_*`, both
 `JUDGE_REASONING_EFFORT_SEAT_*`, and both `JUDGE_RESPONSE_FORMAT_SEAT_*`.
 Recreate the dev container, assert `judge_configuration_snapshot()` exposes no
-fallback endpoint, and run the same scope. This is the readiness proof for the
-manual rollback path; Task 2 deliberately rejects a primary and fallback with
-the same base URL. Restore the canonical LiteLLM-primary/OpenRouter-fallback
-configuration after the smoke. It is also the only arm that exercises the D6
-reasoning-effort resolution against a live OpenRouter endpoint.
+fallback endpoint, then run a **fresh rollback scope** that none of Steps 1-3
+used and that has no existing parsed verdict under the recorded OpenRouter
+primary profile. Do not reuse the forced-fallback scope: it can already hold
+the same serving fingerprint and the normal cache-enabled path
+(`run_judge_batch(..., use_cache=True)`) would make zero live calls.
+
+Record the `JudgeRequestAttempt` count for this rollback run before and after
+the call. Require at least one new `provider="openrouter"` attempt for each
+seat and an HTTP-call count above zero. A cache hit or zero new attempt fails
+this smoke: it proves neither D6 profile resolution nor the rollback transport
+path. This is the readiness proof for the manual rollback path; Task 2
+deliberately rejects a primary and fallback with the same base URL. Restore the
+canonical LiteLLM-primary/OpenRouter-fallback configuration after the smoke. It
+is also the only arm that exercises the D6 reasoning-effort resolution against
+a live OpenRouter endpoint.
 
 ### Step 5: Record
 
 Write the measurement with all four arms, attempt counts, failure kinds,
-providers and identities per verdict, latency, and the forced arm's scoped
-OpenRouter judge-ledger summary. Do not claim availability improvements from a
+providers and identities per verdict, latency, the forced arm's scoped
+OpenRouter judge-ledger summary, and the rollback scope/run ID plus before/after
+attempt and HTTP-call counts. Do not claim availability improvements from a
 forced arm: it proves wiring, not proxy reliability.
 
 ### Step 6: Commit
