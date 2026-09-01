@@ -23,6 +23,7 @@ from weblate.trans.judge import (
     JudgeRequest,
     _decode_non_stream,
     _failure_for_http,
+    _payload,
     _read_capped,
     _read_sse,
     _request_timeout,
@@ -31,10 +32,12 @@ from weblate.trans.judge import (
     get_judge_chat_completions_url,
     judge_configuration_ready,
     judge_configuration_snapshot,
+    judge_fallback_endpoint,
     judge_primary_endpoint,
     judge_seat_profiles,
     render_preview,
     request_verdicts,
+    resolve_judge_fallback_seat_profile,
     resolve_judge_seat_profile,
     validate_judge_configuration,
 )
@@ -44,6 +47,17 @@ from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.tests import http_mock
 
 CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+JUDGE_FALLBACK_SETTINGS = {
+    "JUDGE_FALLBACK_BASE_URL": "https://openrouter.ai/api/v1",
+    "JUDGE_FALLBACK_API_KEY": "sk-fallback",
+    "JUDGE_FALLBACK_MODEL_SEAT_1": "vendor-c/model",
+    "JUDGE_FALLBACK_MODEL_SEAT_2": "vendor-d/model",
+    "JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1": "medium",
+    "JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2": "low",
+    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1": "json_schema",
+    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2": "json_schema",
+}
 
 REQ = JudgeRequest(
     unit_key="MENU_DOOR",
@@ -437,6 +451,149 @@ class JudgeExplicitEndpointTest(SimpleTestCase):
         self.assertEqual(profile.model, "vendor/model-a")
         self.assertEqual(profile.base_url, "https://hcbifrost.herocraft.com/litellm/v1")
         self.assertEqual(profile.api_key, "sk-test")
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-primary",
+    JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+)
+class JudgeFallbackConfigurationTest(SimpleTestCase):
+    """Eight new settings, all blank by default, validated all-or-nothing."""
+
+    def test_unconfigured_fallback_validates_and_is_ready(self) -> None:
+        validate_judge_configuration()
+        self.assertTrue(judge_configuration_ready())
+        self.assertIsNone(judge_fallback_endpoint())
+
+    @http_mock.activate
+    def test_unconfigured_fallback_makes_todays_call_count(self) -> None:
+        http_mock.register(
+            "POST",
+            LITELLM_CHAT_URL,
+            json=_reply(
+                [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+            ),
+        )
+        request_verdicts([REQ], seat=1)
+        self.assertEqual(len(http_mock.calls), 1)
+
+    def test_partial_fallback_configuration_raises_before_any_request(self) -> None:
+        for missing in JUDGE_FALLBACK_SETTINGS:
+            partial = {
+                key: value
+                for key, value in JUDGE_FALLBACK_SETTINGS.items()
+                if key != missing
+            }
+            with (
+                self.subTest(missing=missing),
+                override_settings(**partial),
+                self.assertRaises(JudgeError),
+            ):
+                validate_judge_configuration()
+
+    @override_settings(**JUDGE_FALLBACK_SETTINGS)
+    @http_mock.activate
+    def test_fully_configured_fallback_validates_before_any_request(self) -> None:
+        validate_judge_configuration()
+        self.assertEqual(len(http_mock.calls), 0)
+        endpoint = judge_fallback_endpoint()
+        self.assertIsNotNone(endpoint)
+        self.assertEqual(endpoint.role, "fallback")
+        self.assertEqual(endpoint.provider, "openrouter")
+
+    @override_settings(
+        **{**JUDGE_FALLBACK_SETTINGS, "JUDGE_FALLBACK_BASE_URL": "not-a-url"}
+    )
+    def test_malformed_fallback_base_url_raises(self) -> None:
+        with self.assertRaises(JudgeError):
+            validate_judge_configuration()
+
+    @override_settings(
+        **{
+            **JUDGE_FALLBACK_SETTINGS,
+            "JUDGE_FALLBACK_BASE_URL": "https://hcbifrost.herocraft.com/litellm/v1",
+        }
+    )
+    def test_fallback_equal_to_primary_base_url_raises(self) -> None:
+        with self.assertRaises(JudgeError):
+            validate_judge_configuration()
+
+    @override_settings(JUDGE_BASE_URL="https://openrouter.ai/api/v1")
+    def test_rollback_profile_without_fallback_validates(self) -> None:
+        validate_judge_configuration()
+        self.assertIsNone(judge_fallback_endpoint())
+
+    @override_settings(
+        JUDGE_BASE_URL="https://openrouter.ai/api/v1",
+        **JUDGE_FALLBACK_SETTINGS,
+    )
+    def test_rollback_profile_with_fallback_still_configured_raises(self) -> None:
+        # The historical OpenRouter endpoint is both primary and fallback here.
+        with override_settings(JUDGE_FALLBACK_BASE_URL="https://openrouter.ai/api/v1"):
+            with self.assertRaises(JudgeError):
+                validate_judge_configuration()
+
+    @override_settings(**JUDGE_FALLBACK_SETTINGS)
+    def test_fallback_profile_uses_its_own_reasoning_not_the_primarys(self) -> None:
+        with override_settings(JUDGE_REASONING_EFFORT_SEAT_1="thinking.disabled"):
+            primary = resolve_judge_seat_profile(1)
+            fallback = resolve_judge_fallback_seat_profile(1, primary)
+        self.assertEqual(fallback.provider, "openrouter")
+        self.assertEqual(fallback.reasoning, "medium")
+        body = _payload([REQ], fallback, "")
+        self.assertEqual(body["reasoning"], {"effort": "medium", "exclude": True})
+        self.assertNotIn("thinking", body)
+        self.assertNotIn("thinking.disabled", json.dumps(body))
+
+    @override_settings(
+        JUDGE_BASE_URL="https://openrouter.ai/api/v1",
+        JUDGE_REASONING_EFFORT_SEAT_1="high",
+        JUDGE_FALLBACK_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_FALLBACK_API_KEY="sk-fallback",
+        JUDGE_FALLBACK_MODEL_SEAT_1="vendor-c/model",
+        JUDGE_FALLBACK_MODEL_SEAT_2="vendor-d/model",
+        JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1="thinking.disabled",
+        JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2="",
+        JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1="json_schema",
+        JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2="json_schema",
+    )
+    def test_reverse_fallback_profile_never_leaks_the_primarys_reasoning(self) -> None:
+        primary = resolve_judge_seat_profile(1)
+        fallback = resolve_judge_fallback_seat_profile(1, primary)
+        self.assertEqual(fallback.provider, "litellm")
+        body = _payload([REQ], fallback, "")
+        self.assertEqual(body["thinking"], {"type": "disabled"})
+        self.assertNotIn("reasoning", body)
+        self.assertNotIn("high", json.dumps(body.get("reasoning", "")))
+
+    @override_settings(
+        **{
+            **JUDGE_FALLBACK_SETTINGS,
+            "JUDGE_FALLBACK_BASE_URL": "https://hcbifrost.herocraft.com/litellm/v1",
+            "JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1": "low",
+        }
+    )
+    def test_invalid_fallback_reasoning_for_litellm_provider_raises(self) -> None:
+        with self.assertRaises(JudgeError):
+            validate_judge_configuration()
+
+    @override_settings(**JUDGE_FALLBACK_SETTINGS)
+    def test_snapshot_records_fallback_metadata_without_key_material(self) -> None:
+        snapshot = judge_configuration_snapshot()
+        self.assertEqual(snapshot["fallback_hostname"], "openrouter.ai")
+        self.assertEqual(
+            snapshot["fallback_model"], ["vendor-c/model", "vendor-d/model"]
+        )
+        self.assertEqual(snapshot["fallback_reasoning"], ["medium", "low"])
+        self.assertEqual(
+            snapshot["fallback_response_format"], ["json_schema", "json_schema"]
+        )
+        blob = json.dumps(snapshot)
+        self.assertNotIn("sk-fallback", blob)
+        self.assertNotIn("sk-primary", blob)
 
 
 @override_settings(

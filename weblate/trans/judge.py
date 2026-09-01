@@ -520,6 +520,137 @@ def judge_seat_profiles() -> tuple[JudgeSeatProfile, JudgeSeatProfile]:
     return first, second
 
 
+def judge_fallback_endpoint() -> JudgeEndpoint | None:
+    """Return the configured fallback endpoint, or None when unconfigured."""
+    base_url = settings.JUDGE_FALLBACK_BASE_URL
+    if not isinstance(base_url, str) or not base_url.strip():
+        return None
+    base_url = _validate_base_url(base_url)
+    return JudgeEndpoint(
+        role="fallback",
+        base_url=base_url,
+        api_key=settings.JUDGE_FALLBACK_API_KEY,
+        provider=_judge_provider(base_url),
+    )
+
+
+def _resolve_fallback_profile(
+    seat: int, primary: JudgeSeatProfile, endpoint: JudgeEndpoint
+) -> JudgeSeatProfile:
+    """
+    Resolve one seat's fallback profile.
+
+    Transport shape (``stream``, ``batch_size``, ``request_deadline``,
+    ``temperature``, ``max_tokens``) inherits the primary seat's resolved
+    value: a fallback batch is never wider than the primary's. ``model``,
+    reasoning effort and ``response_format`` are provider-semantic and have
+    no "inherit": mixing one provider's reasoning control into the other's
+    payload would silently corrupt the request.
+    """
+    model = getattr(settings, f"JUDGE_FALLBACK_MODEL_SEAT_{seat}", "")
+    reasoning = getattr(settings, f"JUDGE_FALLBACK_REASONING_EFFORT_SEAT_{seat}", "")
+    response_format = getattr(
+        settings, f"JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_{seat}", ""
+    )
+    if not isinstance(model, str) or not model.strip():
+        raise JudgeError(_("The LLM judge is not configured."))
+    model = model.strip()
+    if response_format not in {"json_object", "json_schema"}:
+        raise JudgeError(_("The LLM judge is not configured."))
+    if not isinstance(reasoning, str):
+        raise JudgeError(_("The LLM judge is not configured."))
+    reasoning = reasoning.strip()
+    # Same LiteLLM allowlist as the primary: aliases declare the exact
+    # control they support.
+    if endpoint.provider == "litellm" and reasoning not in {
+        "",
+        "thinking.disabled",
+        "enable_thinking=false",
+    }:
+        raise JudgeError(_("The LLM judge is not configured."))
+    upstream_model, alias_revision = resolve_judge_alias(
+        endpoint.base_url, model, endpoint.api_key
+    )
+    endpoint_fingerprint = _fingerprint(endpoint.base_url)
+    model_fingerprint = _fingerprint(model, upstream_model, alias_revision)
+    profile_fingerprint = _fingerprint(
+        endpoint_fingerprint,
+        model,
+        upstream_model,
+        alias_revision,
+        response_format,
+        reasoning,
+        primary.stream,
+        primary.batch_size,
+        primary.temperature,
+        primary.max_tokens,
+        _prompt_schema_version(),
+    )
+    return JudgeSeatProfile(
+        seat=seat,
+        model=model,
+        base_url=endpoint.base_url,
+        api_key=endpoint.api_key,
+        provider=endpoint.provider,
+        response_format=response_format,
+        reasoning=reasoning,
+        stream=primary.stream,
+        batch_size=primary.batch_size,
+        request_deadline=primary.request_deadline,
+        temperature=primary.temperature,
+        max_tokens=primary.max_tokens,
+        endpoint_fingerprint=endpoint_fingerprint,
+        model_fingerprint=model_fingerprint,
+        profile_fingerprint=profile_fingerprint,
+        prompt_schema_version=_prompt_schema_version(),
+        upstream_model=upstream_model,
+        alias_revision=alias_revision,
+    )
+
+
+def resolve_judge_fallback_seat_profile(
+    seat: int, primary: JudgeSeatProfile
+) -> JudgeSeatProfile | None:
+    """Return this seat's fallback profile, or None when unconfigured."""
+    if seat not in JUDGE_SEATS:
+        return None
+    endpoint = judge_fallback_endpoint()
+    if endpoint is None:
+        return None
+    return _resolve_fallback_profile(seat, primary, endpoint)
+
+
+_FALLBACK_SETTING_NAMES = (
+    "JUDGE_FALLBACK_BASE_URL",
+    "JUDGE_FALLBACK_API_KEY",
+    "JUDGE_FALLBACK_MODEL_SEAT_1",
+    "JUDGE_FALLBACK_MODEL_SEAT_2",
+    "JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1",
+    "JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2",
+    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1",
+    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2",
+)
+
+
+def _validate_fallback_configuration(
+    primary_profiles: tuple[JudgeSeatProfile, JudgeSeatProfile],
+) -> None:
+    """Validate the fallback pair with the same rules as the primary."""
+    configured = [
+        isinstance(value, str) and bool(value.strip())
+        for value in (getattr(settings, name) for name in _FALLBACK_SETTING_NAMES)
+    ]
+    if not any(configured):
+        return
+    if not all(configured):
+        raise JudgeError(_("The LLM judge is not configured."))
+    endpoint = judge_fallback_endpoint()
+    if endpoint is None or endpoint.base_url == get_judge_base_url():
+        raise JudgeError(_("The LLM judge is not configured."))
+    for seat, primary in zip(JUDGE_SEATS, primary_profiles, strict=True):
+        _resolve_fallback_profile(seat, primary, endpoint)
+
+
 def judge_configuration_snapshot() -> dict[str, object]:
     """Return the redacted, immutable profile metadata recorded on a run."""
     profiles = judge_seat_profiles()
@@ -538,6 +669,30 @@ def judge_configuration_snapshot() -> dict[str, object]:
         "request_deadline": [profile.request_deadline for profile in profiles],
         "prompt_schema_version": [
             profile.prompt_schema_version for profile in profiles
+        ],
+        **_fallback_configuration_snapshot(profiles),
+    }
+
+
+def _fallback_configuration_snapshot(
+    primary_profiles: tuple[JudgeSeatProfile, JudgeSeatProfile],
+) -> dict[str, object]:
+    """Redacted fallback metadata, or {} when no fallback is configured."""
+    endpoint = judge_fallback_endpoint()
+    if endpoint is None:
+        return {}
+    profiles = [
+        resolve_judge_fallback_seat_profile(seat, primary)
+        for seat, primary in zip(JUDGE_SEATS, primary_profiles, strict=True)
+    ]
+    return {
+        # A bare hostname (no scheme, path or query) distinguishes providers
+        # for an audit trail without recording the request URL.
+        "fallback_hostname": urlsplit(endpoint.base_url).hostname or "",
+        "fallback_model": [profile.model for profile in profiles],
+        "fallback_reasoning": [profile.reasoning for profile in profiles],
+        "fallback_response_format": [
+            profile.response_format for profile in profiles
         ],
     }
 
@@ -575,7 +730,7 @@ def validate_judge_configuration() -> None:
         and settings.JUDGE_RETRY_BUDGET_RATIO >= 0
     ):
         raise JudgeError(_("The LLM judge is not configured."))
-    judge_seat_profiles()
+    _validate_fallback_configuration(judge_seat_profiles())
 
 
 def judge_configuration_ready() -> bool:
