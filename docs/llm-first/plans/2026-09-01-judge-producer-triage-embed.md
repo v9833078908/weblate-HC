@@ -215,6 +215,16 @@ and send only mutable outputs to `_apply_repair`. Candidate units never enter
 `next_pending`. Add `RepairStatus.CANDIDATE_STORED` and its `AlterField`
 migration. Delete the obsolete critical and flag auto-apply branches.
 
+`max-length` here is the literal `check_id` in `_has_active_check`, supplied in
+this fork by `GameMaxLengthCheck` with upstream `MaxLengthCheck` removed
+(`weblate_customization/src/weblate_customization/checks.py:910`,
+`dev-docker/docker-compose.yml:64-65`). It is the only check that can trigger a
+repair by itself. `game-length`, `game-markup`, `game-line-break`,
+`game-number`, `game-token`, and `cyrillic-leak` never trigger mutation or
+candidate generation: they reach a repair that is already happening as prompt
+evidence (`machinery/llm.py:1082-1086`, rule 23 at `:244`) and they act as the
+rollback guard (`judge_loop.py:465-471`). Do not widen the trigger to them.
+
 Removing automatic `FLAG` mutation is the point, not a side effect. Today a
 major rewrite lands on a shipping human translation, guarded only by
 deterministic-check regression (`judge_loop.py:466-471`) and a second opinion
