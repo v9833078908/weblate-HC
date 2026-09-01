@@ -108,6 +108,7 @@ class JudgeSeatProfile:
     reasoning: str
     stream: bool
     batch_size: int
+    request_deadline: float
     temperature: float
     max_tokens: int
     endpoint_fingerprint: str
@@ -363,6 +364,9 @@ def _resolve_profile(seat: int, *, legacy_model: str | None = None) -> JudgeSeat
         )
         stream = _profile_value("STREAM", seat, settings.JUDGE_STREAM)
         batch_size = _profile_value("BATCH_SIZE", seat, settings.JUDGE_BATCH_SIZE)
+        request_deadline = _profile_value(
+            "REQUEST_DEADLINE", seat, settings.JUDGE_REQUEST_DEADLINE
+        )
         temperature = _profile_value("TEMPERATURE", seat, settings.JUDGE_TEMPERATURE)
         max_tokens = _profile_value("MAX_TOKENS", seat, settings.JUDGE_MAX_TOKENS)
     else:
@@ -371,10 +375,12 @@ def _resolve_profile(seat: int, *, legacy_model: str | None = None) -> JudgeSeat
         response_format = settings.JUDGE_RESPONSE_FORMAT
         stream = settings.JUDGE_STREAM
         batch_size = settings.JUDGE_BATCH_SIZE
+        request_deadline = settings.JUDGE_REQUEST_DEADLINE
         temperature = settings.JUDGE_TEMPERATURE
         max_tokens = settings.JUDGE_MAX_TOKENS
     stream = _profile_bool(stream)
     batch_size = _profile_number(batch_size, int)
+    request_deadline = _profile_number(request_deadline, float)
     temperature = _profile_number(temperature, float)
     max_tokens = _profile_number(max_tokens, int)
     if not isinstance(model, str) or not model.strip():
@@ -383,6 +389,13 @@ def _resolve_profile(seat: int, *, legacy_model: str | None = None) -> JudgeSeat
     if response_format not in {"json_object", "json_schema"}:
         raise JudgeError(_("The LLM judge is not configured."))
     if not isinstance(stream, bool) or not _positive_int(batch_size):
+        raise JudgeError(_("The LLM judge is not configured."))
+    if (
+        not isinstance(request_deadline, (int, float))
+        or isinstance(request_deadline, bool)
+        or not math.isfinite(float(request_deadline))
+        or request_deadline <= 0
+    ):
         raise JudgeError(_("The LLM judge is not configured."))
     if (
         not isinstance(temperature, (int, float))
@@ -429,6 +442,7 @@ def _resolve_profile(seat: int, *, legacy_model: str | None = None) -> JudgeSeat
         reasoning=reasoning,
         stream=stream,
         batch_size=batch_size,
+        request_deadline=float(request_deadline),
         temperature=float(temperature),
         max_tokens=max_tokens,
         endpoint_fingerprint=endpoint_fingerprint,
@@ -468,6 +482,7 @@ def judge_configuration_snapshot() -> dict[str, object]:
         "reasoning": [profile.reasoning for profile in profiles],
         "stream": [profile.stream for profile in profiles],
         "temperature": [profile.temperature for profile in profiles],
+        "request_deadline": [profile.request_deadline for profile in profiles],
         "prompt_schema_version": [
             profile.prompt_schema_version for profile in profiles
         ],
@@ -744,10 +759,18 @@ def _retry_after(headers: object) -> float | None:
 
 
 def _read_body(
-    response: httpx2.Response, *, started: float
+    response: httpx2.Response,
+    *,
+    started: float,
+    request_deadline: float | None = None,
 ) -> tuple[bytes | None, str, int | None, int, str]:
     deadline, idle = (
-        started + settings.JUDGE_REQUEST_DEADLINE,
+        started
+        + (
+            float(settings.JUDGE_REQUEST_DEADLINE)
+            if request_deadline is None
+            else request_deadline
+        ),
         getattr(settings, "JUDGE_REQUEST_IDLE_TIMEOUT", 30),
     )
     if not isinstance(idle, (int, float)) or idle <= 0:
@@ -870,9 +893,16 @@ def _sse_result(
 
 
 def _read_sse(
-    response: httpx2.Response, *, started: float
+    response: httpx2.Response,
+    *,
+    started: float,
+    request_deadline: float | None = None,
 ) -> tuple[dict | None, str, str, int, int | None, str]:
-    deadline = started + settings.JUDGE_REQUEST_DEADLINE
+    deadline = started + (
+        float(settings.JUDGE_REQUEST_DEADLINE)
+        if request_deadline is None
+        else request_deadline
+    )
     idle = getattr(settings, "JUDGE_REQUEST_IDLE_TIMEOUT", 30)
     if not isinstance(idle, (int, float)) or idle <= 0:
         idle = 30
@@ -966,10 +996,15 @@ def _read_sse(
 
 
 def _decode_non_stream(
-    response: httpx2.Response, started: float
+    response: httpx2.Response,
+    *,
+    started: float,
+    request_deadline: float | None = None,
 ) -> tuple[dict | None, str, str, int, int | None, str]:
     raw, failure, first_byte, byte_count, exception_class = _read_body(
-        response, started=started
+        response,
+        started=started,
+        request_deadline=request_deadline,
     )
     if raw is None:
         return None, failure, "", byte_count, first_byte, exception_class
@@ -1012,7 +1047,9 @@ def _post_response(
     ) as response:
         reader = _read_sse if profile.stream else _decode_non_stream
         body, failure, finish, byte_count, first_byte, exception_class = reader(
-            response, started=started
+            response,
+            started=started,
+            request_deadline=profile.request_deadline,
         )
         return _BatchResponse(
             response.status_code,
@@ -1035,7 +1072,7 @@ def _request_timeout(profile: JudgeSeatProfile) -> httpx2.Timeout:
     Keep connection/write bounds under the absolute deadline and streaming
     reads under the shorter idle-between-chunks bound.
     """
-    deadline = float(settings.JUDGE_REQUEST_DEADLINE)
+    deadline = profile.request_deadline
     idle = getattr(settings, "JUDGE_REQUEST_IDLE_TIMEOUT", 30)
     if not isinstance(idle, (int, float)) or idle <= 0:
         idle = 30
@@ -1433,7 +1470,7 @@ def _run_batch(
             retries_used += 1
             retry = True
             delay = (
-                min(response.retry_after, settings.JUDGE_REQUEST_DEADLINE)
+                min(response.retry_after, profile.request_deadline)
                 if failure == "http-rate-limit" and response.retry_after is not None
                 else _full_jitter(
                     max(settings.JUDGE_REQUEST_SLEEP, 1.0) * 2 ** (retries_used - 1)

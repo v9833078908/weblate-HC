@@ -67,6 +67,7 @@ _SAFE_CONFIGURATION_SNAPSHOT_KEYS = frozenset(
         "reasoning",
         "stream",
         "temperature",
+        "request_deadline",
         "prompt_schema_version",
     }
 )
