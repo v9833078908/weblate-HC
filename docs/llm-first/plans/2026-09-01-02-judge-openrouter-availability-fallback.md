@@ -32,10 +32,25 @@ is not a quality resolver, and a disliked verdict can never be replaced by a
 second opinion.
 
 **Status:** proposed, awaiting approval. This is a multi-module feature change,
-so `AGENTS.md` requires explicit approval before any code is edited; the owner
+so `AGENTS.md` requires explicit approval before any code is edited. The owner
 decisions of 2026-09-01 settled the design questions below but did not authorise
 implementation. Every production step in Rollout then needs its own separate
 approval on top of that.
+
+**Strict implementation order:** Start only after branch
+`docs/llm-usage-attribution-plan` has been implemented and merged to `main`,
+with Tasks 1-5 of
+`docs/llm-first/plans/2026-08-31-llm-usage-cost-attribution.md` green and
+additive migration `0113_llm_usage_scope` present. Rebase this work on that
+merge, not as a stacked or cherry-picked change against today's `main`: the
+attribution code adds scope to `JudgeRequest` and owns the judge's single
+`LLMUsageLog` response seam that fallback must reuse. Before coding, re-ground
+every `file:line` reference in Tasks 1-5, preserve those scope fields in all
+direct request fixtures, and generate
+`0114_judge_verdict_provider` depending on `0113_llm_usage_scope`. If another
+migration lands between them, rebase and regenerate the next migration rather
+than hand-editing a conflicting number. Production rollout starts only after
+the attribution plan's own migration and scoped smoke are green on the target.
 
 ---
 
@@ -100,10 +115,13 @@ implementation:
   not a router.
 - Clearing the 275-unit `need-for-greed/ui/es` backlog. That is a writing run
   and a separate decision.
-- Cost reconciliation. The proxy reports no cost at all (38/38 rows
-  `cost_usd=None`); OpenRouter does. The fallback therefore improves cost
-  visibility by accident and worsens nothing, but reconciliation stays with the
-  LLM usage cost attribution plan.
+- Cost reconciliation. LiteLLM still reports no cost (38/38 rows carried
+  `cost_usd=None`), and neither this fallback nor the attribution prerequisite
+  can reconstruct an upstream-billed primary request whose body never arrived.
+  The prerequisite does make every delivered response service- and
+  scope-attributed. This plan must prove that a delivered fallback response
+  creates exactly one `LLMUsageLog` row for the serving endpoint; reconciliation
+  of missing provider charges remains with the LLM usage cost attribution plan.
 
 ## Deliberately not in this plan: per-run seat demotion
 
@@ -149,16 +167,23 @@ step 4 therefore makes the circuit *record* producer-run outcomes but does not
 make any producer run *obey* it. The obstacle is not only the flag; the consult
 site in the producer request path does not exist.
 
-So after this plan a sustained primary outage still costs one failed primary
-attempt per batch for a whole producer run, with no ceiling but the run's batch
-count, and the adaptive batch budget cannot help seat 2 because it already runs
-at width 1. That is a known, accepted and monitored gap, not a solved problem.
+So after this plan a sustained primary outage still pays one failed primary
+attempt per batch for a whole producer run. The missing control is an outage
+short-circuit after consecutive availability failures, not a literal absence of
+limits: at the standard `JUDGE_MAX_UNITS_PER_RUN=2000` cap, seat 2's 150 s
+deadline bounds primary waiting alone at 83.3 h. A `deadline` consumes that one
+per-batch bound and does not consume `JUDGE_TRANSPORT_RETRIES`; a `transport`
+failure can consume its configured retry. The adaptive batch budget cannot help
+seat 2 once it already runs at width 1. This is a known, accepted and monitored
+gap, not a solved problem.
 
 The hours figure above is an extrapolation from single-request latencies, not a
-measurement. Rollout step 5 measures the real failover rate and the observed
-per-batch outage cost. The follow-up that should then be scoped is integrating
-the existing circuit breaker into the producer request path - one shared
-mechanism, endpoint-scoped and durable - not a per-run demotion counter and not
+measurement. Rollout step 5 measures the real failover rate, failed-primary
+wall time, and separately the provider-reported cost of delivered fallback
+responses. It cannot infer a cost for a primary request whose response body
+never arrived. The follow-up that should then be scoped is integrating the
+existing circuit breaker into the producer request path - one shared,
+endpoint-scoped and durable mechanism - not a per-run demotion counter and not
 a new configurable routing mode.
 
 ---
@@ -254,6 +279,10 @@ Assert:
   a request.
 - A fallback base URL equal to the primary's raises `JudgeError`: a fallback to
   the same endpoint is a configuration mistake, not a fallback.
+- A rollback profile with OpenRouter as primary and all eight
+  `JUDGE_FALLBACK_*` values empty validates and has no fallback endpoint. The
+  same profile with the OpenRouter fallback still configured is rejected by the
+  equal-URL guard above.
 - **The D6 regression.** With `JUDGE_REASONING_EFFORT_SEAT_1="thinking.disabled"`
   on a LiteLLM primary and an OpenRouter fallback, the fallback payload must
   carry `reasoning: {"effort": "medium", "exclude": True}` from
@@ -326,7 +355,8 @@ served the batch.
 - Modify: `weblate/trans/tests/test_judge_loop.py`
 - Modify: `weblate/trans/tests/test_judge_client.py`
 - Modify: `weblate/trans/models/judge.py`
-- Create: `weblate/trans/migrations/0113_judge_verdict_provider.py`
+- Create: `weblate/trans/migrations/0114_judge_verdict_provider.py` (generated
+  after `0113_llm_usage_scope`; see the strict implementation order)
 - Modify: `weblate/trans/judge.py`
 - Modify: `weblate/trans/judge_loop.py`
 
@@ -396,6 +426,7 @@ fix(judge): persist the serving endpoint identity on each verdict
 **Files:**
 
 - Modify: `weblate/trans/tests/test_judge_client.py`
+- Modify: `weblate/trans/tests/test_judge_loop.py`
 - Modify: `weblate/trans/judge.py`
 - Read only, not modified: `weblate/trans/judge_loop.py` (the symmetric-difference
   test imports `_AVAILABILITY_FAILURE_KINDS` from it; the circuit breaker keeps
@@ -440,22 +471,21 @@ sets differ in both directions and each difference is load-bearing:
   (`docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md:257-261`) -
   still holds for the primary: the existing adaptive halving must still be
   applied to the primary's budget, and the fallback attempt is additional, not a
-  substitute. **The per-batch cost of a sustained primary outage is not bounded
-  by anything today, and this plan does not bound it.** Two mechanisms look like
-  they would and do not: the adaptive batch budget halves on a deadline
-  (`weblate/trans/judge.py:1323-1340`) but cannot go below one, so it does
-  nothing at all for seat 2, which runs at batch size 1 in production; and the
-  shared circuit breaker is drain-scoped, written only by
+  substitute. **The missing policy is an outage short-circuit within a run, not
+  a literal absence of limits.** A producer run is finite under the standard
+  `JUDGE_MAX_UNITS_PER_RUN=2000` cap and per-seat deadlines, but nothing stops
+  asking an unhealthy primary after N availability failures. Seat 2 cannot
+  shrink below width 1. A `deadline` takes its one 150 s per-batch bound and
+  does not use `JUDGE_TRANSPORT_RETRIES`; a `transport` failure may use that
+  configured retry. The shared circuit breaker is drain-scoped, written only by
   `_update_deferral_circuit` under `JUDGE_DEFERRAL_ENABLED` and read only by
   `_reserve_deferral_requests_locked` from `_drain_seat`
   (`weblate/trans/judge_loop.py:634-707`, `:1546`). Nothing in
   `weblate/trans/judge.py` consults `circuit_state`, so a producer run never
-  sees it. Concretely: while the primary is down, a producer run pays one failed
-  primary attempt for **every** batch, up to its seat deadline each time, and the
-  only limit is how many batches the run has. Integrating the circuit into the
-  producer request path is the correct fix and is a deliberate follow-up, not
-  part of this plan - see "Deliberately not in this plan". Rollout step 5
-  measures the real rate before that work is scoped.
+  sees it. Integrating the circuit into the producer request path is the
+  correct fix and is a deliberate follow-up, not part of this plan - see
+  "Deliberately not in this plan". Rollout step 5 measures the actual rate,
+  wall time, and observable fallback cost before that work is scoped.
 
 A test must assert the two frozensets' exact symmetric difference, so a future
 edit to either one cannot silently widen the other.
@@ -463,7 +493,7 @@ edit to either one cannot silently widen the other.
 | Primary outcome | Fallback calls | Terminal result |
 |---|---:|---|
 | `transport`, after `JUDGE_TRANSPORT_RETRIES` is spent | 1 | fallback's result |
-| `deadline`, with the primary's batch still halved | 1 | fallback's result |
+| `deadline`, then lower primary budget on later batches | 1 | fallback's result |
 | `http-server` (>=500, including 502/503/504/524), after its retry | 1 | fallback's result |
 | `http-rate-limit` (429), after its retry | 1 | fallback's result |
 | `http-auth` (401/403) | 1, and **zero** further primary calls | fallback's result |
@@ -490,6 +520,12 @@ Also assert:
 - A fallback attempt writes a `JudgeRequestAttempt` with the fallback provider,
   the fallback `endpoint_fingerprint`, and `attempt` distinguishable from the
   primary's ordinals.
+- With the attribution prerequisite, each persisted fallback response with
+  recordable token usage creates exactly one `LLMUsageLog` row: its `service`
+  and `model` are the fallback profile's, its immutable scope matches the
+  original `JudgeRequest`, and `request_attempt` is the fallback attempt. A
+  primary failure without a response body creates no usage row, which remains
+  the known invoice gap.
 - Seat isolation: seat 1 failing over does not change which endpoint serves
   seat 2, and the parallel barrier still releases per batch offset.
 - A fallback that itself fails yields `unparsed`, never an exception, and does
@@ -510,6 +546,11 @@ In `_run_batch`, after the primary's transport, transient-HTTP and protocol
 budgets are spent and the final `failure_kind` is in `_FAILOVER_FAILURE_KINDS`,
 re-send the identical batch once to the fallback seat profile. Log one line with
 the seat, the trigger kind, both models and the batch position.
+
+Do not add a second usage writer in fallback code. Reuse the attributed
+`_record_usage` seam with the profile actually serving each call, the original
+batch, and that call's `JudgeRequestAttempt`; otherwise one fallback response
+can be double-counted or filed as LiteLLM spend.
 
 **`http-auth` needs care: today it does not mark a batch, it raises.**
 `_run_batch` raises `JudgeError("The LLM judge is not configured.")` the moment
@@ -613,6 +654,11 @@ verdict is produced by exactly one endpoint and model pair; the fallback's
 reasoning effort and response format are not inherited from the primary because
 they are provider-specific.
 
+State the rollback invariant in both settings pages: before repointing the
+primary to OpenRouter, clear all eight `JUDGE_FALLBACK_*` values. The same URL
+cannot be both primary and fallback, and leaving the fallback configured makes
+validation reject the rollback before any request.
+
 Add the `WEBLATE_JUDGE_FALLBACK_*` envvars to
 `docs/admin/install/docker.rst` around `:2368-2395`. While there, add the
 existing undocumented `WEBLATE_JUDGE_*` per-seat entries if any are still
@@ -684,6 +730,22 @@ attempt. Verdicts exist for every unit. Each verdict's `judge_model`,
 `profile_fingerprint` and `judge_provider` are the fallback's, which is the live
 proof of Task 3. The run completes without a warning about unjudged strings.
 
+Use an isolated temporary `(project, component, language)` scope for this arm
+and record its post-run judge ledger:
+
+```text
+weblate llm_usage_report --project <project> --component <component> \
+  --language <language> --service openrouter --operation judge --days 1 \
+  --summary --format csv
+```
+
+Expected: every successful fallback response in this OpenRouter arm supplies
+recordable usage, so `requests` equals the successful fallback-attempt count,
+`unattributed_requests=0`, `priced_complete=yes`, and
+`attribution_complete=yes`. Missing usage or cost fails the post-attribution
+accounting proof, not the transport verdict; record it as unknown rather than
+estimating the missing LiteLLM cost.
+
 Baseline worth capturing first, on the unmodified code with no fallback
 configured: the same invalid key aborts the entire run with "Automatic
 translation failed: The LLM judge is not configured", because `http-auth` raises
@@ -713,17 +775,23 @@ one that never fires.
 
 ### Step 4: OpenRouter rollback smoke
 
-Point the primary at OpenRouter with the historical pair and run the same scope
-on the new code. This is the readiness proof for the manual rollback path, and
-`docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md:447-450` refuses
-to declare rollback ready without it. It is also the only arm that exercises the
-D6 reasoning-effort resolution against a live OpenRouter endpoint.
+First clear all eight `JUDGE_FALLBACK_*` settings. Then replace the complete
+provider-semantic primary profile with the recorded OpenRouter profile:
+`JUDGE_BASE_URL`, `JUDGE_API_KEY`, both `JUDGE_MODEL_SEAT_*`, both
+`JUDGE_REASONING_EFFORT_SEAT_*`, and both `JUDGE_RESPONSE_FORMAT_SEAT_*`.
+Recreate the dev container, assert `judge_configuration_snapshot()` exposes no
+fallback endpoint, and run the same scope. This is the readiness proof for the
+manual rollback path; Task 2 deliberately rejects a primary and fallback with
+the same base URL. Restore the canonical LiteLLM-primary/OpenRouter-fallback
+configuration after the smoke. It is also the only arm that exercises the D6
+reasoning-effort resolution against a live OpenRouter endpoint.
 
 ### Step 5: Record
 
 Write the measurement with all four arms, attempt counts, failure kinds,
-providers and identities per verdict, and latency. Do not claim availability
-improvements from a forced arm: it proves wiring, not proxy reliability.
+providers and identities per verdict, latency, and the forced arm's scoped
+OpenRouter judge-ledger summary. Do not claim availability improvements from a
+forced arm: it proves wiring, not proxy reliability.
 
 ### Step 6: Commit
 
@@ -738,10 +806,15 @@ test(judge): record the forced fallback smoke
 Each numbered step needs its own explicit approval. Nothing here runs during
 implementation.
 
-1. Deploy the code and migration `0113` with **all** fallback settings empty.
-   Assert on the running container that the fallback is unconfigured, and that a
-   small read-only canary reproduces the 2026-09-01 numbers exactly. This proves
-   the refactor changed nothing.
+1. First complete the attribution rollout: migration `0113_llm_usage_scope` is
+   applied, all writers use the new ledger, and its scoped production smoke is
+   green. Then apply the generated fallback migration
+   `0114_judge_verdict_provider` before the fallback application image, with
+   **all** fallback settings empty. If rebasing generated a different next
+   migration number, use that migration and verify its dependency instead of
+   assuming `0114`. Assert on the running container that fallback is
+   unconfigured and that a small read-only canary reproduces the 2026-09-01
+   numbers exactly. This proves the refactor changed nothing.
 2. Set the fallback settings to the historical OpenRouter endpoint, key and pair,
    leaving the primary on LiteLLM. Recreate the container: the environment block
    is baked in at creation. Assert `judge_configuration_snapshot()` shows both
@@ -760,25 +833,30 @@ implementation.
    done for `JudgeRequestAttempt` and `LLMUsageLog`, because a queue plus
    indefinite retries grows the database without cleanup. After enabling, watch
    one full drain interval and assert the queue reaches zero.
-5. Watch two numbers over a full production run, not one: the failover rate per
-   seat, and the wall time spent on failed primary attempts. The second matters
-   because no mechanism bounds it - a sustained outage pays one failed primary
-   attempt per batch for the whole run, and seat 2's batch size of 1 makes the
-   adaptive budget inert (see "Deliberately not in this plan"). A high failover
-   rate means the primary is unhealthy; the correct responses are to investigate
-   the proxy, revert the primary, or scope the producer-path circuit follow-up -
-   never to widen retry budgets. Record both numbers in a dated measurement so
-   the follow-up is argued from data.
-6. Manual rollback stays one setting: repoint `WEBLATE_JUDGE_BASE_URL`,
-   `WEBLATE_JUDGE_API_KEY` and both `WEBLATE_JUDGE_MODEL_SEAT_*` at OpenRouter
-   and recreate the container.
+5. Watch three signals over a full production run: failover rate per seat, wall
+   time spent on failed primary attempts from `JudgeRequestAttempt`, and scoped
+   judge usage by service from `LLMUsageLog`. The first two expose the finite
+   per-batch latency tax of an unhealthy primary. The ledger can report exact
+   OpenRouter fallback cost only when both `priced_complete=yes` and
+   `attribution_complete=yes`; LiteLLM `cost_usd=None` and a primary request
+   with no body stay unknown, never zero. A high failover rate means the primary
+   is unhealthy; investigate the proxy, revert the primary, or scope the
+   producer-path circuit follow-up - never widen retry budgets. Record all
+   three in a dated measurement so the follow-up is argued from data.
+6. Manual rollback is a two-endpoint cutover, not one setting: first clear all
+   eight `WEBLATE_JUDGE_FALLBACK_*` values, then replace the complete
+   provider-semantic primary profile with the recorded OpenRouter values:
+   `WEBLATE_JUDGE_BASE_URL`, `WEBLATE_JUDGE_API_KEY`, both model, reasoning
+   effort, and response-format seat values. Recreate the container, assert
+   `judge_configuration_snapshot()` has no fallback endpoint, and run the
+   bounded read-only rollback smoke from Task 7.
 
 Stop conditions: any unknown failure kind, any terminal unparsed unit after the
 queue is enabled, any fallback attempt on a failure kind outside
 `_FAILOVER_FAILURE_KINDS` (a protocol failure or an `http-other` 4xx), any
 `401`/`403` that produces more than one fallback call, a run in which more than
-half of one seat's batches failed over (the primary is unhealthy and the
-unbounded per-batch outage cost is being paid in full), or a reappearance of the
+half of one seat's batches failed over (the primary is unhealthy and the run is
+paying its remaining finite per-batch wait budget), or a reappearance of the
 ~30 s first-byte reset recorded in
 `docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md`.
 
@@ -795,9 +873,10 @@ unbounded per-batch outage cost is being paid in full), or a reappearance of the
   provider, or it will silently average two different configurations, which is
   what rule R3 exists to prevent
   (`docs/llm-first/vision/llm-first-product-architecture.md:674`).
-- **Cost visibility is asymmetric.** LiteLLM reports no cost; OpenRouter does. A
-  run that fails over will have partially priced usage rows. Report it as
-  unknown rather than zero.
+- **Cost visibility is asymmetric.** The attribution prerequisite records the
+  exact service and immutable scope of delivered judge responses, but LiteLLM
+  still reports no cost and a request with no response body writes no usage row.
+  A run that fails over is partially priced: report unknown, never zero.
 - **Two credentials, two rotation paths.** The credential rotation operation of
   `docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md:345-358`
   remains open and now covers one more secret.
