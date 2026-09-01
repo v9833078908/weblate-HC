@@ -1,24 +1,34 @@
-# A refused judge request must stop the run, not become a verdict
+# Zero unparsed on the LiteLLM judge seats
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
 > implement this plan task-by-task.
 
-**Goal:** No `JudgeVerdict` may ever be written for a request the endpoint
-refused. A permanent refusal stops the run immediately with an operator-visible
-error, exactly as `http-auth` already does, instead of being paid for once per
-batch and recorded as an opinion about a translation.
+**Goal:** A producer-launched judge run leaves no string silently unjudged. Two
+causes, in the order they matter:
 
-**Architecture:** Keep the closed `failure_kind` taxonomy, the attempt ledger,
-the retry budget, the adaptive batch state and the deferral queue. Split the one
-kind that today conflates two unrelated things - a request the endpoint will
-refuse every time, and a request that is merely too large - and route the first
-to the existing fail-fast path.
+1. **A refused request must never become a verdict.** No `JudgeVerdict` may be
+   written for a request the endpoint refused; a permanent refusal stops the run
+   immediately with an operator-visible error, exactly as `http-auth` already
+   does, instead of being paid for once per batch and recorded as an opinion
+   about a translation. Tasks 1-5.
+2. **A string lost to a timeout must come back.** With the refusal path closed,
+   the durable queue can finally be enabled, so a `deadline` or `transport` unit
+   is retried by the drain instead of being terminally unjudged. Tasks 6-7.
 
-**Tech stack:** Python 3.14, Django settings, httpx2 streaming, pytest.
+**Architecture:** No new mechanism. Keep the closed `failure_kind` taxonomy, the
+attempt ledger, the retry budget, the adaptive batch state and the existing
+`JudgeDeferral` queue with its drain. Split the one kind that today conflates
+two unrelated things - a request the endpoint will refuse every time, and a
+request that is merely too large - route the first to the existing fail-fast
+path, then turn the queue on with its settings documented.
+
+**Tech stack:** Python 3.14, Django settings, Celery periodic tasks, httpx2
+streaming, pytest.
 
 **Status:** proposed, awaiting approval. This edits `weblate/trans/judge.py`,
 `weblate/trans/judge_loop.py` and adds a migration, so `AGENTS.md` requires
-explicit approval before any code is edited.
+explicit approval before any code is edited. Task 7 changes a running instance
+and needs its own separate approval on top of that.
 
 **Evidence this is needed:**
 `docs/llm-first/measurements/2026-09-01-04-judge-unparsed-attribution.md`. 101 of
@@ -253,6 +263,97 @@ Dev proof, three arms on the dev container, all read-only
 test(judge): record the refused-request fail-fast
 ```
 
+## Task 6: Document the queue before anyone can tune it
+
+**Files:**
+
+- Modify: `docs/admin/config.rst`
+- Modify: `docs/admin/install/docker.rst`
+- Modify: `docs/changes.rst`
+
+Ten deferral settings exist in `weblate/trans/defaults.py:95-104` and in
+`deploy/environment.example`, and **none** of them appears in
+`docs/admin/config.rst` or `docs/admin/install/docker.rst`. Enabling a paid
+background loop whose pacing, circuit and token-bucket knobs are undocumented is
+not an option, so this task precedes Task 7.
+
+Document, in the existing alphabetical `JUDGE_*` run and matching the
+surrounding style: `JUDGE_DEFERRAL_ENABLED`, `JUDGE_DEFERRAL_MIN_INTERVAL`,
+`JUDGE_DEFERRAL_MAX_INTERVAL`, `JUDGE_DEFERRAL_SLOW_AFTER`,
+`JUDGE_DEFERRAL_MAX_UNITS_PER_PASS`,
+`JUDGE_DEFERRAL_CIRCUIT_FAILURE_THRESHOLD`,
+`JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS`,
+`JUDGE_DEFERRAL_TOKEN_BUCKET_CAPACITY`,
+`JUDGE_DEFERRAL_TOKEN_BUCKET_REFILL_PER_SECOND`,
+`JUDGE_DEFERRAL_OPERATOR_STOPPED`, plus the matching `WEBLATE_JUDGE_DEFERRAL_*`
+envvars. State three things in prose that the defaults do not reveal:
+
+- The drain task is registered only when the flag is true at worker startup
+  (`weblate/trans/tasks.py:1581-1586`), so the flag needs a container recreate,
+  not a settings reload.
+- `JUDGE_DEFERRAL_OPERATOR_STOPPED` is the kill switch: it stops the loop
+  without losing the queued rows.
+- Retention is already scheduled and independent of the flag:
+  `cleanup_judge_observability` runs every
+  `JUDGE_OBSERVABILITY_CLEANUP_INTERVAL` seconds, default 86400
+  (`weblate/trans/tasks.py:1355-1380`, `:1572-1580`), and trims
+  `JudgeRequestAttempt` and judge `LLMUsageLog` rows, so the queue cannot grow
+  the observability tables without cleanup. This closes the prerequisite the
+  fallback plan used to demand before enabling.
+
+### Commit
+
+```text
+docs(judge): document the deferral queue settings
+```
+
+## Task 7: Enable the queue and prove it drains
+
+**Files:**
+
+- Create: `docs/llm-first/measurements/<date>-judge-deferral-queue-enabled.md`
+
+Production change, separate explicit approval. Preconditions, each verified
+before the flag moves: Tasks 1-5 deployed; the dev refused arm proved zero
+verdicts and zero deferrals for a refusal; Task 6 merged.
+
+### Step 1: Dev arm first
+
+On the dev container with `JUDGE_DEFERRAL_ENABLED=1`, force a `deadline` on one
+seat by lowering that seat's `JUDGE_REQUEST_DEADLINE_SEAT_*` to a value the
+model cannot meet. Expected: the unit gets a `JudgeDeferral` row in `queued`,
+the run report shows the unit as `DEFERRED` rather than unparsed, the next drain
+pass with the deadline restored closes the row and writes a parsed verdict.
+
+Then repeat with a refusal instead of a timeout. Expected: **zero** deferral
+rows - the refusal aborted the run before any result existed. That is the
+regression this whole plan exists for; assert it against the live queue, not
+only in tests.
+
+### Step 2: Production enable
+
+Set `WEBLATE_JUDGE_DEFERRAL_ENABLED=1` and recreate the container so the
+periodic task registers. Watch one full `JUDGE_DEFERRAL_MIN_INTERVAL` (900 s by
+default) and assert: the drain runs, the queue reaches zero or shrinks
+monotonically, no row reaches `slow`, and the judge ledger shows only the calls
+the drain actually needed.
+
+### Step 3: Record
+
+Write the measurement with the dev arms, the production window, queue depth over
+time, drain call counts, and the per-seat unparsed rate before and after.
+
+### Step 4: Commit
+
+```text
+test(judge): record the deferral queue rollout
+```
+
+**Rollback:** `WEBLATE_JUDGE_DEFERRAL_OPERATOR_STOPPED=1` stops the loop while
+keeping the queued rows for inspection; clearing
+`WEBLATE_JUDGE_DEFERRAL_ENABLED` and recreating the container removes the
+periodic task entirely.
+
 ## Rollout
 
 Each step needs its own explicit approval.
@@ -263,14 +364,17 @@ Each step needs its own explicit approval.
    parsed verdicts; assert zero refusals and unchanged call counts.
 4. Run the cleanup command with `--confirm` for the 101 rows, after reading its
    dry-run output.
-5. Only then reconsider `WEBLATE_JUDGE_DEFERRAL_ENABLED=1`, which this plan
-   unblocks: see Rollout step 4 of
-   `docs/llm-first/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`.
+5. Document the queue settings (Task 6) and enable the queue (Task 7). This is
+   the step that
+   `docs/llm-first/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`
+   used to carry as its Rollout step 4; it belongs here, because it completes
+   "no unparsed" and has nothing to do with the availability fallback.
 
 **Stop conditions:** any refusal in the healthy control arm; any run that aborts
 on a 413 or on an unclassified 4xx; any verdict row written for a refused
 request; the cleanup command reporting a count other than the 101 rows its
-dry-run showed.
+dry-run showed; any `JudgeDeferral` row created for a refusal; a queue that does
+not shrink over two consecutive drain intervals; any row reaching `slow`.
 
 ## Risks
 
@@ -285,3 +389,12 @@ dry-run showed.
   get an error, which is why Task 3 exists.
 - **The cleanup is a production deletion.** It is guarded, dry-run first,
   scoped by linked attempt kind, and never touches a row whose cause is unknown.
+- **The queue spends money without a human.** That is its purpose - a timed-out
+  string has to be re-judged - but it is why Task 7 is gated on the refusal path
+  being closed, on the settings being documented, and on a dev arm proving that
+  a refusal produces zero queued rows. The kill switch is
+  `JUDGE_DEFERRAL_OPERATOR_STOPPED`.
+- **Enabling the flag needs a container recreate.** The periodic task is
+  registered at worker startup (`weblate/trans/tasks.py:1581-1586`), so an
+  operator who only edits the environment will see no drain and may conclude the
+  queue is broken.

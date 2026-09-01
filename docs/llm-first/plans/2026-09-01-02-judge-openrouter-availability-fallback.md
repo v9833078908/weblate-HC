@@ -137,7 +137,9 @@ into a verdict from the other endpoint. A model that answers 200 with an
 unusable body is a quality problem, and answering it with a second paid call to
 a different model would silently average two configurations, which R3 forbids.
 
-**So "no unparsed" needs the refused-request gap closed first, not Rollout step 4.**
+**So "no unparsed" belongs to another plan.** Both halves of it - the refusal
+fail-fast and the durable queue - are Tasks 1-7 of
+`docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`.
 The record is measured, not assumed: HTTP 400 has no fail-fast rule, so the run of
 2026-09-01 05:59 *completed* after 50 consecutive refused batches and wrote 50
 `unparsed` verdicts across two request rounds of run `48bfbd72`; only `http-auth`
@@ -154,8 +156,8 @@ queue's real job is narrower and still worth having: it keeps a `deadline` or
 `need-for-greed/ui/es`, read-only. It is not evidence for a 466-unit component
 or for the 275-unit backlog on that same language, which the Non-goals below
 exclude on purpose. A producer-visible "stable, no unparsed" claim at real scope
-needs the queue enabled and one full drain interval observed reaching zero
-(Rollout step 4).
+needs the refusal path closed and the queue enabled, which is
+`docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`, not this plan.
 
 ## Non-goals
 
@@ -892,22 +894,13 @@ implementation.
    `writable_ids=set()` so no unit state is projected. Accept only: zero
    terminal unparsed, zero unexpected fallback attempts, first-byte p95 under
    20 s per seat, no request within 25% of its deadline.
-4. Enable the durable queue: `WEBLATE_JUDGE_DEFERRAL_ENABLED=1`. **Blocked until
-   a permanently refused request fails the run fast.** Measured reason: the queue
-   enqueues on `result.unparsed` without looking at the failure kind
-   (`weblate/trans/judge_loop.py:779-795`), and HTTP 400 has no fail-fast rule, so
-   today this flag would turn a refused-request incident into a scheduled retry
-   loop and 51 `slow` rows
-   (`docs/llm-first/measurements/2026-09-01-04-judge-unparsed-attribution.md`).
-   Once that is closed, the queue's job is to keep a `deadline` or `transport`
-   unit from being terminally unjudged. The flag also starts a
-   periodic Celery task that spends money without a human
-   (`weblate/trans/tasks.py:1581-1586`), so it is the single most consequential
-   flag in this plan. Before enabling, confirm the retention and index work of
-   `docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md:99-101` is
-   done for `JudgeRequestAttempt` and `LLMUsageLog`, because a queue plus
-   indefinite retries grows the database without cleanup. After enabling, watch
-   one full drain interval and assert the queue reaches zero.
+4. **The durable queue is not enabled here.** It moved to Tasks 6-7 of
+   `docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`, together with the
+   refusal fail-fast it depends on, because the queue completes "no unparsed" and
+   has nothing to do with endpoint availability. Do not set
+   `WEBLATE_JUDGE_DEFERRAL_ENABLED` from this plan. The fallback is correct with
+   the queue off: a failed-over batch still yields a verdict, and a batch that
+   fails on both endpoints ends `unparsed` exactly as it does today.
 5. Watch three signals over a full production run: failover rate per seat, wall
    time spent on failed primary attempts from `JudgeRequestAttempt`, and scoped
    judge usage by service from `LLMUsageLog`. The first two expose the finite
