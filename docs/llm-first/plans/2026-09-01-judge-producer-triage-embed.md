@@ -196,9 +196,27 @@ and the error message would land on the wrong unit.
 ## Task 5: Readiness counters and a conservative ship CTA
 
 The strip (`weblate/templates/snippets/judge-readiness.html`,
-`judge_queue_strip_context` at `weblate/trans/views/basic.py:701-750`)
+`judge_queue_strip_context` at `weblate/trans/views/basic.py:701-756`)
 shows needs-human/not-reviewed/unparsed but names no release decision and
-links to no queue.
+links no counter to a queue. Constraint, documented in the docstring
+(`basic.py:716-723`): no existing view lists units across every language
+of a component filtered by an arbitrary query, so each counter must link
+to a destination that actually exists. Two do:
+
+- `check:judge-reject` / `check:judge-flag` are projected Check rows, and
+  the per-check `CheckList` accepts a Component path
+  (`reverse("checks", kwargs={"name": "judge-reject", "path": ...})`,
+  `weblate/urls.py:819-823`); its per-language rows redirect straight into
+  the translate queue (`weblate/checks/views.py:290-294`).
+- `judge:stale` / `judge:unparsed` are not checks and have no
+  component-wide listing. Their destinations are per-language translate
+  URLs `translation.get_translate_url()?q=judge:stale` (the `judge:`
+  search field exists, `weblate/utils/search.py:816-828`), rendered as a
+  per-language sub-list in the strip - the strip already iterates the
+  prefetched `translations` on component pages, so nonzero per-language
+  counts are free.
+
+No new listing view is added.
 
 **Files:**
 
@@ -209,10 +227,12 @@ links to no queue.
 ### Step 1: Write failing tests
 
 - Counts include `blocked` (sum of `stats.judge_reject`), `stale`
-  (`judge_stale`), `questionable` (`judge_flag`); each nonzero counter
-  links to the matching prefilled search (`q=check:judge-reject`,
-  `q=has:judge AND NOT has:current-judge`-equivalent used by the stats
-  filter, `q=check:judge-flag`).
+  (`judge_stale`), `questionable` (`judge_flag`).
+- Destinations: `blocked`/`questionable` link to the component-scoped
+  per-check `CheckList` for `judge-reject`/`judge-flag`; `stale` and
+  `unparsed` render one `translate?q=judge:stale` / `?q=judge:unparsed`
+  link per non-source translation with a nonzero count, and none for a
+  zero count.
 - The "Ready to hand off" CTA renders only when
   `judge_reject == 0 and judge_stale == 0 and judge_unparsed == 0` and
   `judge_total > 0`; majors and minors never block it (product
@@ -222,10 +242,10 @@ links to no queue.
 
 ### Step 2: Implement
 
-Extend `judge_queue_strip_context` counts and URLs from the existing
-per-translation stats (invalidation already happens on resolution,
-`models/judge.py:1157`); render the CTA as links to the existing
-download menu and repository tab of the component - no new
+Extend `judge_queue_strip_context` counts and the URLs above from the
+existing per-translation stats (invalidation already happens on
+resolution, `models/judge.py:1157`); render the CTA as links to the
+existing download menu and repository tab of the component - no new
 release pipeline. Non-color severity distinction per `ACCESSIBILITY.md`.
 
 ### Step 3: Verify GREEN

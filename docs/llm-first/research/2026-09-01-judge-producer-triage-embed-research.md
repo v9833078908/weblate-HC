@@ -543,10 +543,14 @@ variants from the tab, the stored candidate will pay off.
      field consumed only by the success branch of `resolve_judge_verdict`
      (`edit.py:1863-1864`); the error branches keep `next=this_unit_url`
      so a failed decision stays on the failed unit.
-   - Task 5, readiness strip + conservative ship CTA: "Blocked for release:
-     N" link to the filter; CTA enabled only when fresh
+   - Task 5, readiness strip + conservative ship CTA: "Blocked for
+     release: N" linking to the component-scoped per-check `CheckList`
+     for `judge-reject` (no component-wide arbitrary-query listing
+     exists); stale/unparsed link per language via
+     `translate?q=judge:stale` / `?q=judge:unparsed`; CTA enabled only
+     when fresh
      `judge_reject == 0 AND judge_stale == 0 AND judge_unparsed == 0`
-     (`snippets/judge-readiness.html`, `trans/views/basic.py:701-747`),
+     (`snippets/judge-readiness.html`, `trans/views/basic.py:701-756`),
      pointing at the existing download menu and repository push.
    - Task 6, per-unit re-check (Solution 2): POST endpoint + celery wrapper
      over `auto_translate(unit_ids=[unit.id], mode="judge")`
