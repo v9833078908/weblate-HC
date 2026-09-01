@@ -8,7 +8,7 @@
 
 **Tech stack:** Python 3.14, Django settings, httpx2 streaming, Celery, pytest, Docker Compose.
 
-**Design:** `docs/llm-first/designs/2026-09-01-judge-per-seat-deadline.md`.
+**Design:** `docs/llm-first/designs/2026-09-01-01-judge-per-seat-deadline.md`.
 
 **Status:** completed and deployed 2026-09-01; production canary and comparable measurement passed. Evidence: `docs/llm-first/measurements/2026-09-01-02-judge-seat-parallelism-production.md`.
 
