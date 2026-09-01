@@ -91,17 +91,24 @@ Problems:
   decision the producer stays on the same string; there is no auto-advance
   through the queue.
 
-### 2.3 Confirmed defect: the stale gate is missing
+### 2.3 Correction: the freshness gate already holds (earlier draft claimed a defect)
 
-`_judge_view_context` (`weblate/trans/views/edit.py:1298-1362`) computes
-`judge_can_resolve` **without regard to** `judge_context_changed`: context
-drift (glossary/note updated) stays an explanatory footnote while the
-resolution form renders. This is exactly the live example. `judge_stale`
-suppresses the form only indirectly (no current verdict - no choices), while
-context drift does not: `current_verdict` is non-empty because `current_round`
-filters by target+context, whereas the displayed active verdict comes from the
-target-only fallback (`models/judge.py:694-757,994-996`). The gate must be
-enforced server-side.
+An earlier draft of this document reported a missing stale gate in
+`_judge_view_context`. Verified against the code, that claim is wrong:
+`current_round` filters verdict rows by the unit's current target *and*
+context hashes (`_current_snapshot_hashes`,
+`weblate/trans/models/judge.py:759-769`), resolution choices are built only
+from `judge_current_verdict = current_verdict(unit)`
+(`weblate/trans/views/edit.py:1324-1331`), and `resolve_verdict` re-reads
+`current_verdict` under the Unit lock and raises `stale` when drift made it
+None (`weblate/trans/models/judge.py:1072-1093`). When the card shows the
+"context changed" note, the displayed verdict is the target-only fallback
+(`active_verdict`) and the current verdict is by construction None - the
+resolution form and the drift note are mutually exclusive already.
+
+The remaining gap is UX, not safety: a drifted or stale card is an
+explanatory footnote with nothing to click - no re-judge affordance and no
+queue exit.
 
 ### 2.4 State radio buttons ("Needs editing / Waiting for review / Approved")
 
@@ -434,10 +441,10 @@ increments.
 
 Templates + `_judge_view_context` + minor JS only:
 
-- Server-side stale gate: `judge_can_resolve=False` when `judge_stale` or
-  `judge_context_changed`; a stale card = one status line + one action
-  "Re-check" (until Solution 2 - a link to the prefilled judge launch over the
-  filter).
+- Drift/stale card UX: pin the existing target+context freshness gate with
+  regression tests (no production change - see 2.3); on a drifted or stale
+  card render one status line + one action "Re-judge" (until Solution 2 - a
+  link to the prefilled judge launch over the filter).
 - Collapse seat duplication into a one-line summary + `<details>` with full
   texts, models, timestamps.
 - Outcome-named actions on a fresh critical: "Keep as is" (the existing
@@ -502,7 +509,7 @@ judge_stale == 0 AND judge_unparsed == 0` over a fresh query, not the cache.
 
 ## 6. Recommendation
 
-The minimum release increment is **Solutions 1+2 together** (stale gate,
+The minimum release increment is **Solutions 1+2 together** (drift-card UX,
 compact card, outcome-named actions, auto-advance, per-unit re-check, a
 conservative ship CTA). Solution 3 is a separate phase after observing
 producer behavior: if "edit manually" consistently dominates over accepting
@@ -517,11 +524,12 @@ variants from the tab, the stored candidate will pay off.
 2. **Write the implementation plan** at
    `docs/llm-first/plans/2026-09-01-judge-producer-triage-embed.md` and get
    it approved before editing (working agreement). Proposed task cut:
-   - Task 1, stale gate: `_judge_view_context` sets `judge_can_resolve=False`
-     on `judge_stale` or `judge_context_changed`; the stale/drift card
-     renders one status line and a single "Re-check" affordance
-     (`judge-verdict.html:23-32,167-189`). Tests: card branch rendering and
-     a POST to `resolve_judge_verdict` rejected for a drifted verdict.
+   - Task 1, freshness invariant + drift-card action: regression tests
+     pinning the existing gate (see 2.3 - no production change); the
+     stale/drift card renders one status line and a single "Re-judge"
+     affordance (`judge-verdict.html:23-32,167-189`). Tests: card branch
+     rendering and a POST to `resolve_judge_verdict` rejected for a
+     drifted verdict.
    - Task 2, card compression: merged one-line two-seat summary +
      `<details>` disclosure with full per-seat evidence, models, timestamps
      (`judge-verdict.html:33-64`).

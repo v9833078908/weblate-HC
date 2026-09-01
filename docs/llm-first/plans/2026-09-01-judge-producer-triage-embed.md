@@ -5,15 +5,17 @@
 
 **Goal:** Make the embedded judge card a usable producer triage surface for
 every verdict severity (critical/`judge-reject`, major/`judge-flag`,
-minor/`judge-note`): gate resolutions on context freshness, compress the
-two-seat evidence, name the actions by outcome, auto-advance the queue, and
-give the component page a conservative release CTA. No new pages, no new
-models, no migrations.
+minor/`judge-note`): pin the existing context-freshness gate with tests and
+give drifted cards an action, compress the two-seat evidence, name the
+actions by outcome, auto-advance the queue, and give the component page a
+conservative release CTA. No new pages, no new models, no migrations.
 
-**Architecture:** Templates, `_judge_view_context`, `resolve_verdict`, and
-the readiness strip only. The verdict stays immutable; a resolution is
-recorded only against a verdict whose target *and* context still match the
-unit. The release CTA reads existing per-translation stats
+**Architecture:** Templates, `_judge_view_context`, the resolution
+transition table, and the readiness strip only. The verdict stays
+immutable; the existing readers already guarantee a resolution is recorded
+only against a verdict whose target *and* context still match the unit -
+this plan adds no second hash computation anywhere. The release CTA reads
+existing per-translation stats
 (`judge_reject`/`judge_stale`/`judge_unparsed`) and never invents a new
 counter.
 
@@ -30,47 +32,49 @@ endpoint (Solution 2), stored repair candidate as `Suggestion` (Solution 3).
 
 ---
 
-## Task 1: Context-drift gate on resolutions
+## Task 1: Pin the freshness invariant; give drifted cards an action
 
-A verdict whose glossary/note context drifted is still resolvable today:
-`judge_can_resolve` (`weblate/trans/views/edit.py:1324-1342`) ignores
-`judge_context_changed`, and `resolve_verdict`
-(`weblate/trans/models/judge.py:1039-1158`) verifies only the target-fresh
-representative pk, never the context hash. (Target staleness is already
-transitively gated: a stale round yields no current verdict, hence no
-choices.)
+No gate is missing - verified against the code: `current_round` filters
+rows by the unit's current target *and* context hashes
+(`_current_snapshot_hashes`, `weblate/trans/models/judge.py:759-769`),
+`_judge_view_context` builds resolution choices only from
+`judge_current_verdict = current_verdict(unit)`
+(`weblate/trans/views/edit.py:1324-1331`), and `resolve_verdict` re-reads
+`current_verdict` under the Unit lock and raises `stale` when drift made it
+None (`weblate/trans/models/judge.py:1072-1093`). When
+`judge_context_changed` is true, the displayed verdict is the target-only
+fallback (`active_verdict`) and the current verdict is by construction
+None, so the form and the drift note are already mutually exclusive.
+
+What is missing is coverage pinning that invariant and any producer action
+on a drifted/stale card: today the card shows only an explanatory footnote
+with nothing to click.
 
 **Files:**
 
 - Modify: `weblate/trans/tests/test_judge_views.py`
 - Modify: `weblate/trans/tests/test_judge.py`
-- Modify: `weblate/trans/views/edit.py`
-- Modify: `weblate/trans/models/judge.py`
 - Modify: `weblate/templates/snippets/judge-verdict.html`
 
-### Step 1: Write failing tests
+### Step 1: Write tests pinning the existing invariant
 
 - View: after a glossary/note change that flips `judge_context_changed`,
-  the unit page renders no resolution form and `judge_can_resolve` is
-  false, for critical and major verdicts alike.
-- Model: `resolve_verdict` against a context-drifted verdict raises
-  `JudgeResolutionError("stale", ...)` even when the representative pk
-  matches; the resolution row stays untouched.
+  the unit page renders the drift note and no resolution form
+  (`judge_can_resolve` false), for critical and major verdicts alike.
+- Model: `resolve_verdict` with the drifted verdict's pk raises
+  `JudgeResolutionError("stale", ...)`; the resolution row stays
+  untouched. These tests document behavior that already holds - they
+  must pass without production changes and guard against regression.
 
-### Step 2: Implement
+### Step 2: Implement the drift-card action
 
-- `_judge_view_context`: `judge_can_resolve` additionally requires
-  `not judge_context_changed`.
-- `resolve_verdict`: under the unit lock, recompute the context hash
-  (`compute_context_hash` over source/note/explanation/matched glossary
-  entries, same inputs as `_judge_view_context`) and raise the existing
-  `stale` error on mismatch.
-- Template: on `judge_context_changed`, next to the existing drift note
-  render one action - a "Re-judge this string" link to the automatic
-  translation page prefilled with `mode=judge&q=id:{unit.pk}` (the
-  `judge_queue_strip_context` run-URL pattern,
-  `weblate/trans/views/basic.py:750`). This is the Solution 1 stand-in for
-  the per-unit re-check endpoint.
+Template only: on `judge_context_changed` (and on the `judge_stale`
+branch, `judge-verdict.html:23-32`), next to the existing note render one
+action - a "Re-judge this string" link to the automatic translation page
+prefilled with `mode=judge&q=id:{unit.pk}` (the
+`judge_queue_strip_context` run-URL pattern,
+`weblate/trans/views/basic.py:750`). This is the Solution 1 stand-in for
+the per-unit re-check endpoint. Add a rendering test for both branches.
 
 ### Step 3: Verify GREEN
 
