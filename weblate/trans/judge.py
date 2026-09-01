@@ -34,7 +34,7 @@ from weblate.trans.models.judge import (
     JudgeAdaptiveState,
     JudgeRequestAttempt,
 )
-from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.models.llm_usage import LLMUsageLog, parse_provider_cost
 from weblate.utils.requests import stream_validated_url
 
 if TYPE_CHECKING:
@@ -149,6 +149,12 @@ class JudgeRequest:
     glossary_terms: Sequence[GlossaryPromptEntry]
     failing_checks: Sequence[str] = field(default_factory=tuple)
     target_plurals: Sequence[str] = field(default_factory=tuple)
+    #: Immutable scope plus labels at billing time. Defaults preserve direct
+    #: historical constructions; any missing value leaves the whole request
+    #: unattributed.
+    project_id_snapshot: int | None = None
+    component_id_snapshot: int | None = None
+    component_slug: str = ""
 
 
 @dataclass(frozen=True)
@@ -823,7 +829,7 @@ def _consume_sse_event(lines: list[str], state: _SSEState) -> str:
         state.done = True
         return ""
     try:
-        event = json.loads(data)
+        event = json.loads(data, parse_float=Decimal)
     except ValueError:
         return "invalid-json"
     if not isinstance(event, dict):
@@ -1011,7 +1017,7 @@ def _decode_non_stream(
     if not raw:
         return None, "empty-response", "", byte_count, first_byte, ""
     try:
-        payload = json.loads(raw)
+        payload = json.loads(raw, parse_float=Decimal)
     except ValueError:
         return None, "invalid-json", "", byte_count, first_byte, ""
     if not isinstance(payload, dict):
@@ -1115,38 +1121,87 @@ def _usage_values(payload: dict | None) -> dict[str, object]:
         else {}
     )
 
+def _usage_integer(value: object) -> int:
+    return value if isinstance(value, int) else 0
+
+
+
+
+def _batch_usage_scope(
+    batch: Sequence[JudgeRequest],
+    project_slug: str,
+) -> tuple[int | None, str, int | None, str, str]:
+    """Return one complete scope only when every request agrees."""
+    project_ids = {request.project_id_snapshot for request in batch}
+    component_ids = {request.component_id_snapshot for request in batch}
+    component_slugs = {request.component_slug for request in batch}
+    languages = {request.target_language for request in batch}
+    scopes = (project_ids, component_ids, component_slugs, languages)
+    if not project_slug or any(len(scope) != 1 for scope in scopes):
+        LOGGER.error("judge batch has an unscoped or mixed translation identity")
+        return None, "", None, "", ""
+    if (
+        None in project_ids
+        or None in component_ids
+        or "" in component_slugs
+        or "" in languages
+    ):
+        LOGGER.error("judge batch has an unscoped or mixed translation identity")
+        return None, "", None, "", ""
+    return (
+        next(iter(project_ids)),
+        project_slug,
+        next(iter(component_ids)),
+        next(iter(component_slugs)),
+        next(iter(languages)),
+    )
+
 
 def _write_llm_usage(
     payload: dict,
+    service: str,
     model: str,
     project_slug: str,
-    unit_count: int,
-    request_attempt: object | None,
+    batch: Sequence[JudgeRequest],
+    request_attempt: JudgeRequestAttempt | None,
 ) -> None:
     usage = _usage_values(payload)
-    prompt_tokens, completion_tokens = (
-        usage.get("prompt_tokens") or 0,
-        usage.get("completion_tokens") or 0,
-    )
+    prompt_tokens = _usage_integer(usage.get("prompt_tokens"))
+    completion_tokens = _usage_integer(usage.get("completion_tokens"))
     if not prompt_tokens and not completion_tokens:
         return
-    details, completion_details = (
-        usage.get("prompt_tokens_details") or {},
-        usage.get("completion_tokens_details") or {},
-    )
+    details = usage.get("prompt_tokens_details")
+    completion_details = usage.get("completion_tokens_details")
+    if not isinstance(details, dict):
+        details = {}
+    if not isinstance(completion_details, dict):
+        completion_details = {}
+    (
+        project_id_snapshot,
+        project_slug,
+        component_id_snapshot,
+        component_slug,
+        target_language_code,
+    ) = _batch_usage_scope(batch, project_slug)
     LLMUsageLog.objects.create(
         model=model,
+        service=service,
+        project_id_snapshot=project_id_snapshot,
         project_slug=project_slug,
+        component_id_snapshot=component_id_snapshot,
+        component_slug=component_slug,
+        target_language_code=target_language_code,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
-        total_tokens=usage.get("total_tokens") or (prompt_tokens + completion_tokens),
-        cost_usd=Decimal(str(usage["cost"])) if usage.get("cost") else None,
+        total_tokens=_usage_integer(usage.get("total_tokens"))
+        or (prompt_tokens + completion_tokens),
+        cost_usd=parse_provider_cost(usage.get("cost")),
         response_id=str(payload.get("id") or ""),
-        cached_tokens=details.get("cached_tokens") or 0,
-        reasoning_tokens=completion_details.get("reasoning_tokens") or 0,
+        cached_tokens=_usage_integer(details.get("cached_tokens")),
+        reasoning_tokens=_usage_integer(completion_details.get("reasoning_tokens")),
         operation=LLMUsageLog.Operation.JUDGE,
-        unit_count=unit_count,
-        batch_size=unit_count,
+        unit_count=len(batch),
+        batch_size=len(batch),
         request_attempt=request_attempt,
     )
 
@@ -1215,15 +1270,16 @@ def _persist_attempt(
 
 def _record_usage(
     payload: dict | None,
+    service: str,
     model: str,
     project_slug: str,
-    size: int,
-    attempt: object | None,
+    batch: Sequence[JudgeRequest],
+    attempt: JudgeRequestAttempt | None,
 ) -> None:
     if payload is None:
         return
     try:
-        _write_llm_usage(payload, model, project_slug, size, attempt)
+        _write_llm_usage(payload, service, model, project_slug, batch, attempt)
     except Exception:
         LOGGER.exception("Failed to record LLM usage")
 
@@ -1436,7 +1492,12 @@ def _run_batch(
         )
         if persistence:
             _record_usage(
-                response.payload, profile.model, project_slug, len(batch), attempt
+                response.payload,
+                profile.provider,
+                profile.model,
+                project_slug,
+                batch,
+                cast(JudgeRequestAttempt | None, attempt),
             )
         last_attempt, last_failure = attempt, failure
         _log_attempt(

@@ -4,24 +4,31 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from decimal import Decimal, InvalidOperation
+from typing import ClassVar
 
+from django.core.exceptions import ValidationError
+from django.core.validators import DecimalValidator
 from django.db import models
 
-if TYPE_CHECKING:
-    from decimal import Decimal
+from weblate.trans.defines import COMPONENT_NAME_LENGTH, LANGUAGE_CODE_LENGTH
+
+COST_USD_MAX_DIGITS = 24
+COST_USD_DECIMAL_PLACES = 18
+_cost_usd_validator = DecimalValidator(
+    max_digits=COST_USD_MAX_DIGITS,
+    decimal_places=COST_USD_DECIMAL_PLACES,
+)
 
 
 class LLMUsageLog(models.Model):
     """
     One record per LLM chat-completions request.
 
-    Written at the single seam where the response body is parsed
-    (``BaseOpenAITranslation.fetch_llm_translations``), so the token counts and
-    the cost are exactly what OpenRouter billed, not a local price-table
-    estimate. ``cost_usd`` is null when the provider reports no cost (observed
-    for the gpt-5.4 tiers); tokens are always stored so the cost can be
-    reconstructed from the OpenRouter price list later.
+    Written at the raw-response seam for OpenAI-compatible, LiteLLM, and judge
+    requests. Token counts and cost are the provider's reported values, not a
+    local price-table estimate. ``cost_usd`` is null when the provider reports
+    no cost or reports a value that cannot be stored without rounding.
 
     ``batch_size`` and ``outcome`` make the price of a run readable without the
     provider dashboard. A reply the validator refuses is billed exactly like an
@@ -43,11 +50,27 @@ class LLMUsageLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     model = models.CharField(max_length=200, db_index=True)
     project_slug = models.CharField(max_length=200, blank=True)
+    #: Stable machinery or judge endpoint ID, for example ``openrouter`` or
+    #: ``litellm``. Machinery derives it from its class; judge derives it from
+    #: a recognized endpoint host and stores ``unknown`` for other hosts. Blank
+    #: is a row written before this migration.
+    service = models.CharField(max_length=200, blank=True)
+    #: Immutable identities used for current-slug report filters. They are
+    #: deliberately scalar snapshots, not FKs: a deleted component must not
+    #: rewrite the historical financial row.
+    project_id_snapshot = models.PositiveIntegerField(null=True, blank=True)
+    component_id_snapshot = models.PositiveIntegerField(null=True, blank=True)
+    #: Human-readable labels at billing time, retained through rename/delete.
+    component_slug = models.CharField(max_length=COMPONENT_NAME_LENGTH, blank=True)
+    target_language_code = models.CharField(max_length=LANGUAGE_CODE_LENGTH, blank=True)
     prompt_tokens = models.IntegerField(default=0)
     completion_tokens = models.IntegerField(default=0)
     total_tokens = models.IntegerField(default=0)
     cost_usd = models.DecimalField(
-        max_digits=12, decimal_places=8, null=True, blank=True
+        max_digits=COST_USD_MAX_DIGITS,
+        decimal_places=COST_USD_DECIMAL_PLACES,
+        null=True,
+        blank=True,
     )
     response_id = models.CharField(max_length=255, blank=True)
     cached_tokens = models.IntegerField(default=0)
@@ -83,6 +106,17 @@ class LLMUsageLog(models.Model):
                 fields=["request_attempt", "-created_at"],
                 name="llm_usage_attempt_recent_idx",
             ),
+            models.Index(
+                fields=[
+                    "project_id_snapshot",
+                    "component_id_snapshot",
+                    "target_language_code",
+                    "service",
+                    "operation",
+                    "-created_at",
+                ],
+                name="llm_usage_scope_recent_idx",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -90,19 +124,20 @@ class LLMUsageLog(models.Model):
 
 
 def recent_cost_range(
-    project_slug: str, model: str, operation: str
+    project_id_snapshot: int, service: str, model: str, operation: str
 ) -> tuple[Decimal, Decimal] | None:
     """
     Observed per-unit cost range for the newest priced requests.
 
-    Exact project/model/operation match, newest 20 rows with a stored cost
-    and a positive unit count. Below 5 samples returns None so a thin
-    history never implies a precision the data does not support.
+    Exact project identity/service/model/operation match, newest 20 rows with
+    a stored cost and a positive unit count. Below 5 samples returns None so a
+    thin history never implies a precision the data does not support.
     """
-    per_unit = [
-        cost / unit_count
-        for cost, unit_count in LLMUsageLog.objects.filter(
-            project_slug=project_slug,
+    per_unit: list[Decimal] = []
+    for cost, unit_count in (
+        LLMUsageLog.objects.filter(
+            project_id_snapshot=project_id_snapshot,
+            service=service,
             model=model,
             operation=operation,
             cost_usd__isnull=False,
@@ -110,7 +145,28 @@ def recent_cost_range(
         )
         .order_by("-created_at", "-pk")[:20]
         .values_list("cost_usd", "unit_count")
-    ]
+    ):
+        if cost is not None and unit_count is not None:
+            per_unit.append(cost / unit_count)
     if len(per_unit) < 5:
         return None
     return min(per_unit), max(per_unit)
+
+
+def parse_provider_cost(value: object) -> Decimal | None:
+    """Return a cost that the ledger can store without rounding."""
+    if value is None:
+        return None
+    try:
+        cost = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+    if not cost.is_finite() or cost < 0:
+        return None
+    for candidate in (cost, cost.normalize()):
+        try:
+            _cost_usd_validator(candidate)
+        except ValidationError:
+            continue
+        return candidate
+    return None

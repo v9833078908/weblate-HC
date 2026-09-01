@@ -19,7 +19,7 @@ Weblate 2026.8.1
 * Project-level OpenRouter settings no longer display an API key input while preserving the configured credential.
 * The component :guilabel:`Files` menu can now download all translations as monolingual JSON files in a ZIP archive, for components with a template.
 * Project-level :ref:`automatic suggestion <machine-translation-setup>` configuration now overrides the site-wide one field by field, so a project can set its own translator persona, style, and language-specific instructions without restating credentials.
-* LLM machine translation now records per-request token usage and cost, reportable via the ``llm_usage_report`` management command.
+* LLM machine translation and LLM judge requests now record per-request token usage and provider-reported cost with stable service, project, component, and target-language attribution. The ``llm_usage_report`` management command resolves current project and component slugs, reports attribution completeness, and can emit one scoped total with ``--summary``.
 * Large language model machine translation services now receive the note left by developers for a string, see :ref:`llm-translation-context`.
 * LLM judge requests now receive the producer-authored source string explanation as well as the developer note, and changing either context invalidates cached verdicts and stale repairs.
 * LLM judge runs now show capped scope and observed-cost previews, record per-unit judge usage, and keep delivery state separate from advisory AI evidence.

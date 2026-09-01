@@ -44,12 +44,24 @@ from weblate.utils.hash import calculate_hash, hash_to_checksum
 from weblate.utils.state import STATE_APPROVED, STATE_READONLY, STATE_TRANSLATED
 from weblate.utils.translation import pgettext_noop
 
-#: Project slug of the batch currently fetching, for usage accounting at the
-#: HTTP seam, which does not receive the batch units.
-llm_batch_project: ContextVar[str] = ContextVar("llm_batch_project", default="")
-#: Source batch size of the request currently fetching, set/reset at the same
-#: seam as llm_batch_project. Reflects the exact batch sent over HTTP,
-#: including split-recovery sub-batches, not the original caller's batch.
+#: Scope of the LLM batch currently fetching. ``None`` means no unit evidence:
+#: either no batch, or a batch without a single Unit, where the configured
+#: project stays the owner. Empty strings/IDs mean an active batch whose units
+#: contradict each other, which must never be attributed.
+llm_batch_project: ContextVar[str | None] = ContextVar(
+    "llm_batch_project", default=None
+)
+llm_batch_project_id: ContextVar[int | None] = ContextVar(
+    "llm_batch_project_id", default=None
+)
+llm_batch_component_id: ContextVar[int | None] = ContextVar(
+    "llm_batch_component_id", default=None
+)
+llm_batch_component: ContextVar[str] = ContextVar("llm_batch_component", default="")
+llm_batch_target_language: ContextVar[str] = ContextVar(
+    "llm_batch_target_language", default=""
+)
+#: Exact strings in the HTTP request, including split-recovery sub-batches.
 llm_batch_unit_count: ContextVar[int] = ContextVar("llm_batch_unit_count", default=0)
 
 #: Primary key of the usage row written for the request currently being
@@ -64,17 +76,46 @@ llm_usage_record: ContextVar[int | None] = ContextVar("llm_usage_record", defaul
 type LLMUsageOutcome = Literal["applied", "partial", "refused"]
 
 
-def _sources_project_slug(sources: list[tuple[str, Unit | None]]) -> str:
-    """Project slug of a batch, from the first unit that carries one."""
-    for _text, unit in sources:
-        if unit is None:
-            continue
-        try:
-            slug = unit.translation.component.project.slug
-            return slug if isinstance(slug, str) else ""
-        except AttributeError:
-            return ""
-    return ""
+def _sources_usage_scope(
+    sources: list[tuple[str, Unit | None]],
+) -> tuple[str | None, int | None, int | None, str, str]:
+    """
+    Return a scope only when one Translation owns every source in a request.
+
+    ``None`` as the project slug means the request carries no unit evidence at
+    all: ``validate_settings`` pays for ``[("test", None)]``, and the project
+    configured for the service is the only owner it can have. ``""`` means the
+    units contradict each other, and nothing may be attributed.
+
+    ``translation_id`` is an already-loaded foreign-key value. Reading it for
+    every source avoids an N+1 relation walk; the first related Translation is
+    then read once only after all IDs agree.
+    """
+    if all(unit is None for _text, unit in sources):
+        return None, None, None, "", ""
+    first_unit = sources[0][1]
+    if first_unit is None or first_unit.translation_id is None:
+        LOGGER.error("LLM batch spans unscoped or multiple translations")
+        return "", None, None, "", ""
+    translation_id = first_unit.translation_id
+    if any(
+        unit is None or unit.translation_id != translation_id
+        for _text, unit in sources[1:]
+    ):
+        LOGGER.error("LLM batch spans unscoped or multiple translations")
+        return "", None, None, "", ""
+    try:
+        translation = first_unit.translation
+        component = translation.component
+        return (  # ruff: ignore[try-consider-else]
+            component.project.slug,
+            component.project_id,
+            component.pk,
+            component.slug,
+            translation.language.code,
+        )
+    except AttributeError:
+        return "", None, None, "", ""
 
 
 if TYPE_CHECKING:
@@ -2788,7 +2829,18 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 string_ids,
             )
         )
-        project_token = llm_batch_project.set(_sources_project_slug(sources))
+        (
+            project_slug,
+            project_id_snapshot,
+            component_id_snapshot,
+            component_slug,
+            target_language_code,
+        ) = _sources_usage_scope(sources)
+        project_token = llm_batch_project.set(project_slug)
+        project_id_token = llm_batch_project_id.set(project_id_snapshot)
+        component_id_token = llm_batch_component_id.set(component_id_snapshot)
+        component_token = llm_batch_component.set(component_slug)
+        language_token = llm_batch_target_language.set(target_language_code)
         unit_count_token = llm_batch_unit_count.set(len(sources))
         # Scoped per attempt: a halved retry must not resolve the previous
         # attempt's row, and a reply billed without usable usage leaves the
@@ -2801,6 +2853,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 )
             finally:
                 llm_batch_project.reset(project_token)
+                llm_batch_project_id.reset(project_id_token)
+                llm_batch_component_id.reset(component_id_token)
+                llm_batch_component.reset(component_token)
+                llm_batch_target_language.reset(language_token)
             return self._parse_llm_translations(
                 translations_string, sources, source_occurrences, string_ids=string_ids
             )
@@ -2913,7 +2969,18 @@ class BaseLLMTranslation(BatchMachineTranslation):
             source_occurrences,
             string_ids,
         )
-        project_token = llm_batch_project.set(_sources_project_slug(sources))
+        (
+            project_slug,
+            project_id_snapshot,
+            component_id_snapshot,
+            component_slug,
+            target_language_code,
+        ) = _sources_usage_scope(sources)
+        project_token = llm_batch_project.set(project_slug)
+        project_id_token = llm_batch_project_id.set(project_id_snapshot)
+        component_id_token = llm_batch_component_id.set(component_id_snapshot)
+        component_token = llm_batch_component.set(component_slug)
+        language_token = llm_batch_target_language.set(target_language_code)
         unit_count_token = llm_batch_unit_count.set(len(sources))
         usage_token = llm_usage_record.set(None)
         try:
@@ -2923,6 +2990,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
                 )
             finally:
                 llm_batch_project.reset(project_token)
+                llm_batch_project_id.reset(project_id_token)
+                llm_batch_component_id.reset(component_id_token)
+                llm_batch_component.reset(component_token)
+                llm_batch_target_language.reset(language_token)
             return await sync_to_async(self._parse_llm_translations)(
                 translations_string, sources, source_occurrences, string_ids=string_ids
             )

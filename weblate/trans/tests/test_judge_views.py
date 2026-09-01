@@ -205,11 +205,27 @@ class JudgeAutoTranslateViewTest(ViewTestCase):
             for _ in range(5):
                 LLMUsageLog.objects.create(
                     model=model,
+                    service="openrouter",
+                    project_id_snapshot=self.component.project_id,
                     project_slug=self.component.project.slug,
                     operation=LLMUsageLog.Operation.JUDGE,
                     cost_usd=cost,
                     unit_count=1,
                 )
+            for project_id_snapshot, service in (
+                (self.component.project_id + 1, "openrouter"),
+                (self.component.project_id, "litellm"),
+            ):
+                for _ in range(5):
+                    LLMUsageLog.objects.create(
+                        model=model,
+                        service=service,
+                        project_id_snapshot=project_id_snapshot,
+                        project_slug=self.component.project.slug,
+                        operation=LLMUsageLog.Operation.JUDGE,
+                        cost_usd=9,
+                        unit_count=1,
+                    )
         response = self.client.get(
             reverse("auto_translation_preview", kwargs=self.kw_translation),
             {

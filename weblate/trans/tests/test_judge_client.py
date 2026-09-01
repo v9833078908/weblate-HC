@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import replace
+from decimal import Decimal
 from typing import Any
 from unittest import mock
 
@@ -18,6 +19,7 @@ from weblate.trans.judge import (
     _ALIAS_CACHE,
     JudgeError,
     JudgeRequest,
+    _decode_non_stream,
     _read_capped,
     _read_sse,
     _request_timeout,
@@ -113,8 +115,34 @@ class JudgeSSETest(SimpleTestCase):
         response = httpx2.Response(200, content=b"\xc3")
 
         _, failure, _, _, _, _ = _read_sse(response, started=time.monotonic())
-
         self.assertEqual(failure, "invalid-envelope")
+
+    def test_non_stream_preserves_usage_decimal(self) -> None:
+        response = httpx2.Response(
+            200,
+            content=(
+                b'{"usage":{"cost":0.123456789123456789},'
+                b'"choices":[{"message":{"content":"{}"},"finish_reason":"stop"}]}'
+            ),
+        )
+        payload, failure, *_ = _decode_non_stream(response, started=time.monotonic())
+        self.assertEqual(failure, "")
+        assert payload is not None
+        self.assertEqual(payload["usage"]["cost"], Decimal("0.123456789123456789"))
+
+    def test_stream_preserves_usage_decimal(self) -> None:
+        response = httpx2.Response(
+            200,
+            content=(
+                b'data: {"usage":{"cost":0.123456789123456789},'
+                b'"choices":[{"delta":{"content":"{}"},"finish_reason":"stop"}]}\n\n'
+                b"data: [DONE]\n\n"
+            ),
+        )
+        payload, failure, *_ = _read_sse(response, started=time.monotonic())
+        self.assertEqual(failure, "")
+        assert payload is not None
+        self.assertEqual(payload["usage"]["cost"], Decimal("0.123456789123456789"))
 
 
 class SegmentGlossaryTest(SimpleTestCase):
@@ -1358,23 +1386,167 @@ class JudgeUsageLogTest(TestCase):
     )
     @http_mock.activate
     def test_usage_is_attributed_to_the_project(self) -> None:
-        # The judge is a paid path outside machinery, which records the
-        # project of every paid request (machinery/openai.py:147). Without
-        # the slug, llm_usage_report cannot bill a judge run to anyone.
         payload = _reply(
             [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
         )
         payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
         http_mock.register("POST", CHAT_URL, json=payload)
         request_verdicts(
-            [REQ],
+            [
+                replace(
+                    REQ,
+                    project_id_snapshot=101,
+                    component_id_snapshot=102,
+                    component_slug="ui",
+                )
+            ],
             model="vendor/model-a",
             project_slug="need-for-greed",
             persist_attempts=True,
         )
+        row = LLMUsageLog.objects.get(model="vendor/model-a")
+        self.assertEqual(row.project_id_snapshot, 101)
+        self.assertEqual(row.project_slug, "need-for-greed")
+        self.assertEqual(row.component_id_snapshot, 102)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_is_attributed_to_component_language_and_service(self) -> None:
+        payload = _reply(
+            [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+        )
+        payload["usage"] = {
+            "prompt_tokens": 11,
+            "completion_tokens": 7,
+            "cost": "__COST__",
+        }
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            content=json.dumps(payload).replace('"__COST__"', "0.123456789123456789"),
+        )
+
+        request_verdicts(
+            [
+                replace(
+                    REQ,
+                    project_id_snapshot=101,
+                    component_id_snapshot=102,
+                    component_slug="ui",
+                )
+            ],
+            model="vendor/model-a",
+            project_slug="need-for-greed",
+            persist_attempts=True,
+        )
+
+        row = LLMUsageLog.objects.get(model="vendor/model-a")
+        self.assertEqual(row.service, "openrouter")
+        self.assertEqual(row.project_id_snapshot, 101)
+        self.assertEqual(row.project_slug, "need-for-greed")
+        self.assertEqual(row.component_id_snapshot, 102)
+        self.assertEqual(row.component_slug, "ui")
+        self.assertEqual(row.target_language_code, "fr")
+        self.assertEqual(row.cost_usd, Decimal("0.123456789123456789"))
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_records_zero_provider_cost(self) -> None:
+        payload = _reply(
+            [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+        )
+        payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0}
+        http_mock.register("POST", CHAT_URL, json=payload)
+
+        request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
+
         self.assertEqual(
-            LLMUsageLog.objects.get(model="vendor/model-a").project_slug,
-            "need-for-greed",
+            LLMUsageLog.objects.get(model="vendor/model-a").cost_usd,
+            Decimal(0),
+        )
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_marks_out_of_scale_cost_unpriced(self) -> None:
+        payload = _reply(
+            [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+        )
+        payload["usage"] = {
+            "prompt_tokens": 11,
+            "completion_tokens": 7,
+            "cost": "__COST__",
+        }
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            content=json.dumps(payload).replace('"__COST__"', "0.1234567891234567891"),
+        )
+
+        request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
+
+        self.assertIsNone(LLMUsageLog.objects.get(model="vendor/model-a").cost_usd)
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_leaves_a_mixed_batch_unattributed(self) -> None:
+        payload = _reply(
+            [
+                {"id": 0, "verdict": "pass", "errors": [], "back_translation": ""},
+                {"id": 1, "verdict": "pass", "errors": [], "back_translation": ""},
+            ]
+        )
+        payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
+        http_mock.register("POST", CHAT_URL, json=payload)
+        request_verdicts(
+            [
+                replace(
+                    REQ,
+                    project_id_snapshot=101,
+                    component_id_snapshot=102,
+                    component_slug="ui",
+                ),
+                replace(
+                    REQ,
+                    unit_key="OTHER",
+                    project_id_snapshot=101,
+                    component_id_snapshot=103,
+                    component_slug="loot",
+                ),
+            ],
+            model="vendor/model-a",
+            project_slug="need-for-greed",
+            persist_attempts=True,
+        )
+        row = LLMUsageLog.objects.get(model="vendor/model-a")
+        self.assertEqual(
+            (
+                row.project_id_snapshot,
+                row.project_slug,
+                row.component_id_snapshot,
+                row.component_slug,
+                row.target_language_code,
+            ),
+            (None, "", None, "", ""),
         )
 
     @override_settings(

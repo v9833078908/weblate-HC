@@ -1543,14 +1543,19 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
         overwrite_existing=autoform.cleaned_data["overwrite_existing"],
     )
     preview = batch.preview_judge_scope()
-    project_slugs = {
-        translation.component.project.slug for translation in batch.translations
+    project_ids = {
+        translation.component.project_id for translation in batch.translations
     }
     judge_cost: dict[str, str | bool] = {"available": False}
-    if len(project_slugs) == 1:
-        project_slug = project_slugs.pop()
+    if len(project_ids) == 1:
+        project_id = project_ids.pop()
         ranges = [
-            recent_cost_range(project_slug, profile.model, LLMUsageLog.Operation.JUDGE)
+            recent_cost_range(
+                project_id,
+                profile.provider,
+                profile.model,
+                LLMUsageLog.Operation.JUDGE,
+            )
             for profile in judge_seat_profiles()
         ]
         if all(cost_range is not None for cost_range in ranges):
@@ -1582,7 +1587,8 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
                 model = resolve_model(translation.language.code)
                 if isinstance(model, str):
                     cost_range = recent_cost_range(
-                        translation.component.project.slug,
+                        translation.component.project_id,
+                        machine.get_identifier(),
                         model,
                         LLMUsageLog.Operation.TRANSLATION,
                     )

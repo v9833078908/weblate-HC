@@ -4404,6 +4404,224 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         )
         self.assertEqual(LLMUsageLog.objects.count(), 1)
 
+    def mock_chat_reply_echo(self, cost: str = "0.123456789123456789") -> None:
+        """Answer any batch correctly, with a priced usage block."""
+        http_mock.register(
+            "GET",
+            re.compile(r"/models$"),
+            json={
+                "object": "list",
+                "data": [{"id": self.TRACE_MODEL, "object": "model"}],
+            },
+        )
+
+        def chat_callback(request):
+            request_payload = json.loads(request.content)
+            strings = json.loads(request_payload["messages"][-1]["content"])["strings"]
+            response_payload = {
+                "id": "chatcmpl-scope",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": json.dumps(
+                                [
+                                    {
+                                        "id": item["id"],
+                                        "parts": [
+                                            {
+                                                "type": "text",
+                                                "text": f"{item['source']} (fr)",
+                                            }
+                                        ],
+                                    }
+                                    for item in strings
+                                ]
+                            ),
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 9,
+                    "completion_tokens": 12,
+                    "total_tokens": 21,
+                    "cost": "__COST__",
+                },
+            }
+            return httpx2.Response(
+                200,
+                headers={},
+                content=json.dumps(response_payload).replace('"__COST__"', cost),
+            )
+
+        http_mock.register_callback(
+            "POST", re.compile(r"chat/completions"), chat_callback
+        )
+
+    @http_mock.activate
+    def test_usage_records_the_batch_scope_and_service(self) -> None:
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_reply_echo()
+        unit = make_unit(code="fr", source="Alpha")
+        unit.translation.component.slug = "ui"
+        machine = self.get_machine()
+        machine.settings["_project"] = Mock(slug="wrong-project", pk=999)
+
+        machine.download_multiple_translations(
+            "en", "fr", [("Alpha", cast("Unit", unit))]
+        )
+
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.project_slug, unit.translation.component.project.slug)
+        self.assertEqual(log.project_id_snapshot, unit.translation.component.project_id)
+        self.assertEqual(log.component_slug, "ui")
+        self.assertEqual(log.component_id_snapshot, unit.translation.component_id)
+        self.assertEqual(log.target_language_code, "fr")
+        self.assertEqual(log.service, machine.get_identifier())
+        self.assertEqual(log.cost_usd, Decimal("0.123456789123456789"))
+        self.assertIsNone(llm.llm_batch_project.get())
+        self.assertIsNone(llm.llm_batch_project_id.get())
+        self.assertIsNone(llm.llm_batch_component_id.get())
+        self.assertEqual(llm.llm_batch_component.get(), "")
+        self.assertEqual(llm.llm_batch_target_language.get(), "")
+
+    @http_mock.activate
+    def test_usage_records_the_batch_scope_and_service_async(self) -> None:
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_reply_echo()
+        unit = make_unit(code="fr", source="Alpha")
+        unit.translation.component.slug = "ui"
+        machine = self.get_machine()
+
+        async_to_sync(machine.adownload_multiple_translations)(
+            "en", "fr", [("Alpha", cast("Unit", unit))]
+        )
+
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(log.project_id_snapshot, unit.translation.component.project_id)
+        self.assertEqual(log.component_id_snapshot, unit.translation.component_id)
+        self.assertEqual(log.component_slug, "ui")
+        self.assertEqual(log.target_language_code, "fr")
+        self.assertEqual(log.service, machine.get_identifier())
+        self.assertEqual(log.cost_usd, Decimal("0.123456789123456789"))
+        self.assertIsNone(llm.llm_batch_project.get())
+        self.assertIsNone(llm.llm_batch_project_id.get())
+        self.assertIsNone(llm.llm_batch_component_id.get())
+        self.assertEqual(llm.llm_batch_component.get(), "")
+        self.assertEqual(llm.llm_batch_target_language.get(), "")
+
+    @http_mock.activate
+    def test_usage_marks_out_of_scale_cost_unpriced(self) -> None:
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_reply_echo("0.1234567891234567891")
+        unit = make_unit(code="fr", source="Alpha")
+
+        self.get_machine().download_multiple_translations(
+            "en", "fr", [("Alpha", cast("Unit", unit))]
+        )
+
+        self.assertIsNone(LLMUsageLog.objects.get().cost_usd)
+
+    @http_mock.activate
+    def test_usage_leaves_a_multi_translation_batch_unattributed(self) -> None:
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_reply_echo()
+        first = make_unit(code="fr", source="Alpha")
+        second = make_unit(code="fr", source="Beta")
+        second_translation = second.translation
+        second.translation_id = 2
+        second._state.fields_cache["translation"] = second_translation  # ruff: ignore[private-member-access]
+        machine = self.get_machine()
+        machine.settings["_project"] = Mock(slug="wrong-project", pk=999)
+
+        translations = machine.download_multiple_translations(
+            "en",
+            "fr",
+            [("Alpha", cast("Unit", first)), ("Beta", cast("Unit", second))],
+        )
+
+        self.assertEqual(translations["Alpha"][0]["text"], "Alpha (fr)")
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(
+            (
+                log.project_id_snapshot,
+                log.project_slug,
+                log.component_id_snapshot,
+                log.component_slug,
+                log.target_language_code,
+            ),
+            (None, "", None, "", ""),
+        )
+
+    @http_mock.activate
+    def test_usage_leaves_a_batch_with_an_unscoped_source_unattributed(self) -> None:
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_reply_echo()
+        unit = make_unit(code="fr", source="Alpha")
+
+        self.get_machine().download_multiple_translations(
+            "en",
+            "fr",
+            [("Alpha", cast("Unit", unit)), ("standalone", None)],
+        )
+
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(
+            (
+                log.project_id_snapshot,
+                log.project_slug,
+                log.component_id_snapshot,
+                log.component_slug,
+                log.target_language_code,
+            ),
+            (None, "", None, "", ""),
+        )
+
+    def test_usage_outside_a_batch_uses_service_project_identity(self) -> None:
+        LLMUsageLog.objects.all().delete()
+        machine = self.get_machine()
+        machine.settings["_project"] = Mock(slug="configured-project", pk=99)
+
+        machine.record_llm_usage(
+            {
+                "id": "direct",
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "cost": 0},
+            },
+            self.TRACE_MODEL,
+        )
+
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(
+            (log.project_id_snapshot, log.project_slug),
+            (99, "configured-project"),
+        )
+        self.assertIsNone(log.component_id_snapshot)
+
+    @http_mock.activate
+    def test_usage_probe_without_units_keeps_the_settings_project(self) -> None:
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_reply_echo()
+        machine = self.get_machine()
+        machine.settings["_project"] = Mock(slug="configured-project", pk=99)
+
+        machine.download_multiple_translations("en", "fr", [("test", None)])
+
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(
+            (log.project_id_snapshot, log.project_slug),
+            (99, "configured-project"),
+        )
+        self.assertEqual(
+            (
+                log.component_id_snapshot,
+                log.component_slug,
+                log.target_language_code,
+            ),
+            (None, "", ""),
+        )
+
     @http_mock.activate
     def test_usage_records_outcome_on_the_async_path(self) -> None:
         """
@@ -4524,13 +4742,20 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(log.outcome, "applied")
 
     @http_mock.activate
-    def test_usage_cost_zero_is_unpriced(self) -> None:
+    def test_usage_without_cost_is_unpriced(self) -> None:
         LLMUsageLog.objects.all().delete()
-        self.mock_response_unpriced()  # usage without cost
+        self.mock_response_unpriced()
         self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
         log = LLMUsageLog.objects.get()
         self.assertEqual(log.prompt_tokens, 9)
         self.assertIsNone(log.cost_usd)
+
+    @http_mock.activate
+    def test_usage_zero_cost_is_stored(self) -> None:
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_usage({"prompt_tokens": 9, "completion_tokens": 12, "cost": 0})
+        self.assert_translate(self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN)
+        self.assertEqual(LLMUsageLog.objects.get().cost_usd, Decimal(0))
 
     @http_mock.activate
     def test_usage_missing_means_no_record(self) -> None:
