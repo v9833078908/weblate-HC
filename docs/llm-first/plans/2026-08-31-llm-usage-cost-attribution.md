@@ -1,6 +1,8 @@
 # LLM usage cost attribution per component and target language
 
-**Дата:** 2026-08-31. **Статус:** reviewed, proposed, not started.
+**Дата:** 2026-08-31, ревизия 2026-09-01. **Статус:** reviewed, proposed, not
+started. Все ссылки `файл:строка` сверены с `main` на `ffb6693`; ветка плана
+ребейзнута на этот коммит.
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
 > implement this plan task-by-task.
@@ -13,11 +15,14 @@ target language. `llm_usage_report` отвечает одним итогом п�
 
 **Architecture:** цена запроса неделима, поэтому единица атрибуции - запрос, а
 не строка. Machinery подтверждает scope только когда каждый source несёт одну и
-ту же `Translation`; `None` или другой `translation_id` оставляет весь scope
-пустым, не назначая стоимость первому юниту и не обходя relation каждого
-юнита. Judge несёт те же ID snapshots через `JudgeRequest`. Оба платных шва
-пишут стабильный service ID (`openrouter`, `litellm`, ...), чтобы одинаковая
-model ID за разными шлюзами никогда не смешивалась.
+ту же `Translation`; другой `translation_id` или смесь с `None` оставляет весь
+scope пустым, не назначая стоимость первому юниту и не обходя relation каждого
+юнита. Запрос вообще без юнитов - платный probe `validate_settings()` - это
+третье состояние: юниты ничего не опровергают, поэтому владельцем остаётся
+project из настроек службы. Judge несёт те же ID snapshots через
+`JudgeRequest`. Оба платных шва пишут стабильный service ID (`openrouter`,
+`litellm`, ...), чтобы одинаковая model ID за разными шлюзами никогда не
+смешивалась.
 
 **Tech stack:** Django 5, PostgreSQL, `contextvars`, pytest, Django management
 commands.
@@ -30,8 +35,8 @@ commands.
 
 | Вопрос | Ответ | Точность |
 | --- | --- | --- |
-| Стоимость OpenRouter-перевода `(component, target language)` после деплоя | да, как точная сумма сохранённых `usage.cost` в поддерживаемой decimal scale | `--service openrouter --operation translation --summary`; ledger scope полон только при `priced_complete=yes` и `attribution_complete=yes` |
-| То же для `operation=judge` | да, но только вместе с Task 3 и в пределах retention | service и immutable ID snapshots проходят через `JudgeRequest`; judge usage по умолчанию хранится 90 дней |
+| Стоимость OpenRouter-перевода `(component, target language)` после деплоя | да, как точная сумма сохранённых `usage.cost` в поддерживаемой decimal scale | `--service openrouter --operation translation --days N --summary`; ledger scope полон только при `priced_complete=yes` и `attribution_complete=yes` |
+| То же для `operation=judge` | да, но только вместе с Task 3, в пределах retention и после detail-проверки service | service и immutable ID snapshots проходят через `JudgeRequest`; judge usage по умолчанию хранится 90 дней, а нестандартный `JUDGE_BASE_URL` даёт `service=unknown` |
 | Расход компонента после rename project/component | да, для строк после миграции | current slug резолвится в immutable ID, snapshot slug остаётся историческим label |
 | Разделение расхода по OpenRouter, LiteLLM и другим шлюзам | да | по полю `service`, а не только по model ID |
 | Стоимость Need for Greed за 2026-08-17 - 2026-08-28 | нет | старые строки не содержат новых ID/service/scope полей, backfill невозможен |
@@ -46,10 +51,13 @@ commands.
 `--summary` возвращает одну строку после всех фильтров. `priced_complete=yes`
 значит, что у всех **включённых** rows есть provider-reported цена, которую
 ledger сохранил в точной поддерживаемой schema scale; numeric вне
-`numeric(24, 18)` становится `NULL`. `attribution_complete=yes` значит, что в
-том же service/model/operation/time не осталось ни одной row с неразрешимым
-scope. Вместе они делают `cost_usd` полной суммой **записанного ledger**, не
-заменяя ограничение об оплаченной попытке без тела ответа.
+`numeric(24, 18)` (после снятия хвостовых нулей) становится `NULL`.
+`attribution_complete=yes` значит, что в том же service/model/operation/time
+не осталось ни одной row с неразрешимым scope. Оба флага считаются по окну и
+service, а не по запрошенному компоненту, поэтому осмысленный ответ требует
+`--service` и `--days`. Вместе они делают `cost_usd` полной суммой
+**записанного ledger**, не заменяя ограничение об оплаченной попытке без тела
+ответа.
 
 Гарантия по построению операционная, а не общая: у machinery и у judge два
 независимых шва записи. Если Task 3 не выполнена, judge-строки остаются с
@@ -134,45 +142,92 @@ scope. Вместе они делают `cost_usd` полной суммой **�
     должен принимать только finite `cost >= 0`; иначе malformed provider
     response может сделать `priced_complete=yes` при отрицательной сумме.
 
+Дефекты, найденные при code-grounded ревизии 2026-09-01, после того как `main`
+ушёл вперёд на 36 коммитов:
+
+17. **Ссылки на judge устарели.** Per-seat deadlines и seat parallelism
+    изменили `weblate/trans/judge.py` (+90 строк) и
+    `weblate/trans/judge_loop.py` (+289). Прежние координаты Task 3
+    (`134-144`, `1073-1105`, `1391-1394`) указывали в чужой код; исполнение по
+    ним патчило бы вслепую. Ветка ребейзнута, координаты пересверены.
+18. **Тест parser-а не запустился бы.** `_decode_non_stream` и `_read_sse`
+    имеют сигнатуру `(response, *, started, request_deadline=None)`:
+    позиционный `started` даёт `TypeError` вместо проверки precision.
+19. **Unit-less платный запрос терял верного владельца.** Правило "активный
+    batch с пустым scope нельзя перекрыть настройкой" применялось и к
+    `[("test", None)]` из `validate_settings()`
+    (`weblate/machinery/base.py:168-186`), хотя там настройка службы - и есть
+    правильный и единственный источник project. Итог: своими руками созданный
+    `attribution_complete=unknown` на каждом сохранении настроек.
+20. **`DecimalValidator` считает объявленные дробные places.** Представимая
+    цена с добитыми нулями (`0.000010000000000000000000`, то есть `1e-5`)
+    отбрасывалась как unpriced. Проверено на реальном валидаторе.
+21. **Словарь `service` выводится двумя разными способами.** Machinery берёт
+    его из класса (`get_identifier()`), judge - из хоста, поэтому
+    нестандартный `JUDGE_BASE_URL` даёт `unknown`, а `--service litellm`
+    молча теряет полностью атрибутированные judge-строки.
+22. **`attribution_complete` считается по всему ledger данного service.**
+    `scope_logs` не фильтруется по project/component, поэтому без `--days` и
+    `--service` флаг описывает историю инстанса, а не запрошенный scope; а
+    translation usage не удаляется никаким cleanup.
+23. **Smoke-тест сам себя обесценивал.** Task 6 Step 6 объявлял
+    `priced_complete=no` и `attribution_complete=unknown` не провалом. Это
+    единственный шаг, который проводит настоящее тело ответа провайдера через
+    `parse_float=Decimal`, `numeric(24, 18)` и вывод scope, и в изолированном
+    scope оба флага определяются только вводимым кодом.
+
 ## Что уже существует и инварианты
 
 - `batch_translate` (`weblate/machinery/base.py:1240-1282`) берёт
-  `units[0].translation` для language и plural mapping. `fetch_machinery_matches`
-  режет произвольный список срезами (`weblate/trans/machinery.py:199-205`),
+  `units[0].translation` для language и plural mapping и строит sources как
+  `[(text, unit) for unit in units for text in unit.plural_map]`, то есть с
+  `Unit` у каждого source. `fetch_machinery_matches`
+  (`weblate/trans/machinery.py:199-205`) режет произвольный список срезами,
   поэтому scope guard не заменяет корректную группировку вызывающего: он лишь
   отказывается финансово атрибутировать дефектный batch.
+- Основной платный путь уже сгруппирован по одной `Translation`:
+  `AutoTranslate.get_units()` (`weblate/trans/autotranslate.py:327-333`)
+  выбирает из `self.translation.unit_set`, а `repair_targets`
+  (`weblate/trans/judge_loop.py:152-194`) берёт `units[0].translation` как
+  scope всего вызова. Поэтому guard - страховка, а не заглушка над постоянно
+  срабатывающим дефектом; ожидаемая доля blank-scope строк близка к нулю, и
+  Task 6 Step 6 требует именно нуля.
 - `translation_id` - доступное без запроса поле `Unit`; после подтверждения
   одного ID helper читает `first_unit.translation` один раз. Это O(1), а не
   relation-обход каждого source.
 - `BaseMachineTranslation.get_identifier()` возвращает стабильный service ID
   из class `name` (`weblate/machinery/base.py:202-203`). Для routed services
-  это `openrouter` и `litellm`; judge уже классифицирует endpoint как
-  `openrouter`, `litellm` или `unknown`
-  (`weblate/trans/judge.py:180-186`).
-- `build_request` (`weblate/trans/judge_loop.py:92-108`) - единственный
-  конструктор `JudgeRequest` в продуктовом коде: через него идут обычный
-  прогон, drain и аудит `JudgeRun`. ID snapshots и slug в этом конструкторе
-  покрывают все judge usage-строки.
+  это `openrouter` и `litellm` (`name = "OpenRouter"` и `"LiteLLM"`,
+  `weblate_customization/src/weblate_customization/machinery.py:140,359`);
+  judge классифицирует endpoint по хосту как `openrouter`, `litellm` или
+  `unknown` (`weblate/trans/judge.py:187-193`). Это разные выводы одного
+  словаря, и `unknown` - его реальное значение, а не ошибка.
+- `build_request` (`weblate/trans/judge_loop.py:95-112`) - единственный
+  конструктор `JudgeRequest` в продуктовом коде (проверено поиском по
+  `weblate/`): через него идут обычный прогон, drain и аудит `JudgeRun`. ID
+  snapshots и slug в этом конструкторе покрывают все judge usage-строки.
 - `ContextVar` безопасен при `batch_concurrency > 1`, если set/reset остаются
-  внутри sync/async `_fetch_llm_batch`; `None` у project означает "вне batch",
-  а `""` - "внутри, но scope недоказуем".
+  внутри sync/async `_fetch_llm_batch`; `None` у project означает "нет
+  свидетельства от юнитов" (вне batch или batch без единого `Unit`), а `""` -
+  "внутри batch, но юниты противоречат друг другу".
 - `RoutedLLMTranslation` и `RoutedLiteLLMTranslation`
-  (`weblate_customization/src/weblate_customization/machinery.py:137,356`) не
+  (`weblate_customization/src/weblate_customization/machinery.py:140,359`) не
   переопределяют запись usage, поэтому копирование в
   `dev-docker/data/python/` не требуется.
 
 ## Поток данных и границы точности
 
 ```text
-machinery Unit batch                   judge Unit
-        |                                    |
-        v                                    v
-same non-null translation_id?          build_request(ID snapshots)
-   | yes               | no                  |
-   v                   v                     v
-one Translation    blank scope       JudgeRequest(scope + service)
-   |                   |                     |
-   +----------> accounting seam <------------+
+machinery Unit batch                        judge Unit
+        |                                        |
+        v                                        v
+same non-null translation_id?              build_request(ID snapshots)
+   | yes      | no unit     | mixed              |
+   v          v             v                    v
+one           settings      blank scope   JudgeRequest(scope + service)
+Translation   project
+   |          |             |                    |
+   +----------+-------> accounting seam <--------+
                   | usage.cost + IDs + snapshot slugs
                   v
                LLMUsageLog
@@ -192,7 +247,7 @@ one Translation    blank scope       JudgeRequest(scope + service)
 
 - Modify: `weblate/trans/models/llm_usage.py:15-86`
 - Create: `weblate/trans/migrations/0113_llm_usage_scope.py` (генерируется)
-- Test: `weblate/trans/tests/test_llm_usage.py`
+- Test: `weblate/trans/tests/test_llm_usage.py:16` (`LLMUsageLogModelTest`)
 
 ### Step 1: Write the failing tests
 
@@ -245,6 +300,15 @@ one Translation    blank scope       JudgeRequest(scope + service)
 
     def test_negative_cost_is_unpriced(self) -> None:
         self.assertIsNone(parse_provider_cost(Decimal("-0.01")))
+
+    def test_cost_with_padded_zeros_is_stored(self) -> None:
+        # A representable price the provider padded with fractional zeros must
+        # not be dropped: DecimalValidator counts declared decimal places, not
+        # significant ones.
+        self.assertEqual(
+            parse_provider_cost(Decimal("0.000010000000000000000000")),
+            Decimal("0.00001"),
+        )
 ```
 
 Расширить существующий import `LLMUsageLog` также на `parse_provider_cost`.
@@ -267,7 +331,7 @@ DJANGO_SETTINGS_MODULE=weblate.settings_test uv run pytest \
 
 ### Step 3: Add fields, exact-cost guard and report index
 
-В docstring `LLMUsageLog` (`weblate/trans/models/llm_usage.py:19-24`) заменить
+В docstring `LLMUsageLog` (`weblate/trans/models/llm_usage.py:16-32`) заменить
 утверждение "exactly what OpenRouter billed" на "validated provider cost at the
 raw response seam": generic OpenAI-compatible и LiteLLM requests тоже попадают
 в эту модель. Перенести `Decimal` из `TYPE_CHECKING` в runtime import и добавить:
@@ -350,17 +414,27 @@ def parse_provider_cost(value: object) -> Decimal | None:
         return None
     if not cost.is_finite() or cost < 0:
         return None
-    try:
-        _cost_usd_validator(cost)
-    except ValidationError:
-        return None
-    return cost
+    for candidate in (cost, cost.normalize()):
+        try:
+            _cost_usd_validator(candidate)
+        except ValidationError:
+            continue
+        return candidate
+    return None
 ```
 
 Writer сохраняет `None`, если provider numeric не влезает в `numeric(24, 18)`,
 не finite или отрицателен. Так `unpriced` и `priced_complete=no` честно
 показывают отсутствие точной суммы, вместо того чтобы PostgreSQL молча
 округлил или summary включил некорректную отрицательную стоимость.
+
+Вторая попытка через `normalize()` обязательна и проверена на реальном
+`DecimalValidator(24, 18)`: он считает **объявленные** дробные places, а не
+значащие, поэтому `Decimal("0.000010000000000000000000")` (это `1e-5`, БД
+хранит его без округления) без нормализации был бы отброшен как unpriced.
+Порядок попыток важен: сначала исходное значение, чтобы сохранить масштаб
+ответа провайдера, и только затем нормализованное. `normalize()` не меняет
+значение, поэтому сумма отчёта не смещается.
 
 В `Meta.indexes` добавить:
 
@@ -378,10 +452,15 @@ Writer сохраняет `None`, если provider numeric не влезает 
             ),
 ```
 
-Индекс обязателен: `cleanup_judge_observability` удаляет только judge rows, а
-translation ledger растёт без этого retention. Порядок полей покрывает
-обычный current-identity filter project -> component -> language -> service
--> operation -> period; `model` остаётся измерением детализации.
+Индекс обязателен: `cleanup_judge_observability` удаляет только judge rows
+(`weblate/trans/tasks.py:1375-1381`), а translation ledger растёт без этого
+retention. Порядок полей покрывает обычный current-identity filter project ->
+component -> language -> service -> operation -> period; `model` остаётся
+измерением детализации. Он сознательно не покрывает summary без `--project`
+(например `--service --operation --days`): такой запрос упрётся в
+`llm_usage_operation_recent_idx` и отбор по service, что приемлемо, потому что
+это не основной вопрос заказчика. Второй индекс под него не заводим, пока
+измерение не покажет, что он нужен.
 
 ### Step 4: Generate the migration
 
@@ -419,15 +498,17 @@ git commit -m "feat(trans): attribute LLM usage by service and scope"
 
 **Files:**
 
-- Modify: `weblate/machinery/llm.py:47-77`, `2774-2809`, `2899-2931`
-- Modify: `weblate/machinery/openai.py:23-28`, `162-184`
-- Test: `weblate/machinery/tests.py` (класс `OpenAITranslationTest`)
+- Modify: `weblate/machinery/llm.py:47-77` (ContextVars и
+  `_sources_project_slug`), `2774-2809` (`_fetch_llm_batch`), `2899-2931`
+  (`_afetch_llm_batch`)
+- Modify: `weblate/machinery/openai.py:23-28` (import из `.llm`), `162-184`
+  (`_write_llm_usage`)
+- Test: `weblate/machinery/tests.py:3881` (класс `OpenAITranslationTest`)
 
 ### Step 1: Write the failing tests
 
 В `weblate/machinery/tests.py`, в класс `OpenAITranslationTest` рядом с
-существующими usage-тестами (после `test_usage_recorded_async`, около строки
-4405):
+существующими usage-тестами (после `test_usage_recorded_async`, строка 4399):
 
 ```text
     def mock_chat_reply_echo(self, cost: str = "0.123456789123456789") -> None:
@@ -631,6 +712,32 @@ git commit -m "feat(trans): attribute LLM usage by service and scope"
             (99, "configured-project"),
         )
         self.assertIsNone(log.component_id_snapshot)
+
+    @http_mock.activate
+    def test_usage_probe_without_units_keeps_the_settings_project(self) -> None:
+        # ``validate_settings`` pays for one ``[("test", None)]`` request
+        # (weblate/machinery/base.py:168-186). No unit contradicts the
+        # configured project there, so it stays the owner of that row.
+        LLMUsageLog.objects.all().delete()
+        self.mock_chat_reply_echo()
+        machine = self.get_machine()
+        machine.settings["_project"] = Mock(slug="configured-project", pk=99)
+
+        machine.download_multiple_translations("en", "fr", [("test", None)])
+
+        log = LLMUsageLog.objects.get()
+        self.assertEqual(
+            (log.project_id_snapshot, log.project_slug),
+            (99, "configured-project"),
+        )
+        self.assertEqual(
+            (
+                log.component_id_snapshot,
+                log.component_slug,
+                log.target_language_code,
+            ),
+            (None, "", ""),
+        )
 ```
 
 `mock_chat_reply_echo` передаёт cost через raw `content=`, а не `json=`.
@@ -647,7 +754,7 @@ storage field.
 
 `Mock`, `make_unit`, `cast`, `async_to_sync`, `re`, `json`, `httpx2`,
 `http_mock`, `llm`, `Decimal` и `LLMUsageLog` уже импортированы
-(`weblate/machinery/tests.py:17,21,55,60-113`).
+(`weblate/machinery/tests.py:7,9,12,16-17,20-21,55,112-113,122`).
 
 ### Step 2: Run tests to verify they fail
 
@@ -657,13 +764,18 @@ Expected: FAIL: отсутствуют новые fields/ContextVars, scope бе
 
 ### Step 3: Replace the scope helper
 
-В `weblate/machinery/llm.py` заменить блок `47-77`. `None` у project
-означает, что accounting seam вызван вне `_fetch_llm_batch`; пустые slug и
-`None` IDs означают активный batch без доказуемого владельца:
+В `weblate/machinery/llm.py` заменить блок `47-77`. У project три состояния, и
+их различие - это и есть смысл guard-а: `None` означает "нет свидетельства от
+юнитов" (вызов вне `_fetch_llm_batch` либо batch без единого `Unit`, как
+платный probe `validate_settings()`), поэтому владельцем остаётся project из
+настроек службы; `""` вместе с `None` IDs означает "юниты противоречат друг
+другу", и тогда не атрибутируется ничего:
 
 ```python
-#: Scope of the LLM batch currently fetching. ``None`` means no batch context;
-#: empty strings/IDs mean an active batch that cannot be attributed safely.
+#: Scope of the LLM batch currently fetching. ``None`` means no unit evidence:
+#: either no batch, or a batch without a single Unit, where the configured
+#: project stays the owner. Empty strings/IDs mean an active batch whose units
+#: contradict each other, which must never be attributed.
 llm_batch_project: ContextVar[str | None] = ContextVar(
     "llm_batch_project", default=None
 )
@@ -686,18 +798,24 @@ llm_batch_unit_count: ContextVar[int] = ContextVar("llm_batch_unit_count", defau
 ```python
 def _sources_usage_scope(
     sources: list[tuple[str, Unit | None]],
-) -> tuple[str, int | None, int | None, str, str]:
+) -> tuple[str | None, int | None, int | None, str, str]:
     """
     Return a scope only when one Translation owns every source in a request.
+
+    ``None`` as the project slug means the request carries no unit evidence at
+    all: ``validate_settings`` pays for ``[("test", None)]``, and the project
+    configured for the service is the only owner it can have. ``""`` means the
+    units contradict each other, and nothing may be attributed.
 
     ``translation_id`` is an already-loaded foreign-key value. Reading it for
     every source avoids an N+1 relation walk; the first related Translation is
     then read once only after all IDs agree.
     """
-    if not sources:
-        return "", None, None, "", ""
+    if all(unit is None for _text, unit in sources):
+        return None, None, None, "", ""
     first_unit = sources[0][1]
     if first_unit is None or first_unit.translation_id is None:
+        LOGGER.error("LLM batch spans unscoped or multiple translations")
         return "", None, None, "", ""
     translation_id = first_unit.translation_id
     if any(
@@ -722,7 +840,11 @@ def _sources_usage_scope(
 
 Это намеренно не сохраняет language отдельного multi-component batch:
 финансовый вопрос адресован одной `Translation`, а не частично известному
-срезу неправильного запроса. Никакой scope не лучше выдуманной цены.
+срезу неправильного запроса. Никакой scope не лучше выдуманной цены. Но
+«нет юнитов» - не то же самое, что «юниты противоречат»: в первом случае
+единственное имеющееся свидетельство корректно, и терять его значит своими
+руками создавать `attribution_complete=unknown` на каждом сохранении настроек
+службы.
 
 ### Step 4: Set and reset the new variables at both seams
 
@@ -806,8 +928,10 @@ from weblate.trans.models.llm_usage import LLMUsageLog, parse_provider_cost
         )
 ```
 
-`None` даёт fallback только для прямого вызова accounting вне batch. Активный
-batch с пустым scope не может быть перезаписан project-scoped service setting.
+`None` даёт fallback в двух случаях, и оба корректны: прямой вызов accounting
+вне batch и batch без единого `Unit` (платный probe `validate_settings()`).
+Активный batch с противоречивыми юнитами несёт `""`, и его нельзя перезаписать
+project-scoped service setting: там настройка не является свидетельством.
 
 ### Step 6: Run tests to verify they pass
 
@@ -829,15 +953,24 @@ git commit -m "feat(machinery): attribute LLM usage by service and scope"
 
 **Files:**
 
-- Modify: `weblate/trans/judge.py:134-144`, `786-800`, `959-972`, `1073-1105`, `1170-1182`, `1391-1394`
-- Modify: `weblate/trans/judge_loop.py:92-108`
-- Test: `weblate/trans/tests/test_judge_client.py`
-- Test: `weblate/trans/tests/test_judge_loop.py`
+- Modify: `weblate/trans/judge.py:141-151` (`JudgeRequest`), `826`
+  (`_consume_sse_event`), `1014` (`_decode_non_stream`), `1119-1151`
+  (`_write_llm_usage`), `1216-1228` (`_record_usage`), `1437-1440` (вызов из
+  `_run_batch`)
+- Modify: `weblate/trans/judge_loop.py:95-112` (`build_request`)
+- Test: `weblate/trans/tests/test_judge_client.py:104` (`JudgeSSETest`),
+  `1303` (`JudgeUsageLogTest`)
+- Test: `weblate/trans/tests/test_judge_loop.py:297` (`JudgeLoopTest`)
+
+Все номера строк сверены с `main` на `ffb6693`. Per-seat deadlines добавили
+`request_deadline` в `_read_sse` и `_decode_non_stream`; сигнатуры обеих
+функций - `(response, *, started, request_deadline=None)`, `started`
+keyword-only.
 
 ### Step 1: Write the failing tests
 
 В `weblate/trans/tests/test_judge_loop.py`, класс `JudgeLoopTest`, рядом с
-`test_every_seat_bills_the_units_project` (строка 535):
+`test_every_seat_bills_the_units_project` (строка 1058):
 
 ```text
     def test_request_carries_the_units_scope_identity(self) -> None:
@@ -1019,7 +1152,9 @@ component_slug="ui")` вместо bare `REQ`, затем проверить о�
                 b'"choices":[{"message":{"content":"{}"},"finish_reason":"stop"}]}'
             ),
         )
-        payload, failure, *_ = _decode_non_stream(response, time.monotonic())
+        payload, failure, *_ = _decode_non_stream(
+            response, started=time.monotonic()
+        )
         self.assertEqual(failure, "")
         assert payload is not None
         self.assertEqual(
@@ -1043,8 +1178,10 @@ component_slug="ui")` вместо bare `REQ`, затем проверить о�
         )
 ```
 
-`replace`, `REQ`, `CHAT_URL`, `_reply`, `json`, `httpx2` и `_read_sse` уже
-импортированы; новые imports нужны только для точных Decimal parser assertions.
+`replace`, `REQ`, `CHAT_URL`, `_reply`, `json`, `time`, `httpx2` и `_read_sse`
+уже импортированы (`test_judge_client.py:7-36`); новые imports нужны только
+для точных Decimal parser assertions. `started` у обеих функций
+keyword-only - позиционный вызов даёт `TypeError`, а не падение assertion.
 
 ### Step 2: Run tests to verify they fail
 
@@ -1054,7 +1191,7 @@ Expected: FAIL: у `JudgeRequest` нет ID snapshots/component slug, usage row 
 ### Step 3: Add the dataclass fields
 
 В `weblate/trans/judge.py`, в конец `JudgeRequest` (после `target_plurals`,
-строка 144):
+строка 151):
 
 ```text
     #: Immutable scope plus labels at billing time. Defaults preserve direct
@@ -1184,9 +1321,16 @@ def _batch_usage_scope(
 
 `project_slug` уже является scope текущего judge run; он читается один раз
 на batch, а `JudgeRequest` не загружает `component.project` для каждого unit.
-`profile.provider` классифицирует endpoint (`openrouter`, `litellm`,
-`unknown`), поэтому service не выводится из model alias и не раскрывает URL
-или ключ.
+`profile.provider` классифицирует endpoint (`weblate/trans/judge.py:187-193`),
+поэтому service не выводится из model alias и не раскрывает URL или ключ.
+
+Осознанная асимметрия, которую надо назвать в docstring `LLMUsageLog.service`:
+machinery берёт service из класса службы (`get_identifier()`,
+`weblate/machinery/base.py:202-203`), judge - из хоста. Значит
+`JUDGE_BASE_URL` вне двух известных хостов даёт `service="unknown"`, и
+`--service litellm` такую строку не покажет, хотя она полностью
+атрибутирована. Поэтому Task 6 Step 6 и раздел "Как считать стоимость"
+требуют сначала detail-отчёт, а уже потом summary с фильтром.
 
 ### Step 5: Run tests to verify they pass
 
@@ -1199,7 +1343,7 @@ Run:
 
 Expected: PASS. Новые raw Decimal tests покрывают stream, non-stream и
 persisted usage; существующие проверки `unit_count`
-(`test_judge_client.py:1289`, `1316`) остаются зелёными: `len(batch)` равен
+(`test_judge_client.py:1421`, `1448`) остаются зелёными: `len(batch)` равен
 прежнему `size`.
 
 ### Step 6: Commit
@@ -1217,7 +1361,8 @@ git commit -m "feat(judge): attribute usage by service and scope"
 **Files:**
 
 - Modify: `weblate/trans/management/commands/llm_usage_report.py`
-- Test: `weblate/trans/tests/test_llm_usage.py`
+- Test: `weblate/trans/tests/test_llm_usage.py:54` (`LLMUsageReportTest`,
+  включая удаление `test_csv_report` на строке 90)
 
 ### Step 1: Write the failing tests
 
@@ -1450,6 +1595,30 @@ git commit -m "feat(judge): attribute usage by service and scope"
         )
         rows = list(csv.reader(out.getvalue().strip().splitlines()))
         self.assertEqual(rows[1][2:6], ["col4", "-", "-", "-"])
+
+    def test_legacy_rows_do_not_block_attribution_complete(self) -> None:
+        # A pre-migration row carries service="" and a blank scope. It must
+        # not make every current-service summary permanently "unknown":
+        # translation usage is never deleted by any cleanup task.
+        LLMUsageLog.objects.create(
+            model="m5",
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            prompt_tokens=3,
+        )
+        out = StringIO()
+        call_command(
+            "llm_usage_report",
+            "--service",
+            "openrouter",
+            "--operation",
+            "translation",
+            "--summary",
+            "--format",
+            "csv",
+            stdout=out,
+        )
+        row = list(csv.reader(out.getvalue().strip().splitlines()))[1]
+        self.assertEqual(row[-2:], ["0", "yes"])
 ```
 
 Добавить integration regression в новом классе:
@@ -1771,6 +1940,25 @@ class Command(BaseCommand):
 любой unscoped request с теми же service/model/operation/time мог включать
 запрошенный component, даже если его project ID уже пуст.
 
+Отсюда два свойства, которые обязаны быть в документации команды, иначе флаг
+бесполезен:
+
+- `scope_logs` берётся **после** days/service/model/operation, но **до**
+  project/component. Поэтому `attribution_complete` описывает окно и service,
+  а не запрошенный компонент. Без `--days` он описывает всю историю, а без
+  `--service` - ещё и legacy-строки до миграции, которые несут `service=""` и
+  никогда не удаляются (`cleanup_judge_observability` чистит только judge,
+  `weblate/trans/tasks.py:1375-1381`). `--service` исключает их по построению;
+  это пинится тестом `test_legacy_rows_do_not_block_attribution_complete`.
+- detail-режим группирует и по ID, и по snapshot slug, поэтому переименованный
+  компонент даёт две строки с одним `component_id_snapshot`. Это осознанно:
+  slug - исторический label. Единственный полный итог по такому компоненту -
+  `--summary`, который резолвит current slug в ID.
+
+В `help` команды добавить одну строку: "attribution completeness is computed
+over the filtered window and service, not over the requested project; pass
+--service and --days for a meaningful flag."
+
 ### Step 4: Run tests to verify they pass
 
 Run: `./rundev.sh test weblate/trans/tests/test_llm_usage.py`
@@ -1789,10 +1977,10 @@ git commit -m "feat(trans): report complete scoped LLM cost totals"
 **Files:**
 
 - Modify: `weblate/trans/models/llm_usage.py:92-116`
-- Modify: `weblate/trans/views/edit.py:1544-1587`
+- Modify: `weblate/trans/views/edit.py:1546-1595`
 - Modify: `docs/changes.rst:22`
-- Test: `weblate/trans/tests/test_llm_usage.py` (`RecentCostRangeTest`)
-- Test: `weblate/trans/tests/test_judge_views.py`
+- Test: `weblate/trans/tests/test_llm_usage.py:113-131` (`RecentCostRangeTest`)
+- Test: `weblate/trans/tests/test_judge_views.py:203`
 
 ### Step 1: Write the failing tests
 
@@ -1986,20 +2174,58 @@ Expected: `No changes detected`.
 
 После применения миграции создать или выбрать отдельный временный компонент с
 уникальным `(project, component, language)`, прогнать один реальный batch
-OpenRouter и запросить именно его scope:
+OpenRouter и запросить именно его scope. Сначала detail, чтобы увидеть
+фактический service и не спрятать строку под другим ID:
 
 ```sh
 docker exec dev-docker-weblate-1 weblate migrate
 docker exec dev-docker-weblate-1 weblate llm_usage_report \
   --project llm-usage-smoke --component smoke-ui --language fr \
-  --service openrouter --operation translation --summary --format csv
+  --days 1 --format csv
+docker exec dev-docker-weblate-1 weblate llm_usage_report \
+  --project llm-usage-smoke --component smoke-ui --language fr \
+  --days 1 --service openrouter --operation translation --summary --format csv
 ```
 
-Expected: ровно одна summary row с `requests > 0`, непустыми current
-project/component/service, ненулевым `strings_asked` и явными
-`priced_complete`/`attribution_complete`. `priced_complete=no` или
-`attribution_complete=unknown` - не smoke failure, а сигнал не называть сумму
-полной без расследования соответствующих rows.
+Expected - жёсткий гейт, а не наблюдение: ровно одна summary row, `requests
+> 0`, `strings_asked > 0`, непустые current project/component/service **и оба**
+`priced_complete=yes`, `attribution_complete=yes`. Любое другое значение любого
+из двух флагов - провал smoke-теста.
+
+Почему здесь гейт, хотя в обычном отчёте `no`/`unknown` законны: scope создан
+для этого прогона и изолирован, поэтому оба флага определяются только вводимым
+кодом, а не историей инстанса. `priced_complete=no` в таком scope означает, что
+единственная новая row осталась без цены - `parse_provider_cost` отверг numeric
+или provider его не прислал. `attribution_complete=unknown` означает, что рядом
+есть blank-scope row того же service/operation, то есть unit-less или смешанный
+batch. Оба случая - отказ Tasks 1-2, а не свойство данных.
+
+`--days 1` обязателен: `attribution_complete` считается по `scope_logs`,
+который намеренно не фильтруется по project/component (Task 4, Step 3). Без
+окна флаг описывает весь ledger этого service, а не этот прогон, и «yes»
+становится либо недостижимым, либо бессмысленным.
+
+Это единственный шаг плана, который проводит **настоящее** тело ответа
+провайдера через `parse_float=Decimal`, `numeric(24, 18)` и вывод scope. Моки
+Tasks 1-3 подают лексему, написанную самим планом, и такого доказательства не
+дают.
+
+Диагностика перед повтором:
+
+```sh
+docker exec dev-docker-weblate-1 weblate shell -c "
+from weblate.trans.models.llm_usage import LLMUsageLog
+print(list(LLMUsageLog.objects.order_by('-created_at').values(
+    'model', 'service', 'project_id_snapshot', 'component_id_snapshot',
+    'target_language_code', 'cost_usd', 'prompt_tokens', 'response_id')[:5]))
+"
+```
+
+`priced_complete=no` принимается как поведение провайдера только если в сыром
+теле ответа поля `usage.cost` действительно нет; если оно есть, а
+`cost_usd IS NULL` - это дефект `parse_provider_cost`, его чинят и smoke
+повторяют. Blank scope при непустом `service` - дефект `_sources_usage_scope`
+или его вызова, а не «сигнал».
 
 ### Step 7: Commit and push
 
@@ -2016,8 +2242,15 @@ git push -u origin <branch>
    совместим с новыми пустыми columns.
 2. Убедиться, что миграция завершилась успешно, затем выкатить application
    code и дождаться reload всех writers.
-3. После первого нового LLM batch снять scoped `--summary` отчёт и сохранить
-   вывод как evidence rollout.
+3. После первого нового LLM batch снять scoped `--summary` с `--days 1` и
+   сохранить вывод как evidence rollout. Критерий приёмки тот же, что в
+   Step 6: `priced_complete=yes` и `attribution_complete=yes`. Иначе - назвать
+   конкретные rows и причину до того, как сумма попадёт в отчёт заказчику;
+   в production самый вероятный источник `unknown` - unit-less probe
+   `validate_settings()` при сохранении настроек службы.
+4. Ожидаемый временный эффект, не регрессия: observed-cost preview в UI
+   (Task 5) остаётся `available: false`, пока не накопится пять priced rows
+   нового ledger на каждый `(project_id_snapshot, service, model, operation)`.
 
 Код нельзя выкатывать до migration: новые ORM kwargs обращаются к отсутствующим
 columns, recorder ловит DB exception и логирует её, но usage row **теряется**;
@@ -2028,17 +2261,18 @@ columns, recorder ловит DB exception и логирует её, но usage r
 ## Как считать стоимость языка и компонента после выкладки
 
 ```sh
-# детализация проекта за период, включая legacy/unattributed rows
+# сначала detail: какие service, компоненты и языки вообще писали в период
 weblate llm_usage_report --project need-for-greed --days 30 --format csv > cost.csv
 
 # один ответ: OpenRouter перевод на французский в UI
 weblate llm_usage_report \
-  --project need-for-greed --component ui --language fr \
+  --project need-for-greed --component ui --language fr --days 30 \
   --service openrouter --operation translation --summary --format csv
 
-# отдельный итог judge на том же scope; service берётся из judge detail rows
+# отдельный итог judge на том же scope; service берут из detail rows выше -
+# при нестандартном JUDGE_BASE_URL это будет unknown, а не litellm
 weblate llm_usage_report \
-  --project need-for-greed --component ui --language fr \
+  --project need-for-greed --component ui --language fr --days 30 \
   --service litellm --operation judge --summary --format csv
 ```
 
@@ -2068,6 +2302,20 @@ unscoped request, который журнал не может исключить
 разделяет service и model в detailed режиме. До выкладки Task 3 брать
 component-level judge total нельзя: его scope пуст.
 
+Два правила, без которых `--summary` вводит в заблуждение:
+
+- **всегда указывать `--service` и `--days`.** `attribution_complete` считается
+  по строкам того же service/model/operation/окна с пустым scope, без фильтра
+  по project и component. Legacy-строки до миграции несут `service=""`, поэтому
+  `--service openrouter` их исключает по построению, а вызов без `--service`
+  держит флаг в `unknown`, пока такие строки существуют - а translation usage
+  текущий cleanup не удаляет никогда.
+- **сначала detail, потом summary.** Detail-режим показывает фактические
+  service (включая `unknown` у judge на нестандартном хосте) и делит
+  переименованный компонент на две строки: ID один, snapshot slug разный.
+  Полный итог по такому компоненту даёт только `--summary`, который резолвит
+  current slug в immutable ID.
+
 ## Известные пробелы
 
 Их нужно называть в любом отчёте, иначе сумма выглядит полнее, чем есть:
@@ -2095,11 +2343,29 @@ component-level judge total нельзя: его scope пуст.
 7. **Кеш Weblate.** Повторно использованный перевод не стоит ничего; цена
    строки внутри группы неравномерна, хотя сумма записанных запросов точна.
 8. **Граница decimal schema и знака.** Provider numeric с более чем 24 digits,
-   18 дробными places, не finite значением или отрицательным знаком не
-   округляется и не суммируется: `parse_provider_cost` сохраняет `NULL`, и
-   `priced_complete=no` запрещает назвать summary точной. Это безопаснее
-   неявного PostgreSQL rounding; расширение schema потребует отдельной
+   более чем 18 дробными places после снятия хвостовых нулей, не finite
+   значением или отрицательным знаком не округляется и не суммируется:
+   `parse_provider_cost` сохраняет `NULL`, и `priced_complete=no` запрещает
+   назвать summary точной. Представимая цена с добитыми нулями
+   (`0.000010000000000000000000`) нормализуется и сохраняется - это не пробел,
+   а явное требование Task 1. Расширение самой schema потребует отдельной
    миграции и новых доказательных tests.
+9. **`service="unknown"` у judge.** Judge выводит service из хоста
+   (`weblate/trans/judge.py:187-193`), а не из класса службы, поэтому
+   `JUDGE_BASE_URL` вне `openrouter.ai` и `hcbifrost.herocraft.com` даёт
+   `unknown`. Такая row полностью атрибутирована и не портит
+   `attribution_complete`, но `--service litellm` её не покажет: молчаливо
+   неполный итог. Detail-режим до summary - обязательный шаг, а не совет.
+10. **Unit-less платный запрос.** `validate_settings()`
+    (`weblate/machinery/base.py:168-186`) шлёт один платный `("test", None)`
+    при сохранении настроек службы. Он атрибутируется на project из настроек
+    (Task 2, Step 3), но component и language у него пустые: в
+    component-scoped summary он не попадает, а в project-scoped даёт
+    `attribution_complete=unknown`.
+11. **Detail-строки после rename.** Группировка сохраняет и immutable ID, и
+    snapshot slug, поэтому переименованный компонент виден двумя строками.
+    Это сознательно: slug - исторический label биллинга. Итог берут из
+    `--summary`.
 
 ## Out of scope
 
@@ -2121,12 +2387,15 @@ component-level judge total нельзя: его scope пуст.
 | Eng review | User request | Architecture, correctness, tests, and performance | 1 | CLEARED | 16 findings folded into Tasks 1-6 |
 | Independent review | `reviewer` | Adversarial code-to-plan check | 1 | CLEARED | Confirmed precision and migration-order defects; both fixed |
 | Precision follow-up | System advisory | Raw JSON numeric precision and cost-sign validation | 2 | CLEARED | Added Decimal parsers plus scale and nonnegative-cost guards |
+| Code-grounded re-review | User request 2026-09-01 | Re-check against moved `main`; verification-gate audit | 1 | CLEARED | Findings 17-23 folded into Tasks 1-6; branch rebased onto `ffb6693`, every line reference re-grounded |
 | CEO review | Not run | No product-scope decision remains | 0 | N/A | Backend accounting plan |
 | Design review | Not run | No UI scope | 0 | N/A | Not applicable |
 
-**VERDICT:** ENG, independent and precision follow-up reviews cleared - the
-revised plan preserves stable identity across rename, distinguishes priced from
-attributed completeness, preserves nonnegative raw JSON decimal values within
-declared schema limits, returns one answer, and orders migration before writers.
+**VERDICT:** ENG, independent, precision follow-up and code-grounded re-review
+cleared - the revised plan preserves stable identity across rename,
+distinguishes priced from attributed completeness, keeps the settings-project
+owner of a unit-less paid probe, normalizes before rejecting a provider
+decimal, returns one answer, orders migration before writers, and gates
+rollout on both completeness flags rather than reporting them.
 
 NO UNRESOLVED DECISIONS
