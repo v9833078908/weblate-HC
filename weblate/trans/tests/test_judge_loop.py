@@ -161,6 +161,9 @@ class JudgeSeatConnectionCleanupTest(TransactionTestCase):
             note="",
             explanation="",
             glossary_terms=(),
+            project_id_snapshot=1,
+            component_id_snapshot=1,
+            component_slug="cleanup",
         )
         caller_id = threading.get_ident()
         barrier = threading.Barrier(2, timeout=5)
@@ -192,9 +195,10 @@ class JudgeSeatConnectionCleanupTest(TransactionTestCase):
                         "id": f"cleanup-{seat}",
                         "usage": {"prompt_tokens": 1, "completion_tokens": 1},
                     },
+                    profile.provider,
                     model,
                     "judge-seat-cleanup",
-                    1,
+                    [request],
                     attempt,
                 )
                 with lock:
@@ -1061,6 +1065,14 @@ class JudgeLoopTest(ViewTestCase):
         unit, _, client = self.run_batch([PASS, PASS])
         slugs = {c.kwargs["project_slug"] for c in client.call_args_list}
         self.assertEqual(slugs, {unit.translation.component.project.slug})
+
+    def test_request_carries_the_units_scope_identity(self) -> None:
+        unit = self.get_unit()
+        request = build_request(unit)
+        self.assertEqual(request.project_id_snapshot, self.component.project_id)
+        self.assertEqual(request.component_id_snapshot, self.component.pk)
+        self.assertEqual(request.component_slug, self.component.slug)
+        self.assertEqual(request.target_language, unit.translation.language.code)
 
     def test_every_seat_gets_the_projects_own_context(self) -> None:
         # The judge must describe the game from the same configuration the

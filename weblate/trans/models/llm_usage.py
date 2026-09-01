@@ -51,7 +51,9 @@ class LLMUsageLog(models.Model):
     model = models.CharField(max_length=200, db_index=True)
     project_slug = models.CharField(max_length=200, blank=True)
     #: Stable machinery or judge endpoint ID, for example ``openrouter`` or
-    #: ``litellm``. Blank is a row written before this migration.
+    #: ``litellm``. Machinery derives it from its class; judge derives it from
+    #: a recognized endpoint host and stores ``unknown`` for other hosts. Blank
+    #: is a row written before this migration.
     service = models.CharField(max_length=200, blank=True)
     #: Immutable identities used for current-slug report filters. They are
     #: deliberately scalar snapshots, not FKs: a deleted component must not
