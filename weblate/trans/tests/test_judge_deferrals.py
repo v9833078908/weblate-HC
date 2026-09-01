@@ -140,9 +140,7 @@ class JudgeDeferralTest(ViewTestCase):
             served_provider="openrouter",
         )
         self.defer(unit, fallback_pass)
-        self.assertEqual(
-            unit.judge_deferrals.get().state, JudgeDeferral.State.CLOSED
-        )
+        self.assertEqual(unit.judge_deferrals.get().state, JudgeDeferral.State.CLOSED)
 
     def test_a_protocol_failure_on_the_primary_still_queues(self) -> None:
         unit = self.get_unit()

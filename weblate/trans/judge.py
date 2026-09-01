@@ -22,7 +22,7 @@ from decimal import Decimal
 from importlib import resources
 from itertools import starmap
 from secrets import randbelow, token_hex
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, NoReturn, cast
 from urllib.parse import urlsplit
 
 import httpx2
@@ -704,7 +704,7 @@ def _fallback_configuration_snapshot(
     if endpoint is None:
         return {}
     profiles = [
-        resolve_judge_fallback_seat_profile(seat, primary)
+        _resolve_fallback_profile(seat, primary, endpoint)
         for seat, primary in zip(JUDGE_SEATS, primary_profiles, strict=True)
     ]
     return {
@@ -713,13 +713,11 @@ def _fallback_configuration_snapshot(
         "fallback_hostname": urlsplit(endpoint.base_url).hostname or "",
         "fallback_model": [profile.model for profile in profiles],
         "fallback_reasoning": [profile.reasoning for profile in profiles],
-        "fallback_response_format": [
-            profile.response_format for profile in profiles
-        ],
+        "fallback_response_format": [profile.response_format for profile in profiles],
     }
 
 
-def _raise_configuration() -> None:
+def _raise_configuration() -> NoReturn:
     raise JudgeError(_("The LLM judge is not configured."))
 
 
@@ -1349,10 +1347,9 @@ def _usage_values(payload: dict | None) -> dict[str, object]:
         else {}
     )
 
+
 def _usage_integer(value: object) -> int:
     return value if isinstance(value, int) else 0
-
-
 
 
 def _batch_usage_scope(
@@ -1731,7 +1728,7 @@ def _run_batch(  # ruff: ignore[complex-structure]
                 target_profile.model,
                 project_slug,
                 batch,
-                cast(JudgeRequestAttempt | None, attempt),
+                cast("JudgeRequestAttempt | None", attempt),
             )
         _log_attempt(
             response,
@@ -1765,11 +1762,13 @@ def _run_batch(  # ruff: ignore[complex-structure]
         if fallback_profile is None:
             return None, "", None, False
         fallback_payload = _payload(batch, fallback_profile, project_context)
-        response, failure, outcome, attempt, parsed = send_once(
+        _response, failure, outcome, attempt, parsed = send_once(
             fallback_profile, fallback_payload, target_ordinal
         )
         if not parsed:
             return None, failure, attempt, True
+        # ruff: ignore[assert]
+        assert outcome.results is not None
         return (
             [
                 served(
@@ -1784,9 +1783,13 @@ def _run_batch(  # ruff: ignore[complex-structure]
         )
 
     while True:
-        response, failure, outcome, attempt, parsed = send_once(profile, payload, ordinal)
+        response, failure, outcome, attempt, parsed = send_once(
+            profile, payload, ordinal
+        )
         last_attempt, last_failure, last_profile = attempt, failure, profile
         if parsed:
+            # ruff: ignore[assert]
+            assert outcome.results is not None
             _update_adaptive(profile, adaptive, "")
             return [
                 served(
@@ -1799,13 +1802,13 @@ def _run_batch(  # ruff: ignore[complex-structure]
             # The fallback attempt must run before this raises: a different
             # key presented to a different provider is exactly one warranted
             # call, even though `http-auth` never reaches the retry branch.
-            fb_results, fb_failure, fb_attempt, fb_attempted = try_fallback(
-                ordinal + 1
-            )
+            fb_results, fb_failure, fb_attempt, fb_attempted = try_fallback(ordinal + 1)
             if fb_results is not None:
                 return fb_results
             if not fb_attempted:
                 raise JudgeError(_("The LLM judge is not configured."))
+            # ruff: ignore[assert]
+            assert fallback_profile is not None
             if fb_failure == "http-auth":
                 # Both endpoints reject our credentials: a real configuration
                 # error, not unavailability. Fail fast without a third call.
@@ -1881,6 +1884,8 @@ def _run_batch(  # ruff: ignore[complex-structure]
         if fb_results is not None:
             return fb_results
         if fb_attempted:
+            # ruff: ignore[assert]
+            assert fallback_profile is not None
             last_attempt, last_failure, last_profile = (
                 fb_attempt,
                 fb_failure,

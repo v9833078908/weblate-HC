@@ -1518,6 +1518,7 @@ class JudgeServingIdentityPersistenceTest(ViewTestCase):
             verdict.prompt_schema_version, primary_profile.prompt_schema_version
         )
 
+
 @override_settings(
     JUDGE_ENABLED=True,
     JUDGE_API_KEY="sk-test",

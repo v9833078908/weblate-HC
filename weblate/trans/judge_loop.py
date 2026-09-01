@@ -261,7 +261,9 @@ def _write_verdict(
     # as before.
     judge_model = result.served_model or profile.model
     judge_provider = result.served_provider or profile.provider
-    profile_fingerprint = result.served_profile_fingerprint or profile.profile_fingerprint
+    profile_fingerprint = (
+        result.served_profile_fingerprint or profile.profile_fingerprint
+    )
     prompt_schema_version = (
         result.served_prompt_schema_version or profile.prompt_schema_version
     )

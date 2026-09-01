@@ -17,6 +17,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 
 from weblate.trans.judge import (
     _ALIAS_CACHE,
+    _FAILOVER_FAILURE_KINDS,
     FAILURE_KINDS,
     JudgeEndpoint,
     JudgeError,
@@ -24,7 +25,6 @@ from weblate.trans.judge import (
     RetryBudget,
     _BatchResponse,
     _decode_non_stream,
-    _FAILOVER_FAILURE_KINDS,
     _failure_for_http,
     _payload,
     _read_capped,
@@ -560,9 +560,11 @@ class JudgeFallbackConfigurationTest(SimpleTestCase):
     )
     def test_rollback_profile_with_fallback_still_configured_raises(self) -> None:
         # The historical OpenRouter endpoint is both primary and fallback here.
-        with override_settings(JUDGE_FALLBACK_BASE_URL="https://openrouter.ai/api/v1"):
-            with self.assertRaises(JudgeError):
-                validate_judge_configuration()
+        with (
+            override_settings(JUDGE_FALLBACK_BASE_URL="https://openrouter.ai/api/v1"),
+            self.assertRaises(JudgeError),
+        ):
+            validate_judge_configuration()
 
     @override_settings(**JUDGE_FALLBACK_SETTINGS)
     def test_fallback_profile_uses_its_own_reasoning_not_the_primarys(self) -> None:
@@ -650,9 +652,7 @@ class JudgeServingIdentityTest(TestCase):
         [result] = request_verdicts([REQ], seat=1, persist_attempts=True)
         self.assertEqual(result.served_model, profile.model)
         self.assertEqual(result.served_provider, profile.provider)
-        self.assertEqual(
-            result.served_profile_fingerprint, profile.profile_fingerprint
-        )
+        self.assertEqual(result.served_profile_fingerprint, profile.profile_fingerprint)
         self.assertEqual(
             result.served_prompt_schema_version, profile.prompt_schema_version
         )
@@ -668,9 +668,7 @@ class JudgeServingIdentityTest(TestCase):
         self.assertTrue(result.unparsed)
         self.assertEqual(result.served_provider, profile.provider)
         self.assertEqual(result.served_model, profile.model)
-        self.assertEqual(
-            result.served_profile_fingerprint, profile.profile_fingerprint
-        )
+        self.assertEqual(result.served_profile_fingerprint, profile.profile_fingerprint)
 
 
 def _canned_response(
@@ -734,9 +732,7 @@ class JudgeFailoverTest(TestCase):
             )
 
         with mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch):
-            [result] = request_verdicts(
-                [REQ], seat=1, persist_attempts=True, **kw
-            )
+            [result] = request_verdicts([REQ], seat=1, persist_attempts=True, **kw)
         return result, calls
 
     def test_transport_fails_over_to_a_parsed_fallback_result(self) -> None:
@@ -849,9 +845,11 @@ class JudgeFailoverTest(TestCase):
             calls.append(profile.provider)
             return _canned_response(status_code=401, failure_kind="http-auth")
 
-        with mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch):
-            with self.assertRaises(JudgeError):
-                request_verdicts([REQ], seat=1, persist_attempts=True)
+        with (
+            mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch),
+            self.assertRaises(JudgeError),
+        ):
+            request_verdicts([REQ], seat=1, persist_attempts=True)
         self.assertEqual(calls, ["litellm", "openrouter"])
 
     @override_settings(**dict.fromkeys(JUDGE_FALLBACK_SETTINGS, ""))
@@ -862,9 +860,11 @@ class JudgeFailoverTest(TestCase):
             calls.append(profile.provider)
             return _canned_response(status_code=401, failure_kind="http-auth")
 
-        with mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch):
-            with self.assertRaises(JudgeError):
-                request_verdicts([REQ], seat=1, persist_attempts=True)
+        with (
+            mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch),
+            self.assertRaises(JudgeError),
+        ):
+            request_verdicts([REQ], seat=1, persist_attempts=True)
         self.assertEqual(calls, ["litellm"])
 
     def test_a_fallback_that_also_fails_yields_unparsed_not_an_exception(self) -> None:
@@ -2935,4 +2935,3 @@ class JudgeRefusedRequestTest(TestCase):
         [result] = request_verdicts([REQ], model="vendor/model-a")
         self.assertTrue(result.unparsed)
         self.assertEqual(result.failure_kind, "http-other")
-
