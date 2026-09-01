@@ -298,7 +298,12 @@ Render-test mutually exclusive states:
 - current candidate: diff, provenance, Use suggested fix, Generate another,
   Keep as is, and normal editor access;
 - no candidate: Generate suggested fix, Keep as is, normal editor, and an
-  explicitly generic Automatic suggestions fallback;
+  explicitly generic Automatic suggestions fallback rendered only under
+  `user_can_use_machinery`; without `machinery.view` both the tab and the
+  panel are absent (`translate.html:343,502`), so the fallback must be
+  omitted rather than link to nothing;
+- no `machinery.view`: every other state renders unchanged and no
+  Automatic suggestions control appears;
 - generation pending: no second submit;
 - resolved/consumed/stale/wrong-verdict candidate never active;
 - major/minor never inherit a critical candidate.
@@ -333,8 +338,10 @@ Commit: `refactor(judge): compress verdict evidence`.
 Test and add `(FLAG, "", accepted_as_is)` with immutable `JUDGE_RESOLUTION`
 history. PASS/minor transitions remain absent. Fresh flag shows Keep as is and
 Escalate; minor has evidence without resolution. AI variants remains a generic
-machinery-tab link for major/minor and the critical fallback; never label it as
-the stored judge candidate.
+machinery-tab link for major/minor and the critical fallback, rendered only
+under `user_can_use_machinery` (`translate.html:343,502`) and tested for
+absence without `machinery.view`; never label it as the stored judge
+candidate.
 
 Commit: `feat(judge): name producer triage outcomes`.
 
