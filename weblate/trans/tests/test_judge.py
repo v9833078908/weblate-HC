@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import threading
+import uuid
 from unittest.mock import patch
 
 from django.core.exceptions import PermissionDenied
@@ -23,6 +24,8 @@ from weblate.trans.judge_loop import build_request
 from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
     SEVERITY_RANK,
+    JudgeCandidateError,
+    JudgeCandidateMetadata,
     JudgeResolutionError,
     JudgeVerdict,
     compute_context_hash,
@@ -815,3 +818,66 @@ class JudgeRequestEstimateTest(SimpleTestCase):
     @override_settings(JUDGE_BATCH_SIZE=0, JUDGE_MAX_REPAIR_ATTEMPTS=1)
     def test_a_broken_batch_size_yields_no_number(self) -> None:
         self.assertIsNone(judge_request_upper_bound(6))
+
+
+CANDIDATE_METADATA = {
+    "kind": "judge-repair",
+    "schema": 1,
+    "judge_verdict_id": 1,
+    "judge_run_id": "11111111-1111-1111-1111-111111111111",
+    "target_hash": "a" * 64,
+    "context_hash": "b" * 64,
+    "engine": "openrouter",
+}
+
+
+class JudgeCandidateMetadataTest(SimpleTestCase):
+    def test_valid_metadata_round_trips(self) -> None:
+        candidate = JudgeCandidateMetadata(CANDIDATE_METADATA)
+        self.assertEqual(candidate.verdict_id, 1)
+        self.assertEqual(candidate.run_id, uuid.UUID(CANDIDATE_METADATA["judge_run_id"]))
+        self.assertEqual(candidate.context_hash, "b" * 64)
+        self.assertEqual(candidate.engine, "openrouter")
+        self.assertEqual(candidate.as_dict(), CANDIDATE_METADATA)
+
+    def test_unknown_kind_is_not_a_candidate(self) -> None:
+        self.assertIsNone(JudgeCandidateMetadata.parse({"kind": "other"}))
+        self.assertIsNone(JudgeCandidateMetadata.parse({}))
+
+    def test_missing_or_wrong_typed_fields_are_rejected(self) -> None:
+        for field in ("schema", "judge_verdict_id", "judge_run_id", "engine"):
+            with self.subTest(field=field):
+                broken = dict(CANDIDATE_METADATA)
+                del broken[field]
+                with self.assertRaises(JudgeCandidateError):
+                    JudgeCandidateMetadata(broken)
+        for field in ("judge_verdict_id", "engine"):
+            with self.subTest(field=field):
+                broken = dict(CANDIDATE_METADATA)
+                broken[field] = 5 if field == "engine" else "5"
+                with self.assertRaises(JudgeCandidateError):
+                    JudgeCandidateMetadata(broken)
+        broken = dict(CANDIDATE_METADATA)
+        broken["schema"] = 2
+        with self.assertRaises(JudgeCandidateError):
+            JudgeCandidateMetadata(broken)
+
+    def test_unknown_keys_are_rejected(self) -> None:
+        broken = dict(CANDIDATE_METADATA)
+        broken["prompt"] = "leak"
+        with self.assertRaises(JudgeCandidateError):
+            JudgeCandidateMetadata(broken)
+
+    def test_hashes_must_be_hex64(self) -> None:
+        for field in ("target_hash", "context_hash"):
+            with self.subTest(field=field):
+                broken = dict(CANDIDATE_METADATA)
+                broken[field] = "short"
+                with self.assertRaises(JudgeCandidateError):
+                    JudgeCandidateMetadata(broken)
+
+    def test_run_id_must_be_a_uuid(self) -> None:
+        broken = dict(CANDIDATE_METADATA)
+        broken["judge_run_id"] = "not-a-uuid"
+        with self.assertRaises(JudgeCandidateError):
+            JudgeCandidateMetadata(broken)

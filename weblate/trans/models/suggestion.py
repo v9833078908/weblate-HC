@@ -52,10 +52,22 @@ class SuggestionManager(models.Manager["Suggestion"]):
         vote: bool = False,
         user: User | None = None,
         raise_exception: bool = True,
+        userdetails: dict[str, object] | None = None,
+        change_details: dict[str, object] | None = None,
     ) -> tuple[Suggestion | None, SuggestionAddResult]:
-        """Create new suggestion for this unit."""
+        """Create new suggestion for this unit.
+
+        ``userdetails`` and ``change_details`` are trusted internal-only
+        arguments: they are never taken from user input. A mapping passed
+        as ``userdetails`` opts the suggestion into the judge namespace
+        (dedup scoped to judge candidates, replacement of the previous
+        active candidate for the same verdict).
+        """
         # ruff: ignore[import-outside-top-level]
         from weblate.auth.models import get_anonymous
+        from weblate.trans.models.judge import JudgeCandidateMetadata
+
+        judge_metadata = JudgeCandidateMetadata.parse(userdetails)
 
         max_length = get_translation_text_max_length(unit)
         if any(len(text) > max_length for text in target):
@@ -88,22 +100,39 @@ class SuggestionManager(models.Manager["Suggestion"]):
                 raise SuggestionSimilarToTranslationError
             return None, SuggestionAddResult.SIMILAR
 
+        # Dedup is scoped to the namespace: a judge candidate only collides
+        # with another judge candidate, never with a human suggestion.
+        # The namespace of an existing row is decided in Python: a JSON
+        # key negation would also drop rows where the key is absent.
         same_suggestion = self.filter(target=target_merged, unit=unit).first()
-        if same_suggestion is not None:
+        same_is_judge = (
+            same_suggestion is not None
+            and JudgeCandidateMetadata.parse(same_suggestion.userdetails) is not None
+        )
+        if judge_metadata is not None:
+            if same_is_judge:
+                return same_suggestion, SuggestionAddResult.DUPLICATE
+            # One verdict has at most one active candidate (invariant 8):
+            # a new verdict replaces the previous judge candidate.
+            self.filter(unit=unit, userdetails__kind="judge-repair").delete()
+        elif same_suggestion is not None and not same_is_judge:
             if same_suggestion.user == user or not vote:
                 return same_suggestion, SuggestionAddResult.DUPLICATE
             same_suggestion.add_vote(request, Vote.POSITIVE)
             return same_suggestion, SuggestionAddResult.VOTED
 
         # Create the suggestion
+        stored_details: dict[str, object] = {
+            "address": get_ip_address(request),
+            "agent": get_user_agent_raw(request),
+        }
+        if judge_metadata is not None:
+            stored_details = judge_metadata.as_dict()
         suggestion = self.create(
             target=target_merged,
             unit=unit,
             user=user,
-            userdetails={
-                "address": get_ip_address(request),
-                "agent": get_user_agent_raw(request),
-            },
+            userdetails=stored_details,
         )
         suggestion.fixups = fixups
 
@@ -113,6 +142,8 @@ class SuggestionManager(models.Manager["Suggestion"]):
         )
         change.suggestion = suggestion
         change.target = target_merged
+        if change_details:
+            change.details.update(change_details)
         change.save()
 
         # Add unit vote

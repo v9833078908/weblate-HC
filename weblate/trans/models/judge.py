@@ -40,10 +40,12 @@ from weblate.utils.state import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping, Sequence
+    from collections.abc import Iterable, Sequence
 
     from weblate.auth.models import User
     from weblate.glossary.models import GlossaryPromptEntry
+else:
+    from collections.abc import Mapping
 
 JUDGE_ERROR_SEPARATOR = " | "
 JUDGE_REPAIR_REQUIREMENT = (
@@ -93,6 +95,95 @@ def _digest(parts: Sequence[str]) -> str:
     """
     payload = json.dumps(list(parts), ensure_ascii=False, sort_keys=False)
     return hashlib.sha256(payload.encode()).hexdigest()
+
+
+class JudgeCandidateError(Exception):
+    """Malformed or untrusted judge repair candidate metadata."""
+
+
+_CANDIDATE_METADATA_SCHEMA = 1
+_CANDIDATE_METADATA_FIELDS = (
+    "kind",
+    "schema",
+    "judge_verdict_id",
+    "judge_run_id",
+    "target_hash",
+    "context_hash",
+    "engine",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class JudgeCandidateMetadata:
+    """
+    The closed metadata contract carried in ``Suggestion.userdetails``.
+
+    Identifiers, hashes, and route identity only: never prompts, responses,
+    credentials, or endpoint URLs (invariant 7). The constructor validates
+    strictly so a row written before a schema change can never be mistaken
+    for a live candidate.
+    """
+
+    verdict_id: int
+    run_id: uuid.UUID
+    target_hash: str
+    context_hash: str
+    engine: str
+
+    def __init__(self, details: Mapping[str, object]) -> None:
+        if not isinstance(details, Mapping):
+            raise JudgeCandidateError("metadata must be an object")
+        if set(details) != set(_CANDIDATE_METADATA_FIELDS):
+            raise JudgeCandidateError("metadata keys do not match the contract")
+        if details["kind"] != "judge-repair":
+            raise JudgeCandidateError("unknown candidate kind")
+        if details["schema"] != _CANDIDATE_METADATA_SCHEMA:
+            raise JudgeCandidateError("unsupported candidate schema")
+        verdict_id = details["judge_verdict_id"]
+        if not isinstance(verdict_id, int) or isinstance(verdict_id, bool):
+            raise JudgeCandidateError("judge_verdict_id must be an integer")
+        run_id = details["judge_run_id"]
+        if isinstance(run_id, uuid.UUID):
+            parsed_run = run_id
+        else:
+            try:
+                parsed_run = uuid.UUID(str(run_id))
+            except (AttributeError, TypeError, ValueError) as error:
+                raise JudgeCandidateError("judge_run_id must be a UUID") from error
+        for field in ("target_hash", "context_hash"):
+            value = details[field]
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(char not in "0123456789abcdef" for char in value)
+            ):
+                raise JudgeCandidateError(f"{field} must be a hex sha256")
+        engine = details["engine"]
+        if not isinstance(engine, str) or not engine or len(engine) > 100:
+            raise JudgeCandidateError("engine must be a non-empty identifier")
+        object.__setattr__(self, "verdict_id", verdict_id)
+        object.__setattr__(self, "run_id", parsed_run)
+        object.__setattr__(self, "target_hash", details["target_hash"])
+        object.__setattr__(self, "context_hash", details["context_hash"])
+        object.__setattr__(self, "engine", engine)
+
+    @classmethod
+    def parse(cls, details: object) -> JudgeCandidateMetadata | None:
+        """Return a candidate or None: unknown metadata is a normal suggestion."""
+        if not isinstance(details, Mapping) or details.get("kind") != "judge-repair":
+            return None
+        return cls(details)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "kind": "judge-repair",
+            "schema": _CANDIDATE_METADATA_SCHEMA,
+            "judge_verdict_id": self.verdict_id,
+            "judge_run_id": str(self.run_id),
+            "target_hash": self.target_hash,
+            "context_hash": self.context_hash,
+            "engine": self.engine,
+        }
 
 
 def compute_target_hash(target: Sequence[str]) -> str:

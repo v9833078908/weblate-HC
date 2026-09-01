@@ -58,6 +58,7 @@ from weblate.trans.models import (
 )
 from weblate.trans.models.change import ChangeQuerySet
 from weblate.trans.models.component import ComponentLink
+from weblate.trans.models.judge import JudgeCandidateMetadata
 from weblate.trans.models.project import CommitPolicyChoices
 from weblate.trans.removal import RemovalBatch
 from weblate.trans.tasks import actual_project_removal
@@ -454,8 +455,96 @@ class ProjectTest(RepoTestCase):
             self.assertEqual(result, SuggestionAddResult.VOTED)
             self.assertEqual(suggestion.get_num_votes(), 1)
 
+    def test_judge_candidate_add_and_dedup_scope(self) -> None:
+        component = self.create_po()
+        translation = component.translation_set.get(language_code="cs")
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        unit.translate(create_test_user(), "Translation of unit", STATE_TRANSLATED)
+        metadata = {
+            "kind": "judge-repair",
+            "schema": 1,
+            "judge_verdict_id": 1,
+            "judge_run_id": "11111111-1111-1111-1111-111111111111",
+            "target_hash": "a" * 64,
+            "context_hash": "b" * 64,
+            "engine": "openrouter",
+        }
+
+        suggestion, result = Suggestion.objects.add(
+            unit,
+            ["Judge fix"],
+            None,
+            userdetails=metadata,
+            change_details={"judge": "provenance"},
+        )
+        self.assertIsNotNone(suggestion)
+        self.assertEqual(result, SuggestionAddResult.CREATED)
+        self.assertEqual(suggestion.userdetails, metadata)
+        change = Change.objects.get(suggestion=suggestion)
+        self.assertEqual(change.details["judge"], "provenance")
+
+        # Same candidate payload again: deduplicated within the judge namespace.
+        same, result = Suggestion.objects.add(
+            unit, ["Judge fix"], None, userdetails=metadata
+        )
+        self.assertEqual(result, SuggestionAddResult.DUPLICATE)
+        self.assertEqual(same.pk, suggestion.pk)
+
+        # An identical human suggestion is separate: no reclassification,
+        # no cross-namespace dedup.
+        human, result = Suggestion.objects.add(unit, ["Judge fix"], None)
+        self.assertEqual(result, SuggestionAddResult.CREATED)
+        self.assertEqual(human.userdetails, {"address": "", "agent": ""})
+        self.assertNotEqual(human.pk, suggestion.pk)
+
+    def test_judge_candidate_userdetails_without_add_kwarg_stays_normal(self) -> None:
+        component = self.create_po()
+        translation = component.translation_set.get(language_code="cs")
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        suggestion, result = Suggestion.objects.add(unit, ["Normal"], None)
+        self.assertEqual(result, SuggestionAddResult.CREATED)
+        self.assertIsNone(JudgeCandidateMetadata.parse(suggestion.userdetails))
+
+    def test_new_verdict_replaces_the_old_active_candidate(self) -> None:
+        component = self.create_po()
+        translation = component.translation_set.get(language_code="cs")
+        unit = translation.unit_set.get(source="Hello, world!\n")
+        unit.translate(create_test_user(), "Translation of unit", STATE_TRANSLATED)
+        old = Suggestion.objects.add(
+            unit,
+            ["Old fix"],
+            None,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": 1,
+                "judge_run_id": "11111111-1111-1111-1111-111111111111",
+                "target_hash": "a" * 64,
+                "context_hash": "b" * 64,
+                "engine": "openrouter",
+            },
+        )[0]
+        new = Suggestion.objects.add(
+            unit,
+            ["New fix"],
+            None,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": 2,
+                "judge_run_id": "22222222-2222-2222-2222-222222222222",
+                "target_hash": "a" * 64,
+                "context_hash": "b" * 64,
+                "engine": "openrouter",
+            },
+        )[0]
+        self.assertIsNotNone(new)
+        self.assertFalse(Suggestion.objects.filter(pk=old.pk).exists())
+        self.assertTrue(Suggestion.objects.filter(pk=new.pk).exists())
+
     def test_delete_all(self) -> None:
         project = self.create_project()
+
         self.assertTrue(os.path.exists(project.full_path))
         Project.objects.all().delete()
         self.assertFalse(os.path.exists(project.full_path))
