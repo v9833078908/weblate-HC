@@ -98,7 +98,7 @@ WEBLATE_DEFAULT_FROM_EMAIL=webnotify@herocraft.com
 # --- Hero Craft customizations -----------------------------------------
 WEBLATE_ADD_MACHINERY=weblate_customization.machinery.RoutedLLMTranslation,weblate_customization.machinery.RoutedLiteLLMTranslation
 WEBLATE_ADD_CHECK=weblate_customization.checks.GameMarkupCheck,weblate_customization.checks.GameLineBreakCheck,weblate_customization.checks.CyrillicLeakCheck,weblate_customization.checks.GameNumberCheck,weblate_customization.checks.GameTokenCheck,weblate_customization.checks.GameLengthCheck,weblate_customization.checks.GameMaxLengthCheck,weblate_customization.checks.GameSourceMaxLengthCheck
-WEBLATE_REMOVE_CHECK=weblate.checks.chars.MaxLengthCheck,weblate.checks.source.SourceMaxLengthCheck
+WEBLATE_REMOVE_CHECK=weblate.checks.chars.MaxLengthCheck,weblate.checks.source.SourceMaxLengthCheck,weblate.checks.consistency.TranslatedCheck
 WEBLATE_ADD_AUTOFIX=weblate_customization.autofixes.LineSeparatorSpacing,weblate_customization.autofixes.RemoveAddedFinalStop,weblate_customization.autofixes.AddFrenchPunctuationSpacing
 # Registry reduction for the producer UI: only the file formats and the
 # automatic suggestion services this instance actually uses stay selectable.
