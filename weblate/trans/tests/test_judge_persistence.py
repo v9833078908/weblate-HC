@@ -24,6 +24,7 @@ class JudgePersistenceTest(SimpleTestCase):
                 "http-auth",
                 "http-rate-limit",
                 "http-server",
+                "http-request-invalid",
                 "http-other",
                 "empty-response",
                 "invalid-json",
