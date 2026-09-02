@@ -916,6 +916,18 @@ implementation.
    of assuming `0117`. Assert on the running container that fallback is
    unconfigured and that a small read-only canary reproduces the 2026-09-01
    numbers exactly. This proves the refactor changed nothing.
+
+   Verified deployment topology, which changes how "before the application
+   image" is satisfied here: `deploy/vps.sh` never runs `migrate` itself, and
+   `deploy/docker-compose.yml` declares exactly one `weblate` service with no
+   separate worker container. Migrations run in the upstream `/app/bin/start`
+   entrypoint on every boot (`deploy/Dockerfile:11-12`), before nginx,
+   granian and the in-container Celery workers serve. So the ordering is
+   satisfied structurally by one `docker compose up -d --build weblate`, and
+   there is no window in which new code meets the old schema and no separate
+   migration step to sequence. Rollback stays safe for the same reason the
+   attribution plan states: `0113`, `0117` and `0118` are additive or
+   choices-only, so the previous image tolerates a schema that is ahead.
 2. Set the fallback settings to the historical OpenRouter endpoint, key and pair,
    leaving the primary on LiteLLM. Recreate the container: the environment block
    is baked in at creation. Assert `judge_configuration_snapshot()` shows both
@@ -923,9 +935,25 @@ implementation.
    rows. The fallback is configured and idle.
 3. Run a bounded read-only canary on a second component and language pair, at
    most 100 units, `JUDGE_MAY_APPROVE=0`, through `run_judge_batch` with
-   `writable_ids=set()` so no unit state is projected. Accept only: zero
-   terminal unparsed, zero unexpected fallback attempts, first-byte p95 under
-   20 s per seat, no request within 25% of its deadline.
+   `writable_ids=set()` so no unit state is projected, **and
+   `candidate_severities=()`**. Accept only: zero terminal unparsed, zero
+   unexpected fallback attempts, first-byte p95 under 20 s per seat, no
+   request within 25% of its deadline.
+
+   `candidate_severities=()` is required and is not a detail. Since
+   `docs/llm-first/plans/2026-09-01-judge-producer-triage-embed.md` merged,
+   `needs_candidate` deliberately ignores `writable_ids` and the remaining
+   attempt budget, so a default-severity canary calls `repair_targets` and
+   pays a real machine-translation batch per round for every unresolved
+   critical and major, and stores preview candidates in production. Both
+   halves are pinned by existing tests: `writable_ids=set()` with default
+   severities asserts `repair_mock.call_count == 1`
+   (`weblate/trans/tests/test_judge_loop.py:1443-1445`), and the empty set
+   asserts `repair_mock.assert_not_called()` with zero candidates
+   (`:1465-1482`). A canary measuring judge endpoint availability must not
+   buy repairs; this keeps it read-only for translations, for the machinery
+   budget and for the candidate table alike. The same override applies to any
+   canary in step 1 or step 6 that goes through `run_judge_batch`.
 4. **The durable queue is not enabled here.** It moved to Tasks 6-7 of
    `docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`, together with the
    refusal fail-fast it depends on, because the queue completes "no unparsed" and
