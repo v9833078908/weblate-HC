@@ -1,0 +1,78 @@
+{
+ "buyers": {
+  "same": [
+   106,
+   108
+  ]
+ },
+ "characterdialogue": {},
+ "loot": {
+  "same": [
+   40,
+   44
+  ],
+  "reused": [
+   8,
+   16
+  ]
+ },
+ "orders": {
+  "game-number": [
+   1,
+   18
+  ],
+  "reused": [
+   4,
+   8
+  ],
+  "duplicate": [
+   0,
+   1
+  ]
+ },
+ "survey": {},
+ "tutorial": {
+  "same": [
+   280,
+   294
+  ],
+  "reused": [
+   1,
+   2
+  ],
+  "duplicate": [
+   3,
+   4
+  ]
+ },
+ "ui": {
+  "same": [
+   140,
+   165
+  ],
+  "game-markup": [
+   2,
+   36
+  ],
+  "max-length": [
+   674,
+   1337
+  ],
+  "punctuation": [
+   5,
+   10
+  ],
+  "reused": [
+   7,
+   14
+  ],
+  "duplicate": [
+   2,
+   4
+  ],
+  "cyrillic-leak": [
+   2,
+   4
+  ]
+ }
+}
