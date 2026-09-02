@@ -287,33 +287,13 @@
 
         <ul class="nav nav-pills translation-tabs">
           <li class="nav-item">
-            <a class="nav-link active"
+            <a class="nav-link"
                data-bs-target="#nearby"
                data-bs-toggle="tab"
                id="toggle-nearby"
                href="#"
                title="{% translate "Messages placed around this one" %}">{% translate "Nearby strings" %} <span class="badge text-bg-secondary">{{ nearby|length }}</span></a>
           </li>
-          {% if nearby_keys %}
-            <li class="nav-item">
-              <a class="nav-link"
-                 data-bs-target="#keys"
-                 data-bs-toggle="tab"
-                 id="toggle-keys"
-                 href="#"
-                 title="{% translate "Strings with similar keys" %}">{% translate "Similar keys" %} <span class="badge text-bg-secondary">{{ nearby_keys|length }}</span></a>
-            </li>
-          {% endif %}
-          {% if variants|length > 1 %}
-            <li class="nav-item">
-              <a class="nav-link"
-                 data-bs-target="#variants"
-                 data-bs-toggle="tab"
-                 id="toggle-variants"
-                 href="#"
-                 title="{% translate "Variants of the string" %}">{% translate "Variants" %} <span class="badge text-bg-secondary">{{ variants|length }}</span></a>
-            </li>
-          {% endif %}
           {% if unit.suggestions %}
             <li class="nav-item">
               <a class="nav-link"
@@ -323,55 +303,6 @@
                  href="#">{% translate "Suggestions" %} <span class="badge text-bg-secondary">{{ unit.suggestions|length }}</span></a>
             </li>
           {% endif %}
-          {% if others.total %}
-            <li class="nav-item">
-              <a class="nav-link"
-                 data-bs-target="#others"
-                 data-bs-toggle="tab"
-                 id="toggle-others"
-                 href="#">{% translate "Other occurrences" %} <span class="badge text-bg-secondary">{{ others.total }}</span></a>
-            </li>
-          {% endif %}
-          {% if unit.all_comments or user_can_add_comment %}
-            <li class="nav-item">
-              <a class="nav-link"
-                 data-bs-target="#comments"
-                 data-bs-toggle="tab"
-                 id="toggle-comments"
-                 href="#">{% translate "Comments" %}
-                {% if unit.all_comments %}<span class="badge text-bg-secondary">{{ unit.all_comments|length }}</span>{% endif %}
-              </a>
-            </li>
-          {% endif %}
-          {% if user_can_use_machinery %}
-            <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle"
-                 data-bs-toggle="dropdown"
-                 href="#"
-                 role="button"
-                 aria-expanded="false">{% translate "More" %}</a>
-              <ul class="dropdown-menu">
-                <li>
-                  <a class="dropdown-item"
-                     data-bs-target="#machinery"
-                     data-bs-toggle="tab"
-                     id="toggle-machinery"
-                     data-load="machinery"
-                     href="#"
-                     title="{% translate "Computer-aided translation suggestions" %}">{% translate "Automatic suggestions" %}</a>
-                </li>
-              </ul>
-            </li>
-          {% endif %}
-          <li class="nav-item">
-            <a class="nav-link"
-               data-bs-target="#translations"
-               data-bs-toggle="tab"
-               id="toggle-translations"
-               data-href="{% url 'js-unit-translations' unit_id=unit.id %}"
-               href="#"
-               title="{% translate "Translations of this string in the other languages" %}">{% translate "Other languages" %} <span class="badge text-bg-secondary">{{ other_languages_count }}</span> </a>
-          </li>
           <li class="nav-item">
             <a class="nav-link"
                data-bs-target="#history"
@@ -380,11 +311,84 @@
                href="#"
                title="{% translate "List of recent changes done in Weblate" %}">{% translate "History" %}</a>
           </li>
+          {% if nearby_keys or variants|length > 1 or others.total or unit.all_comments or user_can_add_comment or other_languages_count or user_can_use_machinery %}
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle"
+                 data-bs-toggle="dropdown"
+                 href="#"
+                 role="button"
+                 aria-expanded="false">{% translate "More" %}</a>
+              <ul class="dropdown-menu">
+                {% if nearby_keys %}
+                  <li>
+                    <a class="dropdown-item"
+                       data-bs-target="#keys"
+                       data-bs-toggle="tab"
+                       id="toggle-keys"
+                       href="#"
+                       title="{% translate "Strings with similar keys" %}">{% translate "Similar keys" %} <span class="badge text-bg-secondary">{{ nearby_keys|length }}</span></a>
+                  </li>
+                {% endif %}
+                {% if variants|length > 1 %}
+                  <li>
+                    <a class="dropdown-item"
+                       data-bs-target="#variants"
+                       data-bs-toggle="tab"
+                       id="toggle-variants"
+                       href="#"
+                       title="{% translate "Variants of the string" %}">{% translate "Variants" %} <span class="badge text-bg-secondary">{{ variants|length }}</span></a>
+                  </li>
+                {% endif %}
+                {% if others.total %}
+                  <li>
+                    <a class="dropdown-item"
+                       data-bs-target="#others"
+                       data-bs-toggle="tab"
+                       id="toggle-others"
+                       href="#">{% translate "Other occurrences" %} <span class="badge text-bg-secondary">{{ others.total }}</span></a>
+                  </li>
+                {% endif %}
+                {% if unit.all_comments or user_can_add_comment %}
+                  <li>
+                    <a class="dropdown-item"
+                       data-bs-target="#comments"
+                       data-bs-toggle="tab"
+                       id="toggle-comments"
+                       href="#">{% translate "Comments" %}
+                      {% if unit.all_comments %}<span class="badge text-bg-secondary">{{ unit.all_comments|length }}</span>{% endif %}
+                    </a>
+                  </li>
+                {% endif %}
+                {% if other_languages_count %}
+                  <li>
+                    <a class="dropdown-item"
+                       data-bs-target="#translations"
+                       data-bs-toggle="tab"
+                       id="toggle-translations"
+                       data-href="{% url 'js-unit-translations' unit_id=unit.id %}"
+                       href="#"
+                       title="{% translate "Translations of this string in the other languages" %}">{% translate "Other languages" %} <span class="badge text-bg-secondary">{{ other_languages_count }}</span> </a>
+                  </li>
+                {% endif %}
+                {% if user_can_use_machinery %}
+                  <li>
+                    <a class="dropdown-item"
+                       data-bs-target="#machinery"
+                       data-bs-toggle="tab"
+                       id="toggle-machinery"
+                       data-load="machinery"
+                       href="#"
+                       title="{% translate "Computer-aided translation suggestions" %}">{% translate "Automatic suggestions" %}</a>
+                  </li>
+                {% endif %}
+              </ul>
+            </li>
+          {% endif %}
         </ul>
 
         <div class="tab-content">
 
-          <div class="tab-pane active" id="nearby">
+          <div class="tab-pane" id="nearby">
             {% include "snippets/embed-units.html" with current_unit=unit units=nearby translation=unit.translation component=unit.translation.component actions_template="snippets/embed-units-clone.html" %}
           </div>
 

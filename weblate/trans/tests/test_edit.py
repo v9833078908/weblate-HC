@@ -526,6 +526,83 @@ class EditTest(ViewTestCase):
         self.assertNotContains(response, 'id="toggle-machinery"')
         self.assertNotContains(response, 'id="machinery"')
 
+    def test_bottom_tabs_reduced(self) -> None:
+        """Nearby and History stay direct; the rest fold into More."""
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        tabs_xpath = '//ul[contains(concat(" ", @class, " "), " translation-tabs ")]'
+        direct_ids = tree.xpath(
+            f'{tabs_xpath}/li[not(contains(concat(" ", @class, " "), " dropdown "))]'
+            "/a/@id"
+        )
+        self.assertIn("toggle-nearby", direct_ids)
+        self.assertIn("toggle-history", direct_ids)
+        self.assertNotIn("toggle-translations", direct_ids)
+        dropdown_ids = tree.xpath(
+            f'{tabs_xpath}//li[contains(concat(" ", @class, " "), " dropdown ")]'
+            '//a[contains(concat(" ", @class, " "), " dropdown-item ")]/@id'
+        )
+        self.assertIn("toggle-translations", dropdown_ids)
+
+    def test_suggestions_tab_direct_only_when_present(self) -> None:
+        """Suggestions stays a direct item, but only when non-empty."""
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, 'id="toggle-suggestions"')
+        Suggestion.objects.add(unit, ["Suggested alternative"], request=None)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        tabs_xpath = '//ul[contains(concat(" ", @class, " "), " translation-tabs ")]'
+        direct_ids = tree.xpath(
+            f'{tabs_xpath}/li[not(contains(concat(" ", @class, " "), " dropdown "))]'
+            "/a/@id"
+        )
+        self.assertIn("toggle-suggestions", direct_ids)
+
+    def test_no_tab_open_on_load(self) -> None:
+        """No tab or pane is pre-selected; the first click opens one."""
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        tabs = tree.xpath(
+            '//ul[contains(concat(" ", @class, " "), " translation-tabs ")]'
+            '//a[contains(concat(" ", @class, " "), " nav-link active ")]'
+        )
+        self.assertEqual(tabs, [])
+        panes = tree.xpath(
+            '//div[contains(concat(" ", @class, " "), " tab-content ")]'
+            '/div[contains(concat(" ", @class, " "), " tab-pane active ")]'
+        )
+        self.assertEqual(panes, [])
+
+    def test_more_dropdown_absent_when_empty(self) -> None:
+        """No More dropdown once every folded entry would be empty."""
+        if type(self) is not EditTest:
+            # A template-structural claim (no sub-condition true -> no
+            # dropdown), not a per-format regression: each file format's
+            # own fixture data (keys, variants, comments) varies and is
+            # not what this test is protecting against.
+            self.skipTest("Verified once against the base po fixture")
+        self.grant_only(["unit.edit"])
+        # Keep only the source translation: from the source unit's own
+        # perspective there is then no "other language" left to offer.
+        self.component.translation_set.exclude(
+            language_code=self.component.source_language.code
+        ).delete()
+        unit = self.get_unit(
+            self.source, language=self.component.source_language.code
+        )
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        self.assertEqual(
+            tree.xpath(
+                '//ul[contains(concat(" ", @class, " "), " translation-tabs ")]'
+                '//li[contains(concat(" ", @class, " "), " dropdown ")]'
+            ),
+            [],
+        )
+
 
 class EditAccessTest(ViewTestCase):
     def assert_unit_action_urls_not_found(self, unit: Unit) -> None:
