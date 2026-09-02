@@ -5,7 +5,7 @@
 > id 7) трогается только начиная с Фазы 3, и только после явного «да» владельца
 > на результат Фаз 0-2. До этого - только чтение.
 
-Дата: 2026-09-02. Статус: одобрен владельцем, ожидает исполнения.
+Дата: 2026-09-02. Статус: Фазы 0-5 выполнены на проде; Фаза 6 ожидает приёмки владельцем.
 
 ## Решение владельца
 
@@ -137,15 +137,56 @@ be changed, please recreate the component instead». Прецедент с об�
 Приёмка: `phase0.json` есть, вчерашние ключи локализованы, число заметок
 глоссария известно.
 
-Уже снято 2026-09-02 (только чтение, через API): вчерашние ключи - см. факт 1;
-глоссарий 302 термина, **1** заметка сверх шаблона `[Section] key`
-(`Ancient Tome`, юнит 86469), целевых explanation 0, языковые флаги
-`not-applicable` на `tr` и `id` по одному (юниты 352924, 352919 из плана
-2026-08-24); explanations исходных строк: `ui` 7, `tutorial` 2, остальные 0;
-флагов на исходных юнитах, комментариев и предложений в семи компонентах - 0.
-Осталось снять в Фазе 0: настройки компонентов (п. 1), снятые проверки,
-метки, скриншоты, approved по языкам (п. 4), омонимы при `ru`-источнике
-(п. 3).
+### Результат Фазы 0 (2026-09-02, `analysis/data/nfg-ru-source-2026-09-02/phase0.json`, скрипт `analysis/probes/nfg-ru-source-phase0.py`)
+
+Настройки компонентов (п. 1). Все 7 PO-компонентов идентичны:
+`po-mono`, `filemask = *.po`, `template = en.po`, `new_base = en.po`,
+`source_language = en`, `vcs = local`, `branch = main`, `edit_template`,
+`allow_translation_propagation`, `new_lang = add`,
+`language_regex = ^[^.]+$`, `manage_units`, `commit_pending_age = 24`,
+`enforced_checks = []`, `po_line_wrap = 77`. Отличия: у `ui`
+`check_flags = max-length:110` (добавлен 2026-09-01 в 11:33 владельцем,
+action 96); глоссарий: `tbx`, `filemask = tbx/*.tbx`, без шаблона,
+`is_glossary`, `new_lang = none`, propagation выключен.
+
+| Переносим | buyers | char.dialogue | loot | orders | survey | tutorial | ui | glossary |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| юнитов на язык (18 языков) | 10 | 25 | 154 | 102 | 34 | 102 | 466 | 302 |
+| флаги исходных юнитов | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 (`not-applicable`: `tr` 352924, `id` 352919 на `Forge`) |
+| explanations исходных юнитов | 0 | 0 | 0 | 0 | 0 | 2 | 7 | 1 сверх шаблона (`Ancient Tome` 86469); 301 чистый шаблон, 0 пустых |
+| снятые проверки / комментарии / предложения / метки / скриншоты | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| approved (только в БД) | hu 10 | 0 | hu 1 | 0 | 0 | 0 | hu 8, lv 1 | 0 |
+| fuzzy (переживёт файлами) | 0 | 0 | 0 | 0 | 0 | 0 | es 1 | - |
+
+Вчерашние ключи (п. 2). На живом проде по-прежнему 0 (`context:HelpInfo`).
+Журнал с 2026-09-01: 620 записей; релевантных 576 - 522 «Строка удалена»
+(29 различных ключей `orderTerrain*HelpInfo` x 18 языков, все в 19:56,
+`matios_free`) и 54 «Обновление ресурсов». Событий добавления за 1 сентября
+в журнале нет - добавления предшествовали, зафиксированы только удаления;
+русские тексты 9 ключей из `orders-lost-keys.json` сохранены в
+`details.source` (у остальных 20 ключей ru-перевод был пуст). Объём Фазы 2.1
+по указанию владельца остаётся 9 ключей. `changed:>=2026-09-01` с кириллицей
+в `en` - 0; полный срез кириллицы в `en` - ровно 2 гомоглифа `ui`
+(`dailyRewardClaimDescription` `Х2`, `terrainProgressInfoSlide2` `ADORЕ`).
+
+Омонимы при `ru`-источнике (п. 3): 4 группы, все в пустой секции -
+`Belomar`/`Whitelands` -> `Белоземье`; `Buried Chest`/`Chest` -> `Сундук`;
+`Chest of the Jarl`/`Jarl Chest` -> `Сундук Конунга`; `Meteorfall`/`Starfall`
+-> `Звездопад`. Терминов без `ru` - 0; explanation у целевых юнитов - 0.
+
+Машинный перевод (п. 5). Проект переопределяет у `openrouter` только
+`persona` и `style` - подтверждено. Глобальная `routing` недоступна только
+через API (нет read-only эндпоинта; `weblate shell` на проде требует явного
+одобрения владельца по AGENTS.md, зонд её не трогал). Подтвердить
+`resolve_model('en')` и `language_instructions` для `en` обязательно перед
+Фазой 5 - записать в отчёт Фазы 2 как открытый вопрос.
+
+Add-ons (п. 6): у всех 8 компонентов список пуст (`addons = []` в
+настройках, глобальный `GET /api/addons/` по проекту - 0 совпадений).
+
+Приёмка Фазы 0 выполнена: `phase0.json` есть, вчерашние ключи локализованы
+(удаления 19:56, тексты в `details.source`), число заметок глоссария
+известно (1 + целевых 0).
 
 ### Фаза 1. Свежий кит
 
@@ -252,6 +293,44 @@ be changed, please recreate the component instead». Прецедент с об�
    термин: `ru`-глоссарий матчит `ru`-компонент, в панели видна заметка.
    Один пробный запрос к LLM-движку с включённым логом: в промпте есть
    `source_explanation` термина.
+
+#### Результат Фаз 3-5 (2026-09-02)
+
+Подробный протокол:
+`analysis/data/nfg-ru-source-2026-09-02/interim-report-2026-09-02.md`,
+`phase2-report.md`, `phase4-applied.json`, `phase5-autotranslate.json`,
+`phase5-empties.json`. Кратко:
+
+- Фаза 3: созданы `buyers-ru, characterdialogue-ru, loot-ru, orders-ru,
+  survey-ru, tutorial-ru, ui-ru, glossary-ru` (имя «glossary (ru)») через
+  `POST /api/projects/need-for-greed/components/` с `zipfile` - тот же код
+  `create_component_from_zip`, что и мастер (браузер-релей был недоступен).
+  Дифф настроек старый/новый пуст; `max-length:110` у `ui-ru`; глоссарий
+  302/302 с explanation; `terminology` проставлен PATCH'ом (TBX-атрибут
+  `weblate-flags` импортером не читается). Проба 3.4: добавленный юнит на
+  `buyers-ru` прожил 90+ с - инцидент 01.09 не воспроизводится; пробный
+  юнит удалён.
+- Фаза 4: `phase4-applied.json`, errors 0 - 9 explanations (ui 7,
+  tutorial 2), `not-applicable` id/tr на «Кузница» (2), approved 20 (hu
+  19, lv 1), `ui/es/cryolisUsedIn` -> needs-editing (fuzzy был только в БД,
+  в файле метки нет).
+- Решение владельца по скриншоту: восстанавливать все 29 HelpInfo-ключей,
+  MT-результат - «Перевод» (translated). 20 ключей добавлены в `orders-ru/ru`
+  API'ом (source = текст из журнала удалений; `orders-lost-keys-all.json`).
+- Фаза 5.1: в `orders-ru/ru` все 29 текстов побайтово равны журналу; `en`
+  пустой (29 empty). 5.2: `autotranslate mode=translate engines=openrouter
+  q="state:empty AND context:HelpInfo"` по 17 языкам; 17×29 строк в state
+  20 (cs/lv/pl - nginx 504, сервер доделал: 0 пустых). Итог `orders-ru`:
+  131/131 translated на всех 18 языках. Пустые строки по всем новым
+  компонентам: 0, кроме намеренного needs-editing `ui/es`. 5.3: функционально
+  подтверждено - MT `orderTerrain1.1Step1HelpInfo` дал канонический
+  глоссарийный `Gold Nugget`; `check:glossary` = 0 нарушений на выборке.
+  Лог промпта (`LLMUsageLog`/shell) не снимался - вне API-only режима.
+  Побочный вывод: глобальная `routing` для `en` работает (MT в en прошёл).
+- Add-ons: на инстансе единственный add-on принадлежит space-arena; у
+  старых компонентов need-for-greed их нет - дублировать нечего.
+- DoD-4: `target:r"[А-Яа-яЁё]"` в `en` всех 8 новых компонентов = 0; оба
+  гомоглифа (`X2`, `ADORE`) исправлены.
 
 ### Фаза 6. Архив и переименование
 

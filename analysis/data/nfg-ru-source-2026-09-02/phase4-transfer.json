@@ -1,0 +1,56 @@
+{
+ "ui_source_explanations": {
+  "forge": "Gameplay building: Forge is the upgradable crafting workshop. Do not translate this label as the act of forging or a tattoo.",
+  "craftOpenEliteSlotDialog": "Gameplay verb: \"forge\" means to craft or process treasures. It does not name the Forge building.",
+  "craftClosedRecipeTitle": "Gameplay building: the forge is the upgradable crafting workshop, not the act of forging or a tattoo.",
+  "craftClosedRecipeDescription": "Gameplay building: both \"Forge Level\" and \"forge of legends\" refer to the upgradable crafting workshop. Neither occurrence means the act of forging or a tattoo.",
+  "upgradeCraftRecipesStatDescription": "Gameplay verb: \"forge\" means to craft items. It does not name the Forge building.",
+  "storageUpgradeDescription": "Gameplay verb: \"forged\" describes treasures that were crafted. It does not name the Forge building.",
+  "craftSlotDescription": "Gameplay verb: \"forge\" means to craft a piece of jewelry. It does not name the Forge building."
+ },
+ "tutorial_source_explanations": {
+  "DialogueClaimedChestCharacter1": "Gameplay building: \"magic forge\" is the crafting workshop. It can transform items; it is not the act of forging or a tattoo.",
+  "tip9": "Gameplay building: the player upgrades the Forge crafting workshop to unlock recipes."
+ },
+ "approved": {
+  "buyers/hu": [
+   "Buyer1",
+   "Buyer2",
+   "Buyer3",
+   "Buyer4",
+   "Buyer5",
+   "Buyer6",
+   "Buyer7",
+   "Buyer8",
+   "Buyer9",
+   "Buyer10"
+  ],
+  "loot/hu": [
+   "chest"
+  ],
+  "ui/hu": [
+   "craftSelectBlockedWrongType",
+   "craftSelectBlockedAlreadySelectedType",
+   "lockedTerrain0Tooltip",
+   "terrain0Biome0Title",
+   "terrain1Biome0Title",
+   "terrain1Biome2Title",
+   "goldUsedIn",
+   "meteoriteIronUsedIn"
+  ],
+  "ui/lv": [
+   "upgradeTradeTitle"
+  ]
+ },
+ "fuzzy_ui_es": [
+  "cryolisUsedIn"
+ ],
+ "glossary_flags": {
+  "id": {
+   "[\"\",\"Forge\"]": "not-applicable"
+  },
+  "tr": {
+   "[\"\",\"Forge\"]": "not-applicable"
+  }
+ }
+}
