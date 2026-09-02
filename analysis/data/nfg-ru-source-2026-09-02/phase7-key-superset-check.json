@@ -1,0 +1,55 @@
+{
+ "buyers": {
+  "old": 10,
+  "new": 10,
+  "missing": [],
+  "extra": []
+ },
+ "characterdialogue": {
+  "old": 25,
+  "new": 25,
+  "missing": [],
+  "extra": []
+ },
+ "loot": {
+  "old": 154,
+  "new": 154,
+  "missing": [],
+  "extra": []
+ },
+ "orders": {
+  "old": 102,
+  "new": 131,
+  "missing": [],
+  "extra": [
+   "orderTerrain1.1Step1HelpInfo",
+   "orderTerrain1.1Step2HelpInfo",
+   "orderTerrain1.1Step3HelpInfo",
+   "orderTerrain1.1Step4HelpInfo",
+   "orderTerrain1.1Step5HelpInfo",
+   "orderTerrain1.2Step1HelpInfo",
+   "orderTerrain1.2Step2HelpInfo",
+   "orderTerrain1.2Step3HelpInfo",
+   "orderTerrain1.2Step4HelpInfo",
+   "orderTerrain1.2Step5HelpInfo"
+  ]
+ },
+ "survey": {
+  "old": 34,
+  "new": 34,
+  "missing": [],
+  "extra": []
+ },
+ "tutorial": {
+  "old": 102,
+  "new": 102,
+  "missing": [],
+  "extra": []
+ },
+ "ui": {
+  "old": 466,
+  "new": 466,
+  "missing": [],
+  "extra": []
+ }
+}
