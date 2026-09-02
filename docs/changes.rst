@@ -25,6 +25,7 @@ Weblate 2026.8.1
 * Large language model machine translation services now receive the note left by developers for a string, see :ref:`llm-translation-context`.
 * LLM judge requests now receive the producer-authored source string explanation as well as the developer note, and changing either context invalidates cached verdicts and stale repairs.
 * LLM judge runs now show capped scope and observed-cost previews, record per-unit judge usage, and keep delivery state separate from advisory AI evidence.
+* The LLM judge can now fail over once per batch to a configured second endpoint after the primary is unavailable (a dropped connection, a missed deadline, an HTTP 429/5xx, or an HTTP 401/403), see :setting:`JUDGE_FALLBACK_BASE_URL`.
 * Added optional :ref:`TBX glossary import from CSV, TSV, and XLSX tables <uploading-glossary-tables>`, with a locally validated profile proposal path.
 * Glossary tables with only language columns are now mapped deterministically without contacting the automatic analyzer, and the sheet-selection step is skipped for single-sheet uploads, see :ref:`uploading-glossary-tables`.
 * Glossary tables where a term is followed by its description on the next row are now recognised deterministically: descriptions become explanations, section captions become sections, and the detected layout can be switched from the import preview, see :ref:`uploading-glossary-tables`.
@@ -65,6 +66,10 @@ Weblate 2026.8.1
 * LLM judge seats can now use independent absolute request deadlines, so a model with a measured heavy latency tail no longer forces every other seat to wait under the same ceiling.
 
 * The ``max-length`` and ``source-max-length`` budgets now count only the characters the player reads: Unity rich-text tags such as ``<color=#RRGGBB>`` render to zero width and no longer spend the budget, so a translation that fits its slot is no longer reported. Engine placeholders keep counting their own characters, because each renders to a real value at runtime; declare that width with ``replacements:``. See :ref:`check-max-length`.
+
+* An LLM judge request the endpoint refuses every time (HTTP 400, 404, 405, 406, 415, 422) now fails the run fast as ``http-request-invalid`` instead of writing a fake unparsed verdict and paying for retries or deferrals of a request that can never succeed; the refused attempt stays in the ledger as the diagnostic, see :setting:`JUDGE_REQUEST_SLEEP`. A guarded ``judge_close_refused_verdicts`` command reclassifies the historical false-unparsed verdicts written by that behaviour.
+
+* Closed rows of the durable deferred judge queue are now removed by the observability cleanup after :setting:`JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS` days (default 90), so enabling the queue no longer grows that table forever; live ``queued`` and ``slow`` rows are never deleted automatically. All eleven queue settings are now documented and accepted as ``WEBLATE_*`` environment variables.
 
 .. rubric:: Bug fixes
 

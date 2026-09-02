@@ -54,8 +54,11 @@ JUDGE_REPAIR_REQUIREMENT = (
 )
 
 # These are deliberately limited to request-shape and resolved-profile data.
-# In particular, do not add request text, response text, credentials, or URLs
-# here: JudgeRun is a durable report visible to the producer who started it.
+# In particular, do not add request text, response text, credentials, or full
+# URLs here: JudgeRun is a durable report visible to the producer who started
+# it. ``fallback_hostname`` is a narrow exception: a bare hostname (no
+# scheme, path or query) identifies which provider served a batch without
+# recording the request URL.
 _SAFE_CONFIGURATION_SNAPSHOT_KEYS = frozenset(
     {
         "provider",
@@ -71,6 +74,10 @@ _SAFE_CONFIGURATION_SNAPSHOT_KEYS = frozenset(
         "temperature",
         "request_deadline",
         "prompt_schema_version",
+        "fallback_hostname",
+        "fallback_model",
+        "fallback_reasoning",
+        "fallback_response_format",
     }
 )
 
@@ -349,6 +356,7 @@ class JudgeRequestAttempt(models.Model):
         HTTP_AUTH = "http-auth"
         HTTP_RATE_LIMIT = "http-rate-limit"
         HTTP_SERVER = "http-server"
+        HTTP_REQUEST_INVALID = "http-request-invalid"
         HTTP_OTHER = "http-other"
         EMPTY_RESPONSE = "empty-response"
         INVALID_JSON = "invalid-json"
@@ -517,6 +525,10 @@ class JudgeDeferral(models.Model):
                 fields=["unit", "seat", "-created_at"],
                 name="judge_deferral_unit_idx",
             ),
+            models.Index(
+                fields=["state", "closed_at"],
+                name="judge_deferral_closed_idx",
+            ),
         ]
         # ruff: ignore[mutable-class-default]
         constraints = [
@@ -540,6 +552,7 @@ class JudgeRunUnit(models.Model):
         CRITICAL = "critical"
         UNPARSED = "unparsed"
         DEFERRED = "deferred"
+        REFUSED = "refused"
         SKIPPED = "skipped"
         STALE_CONFLICT = "stale-conflict"
 
@@ -675,6 +688,9 @@ class JudgeVerdict(models.Model):
     back_translation = models.TextField(blank=True)
     instruction = models.TextField(blank=True)
     judge_model = models.CharField(max_length=200)
+    # The endpoint that actually served this verdict. Blank on every row
+    # written before the availability fallback existed; no data migration.
+    judge_provider = models.CharField(max_length=32, blank=True)
     # Place in the collegium, not seniority: seat 2 may not lower seat 1.
     seat = models.SmallIntegerField()
     attempt = models.SmallIntegerField(default=0)

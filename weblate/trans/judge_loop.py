@@ -269,6 +269,19 @@ def _write_verdict(
         glossary_terms=request.glossary_terms,
     )
     project_context_hash = compute_target_hash([project_context])
+    # Prefer the profile that actually served this result: after a
+    # fallback attempt it differs from the requesting seat's bound
+    # `profile`, which is always the primary (see `make_seat_job`). Every
+    # pre-failover path leaves `result.served_*` blank and behaves exactly
+    # as before.
+    judge_model = result.served_model or profile.model
+    judge_provider = result.served_provider or profile.provider
+    profile_fingerprint = (
+        result.served_profile_fingerprint or profile.profile_fingerprint
+    )
+    prompt_schema_version = (
+        result.served_prompt_schema_version or profile.prompt_schema_version
+    )
     request_identity = compute_judge_request_identity(
         unit_id=unit.id,
         target_hash=target_hash,
@@ -276,8 +289,8 @@ def _write_verdict(
         project_context_hash=project_context_hash,
         source_language=request.source_language,
         target_language=request.target_language,
-        profile_fingerprint=profile.profile_fingerprint,
-        prompt_schema_version=profile.prompt_schema_version,
+        profile_fingerprint=profile_fingerprint,
+        prompt_schema_version=prompt_schema_version,
     )
     storage_hash = compute_target_storage_hash(request.target)
     JudgeVerdict.objects.create(
@@ -288,7 +301,8 @@ def _write_verdict(
         errors=result.errors,
         back_translation=result.back_translation,
         instruction="",
-        judge_model=profile.model,
+        judge_model=judge_model,
+        judge_provider=judge_provider,
         seat=seat,
         attempt=attempt,
         request_round=request_round,
@@ -301,8 +315,8 @@ def _write_verdict(
         project_context_hash=project_context_hash,
         source_language=request.source_language,
         target_language=request.target_language,
-        profile_fingerprint=profile.profile_fingerprint,
-        prompt_schema_version=profile.prompt_schema_version,
+        profile_fingerprint=profile_fingerprint,
+        prompt_schema_version=prompt_schema_version,
     )
     # A round written before the target_storage_hash backfill (or one whose
     # text was not current at that one-time migration) never got the field

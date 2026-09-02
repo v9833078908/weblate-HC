@@ -1,0 +1,72 @@
+{
+  "po": {
+    "orders": {
+      "keys": 9,
+      "ru_text_added": 9,
+      "empty_added_per_other_lang": 153,
+      "already_present_in_fresh_kit": []
+    },
+    "ui": {
+      "homoglyph_fixed_in_en": [
+        "dailyRewardClaimDescription",
+        "terrainProgressInfoSlide2"
+      ]
+    },
+    "unit_counts_verified": true
+  },
+  "glossary": {
+    "files_written": [
+      "en",
+      "bg",
+      "cs",
+      "de",
+      "es",
+      "fil",
+      "fr",
+      "hu",
+      "id",
+      "it",
+      "lt",
+      "lv",
+      "nl",
+      "pl",
+      "pt",
+      "ro",
+      "tr"
+    ],
+    "terms_per_file": 302,
+    "descrips_per_file": 302,
+    "homonym_groups_separated": 4,
+    "translator_notes_per_lang": {
+      "en": 0,
+      "bg": 0,
+      "cs": 0,
+      "de": 0,
+      "es": 0,
+      "fil": 0,
+      "fr": 0,
+      "hu": 0,
+      "id": 0,
+      "it": 0,
+      "lt": 0,
+      "lv": 0,
+      "nl": 0,
+      "pl": 0,
+      "pt": 0,
+      "ro": 0,
+      "tr": 0
+    },
+    "parse_back": "ok"
+  },
+  "conflicts": [],
+  "zips": [
+    "buyers.zip",
+    "characterdialogue.zip",
+    "glossary.zip",
+    "loot.zip",
+    "orders.zip",
+    "survey.zip",
+    "tutorial.zip",
+    "ui.zip"
+  ]
+}

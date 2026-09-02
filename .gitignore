@@ -56,3 +56,4 @@ weblate-*.tar.*
 /deploy/.env
 /deploy/.env.local
 /deploy/*.ovpn
+.env.local

@@ -1879,8 +1879,13 @@ JUDGE_REQUEST_SLEEP
 
 Seconds to sleep between judge batches. Defaults to 0.0. Raise this on a
 provider or model that throttles a low-latency run; a batch that receives an
-HTTP 429 or 403 response is retried once with a longer sleep before its
-strings are marked unparsed.
+HTTP 429 response is retried once with a longer sleep before its strings are
+marked unparsed. Requests the endpoint refuses every time are classified
+separately: HTTP 400, 404, 405, 406, 415, and 422 abort the run as
+``http-request-invalid``, because resending them anywhere is paid waste, and
+no verdict or deferral is recorded for a refused request. HTTP 401 and 403
+abort as a configuration error. Any other status (413, an unclassified 4xx,
+5xx) keeps the previous retry-or-unparsed behaviour.
 
 .. seealso::
 
@@ -1930,6 +1935,77 @@ request, and the backoff doubles between repeats.
    * :setting:`JUDGE_BASE_URL`
    * :setting:`JUDGE_REQUEST_DEADLINE`
 
+.. setting:: JUDGE_DEFERRAL_ENABLED
+.. setting:: JUDGE_DEFERRAL_MIN_INTERVAL
+.. setting:: JUDGE_DEFERRAL_MAX_INTERVAL
+.. setting:: JUDGE_DEFERRAL_SLOW_AFTER
+.. setting:: JUDGE_DEFERRAL_MAX_UNITS_PER_PASS
+.. setting:: JUDGE_DEFERRAL_CIRCUIT_FAILURE_THRESHOLD
+.. setting:: JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS
+.. setting:: JUDGE_DEFERRAL_TOKEN_BUCKET_CAPACITY
+.. setting:: JUDGE_DEFERRAL_TOKEN_BUCKET_REFILL_PER_SECOND
+.. setting:: JUDGE_DEFERRAL_OPERATOR_STOPPED
+.. setting:: JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS
+
+JUDGE_DEFERRAL_ENABLED, JUDGE_DEFERRAL_MIN_INTERVAL, JUDGE_DEFERRAL_MAX_INTERVAL,
+JUDGE_DEFERRAL_SLOW_AFTER, JUDGE_DEFERRAL_MAX_UNITS_PER_PASS,
+JUDGE_DEFERRAL_CIRCUIT_FAILURE_THRESHOLD, JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS,
+JUDGE_DEFERRAL_TOKEN_BUCKET_CAPACITY, JUDGE_DEFERRAL_TOKEN_BUCKET_REFILL_PER_SECOND,
+JUDGE_DEFERRAL_OPERATOR_STOPPED, JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS
+------------------------------------------------------------------------------------
+
+.. versionadded:: 2026.8.1
+
+Configure the durable deferred judge queue. When a judge batch ends without an
+opinion (deadline, transport, rate limit, server error, or a model reply the
+parser rejected), each affected seat records one durable ``JudgeDeferral`` row
+instead of only a provisional unparsed verdict, and a periodic drain retries
+the request later and records the recovered verdict. A refused request
+(``http-request-invalid``, see :setting:`JUDGE_REQUEST_SLEEP`) never reaches
+the queue: it aborts the run before any deferral is written.
+
+``JUDGE_DEFERRAL_ENABLED`` (default ``False``) turns the queue on. The drain
+schedule is registered when the Celery application finalizes, so the beat
+process only picks it up when it starts with the flag true; changing a Docker
+environment variable requires recreating the process, a settings reload does
+not add the schedule.
+
+``JUDGE_DEFERRAL_MIN_INTERVAL`` (default 900 seconds) is both the drain
+schedule and the floor of the per-row retry backoff;
+``JUDGE_DEFERRAL_MAX_INTERVAL`` (default 86400) is its ceiling. A row reaches
+``slow`` state after ``JUDGE_DEFERRAL_SLOW_AFTER`` (default 5) consecutive
+failures and backs off to the ceiling.
+
+``JUDGE_DEFERRAL_MAX_UNITS_PER_PASS`` (default 200) caps how many deferred
+units one drain pass may claim.
+
+The circuit breaker opens on ``JUDGE_DEFERRAL_CIRCUIT_FAILURE_THRESHOLD``
+(default 5) consecutive availability failures against one endpoint and seat
+profile and stays open for ``JUDGE_DEFERRAL_CIRCUIT_OPEN_SECONDS`` (default
+900), during which the drain sends no paid requests for that profile. Only
+availability failures count; a unit-scoped defect such as a truncated reply
+never trips a circuit shared by other units.
+
+``JUDGE_DEFERRAL_TOKEN_BUCKET_CAPACITY`` (default 200) and
+``JUDGE_DEFERRAL_TOKEN_BUCKET_REFILL_PER_SECOND`` (default 0.25) bound the
+paid drain calls per unit time across the instance.
+
+``JUDGE_DEFERRAL_OPERATOR_STOPPED`` (default ``False``) is the emergency
+stop: the drain keeps waking, claiming and releasing rows but makes no paid
+call, and queued rows are preserved.
+
+``JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS`` (default 90) is how long a closed
+deferral row is kept for audit before the observability cleanup deletes it;
+0 purges closed rows at the next cleanup pass, and an invalid value falls
+back to 90. The cleanup runs independently of ``JUDGE_DEFERRAL_ENABLED`` and
+never deletes a ``queued`` or ``slow`` row: those are live work, not history.
+
+.. seealso::
+
+   * :setting:`JUDGE_ENABLED`
+   * :setting:`JUDGE_REQUEST_SLEEP`
+   * :setting:`JUDGE_TRANSPORT_RETRIES`
+
 .. setting:: JUDGE_MAY_APPROVE
 
 JUDGE_MAY_APPROVE
@@ -1968,6 +2044,79 @@ only the structured verdict.
 
    * :setting:`JUDGE_ENABLED`
    * :setting:`JUDGE_BATCH_SIZE`
+
+
+.. setting:: JUDGE_FALLBACK_BASE_URL
+.. setting:: JUDGE_FALLBACK_API_KEY
+
+JUDGE_FALLBACK_BASE_URL, JUDGE_FALLBACK_API_KEY
+------------------------------------------------
+
+.. versionadded:: 2026.8.1
+
+Endpoint and credential for the judge's availability fallback. Empty by
+default: an unconfigured fallback is not an error, and every call count and
+outcome is then identical to a build without this feature. When
+``JUDGE_FALLBACK_BASE_URL`` is set, the credential, both seat models and both
+seat response formats must be set together; the two reasoning-effort settings
+are optional and may legitimately be blank, exactly like
+:setting:`JUDGE_REASONING_EFFORT`. A partial configuration raises before any
+request is sent, on every entry point. The fallback base
+URL may not equal :setting:`JUDGE_BASE_URL`: pointing an endpoint at itself
+is a configuration mistake, not a fallback. The comparison is made on the
+canonical URL, so a trailing slash does not make one endpoint into two.
+
+After the primary's own retries are exhausted with an availability failure
+(a dropped connection, a missed deadline, an HTTP 429/5xx, or an HTTP
+401/403), the judge sends the identical batch once more to this endpoint.
+An HTTP 200 response whose body fails to parse is never retried anywhere
+else: the fallback is an availability mechanism, not a second opinion, and
+a disliked verdict can never be replaced by resending it to another model.
+A verdict is always the work of exactly one endpoint and model pair,
+recorded on the verdict itself; that pair is never averaged or merged
+across seats.
+
+To roll the primary back onto this same endpoint later, clear all eight
+``JUDGE_FALLBACK_*`` settings first, then set the primary settings to the
+recorded values, and recreate the container. Leaving the fallback pointed
+at the endpoint you are about to promote to primary is rejected by the
+equal-URL check above.
+
+.. seealso::
+
+   * :setting:`JUDGE_BASE_URL`
+   * :setting:`JUDGE_API_KEY`
+   * :setting:`JUDGE_FALLBACK_MODEL_SEAT_1`
+
+.. setting:: JUDGE_FALLBACK_MODEL_SEAT_1
+.. setting:: JUDGE_FALLBACK_MODEL_SEAT_2
+.. setting:: JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1
+.. setting:: JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2
+.. setting:: JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1
+.. setting:: JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2
+
+JUDGE_FALLBACK_MODEL_SEAT_1, JUDGE_FALLBACK_MODEL_SEAT_2, JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1, JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2, JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1, JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+.. versionadded:: 2026.8.1
+
+Per-seat model and provider-semantic profile for the fallback endpoint.
+Unlike :setting:`JUDGE_REQUEST_DEADLINE_SEAT_1` and the other transport
+settings, none of these three inherit from the primary seat's value: model,
+reasoning effort and response format are specific to the provider actually
+serving the request, and reusing the primary's value here has previously
+sent a LiteLLM-only reasoning control to OpenRouter. The reasoning-effort
+setting may be blank, exactly like :setting:`JUDGE_REASONING_EFFORT`: blank
+means "send no reasoning parameter", not "unset". Transport shape - stream,
+batch size, request deadline, temperature, and the token cap - always
+inherits the primary seat's resolved value, so a fallback batch is never
+wider than the primary's.
+
+.. seealso::
+
+   * :setting:`JUDGE_FALLBACK_BASE_URL`
+   * :setting:`JUDGE_MODEL_SEAT_1`
+   * :setting:`JUDGE_REASONING_EFFORT`
 
 .. setting:: PIWIK_SITE_ID
 .. setting:: MATOMO_SITE_ID

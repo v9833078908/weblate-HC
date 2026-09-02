@@ -31,18 +31,46 @@ and deadline plans). It also overrides one sentence of
 is not a quality resolver, and a disliked verdict can never be replaced by a
 second opinion.
 
-**Status:** proposed, awaiting approval. This is a multi-module feature change,
-so `AGENTS.md` requires explicit approval before any code is edited. The owner
-decisions of 2026-09-01 settled the design questions below but did not authorise
-implementation. Every production step in Rollout then needs its own separate
-approval on top of that.
+**Status:** Tasks 1-6 implemented and merged to `main` as `382fd51`. The full
+judge suite is green on merged `main`: 409 passed, 47 subtests, zero failures
+(the one long-standing failure in `test_judge_persistence.py` was a stale
+expected list that predated this work and is fixed in `0191a7c`).
+mypy/pylint/ruff clean on the changed files. A three-way review found one
+blocking defect - trailing-slash spellings of one endpoint passed the
+equal-endpoint guard - fixed in `1538d24` by canonicalizing the URL in
+`_validate_base_url` and moving the completeness and distinct-endpoint rules
+into `judge_fallback_endpoint`, so the direct `request_verdicts` API is gated
+like a producer-launched run.
+
+**Task 7: run 2026-09-02, three arms of four pass.**
+`docs/llm-first/measurements/2026-09-02-judge-openrouter-fallback-dev-smoke.md`
+records it. Proven live against real endpoints: one fallback attempt per batch
+per seat after a primary availability failure, the fallback completing the
+batch, `served_provider=openrouter` provenance on the result, a configured
+fallback leaving a healthy run's call count and provider unchanged, one usage
+row per delivered response against the serving provider, and no mutation of
+translation content, verdicts or the deferral queue. Arm 2, the
+non-availability negative case, is **inconclusive**: this LiteLLM proxy answers
+an unknown model with 403, which classifies as `http-auth` and correctly does
+fail over, so the arm never produced the kind it intended. That contract is
+covered by
+`JudgeFailoverTest.test_every_failure_kind_fails_over_only_when_it_is_an_availability_kind`,
+which enumerates the whole closed `FAILURE_KINDS` set. Measuring it live needs
+a primary that returns a 4xx outside 401/403/429, which is a probe change.
+
+Production rollout remains **not started**: production still runs with all
+eight `JUDGE_FALLBACK_*` settings empty, and every step in Rollout needs its
+own separate approval per `AGENTS.md`.
 
 **Dependency gate: satisfied 2026-09-01.** Branch
 `docs/llm-usage-attribution-plan` is merged to `main` as `0011d3c`, Tasks 1-5 of
 `docs/llm-first/plans/2026-08-31-llm-usage-cost-attribution.md` are implemented
-there, and additive migration `0113_llm_usage_scope` is present and is the
-latest `weblate/trans` migration, so `0114_judge_verdict_provider` is the next
-free number. Every `file:line` reference in this plan was re-grounded against
+there. Migrations `0114_judge_request_invalid_kind`,
+`0115_judge_run_unit_refused_outcome` and `0116_judge_deferral_closed_retention`
+were then taken by the merged `feat/judge-zero-unparsed` work, so this plan's
+additive migration is `0117_judge_verdict_provider`; the chain
+`0113 -> 0114 -> 0115 -> 0116 -> 0117` is linear and collision-free.
+Every `file:line` reference in this plan was re-grounded against
 that merge on 2026-09-01; the merge moved most judge anchors (for example
 `_failure_for_http` 1099 -> 1105, `RetryBudget` 88 -> 122, the `http-auth`
 raise 1455 -> 1516, `_write_verdict` 234 -> 237). Re-ground again if another
@@ -126,7 +154,7 @@ and conflating them is the main risk in reading this plan.
 | Two seats judging in parallel | `JUDGE_SEATS = (1, 2)` with the seat barrier (`weblate/trans/judge_loop.py:921-1069`); measured 50.15% window overlap | live |
 | Visible verdict | inline card `weblate/templates/snippets/judge-verdict.html` on the translate page, plus the run report `weblate/templates/judge-run.html` | live |
 | Fallback in place | Tasks 1-7 of this plan | not started |
-| No unparsed | **not the fallback.** Bounded unparsed retry rounds (`JUDGE_MAX_UNPARSED_RETRY_ROUNDS`, default 1) plus the durable `JudgeDeferral` queue and its drain, gated by `JUDGE_DEFERRAL_ENABLED` | queue exists in code, **disabled in production** (`WEBLATE_JUDGE_DEFERRAL_ENABLED=0`) |
+| No unparsed | **neither the fallback nor the queue.** Measured: 101 of the 102 diagnosable unparsed verdicts came from a refused request (HTTP 400/401), 1 from the old shared deadline, 0 from a LiteLLM model answer (`docs/llm-first/measurements/2026-09-01-04-judge-unparsed-attribution.md`) | LiteLLM under the running profiles is at 0 unparsed for seat 1 (97 verdicts) and 1 in 98 attempts for seat 2; the missing control is fail-fast on a permanently refused request |
 
 **The fallback does not reduce unparsed, by design.** `_FAILOVER_FAILURE_KINDS`
 (Task 4) excludes every protocol failure: `invalid-json`, `invalid-envelope`,
@@ -137,20 +165,27 @@ into a verdict from the other endpoint. A model that answers 200 with an
 unusable body is a quality problem, and answering it with a second paid call to
 a different model would silently average two configurations, which R3 forbids.
 
-**So "no unparsed" as a durable property needs Rollout step 4, not Tasks 1-7.**
-Today, with the queue off, an unparsed unit is terminally unjudged: `_sync_deferral`
-returns immediately (`weblate/trans/judge_loop.py:758-759`). With the queue on,
-that unit is persisted per seat, retried by the periodic drain, and the run
-report shows it as `DEFERRED` rather than silently unparsed. That flag starts a
-Celery task which spends money without a human present and is the single most
-consequential step in this plan; it keeps its own approval.
+**So "no unparsed" belongs to another plan.** Both halves of it - the refusal
+fail-fast and the durable queue - are Tasks 1-7 of
+`docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`.
+The record is measured, not assumed: HTTP 400 has no fail-fast rule, so the run of
+2026-09-01 05:59 *completed* after 50 consecutive refused batches and wrote 50
+`unparsed` verdicts across two request rounds of run `48bfbd72`; only `http-auth`
+raises today (`weblate/trans/judge.py:1516-1517`). Enabling the queue before that
+is fixed makes it worse, not better: `_sync_deferral` queues on `result.unparsed`
+regardless of failure kind (`weblate/trans/judge_loop.py:779-795`), so the same
+incident would have become a scheduled retry loop against an endpoint that refuses
+the request every time, ending in 51 `slow` rows instead of 51 terminal ones. The
+queue's real job is narrower and still worth having: it keeps a `deadline` or
+`transport` unit from being terminally unjudged, which today it is, because
+`_sync_deferral` returns immediately (`weblate/trans/judge_loop.py:758-759`).
 
 **Scale caveat.** The zero-unparsed evidence is 25 units on
 `need-for-greed/ui/es`, read-only. It is not evidence for a 466-unit component
 or for the 275-unit backlog on that same language, which the Non-goals below
 exclude on purpose. A producer-visible "stable, no unparsed" claim at real scope
-needs the queue enabled and one full drain interval observed reaching zero
-(Rollout step 4).
+needs the refusal path closed and the queue enabled, which is
+`docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`, not this plan.
 
 ## Non-goals
 
@@ -406,8 +441,9 @@ gets written is the primary's whoever served the batch.
 - Modify: `weblate/trans/tests/test_judge_loop.py`
 - Modify: `weblate/trans/tests/test_judge_client.py`
 - Modify: `weblate/trans/models/judge.py`
-- Create: `weblate/trans/migrations/0114_judge_verdict_provider.py` (generated
-  after `0113_llm_usage_scope`; see the strict implementation order)
+- Create: `weblate/trans/migrations/0117_judge_verdict_provider.py` (generated
+  after `0116_judge_deferral_closed_retention`; see the strict implementation
+  order)
 - Modify: `weblate/trans/judge.py`
 - Modify: `weblate/trans/judge_loop.py`
 
@@ -499,13 +535,14 @@ It is deliberately **not** derived from `_AVAILABILITY_FAILURE_KINDS`
 (`weblate/trans/judge_loop.py:632-634`), which the circuit breaker owns. The two
 sets differ in both directions and each difference is load-bearing:
 
-- `http-other` is in the availability set but **not** here.
-  `_failure_for_http` (`weblate/trans/judge.py:1105-1114`) maps every 4xx that
-  is not 401/403/429 to `http-other`, so it means 400, 404 or 422: our request
-  is wrong for that endpoint, which is a configuration defect, not
+- `http-other` is in the availability set but **not** here. Since the merged
+  `feat/judge-zero-unparsed` work, `_failure_for_http` maps 400, 404, 405, 406,
+  415 and 422 to the separate `http-request-invalid` kind and fails the run
+  fast, leaving `http-other` for any remaining 4xx. Either way our request is
+  wrong for that endpoint, which is a configuration defect, not
   unavailability. Failing it over would double every batch's calls while hiding
   the defect. This case is not hypothetical: the 2026-09-01 rollout produced 50
-  `http-other` attempts because LiteLLM model names reached the default
+  such attempts because LiteLLM model names reached the default
   OpenRouter endpoint
   (`docs/llm-first/measurements/2026-09-01-03-judge-litellm-nfg-es-canary.md`).
   A fallback would have silently "fixed" that misconfiguration and doubled the
@@ -548,7 +585,8 @@ edit to either one cannot silently widen the other.
 | `http-server` (>=500, including 502/503/504/524), after its retry | 1 | fallback's result |
 | `http-rate-limit` (429), after its retry | 1 | fallback's result |
 | `http-auth` (401/403) | 1, and **zero** further primary calls | fallback's result |
-| `http-other` (400/404/422) | 0 | `unparsed` |
+| `http-request-invalid` (400/404/405/406/415/422) | 0 | run raises, no verdict |
+| `http-other` (any other 4xx) | 0 | `unparsed` |
 | `invalid-json` | 0 | `unparsed` |
 | `invalid-envelope` | 0 | `unparsed` |
 | `segment-count` | 0 | `unparsed` |
@@ -871,10 +909,11 @@ implementation.
 1. First complete the attribution rollout: migration `0113_llm_usage_scope` is
    applied, all writers use the new ledger, and its scoped production smoke is
    green. Then apply the generated fallback migration
-   `0114_judge_verdict_provider` before the fallback application image, with
-   **all** fallback settings empty. If rebasing generated a different next
-   migration number, use that migration and verify its dependency instead of
-   assuming `0114`. Assert on the running container that fallback is
+   `0117_judge_verdict_provider` before the fallback application image, with
+   **all** fallback settings empty. Its dependency is
+   `0116_judge_deferral_closed_retention`; if a later rebase generates a
+   different next number, use that migration and verify its dependency instead
+   of assuming `0117`. Assert on the running container that fallback is
    unconfigured and that a small read-only canary reproduces the 2026-09-01
    numbers exactly. This proves the refactor changed nothing.
 2. Set the fallback settings to the historical OpenRouter endpoint, key and pair,
@@ -887,14 +926,13 @@ implementation.
    `writable_ids=set()` so no unit state is projected. Accept only: zero
    terminal unparsed, zero unexpected fallback attempts, first-byte p95 under
    20 s per seat, no request within 25% of its deadline.
-4. Enable the durable queue: `WEBLATE_JUDGE_DEFERRAL_ENABLED=1`. This starts a
-   periodic Celery task that spends money without a human
-   (`weblate/trans/tasks.py:1581-1586`), so it is the single most consequential
-   flag in this plan. Before enabling, confirm the retention and index work of
-   `docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md:99-101` is
-   done for `JudgeRequestAttempt` and `LLMUsageLog`, because a queue plus
-   indefinite retries grows the database without cleanup. After enabling, watch
-   one full drain interval and assert the queue reaches zero.
+4. **The durable queue is not enabled here.** It moved to Tasks 6-7 of
+   `docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`, together with the
+   refusal fail-fast it depends on, because the queue completes "no unparsed" and
+   has nothing to do with endpoint availability. Do not set
+   `WEBLATE_JUDGE_DEFERRAL_ENABLED` from this plan. The fallback is correct with
+   the queue off: a failed-over batch still yields a verdict, and a batch that
+   fails on both endpoints ends `unparsed` exactly as it does today.
 5. Watch three signals over a full production run: failover rate per seat, wall
    time spent on failed primary attempts from `JudgeRequestAttempt`, and scoped
    judge usage by service from `LLMUsageLog`. The first two expose the finite

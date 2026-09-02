@@ -186,6 +186,7 @@ class JudgeRoundTest(ViewTestCase):
             model="vendor/model-a",
             profile_fingerprint="pf",
             prompt_schema_version="v1",
+            provider="vendor-a",
         )
         _write_verdict(
             unit,

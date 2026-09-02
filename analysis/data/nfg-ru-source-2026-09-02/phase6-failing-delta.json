@@ -1,0 +1,34 @@
+{
+ "buyers": {
+  "old": 116,
+  "new": 4
+ },
+ "characterdialogue": {
+  "old": 25,
+  "new": 168
+ },
+ "loot": {
+  "old": 76,
+  "new": 53
+ },
+ "orders": {
+  "old": 45,
+  "new": 102
+ },
+ "survey": {
+  "old": 6,
+  "new": 42
+ },
+ "tutorial": {
+  "old": 310,
+  "new": 115
+ },
+ "ui": {
+  "old": 972,
+  "new": 1325
+ },
+ "glossary": {
+  "old": 0,
+  "new": 0
+ }
+}
