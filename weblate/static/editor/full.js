@@ -130,9 +130,9 @@
     });
 
     hotkeys("alt+end", () => {
-      const button = document.getElementById("button-end");
-      if (button?.href) {
-        window.location = button.href;
+      const url = document.querySelector(".unit-pagination")?.dataset.lastUrl;
+      if (url) {
+        window.location = url;
       }
       return false;
     });
@@ -151,9 +151,9 @@
       return false;
     });
     hotkeys("alt+home", () => {
-      const button = document.getElementById("button-first");
-      if (button?.href) {
-        window.location = button.href;
+      const url = document.querySelector(".unit-pagination")?.dataset.firstUrl;
+      if (url) {
+        window.location = url;
       }
       return false;
     });
@@ -698,6 +698,12 @@
               termsInput.setAttribute("value", data.terms);
             }
             form.reset();
+            if (form.dataset.glossaryBody) {
+              const body = document.getElementById(form.dataset.glossaryBody);
+              if (body) {
+                bootstrap.Collapse.getOrCreateInstance(body).show();
+              }
+            }
           } else {
             addAlert(data.responseDetails);
           }

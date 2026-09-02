@@ -603,6 +603,107 @@ class EditTest(ViewTestCase):
             [],
         )
 
+    def test_pager_reduced(self) -> None:
+        """The pager keeps only previous, position and next."""
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, 'id="button-prev"')
+        self.assertContains(response, 'id="button-next"')
+        self.assertContains(response, "position-input")
+        self.assertNotContains(response, 'id="button-first"')
+        self.assertNotContains(response, 'id="button-end"')
+        self.assertNotContains(response, 'id="prev-section"')
+        self.assertNotContains(response, 'id="next-section"')
+        tree = html.fromstring(response.content)
+        pager = tree.xpath(
+            '//div[contains(concat(" ", @class, " "), " unit-pagination ")]'
+        )[0]
+        self.assertEqual(pager.get("data-first-url"), response.context["first_unit_url"])
+        self.assertEqual(pager.get("data-last-url"), response.context["last_unit_url"])
+
+    def test_pager_first_and_last_disabled_states(self) -> None:
+        """The boundary buttons stay the only disabled-state signal."""
+        # prev_unit_url/next_unit_url on the single-unit translate view are
+        # always non-empty offset math (offset-1/offset+1 with no clamp);
+        # the boundary-aware None only exists on the browse listing, where
+        # a two-unit fixture fits on one page and hits both edges at once.
+        response = self.client.get(reverse("browse", kwargs=self.kw_translation))
+        tree = html.fromstring(response.content)
+        prev_button = tree.xpath('//a[@id="button-prev"]')[0]
+        self.assertIn("disabled", prev_button.get("class", "").split())
+        next_button = tree.xpath('//a[@id="button-next"]')[0]
+        self.assertIn("disabled", next_button.get("class", "").split())
+
+    def test_glossary_card_collapsed_when_no_terms(self) -> None:
+        """The Glossary header is a collapse toggle, closed with no matches."""
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        toggle = tree.xpath(
+            f'//button[@aria-controls="glossary-card-body-{unit.id}"]'
+        )[0]
+        self.assertEqual(toggle.get("aria-expanded"), "false")
+        self.assertIn("collapsed", toggle.get("class", "").split())
+        body = tree.xpath(f'//div[@id="glossary-card-body-{unit.id}"]')[0]
+        body_classes = body.get("class", "").split()
+        self.assertIn("collapse", body_classes)
+        self.assertNotIn("show", body_classes)
+
+    def test_glossary_card_expanded_with_matching_term(self) -> None:
+        """A matching term opens the Glossary card by default."""
+        glossary = self.create_po(
+            name="Glossary",
+            project=self.project,
+            is_glossary=True,
+            manage_units=True,
+        )
+        glossary.source_translation.unit_set.create(
+            source="Hello",
+            target="Hello",
+            context="",
+            id_hash=calculate_hash("Hello", ""),
+            position=glossary.source_translation.unit_set.count() + 1,
+            state=STATE_TRANSLATED,
+        )
+        glossary.invalidate_glossary_cache()
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        toggle = tree.xpath(
+            f'//button[@aria-controls="glossary-card-body-{unit.id}"]'
+        )[0]
+        self.assertEqual(toggle.get("aria-expanded"), "true")
+        self.assertNotIn("collapsed", toggle.get("class", "").split())
+        body = tree.xpath(f'//div[@id="glossary-card-body-{unit.id}"]')[0]
+        body_classes = body.get("class", "").split()
+        self.assertIn("collapse", body_classes)
+        self.assertIn("show", body_classes)
+
+    def test_string_info_card_collapsed_when_empty(self) -> None:
+        """No explanation, labels or flags: the card body stays collapsed."""
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        toggle = tree.xpath(
+            f'//button[@aria-controls="string-info-card-body-{unit.id}"]'
+        )[0]
+        self.assertEqual(toggle.get("aria-expanded"), "false")
+        body = tree.xpath(f'//div[@id="string-info-card-body-{unit.id}"]')[0]
+        self.assertNotIn("show", body.get("class", "").split())
+
+    def test_string_info_card_shown_with_explanation(self) -> None:
+        """Any of explanation, labels or flags opens the card by default."""
+        unit = self.get_unit(self.source)
+        unit.source_unit.update_explanation("Some explanation.", self.user)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        toggle = tree.xpath(
+            f'//button[@aria-controls="string-info-card-body-{unit.id}"]'
+        )[0]
+        self.assertEqual(toggle.get("aria-expanded"), "true")
+        body = tree.xpath(f'//div[@id="string-info-card-body-{unit.id}"]')[0]
+        self.assertIn("show", body.get("class", "").split())
+
 
 class EditAccessTest(ViewTestCase):
     def assert_unit_action_urls_not_found(self, unit: Unit) -> None:
