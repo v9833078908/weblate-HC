@@ -877,6 +877,7 @@ def perform_suggestion(unit, form, request: AuthenticatedHttpRequest):
         display_fixups(request, suggestion.fixups)
     return result == SuggestionAddResult.CREATED
 
+
 def _queue_manual_save_recheck(request: AuthenticatedHttpRequest, unit: Unit) -> None:
     """Queue the judge re-check of a manual fix, or explain why it will not run."""
     user = request.user

@@ -1710,10 +1710,10 @@ class JudgeQueueStripViewTest(ViewTestCase):
 
     def judge_all_units(self, severity="none") -> None:
         """Give every non-source, non-readonly unit a fresh PASS verdict."""
-        for translation in self.component.translation_set.all():
-            if translation.is_source:
+        for component_translation in self.component.translation_set.all():
+            if component_translation.is_source:
                 continue
-            for unit in translation.unit_set.exclude(state=STATE_READONLY):
+            for unit in component_translation.unit_set.exclude(state=STATE_READONLY):
                 self.make_verdict(unit, severity)
 
     def test_hand_off_absent_with_zero_history(self) -> None:
@@ -2768,14 +2768,10 @@ class JudgeManualSaveTest(ViewTestCase):
         self.make_verdict(unit, "critical")
         # The stored target carries the source trailing newline, and that is
         # what the textarea posts back for an unchanged string.
-        response = self.edit_unit(
-            "Hello, world!\n", "Ahoj\n", review=str(STATE_APPROVED)
-        )
+        self.edit_unit("Hello, world!\n", "Ahoj\n", review=str(STATE_APPROVED))
         unit = self.get_unit()
         self.assertEqual(unit.state, STATE_APPROVED)
-        self.assertEqual(
-            JudgeRun.objects.filter(requested_mode="recheck").count(), 0
-        )
+        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 0)
 
     def test_manual_save_of_changed_text_recheck(self) -> None:
         self.grant_only(["unit.edit", "unit.review", "translation.auto"])
@@ -2793,9 +2789,7 @@ class JudgeManualSaveTest(ViewTestCase):
         runs = JudgeRun.objects.filter(requested_mode="recheck")
         self.assertEqual(runs.count(), 1)
         self.assertEqual(runs.get().requested_query, recheck_query(unit.pk))
-        self.assert_redirects_offset(
-            response, unit.translation.get_translate_url(), 2
-        )
+        self.assert_redirects_offset(response, unit.translation.get_translate_url(), 2)
 
     def test_manual_save_of_approved_changed_text_demotes_to_translated(self) -> None:
         self.grant_only(["unit.edit", "unit.review", "translation.auto"])
@@ -2810,9 +2804,7 @@ class JudgeManualSaveTest(ViewTestCase):
         self.assertEqual(response.status_code, 302)
         unit = self.get_unit()
         self.assertEqual(unit.state, STATE_TRANSLATED)
-        self.assertEqual(
-            JudgeRun.objects.filter(requested_mode="recheck").count(), 1
-        )
+        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 1)
 
     def test_manual_save_unjudged_string_no_recheck(self) -> None:
         self.grant_only(["unit.edit", "unit.review", "translation.auto"])
@@ -2831,9 +2823,7 @@ class JudgeManualSaveTest(ViewTestCase):
         self.grant_only(["unit.edit", "unit.review"])
         unit = self.get_unit()
         self.make_verdict(unit, "critical")
-        response = self.edit_unit(
-            "Hello, world!\n", "Nový cíl po opravě", follow=True
-        )
+        response = self.edit_unit("Hello, world!\n", "Nový cíl po opravě", follow=True)
         self.assertContains(response, "awaits a judge re-check")
         self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
         self.assertEqual(JudgeRun.objects.count(), 0)
@@ -3019,9 +3009,7 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         self.assertIn("Keep as is", card_html)
         self.assertNotIn("Use suggested fix", card_html)
         self.assertEqual(card_html.count("btn-primary"), 1)
-        self.assertLess(
-            card_html.index("Keep as is"), card_html.index("More actions")
-        )
+        self.assertLess(card_html.index("Keep as is"), card_html.index("More actions"))
         # The card no longer links to the machinery tab in any state; the
         # automatic suggestions entry lives under the More dropdown instead.
         self.assertNotIn("Computer-aided translation suggestions", card_html)
@@ -3295,9 +3283,7 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
 
         def card_html() -> str:
             response = self.client.get(unit.get_absolute_url())
-            card = html.fromstring(response.content).get_element_by_id(
-                "id_judge_card"
-            )
+            card = html.fromstring(response.content).get_element_by_id("id_judge_card")
             return html.tostring(card, encoding="unicode")
 
         content = card_html()

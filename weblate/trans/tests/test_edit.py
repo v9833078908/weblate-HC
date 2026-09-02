@@ -484,9 +484,7 @@ class EditTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         tree = html.fromstring(response.content)
         self.assertEqual(
-            len(
-                tree.xpath("//h4[contains(normalize-space(.), 'Screenshots')]")
-            ),
+            len(tree.xpath("//h4[contains(normalize-space(.), 'Screenshots')]")),
             1,
         )
 
@@ -498,9 +496,7 @@ class EditTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         self.assertNotContains(response, "check-automatically-translated")
         with pytest.raises(NoReverseMatch):
-            reverse(
-                "js-dismiss-automatically-translated", kwargs={"unit_id": unit.id}
-            )
+            reverse("js-dismiss-automatically-translated", kwargs={"unit_id": unit.id})
 
     def test_machinery_tab_in_more_dropdown(self) -> None:
         """The automatic suggestions tab lives in the More dropdown."""
@@ -561,7 +557,7 @@ class EditTest(ViewTestCase):
         self.assertIn("toggle-suggestions", direct_ids)
 
     def test_no_tab_open_on_load(self) -> None:
-        """No tab or pane is pre-selected; the first click opens one."""
+        """No tab or pane is preselected; the first click opens one."""
         unit = self.get_unit(self.source)
         response = self.client.get(unit.get_absolute_url())
         tree = html.fromstring(response.content)
@@ -590,9 +586,7 @@ class EditTest(ViewTestCase):
         self.component.translation_set.exclude(
             language_code=self.component.source_language.code
         ).delete()
-        unit = self.get_unit(
-            self.source, language=self.component.source_language.code
-        )
+        unit = self.get_unit(self.source, language=self.component.source_language.code)
         response = self.client.get(unit.get_absolute_url())
         tree = html.fromstring(response.content)
         self.assertEqual(
@@ -618,7 +612,9 @@ class EditTest(ViewTestCase):
         pager = tree.xpath(
             '//div[contains(concat(" ", @class, " "), " unit-pagination ")]'
         )[0]
-        self.assertEqual(pager.get("data-first-url"), response.context["first_unit_url"])
+        self.assertEqual(
+            pager.get("data-first-url"), response.context["first_unit_url"]
+        )
         self.assertEqual(pager.get("data-last-url"), response.context["last_unit_url"])
 
     def test_pager_first_and_last_disabled_states(self) -> None:
@@ -639,9 +635,9 @@ class EditTest(ViewTestCase):
         unit = self.get_unit(self.source)
         response = self.client.get(unit.get_absolute_url())
         tree = html.fromstring(response.content)
-        toggle = tree.xpath(
-            f'//button[@aria-controls="glossary-card-body-{unit.id}"]'
-        )[0]
+        toggle = tree.xpath(f'//button[@aria-controls="glossary-card-body-{unit.id}"]')[
+            0
+        ]
         self.assertEqual(toggle.get("aria-expanded"), "false")
         self.assertIn("collapsed", toggle.get("class", "").split())
         body = tree.xpath(f'//div[@id="glossary-card-body-{unit.id}"]')[0]
@@ -674,9 +670,9 @@ class EditTest(ViewTestCase):
         unit = self.get_unit(self.source)
         response = self.client.get(unit.get_absolute_url())
         tree = html.fromstring(response.content)
-        toggle = tree.xpath(
-            f'//button[@aria-controls="glossary-card-body-{unit.id}"]'
-        )[0]
+        toggle = tree.xpath(f'//button[@aria-controls="glossary-card-body-{unit.id}"]')[
+            0
+        ]
         self.assertEqual(toggle.get("aria-expanded"), "true")
         self.assertNotIn("collapsed", toggle.get("class", "").split())
         body = tree.xpath(f'//div[@id="glossary-card-body-{unit.id}"]')[0]
@@ -726,9 +722,9 @@ class EditTest(ViewTestCase):
         )[0]
         save_button = footer.xpath('.//button[@name="save"]')[0]
         save_stay_button = footer.xpath('.//button[@name="save-stay"]')[0]
-        skip_link = footer.xpath(
-            './/a[contains(concat(" ", @class, " "), " skip ")]'
-        )[0]
+        skip_link = footer.xpath('.//a[contains(concat(" ", @class, " "), " skip ")]')[
+            0
+        ]
         self.assertIn("btn-primary", save_button.get("class", "").split())
         self.assertIn("btn-link", save_stay_button.get("class", "").split())
         self.assertNotIn("btn-primary", save_stay_button.get("class", "").split())

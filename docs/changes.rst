@@ -70,6 +70,11 @@ Weblate 2026.8.1
 * An LLM judge request the endpoint refuses every time (HTTP 400, 404, 405, 406, 415, 422) now fails the run fast as ``http-request-invalid`` instead of writing a fake unparsed verdict and paying for retries or deferrals of a request that can never succeed; the refused attempt stays in the ledger as the diagnostic, see :setting:`JUDGE_REQUEST_SLEEP`. A guarded ``judge_close_refused_verdicts`` command reclassifies the historical false-unparsed verdicts written by that behaviour.
 
 * Closed rows of the durable deferred judge queue are now removed by the observability cleanup after :setting:`JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS` days (default 90), so enabling the queue no longer grows that table forever; live ``queued`` and ``slow`` rows are never deleted automatically. All eleven queue settings are now documented and accepted as ``WEBLATE_*`` environment variables.
+* The LLM-judge verdict card now leads with the judge's main finding and the stored fix; :guilabel:`Keep as is` is a one-click decision with an optional reason, and escalation is labelled :guilabel:`Send back to queue`.
+* Saving changed text on a judged string now queues the one-string judge re-check automatically and stores the text as translated; the review-state radios are hidden for judged strings.
+* The string page hides the Suggest button for users who can edit, the Screenshots card until a screenshot exists, and moves :guilabel:`Automatic suggestions`, :guilabel:`Similar keys`, :guilabel:`Comments`, :guilabel:`Other languages` and the other context tabs under a :guilabel:`More` tab; no tab is open until chosen; the "Automatically translated" notice is removed.
+* The translation editor now keeps the special-characters toolbar behind one button, reduces the pager to previous / position / next, demotes :guilabel:`Save and stay` to a secondary action, and collapses the Glossary and String information cards while they have nothing to show.
+* Added :kbd:`Ctrl+Alt+A`, :kbd:`Ctrl+Alt+K` and :kbd:`Ctrl+Alt+R` for the LLM-judge triage actions, and a paid-request hint on every button that spends a model call.
 
 .. rubric:: Bug fixes
 

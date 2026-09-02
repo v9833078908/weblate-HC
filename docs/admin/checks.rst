@@ -199,17 +199,19 @@ new attempt. The one exception is a string with an active ``max-length``
 check: only editing the stored text can satisfy that check, so it keeps
 the repair-then-rejudge behavior instead and never gets a candidate. Either
 way, an unresolved ``major`` or ``critical`` stays in the human queue,
-where the reviewer can also escalate it (``escalated``) to request a
-second opinion without changing what it currently blocks. This is not an
-automatic guarantee that a broken translation never ships: verify with
-your own held-out sample before relying on it, and note that a ``pass``
-verdict does not, on its own, move a string to :ref:`approved <states>`
-unless the site additionally sets :setting:`JUDGE_MAY_APPROVE`.
+where the reviewer can also send it back to the queue (stored as
+``escalated``) to request a second opinion without changing what it
+currently blocks. This is not an automatic guarantee that a broken
+translation never ships: verify with your own held-out sample before
+relying on it, and note that a ``pass`` verdict does not, on its own, move
+a string to :ref:`approved <states>` unless the site additionally sets
+:setting:`JUDGE_MAY_APPROVE`.
 
 Recording a decision on a verdict requires the :guilabel:`Review strings`
 permission (the same :guilabel:`unit.review` boundary the resolution form
-itself enforces) and always needs a written reason; it is a CSRF-protected
-POST and the only way a decision is ever recorded. Weblate recomputes the
+itself enforces) and may carry an optional written reason; it is a
+CSRF-protected POST and the only way a decision is ever recorded. Weblate
+recomputes the
 verdict's current round at request time and rejects a decision against
 stale, superseded, or already-resolved evidence rather than silently
 applying it to a string that no longer matches what was reviewed. The
