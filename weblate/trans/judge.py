@@ -206,9 +206,18 @@ type OnBatch = Callable[[Sequence[JudgeRequest], Sequence[JudgeResult]], None]
 
 
 def _validate_base_url(base_url: object) -> str:
-    """Validate an endpoint URL shape without making a request."""
+    """
+    Validate an endpoint URL shape without making a request.
+
+    The returned value is canonical: the request path has always dropped a
+    trailing slash when building ``/chat/completions``, so two spellings of
+    one destination must not survive as two distinct endpoints. Canonicalizing
+    here keeps the equal-endpoint guard, the alias cache key and every
+    fingerprint in agreement with the URL actually posted to.
+    """
     if not isinstance(base_url, str) or not base_url.strip():
         raise JudgeError(_("The LLM judge is not configured."))
+    base_url = base_url.strip().rstrip("/")
     parsed = urlsplit(base_url)
     if parsed.scheme != "https" or not parsed.netloc:
         raise JudgeError(_("The LLM judge is not configured."))
@@ -538,12 +547,43 @@ def judge_seat_profiles() -> tuple[JudgeSeatProfile, JudgeSeatProfile]:
     return first, second
 
 
+# Reasoning effort is deliberately excluded: like the primary's own
+# `JUDGE_REASONING_EFFORT`, "" is a valid, common value ("send no reasoning
+# parameter"), not a missing setting. `_resolve_fallback_profile` still
+# requires it to be a string and applies the same per-provider allowlist.
+_FALLBACK_REQUIRED_SETTING_NAMES = (
+    "JUDGE_FALLBACK_BASE_URL",
+    "JUDGE_FALLBACK_API_KEY",
+    "JUDGE_FALLBACK_MODEL_SEAT_1",
+    "JUDGE_FALLBACK_MODEL_SEAT_2",
+    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1",
+    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2",
+)
+
+
 def judge_fallback_endpoint() -> JudgeEndpoint | None:
-    """Return the configured fallback endpoint, or None when unconfigured."""
-    base_url = settings.JUDGE_FALLBACK_BASE_URL
-    if not isinstance(base_url, str) or not base_url.strip():
+    """
+    Return the configured fallback endpoint, or None when unconfigured.
+
+    Raise when the operator asked for a fallback but the pair is unusable:
+    incomplete, or resolving to the primary's own endpoint. This is the only
+    place that decides whether a fallback exists, so the direct
+    ``request_verdicts`` API is gated exactly like a producer-launched run
+    rather than half-enabling a second paid endpoint.
+    """
+    configured = [
+        isinstance(value, str) and bool(value.strip())
+        for value in (
+            getattr(settings, name) for name in _FALLBACK_REQUIRED_SETTING_NAMES
+        )
+    ]
+    if not any(configured):
         return None
-    base_url = _validate_base_url(base_url)
+    if not all(configured):
+        raise JudgeError(_("The LLM judge is not configured."))
+    base_url = _validate_base_url(settings.JUDGE_FALLBACK_BASE_URL)
+    if base_url == get_judge_base_url():
+        raise JudgeError(_("The LLM judge is not configured."))
     return JudgeEndpoint(
         role="fallback",
         base_url=base_url,
@@ -578,6 +618,12 @@ def _resolve_fallback_profile(
     if not isinstance(reasoning, str):
         raise JudgeError(_("The LLM judge is not configured."))
     reasoning = reasoning.strip()
+    # The primary reads its per-seat settings through `_profile_value`, where
+    # "inherit" is the sentinel for "use the global value". The fallback has
+    # no such fallthrough, so the literal is an operator mistake that would
+    # otherwise be sent to a provider as a real reasoning effort or model.
+    if "inherit" in {model, reasoning}:
+        raise JudgeError(_("The LLM judge is not configured."))
     # Same LiteLLM allowlist as the primary: aliases declare the exact
     # control they support.
     if endpoint.provider == "litellm" and reasoning not in {
@@ -638,37 +684,19 @@ def resolve_judge_fallback_seat_profile(
     return _resolve_fallback_profile(seat, primary, endpoint)
 
 
-# Reasoning effort is deliberately excluded: like the primary's own
-# `JUDGE_REASONING_EFFORT`, "" is a valid, common value ("send no reasoning
-# parameter"), not a missing setting. `_resolve_fallback_profile` still
-# requires it to be a string and applies the same per-provider allowlist.
-_FALLBACK_REQUIRED_SETTING_NAMES = (
-    "JUDGE_FALLBACK_BASE_URL",
-    "JUDGE_FALLBACK_API_KEY",
-    "JUDGE_FALLBACK_MODEL_SEAT_1",
-    "JUDGE_FALLBACK_MODEL_SEAT_2",
-    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1",
-    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2",
-)
-
-
 def _validate_fallback_configuration(
     primary_profiles: tuple[JudgeSeatProfile, JudgeSeatProfile],
 ) -> None:
-    """Validate the fallback pair with the same rules as the primary."""
-    configured = [
-        isinstance(value, str) and bool(value.strip())
-        for value in (
-            getattr(settings, name) for name in _FALLBACK_REQUIRED_SETTING_NAMES
-        )
-    ]
-    if not any(configured):
-        return
-    if not all(configured):
-        raise JudgeError(_("The LLM judge is not configured."))
+    """
+    Validate the fallback pair with the same rules as the primary.
+
+    Completeness and the distinct-endpoint rule are enforced by
+    `judge_fallback_endpoint`, so every caller shares one contract; this adds
+    the per-seat profile resolution a run needs before its first paid POST.
+    """
     endpoint = judge_fallback_endpoint()
-    if endpoint is None or endpoint.base_url == get_judge_base_url():
-        raise JudgeError(_("The LLM judge is not configured."))
+    if endpoint is None:
+        return
     for seat, primary in zip(JUDGE_SEATS, primary_profiles, strict=True):
         _resolve_fallback_profile(seat, primary, endpoint)
 

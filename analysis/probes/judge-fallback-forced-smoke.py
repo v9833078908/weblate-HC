@@ -10,13 +10,16 @@
 r"""
 Prove the OpenRouter availability fallback against the live LiteLLM proxy.
 
-Three read-only arms, each judging the same small real scope with both seats
-and reporting per-seat attempt count, failure kind, provider and whether the
-result parsed. Every arm calls ``request_verdicts(..., persist_attempts=True)``
-directly: it writes ``JudgeRequestAttempt`` rows (the ledger this plan proves)
-and, for a parsed response with usage, one ``LLMUsageLog`` row, but never
-touches a ``Unit`` or writes a ``JudgeVerdict`` - ``request_verdicts()`` has no
-access to either.
+Three arms, each judging the same small real scope with both seats and
+reporting per-seat attempt count, failure kind, provider and whether the
+result parsed. The arms are read-only with respect to translation content and
+are **not** read-only with respect to the database. Every arm calls
+``request_verdicts(..., persist_attempts=True)`` directly: it writes
+``JudgeRequestAttempt`` rows and, for a parsed response with usage, one
+``LLMUsageLog`` row. Those rows are the evidence this plan proves, so they are
+deliberately kept rather than cleaned up; expect the ledger to grow by one row
+per attempt per run. No arm touches a ``Unit`` or writes a ``JudgeVerdict`` -
+``request_verdicts()`` has no access to either.
 
 1. **Forced arm**: an invalid primary key maps to ``http-auth``, a permitted
    failover trigger. Expect one primary attempt per seat (``http-auth``,
@@ -55,6 +58,7 @@ import contextlib
 import os
 
 from django.conf import settings
+from django.db.models import Max
 
 from weblate.trans import judge
 from weblate.trans.judge_loop import build_request, judge_project_context
@@ -102,7 +106,10 @@ def _run_arm(label: str, *, seats: tuple[int, ...] = (1, 2)) -> None:
     batch = [build_request(unit) for unit in units]
     project_context = judge_project_context(translation.component.project)
     for seat in seats:
-        before = set(JudgeRequestAttempt.objects.values_list("pk", flat=True))
+        # A max-pk watermark, not a full-table pk set: this runs against a
+        # live instance whose ledger is large, and the rows this arm creates
+        # are always above the watermark.
+        watermark = JudgeRequestAttempt.objects.aggregate(top=Max("pk"))["top"] or 0
         try:
             results = judge.request_verdicts(
                 batch,
@@ -115,10 +122,7 @@ def _run_arm(label: str, *, seats: tuple[int, ...] = (1, 2)) -> None:
             print(f"    seat {seat}: raised {error}")
             continue
         attempts = list(
-            JudgeRequestAttempt.objects.filter(
-                pk__in=set(JudgeRequestAttempt.objects.values_list("pk", flat=True))
-                - before
-            ).order_by("pk")
+            JudgeRequestAttempt.objects.filter(pk__gt=watermark).order_by("pk")
         )
         for attempt in attempts:
             print(

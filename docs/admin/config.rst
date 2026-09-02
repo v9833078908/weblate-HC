@@ -2057,12 +2057,14 @@ JUDGE_FALLBACK_BASE_URL, JUDGE_FALLBACK_API_KEY
 Endpoint and credential for the judge's availability fallback. Empty by
 default: an unconfigured fallback is not an error, and every call count and
 outcome is then identical to a build without this feature. When
-``JUDGE_FALLBACK_BASE_URL`` is set, the other seven ``JUDGE_FALLBACK_*``
-settings below must be set together (the two reasoning-effort settings may
-legitimately be blank, exactly like :setting:`JUDGE_REASONING_EFFORT`); a
-partial configuration raises before any request is sent. The fallback base
+``JUDGE_FALLBACK_BASE_URL`` is set, the credential, both seat models and both
+seat response formats must be set together; the two reasoning-effort settings
+are optional and may legitimately be blank, exactly like
+:setting:`JUDGE_REASONING_EFFORT`. A partial configuration raises before any
+request is sent, on every entry point. The fallback base
 URL may not equal :setting:`JUDGE_BASE_URL`: pointing an endpoint at itself
-is a configuration mistake, not a fallback.
+is a configuration mistake, not a fallback. The comparison is made on the
+canonical URL, so a trailing slash does not make one endpoint into two.
 
 After the primary's own retries are exhausted with an availability failure
 (a dropped connection, a missed deadline, an HTTP 429/5xx, or an HTTP

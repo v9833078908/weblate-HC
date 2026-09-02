@@ -129,14 +129,17 @@ Scope and intended use
        diagnostics), outbound request per batch to the provider configured by
        :setting:`JUDGE_BASE_URL`, bounded by
        :setting:`JUDGE_REQUEST_DEADLINE` when enabled, and at most one further
-       request per batch to the second endpoint and credential configured by
-       :setting:`JUDGE_FALLBACK_BASE_URL` after an availability failure -
+       request per batch to the second endpoint configured by
+       :setting:`JUDGE_FALLBACK_BASE_URL`, under its own separate credential
+       :setting:`JUDGE_FALLBACK_API_KEY`, after an availability failure -
        never on a parsed-but-unusable response. Attempts retain only
        status, timing, response shape, hashes, and token counters, never
        source/target text, prompts, completions, reasoning, headers, or keys.
        A durable run and its per-string outcomes are database-only records
-       with no outbound leg, readable only through the permission-checked
-       report page; the report never renders a cost figure or an identity
+       with no outbound leg; the run and its aggregates are readable through
+       the permission-checked report page, and a string's own stored verdict
+       is additionally rendered to users who may view that translation. The
+       report never renders a cost figure or an identity
        hash that could confirm a known translation
      - In scope. The outbound request is an operator-configured-host,
        site-wide-credentialed review only; provider behavior is out of scope.
@@ -1016,9 +1019,12 @@ configuration rather than per-project configuration, the key is built inline
 into the request and never bound to a frame local an error reporter could
 serialize, and a
 transport or parse failure is recorded as unparsed rather than defaulting to
-a favorable verdict. A batch may be sent to a second, separately
-credentialed endpoint (:setting:`JUDGE_FALLBACK_BASE_URL`) after the primary
-is unavailable; that credential is never shared with the primary, and the
+a favorable verdict. A batch may be sent to a second endpoint
+(:setting:`JUDGE_FALLBACK_BASE_URL`) under its own separate site-wide
+credential (:setting:`JUDGE_FALLBACK_API_KEY`, the second secret to rotate)
+after the primary
+is unavailable; that credential is never shared with the primary, the two
+endpoints must differ once canonicalized, and the
 fallback can only substitute for a missing response, never resend a parsed
 reply the run disliked to a different model. Its bounded request-attempt
 records contain only redacted metadata and keyed digests, and are not an API

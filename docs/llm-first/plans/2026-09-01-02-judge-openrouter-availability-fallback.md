@@ -32,23 +32,33 @@ is not a quality resolver, and a disliked verdict can never be replaced by a
 second opinion.
 
 **Status:** Tasks 1-6 implemented and verified on branch
-`feat/judge-openrouter-fallback` (`30b2464`..`9aaba16`); full judge suite green
-(400 passed, 32 subtests, one pre-existing unrelated failure in
-`test_judge_persistence.py` traced to the `feat/judge-zero-unparsed` merge, not
-this change), mypy/pylint/ruff clean on the changed files. Task 7's dev-container
-live arms are prepared as `analysis/probes/judge-fallback-forced-smoke.py` but
-not run: per `AGENTS.md`, touching the shared dev-docker stack needs its own
-explicit approval, and the arms need real primary/fallback credentials this
-session does not hold. No measurement document was written, to avoid recording
-fabricated data. Every production step in Rollout still needs its own separate
-approval on top of implementation approval.
+`feat/judge-openrouter-fallback`. Judge suite: 400 passed, 32 subtests, plus
+one known pre-existing failure in `test_judge_persistence.py`
+(`test_failure_kinds_match_the_closed_transport_contract`) which also fails on
+the merge base and belongs to the merged `feat/judge-zero-unparsed` work, not
+to this change. mypy/pylint/ruff clean on the changed files. A three-way review
+then found one blocking defect - trailing-slash spellings of one endpoint
+passed the equal-endpoint guard - which is fixed by canonicalizing the URL in
+`_validate_base_url` and moving the completeness and distinct-endpoint rules
+into `judge_fallback_endpoint`, so the direct `request_verdicts` API is gated
+like a producer-launched run. Task 7's dev-container live arms are prepared as
+`analysis/probes/judge-fallback-forced-smoke.py` but **not run**: per
+`AGENTS.md`, touching the shared dev-docker stack needs its own explicit
+approval, and the arms need real primary/fallback credentials this session does
+not hold. No measurement document was written, to avoid recording fabricated
+data. Production rollout is therefore blocked on Task 7; every production step
+in Rollout still needs its own separate approval on top of implementation
+approval.
 
 **Dependency gate: satisfied 2026-09-01.** Branch
 `docs/llm-usage-attribution-plan` is merged to `main` as `0011d3c`, Tasks 1-5 of
 `docs/llm-first/plans/2026-08-31-llm-usage-cost-attribution.md` are implemented
-there, and additive migration `0113_llm_usage_scope` is present and is the
-latest `weblate/trans` migration, so `0114_judge_verdict_provider` is the next
-free number. Every `file:line` reference in this plan was re-grounded against
+there. Migrations `0114_judge_request_invalid_kind`,
+`0115_judge_run_unit_refused_outcome` and `0116_judge_deferral_closed_retention`
+were then taken by the merged `feat/judge-zero-unparsed` work, so this plan's
+additive migration is `0117_judge_verdict_provider`; the chain
+`0113 -> 0114 -> 0115 -> 0116 -> 0117` is linear and collision-free.
+Every `file:line` reference in this plan was re-grounded against
 that merge on 2026-09-01; the merge moved most judge anchors (for example
 `_failure_for_http` 1099 -> 1105, `RetryBudget` 88 -> 122, the `http-auth`
 raise 1455 -> 1516, `_write_verdict` 234 -> 237). Re-ground again if another
@@ -419,8 +429,9 @@ gets written is the primary's whoever served the batch.
 - Modify: `weblate/trans/tests/test_judge_loop.py`
 - Modify: `weblate/trans/tests/test_judge_client.py`
 - Modify: `weblate/trans/models/judge.py`
-- Create: `weblate/trans/migrations/0114_judge_verdict_provider.py` (generated
-  after `0113_llm_usage_scope`; see the strict implementation order)
+- Create: `weblate/trans/migrations/0117_judge_verdict_provider.py` (generated
+  after `0116_judge_deferral_closed_retention`; see the strict implementation
+  order)
 - Modify: `weblate/trans/judge.py`
 - Modify: `weblate/trans/judge_loop.py`
 
@@ -512,13 +523,14 @@ It is deliberately **not** derived from `_AVAILABILITY_FAILURE_KINDS`
 (`weblate/trans/judge_loop.py:632-634`), which the circuit breaker owns. The two
 sets differ in both directions and each difference is load-bearing:
 
-- `http-other` is in the availability set but **not** here.
-  `_failure_for_http` (`weblate/trans/judge.py:1105-1114`) maps every 4xx that
-  is not 401/403/429 to `http-other`, so it means 400, 404 or 422: our request
-  is wrong for that endpoint, which is a configuration defect, not
+- `http-other` is in the availability set but **not** here. Since the merged
+  `feat/judge-zero-unparsed` work, `_failure_for_http` maps 400, 404, 405, 406,
+  415 and 422 to the separate `http-request-invalid` kind and fails the run
+  fast, leaving `http-other` for any remaining 4xx. Either way our request is
+  wrong for that endpoint, which is a configuration defect, not
   unavailability. Failing it over would double every batch's calls while hiding
   the defect. This case is not hypothetical: the 2026-09-01 rollout produced 50
-  `http-other` attempts because LiteLLM model names reached the default
+  such attempts because LiteLLM model names reached the default
   OpenRouter endpoint
   (`docs/llm-first/measurements/2026-09-01-03-judge-litellm-nfg-es-canary.md`).
   A fallback would have silently "fixed" that misconfiguration and doubled the
@@ -561,7 +573,8 @@ edit to either one cannot silently widen the other.
 | `http-server` (>=500, including 502/503/504/524), after its retry | 1 | fallback's result |
 | `http-rate-limit` (429), after its retry | 1 | fallback's result |
 | `http-auth` (401/403) | 1, and **zero** further primary calls | fallback's result |
-| `http-other` (400/404/422) | 0 | `unparsed` |
+| `http-request-invalid` (400/404/405/406/415/422) | 0 | run raises, no verdict |
+| `http-other` (any other 4xx) | 0 | `unparsed` |
 | `invalid-json` | 0 | `unparsed` |
 | `invalid-envelope` | 0 | `unparsed` |
 | `segment-count` | 0 | `unparsed` |
@@ -884,10 +897,11 @@ implementation.
 1. First complete the attribution rollout: migration `0113_llm_usage_scope` is
    applied, all writers use the new ledger, and its scoped production smoke is
    green. Then apply the generated fallback migration
-   `0114_judge_verdict_provider` before the fallback application image, with
-   **all** fallback settings empty. If rebasing generated a different next
-   migration number, use that migration and verify its dependency instead of
-   assuming `0114`. Assert on the running container that fallback is
+   `0117_judge_verdict_provider` before the fallback application image, with
+   **all** fallback settings empty. Its dependency is
+   `0116_judge_deferral_closed_retention`; if a later rebase generates a
+   different next number, use that migration and verify its dependency instead
+   of assuming `0117`. Assert on the running container that fallback is
    unconfigured and that a small read-only canary reproduces the 2026-09-01
    numbers exactly. This proves the refactor changed nothing.
 2. Set the fallback settings to the historical OpenRouter endpoint, key and pair,

@@ -31,6 +31,7 @@ from weblate.trans.judge import (
     _read_sse,
     _request_timeout,
     _resolve_profile,
+    _validate_base_url,
     get_judge_base_url,
     get_judge_chat_completions_url,
     judge_configuration_ready,
@@ -956,6 +957,167 @@ class JudgeFailoverTest(TestCase):
         self.assertTrue(all(item.unparsed for item in results))
         self.assertTrue(all(item.served_provider == "litellm" for item in results))
         self.assertEqual(set(calls), {"litellm"})
+
+    def test_every_failure_kind_fails_over_only_when_it_is_an_availability_kind(
+        self,
+    ) -> None:
+        """
+        Enumerate the closed kind set rather than trusting a representative.
+
+        A regression that routed a parser kind to the fallback, or that
+        stopped failing over on one availability kind, passes a
+        set-difference assertion but fails here.
+        """
+        fallback = _canned_response(
+            status_code=200,
+            payload=_FALLBACK_PARSED_PAYLOAD,
+            transport_succeeded=True,
+        )
+        for kind in sorted(FAILURE_KINDS):
+            with self.subTest(kind=kind):
+                if kind == "http-request-invalid":
+                    # A refused request aborts the run outright and must
+                    # still never reach the fallback: resending a request
+                    # the endpoint rejected is waste, not availability.
+                    with self.assertRaises(JudgeError):
+                        self._run_with_primary_failure(
+                            _canned_response(failure_kind=kind),
+                            fallback_response=fallback,
+                        )
+                    continue
+                _result, calls = self._run_with_primary_failure(
+                    _canned_response(failure_kind=kind),
+                    fallback_response=fallback,
+                )
+                if kind in _FAILOVER_FAILURE_KINDS:
+                    self.assertEqual(calls, ["litellm", "openrouter"])
+                else:
+                    self.assertEqual(calls, ["litellm"])
+
+    @override_settings(JUDGE_BATCH_SIZE=2, JUDGE_RETRY_BUDGET_RATIO=10)
+    def test_a_fallback_protocol_failure_never_triggers_width_one_isolation(
+        self,
+    ) -> None:
+        """
+        Isolation must key off the primary's own failure, not the fallback's.
+
+        The fallback is one attempt with no isolation of its own. An
+        implementation that narrowed on the fallback's ``invalid-json``
+        would pay one POST per unit here.
+        """
+        second_request = replace(REQ, unit_key="OTHER_KEY")
+        calls = []
+
+        def fake_post_batch(payload, profile):
+            calls.append(profile.provider)
+            if profile.provider == "litellm":
+                return _canned_response(status_code=500, failure_kind="http-server")
+            return _canned_response(
+                status_code=200,
+                payload={"choices": [{"message": {"content": "not json"}}]},
+                transport_succeeded=True,
+            )
+
+        with mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch):
+            results = request_verdicts(
+                [REQ, second_request], seat=1, persist_attempts=True
+            )
+        self.assertEqual(len(results), 2)
+        self.assertTrue(all(item.unparsed for item in results))
+        self.assertEqual(calls, ["litellm", "openrouter"])
+
+
+_SLASHED_PRIMARY = "https://openrouter.ai/api/v1/"
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-primary",
+    JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_BATCH_SIZE=5,
+    JUDGE_REQUEST_SLEEP=0.0,
+)
+class JudgeEndpointCanonicalizationTest(SimpleTestCase):
+    """
+    One destination is one endpoint, whatever way the operator spelled it.
+
+    The request path always dropped the trailing slash, so a guard that
+    compared raw strings let two spellings of one endpoint through.
+    """
+
+    def test_validation_drops_a_trailing_slash(self) -> None:
+        self.assertEqual(
+            _validate_base_url("https://openrouter.ai/api/v1/"),
+            "https://openrouter.ai/api/v1",
+        )
+        self.assertEqual(
+            _validate_base_url("https://openrouter.ai/api/v1"),
+            "https://openrouter.ai/api/v1",
+        )
+        self.assertEqual(_validate_base_url("https://host/"), "https://host")
+
+    def test_a_slash_only_difference_is_one_endpoint_fingerprint(self) -> None:
+        with override_settings(JUDGE_BASE_URL="https://openrouter.ai/api/v1"):
+            bare = resolve_judge_seat_profile(1).endpoint_fingerprint
+        with override_settings(JUDGE_BASE_URL=_SLASHED_PRIMARY):
+            slashed = resolve_judge_seat_profile(1).endpoint_fingerprint
+        self.assertEqual(bare, slashed)
+
+    @override_settings(JUDGE_BASE_URL=_SLASHED_PRIMARY, **JUDGE_FALLBACK_SETTINGS)
+    def test_a_slash_only_difference_is_rejected_as_the_same_endpoint(self) -> None:
+        with self.assertRaises(JudgeError):
+            validate_judge_configuration()
+
+    @override_settings(JUDGE_BASE_URL=_SLASHED_PRIMARY, **JUDGE_FALLBACK_SETTINGS)
+    def test_the_same_endpoint_is_refused_before_any_direct_request(self) -> None:
+        calls = []
+
+        def fake_post_batch(payload, profile):
+            calls.append(profile.provider)
+            return _canned_response(status_code=200, transport_succeeded=True)
+
+        with (
+            mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch),
+            self.assertRaises(JudgeError),
+        ):
+            request_verdicts([REQ], seat=1)
+        self.assertEqual(calls, [])
+
+    @override_settings(
+        **{**JUDGE_FALLBACK_SETTINGS, "JUDGE_FALLBACK_API_KEY": ""},
+    )
+    def test_a_partial_fallback_is_refused_before_any_direct_request(self) -> None:
+        """
+        Refuse a half-configured fallback before any request is sent.
+
+        request_verdicts is a documented direct-caller API and the probe uses
+        it. A blank key must never reach an Authorization header.
+        """
+        calls = []
+
+        def fake_post_batch(payload, profile):
+            calls.append(profile.provider)
+            return _canned_response(status_code=200, transport_succeeded=True)
+
+        with (
+            mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch),
+            self.assertRaises(JudgeError),
+        ):
+            request_verdicts([REQ], seat=1)
+        self.assertEqual(calls, [])
+
+    @override_settings(
+        **{
+            **JUDGE_FALLBACK_SETTINGS,
+            "JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1": "inherit",
+        }
+    )
+    def test_the_literal_inherit_is_not_a_fallback_value(self) -> None:
+        """The fallback has no inherit semantics; the literal is a mistake."""
+        with self.assertRaises(JudgeError):
+            validate_judge_configuration()
 
 
 @override_settings(
