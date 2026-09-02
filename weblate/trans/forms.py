@@ -276,6 +276,16 @@ GROUP_TEMPLATE = """
 TOOLBAR_TEMPLATE = """
 <div class="btn-toolbar float-end editor-toolbar">{0}</div>
 """
+# Collapsed by default: the special characters are rarely needed and were
+# competing with the actual translation text for attention. The toggle id
+# embeds the unit checksum and plural index so two units on one Zen page
+# never share a collapse target.
+COLLAPSIBLE_TOOLBAR_TEMPLATE = """
+<div class="float-end editor-toolbar">
+<button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#{0}" aria-expanded="false" aria-controls="{0}" title="{1}" tabindex="-1">…</button>
+<div class="collapse btn-toolbar" id="{0}">{2}</div>
+</div>
+"""
 MIN_COST_ESTIMATE_TM_THRESHOLD = 75
 
 
@@ -504,7 +514,13 @@ class PluralTextarea(forms.Textarea):
             [("", chars)],  # Only one group.
         )
 
-        result = format_html(TOOLBAR_TEMPLATE, groups)
+        toggle_id = f"toolbar-{unit.checksum}-{idx}"
+        result = format_html(
+            COLLAPSIBLE_TOOLBAR_TEMPLATE,
+            toggle_id,
+            gettext("Special characters"),
+            groups,
+        )
 
         if language.direction == "rtl":
             result = format_html("{}{}", self.get_rtl_toolbar(fieldname), result)
