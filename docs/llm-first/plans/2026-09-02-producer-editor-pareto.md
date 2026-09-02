@@ -33,9 +33,10 @@ chat on 2026-09-02 recorded below.
 (live inventory, the three scout reports, verified facts, and the full
 recommendation including the deferred waves).
 
-**Status:** waves 0 and 1 approved on 2026-09-02; wave 2 items approved
-individually (see "Waves"). Not started. Items outside the approved list are
-kept in "Deferred" at the end and need their own approval.
+**Status:** waves 0 and 1 approved on 2026-09-02 (second round: every wave 0
+and wave 1 proposal, including the ones first parked as deferred); wave 2
+items approved individually (see "Waves"). Not started. Items outside the
+approved list are kept in "Deferred" at the end and need their own approval.
 
 **Out of scope:** Zen mode (the 2026-09-01 research decision "leave Zen
 untouched" stands), a persistent Producer/Advanced mode toggle, judge prompt or
@@ -61,6 +62,7 @@ requires explicit approval each time.
 | 8 | Re-check is invisible to the producer | Manual save of changed text on a judged string queues the one-unit re-check; the manual button moves under "More actions"; the pending status stays as passive text |
 | 9 | "Keep as is" is one click; the reason is optional | `JudgeResolutionForm.reason` not required; `resolve_verdict` accepts a blank reason |
 | 10 | "Escalate for review" becomes "Send back to queue" | Label and badge only; the `ESCALATED` value, transitions and `judge:escalated` filter are unchanged |
+| 11 | Every remaining wave 0/1 proposal is in scope (second round) | Tabs folded into "More", collapsed toolbar, reduced pager, empty cards collapsed, demoted secondary buttons, triage shortcuts and paid-request hints become Tasks 10-15 |
 
 ## Waves
 
@@ -70,7 +72,7 @@ own and the next one never depends on a deferred item.
 | Wave | What | Code touched | Tasks | Approval |
 | --- | --- | --- | --- | --- |
 | 0 | Zero-code: registry and environment configuration | `dev-docker/docker-compose.yml`, `deploy/environment.example` | 1 | approved |
-| 1 | Templates, forms, static JS, Russian wording; no model or task changes | `translate.html`, `judge-verdict.html`, `judge-verdict-evidence.html`, `forms.py`, `full.js`, `ru/django.po`, one guard in `resolve_verdict` | 2, 4, 5, 6, 7 | approved |
+| 1 | Templates, forms, static JS, Russian wording; no model or task changes | `translate.html`, `judge-verdict.html`, `judge-verdict-evidence.html`, `editor.html`, `position-field.html`, `keyboard-shortcuts.html`, `forms.py`, `full.js`, `ru/django.po`, one guard in `resolve_verdict` | 2, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15 | approved |
 | 2 | Small backend: automatic re-check after a manual save, candidate backfill for the backlog | `views/edit.py`, `forms.py`, new management command | 3, 8 | 3 approved (questions 2 and 3 on 2026-09-02); 8 follows from decision 6 ("the fix lives in the card") and needs one confirmation before it is run anywhere |
 | - | Documentation and verification | `docs/` | 9 | with wave 1 |
 
@@ -593,6 +595,15 @@ entries with empty `msgstr` and the new ones from Tasks 2-6):
 | The changed text has been queued for a judge re-check. | Изменённый текст поставлен в очередь на перепроверку судьёй. |
 | Relates to a previous version | Относится к предыдущей версии |
 | The judge's opinion below was recorded for an earlier version of this translation; it may no longer apply. | Мнение судьи ниже записано для более ранней версии перевода и может быть неактуально. |
+| Special characters | Специальные символы |
+| Paid model request | Платный запрос к модели |
+| Accepting queues one judge re-check. | После принятия строка уходит на одну перепроверку судьёй. |
+| Apply the suggested judge fix. | Принять исправление, предложенное судьёй. |
+| Keep the current text as is. | Оставить текущий текст как есть. |
+| Re-check this string with the judge. | Перепроверить строку судьёй. |
+
+Tasks 11 and 15 land after this task; their strings are listed here so the
+`.po` file is touched once more at the end of wave 1, not on every commit.
 
 Keep the existing `Will not ship` -> `Не публикуется` and `Ships with
 evidence` -> current translation. Compile for the host tests with
@@ -655,6 +666,269 @@ uv run pytest weblate/trans/tests/test_commands.py -k Judge -q
 
 Commit: `feat(judge): add a candidate backfill command for the backlog`.
 
+## Task 10 (wave 1): Fold the remaining translator tabs into "More" and open no tab by default
+
+**Files:**
+
+- Modify: `weblate/templates/translate.html:285-371` (tab headers),
+  `:373-600` (tab panes: only the `active` class on `#nearby`)
+- Test: `weblate/trans/tests/test_edit.py` (the class extended in Task 2)
+
+Tests first:
+
+- `test_bottom_tabs_reduced`: `Nearby strings` and `History` are direct
+  `nav-link` items; `Suggestions` is a direct item only when
+  `unit.suggestions` is non-empty; `Similar keys`, `Variants`,
+  `Other occurrences`, `Comments`, `Other languages` and
+  `Automatic suggestions` are `dropdown-item` entries of the single `More`
+  dropdown, each keeping its `id="toggle-…"` and `data-bs-target`.
+- `test_no_tab_open_on_load`: the response contains no `nav-link active` and
+  no `tab-pane active` inside `.translation-tabs` / its `.tab-content`.
+- `test_more_dropdown_absent_when_empty`: a unit with no similar keys, no
+  variants, no other occurrences, a user without `comment.add` and
+  `machinery.view`, and a single-language component renders no `More`
+  dropdown at all (Other languages still counts: it is present whenever the
+  component has other languages, so this case needs a one-language project).
+
+Implementation:
+
+- Extend the dropdown introduced in Task 2 so that every conditional tab
+  header from `translate.html:294-353` and the `Other languages` header
+  (`:354-362`) become `<li><a class="dropdown-item" …>` entries in the same
+  `<ul class="dropdown-menu">`, preserving their existing conditions, ids,
+  `data-bs-target`, `data-load`, `data-href`, titles and badges verbatim.
+  Wrap the whole `<li class="nav-item dropdown">` in one condition that is
+  true when at least one entry renders.
+- Remove `active` from the `Nearby strings` link (`:287`) and from
+  `<div class="tab-pane active" id="nearby">` (`:375`). Bootstrap 5 tabs
+  work without an initially shown pane; the first click shows one.
+- `full.js` needs no change: `Ctrl+U`, `Ctrl+J`, `Ctrl+M` select
+  `.nav [data-bs-target="#…"]` (`full.js:186-198`) and a dropdown item is
+  inside `.nav`; the machinery lazy loader keys on `data-load`, the other
+  languages loader on `data-href`; the URL-hash tab opener in
+  `loader-bootstrap.js` targets by `data-bs-target` too. Verify all four in
+  the browser.
+
+Verify:
+
+```bash
+uv run pytest weblate/trans/tests/test_edit.py -k "tabs or tab_open or more_dropdown" -q
+uv run prek run --files weblate/templates/translate.html
+```
+
+Commit: `feat(editor): fold translator tabs into a More dropdown`.
+
+## Task 11 (wave 1): Collapse the special-characters toolbar behind one button
+
+**Files:**
+
+- Modify: `weblate/trans/forms.py:276-278` (`TOOLBAR_TEMPLATE`),
+  `:474-512` (`get_toolbar`)
+- Modify: `weblate/static/styles/main.css:383-387` (`.editor-toolbar`) only if
+  the collapsed wrapper needs a rule
+- Test: `weblate/trans/tests/test_forms.py` (or wherever `get_toolbar` /
+  `specialchar` is currently asserted: `grep -rn specialchar weblate/trans/tests`)
+
+Tests first:
+
+- `test_toolbar_collapsed_by_default`: the rendered editor contains one
+  `button` with `data-bs-toggle="collapse"`, `aria-expanded="false"` and a
+  `data-bs-target` pointing at a `div.collapse.btn-toolbar` that holds every
+  `.specialchar` button; the toggle id embeds `unit.checksum` and the plural
+  index so two units on one Zen page never share an id.
+- `test_toolbar_rtl_toggle_outside_collapse`: for an RTL language the
+  direction toggle from `get_rtl_toolbar` renders outside the collapsed
+  group (it changes the editor, not the text).
+- Existing tests asserting the `specialchar` buttons and their `data-value`
+  keep passing unchanged.
+
+Implementation: `TOOLBAR_TEMPLATE` becomes a wrapper with the toggle and the
+collapsible group:
+
+```python
+TOOLBAR_TEMPLATE = """
+<div class="float-end editor-toolbar">
+<button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#{0}" aria-expanded="false" aria-controls="{0}" title="{1}" tabindex="-1">…</button>
+<div class="collapse btn-toolbar" id="{0}">{2}</div>
+</div>
+"""
+```
+
+`get_toolbar` passes `f"toolbar-{unit.checksum}-{idx}"`, the translated title
+`gettext("Special characters")`, and `groups`. `base.js` inserts characters
+through a delegated `.specialchar` click handler, so the buttons keep working
+inside the collapse. Zen uses the same widget and inherits the change.
+
+Verify:
+
+```bash
+uv run pytest weblate/trans/tests/test_forms.py -k toolbar -q
+uv run prek run --files weblate/trans/forms.py
+```
+
+Commit: `feat(editor): collapse the special characters toolbar`.
+
+## Task 12 (wave 1): Reduce the pager to previous, position, next
+
+**Files:**
+
+- Modify: `weblate/templates/snippets/position-field.html:5-58, 82-137`
+- Modify: `weblate/static/editor/full.js:131-158` (`alt+home` / `alt+end`)
+- Test: `weblate/trans/tests/test_edit.py`
+
+Tests first:
+
+- `test_pager_reduced`: the translate page renders `button-prev`,
+  `position-input` and `button-next` and none of `button-first`,
+  `button-end`, `prev-section`, `next-section`; the pager root carries
+  `data-first-url` and `data-last-url` equal to `first_unit_url` /
+  `last_unit_url`.
+- `test_pager_first_and_last_disabled_states`: on the first unit `button-prev`
+  has `disabled`; on the last unit `button-next` has `disabled` (unchanged
+  behaviour, now the only boundary signal).
+
+Implementation:
+
+- Delete the `button-first`, `prev-section`, `next-section` and `button-end`
+  anchors in both branches of the snippet; keep `button-prev`, the position
+  widgets and `button-next` exactly as they are. Add
+  `data-first-url="{{ first_unit_url }}" data-last-url="{{ last_unit_url }}"`
+  to the root `div.unit-pagination` (empty when there is no previous/next
+  unit, mirroring today's disabled buttons).
+- `full.js:131-158`: `alt+home` / `alt+end` read
+  `document.querySelector(".unit-pagination")?.dataset.firstUrl` /
+  `.lastUrl` and navigate when non-empty. The shortcuts dialog entries
+  (`keyboard-shortcuts.html:34-44`) stay valid.
+- `browse.html` includes the same snippet with `is_in_browse`; it loses first
+  and last too, which is acceptable: the position input jumps anywhere.
+
+Verify:
+
+```bash
+uv run pytest weblate/trans/tests/test_edit.py -k pager -q
+uv run prek run --files weblate/templates/snippets/position-field.html weblate/static/editor/full.js
+```
+
+Commit: `feat(editor): reduce the pager to previous, position and next`.
+
+## Task 13 (wave 1): Collapse the Glossary and String information cards when empty
+
+**Files:**
+
+- Modify: `weblate/templates/translate.html:768-818` (Glossary card),
+  `:851-960` (String information card)
+- Modify: `weblate/static/editor/full.js:700-735` (glossary add success)
+- Test: `weblate/trans/tests/test_edit.py`
+
+Tests first:
+
+- `test_glossary_card_collapsed_when_no_terms`: a string without glossary
+  matches renders the Glossary header as a collapse toggle with
+  `aria-expanded="false"` and its body inside `div.collapse` without `show`;
+  with a matching term the body has `collapse show` and the toggle
+  `aria-expanded="true"`.
+- `test_string_info_card_collapsed_when_empty`: no explanation, no labels,
+  no flags: body collapsed; any of the three present: body shown.
+- The existing glossary-add view tests keep passing; the JSON contract of
+  `js-add-glossary` is untouched.
+
+Implementation: reuse the accordion markup already used for `Details`
+(`translate.html:941-953`): the `h4.card-title` becomes a
+`button.accordion-button` with `data-bs-toggle="collapse"` targeting the
+card's `.list-group`, `collapsed` and `aria-expanded` set from
+`{% if glossary %}` (Glossary) and
+`{% if unit.source_unit.explanation or unit.all_labels or unit.all_flags %}`
+(String information; use the exact context names the card already reads at
+`:858-940`). Ids embed `unit.id` like the existing accordion. In `full.js`,
+after a successful glossary add (`responseCode === 200`, `:716`), call
+`bootstrap.Collapse.getOrCreateInstance(document.getElementById("glossary-card-body-<unit.id>")).show()`
+so the new term is visible immediately; read the id from a `data-glossary-body`
+attribute on the form rather than hard-coding it.
+
+Verify:
+
+```bash
+uv run pytest weblate/trans/tests/test_edit.py -k "glossary_card or string_info" -q
+uv run prek run --files weblate/templates/translate.html weblate/static/editor/full.js
+```
+
+Commit: `feat(editor): collapse empty glossary and string information cards`.
+
+## Task 14 (wave 1): Demote "Save and stay"
+
+**Files:**
+
+- Modify: `weblate/templates/translate.html:259-264`
+- Test: `weblate/trans/tests/test_edit.py`
+
+Test first: `test_save_and_stay_is_secondary`: the `name="save-stay"` button
+has class `btn-link` and not `btn-primary`; `name="save"` stays the only
+`btn-primary` in the editor footer; `Skip` keeps `btn-link` (unchanged at
+`:271`).
+
+Implementation: change `class="btn btn-primary btn-spaced"` to
+`class="btn btn-link btn-spaced"` on the `save-stay` button; keep the
+`disabled` conditions. No behaviour change; `Ctrl+Enter` still submits
+`save`.
+
+Verify: `uv run pytest weblate/trans/tests/test_edit.py -k save_and_stay -q`.
+
+Commit: `feat(editor): demote save and stay to a secondary action`.
+
+## Task 15 (wave 1): Triage keyboard shortcuts and paid-request hints
+
+**Files:**
+
+- Modify: `weblate/static/editor/full.js:131-198` (hotkeys block)
+- Modify: `weblate/templates/keyboard-shortcuts.html` (three new rows)
+- Modify: `weblate/templates/snippets/judge-verdict.html` (hints)
+- Test: `weblate/trans/tests/test_judge_views.py` (`JudgeVerdictCardRenderTest`)
+
+Tests first:
+
+- `test_paid_hint_on_paid_buttons`: `Generate suggested fix`,
+  `Generate another` and `Re-check this string` each render with
+  `title="Paid model request"` and a sibling
+  `<small class="text-muted">Paid model request</small>`; `Use suggested fix`
+  and `Keep as is` carry neither (accepting a stored candidate queues the
+  re-check, which is already declared on the candidate block in one line:
+  `Accepting queues one judge re-check.`).
+- `test_shortcut_targets_present`: the three triage forms carry stable ids
+  `id_judge_accept_form`, `id_judge_keep_form`, `id_judge_recheck_form` so
+  the JS can find them.
+- The shortcuts dialog test (if one exists; otherwise a render test of
+  `keyboard-shortcuts.html`) lists the three new rows.
+
+Implementation:
+
+- `full.js`, next to the existing bindings (same `hotkeys("…", () => {…; return false;})` shape):
+  `ctrl+alt+a,command+alt+a` submits `#id_judge_accept_form`;
+  `ctrl+alt+k,command+alt+k` submits `#id_judge_keep_form`;
+  `ctrl+alt+r,command+alt+r` submits `#id_judge_recheck_form`; each is a
+  no-op when the form is absent. `Ctrl+Alt` avoids every browser-owned
+  `Ctrl+Shift+letter` and the macOS `Option+letter` dead keys; the Russian
+  layout has no `AltGr` characters. If the vendored `hotkeys-js` filter
+  swallows the combination while focus is inside the textarea, the shortcut
+  still works with focus anywhere else on the page, which is the producer's
+  state after reading the card; note the observed behaviour in the commit.
+- `keyboard-shortcuts.html`: three rows in the existing table format
+  (`<kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>A</kbd>` … "Apply the suggested
+  judge fix." / "Keep the current text as is." / "Re-check this string with
+  the judge."), all `{% translate %}`d and added to `ru/django.po` with Task 7
+  wording.
+- `judge-verdict.html`: `title="{% translate "Paid model request" %}"` and
+  the `<small>` hint on the three paid buttons; the one-line note under
+  `Use suggested fix`.
+
+Verify:
+
+```bash
+uv run pytest weblate/trans/tests/test_judge_views.py -k "paid_hint or shortcut" -q
+uv run prek run --files weblate/static/editor/full.js weblate/templates/keyboard-shortcuts.html weblate/templates/snippets/judge-verdict.html
+```
+
+Commit: `feat(judge): add triage shortcuts and paid-request hints`.
+
 ## Task 9 (docs): Documentation, changelog, verification
 
 **Files:**
@@ -671,9 +945,13 @@ Commit: `feat(judge): add a candidate backfill command for the backlog`.
 Producer guide: rename the buttons to their Russian labels, describe the
 three-action flow (Принять исправление / Оставить как есть / правка руками +
 Сохранить и продолжить с автоматической перепроверкой), state that the reason
-is optional, that "Автоматические предложения" now sits under "Ещё" in the
-bottom tabs, that review radios are gone for judged strings, and that the
-page refreshes itself while a fix is being generated or re-checked.
+is optional, that "Автоматические предложения" and the other context tabs now
+sit under "Ещё" in the bottom tabs, that review radios are gone for judged
+strings, that the special-characters toolbar opens from the "…" button, that
+the pager keeps only previous / position / next, that the glossary and string
+information cards open when they have content, list the three triage
+shortcuts, and note that the page refreshes itself while a fix is being
+generated or re-checked.
 
 `checks.rst`: `Use suggested fix` / `Generate another` wording stays;
 "always needs a written reason" (`:211`) becomes "may carry an optional
@@ -690,8 +968,17 @@ Changelog entries (concise, one per user-visible change):
   radios are hidden for judged strings.
 - The string page hides the Suggest button for users who can edit, the
   Screenshots card until a screenshot exists, and moves
-  :guilabel:`Automatic suggestions` under a :guilabel:`More` tab; the
+  :guilabel:`Automatic suggestions`, :guilabel:`Similar keys`,
+  :guilabel:`Comments`, :guilabel:`Other languages` and the other context tabs
+  under a :guilabel:`More` tab; no tab is open until chosen; the
   "Automatically translated" notice is removed.
+- The translation editor now keeps the special-characters toolbar behind one
+  button, reduces the pager to previous / position / next, demotes
+  :guilabel:`Save and stay` to a secondary action, and collapses the Glossary
+  and String information cards while they have nothing to show.
+- Added :kbd:`Ctrl+Alt+A`, :kbd:`Ctrl+Alt+K` and :kbd:`Ctrl+Alt+R` for the
+  LLM-judge triage actions, and a paid-request hint on every button that
+  spends a model call.
 - Added the ``judge_backfill_candidates`` management command.
 
 Verification (host, isolated test database per session):
@@ -702,6 +989,7 @@ CI_DB_NAME=weblate_producer_pareto uv run pytest \
   weblate/trans/tests/test_judge_views.py \
   weblate/trans/tests/test_judge_form.py \
   weblate/trans/tests/test_edit.py \
+  weblate/trans/tests/test_forms.py \
   weblate/trans/tests/test_commands.py -k "not Selenium" -q
 uv run prek run --files <all touched files>
 DJANGO_SETTINGS_MODULE=weblate.settings_test uv run ./manage.py makemigrations --check
@@ -726,8 +1014,10 @@ Commit: `docs(judge): document the producer editor reduction`.
 
 1. A judged string shows at most three visible actions in the card (accept
    fix or generate it, keep as is, more) and two under the editor (save and
-   continue, save and stay); no review radios, no Suggest, no
-   "Automatically translated", no Screenshots card without screenshots.
+   continue as the only primary button, save and stay demoted to a link); no
+   review radios, no Suggest, no "Automatically translated", no Screenshots
+   card without screenshots, no special-characters toolbar until it is opened,
+   no first/last/section pager buttons.
 2. `Keep as is` resolves a fresh critical or major in one POST without a
    reason and advances to the next string.
 3. Saving changed text on a judged string stores `STATE_TRANSLATED`, queues
@@ -743,20 +1033,21 @@ Commit: `docs(judge): document the producer editor reduction`.
 8. Every hidden control remains reachable: machinery under `More`, screenshots
    on the component page, escalation and manual re-check under `More actions`.
 9. No migration, no new permission, no secret or prompt in templates or logs.
+10. Only `Nearby strings`, `Suggestions` (when any exist) and `History` are
+    direct tabs; every other bottom tab lives in `More`; no tab pane is open
+    on page load.
+11. The Glossary and String information cards are collapsed when they have
+    nothing to show and open when they do; adding a glossary term opens the
+    card.
+12. Accept / keep / re-check are reachable from the keyboard and listed in the
+    shortcuts dialog; every paid button carries the paid-request hint.
 
 ## Deferred (proposed on 2026-09-02, not approved)
 
-- Collapse `Similar keys`, `Comments`, `Other languages` into the same `More`
-  dropdown; make `Nearby strings` collapsed by default.
-- Collapse the special-characters toolbar behind one button.
-- Remove the section-jump buttons from the pager.
-- Collapse empty `Glossary` and `String information` cards.
-- Demote `Save and stay` and `Skip`.
-- Link each judge-run report to the editor with `q=check:judge-reject`.
-- Keyboard shortcuts for accept / keep / re-check; a paid-request hint on
-  `Generate` and `Re-check`.
+- Link each judge-run report to the editor with `q=check:judge-reject`
+  (wave 2 item).
 - A persistent Producer/Advanced toggle (third `Profile.translate_mode`
-  value) once the above has been used for a while.
+  value) once the above has been used for a while (wave 3).
 - Judge rationale in Russian (prompt change).
 
 ## Deployment notes (each needs explicit approval)

@@ -386,15 +386,19 @@ Do not: disable the `Suggestion` mechanism (it stores the candidate); touch
 button (both rejected); change the judge prompt for a Russian rationale in
 this iteration (the back-translation already gives Russian text).
 
-### 6.4 Deferred with reasons
+### 6.4 Second-round wave 1 items
 
-Collapsing `Похожие ключи` / `Комментарии` / `Другие языки`, the
-special-characters toolbar, the pager's section buttons, empty glossary and
-string-info cards, `Сохранить и остаться` / `Пропустить`, keyboard shortcuts,
-a paid-request hint, the report-to-editor link and the persistent toggle were
-proposed but not approved on 2026-09-02; the ui-reduction design also asks for
-a telemetry audit before removing a P1 item, which collapsing satisfies and
-removal does not.
+Collapsing `Похожие ключи` / `Комментарии` / `Другие языки` into the same
+"More" dropdown with no tab open by default, the special-characters toolbar
+behind one button, the pager reduced to previous / position / next, empty
+glossary and string-info cards collapsed, `Сохранить и остаться` demoted,
+keyboard shortcuts for accept / keep / re-check and a paid-request hint were
+first parked as deferred and then approved in a second round on 2026-09-02
+(plan Tasks 10-15). The ui-reduction design asks for a telemetry audit before
+removing a P1 item; every item here collapses or relocates, none removes a
+capability, which is why no audit gates them. Still deferred: the
+report-to-editor link (wave 2), the persistent Producer/Advanced toggle
+(wave 3) and a Russian judge rationale (prompt change).
 
 ## 7. Product owner decisions (2026-09-02)
 
@@ -408,6 +412,7 @@ removal does not.
 | Remove the three review radios and keep only "Зафиксировать решение"? | remove radios; one decision button is not enough because it does not save text | radios hidden on judged strings; three actions: accept fix, keep as is, save (with auto re-check) |
 | Mandatory reason for "Оставить как есть"? | optional | `reason` not required; `resolve_verdict` accepts blank |
 | Auto re-check after a manual edit? | yes | wave 2 task |
+| Include the rest of waves 0 and 1 (tabs, toolbar, pager, empty cards, Save and stay, shortcuts, hints)? | yes, all of it | plan Tasks 10-15; only wave 2/3 items remain deferred |
 
 The approved subset is the plan
 `docs/llm-first/plans/2026-09-02-producer-editor-pareto.md`.
