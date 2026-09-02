@@ -761,10 +761,16 @@
               <h4 class="card-title">
                 {% documentation_icon 'user/glossary' right=True %}
                 {% loading_icon "glossary-add" %}
-                {% translate "Glossary" %}
+                <button type="button"
+                        class="accordion-button {% if not glossary %}collapsed{% endif %}"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#glossary-card-body-{{ unit.id }}"
+                        aria-expanded="{% if glossary %}true{% else %}false{% endif %}"
+                        aria-controls="glossary-card-body-{{ unit.id }}">{% translate "Glossary" %}</button>
               </h4>
             </div>
-            <div class="list-group">
+            <div class="list-group collapse {% if glossary %}show{% endif %}"
+                 id="glossary-card-body-{{ unit.id }}">
               <div class="list-group-item">
                 <table class="table table-sm table-simple">
                   <thead>
@@ -842,10 +848,16 @@
           <div class="card-header">
             <h4 class="card-title">
               {% documentation_icon 'user/translating' 'source-context' right=True %}
-              {% translate "String information" %}
+              <button type="button"
+                      class="accordion-button {% if not unit.source_unit.explanation and not unit.all_labels and not unit.all_flags %}collapsed{% endif %}"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#string-info-card-body-{{ unit.id }}"
+                      aria-expanded="{% if unit.source_unit.explanation or unit.all_labels or unit.all_flags %}true{% else %}false{% endif %}"
+                      aria-controls="string-info-card-body-{{ unit.id }}">{% translate "String information" %}</button>
             </h4>
           </div>
-          <div class="list-group">
+          <div class="list-group collapse {% if unit.source_unit.explanation or unit.all_labels or unit.all_flags %}show{% endif %}"
+               id="string-info-card-body-{{ unit.id }}">
             {% if path_object != unit.translation %}
               <div class="list-group-item">
                 <h5>{% translate "Component" %}</h5>
@@ -1144,6 +1156,7 @@
   {% if not unit.translation.component.hide_glossary_matches and addterm_form %}
     <form action="{% url 'js-add-glossary' unit_id=unit.id %}"
           method="post"
+          data-glossary-body="glossary-card-body-{{ unit.id }}"
           class="add-dict-inline double-submission">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ this_unit_url }}" />

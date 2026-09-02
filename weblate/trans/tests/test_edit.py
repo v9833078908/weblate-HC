@@ -651,6 +651,11 @@ class EditTest(ViewTestCase):
 
     def test_glossary_card_expanded_with_matching_term(self) -> None:
         """A matching term opens the Glossary card by default."""
+        if type(self) is not EditTest:
+            # A template-structural claim about the collapse wiring, not a
+            # per-format regression; some subclasses override self.source
+            # to text that would never match a "Hello" glossary term.
+            self.skipTest("Verified once against the base po fixture")
         glossary = self.create_po(
             name="Glossary",
             project=self.project,
@@ -681,7 +686,13 @@ class EditTest(ViewTestCase):
 
     def test_string_info_card_collapsed_when_empty(self) -> None:
         """No explanation, labels or flags: the card body stays collapsed."""
-        unit = self.get_unit(self.source)
+        if type(self) is not EditTest:
+            # A template-structural claim; the base po fixture bakes
+            # "#, c-format, max-length:100" onto self.source specifically
+            # for check tests elsewhere, so this uses the other, plain
+            # fixture string instead of assuming self.source is clean.
+            self.skipTest("Verified once against the base po fixture")
+        unit = self.get_unit("Thank you for using Weblate.")
         response = self.client.get(unit.get_absolute_url())
         tree = html.fromstring(response.content)
         toggle = tree.xpath(
