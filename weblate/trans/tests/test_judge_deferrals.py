@@ -184,6 +184,9 @@ class JudgeDeferralTest(ViewTestCase):
         self.assertIsNone(run_judge_batch.call_args.kwargs["user"])
         self.assertEqual(run_judge_batch.call_args.kwargs["seats"], (1,))
         self.assertFalse(run_judge_batch.call_args.kwargs["use_cache"])
+        # Read-only also means no paid candidate: a drain must not fetch a
+        # repair or leave a producer-facing suggestion behind.
+        self.assertEqual(run_judge_batch.call_args.kwargs["candidate_severities"], ())
         unit.refresh_from_db()
         self.assertEqual((unit.target, unit.state), original)
 

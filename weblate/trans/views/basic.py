@@ -725,6 +725,9 @@ def _judge_hand_off_blocked(translations: list[Translation]) -> bool:
     field: it never appears in ``judge_active_severity``/
     ``judge_active_resolution`` and so never clears a blocking critical
     here, by construction.
+
+    Coverage is checked live as well: a unit with no judge evidence at all
+    blocks, independently of the cached counters the caller gates on.
     """
     blocking_query = (
         "(judge:reject AND NOT judge:resolved) OR judge:escalated "
@@ -734,6 +737,16 @@ def _judge_hand_off_blocked(translations: list[Translation]) -> bool:
         if not isinstance(translation, Translation) or translation.is_source:
             continue
         if translation.unit_set.search(blocking_query).exists():
+            return True
+        # A never-judged string blocks hand-off. The cached ``not_reviewed``
+        # counter is the only other guard against it, and stats can lag
+        # behind a freshly added unit, so the authoritative pass must look
+        # for live coverage itself rather than trust that counter.
+        if (
+            translation.unit_set.search("NOT has:judge")
+            .exclude(state=STATE_READONLY)
+            .exists()
+        ):
             return True
     for translation in translations:
         if not isinstance(translation, Translation) or translation.is_source:

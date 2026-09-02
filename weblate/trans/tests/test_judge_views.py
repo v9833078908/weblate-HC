@@ -38,6 +38,7 @@ from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.models.suggestion import Suggestion
 from weblate.trans.models.unit import Unit
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.trans.views.basic import _judge_hand_off_blocked
 from weblate.utils.state import (
     STATE_FUZZY,
     STATE_NEEDS_CHECKING,
@@ -1794,6 +1795,22 @@ class JudgeQueueStripViewTest(ViewTestCase):
         self.assertEqual(counts["unparsed"], 0)
         self.assertFalse(response.context["judge_queue"]["hand_off_ready"])
 
+    def test_the_authoritative_check_sees_an_unjudged_unit(self) -> None:
+        # The cached ``not_reviewed`` counter is the only other guard against
+        # a never-judged string, and stats lag. The authoritative pass must
+        # therefore detect missing coverage on its own, independently of any
+        # cached count the caller gates on.
+        self.enable_review()
+        self.judge_all_units()
+        translations = [
+            translation
+            for translation in self.component.translation_set.all()
+            if not translation.is_source
+        ]
+        self.assertFalse(_judge_hand_off_blocked(translations))
+        JudgeVerdict.objects.filter(unit=self.get_unit()).delete()
+        self.assertTrue(_judge_hand_off_blocked(translations))
+
     def test_hand_off_query_count_stays_bounded(self) -> None:
         self.enable_review()
         self.judge_all_units()
@@ -2750,6 +2767,32 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "Re-checking this string")
         self.assertNotContains(response, "Re-check this string<")
+
+    def test_a_pending_recheck_suppresses_every_candidate_action(self) -> None:
+        # The re-check decides what the card may offer next; applying or
+        # regenerating a candidate while it is in flight races that answer.
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.make_candidate(unit, verdict)
+        self._completed_recheck(unit)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Re-checking this string")
+        self.assertNotContains(response, "Use suggested fix")
+        self.assertNotContains(response, "Generate another")
+        self.assertNotContains(response, "Generate suggested fix")
+
+    def test_a_pending_generation_replaces_the_generate_another_button(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.make_candidate(unit, verdict)
+        cache.set(_generation_lock_key(unit.pk, verdict.pk), "1", 60)
+        self.addCleanup(cache.delete, _generation_lock_key(unit.pk, verdict.pk))
+        response = self.client.get(unit.get_absolute_url())
+        # The preview stays usable, but a second paid generation must not be
+        # offered while one is already running.
+        self.assertContains(response, "Use suggested fix")
+        self.assertContains(response, "Generating a suggested fix")
+        self.assertNotContains(response, "Generate another")
 
     def test_current_candidate_shows_diff_provenance_and_actions(self) -> None:
         unit = self.get_unit()

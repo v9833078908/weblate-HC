@@ -846,6 +846,15 @@ CANDIDATE_METADATA = {
 
 
 class JudgeCandidateMetadataTest(SimpleTestCase):
+    def test_a_non_integer_schema_is_rejected(self) -> None:
+        # 1.0 and True both compare equal to 1 in Python; neither is a valid
+        # schema version under the closed contract.
+        for value in (1.0, True):
+            with self.subTest(schema=value):
+                details = dict(CANDIDATE_METADATA, schema=value)
+                with self.assertRaises(JudgeCandidateError):
+                    JudgeCandidateMetadata(details)
+
     def test_valid_metadata_round_trips(self) -> None:
         candidate = JudgeCandidateMetadata(CANDIDATE_METADATA)
         self.assertEqual(candidate.verdict_id, 1)

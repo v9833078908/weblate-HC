@@ -390,21 +390,25 @@ def bulk_accept_user_suggestions(
     # must happen in Python: a JSON key exclusion in the query would also
     # drop every row where "kind" is absent, i.e. every human suggestion
     # (matches the same trap SuggestionManager.add's dedup check avoids).
-    suggestions = [
-        suggestion
-        for suggestion in Suggestion.objects.filter(
-            unit__translation=translation, user=target_user
-        ).select_related("unit")
-        if not suggestion.is_judge_candidate
-    ]
-    total = len(suggestions)
+    base_suggestions = Suggestion.objects.filter(
+        unit__translation=translation, user=target_user
+    ).select_related("unit")
+    # Counted with two positive queries rather than by materializing the
+    # backlog: a large translation must not be loaded into memory at once,
+    # and matching "kind" positively avoids the negation trap above.
+    total = (
+        base_suggestions.count()
+        - base_suggestions.filter(userdetails__kind="judge-repair").count()
+    )
     accepted = 0
     failed = 0
     processed = 0
 
     report_bulk_accept_user_suggestions_progress(processed, total)
 
-    for suggestion in suggestions:
+    for suggestion in base_suggestions.iterator(chunk_size=100):
+        if suggestion.is_judge_candidate:
+            continue
         processed += 1
 
         if (
@@ -1024,6 +1028,21 @@ def auto_translate(
             result["message"] = gettext(
                 "Automatic translation skipped because the target no longer exists."
             )
+            # A pre-created re-check run would otherwise stay QUEUED forever
+            # and keep suppressing every replacement re-check for that unit.
+            if judge_run_id:
+                from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
+                    JudgeRun,
+                )
+
+                JudgeRun.objects.filter(
+                    pk=judge_run_id,
+                    status__in=[JudgeRun.Status.QUEUED, JudgeRun.Status.RUNNING],
+                ).update(
+                    status=JudgeRun.Status.FAILED,
+                    finished=timezone.now(),
+                    failure=result["message"],
+                )
             return store_auto_translate_activity_log(
                 activity_log_id,
                 result,

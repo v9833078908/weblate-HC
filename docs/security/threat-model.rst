@@ -118,10 +118,13 @@ Scope and intended use
        CSRF-protected POST gated by the same :guilabel:`unit.review`
        permission; it makes no outbound request and is refused against
        stale, superseded, or already-resolved evidence. A fresh, unresolved
-       reject or major on a writable string instead gets one stored repair
-       candidate - a native ``Suggestion``, never a direct edit to the live
-       target - through the already-modelled, project-configured
-       machine-translation data flow. Applying it
+       reject or major instead gets one stored repair candidate - a native
+       ``Suggestion``, never a direct edit to the live target - through the
+       already-modelled, project-configured machine-translation data flow.
+       Candidate storage does not depend on the run's writable selection,
+       because it writes no translation; only the unchanged deterministic
+       ``max-length`` repair still edits a target, and a unit on that path
+       stores no candidate at all. Applying it
        (:guilabel:`Use suggested fix`) is a separate CSRF-protected POST
        requiring both :guilabel:`unit.review` and automatic-translation
        permission together (stronger than plain suggestion acceptance),
@@ -129,10 +132,15 @@ Scope and intended use
        stale/superseded/already-resolved guard, and makes no outbound
        request itself. Producer-triggered candidate (re)generation and a
        one-string re-check are each a separate CSRF-protected POST gated by
-       the same two permissions and deduplicated - a cache lock for
-       generation, a capped queued run for re-check - so repeated clicks
-       cannot multiply outbound spend, and neither can be aimed at more than
-       the one requesting string. Reading a producer's durable run report,
+       the same two permissions, and neither can be aimed at more than the
+       one requesting string. Deduplication is scoped to work already in
+       flight - a cache lock for generation, a single queued or running
+       capped run for re-check - so a double-click or a reloaded form cannot
+       multiply outbound spend. A deliberate repeat after the previous
+       attempt has finished (:guilabel:`Generate another`, or re-checking a
+       string again) is a new authorised request and is charged as one; the
+       spend ceiling for these endpoints is the reviewer's own permission,
+       not a per-string cap. Reading a producer's durable run report,
        and running the guarded :wladmin:`judge_release_advisory_holds`
        cleanup command, are both local, read/local-write operations gated by
        the same automatic translation and review permissions, re-checked for
@@ -361,11 +369,15 @@ Reachability preconditions:
   models are configured. A run over :setting:`JUDGE_MAX_UNITS_PER_RUN` is
   refused before any request is sent. Repair of a parsed major or critical
   finding uses the already-modelled, project-configured machine-translation
-  data flow, but is reachable only for strings the run explicitly marked
-  writable (empty, needing editing, or with the overwrite checkbox on). An
-  end user cannot choose its endpoint, key, or model; a run without the
-  checkbox never rewrites an existing human translation, judges it instead,
-  storing a previewable repair candidate rather than an automatic rewrite.
+  data flow. Only the deterministic ``max-length`` repair still writes to a
+  target, and it remains restricted to strings the run explicitly marked
+  writable (empty, needing editing, or with the overwrite checkbox on);
+  every other parsed major or critical produces a stored candidate instead,
+  which writes no translation and therefore does not depend on that
+  selection. An end user cannot choose its endpoint, key, or model; a run
+  without the checkbox never rewrites an existing human translation, judges
+  it instead, storing a previewable repair candidate rather than an
+  automatic rewrite.
   Applying a stored candidate is refused unless it is still the current
   verdict's own suggestion for the unit's exact current target and context,
   and requires unit-review and automatic-translation permission together; a

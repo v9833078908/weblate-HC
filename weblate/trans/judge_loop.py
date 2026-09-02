@@ -497,16 +497,23 @@ def _store_candidate(
     verdict: JudgeVerdict,
     engine: str,
     user: User | None,
-) -> bool:
+) -> str:
     """
     Persist a repair candidate as a native Suggestion under the unit lock.
 
     Mirrors the _apply_repair snapshot check: the candidate is stored only
     when the judged target/state/context still owns the unit. The unit
     target itself is never mutated (invariant 1).
+
+    Returns ``stored``, ``drift`` (the judged snapshot lost the unit, so the
+    round's projection can no longer be trusted) or ``refused`` (the snapshot
+    still holds but the manager kept no row, because the repair matched the
+    live text or was too long). ``refused`` is not drift: the verdict itself
+    remains valid and must keep holding the string.
     """
     from weblate.trans.models.suggestion import (  # ruff: ignore[import-outside-top-level]
         Suggestion,
+        SuggestionAddResult,
     )
 
     with transaction.atomic():
@@ -534,7 +541,7 @@ def _store_candidate(
                 glossary_terms=request.glossary_terms,
             )
         ):
-            return False
+            return "drift"
         metadata = {
             "kind": "judge-repair",
             "schema": 1,
@@ -549,7 +556,7 @@ def _store_candidate(
             ),
             "engine": engine,
         }
-        Suggestion.objects.add(
+        suggestion, result = Suggestion.objects.add(
             locked,
             new_target,
             request=None,
@@ -557,8 +564,19 @@ def _store_candidate(
             user=user,
             raise_exception=False,
             userdetails=metadata,
+            change_details={
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+            },
         )
-    return True
+    # DUPLICATE is a real stored candidate for this same verdict, so it
+    # counts as success; anything else left no row behind.
+    if suggestion is not None and result in {
+        SuggestionAddResult.CREATED,
+        SuggestionAddResult.DUPLICATE,
+    }:
+        return "stored"
+    return "refused"
 
 
 def _prepare_round_unit(
@@ -590,15 +608,23 @@ def _prepare_round_unit(
     # verdicts select the candidate path regardless of writable state or
     # remaining attempts. A producer re-check turns mutating repairs off
     # entirely, so max-length there neither mutates nor stores.
+    max_length_active = _has_active_check(current, "max-length")
     needs_mutating_repair = (
         mutating_repairs
         and verdict.verdict != JudgeVerdict.Verdict.UNPARSED
-        and _has_active_check(current, "max-length")
+        and max_length_active
         and attempt < attempts
         and unit.id in writable_ids
     )
+    # An active max-length check suppresses candidate storage unconditionally,
+    # not merely when the mutating branch happens to be taken. A non-writable
+    # unit, an exhausted repair budget, or a producer re-check (which turns
+    # mutating repairs off entirely) must all still leave the unit on the
+    # deterministic path with no preview stored (invariant 9).
     needs_candidate = (
-        verdict.verdict in candidate_verdicts and not needs_mutating_repair
+        verdict.verdict in candidate_verdicts
+        and not needs_mutating_repair
+        and not max_length_active
     )
     return _PreparedRound(
         unit=current,
@@ -1372,17 +1398,36 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
             )
             for unit in pending
         ]
+        # A candidate that is still active for this exact verdict is reused:
+        # regenerating pays a second repair MT for an unchanged string and
+        # would replace a preview the producer may already be reading.
+        reused_candidate_ids = {
+            item.unit.id
+            for item in prepared
+            if item is not None
+            and item.needs_candidate
+            and active_judge_candidate(item.unit, item.verdict) is not None
+        }
         repairable_units = [
             item.unit
             for item in prepared
-            if item is not None and (item.needs_candidate or item.needs_mutating_repair)
+            if item is not None
+            and (
+                item.needs_mutating_repair
+                or (item.needs_candidate and item.unit.id not in reused_candidate_ids)
+            )
         ]
         repairs = repair_targets(repairable_units, user) if repairable_units else {}
         candidate_engine = (
             configured_routed_engine(
                 units[0].translation.component.project.get_machinery_settings()
             )
-            if any(item is not None and item.needs_candidate for item in prepared)
+            if any(
+                item is not None
+                and item.needs_candidate
+                and item.unit.id not in reused_candidate_ids
+                for item in prepared
+            )
             else None
         )
         next_pending = []
@@ -1395,6 +1440,14 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
             verdicts.initial_severity.setdefault(unit.id, item.verdict.max_severity)
             verdicts.attempt_counts[unit.id] = attempt + 1
             wants_repair = item.needs_candidate or item.needs_mutating_repair
+            if item.needs_candidate and unit.id in reused_candidate_ids:
+                verdicts.repair_status[unit.id] = "candidate-stored"
+                if unit.id in cached_ids:
+                    verdicts.cached_unit_ids.add(unit.id)
+                else:
+                    verdicts.cached_unit_ids.discard(unit.id)
+                record_final_snapshot(item.unit)
+                continue
             new_target = repairs.get(unit.id) if wants_repair else None
             if new_target is None:
                 if wants_repair:
@@ -1420,12 +1473,19 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                     candidate_engine,
                     user,
                 )
-                if not stored:
+                if stored == "drift":
                     # The judged snapshot no longer owns the unit: discard
                     # the output and stop trusting the round's projection.
                     verdicts.repair_status[unit.id] = "no-candidate"
                     verdicts.pop(unit.id, None)
                     verdicts.cached_unit_ids.discard(unit.id)
+                    continue
+                if stored == "refused":
+                    # Nothing previewable came back, but the verdict still
+                    # owns the unit and must keep holding it.
+                    verdicts.repair_status[unit.id] = "no-candidate"
+                    verdicts.cached_unit_ids.discard(unit.id)
+                    record_final_snapshot(item.unit)
                     continue
                 verdicts.repair_status[unit.id] = "candidate-stored"
                 verdicts.cached_unit_ids.discard(unit.id)
@@ -1719,7 +1779,9 @@ def _drain_seat(
         remaining = (earliest_expiry - timezone.now()).total_seconds()
         lease_deadline = started + max(0.0, remaining - margin)
     # `run_judge_batch` persists and synchronizes the claimed rows. Empty
-    # writable IDs makes this retry strictly read-only.
+    # writable IDs and an empty candidate severity set make this retry
+    # strictly read-only: a drain never mutates a target, and it never pays
+    # a repair MT to store a producer-facing candidate either.
     run_judge_batch(
         seat_units,
         writable_ids=set(),
@@ -1728,6 +1790,7 @@ def _drain_seat(
         seats=(seat,),
         use_cache=False,
         retry_deadline=lease_deadline,
+        candidate_severities=(),
     )
     return len(seat_units)
 
@@ -1894,6 +1957,7 @@ def active_judge_candidate(unit: Unit, verdict: JudgeVerdict | None):
             continue
         if (
             metadata.verdict_id == verdict.pk
+            and metadata.run_id == verdict.run_id
             and metadata.target_hash == target_hash
             and metadata.context_hash == context_hash
         ):
@@ -2045,6 +2109,10 @@ def accept_judge_candidate(
             or verdict.verdict not in _CANDIDATE_VERDICTS
             or current is None
             or current.pk != verdict.pk
+            # Route identity is part of the contract: a row claiming a run
+            # that did not produce this verdict is not a live candidate, and
+            # accepting it would record forged provenance.
+            or metadata.run_id != verdict.run_id
         ):
             raise JudgeCandidateError(
                 gettext("The verdict is no longer current for this string.")
@@ -2112,6 +2180,13 @@ def _generate_candidate(
     unit = UnitModel.objects.filter(pk=unit_id).prefetch_full().first()
     if unit is None:
         return "stale"
+    # The view checked permissions before queueing; re-check them here so a
+    # revocation between enqueue and execution cannot still spend money.
+    if user is not None and (
+        not user.has_perm("unit.review", unit)
+        or not user.has_perm("translation.auto", unit.translation)
+    ):
+        return "denied"
     unit.invalidate_checks_cache()
     unit.clear_checks_cache()
     unit.run_checks()
@@ -2148,4 +2223,6 @@ def _generate_candidate(
         engine,
         user,
     )
-    return "generated" if stored else "drift"
+    if stored == "stored":
+        return "generated"
+    return "drift" if stored == "drift" else "failed"

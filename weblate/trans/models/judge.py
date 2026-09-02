@@ -140,7 +140,14 @@ class JudgeCandidateMetadata:
         if details["kind"] != "judge-repair":
             msg = "unknown candidate kind"
             raise JudgeCandidateError(msg)
-        if details["schema"] != _CANDIDATE_METADATA_SCHEMA:
+        schema = details["schema"]
+        # `1.0` and `True` both compare equal to 1 in Python; neither is a
+        # valid schema version under the closed contract.
+        if (
+            not isinstance(schema, int)
+            or isinstance(schema, bool)
+            or schema != _CANDIDATE_METADATA_SCHEMA
+        ):
             msg = "unsupported candidate schema"
             raise JudgeCandidateError(msg)
         verdict_id = details["judge_verdict_id"]

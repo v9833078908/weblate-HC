@@ -1191,34 +1191,48 @@ class BatchAutoTranslate(BaseAutoTranslate):
         """
         if self.judge_run_id is None:
             return self._create_judge_run()
-        run = JudgeRun.objects.filter(
-            pk=self.judge_run_id,
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
-            requested_mode="recheck",
-            status=JudgeRun.Status.QUEUED,
-        ).first()
-        if run is None:
-            msg = gettext("The re-check run is no longer available.")
-            raise ValueError(msg)
         expected_unit = (
             self.unit_ids[0] if self.unit_ids and len(self.unit_ids) == 1 else None
         )
-        if expected_unit is None or run.requested_query != f"id:{expected_unit}":
-            run.status = JudgeRun.Status.FAILED
-            run.finished = timezone.now()
-            run.failure = gettext("The re-check request does not match the run.")
-            run.save(update_fields=["status", "finished", "failure"])
-            msg = run.failure
-            raise ValueError(msg)
         task_id = (
             current_task.request.id if current_task and current_task.request.id else ""
         )
-        run.status = JudgeRun.Status.RUNNING
-        run.started = timezone.now()
-        if task_id:
-            run.task_id = task_id
-        run.save(update_fields=["status", "started", "task_id"])
-        return run
+        # Claim the queued run under a row lock: `auto_translate` uses late
+        # acknowledgement, so the broker can redeliver the same task, and two
+        # workers must never both observe QUEUED and both pay for the seats.
+        with transaction.atomic():
+            claimed = (
+                JudgeRun.objects.select_for_update()
+                .filter(
+                    pk=self.judge_run_id,
+                    scope_type=JudgeRun.ScopeType.TRANSLATION,
+                    requested_mode="recheck",
+                    status=JudgeRun.Status.QUEUED,
+                )
+                .first()
+            )
+            if (
+                claimed is not None
+                and expected_unit is not None
+                and claimed.requested_query == f"id:{expected_unit}"
+            ):
+                claimed.status = JudgeRun.Status.RUNNING
+                claimed.started = timezone.now()
+                if task_id:
+                    claimed.task_id = task_id
+                claimed.save(update_fields=["status", "started", "task_id"])
+                return claimed
+        # Both failure paths run outside the claim transaction so the FAILED
+        # transition below is not rolled back by the exception that follows.
+        if claimed is None:
+            msg = gettext("The re-check run is no longer available.")
+            raise ValueError(msg)
+        claimed.status = JudgeRun.Status.FAILED
+        claimed.finished = timezone.now()
+        claimed.failure = gettext("The re-check request does not match the run.")
+        claimed.save(update_fields=["status", "finished", "failure"])
+        msg = claimed.failure
+        raise ValueError(msg)
 
     def _create_judge_run(self) -> JudgeRun:
         scope = self.judge_scope

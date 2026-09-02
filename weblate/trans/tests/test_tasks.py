@@ -575,7 +575,39 @@ class JudgeCandidateGenerationTest(ComponentTestCase):
     def setUp(self) -> None:
         super().setUp()
         self.project.machinery_settings = {"openrouter": {"key": "test"}}
-        self.project.save(update_fields=["machinery_settings"])
+        # unit.review is gated on review being enabled for the project, so a
+        # superuser actor still needs the feature switch on to hold it.
+        self.project.translation_review = True
+        self.project.save(update_fields=["machinery_settings", "translation_review"])
+        # The worker re-checks unit.review + translation.auto before spending
+        # (a revocation between enqueue and execution must stop it). These
+        # outcome tests exercise an authorised actor; permission gating is
+        # covered separately by the view tests and the revocation test below.
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+
+    def test_generation_is_refused_after_permission_revocation(self) -> None:
+        # The view checked permissions before queueing; a revocation between
+        # enqueue and execution must still stop the spend.
+        unit, verdict = self.critical_verdict()
+        with (
+            mock.patch(
+                "weblate.trans.judge_loop.repair_targets",
+                return_value={unit.pk: ["repaired"]},
+            ) as repair,
+            mock.patch("weblate.auth.models.User.has_perm", return_value=False),
+        ):
+            outcome = generate_judge_candidate(
+                unit_id=unit.pk,
+                verdict_id=verdict.pk,
+                user_id=self.user.pk,
+                replace=False,
+            )
+        self.assertEqual(outcome, "denied")
+        repair.assert_not_called()
+        self.assertEqual(
+            unit.suggestion_set.filter(userdetails__kind="judge-repair").count(), 0
+        )
 
     def critical_verdict(self, *, target="existing translation"):
         unit = self.translation.unit_set.first()

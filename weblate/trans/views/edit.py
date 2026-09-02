@@ -1994,6 +1994,11 @@ def judge_generate_candidate(request: AuthenticatedHttpRequest, pk):
             messages.info(request, gettext("This verdict already has a candidate."))
         elif outcome == "busy":
             messages.info(request, gettext("A candidate is already being generated."))
+        elif outcome == "denied":
+            messages.error(
+                request,
+                gettext("You no longer have permission to generate a candidate."),
+            )
         elif outcome in {"stale", "resolved", "invalid-verdict"}:
             messages.error(
                 request, gettext("The verdict is no longer current for this string.")

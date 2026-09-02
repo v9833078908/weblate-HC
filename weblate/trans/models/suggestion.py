@@ -67,6 +67,7 @@ class SuggestionManager(models.Manager["Suggestion"]):
         # ruff: ignore[import-outside-top-level]
         from weblate.auth.models import get_anonymous
         from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
+            JudgeCandidateError,
             JudgeCandidateMetadata,
         )
 
@@ -112,15 +113,29 @@ class SuggestionManager(models.Manager["Suggestion"]):
         # The namespace of an existing row is decided in Python: a JSON
         # key negation would also drop rows where the key is absent.
         same_suggestion = self.filter(target=target_merged, unit=unit).first()
-        same_is_judge = (
-            same_suggestion is not None
-            and JudgeCandidateMetadata.parse(same_suggestion.userdetails) is not None
-        )
+        same_judge_metadata = None
+        if same_suggestion is not None:
+            try:
+                same_judge_metadata = JudgeCandidateMetadata.parse(
+                    same_suggestion.userdetails
+                )
+            except JudgeCandidateError:
+                # A malformed persisted row must never abort an unrelated
+                # suggestion: treat it as opaque here, never as a live
+                # candidate. `active_judge_candidate` skips it too.
+                same_judge_metadata = None
+        same_is_judge = same_judge_metadata is not None
         if judge_metadata is not None:
-            if same_is_judge:
+            if (
+                same_is_judge
+                and same_judge_metadata.verdict_id == judge_metadata.verdict_id
+            ):
                 return same_suggestion, SuggestionAddResult.DUPLICATE
             # One verdict has at most one active candidate (invariant 8):
-            # a new verdict replaces the previous judge candidate.
+            # a new verdict replaces the previous judge candidate. Identity
+            # is the verdict, not the text: a fresh verdict whose repair is
+            # byte-identical to the superseded one must still end up bound
+            # to the current verdict, or no candidate is active at all.
             self.filter(unit=unit, userdetails__kind="judge-repair").delete()
         elif same_suggestion is not None and not same_is_judge:
             if same_suggestion.user == user or not vote:
@@ -302,9 +317,14 @@ class Suggestion(models.Model, UserDisplayMixin):
         old: str = "",
     ) -> None:
         """Delete with logging change."""
-        if is_spam and self.userdetails:
+        # Judge candidates carry closed metadata with no reporter address or
+        # agent, so they are never spam-reportable; a plain key lookup here
+        # would raise KeyError and 500 the delete endpoint.
+        if is_spam and self.userdetails and not self.is_judge_candidate:
             report_spam(
-                self.userdetails["address"], self.userdetails["agent"], self.target
+                self.userdetails.get("address", ""),
+                self.userdetails.get("agent", ""),
+                self.target,
             )
         self.unit.change_set.create(
             action=change,

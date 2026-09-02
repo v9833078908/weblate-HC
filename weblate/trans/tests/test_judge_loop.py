@@ -25,10 +25,12 @@ from weblate.trans.judge import (
     resolve_judge_seat_profile,
 )
 from weblate.trans.judge_loop import (
+    _has_active_check,
     _run_seats,
     _SeatJob,
     _select_repair_texts,
     _write_verdict,
+    active_judge_candidate,
     build_request,
     repair_targets,
     run_judge_batch,
@@ -1338,6 +1340,159 @@ class JudgeLoopTest(ViewTestCase):
     def test_repair_that_changes_nothing_stops_the_loop(self) -> None:
         _, _verdict, client = self.run_batch([CRITICAL, CRITICAL], repair=None)
         self.assertEqual(client.call_count, 2)
+
+    # -- review remediation: candidate storage must not lie or overpay ------
+
+    def _candidates(self, unit):
+        return unit.suggestion_set.filter(userdetails__kind="judge-repair")
+
+    def test_a_refused_repair_is_not_audited_as_a_stored_candidate(self) -> None:
+        self.enable_repair_engine()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Identical target"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        repair_mock = mock.Mock(return_value={unit.id: ["Identical target"]})
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+        ):
+            verdicts = run_judge_batch([unit], writable_ids=set(), user=self.user)
+        # The manager refuses a repair identical to the live target, so no
+        # row exists and the audit must not claim one.
+        self.assertEqual(self._candidates(unit).count(), 0)
+        self.assertEqual(verdicts.repair_status[unit.id], "no-candidate")
+        # A refusal is not drift: the critical verdict still stands.
+        self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.REJECT)
+
+    def test_a_fresh_verdict_rebinds_an_identical_candidate(self) -> None:
+        self.enable_repair_engine()
+        unit = self.get_unit()
+        first_client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        repair_mock = mock.Mock(return_value={unit.id: ["same repair text"]})
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", first_client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+        ):
+            first = run_judge_batch([unit], writable_ids=set(), user=self.user)
+        first_verdict = first[unit.id]
+        second_client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", second_client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+            mock.patch("weblate.trans.judge_loop._cached_verdict", return_value=None),
+        ):
+            second = run_judge_batch(
+                [self.get_unit()], writable_ids=set(), user=self.user
+            )
+        second_verdict = second[unit.id]
+        self.assertNotEqual(second_verdict.pk, first_verdict.pk)
+        # Byte-identical repair text must still be rebound to the current
+        # verdict, otherwise the producer sees no candidate at all.
+        self.assertEqual(self._candidates(unit).count(), 1)
+        self.assertIsNotNone(active_judge_candidate(self.get_unit(), second_verdict))
+
+    def test_a_cached_negative_verdict_reuses_its_candidate(self) -> None:
+        self.enable_repair_engine()
+        unit = self.get_unit()
+        repair_mock = mock.Mock(return_value={unit.id: ["stored repair"]})
+        client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+        ):
+            first = run_judge_batch([unit], writable_ids=set(), user=self.user)
+        stored_verdict = first[unit.id]
+        self.assertEqual(repair_mock.call_count, 1)
+        second_client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", second_client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+            mock.patch(
+                "weblate.trans.judge_loop._cached_verdict",
+                return_value=stored_verdict,
+            ),
+        ):
+            verdicts = run_judge_batch(
+                [self.get_unit()], writable_ids=set(), user=self.user
+            )
+        # The verdict was reused from cache, so no seat was asked again and
+        # the still-active candidate must not be regenerated either.
+        second_client.assert_not_called()
+        self.assertEqual(repair_mock.call_count, 1)
+        self.assertEqual(self._candidates(unit).count(), 1)
+        self.assertEqual(verdicts.repair_status[unit.id], "candidate-stored")
+
+    def test_an_empty_candidate_severity_set_stores_nothing(self) -> None:
+        self.enable_repair_engine()
+        unit = self.get_unit()
+        repair_mock = mock.Mock(return_value={unit.id: ["drain repair"]})
+        client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+        ):
+            run_judge_batch(
+                [unit],
+                writable_ids=set(),
+                user=self.user,
+                candidate_severities=(),
+            )
+        # A read-only drain neither pays for a repair nor stores a preview.
+        repair_mock.assert_not_called()
+        self.assertEqual(self._candidates(unit).count(), 0)
+
+    def test_active_max_length_stores_no_candidate_when_not_writable(self) -> None:
+        self.enable_repair_engine()
+        unit = self.get_unit()
+        unit.extra_flags = "max-length:5"
+        unit.save(update_fields=["extra_flags"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["a much longer raw target"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        unit.run_checks()
+        self.assertTrue(_has_active_check(unit, "max-length"))
+        repair_mock = mock.Mock(return_value={unit.id: ["also far too long"]})
+        client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+        ):
+            run_judge_batch([unit], writable_ids=set(), user=self.user)
+        # max-length precedence is absolute: a non-writable unit stays on the
+        # deterministic path instead of falling through to a preview.
+        repair_mock.assert_not_called()
+        self.assertEqual(self._candidates(unit).count(), 0)
+
+    def test_active_max_length_stores_no_candidate_without_mutating_repairs(
+        self,
+    ) -> None:
+        self.enable_repair_engine()
+        unit = self.get_unit()
+        unit.extra_flags = "max-length:5"
+        unit.save(update_fields=["extra_flags"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["a much longer raw target"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        unit.run_checks()
+        repair_mock = mock.Mock(return_value={unit.id: ["still far too long"]})
+        client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+        ):
+            run_judge_batch(
+                [unit],
+                writable_ids={unit.id},
+                user=self.user,
+                mutating_repairs=False,
+                candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
+            )
+        # A producer re-check neither mutates nor stores while max-length is
+        # active, exactly as _prepare_round_unit's comment promises.
+        repair_mock.assert_not_called()
+        self.assertEqual(self._candidates(unit).count(), 0)
+        self.assertEqual(self.get_unit().target.strip(), "a much longer raw target")
 
     def test_repair_is_rolled_back_when_it_adds_a_deterministic_check(self) -> None:
         # Only the max-length path mutates the target; the rollback guard

@@ -122,6 +122,11 @@
            (invariant 9): no candidate is stored while max-length is
            active, so there is nothing to preview here. The failing check
            itself is shown elsewhere on the page. #}
+      {% elif judge_recheck_pending %}
+        {# A paid re-check is in flight and its answer decides what this
+           card may offer next. Applying or regenerating a candidate now
+           would race that answer, so the card shows only the re-check
+           status rendered further down until it lands. #}
       {% elif judge_candidate %}
         <div class="list-group-item check">
           <h5 class="list-group-item-heading">
@@ -141,14 +146,18 @@
               <input type="hidden" name="success_next" value="{{ next_unit_url }}" />
               <button type="submit" class="btn btn-success">{% translate "Use suggested fix" %}</button>
             </form>
-            <form method="post"
-                  action="{% url 'judge-generate-candidate' pk=judge_current_verdict.pk %}"
-                  class="form-inline">
-              {% csrf_token %}
-              <input type="hidden" name="next" value="{{ this_unit_url }}" />
-              <input type="hidden" name="replace" value="1" />
-              <button type="submit" class="btn btn-link">{% translate "Generate another" %}</button>
-            </form>
+            {% if judge_generation_pending %}
+              <p class="list-group-item-text text-muted">{% translate "Generating a suggested fix…" %}</p>
+            {% else %}
+              <form method="post"
+                    action="{% url 'judge-generate-candidate' pk=judge_current_verdict.pk %}"
+                    class="form-inline">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ this_unit_url }}" />
+                <input type="hidden" name="replace" value="1" />
+                <button type="submit" class="btn btn-link">{% translate "Generate another" %}</button>
+              </form>
+            {% endif %}
           {% endif %}
         </div>
       {% elif judge_active_verdict %}

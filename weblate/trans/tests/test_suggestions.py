@@ -668,6 +668,35 @@ class JudgeCandidateSuggestionTest(ViewTestCase):
         self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
         self.assertNotEqual(self.get_unit().state, STATE_FUZZY)
 
+    def test_spam_deleting_a_candidate_does_not_crash(self) -> None:
+        # Candidate metadata is closed and carries no reporter address or
+        # agent; a plain key lookup in delete_log would 500 the endpoint.
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit)
+        candidate = self.make_candidate(unit, verdict)
+        candidate.delete_log(self.user, is_spam=True)
+        self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
+
+    def test_a_malformed_candidate_row_does_not_block_a_human_suggestion(self) -> None:
+        # A broken persisted judge row must stay opaque instead of aborting
+        # an unrelated suggestion that happens to share its text.
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit)
+        candidate = self.make_candidate(unit, verdict, target="Shared text")
+        Suggestion.objects.filter(pk=candidate.pk).update(
+            userdetails={"kind": "judge-repair", "schema": 1}
+        )
+        suggestion, _result = Suggestion.objects.add(
+            unit,
+            ["Shared text"],
+            request=self.get_request(),
+            vote=False,
+            raise_exception=False,
+        )
+        self.assertIsNotNone(suggestion)
+
     def test_vote_never_autoaccepts_a_judge_candidate(self) -> None:
         self.enable_review()
         self.component.suggestion_voting = True
