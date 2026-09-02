@@ -147,6 +147,7 @@
               <input type="hidden" name="success_next" value="{{ next_unit_url }}" />
               <button type="submit" class="btn btn-success">{% translate "Use suggested fix" %}</button>
             </form>
+            <p class="list-group-item-text text-muted">{% translate "Accepting queues one judge re-check." %}</p>
           {% endif %}
         </div>
       {% elif judge_active_verdict %}
@@ -158,7 +159,10 @@
                   action="{% url 'judge-generate-candidate' pk=judge_current_verdict.pk %}">
               {% csrf_token %}
               <input type="hidden" name="next" value="{{ this_unit_url }}" />
-              <button type="submit" class="btn btn-primary">{% translate "Generate suggested fix" %}</button>
+              <button type="submit"
+                      class="btn btn-primary"
+                      title="{% translate "Paid model request" %}">{% translate "Generate suggested fix" %}</button>
+              <small class="text-muted">{% translate "Paid model request" %}</small>
             </form>
           {% endif %}
         </div>
@@ -176,7 +180,10 @@
             <button type="submit" class="btn btn-outline-secondary">{% translate "Keep as is" %}</button>
             <details class="mt-2">
               <summary class="text-muted">{% translate "Add a reason (optional)" %}</summary>
-              <textarea class="form-control" name="reason" rows="2" aria-label="{% translate "Reason (optional)" %}"></textarea>
+              <textarea class="form-control"
+                        name="reason"
+                        rows="2"
+                        aria-label="{% translate "Reason (optional)" %}"></textarea>
             </details>
           </form>
         </div>
@@ -196,7 +203,8 @@
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ this_unit_url }}" />
                     <input type="hidden" name="replace" value="1" />
-                    <button type="submit" class="btn btn-link">{% translate "Generate another" %}</button>
+                    <button type="submit" class="btn btn-link" title="{% translate "Paid model request" %}">{% translate "Generate another" %}</button>
+                    <small class="text-muted">{% translate "Paid model request" %}</small>
                   </form>
                 {% endif %}
               {% endif %}
@@ -211,15 +219,21 @@
                   <button type="submit" class="btn btn-link">{% translate "Send back to queue" %}</button>
                   <details class="mt-2">
                     <summary class="text-muted">{% translate "Add a reason (optional)" %}</summary>
-                    <textarea class="form-control" name="reason" rows="2" aria-label="{% translate "Reason (optional)" %}"></textarea>
+                    <textarea class="form-control"
+                              name="reason"
+                              rows="2"
+                              aria-label="{% translate "Reason (optional)" %}"></textarea>
                   </details>
                 </form>
               {% endif %}
               {% if judge_can_triage and not judge_recheck_pending %}
-                <form method="post" action="{% url 'judge-recheck' pk=unit.pk %}" id="id_judge_recheck_form">
+                <form method="post"
+                      action="{% url 'judge-recheck' pk=unit.pk %}"
+                      id="id_judge_recheck_form">
                   {% csrf_token %}
                   <input type="hidden" name="next" value="{{ this_unit_url }}" />
-                  <button type="submit" class="btn btn-link">{% translate "Re-check this string" %}</button>
+                  <button type="submit" class="btn btn-link" title="{% translate "Paid model request" %}">{% translate "Re-check this string" %}</button>
+                  <small class="text-muted">{% translate "Paid model request" %}</small>
                 </form>
               {% endif %}
             </details>
@@ -231,10 +245,13 @@
            action, so it stays a plain, always-visible slot rather than
            hiding the one thing there is to do behind a toggle. #}
         <div class="list-group-item check">
-          <form method="post" action="{% url 'judge-recheck' pk=unit.pk %}" id="id_judge_recheck_form">
+          <form method="post"
+                action="{% url 'judge-recheck' pk=unit.pk %}"
+                id="id_judge_recheck_form">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ this_unit_url }}" />
-            <button type="submit" class="btn btn-link">{% translate "Re-check this string" %}</button>
+            <button type="submit" class="btn btn-link" title="{% translate "Paid model request" %}">{% translate "Re-check this string" %}</button>
+            <small class="text-muted">{% translate "Paid model request" %}</small>
           </form>
         </div>
       {% endif %}
@@ -260,10 +277,13 @@
           {% if judge_recheck_pending %}
             <p class="list-group-item-text">{% translate "Re-checking this string…" %}</p>
           {% else %}
-            <form method="post" action="{% url 'judge-recheck' pk=unit.pk %}" id="id_judge_recheck_form">
+            <form method="post"
+                  action="{% url 'judge-recheck' pk=unit.pk %}"
+                  id="id_judge_recheck_form">
               {% csrf_token %}
               <input type="hidden" name="next" value="{{ this_unit_url }}" />
-              <button type="submit" class="btn btn-link">{% translate "Re-check this string" %}</button>
+              <button type="submit" class="btn btn-link" title="{% translate "Paid model request" %}">{% translate "Re-check this string" %}</button>
+              <small class="text-muted">{% translate "Paid model request" %}</small>
             </form>
           {% endif %}
         </div>

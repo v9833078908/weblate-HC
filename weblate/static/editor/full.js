@@ -197,6 +197,18 @@
       document.querySelector('.nav [data-bs-target="#machinery"]')?.click();
       return false;
     });
+    hotkeys("ctrl+alt+a,command+alt+a", () => {
+      document.getElementById("id_judge_accept_form")?.requestSubmit();
+      return false;
+    });
+    hotkeys("ctrl+alt+k,command+alt+k", () => {
+      document.getElementById("id_judge_keep_form")?.requestSubmit();
+      return false;
+    });
+    hotkeys("ctrl+alt+r,command+alt+r", () => {
+      document.getElementById("id_judge_recheck_form")?.requestSubmit();
+      return false;
+    });
   }
   FullEditor.prototype = Object.create(EditorBase.prototype);
   FullEditor.prototype.constructor = FullEditor;
@@ -291,11 +303,13 @@
     }
   };
 
-  FullEditor.prototype.initJudgePending = function () {
+  FullEditor.prototype.initJudgePending = () => {
     const judgeCard = document.getElementById("id_judge_card");
     if (judgeCard && judgeCard.dataset.judgePending === "1") {
       window.setTimeout(() => {
-        const editors = document.querySelectorAll("textarea.translation-editor");
+        const editors = document.querySelectorAll(
+          "textarea.translation-editor",
+        );
         const untouched = Array.from(editors).every(
           (el) => el.value === el.defaultValue,
         );

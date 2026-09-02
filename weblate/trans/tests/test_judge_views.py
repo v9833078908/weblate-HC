@@ -3026,6 +3026,62 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         # automatic suggestions entry lives under the More dropdown instead.
         self.assertNotIn("Computer-aided translation suggestions", card_html)
 
+    # -- Task 15: paid-request hints and triage keyboard shortcuts ---------
+
+    def test_paid_hint_on_paid_buttons(self) -> None:
+        """Only the three LLM-calling buttons carry the paid-request hint."""
+
+        def assert_paid(tree, text: str) -> None:
+            button = tree.xpath(f'//button[normalize-space(text())="{text}"]')[0]
+            self.assertEqual(button.get("title"), "Paid model request")
+            small = button.getnext()
+            self.assertIsNotNone(small)
+            self.assertEqual(small.tag, "small")
+            self.assertEqual(small.text, "Paid model request")
+
+        def assert_free(tree, text: str) -> None:
+            button = tree.xpath(f'//button[normalize-space(text())="{text}"]')[0]
+            self.assertIsNone(button.get("title"))
+            small = button.getnext()
+            self.assertFalse(
+                small is not None
+                and small.tag == "small"
+                and small.text == "Paid model request"
+            )
+
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        assert_paid(tree, "Generate suggested fix")
+        assert_free(tree, "Keep as is")
+
+        self.make_candidate(unit, verdict)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        assert_paid(tree, "Generate another")
+        assert_paid(tree, "Re-check this string")
+        assert_free(tree, "Use suggested fix")
+        self.assertContains(response, "Accepting queues one judge re-check.")
+
+    def test_shortcut_targets_present(self) -> None:
+        """The three triage forms carry stable ids for the JS shortcuts."""
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.make_candidate(unit, verdict)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        self.assertTrue(tree.xpath('//form[@id="id_judge_accept_form"]'))
+        self.assertTrue(tree.xpath('//form[@id="id_judge_keep_form"]'))
+        self.assertTrue(tree.xpath('//form[@id="id_judge_recheck_form"]'))
+
+    def test_shortcuts_dialog_lists_judge_triage_rows(self) -> None:
+        unit = self.get_unit()
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Apply the suggested judge fix.")
+        self.assertContains(response, "Keep the current text as is.")
+        self.assertContains(response, "Re-check this string with the judge.")
+
     def test_automatic_suggestions_fallback_needs_machinery_permission(self) -> None:
         unit = self.get_unit()
         self.make_verdict(unit, "critical")
