@@ -14,7 +14,7 @@ from django.db import connection
 from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import timezone, translation
 from lxml import html
 
 from weblate.auth.data import SELECTION_ALL
@@ -3358,3 +3358,98 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         card = html.fromstring(response.content).get_element_by_id("id_judge_card")
         self.assertIsNone(card.get("data-judge-pending"))
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
+class JudgeCardLocalizationTest(ViewTestCase):
+    """Task 7: the producer verdict card renders in Russian."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.user.profile.language = "ru"
+        self.user.profile.save(update_fields=["language"])
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        return verdict
+
+    def make_candidate(self, unit, verdict, target="Better translation"):
+        suggestion, _result = Suggestion.objects.add(
+            unit,
+            [target],
+            request=self.get_request(),
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": judge_context_hash(unit),
+                "engine": "openrouter",
+            },
+        )
+        return suggestion
+
+    def test_rejected_card_with_candidate_renders_in_russian(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.make_candidate(unit, verdict)
+        with translation.override("ru"):
+            response = self.client.get(unit.get_absolute_url())
+        content = response.content.decode()
+        for text in (
+            "Вердикт ИИ-судьи",
+            "Отклонено",
+            "Не публикуется",
+            "Предложенное исправление",
+            "Принять исправление",
+            "Оставить как есть",
+            "Ещё",
+            "Перепроверить строку",
+        ):
+            self.assertIn(text, content)
+
+    def test_pending_recheck_renders_in_russian(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        translation_obj = unit.translation
+        JudgeRun.objects.create(
+            actor=self.user,
+            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_id=str(translation_obj.pk),
+            scope_label=str(translation_obj),
+            scope_path=translation_obj.get_absolute_url(),
+            requested_query=recheck_query(unit.pk),
+            requested_mode="recheck",
+            cap=1,
+            status=JudgeRun.Status.QUEUED,
+        )
+        with translation.override("ru"):
+            response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Перепроверяем строку…")
+
+    def test_escalation_button_renders_in_russian(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        with translation.override("ru"):
+            response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "Вернуть в очередь")

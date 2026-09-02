@@ -778,11 +778,13 @@ class JudgeResolutionLocalizationTest(SimpleTestCase):
             )
             form = JudgeResolutionForm()
             self.assertEqual(str(form.fields["resolution"].label), "Решение")
-            self.assertEqual(str(form.fields["reason"].label), "Причина")
+            self.assertEqual(
+                str(form.fields["reason"].label), "Причина (необязательно)"
+            )
             choice_labels = {
                 value: str(label) for value, label in form.fields["resolution"].choices
             }
-            self.assertEqual(choice_labels["escalated"], "Эскалировать на проверку")
+            self.assertEqual(choice_labels["escalated"], "Вернуть в очередь")
             self.assertEqual(choice_labels["accepted_as_is"], "Принять как есть")
             self.assertEqual(
                 str(RenderJudgeResolution.RESOLUTION_LABELS["escalated"]),
