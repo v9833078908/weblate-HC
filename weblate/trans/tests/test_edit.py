@@ -12,10 +12,11 @@ from typing import TYPE_CHECKING, cast
 from unittest import TestCase
 from unittest.mock import patch
 
+import pytest
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from lxml import html
 
 from weblate.addons.resx import ResxUpdateAddon
@@ -82,7 +83,15 @@ class SearchSessionTest(TestCase):
 class EditScreenshotContextTest(ViewTestCase):
     def test_screenshot_context_has_documentation_link(self) -> None:
         self.make_manager()
-        response = self.client.get(self.translation.get_translate_url())
+        unit = self.get_unit()
+        screenshot = Screenshot.objects.create(
+            name="Documented screenshot",
+            image="screenshots/test.png",
+            translation=unit.source_unit.translation,
+            user=self.user,
+        )
+        screenshot.units.add(unit.source_unit)
+        response = self.client.get(unit.get_absolute_url())
         self.assertContains(
             response, get_doc_url("admin/translating", "screenshots", user=self.user)
         )
@@ -423,53 +432,99 @@ class EditTest(ViewTestCase):
         else:
             self.skipTest("Not supported")
 
-    def test_dismiss_automatically_translated(self) -> None:
-        """Test dismissing automatically translated flag."""
-        unit = self.get_unit(self.source)
-        unit.automatically_translated = True
-        unit.save(update_fields=["automatically_translated"])
-
-        response = self.client.post(
-            reverse("js-dismiss-automatically-translated", kwargs={"unit_id": unit.id})
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["Content-Type"], "application/json")
-
-        unit = self.get_unit(self.source)
-        self.assertFalse(unit.automatically_translated)
-
-    def test_dismiss_automatically_translated_no_permission(self) -> None:
-        """Test dismissing automatically translated without permission."""
-        unit = self.get_unit(self.source)
-        unit.automatically_translated = True
-        unit.save(update_fields=["automatically_translated"])
-
-        # Remove edit permission
+    def grant_only(self, codenames) -> None:
+        """Replace the user's permissions with exactly these codenames."""
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
         self.user.groups.clear()
-
-        response = self.client.post(
-            reverse("js-dismiss-automatically-translated", kwargs={"unit_id": unit.id})
+        role = Role.objects.create(name="Editor reduction test role")
+        for codename in codenames:
+            role.permissions.add(Permission.objects.get(codename=codename))
+        group = Group.objects.create(
+            name="Editor reduction testers",
+            project_selection=SELECTION_ALL,
+            language_selection=SELECTION_ALL,
         )
-        self.assertEqual(response.status_code, 403)
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
 
+    def test_suggest_button_hidden_for_editor(self) -> None:
+        """A user who can edit the unit is not offered the Suggest button."""
         unit = self.get_unit(self.source)
-        self.assertTrue(unit.automatically_translated)
+        self.assertTrue(self.user.has_perm("unit.edit", unit))
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, 'name="save"')
+        self.assertNotContains(response, 'name="suggest"')
 
-    def test_dismiss_automatically_translated_not_authenticated(self) -> None:
-        """Test dismissing automatically translated without authentication."""
+    def test_suggest_button_shown_without_edit(self) -> None:
+        """Suggesting is the only action a suggestion-only user has."""
+        self.grant_only(["suggestion.add"])
+        unit = self.get_unit(self.source)
+        self.assertFalse(self.user.has_perm("unit.edit", unit))
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, 'name="suggest"')
+
+    def test_screenshots_card_hidden_when_empty(self) -> None:
+        """The Screenshots card renders only for a string that has one."""
+        self.make_manager()
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        self.assertEqual(
+            tree.xpath("//h4[contains(normalize-space(.), 'Screenshots')]"), []
+        )
+        screenshot = Screenshot.objects.create(
+            name="Shown screenshot",
+            image="screenshots/test.png",
+            translation=unit.source_unit.translation,
+            user=self.user,
+        )
+        screenshot.units.add(unit.source_unit)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        self.assertEqual(
+            len(
+                tree.xpath("//h4[contains(normalize-space(.), 'Screenshots')]")
+            ),
+            1,
+        )
+
+    def test_automatically_translated_block_absent(self) -> None:
+        """The dismissed-by-design notice and its endpoint are gone."""
         unit = self.get_unit(self.source)
         unit.automatically_translated = True
         unit.save(update_fields=["automatically_translated"])
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "check-automatically-translated")
+        with pytest.raises(NoReverseMatch):
+            reverse(
+                "js-dismiss-automatically-translated", kwargs={"unit_id": unit.id}
+            )
 
-        self.client.logout()
-
-        response = self.client.post(
-            reverse("js-dismiss-automatically-translated", kwargs={"unit_id": unit.id})
+    def test_machinery_tab_in_more_dropdown(self) -> None:
+        """The automatic suggestions tab lives in the More dropdown."""
+        self.assertTrue(self.user.has_perm("machinery.view", self.translation))
+        response = self.client.get(self.get_unit(self.source).get_absolute_url())
+        self.assertContains(response, 'id="toggle-machinery"')
+        self.assertContains(response, 'data-load="machinery"')
+        tree = html.fromstring(response.content)
+        self.assertEqual(
+            len(
+                tree.xpath(
+                    '//a[@id="toggle-machinery"][contains('
+                    'concat(" ", @class, " "), " dropdown-item ")]'
+                    "/ancestor::li[contains(concat(' ', @class, ' '), ' dropdown ')]"
+                    '/ancestor::ul[contains(concat(" ", @class, " "), " translation-tabs ")]'
+                )
+            ),
+            1,
         )
-        self.assertEqual(response.status_code, 302)
-
-        unit = self.get_unit(self.source)
-        self.assertTrue(unit.automatically_translated)
+        self.grant_only(["unit.edit"])
+        self.assertFalse(self.user.has_perm("machinery.view", self.translation))
+        response = self.client.get(self.get_unit(self.source).get_absolute_url())
+        self.assertNotContains(response, 'id="toggle-machinery"')
+        self.assertNotContains(response, 'id="machinery"')
 
 
 class EditAccessTest(ViewTestCase):
@@ -477,7 +532,6 @@ class EditAccessTest(ViewTestCase):
         check = Check.objects.create(unit=unit, name="same")
 
         urls = (
-            reverse("js-dismiss-automatically-translated", kwargs={"unit_id": unit.pk}),
             reverse("delete-unit", kwargs={"unit_id": unit.source_unit.pk}),
             reverse("js-ignore-check", kwargs={"check_id": check.pk}),
             reverse("js-ignore-check-source", kwargs={"check_id": check.pk}),

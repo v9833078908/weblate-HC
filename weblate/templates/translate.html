@@ -263,7 +263,7 @@
                   {% translate "Save and stay" %}
                 </button>
 
-                {% if unit.translation.enable_suggestions %}
+                {% if unit.translation.enable_suggestions and not user_can_translate %}
                   <button class="btn btn-warning btn-spaced" type="submit" name="suggest" {% if project_locked or not user_can_suggest or unit.readonly %}disabled="disabled"{% endif %} {% if not user_can_suggest %} title="{% if user_can_suggest.reason %}{{ user_can_suggest.reason }}{% else %}{% translate "You do not have permission to add suggestions." %}{% endif %}" {% elif project_locked %} title="{% translate "This translation is currently locked." %}" {% elif unit.readonly %} title="{% translate "Read-only" %}" {% endif %}>
                     {% translate "Suggest" %}
                   </button>
@@ -341,14 +341,23 @@
             </li>
           {% endif %}
           {% if user_can_use_machinery %}
-            <li class="nav-item">
-              <a class="nav-link"
-                 data-bs-target="#machinery"
-                 data-bs-toggle="tab"
-                 id="toggle-machinery"
-                 data-load="machinery"
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle"
+                 data-bs-toggle="dropdown"
                  href="#"
-                 title="{% translate "Computer-aided translation suggestions" %}">{% translate "Automatic suggestions" %}</a>
+                 role="button"
+                 aria-expanded="false">{% translate "More" %}</a>
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item"
+                     data-bs-target="#machinery"
+                     data-bs-toggle="tab"
+                     id="toggle-machinery"
+                     data-load="machinery"
+                     href="#"
+                     title="{% translate "Computer-aided translation suggestions" %}">{% translate "Automatic suggestions" %}</a>
+                </li>
+              </ul>
             </li>
           {% endif %}
           <li class="nav-item">
@@ -722,32 +731,6 @@
                 </div>
               {% endif %}
 
-              {% if unit.automatically_translated %}
-                <div class="list-group-item check check-item check-automatically-translated">
-                  <h5>
-                    <span class="green">{% icon "check.svg" %}</span>
-                    {% translate "Automatically translated" %}
-                  </h5>
-                  <p class="list-group-item-text check-description">
-                    {% with author=unit.get_last_author %}
-                      {% if not author or author.is_anonymous %}
-                        {% blocktranslate %}This string was translated automatically.{% endblocktranslate %}
-                      {% elif author.is_bot %}
-                        {% blocktranslate %}This string was translated automatically using {{ author }}.{% endblocktranslate %}
-                      {% else %}
-                        {% blocktranslate %}This string was translated automatically by {{ author }}.{% endblocktranslate %}
-                      {% endif %}
-                    {% endwith %}
-                  </p>
-                  {% if user_can_translate %}
-                    <p class="list-group-item-text list-buttons">
-                      <a href="{% url 'js-dismiss-automatically-translated' unit_id=unit.id %}"
-                         class="btn btn-warning dismiss-automatically-translated">{% translate "Dismiss" %}</a>
-                    </p>
-                  {% endif %}
-                </div>
-              {% endif %}
-
 
               {% if unit.is_blocked_by_commit_policy %}
                 <div class="list-group-item check check-item">
@@ -817,7 +800,7 @@
           </div>
         {% endif %}
 
-        {% if screenshots or user_can_add_screenshot %}
+        {% if screenshots %}
           <div class="card string-info">
             <div class="card-header">
               <h4 class="card-title">

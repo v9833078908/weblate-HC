@@ -15,6 +15,7 @@ from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
+from lxml import html
 
 from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Permission, Role
@@ -2826,10 +2827,14 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "Generate suggested fix")
         self.assertContains(response, "Record decision")
-        # "Automatic suggestions" alone also matches an unrelated keyboard
-        # shortcuts help entry always present on the page.
-        self.assertContains(response, "Computer-aided translation suggestions")
         self.assertNotContains(response, "Use suggested fix")
+        # The card no longer links to the machinery tab in any state; the
+        # automatic suggestions entry lives under the More dropdown instead.
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        self.assertNotIn(
+            "Computer-aided translation suggestions",
+            str(card),
+        )
 
     def test_automatic_suggestions_fallback_needs_machinery_permission(self) -> None:
         unit = self.get_unit()
@@ -2838,9 +2843,8 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         self.assertFalse(self.user.has_perm("machinery.view", unit.translation))
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "Generate suggested fix")
-        # "Automatic suggestions" alone also matches an unrelated keyboard
-        # shortcuts help entry always present on the page; the card's
-        # fallback link is uniquely identified by its title text.
+        # Without machinery.view neither the card nor the More dropdown
+        # offers the automatic suggestions entry.
         self.assertNotContains(response, "Computer-aided translation suggestions")
 
     def test_generation_pending_hides_generate_button(self) -> None:

@@ -532,47 +532,6 @@
       }
     });
 
-    /* Automatically translated dismissal */
-    delegate(
-      this.editors,
-      "click",
-      ".dismiss-automatically-translated",
-      (e) => {
-        e.preventDefault();
-        const el = e.target.closest(".dismiss-automatically-translated");
-        const url = el.getAttribute("href");
-        const check = el.closest(".check");
-
-        fetch(url, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            "X-Requested-With": "XMLHttpRequest",
-            Accept: "application/json",
-          },
-          body: new URLSearchParams({ csrfmiddlewaretoken: this.csrfToken }),
-        })
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}`);
-            }
-            const listGroup = check.closest(".list-group");
-            check.remove();
-
-            // Hide the entire "Things to check" panel if no checks remain
-            if (
-              listGroup &&
-              listGroup.querySelectorAll(".list-group-item").length === 0
-            ) {
-              listGroup.closest(".panel")?.remove();
-            }
-          })
-          .catch((error) => {
-            addAlert(error.message);
-          });
-      },
-    );
-
     /* Check fix */
     delegate(this.editors, "click", "[data-check-fixup]", (e) => {
       const el = e.target.closest("[data-check-fixup]");
