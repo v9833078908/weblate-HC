@@ -75,6 +75,7 @@ Weblate 2026.8.1
 * The string page hides the Suggest button for users who can edit, the Screenshots card until a screenshot exists, and moves :guilabel:`Automatic suggestions`, :guilabel:`Similar keys`, :guilabel:`Comments`, :guilabel:`Other languages` and the other context tabs under a :guilabel:`More` tab; no tab is open until chosen; the "Automatically translated" notice is removed.
 * The translation editor now keeps the special-characters toolbar behind one button, reduces the pager to previous / position / next, demotes :guilabel:`Save and stay` to a secondary action, and collapses the Glossary and String information cards while they have nothing to show.
 * Added :kbd:`Ctrl+Alt+A`, :kbd:`Ctrl+Alt+K` and :kbd:`Ctrl+Alt+R` for the LLM-judge triage actions, and a paid-request hint on every button that spends a model call.
+* Added the ``judge_backfill_candidates`` management command.
 
 .. rubric:: Bug fixes
 

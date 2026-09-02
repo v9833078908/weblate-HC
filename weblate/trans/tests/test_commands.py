@@ -37,7 +37,14 @@ from weblate.trans.management.commands.judge_release_advisory_holds import (
     Command as JudgeReleaseAdvisoryHoldsCommand,
 )
 from weblate.trans.management.commands.reapply_autofixes import Command
-from weblate.trans.models import Change, Component, Project, Translation, Unit
+from weblate.trans.models import (
+    Change,
+    Component,
+    Project,
+    Suggestion,
+    Translation,
+    Unit,
+)
 from weblate.trans.models.judge import (
     JudgeRequestAttempt,
     JudgeRun,
@@ -915,6 +922,194 @@ class JudgeReleaseAdvisoryHoldsCommandTest(ComponentTestCase):
     def test_rejects_all_scope(self) -> None:
         with self.assertRaises(CommandError):
             call_command("judge_release_advisory_holds", "--all", "--write")
+
+
+class JudgeBackfillCandidatesCommandTest(ComponentTestCase):
+    """Task 8 of docs/llm-first/plans/2026-09-02-producer-editor-pareto.md."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.project.machinery_settings = {"openrouter": {"key": "test-key"}}
+        # unit.review is gated on review being enabled for the project, so a
+        # superuser actor still needs the feature switch on to hold it.
+        self.project.translation_review = True
+        self.project.save(update_fields=["machinery_settings", "translation_review"])
+
+    def create_verdict(
+        self,
+        unit: Unit,
+        *,
+        max_severity: str = "critical",
+        resolution: str = "",
+        target_hash: str | None = None,
+    ) -> JudgeVerdict:
+        request = build_request(unit)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity=max_severity,
+            judge_model="vendor-a/model",
+            seat=1,
+            target_hash=target_hash or compute_target_hash(request.target_plurals),
+            context_hash=compute_context_hash(
+                source=request.source,
+                note=request.note,
+                explanation=request.explanation,
+                glossary_terms=request.glossary_terms,
+            ),
+            resolution=resolution,
+        )
+        unit.run_checks()
+        return verdict
+
+    def make_candidate(
+        self, unit: Unit, verdict: JudgeVerdict, target: str = "Better translation"
+    ) -> Suggestion:
+        suggestion, _result = Suggestion.objects.add(
+            unit,
+            [target],
+            request=self.get_request(),
+            vote=False,
+            raise_exception=False,
+            userdetails={
+                "kind": "judge-repair",
+                "schema": 1,
+                "judge_verdict_id": verdict.pk,
+                "judge_run_id": str(verdict.run_id),
+                "target_hash": compute_target_hash(unit.get_target_plurals()),
+                "context_hash": verdict.context_hash,
+                "engine": "openrouter",
+            },
+        )
+        return suggestion
+
+    def test_dry_run_lists_pending_unit_and_writes_nothing(self) -> None:
+        unit = self.get_unit("Try Weblate at <https://demo.weblate.org/>!\n")
+        self.create_verdict(unit)
+        output = StringIO()
+        with patch("weblate.trans.judge_loop.repair_targets") as repair_targets:
+            call_command("judge_backfill_candidates", self.project.slug, stdout=output)
+        repair_targets.assert_not_called()
+        self.assertIn(f"{unit.pk} {unit.context} pending", output.getvalue())
+        self.assertIn("1 pending", output.getvalue())
+        self.assertIn("Dry run: nothing written.", output.getvalue())
+        self.assertFalse(Suggestion.objects.filter(unit=unit).exists())
+
+    def test_write_without_user_is_command_error(self) -> None:
+        unit = self.get_unit("Try Weblate at <https://demo.weblate.org/>!\n")
+        self.create_verdict(unit)
+        with self.assertRaises(CommandError):
+            call_command("judge_backfill_candidates", self.project.slug, "--write")
+
+    def test_write_generates_exactly_one_candidate_and_reports_outcome(self) -> None:
+        unit = self.get_unit("Try Weblate at <https://demo.weblate.org/>!\n")
+        self.create_verdict(unit)
+        output = StringIO()
+        with patch(
+            "weblate.trans.judge_loop.repair_targets",
+            return_value={unit.pk: ["Repaired text"]},
+        ) as repair_targets:
+            call_command(
+                "judge_backfill_candidates",
+                self.project.slug,
+                "--write",
+                "--user",
+                self.user.username,
+                stdout=output,
+            )
+        repair_targets.assert_called_once()
+        self.assertIn(f"{unit.pk} {unit.context} generated", output.getvalue())
+        self.assertIn("1 generated", output.getvalue())
+        self.assertEqual(Suggestion.objects.filter(unit=unit).count(), 1)
+
+    def test_existing_candidate_reported_and_costs_no_call(self) -> None:
+        unit = self.get_unit("Try Weblate at <https://demo.weblate.org/>!\n")
+        verdict = self.create_verdict(unit)
+        self.make_candidate(unit, verdict)
+        output = StringIO()
+        with patch("weblate.trans.judge_loop.repair_targets") as repair_targets:
+            call_command(
+                "judge_backfill_candidates",
+                self.project.slug,
+                "--write",
+                "--user",
+                self.user.username,
+                stdout=output,
+            )
+        repair_targets.assert_not_called()
+        self.assertIn(f"{unit.pk} {unit.context} existing", output.getvalue())
+        self.assertIn("0 pending", output.getvalue())
+
+    def test_max_length_unit_skipped(self) -> None:
+        unit = self.get_unit("Try Weblate at <https://demo.weblate.org/>!\n")
+        unit.extra_flags = "max-length:5"
+        unit.save(update_fields=["extra_flags"], same_content=True)
+        unit.translate(self.user, ["a much longer raw target"], STATE_TRANSLATED)
+        unit = self.get_unit("Try Weblate at <https://demo.weblate.org/>!\n")
+        self.create_verdict(unit)
+        output = StringIO()
+        with patch("weblate.trans.judge_loop.repair_targets") as repair_targets:
+            call_command(
+                "judge_backfill_candidates",
+                self.project.slug,
+                "--write",
+                "--user",
+                self.user.username,
+                stdout=output,
+            )
+        repair_targets.assert_not_called()
+        self.assertIn(f"{unit.pk} {unit.context} max-length", output.getvalue())
+        self.assertIn("0 pending", output.getvalue())
+
+    def test_resolved_verdict_not_listed(self) -> None:
+        unit = self.get_unit("Try Weblate at <https://demo.weblate.org/>!\n")
+        self.create_verdict(unit, resolution=JudgeVerdict.Resolution.ESCALATED)
+        output = StringIO()
+        call_command("judge_backfill_candidates", self.project.slug, stdout=output)
+        self.assertNotIn(str(unit.pk), output.getvalue())
+        self.assertIn("0 pending", output.getvalue())
+
+    def test_minor_unit_not_listed(self) -> None:
+        unit = self.get_unit("Try Weblate at <https://demo.weblate.org/>!\n")
+        self.create_verdict(unit, max_severity="minor")
+        output = StringIO()
+        call_command("judge_backfill_candidates", self.project.slug, stdout=output)
+        self.assertNotIn(str(unit.pk), output.getvalue())
+        self.assertIn("0 pending", output.getvalue())
+
+    def test_limit_stops_after_one_paid_call(self) -> None:
+        first = self.get_unit("Try Weblate at <https://demo.weblate.org/>!\n")
+        second = self.get_unit("Thank you for using Weblate.")
+        self.create_verdict(first)
+        self.create_verdict(second)
+        output = StringIO()
+        with patch(
+            "weblate.trans.judge_loop.repair_targets",
+            side_effect=lambda units, _user: {units[0].pk: ["Repaired text"]},
+        ) as repair_targets:
+            call_command(
+                "judge_backfill_candidates",
+                self.project.slug,
+                "--write",
+                "--user",
+                self.user.username,
+                "--limit",
+                "1",
+                stdout=output,
+            )
+        repair_targets.assert_called_once()
+        self.assertEqual(Suggestion.objects.filter(unit__in=[first, second]).count(), 1)
+
+    def test_requires_component_or_project_scope(self) -> None:
+        with self.assertRaises(CommandError):
+            call_command("judge_backfill_candidates")
+
+    def test_rejects_all_scope(self) -> None:
+        with self.assertRaises(CommandError):
+            call_command(
+                "judge_backfill_candidates", "--all", "--write", "--user", "someone"
+            )
 
 
 class WeblateComponentCommandMixin:
