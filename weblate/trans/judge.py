@@ -22,7 +22,7 @@ from decimal import Decimal
 from importlib import resources
 from itertools import starmap
 from secrets import randbelow, token_hex
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, NoReturn, cast
 from urllib.parse import urlsplit
 
 import httpx2
@@ -66,6 +66,17 @@ FAILURE_KINDS = frozenset(
         "unknown",
     }
 )
+# Deliberately independent of `_AVAILABILITY_FAILURE_KINDS`
+# (weblate/trans/judge_loop.py), which the circuit breaker owns. The two
+# differ in both directions and each difference is load-bearing:
+# `http-other` means the request itself is wrong for this endpoint (a
+# configuration defect), so failing it over would double every batch's
+# calls while hiding the defect; `http-auth` is here because a different
+# key presented to a different provider is exactly one warranted fallback
+# call, even though it raises before reaching the retry branch below.
+_FAILOVER_FAILURE_KINDS = frozenset(
+    {"transport", "deadline", "http-rate-limit", "http-server", "http-auth"}
+)
 CATEGORIES = (
     "terminology",
     "mistranslation",
@@ -98,12 +109,23 @@ class JudgeError(Exception):
 
 
 @dataclass(frozen=True)
+class JudgeEndpoint:
+    """An explicit, immutable outbound Judge endpoint: role, URL, credential."""
+
+    role: str
+    base_url: str
+    api_key: str
+    provider: str
+
+
+@dataclass(frozen=True)
 class JudgeSeatProfile:
     """An immutable, fully resolved request profile for one judge seat."""
 
     seat: int
     model: str
     base_url: str
+    api_key: str
     provider: str
     response_format: str
     reasoning: str
@@ -170,21 +192,41 @@ class JudgeResult:
     unparsed: bool = False
     request_attempt_id: int | None = None
     failure_kind: str = ""
+    #: The profile that actually produced this result, which the requesting
+    #: seat's bound profile may differ from after a fallback attempt. Blank
+    #: means "use the caller's profile argument" (every pre-failover path).
+    served_model: str = ""
+    served_provider: str = ""
+    served_profile_fingerprint: str = ""
+    served_prompt_schema_version: str = ""
 
 
 UNPARSED = JudgeResult("none", "", [], "", unparsed=True, failure_kind="unknown")
 type OnBatch = Callable[[Sequence[JudgeRequest], Sequence[JudgeResult]], None]
 
 
-def get_judge_base_url() -> str:
-    """Validate and return the configured endpoint without making a request."""
-    base_url = settings.JUDGE_BASE_URL
+def _validate_base_url(base_url: object) -> str:
+    """
+    Validate an endpoint URL shape without making a request.
+
+    The returned value is canonical: the request path has always dropped a
+    trailing slash when building ``/chat/completions``, so two spellings of
+    one destination must not survive as two distinct endpoints. Canonicalizing
+    here keeps the equal-endpoint guard, the alias cache key and every
+    fingerprint in agreement with the URL actually posted to.
+    """
     if not isinstance(base_url, str) or not base_url.strip():
         raise JudgeError(_("The LLM judge is not configured."))
+    base_url = base_url.strip().rstrip("/")
     parsed = urlsplit(base_url)
     if parsed.scheme != "https" or not parsed.netloc:
         raise JudgeError(_("The LLM judge is not configured."))
     return base_url
+
+
+def get_judge_base_url() -> str:
+    """Validate and return the configured endpoint without making a request."""
+    return _validate_base_url(settings.JUDGE_BASE_URL)
 
 
 def get_judge_chat_completions_url() -> str:
@@ -198,6 +240,17 @@ def _judge_provider(base_url: str) -> str:
     if hostname == _LITELLM_HOST or hostname.endswith(f".{_LITELLM_HOST}"):
         return "litellm"
     return "unknown"
+
+
+def judge_primary_endpoint() -> JudgeEndpoint:
+    """Return the configured primary endpoint as an explicit value."""
+    base_url = get_judge_base_url()
+    return JudgeEndpoint(
+        role="primary",
+        base_url=base_url,
+        api_key=settings.JUDGE_API_KEY,
+        provider=_judge_provider(base_url),
+    )
 
 
 def _redact_alias_config(value: object, depth: int = 0) -> object:
@@ -248,13 +301,15 @@ def _read_capped(
     return bytes(buffer)
 
 
-def _fetch_litellm_alias(base_url: str, model: str) -> tuple[str, str] | None:
+def _fetch_litellm_alias(
+    base_url: str, model: str, api_key: str
+) -> tuple[str, str] | None:
     """Fetch one LiteLLM alias's resolved model and redacted revision hash."""
     with stream_validated_url(
         "GET",
         f"{base_url.rstrip('/')}/model/info",
         params={"model": model},
-        headers={"Authorization": f"Bearer {settings.JUDGE_API_KEY}"},
+        headers={"Authorization": f"Bearer {api_key}"},
         timeout=httpx2.Timeout(timeout=_ALIAS_INFO_TIMEOUT),
         follow_redirects=False,
     ) as response:
@@ -288,7 +343,7 @@ def _fetch_litellm_alias(base_url: str, model: str) -> tuple[str, str] | None:
     return upstream, _alias_revision_hash(entry)
 
 
-def resolve_judge_alias(base_url: str, model: str) -> tuple[str, str]:
+def resolve_judge_alias(base_url: str, model: str, api_key: str) -> tuple[str, str]:
     """
     Return ``(resolved_upstream_model, revision_hash)`` for an alias.
 
@@ -307,7 +362,7 @@ def resolve_judge_alias(base_url: str, model: str) -> tuple[str, str]:
     resolved, revision = model, ""
     cache_ttl = _ALIAS_CACHE_FAILURE_TTL
     try:
-        alias = _fetch_litellm_alias(base_url, model)
+        alias = _fetch_litellm_alias(base_url, model, api_key)
     except Exception:
         # A capability outage must degrade, not block, judging.
         LOGGER.debug("Judge alias resolution failed for %s", model)
@@ -356,11 +411,18 @@ def _profile_number(value: object, converter: Callable[[str], object]) -> object
         return value
 
 
-def _resolve_profile(seat: int, *, legacy_model: str | None = None) -> JudgeSeatProfile:
+def _resolve_profile(
+    seat: int,
+    *,
+    legacy_model: str | None = None,
+    endpoint: JudgeEndpoint | None = None,
+) -> JudgeSeatProfile:
     if seat not in JUDGE_SEATS and seat != 0:
         raise JudgeError(_("The LLM judge is not configured."))
-    base_url = get_judge_base_url()
-    provider = _judge_provider(base_url)
+    if endpoint is None:
+        endpoint = judge_primary_endpoint()
+    base_url = endpoint.base_url
+    provider = endpoint.provider
     if seat:
         model = getattr(settings, f"JUDGE_MODEL_SEAT_{seat}", "")
         reasoning = _profile_value(
@@ -424,7 +486,9 @@ def _resolve_profile(seat: int, *, legacy_model: str | None = None) -> JudgeSeat
         "enable_thinking=false",
     }:
         raise JudgeError(_("The LLM judge is not configured."))
-    upstream_model, alias_revision = resolve_judge_alias(base_url, model)
+    upstream_model, alias_revision = resolve_judge_alias(
+        base_url, model, endpoint.api_key
+    )
     endpoint_fingerprint = _fingerprint(base_url)
     model_fingerprint = _fingerprint(model, upstream_model, alias_revision)
     profile_fingerprint = _fingerprint(
@@ -444,6 +508,7 @@ def _resolve_profile(seat: int, *, legacy_model: str | None = None) -> JudgeSeat
         seat=seat,
         model=model,
         base_url=base_url,
+        api_key=endpoint.api_key,
         provider=provider,
         response_format=response_format,
         reasoning=reasoning,
@@ -461,8 +526,16 @@ def _resolve_profile(seat: int, *, legacy_model: str | None = None) -> JudgeSeat
     )
 
 
-def resolve_judge_seat_profile(seat: int) -> JudgeSeatProfile:
-    """Return one profile after validating both paid seats atomically."""
+def resolve_judge_seat_profile(
+    seat: int, *, endpoint: JudgeEndpoint | None = None
+) -> JudgeSeatProfile:
+    """Return one profile, validating both paid seats atomically for the primary."""
+    if endpoint is not None:
+        return (
+            _resolve_profile(seat, endpoint=endpoint)
+            if seat in JUDGE_SEATS
+            else _raise_configuration()
+        )
     profiles = judge_seat_profiles()
     return profiles[seat - 1] if seat in JUDGE_SEATS else _raise_configuration()
 
@@ -472,6 +545,160 @@ def judge_seat_profiles() -> tuple[JudgeSeatProfile, JudgeSeatProfile]:
     validate_request_settings()
     first, second = (_resolve_profile(number) for number in JUDGE_SEATS)
     return first, second
+
+
+# Reasoning effort is deliberately excluded: like the primary's own
+# `JUDGE_REASONING_EFFORT`, "" is a valid, common value ("send no reasoning
+# parameter"), not a missing setting. `_resolve_fallback_profile` still
+# requires it to be a string and applies the same per-provider allowlist.
+_FALLBACK_REQUIRED_SETTING_NAMES = (
+    "JUDGE_FALLBACK_BASE_URL",
+    "JUDGE_FALLBACK_API_KEY",
+    "JUDGE_FALLBACK_MODEL_SEAT_1",
+    "JUDGE_FALLBACK_MODEL_SEAT_2",
+    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1",
+    "JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2",
+)
+
+
+def judge_fallback_endpoint() -> JudgeEndpoint | None:
+    """
+    Return the configured fallback endpoint, or None when unconfigured.
+
+    Raise when the operator asked for a fallback but the pair is unusable:
+    incomplete, or resolving to the primary's own endpoint. This is the only
+    place that decides whether a fallback exists, so the direct
+    ``request_verdicts`` API is gated exactly like a producer-launched run
+    rather than half-enabling a second paid endpoint.
+    """
+    configured = [
+        isinstance(value, str) and bool(value.strip())
+        for value in (
+            getattr(settings, name) for name in _FALLBACK_REQUIRED_SETTING_NAMES
+        )
+    ]
+    if not any(configured):
+        return None
+    if not all(configured):
+        raise JudgeError(_("The LLM judge is not configured."))
+    base_url = _validate_base_url(settings.JUDGE_FALLBACK_BASE_URL)
+    if base_url == get_judge_base_url():
+        raise JudgeError(_("The LLM judge is not configured."))
+    return JudgeEndpoint(
+        role="fallback",
+        base_url=base_url,
+        api_key=settings.JUDGE_FALLBACK_API_KEY,
+        provider=_judge_provider(base_url),
+    )
+
+
+def _resolve_fallback_profile(
+    seat: int, primary: JudgeSeatProfile, endpoint: JudgeEndpoint
+) -> JudgeSeatProfile:
+    """
+    Resolve one seat's fallback profile.
+
+    Transport shape (``stream``, ``batch_size``, ``request_deadline``,
+    ``temperature``, ``max_tokens``) inherits the primary seat's resolved
+    value: a fallback batch is never wider than the primary's. ``model``,
+    reasoning effort and ``response_format`` are provider-semantic and have
+    no "inherit": mixing one provider's reasoning control into the other's
+    payload would silently corrupt the request.
+    """
+    model = getattr(settings, f"JUDGE_FALLBACK_MODEL_SEAT_{seat}", "")
+    reasoning = getattr(settings, f"JUDGE_FALLBACK_REASONING_EFFORT_SEAT_{seat}", "")
+    response_format = getattr(
+        settings, f"JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_{seat}", ""
+    )
+    if not isinstance(model, str) or not model.strip():
+        raise JudgeError(_("The LLM judge is not configured."))
+    model = model.strip()
+    if response_format not in {"json_object", "json_schema"}:
+        raise JudgeError(_("The LLM judge is not configured."))
+    if not isinstance(reasoning, str):
+        raise JudgeError(_("The LLM judge is not configured."))
+    reasoning = reasoning.strip()
+    # The primary reads its per-seat settings through `_profile_value`, where
+    # "inherit" is the sentinel for "use the global value". The fallback has
+    # no such fallthrough, so the literal is an operator mistake that would
+    # otherwise be sent to a provider as a real reasoning effort or model.
+    if "inherit" in {model, reasoning}:
+        raise JudgeError(_("The LLM judge is not configured."))
+    # Same LiteLLM allowlist as the primary: aliases declare the exact
+    # control they support.
+    if endpoint.provider == "litellm" and reasoning not in {
+        "",
+        "thinking.disabled",
+        "enable_thinking=false",
+    }:
+        raise JudgeError(_("The LLM judge is not configured."))
+    upstream_model, alias_revision = resolve_judge_alias(
+        endpoint.base_url, model, endpoint.api_key
+    )
+    endpoint_fingerprint = _fingerprint(endpoint.base_url)
+    model_fingerprint = _fingerprint(model, upstream_model, alias_revision)
+    profile_fingerprint = _fingerprint(
+        endpoint_fingerprint,
+        model,
+        upstream_model,
+        alias_revision,
+        response_format,
+        reasoning,
+        primary.stream,
+        primary.batch_size,
+        primary.temperature,
+        primary.max_tokens,
+        _prompt_schema_version(),
+    )
+    return JudgeSeatProfile(
+        seat=seat,
+        model=model,
+        base_url=endpoint.base_url,
+        api_key=endpoint.api_key,
+        provider=endpoint.provider,
+        response_format=response_format,
+        reasoning=reasoning,
+        stream=primary.stream,
+        batch_size=primary.batch_size,
+        request_deadline=primary.request_deadline,
+        temperature=primary.temperature,
+        max_tokens=primary.max_tokens,
+        endpoint_fingerprint=endpoint_fingerprint,
+        model_fingerprint=model_fingerprint,
+        profile_fingerprint=profile_fingerprint,
+        prompt_schema_version=_prompt_schema_version(),
+        upstream_model=upstream_model,
+        alias_revision=alias_revision,
+    )
+
+
+def resolve_judge_fallback_seat_profile(
+    seat: int, primary: JudgeSeatProfile
+) -> JudgeSeatProfile | None:
+    """Return this seat's fallback profile, or None when unconfigured."""
+    if seat not in JUDGE_SEATS:
+        return None
+    endpoint = judge_fallback_endpoint()
+    if endpoint is None:
+        return None
+    return _resolve_fallback_profile(seat, primary, endpoint)
+
+
+def _validate_fallback_configuration(
+    primary_profiles: tuple[JudgeSeatProfile, JudgeSeatProfile],
+) -> None:
+    """
+    Validate the fallback pair with the same rules as the primary.
+
+    Completeness and the distinct-endpoint rule are enforced by
+    `judge_fallback_endpoint`, so every caller shares one contract; this adds
+    the per-seat profile resolution a run needs before its first paid POST.
+    """
+    endpoint = judge_fallback_endpoint()
+    if endpoint is None:
+        return
+    for seat, primary in zip(JUDGE_SEATS, primary_profiles, strict=True):
+        _resolve_fallback_profile(seat, primary, endpoint)
 
 
 def judge_configuration_snapshot() -> dict[str, object]:
@@ -493,10 +720,32 @@ def judge_configuration_snapshot() -> dict[str, object]:
         "prompt_schema_version": [
             profile.prompt_schema_version for profile in profiles
         ],
+        **_fallback_configuration_snapshot(profiles),
     }
 
 
-def _raise_configuration() -> None:
+def _fallback_configuration_snapshot(
+    primary_profiles: tuple[JudgeSeatProfile, JudgeSeatProfile],
+) -> dict[str, object]:
+    """Redacted fallback metadata, or {} when no fallback is configured."""
+    endpoint = judge_fallback_endpoint()
+    if endpoint is None:
+        return {}
+    profiles = [
+        _resolve_fallback_profile(seat, primary, endpoint)
+        for seat, primary in zip(JUDGE_SEATS, primary_profiles, strict=True)
+    ]
+    return {
+        # A bare hostname (no scheme, path or query) distinguishes providers
+        # for an audit trail without recording the request URL.
+        "fallback_hostname": urlsplit(endpoint.base_url).hostname or "",
+        "fallback_model": [profile.model for profile in profiles],
+        "fallback_reasoning": [profile.reasoning for profile in profiles],
+        "fallback_response_format": [profile.response_format for profile in profiles],
+    }
+
+
+def _raise_configuration() -> NoReturn:
     raise JudgeError(_("The LLM judge is not configured."))
 
 
@@ -529,7 +778,7 @@ def validate_judge_configuration() -> None:
         and settings.JUDGE_RETRY_BUDGET_RATIO >= 0
     ):
         raise JudgeError(_("The LLM judge is not configured."))
-    judge_seat_profiles()
+    _validate_fallback_configuration(judge_seat_profiles())
 
 
 def judge_configuration_ready() -> bool:
@@ -1045,7 +1294,7 @@ def _post_response(
         "POST",
         f"{profile.base_url.rstrip('/')}/chat/completions",
         headers={
-            "Authorization": f"Bearer {settings.JUDGE_API_KEY}",
+            "Authorization": f"Bearer {profile.api_key}",
             "Content-Type": "application/json",
         },
         json=payload,
@@ -1126,10 +1375,9 @@ def _usage_values(payload: dict | None) -> dict[str, object]:
         else {}
     )
 
+
 def _usage_integer(value: object) -> int:
     return value if isinstance(value, int) else 0
-
-
 
 
 def _batch_usage_scope(
@@ -1451,7 +1699,7 @@ def _update_adaptive(profile: JudgeSeatProfile, enabled: bool, failure: str) -> 
         LOGGER.exception("Failed to update judge adaptive state")
 
 
-def _run_batch(
+def _run_batch(  # ruff: ignore[complex-structure]
     batch: Sequence[JudgeRequest],
     *,
     profile: JudgeSeatProfile,
@@ -1466,13 +1714,18 @@ def _run_batch(
     retry_deadline: float | None = None,
 ) -> list[JudgeResult]:
     payload = _payload(batch, profile, project_context)
+    fallback_profile = resolve_judge_fallback_seat_profile(profile.seat, profile)
     transport_left = _setting_retries("JUDGE_TRANSPORT_RETRIES", 1)
     transient_left = _setting_retries("JUDGE_TRANSIENT_HTTP_RETRIES", 1)
     protocol_left = _setting_retries("JUDGE_PROTOCOL_RETRIES", 1)
-    last_failure, last_attempt = "unknown", None
+    last_failure, last_attempt, last_profile = "unknown", None, profile
     retries_used = 0
-    while True:
-        response = _post_batch(payload, profile)
+
+    def send_once(
+        target_profile: JudgeSeatProfile, target_payload: dict, target_ordinal: int
+    ) -> tuple[_BatchResponse, str, _ParseOutcome, object | None, bool]:
+        """POST once, persist the attempt and usage, and classify the outcome."""
+        response = _post_batch(target_payload, target_profile)
         failure = _failure_for_http(response.status_code) or response.failure_kind
         outcome = _ParseOutcome(None, failure)
         if not failure and response.payload is not None:
@@ -1484,46 +1737,125 @@ def _run_batch(
         attempt = _persist_attempt(
             enabled=persistence,
             run=run,
-            profile=profile,
+            profile=target_profile,
             batch=batch,
-            ordinal=ordinal,
+            ordinal=target_ordinal,
             response=response,
             parsed=parsed,
             failure_kind=failure,
             segment_count=outcome.segment_count,
             response_shape=(
-                f"{'stream' if profile.stream else 'chat'}:{outcome.shape or 'raw'}"
+                f"{'stream' if target_profile.stream else 'chat'}:"
+                f"{outcome.shape or 'raw'}"
             ),
         )
         if persistence:
             _record_usage(
                 response.payload,
-                profile.provider,
-                profile.model,
+                target_profile.provider,
+                target_profile.model,
                 project_slug,
                 batch,
-                cast(JudgeRequestAttempt | None, attempt),
+                cast("JudgeRequestAttempt | None", attempt),
             )
-        last_attempt, last_failure = attempt, failure
         _log_attempt(
             response,
-            profile=profile,
+            profile=target_profile,
             batch_size=len(batch),
             parsed=parsed,
             failure_kind=failure,
         )
+        return response, failure, outcome, attempt, parsed
+
+    def served(result: JudgeResult, target_profile: JudgeSeatProfile) -> JudgeResult:
+        return replace(
+            result,
+            served_model=target_profile.model,
+            served_provider=target_profile.provider,
+            served_profile_fingerprint=target_profile.profile_fingerprint,
+            served_prompt_schema_version=target_profile.prompt_schema_version,
+        )
+
+    def try_fallback(
+        target_ordinal: int,
+    ) -> tuple[list[JudgeResult] | None, str, object | None, bool]:
+        """
+        One additional attempt on the fallback endpoint, never retried itself.
+
+        Returns ``(results, failure, attempt, attempted)``. ``results`` is set
+        only when the fallback parsed. ``attempted`` distinguishes "no
+        fallback is configured" from "the fallback attempt was not persisted"
+        (``attempt`` is ``None`` in both, since persistence can be off).
+        """
+        if fallback_profile is None:
+            return None, "", None, False
+        fallback_payload = _payload(batch, fallback_profile, project_context)
+        _response, failure, outcome, attempt, parsed = send_once(
+            fallback_profile, fallback_payload, target_ordinal
+        )
+        if not parsed:
+            return None, failure, attempt, True
+        # ruff: ignore[assert]
+        assert outcome.results is not None
+        return (
+            [
+                served(
+                    replace(result, request_attempt_id=getattr(attempt, "pk", None)),
+                    fallback_profile,
+                )
+                for result in outcome.results
+            ],
+            failure,
+            attempt,
+            True,
+        )
+
+    while True:
+        response, failure, outcome, attempt, parsed = send_once(
+            profile, payload, ordinal
+        )
+        last_attempt, last_failure, last_profile = attempt, failure, profile
         if parsed:
+            # ruff: ignore[assert]
+            assert outcome.results is not None
             _update_adaptive(profile, adaptive, "")
             return [
-                replace(result, request_attempt_id=getattr(attempt, "pk", None))
+                served(
+                    replace(result, request_attempt_id=getattr(attempt, "pk", None)),
+                    profile,
+                )
                 for result in outcome.results
             ]
         if failure == "http-auth":
-            raise JudgeError(_("The LLM judge is not configured."))
+            # The fallback attempt must run before this raises: a different
+            # key presented to a different provider is exactly one warranted
+            # call, even though `http-auth` never reaches the retry branch.
+            fb_results, fb_failure, fb_attempt, fb_attempted = try_fallback(ordinal + 1)
+            if fb_results is not None:
+                return fb_results
+            if not fb_attempted:
+                raise JudgeError(_("The LLM judge is not configured."))
+            # ruff: ignore[assert]
+            assert fallback_profile is not None
+            if fb_failure == "http-auth":
+                # Both endpoints reject our credentials: a real configuration
+                # error, not unavailability. Fail fast without a third call.
+                raise JudgeError(_("The LLM judge is not configured."))
+            return [
+                served(
+                    replace(
+                        UNPARSED,
+                        request_attempt_id=getattr(fb_attempt, "pk", None),
+                        failure_kind=fb_failure,
+                    ),
+                    fallback_profile,
+                )
+                for _ in batch
+            ]
         if failure == "http-request-invalid":
             # The endpoint will refuse this request every time: no verdict,
-            # no paid retry, no deferral. The attempt row above is the
-            # operator-visible diagnostic.
+            # no paid retry, no deferral, no fallback. The attempt row above
+            # is the operator-visible diagnostic.
             raise JudgeError(
                 _("The LLM judge endpoint refused the request (HTTP %s).")
                 % response.status_code
@@ -1570,21 +1902,40 @@ def _run_batch(
             ordinal += 1
             continue
         break
-    _update_adaptive(profile, adaptive, last_failure)
+    # The primary's own outcome, kept for adaptive/circuit bookkeeping and for
+    # the width-one isolation trigger below: a fallback attempt (whichever
+    # way it goes) must never corrupt what the primary itself observed.
+    primary_failure = last_failure
+    _update_adaptive(profile, adaptive, primary_failure)
+    if primary_failure in _FAILOVER_FAILURE_KINDS:
+        fb_results, fb_failure, fb_attempt, fb_attempted = try_fallback(ordinal + 1)
+        if fb_results is not None:
+            return fb_results
+        if fb_attempted:
+            # ruff: ignore[assert]
+            assert fallback_profile is not None
+            last_attempt, last_failure, last_profile = (
+                fb_attempt,
+                fb_failure,
+                fallback_profile,
+            )
     if (
         isolate
         and len(batch) > 1
-        and last_failure
+        and primary_failure
         in {"invalid-json", "invalid-envelope", "segment-count", "invalid-segment"}
     ):
         results: list[JudgeResult] = []
         for request in batch:
             if not retry_budget.spend():
                 results.append(
-                    replace(
-                        UNPARSED,
-                        request_attempt_id=getattr(last_attempt, "pk", None),
-                        failure_kind=last_failure,
+                    served(
+                        replace(
+                            UNPARSED,
+                            request_attempt_id=getattr(last_attempt, "pk", None),
+                            failure_kind=last_failure,
+                        ),
+                        last_profile,
                     )
                 )
                 continue
@@ -1605,10 +1956,13 @@ def _run_batch(
             )
         return results
     return [
-        replace(
-            UNPARSED,
-            request_attempt_id=getattr(last_attempt, "pk", None),
-            failure_kind=last_failure,
+        served(
+            replace(
+                UNPARSED,
+                request_attempt_id=getattr(last_attempt, "pk", None),
+                failure_kind=last_failure,
+            ),
+            last_profile,
         )
         for _ in batch
     ]

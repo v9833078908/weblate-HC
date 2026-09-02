@@ -104,6 +104,19 @@ DEFAULT_JUDGE_DEFERRAL_TOKEN_BUCKET_REFILL_PER_SECOND = 0.25
 DEFAULT_JUDGE_DEFERRAL_OPERATOR_STOPPED = False
 DEFAULT_JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS = 90
 DEFAULT_JUDGE_REQUEST_ATTEMPT_RETENTION_DAYS = 90
+# Availability fallback for the judge seats: one alternate endpoint, tried
+# once per batch after the primary's own retries are spent. Empty by default.
+# The six non-reasoning settings must be set together and the endpoint must
+# differ from the primary's; reasoning effort is optional, where empty means
+# "send no reasoning parameter" (see judge.judge_fallback_endpoint).
+DEFAULT_JUDGE_FALLBACK_BASE_URL = ""
+DEFAULT_JUDGE_FALLBACK_API_KEY = ""
+DEFAULT_JUDGE_FALLBACK_MODEL_SEAT_1 = ""
+DEFAULT_JUDGE_FALLBACK_MODEL_SEAT_2 = ""
+DEFAULT_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1 = ""
+DEFAULT_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2 = ""
+DEFAULT_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1 = ""
+DEFAULT_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2 = ""
 DEFAULT_LLM_USAGE_LOG_RETENTION_DAYS = 90
 
 

@@ -52,8 +52,11 @@ JUDGE_REPAIR_REQUIREMENT = (
 )
 
 # These are deliberately limited to request-shape and resolved-profile data.
-# In particular, do not add request text, response text, credentials, or URLs
-# here: JudgeRun is a durable report visible to the producer who started it.
+# In particular, do not add request text, response text, credentials, or full
+# URLs here: JudgeRun is a durable report visible to the producer who started
+# it. ``fallback_hostname`` is a narrow exception: a bare hostname (no
+# scheme, path or query) identifies which provider served a batch without
+# recording the request URL.
 _SAFE_CONFIGURATION_SNAPSHOT_KEYS = frozenset(
     {
         "provider",
@@ -69,6 +72,10 @@ _SAFE_CONFIGURATION_SNAPSHOT_KEYS = frozenset(
         "temperature",
         "request_deadline",
         "prompt_schema_version",
+        "fallback_hostname",
+        "fallback_model",
+        "fallback_reasoning",
+        "fallback_response_format",
     }
 )
 
@@ -574,6 +581,9 @@ class JudgeVerdict(models.Model):
     back_translation = models.TextField(blank=True)
     instruction = models.TextField(blank=True)
     judge_model = models.CharField(max_length=200)
+    # The endpoint that actually served this verdict. Blank on every row
+    # written before the availability fallback existed; no data migration.
+    judge_provider = models.CharField(max_length=32, blank=True)
     # Place in the collegium, not seniority: seat 2 may not lower seat 1.
     seat = models.SmallIntegerField()
     attempt = models.SmallIntegerField(default=0)

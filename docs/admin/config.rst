@@ -2045,6 +2045,79 @@ only the structured verdict.
    * :setting:`JUDGE_ENABLED`
    * :setting:`JUDGE_BATCH_SIZE`
 
+
+.. setting:: JUDGE_FALLBACK_BASE_URL
+.. setting:: JUDGE_FALLBACK_API_KEY
+
+JUDGE_FALLBACK_BASE_URL, JUDGE_FALLBACK_API_KEY
+------------------------------------------------
+
+.. versionadded:: 2026.8.1
+
+Endpoint and credential for the judge's availability fallback. Empty by
+default: an unconfigured fallback is not an error, and every call count and
+outcome is then identical to a build without this feature. When
+``JUDGE_FALLBACK_BASE_URL`` is set, the credential, both seat models and both
+seat response formats must be set together; the two reasoning-effort settings
+are optional and may legitimately be blank, exactly like
+:setting:`JUDGE_REASONING_EFFORT`. A partial configuration raises before any
+request is sent, on every entry point. The fallback base
+URL may not equal :setting:`JUDGE_BASE_URL`: pointing an endpoint at itself
+is a configuration mistake, not a fallback. The comparison is made on the
+canonical URL, so a trailing slash does not make one endpoint into two.
+
+After the primary's own retries are exhausted with an availability failure
+(a dropped connection, a missed deadline, an HTTP 429/5xx, or an HTTP
+401/403), the judge sends the identical batch once more to this endpoint.
+An HTTP 200 response whose body fails to parse is never retried anywhere
+else: the fallback is an availability mechanism, not a second opinion, and
+a disliked verdict can never be replaced by resending it to another model.
+A verdict is always the work of exactly one endpoint and model pair,
+recorded on the verdict itself; that pair is never averaged or merged
+across seats.
+
+To roll the primary back onto this same endpoint later, clear all eight
+``JUDGE_FALLBACK_*`` settings first, then set the primary settings to the
+recorded values, and recreate the container. Leaving the fallback pointed
+at the endpoint you are about to promote to primary is rejected by the
+equal-URL check above.
+
+.. seealso::
+
+   * :setting:`JUDGE_BASE_URL`
+   * :setting:`JUDGE_API_KEY`
+   * :setting:`JUDGE_FALLBACK_MODEL_SEAT_1`
+
+.. setting:: JUDGE_FALLBACK_MODEL_SEAT_1
+.. setting:: JUDGE_FALLBACK_MODEL_SEAT_2
+.. setting:: JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1
+.. setting:: JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2
+.. setting:: JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1
+.. setting:: JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2
+
+JUDGE_FALLBACK_MODEL_SEAT_1, JUDGE_FALLBACK_MODEL_SEAT_2, JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1, JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2, JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1, JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+.. versionadded:: 2026.8.1
+
+Per-seat model and provider-semantic profile for the fallback endpoint.
+Unlike :setting:`JUDGE_REQUEST_DEADLINE_SEAT_1` and the other transport
+settings, none of these three inherit from the primary seat's value: model,
+reasoning effort and response format are specific to the provider actually
+serving the request, and reusing the primary's value here has previously
+sent a LiteLLM-only reasoning control to OpenRouter. The reasoning-effort
+setting may be blank, exactly like :setting:`JUDGE_REASONING_EFFORT`: blank
+means "send no reasoning parameter", not "unset". Transport shape - stream,
+batch size, request deadline, temperature, and the token cap - always
+inherits the primary seat's resolved value, so a fallback batch is never
+wider than the primary's.
+
+.. seealso::
+
+   * :setting:`JUDGE_FALLBACK_BASE_URL`
+   * :setting:`JUDGE_MODEL_SEAT_1`
+   * :setting:`JUDGE_REASONING_EFFORT`
+
 .. setting:: PIWIK_SITE_ID
 .. setting:: MATOMO_SITE_ID
 

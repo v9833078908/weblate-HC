@@ -189,6 +189,19 @@ WEBLATE_JUDGE_DEFERRAL_OPERATOR_STOPPED=0
 # High-volume request diagnostics have bounded retention; verdicts persist.
 WEBLATE_JUDGE_DEFERRAL_CLOSED_RETENTION_DAYS=90
 WEBLATE_JUDGE_REQUEST_ATTEMPT_RETENTION_DAYS=90
+# Availability fallback: one alternate endpoint, tried once per batch after
+# the primary's own retries are spent. Empty by default; the seven fields
+# below must be set together with the base URL (the two reasoning-effort
+# fields may legitimately be blank). Before repointing the primary at this
+# same endpoint, clear all eight fallback settings first.
+WEBLATE_JUDGE_FALLBACK_BASE_URL=
+WEBLATE_JUDGE_FALLBACK_API_KEY=
+WEBLATE_JUDGE_FALLBACK_MODEL_SEAT_1=
+WEBLATE_JUDGE_FALLBACK_MODEL_SEAT_2=
+WEBLATE_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1=
+WEBLATE_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2=
+WEBLATE_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1=
+WEBLATE_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2=
 WEBLATE_LLM_USAGE_LOG_RETENTION_DAYS=90
 
 # --- VCS ----------------------------------------------------------------

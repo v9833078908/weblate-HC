@@ -23,6 +23,7 @@ Weblate 2026.8.1
 * Large language model machine translation services now receive the note left by developers for a string, see :ref:`llm-translation-context`.
 * LLM judge requests now receive the producer-authored source string explanation as well as the developer note, and changing either context invalidates cached verdicts and stale repairs.
 * LLM judge runs now show capped scope and observed-cost previews, record per-unit judge usage, and keep delivery state separate from advisory AI evidence.
+* The LLM judge can now fail over once per batch to a configured second endpoint after the primary is unavailable (a dropped connection, a missed deadline, an HTTP 429/5xx, or an HTTP 401/403), see :setting:`JUDGE_FALLBACK_BASE_URL`.
 * Added optional :ref:`TBX glossary import from CSV, TSV, and XLSX tables <uploading-glossary-tables>`, with a locally validated profile proposal path.
 * Glossary tables with only language columns are now mapped deterministically without contacting the automatic analyzer, and the sheet-selection step is skipped for single-sheet uploads, see :ref:`uploading-glossary-tables`.
 * Glossary tables where a term is followed by its description on the next row are now recognised deterministically: descriptions become explanations, section captions become sections, and the detected layout can be switched from the import preview, see :ref:`uploading-glossary-tables`.
