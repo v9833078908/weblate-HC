@@ -31,24 +31,36 @@ and deadline plans). It also overrides one sentence of
 is not a quality resolver, and a disliked verdict can never be replaced by a
 second opinion.
 
-**Status:** Tasks 1-6 implemented and verified on branch
-`feat/judge-openrouter-fallback`. Judge suite: 400 passed, 32 subtests, plus
-one known pre-existing failure in `test_judge_persistence.py`
-(`test_failure_kinds_match_the_closed_transport_contract`) which also fails on
-the merge base and belongs to the merged `feat/judge-zero-unparsed` work, not
-to this change. mypy/pylint/ruff clean on the changed files. A three-way review
-then found one blocking defect - trailing-slash spellings of one endpoint
-passed the equal-endpoint guard - which is fixed by canonicalizing the URL in
+**Status:** Tasks 1-6 implemented and merged to `main` as `382fd51`. The full
+judge suite is green on merged `main`: 409 passed, 47 subtests, zero failures
+(the one long-standing failure in `test_judge_persistence.py` was a stale
+expected list that predated this work and is fixed in `0191a7c`).
+mypy/pylint/ruff clean on the changed files. A three-way review found one
+blocking defect - trailing-slash spellings of one endpoint passed the
+equal-endpoint guard - fixed in `1538d24` by canonicalizing the URL in
 `_validate_base_url` and moving the completeness and distinct-endpoint rules
 into `judge_fallback_endpoint`, so the direct `request_verdicts` API is gated
-like a producer-launched run. Task 7's dev-container live arms are prepared as
-`analysis/probes/judge-fallback-forced-smoke.py` but **not run**: per
-`AGENTS.md`, touching the shared dev-docker stack needs its own explicit
-approval, and the arms need real primary/fallback credentials this session does
-not hold. No measurement document was written, to avoid recording fabricated
-data. Production rollout is therefore blocked on Task 7; every production step
-in Rollout still needs its own separate approval on top of implementation
-approval.
+like a producer-launched run.
+
+**Task 7: run 2026-09-02, three arms of four pass.**
+`docs/llm-first/measurements/2026-09-02-judge-openrouter-fallback-dev-smoke.md`
+records it. Proven live against real endpoints: one fallback attempt per batch
+per seat after a primary availability failure, the fallback completing the
+batch, `served_provider=openrouter` provenance on the result, a configured
+fallback leaving a healthy run's call count and provider unchanged, one usage
+row per delivered response against the serving provider, and no mutation of
+translation content, verdicts or the deferral queue. Arm 2, the
+non-availability negative case, is **inconclusive**: this LiteLLM proxy answers
+an unknown model with 403, which classifies as `http-auth` and correctly does
+fail over, so the arm never produced the kind it intended. That contract is
+covered by
+`JudgeFailoverTest.test_every_failure_kind_fails_over_only_when_it_is_an_availability_kind`,
+which enumerates the whole closed `FAILURE_KINDS` set. Measuring it live needs
+a primary that returns a 4xx outside 401/403/429, which is a probe change.
+
+Production rollout remains **not started**: production still runs with all
+eight `JUDGE_FALLBACK_*` settings empty, and every step in Rollout needs its
+own separate approval per `AGENTS.md`.
 
 **Dependency gate: satisfied 2026-09-01.** Branch
 `docs/llm-usage-attribution-plan` is merged to `main` as `0011d3c`, Tasks 1-5 of
