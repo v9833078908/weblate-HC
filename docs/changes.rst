@@ -73,6 +73,7 @@ Weblate 2026.8.1
 
 .. rubric:: Bug fixes
 
+* A string explanation set through the REST API is now written to the translation file on commit, mirrored to the other languages of the string, and recorded in its history, so glossary notes no longer disappear from exports.
 * French punctuation spacing and automatic translation no longer modify syntax in Hero Craft conditional game placeholders.
 * Large language model machine translation services no longer fail when the optional persona and style settings are absent from the stored configuration, as happens when the service is installed through the REST API.
 * Repository actions now require permission on every component sharing the affected repository, including linked components in other projects.

@@ -79,6 +79,7 @@ from weblate.trans.models import (
     Component,
     ComponentLink,
     ComponentList,
+    PendingUnitChange,
     Project,
     Suggestion,
     Translation,
@@ -12188,6 +12189,60 @@ class UnitAPITest(APIBaseTest):
             superuser=True,
             request={"extra_flags": "read-only"},
         )
+
+    def test_glossary_explanation_reaches_file(self) -> None:
+        """An explanation set through the API is committed to the glossary file."""
+        glossary_component = self.project.glossaries[0]
+        cs_glossary = glossary_component.translation_set.get(language_code="cs")
+        with self.captureOnCommitCallbacks(execute=True):
+            cs_glossary.add_unit(None, "", "hello", "ahoj", author=self.user)
+        source_unit = glossary_component.source_translation.unit_set.get(source="hello")
+
+        self.do_request(
+            "api:unit-detail",
+            kwargs={"pk": source_unit.pk},
+            method="patch",
+            code=200,
+            superuser=True,
+            request={"explanation": "A greeting"},
+        )
+
+        # The change is marked pending for the target-language file and
+        # recorded in the history, exactly as the UI does it.
+        target_unit = cs_glossary.unit_set.get(source="hello")
+        self.assertTrue(
+            PendingUnitChange.objects.filter(
+                unit=target_unit, source_unit_explanation="A greeting"
+            ).exists()
+        )
+        self.assertTrue(
+            Change.objects.filter(
+                unit=target_unit, action=ActionEvents.EXPLANATION
+            ).exists()
+        )
+
+        glossary_component.commit_pending("test", None)
+        filename = cs_glossary.get_filename()
+        if filename is None:
+            self.fail("Glossary translation file is missing")
+        self.assertIn("A greeting", Path(filename).read_text(encoding="utf-8"))
+
+    def test_explanation_without_file_support(self) -> None:
+        """A format without explanation support stores the value without pending."""
+        unit = Unit.objects.get(
+            translation__language_code="en", source="Hello, world!\n"
+        )
+        self.do_request(
+            "api:unit-detail",
+            kwargs={"pk": unit.pk},
+            method="patch",
+            code=200,
+            superuser=True,
+            request={"explanation": "Just a note"},
+        )
+        unit.refresh_from_db()
+        self.assertEqual(unit.explanation, "Just a note")
+        self.assertFalse(PendingUnitChange.objects.filter(unit=unit).exists())
 
     def test_unit_labels(self) -> None:
         other_project = Project.objects.create(

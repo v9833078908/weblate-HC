@@ -3864,17 +3864,16 @@ class UnitViewSet(viewsets.ReadOnlyModelViewSet, UpdateModelMixin, DestroyModelM
                 if not can_review:
                     raise ValidationError({"state": can_review.reason})
 
-        # Update attributes
+        # Update attributes through the model methods the UI uses, so that the
+        # change is marked pending for the file, mirrored to the other
+        # languages of the same string, and recorded in the history.
         if do_source:
-            fields = ["extra_flags", "explanation"]
-            for name in fields:
-                try:
-                    setattr(unit, name, data[name])
-                except KeyError:
-                    continue
+            if "extra_flags" in data:
+                unit.update_extra_flags(data["extra_flags"], user)
+            if "explanation" in data:
+                unit.update_explanation(data["explanation"], user)
             if "labels" in data:
                 unit.save_labels(data["labels"], user)
-            unit.save(update_fields=fields)
 
         # Handle translate
         if do_translate:
