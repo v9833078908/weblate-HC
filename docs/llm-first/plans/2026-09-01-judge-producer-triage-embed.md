@@ -30,12 +30,16 @@ is a first-increment requirement. The smallest safe increment therefore
 contains Solution 1, the one-unit re-check substrate from Solution 2, and the
 stored-candidate lifecycle from Solution 3.
 
-**Status:** implemented on branch `feat/judge-producer-triage` (Tasks 1-11
-complete, all 11 commits), full targeted regression green (1075 passed, 33
-subtests; the 2 unrelated `botocore` machinery failures pre-date this branch).
-Not yet merged to `main` or deployed. One migration shipped for the
-`candidate-stored` audit choice on the existing `JudgeRunUnit.repair_status`
-field (`0114_judge_run_unit_candidate_stored`).
+**Status:** implemented (Tasks 1-11 complete, all 11 commits) and **merged to
+`main`** as `e499e7e`, alongside the availability fallback of
+`docs/llm-first/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`.
+Both features verified green together on merged `main`: 486 passed, 47
+subtests, zero failures across all seven judge test files. Not deployed. One
+migration shipped for the `candidate-stored` audit choice on the existing
+`JudgeRunUnit.repair_status` field; the merge renumbered it from `0114` to
+**`0118_judge_run_unit_candidate_stored`**, whose dependency is
+`0117_judge_verdict_provider`. It is a choices-only `AlterField`: no data
+migration and no backfill.
 
 **Known regression accepted with this amendment:** unattended self-healing of
 majors ends. Today an ignored major is sometimes machine-repaired with no human
