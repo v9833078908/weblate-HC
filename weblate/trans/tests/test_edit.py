@@ -715,6 +715,29 @@ class EditTest(ViewTestCase):
         body = tree.xpath(f'//div[@id="string-info-card-body-{unit.id}"]')[0]
         self.assertIn("show", body.get("class", "").split())
 
+    def test_save_and_stay_is_secondary(self) -> None:
+        """Save and stay is secondary; Save stays the only primary action."""
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        footer = tree.xpath(
+            '//form[contains(concat(" ", @class, " "), " translator ")]'
+            '//div[contains(concat(" ", @class, " "), " card-footer ")]'
+        )[0]
+        save_button = footer.xpath('.//button[@name="save"]')[0]
+        save_stay_button = footer.xpath('.//button[@name="save-stay"]')[0]
+        skip_link = footer.xpath(
+            './/a[contains(concat(" ", @class, " "), " skip ")]'
+        )[0]
+        self.assertIn("btn-primary", save_button.get("class", "").split())
+        self.assertIn("btn-link", save_stay_button.get("class", "").split())
+        self.assertNotIn("btn-primary", save_stay_button.get("class", "").split())
+        self.assertIn("btn-link", skip_link.get("class", "").split())
+        primary_buttons = footer.xpath(
+            './/button[contains(concat(" ", @class, " "), " btn-primary ")]'
+        )
+        self.assertEqual(len(primary_buttons), 1)
+
 
 class EditAccessTest(ViewTestCase):
     def assert_unit_action_urls_not_found(self, unit: Unit) -> None:
