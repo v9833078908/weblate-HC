@@ -1,0 +1,304 @@
+en,ru,note
+A New Glasses,Новые очки,[Orders] orderTerrain1.1Step2Title
+All about the likes!,Щедрые на лайки!,[UI] upgradeTradeMoreLikesStat
+Altar,Алтарь,[UI] upgradeCraftCurseRemovalSlotsStat
+Amethyst (Big),Аметист (Большой),[Loot] amethystBig
+Amethyst (Medium),Аметист (Средний),[Loot] amethystMedium
+Amethyst (Rough),Аметист (Необработанный),[Loot] amethystRough
+Amethyst (Small),Аметист (Малый),[Loot] amethystSmall
+Ancient Coin (Gold),Древняя монета (золото),[Loot] goldSmallCoin
+Ancient Coin (Silver),Древняя монета (серебро),[Loot] silverSmallCoin
+Ancient Money,Древние деньги,[Orders] orderTerrain1.2Step1Title
+Ancient Tome,Древняя книга,[Loot] artifactBook
+Appraisal,Оценка,[UI] unknownSlot
+Artifact,Артефакт,[Loot] artifact; [UI] artifact
+Artifacts,Артефакты,[UI] artifacts
+Avian Gemstone,Птичий Самоцвет,[Loot] gemBirdSmall
+Backpack,Рюкзак,[UI] backpack
+Bad profit,Плохая прибыль,[UI] badProfit
+Ball-Roller,Шарокат,[Orders] orderTerrain1.2Step2Title
+Beacon,Светоч,[UI] terrain2Biome2Title
+Belomar,Белоземье,[UI] terrain2Title
+Best Heater,Лучшая Грелка,[Orders] orderTerrain2.3Step2Title
+Best profit,Лучшая прибыль,[UI] bestProfit
+Big bag,Большая сумка,[UI] upgradeVehicleWeightStat
+Big Deal,Большой Куш,[Orders] orderTerrain2.3Step7Title
+Big Owl,Взрослая Сова,[Orders] orderTerrain2.3Step6Thank
+Bird,Птица,[UI] bird
+Bleed,Кровотечение,[UI] statEffectDamageBleed
+Blooming Garden Brooch (Gold),Брошь Расцветшего Сада (золото),[Loot] treasureGoldNecklace1GT1.1
+Blue Sapphire (Big),Синий Сапфир (Большой),[Loot] sapphireBig
+Blue Sapphire (Medium),Синий Сапфир (Средний),[Loot] sapphireMedium
+Blue Sapphire (Small),Синий Сапфир (Малый),[Loot] sapphireSmall
+Bonded Belt (Silver),Пояс Уз (серебро),[Loot] treasureSilverNecklace1GT1.1
+Bondstone (Big),Камень Привязанности (Большой),[Loot] loveBig
+Bondstone (Medium),Камень Привязанности (Средний),[Loot] loveMedium
+Bondstone (Small),Камень Привязанности (Малый),[Loot] gemLoveSmall
+Bracelet,Браслет,[Loot] bracelet
+Broken Visage Mask,Сломанная Маска Лика,[Loot] roughMaskT1
+Brooch,Брошь,[Loot] brooch
+Brown Ruby,Бурый Рубин,[Loot] gem.ruby.small.t1.bad
+Buried Chest,Сундук,[Loot] chest
+Buyer,Покупатель,[Tutorial] buyer
+Canary,Канарейка,[Orders] orderTerrain2.3Step3Description; [Tutorial] DialogueBeforeBirdCharacter2
+Capacity,Вместимость,[UI] upgradeStorageWeightStat
+Casket,Шкатулка,[Loot] casket
+Celestial Ring,Небесное кольцо,[Loot] treasureMeteoriteIron1GT1.1
+Character,Искатель,[Tutorial] character
+Character Status,Состояние персонажа,[UI] effects
+Chest,Сундук,[UI] chest
+Chest of the Jarl,Сундук Конунга,[Loot] winter.chest
+Chest slot,Взлом,[UI] upgradeCraftChestSlotsStat
+Chests,Сундуки,[UI] chests
+Chipped Big Diamond,Сколотый Алмаз (Большой),[Loot] gem.diamond.big.bad
+Coco,КоКо,[UI] upgradeCraftEggSlotsStatDescription
+Coin of Ancient Glory,Монета древнего величия,[Loot] artifactGoldCoinBest
+Coins,Монеты,[UI] coins
+Collected,Получено,[Loot] collected
+Colophony Mosquito,Комар в канифоли,[Loot] Jur.Cheap
+Colossal Diamond,Колоссальный Алмаз,[Loot] gem.diamond.big.good
+Common,Обычный,[UI] common
+Cosmic Intruder,Космический засланец,[Orders] orderTerrain2.2Step3Title
+Count Blingula,Граф Блингула,[Buyers] Buyer10
+Covenant Stone,Камень Завета,[Loot] artifactTablet
+Crab Metal,Крабовое Железо,[Orders] orderTerrain2.2Step2Title
+Crab Warmcoat,Крабовая Шуба,[Orders] orderTerrain2.2Step6Title
+Crab Warmth,Крабовое Тепло,[Orders] orderTerrain2.2Step4Title
+Cracked Gauntlet,Треснувшая Длань,[Loot] roughGloveT1
+Craft,Крафт,[UI] craft
+Craft slot,Плавильня,[UI] craftSlot; [UI] upgradeCraftCraftSlotsStat
+Crimson Ruby (Big),Алый Рубин (Большой),[Loot] rubyBig
+Crimson Ruby (Medium),Алый Рубин (Средний),[Loot] rubyMedium
+Crimson Ruby (Small),Алый Рубин (Малый),[Loot] rubySmall
+Crimson-blood Ruby,Кроваво-красный Рубин,[Loot] gem.ruby.small.t1.good
+Crumbled Gold,Раскрошенное золото,[Loot] gold.small.t1.bad
+Cryolis,Криолис,[Orders] orderTerrain2.2Step2Description; [Orders] orderTerrain2.2Step4Description; [Loot] cryolisSmall
+Cryolis Nugget (Small),Самородок Криолиса (Малый),[Loot] cryolisSmall
+Cursed,Проклято,[UI] cursed
+Cursed Relic,Проклятый предмет,[Loot] cursedItem
+Dagger,Кинжал,[Loot] dagger
+Dead Man’s Chest,Сундук мертвеца,[Orders] orderTerrain1.1Step4Title
+Dealer,Скупщик,[Tutorial] tip7; [UI] dealerWillBuyTheRest
+Dexterity,Сноровка,[UI] statEffectToolSpeedPositive
+Diadem,Диадема,[Loot] diadem
+Diamond (Rough),Алмаз (Необработанный),[Loot] diamondRough
+Dull Silver,Потускневшее серебро,[Loot] silver.small.t1.bad
+Dummy drive,Дискета с ярлыками игр,[Loot] Flop.Cheap
+Dung Pie,Навозный пирог,[Loot] Shit.Cheap
+Earring,Серьга,[Loot] earring
+Egg,Яйцо,[UI] egg
+Eggs,Яйца,[UI] eggs
+Elf Lustro,Эльф Лустро,[Buyers] Buyer6
+Elite slot,Элитная ячейка,[UI] eliteSlot
+Eliza Glitterford,Элиза Блескфорд,[Buyers] Buyer4
+Ember Sphere,Огненная сфера,[Loot] emberSphere
+Emerald (Big),Изумруд (Большой),[Loot] emeraldBig
+Emerald (Medium),Изумруд (Средний),[Loot] emeraldMedium
+Emerald (Rough),Изумруд (Необработанный),[Loot] emeraldRough
+Emerald (Small),Изумруд (Малый),[Loot] emeraldSmall
+Epic,Эпический,[UI] epic
+Essence of Flame,Эссенция пламени,[Orders] orderTerrain2.3Step4Title
+Exhaustion,Истощение,[UI] statEffectDamageCurse
+Fatigue,Усталость,[UI] statEffectToolSpeedNegative
+Fenmar Swamp,Фенмарская топь,[UI] terrain1Title
+Flawed Diamond (Medium),Несовершенный Алмаз (Средний),[Loot] gem.diamond.medium.t1.bad
+Flawless Diamond (Medium),Идеальный Алмаз (Средний),[Loot] gem.diamond.medium.t1.good
+Floppy with Flopcoins,Дискета со Скуфкоинами,[Loot] Flop
+Forge,Кузница,[UI] forge
+Fractured Crown,Надломленный Венец,[Loot] roughCrownT1
+Fractured Dagger of Will,Надломленной Кинжал Воли,[Loot] roughDaggerT1
+Friday Night Mask,Маска для пятницы,[Loot] Frid
+Frostbite,Обморожение,[UI] statEffectAccumulationFreeze
+Frosty Gold,Мороженное Золото,[Orders] orderTerrain2.1Step3Title
+Frosty Silver,Мороженное Серебро,[Orders] orderTerrain2.1Step2Title
+Frozen,Замороженный,[UI] frozen
+Frozen Ancient Tome,Замороженная древняя книга,[Loot] frozen.artifact.book.t4.1
+Frozen Diamond (Big),Замороженный Алмаз (Большой),[Loot] frozen.daimond.big.t1.1
+Frozen Diamond (Medium),Замороженный Алмаз (Средний),[Loot] frozen.daimond.medium.t1.1
+Frozen Gold Nugget (Small),Замороженный Золотой самородок (Малый),[Loot] frozen.gold.small.t1
+Frozen Idol,Замороженный Идол,[Loot] frozen.treasure.1g.idol
+Frozen item,Замороженный предмет,[Loot] frozenItem
+Frozen Large Gold Chunk,Замороженный Крупный Кусок Золота,[Loot] frozen.gold.medium.t1.1
+Frozen Opal (Small),Замороженный Опал (Малый),[Loot] frozen.opal.small.t1.1
+Frozen Ruby (Small),Замороженный Рубин (Малый),[Loot] frozen.ruby.small.t1.1
+Frozen Sapphire (Small),Замороженный Сапфир (Малый),[Loot] frozen.sapphire.small.t1.1
+Frozen Shipyard,Мёрзлая Верфь,[UI] terrain2Biome1Title
+Frozen Silver Nugget (Small),Замороженный Серебряный самородок (Малый),[Loot] frozen.silver.small.t1
+Gem,Камень,[UI] gem
+Gem Seeker,Искатель самоцветов,[UI] upgradeDetectorGemsAmountStat
+Gems,Камни,[UI] gems
+Generous buyers,Щедрые покупатели,[UI] upgradeTradeNewBuyersStat
+Genghis Khan Tooth,Зуб Чингисхана,[Loot] Tooth
+Geode,Геод,[UI] geode
+Geode (Medium),Геод (Средний),[Loot] geodeMedium
+Geode (Small),Геод (Малый),[Loot] geodeSmall
+Geodes,Геоды,[UI] geodes
+Getting Used to the Land,Привыкание к земле,[Orders] orderTerrain1.1Step3Title
+Glasses,Очки,[Loot] glasses
+Gleam of Dawn,Отблеск рассвета,[Orders] orderTerrain1.1Step1Title
+Gleaming Silver Nugget,Сияющий Серебряный Самородок,[Loot] silver.small.t1.good
+Going Big,Ходим по-большому,[Orders] orderTerrain2.3Step1Title
+Gold,Золото,[UI] gold
+Gold Nugget (Big),Золотой самородок (Большой),[Loot] goldBig
+Gold Nugget (Small),Золотой самородок (Малый),[Loot] goldSmall
+Golden coins,Золотые монеты,[UI] hardCurrency
+Golden Crown,Золотой Венец,[Loot] treasureGoldCrownT1.1
+Golden Dagger of Will,Золотой Кинжал Воли,[Loot] treasureGoldDagger2GT1.1
+Golden Gauntlet,Золотая Длань,[Loot] treasureGoldGlove5GT1.1
+Golden Omelette,Золотой омлет,[Orders] orderTerrain1.2Step4Title
+Golden Scarab,Золотой жук-скарабей,[Loot] goldSmallScarab
+Golden Scepter,Золотой Скипетр,[Loot] treasureGoldScepter3GT1.1
+Golden toilet,Золотой унитаз,[Orders] orderTerrain1.2Step7Title
+Golden Visage Mask,Золотая Маска Лика,[Loot] treasureGoldMask2GT1.1
+Goldmine,Золотая жила,[UI] upgradeCraftCostStat
+Good profit,Хорошая прибыль,[UI] goodProfit
+Graves,Могилы,[UI] terrain1Biome1Title
+Grimdal,Гримдаль,[UI] terrain3Title
+Grounded Astrology,Подножная Астрология,[Orders] orderTerrain2.2Step1Title
+Heaven’s Grace,Небесная благодать,[Orders] orderTerrain1.2Step6Title
+Hexed Coin,Заговорённая монета,[Loot] artifactGoldCoin
+Hidden Gem Pin (Gold),Булавка Тайного Самоцвета (Золото),[Loot] treasureGoldPin1GT1.1
+Holy Dubai Choco,Мощи Святого Говарда,[Loot] Shit
+Horse,Лошадь,[Tutorial] horse
+Horse cargo bag,Сумка для лошади,[UI] horseCargoBag
+ice crab,ледяной краб,[Orders] orderTerrain2.2Step2Description; [Orders] orderTerrain2.2Step4Description
+Ice Cubes,Колотый Лед,[Orders] orderTerrain2.1Step1Title
+Idol,Идол,[Loot] idol
+Idol Hearth,Искра идола,[Loot] gemIdolHearthSmall
+Idol of the Blazing Skull,Идол Пылающего Черепа,[Loot] treasure2GIdolT1.2
+Idol of the Great Boar,Идол Великого Хряка,[Loot] treasure2GIdolT1.1
+Idol of the Mustachedness,Идол Усатости,[Loot] treasure.3g.idol.cheap.t1.1
+Idol of the Singed Noggin,Идол Обгоревшей Макушки,[Loot] treasure2GIdolCheapT1.2
+Idol of the Wisdom,Идол Мудрости,[Loot] treasure.3g.idol.t1.1
+Idol Spark,Искра Идола,[Orders] orderTerrain2.3Step4Description
+Incubator,Инкубатор,[UI] upgradeCraftEggSlotsStat
+Insert,Вставка,[UI] upgradeCraftInlaySlotsStat
+Inventory,Инвентарь,[UI] inventory
+Invisible Gem,Невидимый Камень,[Orders] orderTerrain2.1Step4Title
+Iridescent Stone,Переливчатый камень,[Orders] orderTerrain2.3Step5Title
+It Left Offspring!,Оно оставило потомство!,[Orders] orderTerrain2.3Step6Title
+Jarl Chest,Сундук Конунга,[Orders] orderTerrain2.3Step3Description
+Jewelry,Украшение,[UI] treasure
+Jewelry Sprint,Ювелирный спринт,[UI] upgradeCraftTimeStat
+Keepsake Box,Шкатулка Прошлого,[Loot] Lem
+King’s Signet (Gold),Перстень короля (золото),[Loot] treasureGoldRing1GT1.3
+Labyrinth,Лабиринт,[Orders] orderTerrain2.3Step8Description
+Lady Amethysta,Леди Аметиста,[Buyers] Buyer2
+Large Gold Chunk,Крупный Кусок Золота,[Loot] goldMedium
+Leaders,Лидеры,[UI] leaders
+Legendary,Легендарный,[UI] legendary
+Leonard Goldstein,Леонард Голдстейн,[Buyers] Buyer3
+Likes,Лайки,[UI] hearthCurrency
+Lion’s Blood,Кровь льва,[Orders] orderTerrain1.2Step5Title
+Loot,Добыча,[UI] loot
+Lopsided Sapphire,Перекошенный Сапфир,[Loot] gem.sapphire.medium.t1.bad
+Lord Glimo,Лорд Глимо,[Buyers] Buyer5
+Lostwood,Заблудье,[UI] terrain2Biome3Title
+Luminous Opal,Лучистый Опал,[Loot] gem.opal.small.t1.good
+Mangled Gold Chunk,Промерзший кусок золота,[Loot] gold.medium.t1.2
+Map,Карта,[UI] map
+Mask,Маска,[Loot] mask
+Metal,Металл,[UI] metal
+Metals,Металлы,[UI] metals
+Meteor Core,Ядро Метеора,[Loot] artifactGalaxyMechanism
+Meteorfall,Звездопад,[UI] terrain1Biome2Title
+Monday 12th Mask,Маска Четных Чисел,[Loot] Frid.Cheap
+Moonlit Ring (Silver),Лунное Кольцо (серебро),[Loot] treasureSilverRing1GT1.1
+Mossy Coin,Замшелая монета,[Loot] artifactGoldCoinCheap
+Murky Opal,Мутный Опал,[Loot] gem.opal.small.t1.bad
+Mystery-Crap Stone,Камень Чего-то?,[Loot] Tablet.Cheap
+Mythic,Мифический,[UI] mythic
+Narrow Stone Bracelet (Gold),Браслет Узкого Камня (золото),[Loot] treasureGoldRing1GT1.2
+Necklace,Ожерелье,[Loot] necklace
+Needle of Honor (Silver),Игла Чести (серебро),[Loot] treasureSilverPin1GT1.1
+New Sensors,Новые датчики,[Orders] orderTerrain2.2Step5Title
+New slot,Новый прилавок,[UI] upgradeTradeSlotsStat
+Noisy Tool,Шумный инструмент,[UI] statEffectToolNoiseNegative
+Opal (Big),Опал (Большой),[Loot] opalBig
+Opal (Medium),Опал (Средний),[Loot] opalMedium
+Opal (Rough),Опал (Необработанный),[Loot] opalRough
+Opal (Small),Опал (Малый),[Loot] opalSmall
+Ore Seeker,Искатель руды,[UI] upgradeDetectorGoldAmountStat
+Owl Chick,Птенец Совы,[Orders] orderTerrain2.3Step6Description
+Paradise Bird Egg,Золотое Яйцо,[Loot] eggBird
+Pendant of Hidden Light (Gold),Кулон Скрытого Света (Золото),[Loot] treasureGoldNecklace1GT1.2
+Pick,Кирка,[UI] Pick
+Pin,Булавка,[Loot] pin
+Polishing,Полировка,[UI] upgradeCraftPolishingSlotsStat
+Poor Man's Boar Idol,Идол Хряка для бедных,[Loot] treasure2GIdolCheapT1.1
+Pristine Gold Nugget,Чистейший золотой самородок,[Loot] gold.small.t1.good
+Prospectors,Старатели,[UI] prospectors
+Pure Diamond (Big),Чистый Алмаз (Большой),[Loot] diamondBig
+Pure Diamond (Medium),Чистый Алмаз (Средний),[Loot] diamondMedium
+Pure Diamond (Small),Чистый Алмаз (Малый),[Loot] diamondSmall
+Quietwood,Тихолесье,[UI] terrain0Title
+Radiant Medallion (Gold),Медальон Блеска (Золото),[Loot] treasureGoldEarring1GT1.1
+Rare,Редкий,[UI] rare
+Rarity,Редкость,[UI] upgradeCraftRarityStat
+Recipe,Рецепт,[UI] recipe
+Recipe book,Книга рецептов,[UI] upgradeCraftRecipesStat
+Regeneration,Регенерация,[UI] statEffectHeal
+Resonant Earrings (Gold),Звонкие Серьги (золото),[Loot] treasureGoldEarring2GT1.1
+Ring,Кольцо,[Loot] ring
+Ring (Gold),Кольцо (золото),[Loot] treasureGoldRing1GT1.1
+Roman von Valiant,Роман фон Вэлиант,[Buyers] Buyer1
+Rough,Необработанные,[UI] rough
+Ruby (Rough),Рубин (Необработанный),[Loot] rubyRough
+Ruby Ray,Руби Рэй,[Buyers] Buyer8
+Rubybeard,Рубинобород,[Buyers] Buyer9
+Sapphire (Rough),Сапфир (Необработанный),[Loot] sapphireRough
+Sawmill,Лесопилка,[UI] terrain2Biome0Title
+Serpent Ring (Silver),змеиное кольцо (серебро),[Loot] treasureSilverRing1GT1.2
+Shattered Scepter,Расколотый Скипетр,[Loot] roughtScepterT1
+Shrine,Капище,[Orders] orderTerrain2.3Step2Description
+Silent Tool,Тихий инструмент,[UI] statEffectToolNoisePositive
+Silver coins,Серебряные монеты,[UI] softCurrency
+Silver for Tempering,Серебро для закалки,[Orders] orderTerrain1.1Step5Title
+Silver Nugget (Small),Серебряный самородок (Малый),[Loot] silverSmall
+Sir Maxillion,Сэр Максиллион,[Buyers] Buyer7
+Skyborn Sapphire,Небесный Сапфир,[Loot] gem.sapphire.medium.t1.good
+Slot,Ячейка,[UI] slot
+Slowdown,Замедление,[UI] statEffectMovementSpeedNegative
+Source of the Old Blood,Источник Древней Крови,[Loot] Jur
+Sovereign’s Signet (Gold),Перстень Владыки (золото),[Loot] treasureGoldRing1GT1.4
+Sparkwing,Искрокрыл,[Loot] sparkwing
+Speed Boost,Ускорение,[UI] statEffectMovementSpeedPositive
+Splendid Gold Chunk,Великолепный Кусок Золота,[Loot] gold.medium.t1.3
+Star Iron (Small),Звёздное железо (Малое),[Loot] meteoriteIronSmall
+Starfall,Звездопад,[Orders] orderTerrain2.2Step1Description; [Orders] orderTerrain2.2Step3Description
+Stone Bowling,Каменный боулинг,[Orders] orderTerrain1.2Step3Title
+Storage,Склад,[UI] storage
+Sun Cult,Культ Солнца,[Orders] orderTerrain2.2Step7Description; [Orders] orderTerrain2.3Step8Description
+Sun Sphere,Солнечная Сфера,[Orders] orderTerrain2.3Step2Description; [Orders] orderTerrain2.3Step4Description; [Orders] orderTerrain2.3Step6Description
+Sunburst Brooch (Gold),Солнечная Брошь (золото),[Loot] treasureGoldBrooch2GT1.1
+Super slot,Супер слот,[UI] upgradeCraftSuperSlotsStat
+Swamp,Топь,[UI] terrain1Biome0Title
+Swamp Larva,Болотная Личинка,[Loot] artifactWormEntity
+Tentacle Signet (Silver),Щупальцевый Перстень (серебро),[Loot] treasureSilverRing1GT1.3
+Trader,Торговец,[Tutorial] trader
+Trading,Торги,[UI] trading
+Trading shop,Торговая лавка,[UI] tradingShop
+Trash,Хлам,[Loot] trash; [UI] trash
+Treasure detector,Детектор сокровищ,[UI] treasureDetector
+Twin Fates Ring (Gold),Перстень Двух Судеб (золото),[Loot] treasureGoldRing2GT1.1
+Uncommon,Необычный,[UI] uncommon
+Unknown,Неизвестный,[UI] unknown
+Unknown item,Неизвестный предмет,[Loot] unknownItem
+Valuable Geode (Medium),Ценный Геод (Средний),[Loot] geodeGemMedium
+Valuable Geode (Small),Ценный Геод (Малый),[Loot] geodeGemSmall
+Vanity Spectacles (Gold),Очки Тщеславия (золото),[Loot] treasureGoldGlasses2GT1.1
+Wasteland,Пустошь,[UI] terrain0Biome0Title
+We Need More Gold!,Нужно больше золота!,[Orders] orderTerrain0.1Step1Title
+Whitelands,Белоземье,[Orders] orderTerrain2.3Step3Title; [Orders] orderTerrain2.3Step3Description
+Whitelands Treasure,Сокровище Белоземья,[Orders] orderTerrain2.3Step3Title
+Wild Gemstone (Medium),Дикий Самоцвет (Средний),[Loot] gemRoughMedium
+Wild Gemstone (small),Дикий Самоцвет (малый),[Loot] gemRoughSmall
+Wise notes,Мудрые записи,[UI] wiseNotes
+Worm,Червь,[Tutorial] tip2; [UI] terrain1Description
+Worm Egg,Червиное Яйцо,[Loot] eggWorm
+Worn Scroll,Потёртый Свиток,[Loot] artifactManuscript
+Yolk of Fortune,Желток Фортуны,[Loot] artifactBirdEntity
+You reek of riches,Ты пахнешь богатством,[UI] upgradeTradeBestBuyersRateStat
+Your tooth?!?,Твой зуб?!?,[Loot] Tooth.Cheap
+Zlatovich the Dealer,Скупщик Златович,[UI] traderName
+Zlatovich’s Trading Shop,Торговая лавка Златовича,[UI] tradingShopInfoTitle
