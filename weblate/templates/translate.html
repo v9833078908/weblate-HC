@@ -277,6 +277,9 @@
                     {% icon "fast-forward.svg" %}
                   {% endif %}
                 {% translate "Skip" %}</a>
+                {% if judge_round and user_can_translate %}
+                  <span class="text-muted small">{% translate "Changed text is re-checked by the judge automatically." %}</span>
+                {% endif %}
               </div>
             </div>
           </div>

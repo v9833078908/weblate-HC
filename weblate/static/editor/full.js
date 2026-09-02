@@ -54,6 +54,7 @@
     this.initChecks();
     this.initGlossary();
     this.initSuggestions();
+    this.initJudgePending();
 
     const copyMachinery = (row, mark) => {
       const raw = getRawData(row);
@@ -287,6 +288,21 @@
         return;
       }
       this.initMachinery();
+    }
+  };
+
+  FullEditor.prototype.initJudgePending = function () {
+    const judgeCard = document.getElementById("id_judge_card");
+    if (judgeCard && judgeCard.dataset.judgePending === "1") {
+      window.setTimeout(() => {
+        const editors = document.querySelectorAll("textarea.translation-editor");
+        const untouched = Array.from(editors).every(
+          (el) => el.value === el.defaultValue,
+        );
+        if (untouched) {
+          window.location.reload();
+        }
+      }, 5000);
     }
   };
 

@@ -1,9 +1,11 @@
-{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed', 'judge_current_verdict', 'judge_can_resolve', 'judge_resolution_form', 'judge_repair_evidence', 'judge_candidate', 'judge_recheck_pending', 'judge_generation_pending', 'judge_can_triage', 'judge_active_verdict', 'judge_active_max_length', 'this_unit_url' in context #}
+{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed', 'judge_current_verdict', 'judge_can_resolve', 'judge_resolution_choices', 'judge_repair_evidence', 'judge_candidate', 'judge_recheck_pending', 'judge_generation_pending', 'judge_can_triage', 'judge_active_verdict', 'judge_active_max_length', 'this_unit_url' in context #}
 
 {% load humanize i18n icons translations %}
 
 {% if judge_verdict or judge_stale or judge_unparsed %}
-  <div class="card" id="id_judge_card">
+  <div class="card"
+       id="id_judge_card"
+       {% if judge_generation_pending or judge_recheck_pending %}data-judge-pending="1"{% endif %}>
     <div class="card-header">
       <h4 class="card-title">{% translate "AI judge verdict" %}</h4>
     </div>
@@ -41,13 +43,15 @@
               <span class="badge text-bg-danger">{% translate "Will not ship" %}</span>
             {% endif %}
           </h5>
+          {% with error=judge_verdict.primary_error %}
+            {% if error %}
+              <p class="list-group-item-text"><strong>{{ error.category }}</strong>: {{ error.description }}</p>
+            {% endif %}
+          {% endwith %}
           {% if judge_context_changed %}
             <p class="list-group-item-text">
               {% translate "The context changed (glossary or note updated) since this verdict was recorded." %}
             </p>
-          {% endif %}
-          {% if judge_seats|length > 1 %}
-            <p class="list-group-item-text text-muted">{% translate "Both judges reviewed this string independently." %}</p>
           {% endif %}
           {% include "snippets/judge-verdict-evidence.html" with seats=judge_seats %}
         </div>
@@ -58,6 +62,11 @@
             {% translate "Questionable" %}
             <span class="badge text-bg-warning">{% translate "Ships with evidence" %}</span>
           </h5>
+          {% with error=judge_verdict.primary_error %}
+            {% if error %}
+              <p class="list-group-item-text"><strong>{{ error.category }}</strong>: {{ error.description }}</p>
+            {% endif %}
+          {% endwith %}
           {% if judge_context_changed %}
             <p class="list-group-item-text">
               {% translate "The context changed (glossary or note updated) since this verdict was recorded." %}
@@ -99,7 +108,7 @@
         <div class="list-group-item check">
           <p class="list-group-item-text">
             {% if judge_current_verdict.resolution == "escalated" %}
-              <span class="badge text-bg-info">{% translate "Escalated for review" %}</span>
+              <span class="badge text-bg-info">{% translate "Sent back to queue" %}</span>
             {% elif judge_current_verdict.resolution == "accepted_as_is" %}
               <span class="badge text-bg-success">{% translate "Accepted as-is" %}</span>
             {% endif %}
@@ -115,10 +124,9 @@
            active, so there is nothing to preview here. The failing check
            itself is shown elsewhere on the page. #}
       {% elif judge_recheck_pending %}
-        {# A paid re-check is in flight and its answer decides what this
-           card may offer next. Applying or regenerating a candidate now
-           would race that answer, so the card shows only the re-check
-           status rendered further down until it lands. #}
+        <div class="list-group-item check">
+          <p class="list-group-item-text">{% translate "Re-checking this string…" %}</p>
+        </div>
       {% elif judge_candidate %}
         <div class="list-group-item check">
           <h5 class="list-group-item-heading">
@@ -132,24 +140,13 @@
           {% if judge_can_triage %}
             <form method="post"
                   action="{% url 'judge-accept-candidate' pk=judge_candidate.pk %}"
-                  class="form-inline">
+                  class="form-inline"
+                  id="id_judge_accept_form">
               {% csrf_token %}
               <input type="hidden" name="next" value="{{ this_unit_url }}" />
               <input type="hidden" name="success_next" value="{{ next_unit_url }}" />
               <button type="submit" class="btn btn-success">{% translate "Use suggested fix" %}</button>
             </form>
-            {% if judge_generation_pending %}
-              <p class="list-group-item-text text-muted">{% translate "Generating a suggested fix…" %}</p>
-            {% else %}
-              <form method="post"
-                    action="{% url 'judge-generate-candidate' pk=judge_current_verdict.pk %}"
-                    class="form-inline">
-                {% csrf_token %}
-                <input type="hidden" name="next" value="{{ this_unit_url }}" />
-                <input type="hidden" name="replace" value="1" />
-                <button type="submit" class="btn btn-link">{% translate "Generate another" %}</button>
-              </form>
-            {% endif %}
           {% endif %}
         </div>
       {% elif judge_active_verdict %}
@@ -166,39 +163,79 @@
           {% endif %}
         </div>
       {% endif %}
-      {% if judge_can_resolve %}
-        <div class="list-group-item check">
+      {% if judge_can_resolve and "accepted_as_is" in judge_resolution_choices %}
+        <div class="list-group-item check" id="id_judge_resolution_form">
           <form method="post"
                 action="{% url 'resolve-judge-verdict' pk=judge_current_verdict.pk %}"
-                id="id_judge_resolution_form">
+                class="judge-keep-form"
+                id="id_judge_keep_form">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ this_unit_url }}" />
             <input type="hidden" name="success_next" value="{{ next_unit_url }}" />
-            <div class="form-group">
-              {{ judge_resolution_form.resolution.label_tag }}
-              {{ judge_resolution_form.resolution }}
-              {{ judge_resolution_form.resolution.errors }}
-            </div>
-            <div class="form-group">
-              {{ judge_resolution_form.reason.label_tag }}
-              {{ judge_resolution_form.reason }}
-              {{ judge_resolution_form.reason.errors }}
-            </div>
-            <button type="submit" class="btn btn-warning">{% translate "Record decision" %}</button>
+            <input type="hidden" name="resolution" value="accepted_as_is" />
+            <button type="submit" class="btn btn-outline-secondary">{% translate "Keep as is" %}</button>
+            <details class="mt-2">
+              <summary class="text-muted">{% translate "Add a reason (optional)" %}</summary>
+              <textarea class="form-control" name="reason" rows="2" aria-label="{% translate "Reason (optional)" %}"></textarea>
+            </details>
           </form>
         </div>
       {% endif %}
-      {% if judge_can_triage %}
+      {% if judge_verdict %}
+        {% if judge_can_triage and not judge_recheck_pending or judge_can_resolve and "escalated" in judge_resolution_choices %}
+          <div class="list-group-item check">
+            <details class="list-group-item-text">
+              <summary>{% translate "More actions" %}</summary>
+              {% if judge_candidate and judge_can_triage and not judge_recheck_pending %}
+                {% if judge_generation_pending %}
+                  <p class="list-group-item-text text-muted">{% translate "Generating a suggested fix…" %}</p>
+                {% else %}
+                  <form method="post"
+                        action="{% url 'judge-generate-candidate' pk=judge_current_verdict.pk %}"
+                        class="form-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ this_unit_url }}" />
+                    <input type="hidden" name="replace" value="1" />
+                    <button type="submit" class="btn btn-link">{% translate "Generate another" %}</button>
+                  </form>
+                {% endif %}
+              {% endif %}
+              {% if judge_can_resolve and "escalated" in judge_resolution_choices %}
+                <form method="post"
+                      action="{% url 'resolve-judge-verdict' pk=judge_current_verdict.pk %}"
+                      class="judge-escalate-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ this_unit_url }}" />
+                  <input type="hidden" name="success_next" value="{{ next_unit_url }}" />
+                  <input type="hidden" name="resolution" value="escalated" />
+                  <button type="submit" class="btn btn-link">{% translate "Send back to queue" %}</button>
+                  <details class="mt-2">
+                    <summary class="text-muted">{% translate "Add a reason (optional)" %}</summary>
+                    <textarea class="form-control" name="reason" rows="2" aria-label="{% translate "Reason (optional)" %}"></textarea>
+                  </details>
+                </form>
+              {% endif %}
+              {% if judge_can_triage and not judge_recheck_pending %}
+                <form method="post" action="{% url 'judge-recheck' pk=unit.pk %}" id="id_judge_recheck_form">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ this_unit_url }}" />
+                  <button type="submit" class="btn btn-link">{% translate "Re-check this string" %}</button>
+                </form>
+              {% endif %}
+            </details>
+          </div>
+        {% endif %}
+      {% elif judge_can_triage and not judge_recheck_pending %}
+        {# No live verdict to act on (stale text, or a fully unparsed
+           round with no historical fallback): re-check is the only
+           action, so it stays a plain, always-visible slot rather than
+           hiding the one thing there is to do behind a toggle. #}
         <div class="list-group-item check">
-          {% if judge_recheck_pending %}
-            <p class="list-group-item-text">{% translate "Re-checking this string…" %}</p>
-          {% else %}
-            <form method="post" action="{% url 'judge-recheck' pk=unit.pk %}">
-              {% csrf_token %}
-              <input type="hidden" name="next" value="{{ this_unit_url }}" />
-              <button type="submit" class="btn btn-link">{% translate "Re-check this string" %}</button>
-            </form>
-          {% endif %}
+          <form method="post" action="{% url 'judge-recheck' pk=unit.pk %}" id="id_judge_recheck_form">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ this_unit_url }}" />
+            <button type="submit" class="btn btn-link">{% translate "Re-check this string" %}</button>
+          </form>
         </div>
       {% endif %}
     </div>
@@ -223,7 +260,7 @@
           {% if judge_recheck_pending %}
             <p class="list-group-item-text">{% translate "Re-checking this string…" %}</p>
           {% else %}
-            <form method="post" action="{% url 'judge-recheck' pk=unit.pk %}">
+            <form method="post" action="{% url 'judge-recheck' pk=unit.pk %}" id="id_judge_recheck_form">
               {% csrf_token %}
               <input type="hidden" name="next" value="{{ this_unit_url }}" />
               <button type="submit" class="btn btn-link">{% translate "Re-check this string" %}</button>

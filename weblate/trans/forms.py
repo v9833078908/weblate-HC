@@ -700,7 +700,9 @@ class TranslationForm(UnitForm):
         required=False,
     )
 
-    def __init__(self, user: User, unit: Unit, *args, **kwargs) -> None:
+    def __init__(
+        self, user: User, unit: Unit, *args, judged: bool = False, **kwargs
+    ) -> None:
         translation = unit.translation
         component = translation.component
         kwargs["initial"] = {
@@ -786,6 +788,14 @@ class TranslationForm(UnitForm):
             commit_policy = f" {component.project.get_commit_policy_description()}"
             self.fields["review"].help_text += commit_policy
             self.fields["fuzzy"].help_text += commit_policy
+        if judged and user_can_edit and user_can_review and not unit.readonly:
+            # A judged string takes its release state from the judge, not from
+            # a human radio choice: the producer saves text, the re-check
+            # decides. An untouched approved string keeps its state on a no-op
+            # save; anything below translated is lifted to translated.
+            self.fields["review"].widget = forms.HiddenInput()
+            self.initial["review"] = max(unit.state, STATE_TRANSLATED)
+            self.fields["review"].help_text = ""
 
     def clean(self) -> None:
         super().clean()
@@ -1443,7 +1453,7 @@ class JudgeResolutionForm(forms.Form):
         choices=(
             (
                 JudgeVerdict.Resolution.ESCALATED,
-                gettext_lazy("Escalate for review"),
+                gettext_lazy("Send back to queue"),
             ),
             (
                 JudgeVerdict.Resolution.ACCEPTED_AS_IS,
@@ -1452,7 +1462,8 @@ class JudgeResolutionForm(forms.Form):
         ),
     )
     reason = forms.CharField(
-        label=gettext_lazy("Reason"),
+        label=gettext_lazy("Reason (optional)"),
+        required=False,
         widget=forms.Textarea(attrs={"rows": 2}),
     )
 

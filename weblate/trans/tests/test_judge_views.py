@@ -20,9 +20,11 @@ from lxml import html
 from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Permission, Role
 from weblate.trans.actions import ActionEvents
+from weblate.trans.judge import JudgeError
 from weblate.trans.judge_loop import (
     _generation_lock_key,
     build_request,
+    queue_judge_recheck,
     recheck_query,
 )
 from weblate.trans.models.change import Change
@@ -41,6 +43,7 @@ from weblate.trans.models.unit import Unit
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.views.basic import _judge_hand_off_blocked
 from weblate.utils.state import (
+    STATE_APPROVED,
     STATE_FUZZY,
     STATE_NEEDS_CHECKING,
     STATE_READONLY,
@@ -1099,7 +1102,7 @@ class JudgeResolutionViewTest(ViewTestCase):
             {"resolution": "escalated", "reason": "flagged for a human"},
         )
         response = self.client.get(unit.get_absolute_url())
-        self.assertContains(response, "Escalated for review")
+        self.assertContains(response, "Sent back to queue")
         self.assertContains(response, "flagged for a human")
 
     # -- Task 8: auto-advance only after success ---------------------------
@@ -1124,8 +1127,10 @@ class JudgeResolutionViewTest(ViewTestCase):
         )
         self.assertRedirects(response, next_unit_url, fetch_redirect_response=False)
 
-    def test_blank_reason_stays_on_the_current_unit(self) -> None:
+    def test_keep_as_is_one_click(self) -> None:
         self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
         unit = self.get_unit()
         verdict = self.make_verdict(unit, "critical")
         this_unit_url, next_unit_url = self._next_urls(unit)
@@ -1133,12 +1138,25 @@ class JudgeResolutionViewTest(ViewTestCase):
             self.resolve_url(verdict),
             {
                 "resolution": "accepted_as_is",
-                "reason": "   ",
                 "next": this_unit_url,
                 "success_next": next_unit_url,
             },
         )
-        self.assertRedirects(response, this_unit_url, fetch_redirect_response=False)
+        self.assertRedirects(response, next_unit_url, fetch_redirect_response=False)
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+
+    def test_keep_as_is_with_reason(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        response = self.client.post(
+            self.resolve_url(verdict),
+            {"resolution": "accepted_as_is", "reason": "acceptable in context"},
+        )
+        self.assertRedirects(response, unit.get_absolute_url())
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.resolution_reason, "acceptable in context")
 
     def test_stale_verdict_stays_on_the_current_unit(self) -> None:
         self.enable_review()
@@ -2682,6 +2700,167 @@ class JudgeProducerTriageViewTest(ViewTestCase):
     JUDGE_MODEL_SEAT_2="vendor-b/model",
     JUDGE_MAX_REPAIR_ATTEMPTS=1,
 )
+class JudgeManualSaveTest(ViewTestCase):
+    """Task 3: review radios hidden for a judged string, automatic re-check."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.component.project.translation_review = True
+        self.component.project.save(update_fields=["translation_review"])
+
+    def grant_only(self, codenames) -> None:
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        self.user.groups.clear()
+        role = Role.objects.create(name="Manual save permissions")
+        for codename in codenames:
+            role.permissions.add(Permission.objects.get(codename=codename))
+        group = Group.objects.create(
+            name="Manual save testers",
+            project_selection=SELECTION_ALL,
+            language_selection=SELECTION_ALL,
+        )
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+    def make_verdict(self, unit, severity, **kwargs):
+        kwargs.setdefault("target_hash", compute_target_hash(unit.get_target_plurals()))
+        kwargs.setdefault("context_hash", judge_context_hash(unit))
+        kwargs.setdefault("judge_model", "vendor/model-a")
+        kwargs.setdefault("seat", 1)
+        verdict = JudgeVerdict.objects.create(
+            unit=unit, max_severity=severity, **kwargs
+        )
+        unit.run_checks()
+        return verdict
+
+    def test_review_radios_hidden_when_judged(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        self.project.commit_policy = 20  # WITHOUT_NEEDS_EDITING
+        self.project.save(update_fields=["commit_policy"])
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        self.assertEqual(tree.xpath('//div[contains(@class, "review_radio")]'), [])
+        inputs = tree.xpath('//input[@name="review"]')
+        self.assertEqual(len(inputs), 1)
+        self.assertEqual(inputs[0].get("type"), "hidden")
+        self.assertEqual(inputs[0].get("value"), str(STATE_TRANSLATED))
+        self.assertNotContains(response, "not written to the translation file")
+
+    def test_review_radios_shown_when_not_judged(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        self.project.commit_policy = 20
+        self.project.save(update_fields=["commit_policy"])
+        unit = self.get_unit("Thank you for using Weblate.")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, "review_radio")
+        self.assertContains(response, "not written to the translation file")
+
+    def test_review_hidden_keeps_approved_on_unchanged_save(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_APPROVED)
+        self.make_verdict(unit, "critical")
+        # The stored target carries the source trailing newline, and that is
+        # what the textarea posts back for an unchanged string.
+        response = self.edit_unit(
+            "Hello, world!\n", "Ahoj\n", review=str(STATE_APPROVED)
+        )
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_APPROVED)
+        self.assertEqual(
+            JudgeRun.objects.filter(requested_mode="recheck").count(), 0
+        )
+
+    def test_manual_save_of_changed_text_recheck(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        with mock.patch(
+            "weblate.trans.views.edit.queue_judge_recheck",
+            autospec=True,
+            wraps=queue_judge_recheck,
+        ) as queued:
+            response = self.edit_unit("Hello, world!\n", "Nový cíl po opravě")
+        self.assertEqual(queued.call_count, 1)
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+        runs = JudgeRun.objects.filter(requested_mode="recheck")
+        self.assertEqual(runs.count(), 1)
+        self.assertEqual(runs.get().requested_query, recheck_query(unit.pk))
+        self.assert_redirects_offset(
+            response, unit.translation.get_translate_url(), 2
+        )
+
+    def test_manual_save_of_approved_changed_text_demotes_to_translated(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_APPROVED)
+        self.make_verdict(unit, "critical")
+        response = self.edit_unit(
+            "Hello, world!\n", "Nový cíl po opravě", review=str(STATE_APPROVED)
+        )
+        self.assertEqual(response.status_code, 302)
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+        self.assertEqual(
+            JudgeRun.objects.filter(requested_mode="recheck").count(), 1
+        )
+
+    def test_manual_save_unjudged_string_no_recheck(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        with mock.patch(
+            "weblate.trans.views.edit.queue_judge_recheck",
+            autospec=True,
+            wraps=queue_judge_recheck,
+        ) as queued:
+            self.edit_unit("Thank you for using Weblate.", "Děkuji za Use Weblate")
+        self.assertEqual(queued.call_count, 0)
+        self.assertEqual(JudgeRun.objects.count(), 0)
+        unit = self.get_unit("Thank you for using Weblate.")
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+
+    def test_manual_save_without_translation_auto_no_recheck(self) -> None:
+        self.grant_only(["unit.edit", "unit.review"])
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.edit_unit(
+            "Hello, world!\n", "Nový cíl po opravě", follow=True
+        )
+        self.assertContains(response, "awaits a judge re-check")
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
+        self.assertEqual(JudgeRun.objects.count(), 0)
+
+    def test_manual_save_recheck_configuration_error(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        with mock.patch(
+            "weblate.trans.views.edit.validate_judge_configuration",
+            side_effect=JudgeError("The judge is not configured."),
+        ):
+            response = self.edit_unit(
+                "Hello, world!\n", "Nový cíl po opravě", follow=True
+            )
+        self.assertContains(response, "The judge is not configured.")
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
+        self.assertEqual(JudgeRun.objects.count(), 0)
+
+
+@override_settings(
+    JUDGE_ENABLED=True,
+    JUDGE_API_KEY="sk-test",
+    JUDGE_MODEL_SEAT_1="vendor-a/model",
+    JUDGE_MODEL_SEAT_2="vendor-b/model",
+    JUDGE_MAX_REPAIR_ATTEMPTS=1,
+)
 class JudgeVerdictCardRenderTest(ViewTestCase):
     """Task 5: the embedded triage states the verdict card renders."""
 
@@ -2771,7 +2950,10 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         self.assertContains(response, "Re-check this string")
         self.assertNotContains(response, "Use suggested fix")
         self.assertNotContains(response, "Generate suggested fix")
-        self.assertNotContains(response, "Record decision")
+        self.assertNotContains(response, "Keep as is")
+        self.assertNotContains(response, "Send back to queue")
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        self.assertNotIn("<details", html.tostring(card, encoding="unicode"))
 
     def test_queued_recheck_shows_status_not_button(self) -> None:
         unit = self.get_unit()
@@ -2795,6 +2977,12 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         self.assertNotContains(response, "Use suggested fix")
         self.assertNotContains(response, "Generate another")
         self.assertNotContains(response, "Generate suggested fix")
+        # Position, not just presence: the pending status sits directly
+        # under the status heading, before any resolution controls.
+        content = response.content.decode()
+        self.assertLess(
+            content.index("Re-checking this string"), content.index("Keep as is")
+        )
 
     def test_a_pending_generation_replaces_the_generate_another_button(self) -> None:
         unit = self.get_unit()
@@ -2825,16 +3013,18 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         unit = self.get_unit()
         self.make_verdict(unit, "critical")
         response = self.client.get(unit.get_absolute_url())
-        self.assertContains(response, "Generate suggested fix")
-        self.assertContains(response, "Record decision")
-        self.assertNotContains(response, "Use suggested fix")
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        card_html = html.tostring(card, encoding="unicode")
+        self.assertIn("Generate suggested fix", card_html)
+        self.assertIn("Keep as is", card_html)
+        self.assertNotIn("Use suggested fix", card_html)
+        self.assertEqual(card_html.count("btn-primary"), 1)
+        self.assertLess(
+            card_html.index("Keep as is"), card_html.index("More actions")
+        )
         # The card no longer links to the machinery tab in any state; the
         # automatic suggestions entry lives under the More dropdown instead.
-        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
-        self.assertNotIn(
-            "Computer-aided translation suggestions",
-            str(card),
-        )
+        self.assertNotIn("Computer-aided translation suggestions", card_html)
 
     def test_automatic_suggestions_fallback_needs_machinery_permission(self) -> None:
         unit = self.get_unit()
@@ -2869,7 +3059,7 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         response = self.client.get(self.get_unit().get_absolute_url())
         self.assertNotContains(response, "Use suggested fix")
         self.assertNotContains(response, "Generate suggested fix")
-        self.assertContains(response, "Escalated for review")
+        self.assertContains(response, "Sent back to queue")
 
     def test_minor_never_shows_candidate_controls(self) -> None:
         unit = self.get_unit()
@@ -2922,7 +3112,7 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         )
         response = self.client.get(unit.get_absolute_url())
         content = response.content.decode()
-        self.assertEqual(content.count("<details"), 1)
+        self.assertEqual(content.count("Judge details"), 1)
         self.assertIn("<summary>", content)
         self.assertContains(response, "Wrong term used for the key item.")
         self.assertContains(response, "vendor/model-a")
@@ -2946,7 +3136,7 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         )
         response = self.client.get(unit.get_absolute_url())
         content = response.content.decode()
-        self.assertEqual(content.count("<details"), 1)
+        self.assertEqual(content.count("Judge details"), 1)
         self.assertContains(response, "Overly formal register.")
         self.assertLess(content.index("Ships with evidence"), content.index("<details"))
 
@@ -2967,7 +3157,7 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         )
         response = self.client.get(unit.get_absolute_url())
         content = response.content.decode()
-        self.assertEqual(content.count("<details"), 1)
+        self.assertEqual(content.count("Judge details"), 1)
         self.assertContains(response, "Slightly awkward phrasing.")
 
     def test_repair_evidence_also_collapses_into_a_details_element(self) -> None:
@@ -3015,7 +3205,8 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         unit = self.get_unit()
         verdict = self.make_verdict(unit, "major")
         response = self.client.get(unit.get_absolute_url())
-        self.assertContains(response, "Record decision")
+        self.assertContains(response, "Keep as is")
+        self.assertContains(response, "Send back to queue")
         form = response.context["judge_resolution_form"]
         choices = {value for value, _label in form.fields["resolution"].choices}
         self.assertEqual(
@@ -3029,7 +3220,7 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         self.make_verdict(unit, "minor")
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "Computer-aided translation suggestions")
-        self.assertNotContains(response, "Record decision")
+        self.assertNotContains(response, "Keep as is")
         self.assertNotContains(response, "Use suggested fix")
         self.assertNotContains(response, "Generate suggested fix")
 
@@ -3039,3 +3230,131 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         self.grant_only(["unit.review", "translation.auto"])
         response = self.client.get(unit.get_absolute_url())
         self.assertNotContains(response, "Computer-aided translation suggestions")
+
+    # -- Task 4/5: one-click keep-as-is and card reordering -----------------
+
+    def test_card_renders_resolution_buttons_per_transition(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+
+        def card_html() -> str:
+            response = self.client.get(unit.get_absolute_url())
+            card = html.fromstring(response.content).get_element_by_id(
+                "id_judge_card"
+            )
+            return html.tostring(card, encoding="unicode")
+
+        content = card_html()
+        self.assertIn("Keep as is", content)
+        self.assertIn("Send back to queue", content)
+        self.assertNotIn("<select", content)
+
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ESCALATED,
+            reason="",
+        )
+        content = card_html()
+        self.assertIn("Keep as is", content)
+        self.assertNotIn("Send back to queue", content)
+
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ACCEPTED_AS_IS,
+            reason="",
+        )
+        content = card_html()
+        self.assertNotIn("Keep as is", content)
+        self.assertNotIn("Send back to queue", content)
+
+    def test_card_dom_order_for_current_candidate(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(
+            unit,
+            "critical",
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "Wrong term for the key item.",
+                }
+            ],
+        )
+        self.make_candidate(unit, verdict, target="A much better translation")
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        content = html.tostring(card, encoding="unicode")
+        positions = [
+            content.index("Rejected"),
+            content.index("Wrong term for the key item."),
+            content.index("Judge details"),
+            content.index("A much better translation"),
+            content.index("Use suggested fix"),
+            content.index("Keep as is"),
+            content.index("More actions"),
+            content.index("Generate another"),
+            content.index("Send back to queue"),
+            content.index("Re-check this string"),
+        ]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_rejected_card_shows_primary_error_outside_details_and_both_judges_inside(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        self.make_verdict(
+            unit,
+            "critical",
+            seat=1,
+            errors=[
+                {
+                    "category": "terminology",
+                    "severity": "critical",
+                    "description": "Wrong term for the key item.",
+                }
+            ],
+        )
+        self.make_verdict(
+            unit,
+            "minor",
+            seat=2,
+            judge_model="vendor/model-b",
+        )
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        content = html.tostring(card, encoding="unicode")
+        details_start = content.index("<details")
+        self.assertLess(content.index("Wrong term for the key item."), details_start)
+        self.assertGreater(
+            content.index("Both judges reviewed this string independently."),
+            details_start,
+        )
+
+    # -- Task 6: refresh the page while a paid action is pending ------------
+
+    def test_card_marks_pending_generation(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        self.assertEqual(card.get("data-judge-pending"), "1")
+
+    def test_card_marks_pending_recheck(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        self._completed_recheck(unit)
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        self.assertEqual(card.get("data-judge-pending"), "1")
+
+    def test_card_not_marked_when_idle(self) -> None:
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        self.assertIsNone(card.get("data-judge-pending"))
