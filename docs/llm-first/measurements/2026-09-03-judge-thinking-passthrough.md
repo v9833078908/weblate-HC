@@ -200,21 +200,59 @@ representative mix the baseline run's shape implies roughly 3x, bounded now by
 seat 1. Going further is a seat-1 model choice question, not a settings
 question.
 
+## Recall against labeled ground truth
+
+Agreement with a stored verdict is not recall, so the question was put to the
+annotated corpus. Fifteen `dev`-split records of
+`analysis/data/col4-judge-golden.json` - 5 gold critical, 5 gold major, 5
+annotated clean - one unit per request so a lost batch cannot cost a class,
+the two arms interleaved per unit against the current `atlas/qwen3.8-max`.
+
+| arm | defects caught | false flags | unparsed | mean wall | mean completion | mean reasoning |
+|---|---:|---:|---:|---:|---:|---:|
+| thinking (pre-change) | 9/10 | 0/5 | 0/15 | 44.8 s | 1,761 | 1,642 |
+| `extra_body` off (shipped) | **10/10** | 0/5 | 0/15 | **2.9 s** | **101** | **0** |
+
+No-think caught more, not fewer. The one defect thinking missed is the worst
+class of miss available: `mut-177708-cyrillic-fragment`, an untranslated
+Cyrillic fragment left in a French target, gold **critical**, answered `pass`
+after 1,091 reasoning tokens. No-think rejected it in 2.8 s on 86 tokens.
+Neither arm flagged a single clean unit.
+
+The one place thinking calibrates better is severity on the
+`obscenity-injected` class: all three gold majors came back `flag` from the
+thinking arm, while no-think escalated two of them to `reject`. That is a
+triage-ordering cost, not a lost defect - both severities reach the producer,
+one as critical held and one as major not fixed - and it is the opposite
+trade from missing a critical outright.
+
+By class: no-think returned exactly `reject` on 5 of 5 gold critical records,
+the thinking arm on 4 of 5.
+
 ## Limits - read before quoting any number
 
-- **Verdict counts are n = 2 per unit per arm on a single component and
-  language pair.** They are enough to show that no-think does not silently
-  stop judging, and to prefer no-think on seat 2. They are not a recall rate,
-  and the flip noise on `141811` and `141817` means one repeat could have
-  reversed either arm's score.
-- **The comparison target is a stored verdict, not ground truth.** "Matches
-  stored" measures agreement with one earlier thinking-arm answer from the same
-  non-deterministic model, so it understates no-think whenever the stored
-  verdict was itself wrong. Unit `141815` is exactly that case.
-- **Nothing here is a golden-set evaluation.** Adopting no-think on seat 2 is
-  justified as a strict improvement in latency, cost and parse rate at
-  non-inferior observed recall; a recall *claim* needs
-  `analysis/data/col4-judge-golden.json` and the registered A/B design.
+- **The labeled slice is 15 records on one language pair, one repeat.** Ten
+  defects cannot separate a 90% recall from a 99% one, and the corpus is
+  `col4/data/fr` (ru into fr) while the reported run is en into ru. It is
+  enough to refuse the claim that no-think stops detecting, and to show the
+  direction; it is not a recall rate for production.
+- **Two defect classes carry the slice.** `cyrillic-fragment` and
+  `obscenity-injected` are constructed mutations and are among the more
+  legible defects; the classes a producer actually argues about - register,
+  terminology drift, an over-literal but grammatical line - are represented
+  by one record each here.
+- **The en-into-ru verdict counts are n = 2 per unit per arm on one
+  component.** The flip noise on `141811` and `141817` means one repeat could
+  have reversed either arm's score there, and "matches stored" measures
+  agreement with one earlier thinking-arm answer from the same
+  non-deterministic model, not correctness. Unit `141815` is exactly the case
+  where the stored verdict was the weaker one.
+- **Seat 2 is the sole detector for 41% of flags.** Across the 279 dev-database
+  units where both seats parsed attempt 0, 80 were flagged by at least one
+  seat: 17 by both, 30 by seat 1 alone, 33 by seat 2 alone. `collegium_verdict`
+  takes the strictest opinion, so a seat-2 recall loss is invisible for the
+  first two groups and total for the third. That is why this change was
+  measured against labels rather than adopted on latency.
 - **The proxy rate-limited the probes.** Cells after an HTTP 500 answered 429
   until a backoff was added, and probe v2's later rows are void for that
   reason. Only the retried runs are quoted.
@@ -234,6 +272,9 @@ question.
   `f9423ea4-f364-40d6-93cd-4f8b048fed56` in the dev database.
 - `GET /model/info` on `https://hcbifrost.herocraft.com/litellm/v1` for all 23
   aliases and for both judge aliases individually.
+- `analysis/data/col4-judge-golden.json`, `dev` split, the 15 records reached
+  by taking 5 critical, 5 major and 5 clean in `record_id` order, the same
+  deterministic selection `analysis/probes/litellm-complement-smoke.py` uses.
 - Production code paths: `_reasoning_payload`, `_payload`, `_post_batch`,
   `_parse_reply`, `_resolve_profile` in `weblate/trans/judge.py`;
   `_run_seats`, `_request_identity`, `_cached_verdict` in
