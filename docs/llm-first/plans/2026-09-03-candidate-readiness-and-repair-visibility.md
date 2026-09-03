@@ -38,7 +38,7 @@ never broken; it was starved by configuration and silent about it.
 
 | # | Decision | Consequence |
 | --- | --- | --- |
-| 1 | The stored candidate stays out of the :guilabel:`Автоматические предложения` tab | That tab is the live-engine surface; a stored candidate keeps its diff, round, provenance and instruction only in the verdict card and the :guilabel:`Предложения` tab (`snippets/suggestions.html:7,21`) |
+| 1 | The stored candidate stays out of the :guilabel:`Автоматические предложения` tab by default | Not for speed - a stored candidate would render from the database with no call at all. The load-bearing reason is acceptance semantics: that tab's :guilabel:`Принять` is copy + `markTranslated` + submit (`full.js:79-82`), while a candidate must be accepted through `accept_judge_candidate`, which re-verifies target and context hashes, refuses a forged run id, writes `STATE_FUZZY`, deletes the candidate and queues the fresh re-check (`judge_loop.py:2114-2148`). A machinery row also cannot carry the diff, the round or the judge's repair instruction. See "Optional Task 4" for the version that keeps those guarantees |
 | 2 | Generation outcome becomes durable, not a message | A redirect message cannot survive navigating away, which is exactly what the producer did; the outcome is stored on the verdict and rendered by the card |
 | 3 | The reply schema must be provider-portable | An OpenAI-family model in any routing entry currently breaks all machine translation and all repair for that language, silently |
 | 4 | A language with no usable routing entry is a configuration error, reported once | Not a per-string failure the producer has to interpret |
@@ -189,6 +189,40 @@ result being indistinguishable from a model that answered badly.
 
 ---
 
+## Optional Task 4 (proposed 2026-09-03, needs its own approval)
+
+Show the stored candidate as the first row of the
+:guilabel:`Автоматические предложения` table, for producers who look for a
+suggestion there rather than in the card.
+
+**Files:**
+
+- Modify: `weblate/templates/translate.html` (the `#machinery` pane)
+- Modify: `weblate/trans/views/edit.py` (`_judge_view_context` already
+  resolves `judge_candidate`; the pane needs it)
+- Tests: `weblate/trans/tests/test_judge_views.py`
+
+The row is rendered server-side, so it is present the moment the tab opens
+and costs no call: the text is already in the database. Its service column
+names the judge, and its action is a form posting to
+`judge-accept-candidate`, never the JS `js-copy-save-machinery` handler -
+otherwise acceptance would write `STATE_TRANSLATED` and skip the hash
+re-verification, the candidate deletion and the audited Change that
+`accept_judge_candidate` performs.
+
+What it cannot reproduce: the diff against the current text, the round and
+seat provenance, and the judge's repair instruction. Those stay in the card.
+
+**Acceptance:**
+
+- The pane contains the candidate row before any machinery request is made
+  (assert on the server-rendered HTML, with no JS involved).
+- The row's only action posts to `judge-accept-candidate` and the accepted
+  string ends in `STATE_FUZZY` with a queued re-check.
+- A string with no stored candidate renders no such row.
+
+---
+
 ## Verification
 
 ```bash
@@ -203,8 +237,7 @@ uv run prek run --files <touched files>
 
 ## Out of scope
 
-- Rendering the stored candidate in the :guilabel:`Автоматические предложения`
-  tab (decision 1).
+- Optional Task 4 unless it is separately approved.
 - Any change to the judge prompt, the seat configuration or the verdict
   schema.
 - Re-judging anything. Filling a historical candidate gap is
