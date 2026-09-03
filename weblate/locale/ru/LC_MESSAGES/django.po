@@ -25480,11 +25480,111 @@ msgstr "Эскалировано на проверку"
 
 #: weblate/templates/snippets/judge-verdict.html:119
 msgid "Accepted as-is"
-msgstr "Принято как есть"
+msgstr "Оставлено как есть"
 
 #: weblate/templates/snippets/judge-verdict.html:144
 msgid "Record decision"
 msgstr "Зафиксировать решение"
+
+msgid "AI judge verdict"
+msgstr "Вердикт ИИ-судьи"
+
+msgid "Rejected"
+msgstr "Отклонено"
+
+msgid "Questionable"
+msgstr "Сомнительно"
+
+msgid "Accepted"
+msgstr "Принято"
+
+msgid "Both judges reviewed this string independently."
+msgstr "Оба судьи проверили строку независимо."
+
+msgid "Judge details"
+msgstr "Подробности судей"
+
+msgid "Back-translation:"
+msgstr "Обратный перевод:"
+
+#, python-format
+msgid "Judge-guided repair · %(when)s"
+msgstr "Исправление по вердикту судьи · %(when)s"
+
+msgid "Suggested fix"
+msgstr "Предложенное исправление"
+
+msgid "Use suggested fix"
+msgstr "Принять исправление"
+
+msgid "Generate suggested fix"
+msgstr "Сгенерировать исправление"
+
+msgid "Generate another"
+msgstr "Сгенерировать другой вариант"
+
+msgid "Generating a suggested fix…"
+msgstr "Готовим исправление…"
+
+msgid "Keep as is"
+msgstr "Оставить как есть"
+
+msgid "Add a reason (optional)"
+msgstr "Указать причину (необязательно)"
+
+msgid "Reason (optional)"
+msgstr "Причина (необязательно)"
+
+msgid "Send back to queue"
+msgstr "Вернуть в очередь"
+
+msgid "Sent back to queue"
+msgstr "Возвращено в очередь"
+
+msgid "More actions"
+msgstr "Ещё"
+
+msgid "More"
+msgstr "Ещё"
+
+msgid "Re-check this string"
+msgstr "Перепроверить строку"
+
+msgid "Re-checking this string…"
+msgstr "Перепроверяем строку…"
+
+msgid "Changed text is re-checked by the judge automatically."
+msgstr "Изменённый текст судья перепроверит автоматически."
+
+msgid "The changed text has been queued for a judge re-check."
+msgstr "Изменённый текст поставлен в очередь на перепроверку судьёй."
+
+#: weblate/trans/views/edit.py:890
+msgid "The changed text awaits a judge re-check by a user who may run it."
+msgstr ""
+"Изменённый текст ждёт перепроверки судьёй: её запустит пользователь с "
+"нужными правами."
+
+msgid "Relates to a previous version"
+msgstr "Относится к предыдущей версии"
+
+msgid "The judge's opinion below was recorded for an earlier version of this translation; it may no longer apply."
+msgstr "Мнение судьи ниже записано для более ранней версии перевода и может быть неактуально."
+
+msgid "Paid model request"
+msgstr "Платный запрос к модели"
+
+msgid "Accepting queues one judge re-check."
+msgstr "После принятия строка уходит на одну перепроверку судьёй."
+
+msgid "Apply the suggested judge fix."
+msgstr "Принять исправление, предложенное судьёй."
+
+msgid "Keep the current text as is."
+msgstr "Оставить текущий текст как есть."
+
+msgid "Re-check this string with the judge."
+msgstr "Перепроверить строку судьёй."
 
 #: weblate/templates/snippets/judge-readiness.html:6
 msgid "AI judge"

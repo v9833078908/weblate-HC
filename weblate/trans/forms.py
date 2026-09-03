@@ -276,6 +276,16 @@ GROUP_TEMPLATE = """
 TOOLBAR_TEMPLATE = """
 <div class="btn-toolbar float-end editor-toolbar">{0}</div>
 """
+# Collapsed by default: the special characters are rarely needed and were
+# competing with the actual translation text for attention. The toggle id
+# embeds the unit checksum and plural index so two units on one Zen page
+# never share a collapse target.
+COLLAPSIBLE_TOOLBAR_TEMPLATE = """
+<div class="float-end editor-toolbar">
+<button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#{0}" aria-expanded="false" aria-controls="{0}" aria-label="{1}" title="{1}">…</button>
+<div class="collapse btn-toolbar" id="{0}">{2}</div>
+</div>
+"""
 MIN_COST_ESTIMATE_TM_THRESHOLD = 75
 
 
@@ -504,7 +514,13 @@ class PluralTextarea(forms.Textarea):
             [("", chars)],  # Only one group.
         )
 
-        result = format_html(TOOLBAR_TEMPLATE, groups)
+        toggle_id = f"toolbar-{unit.checksum}-{idx}"
+        result = format_html(
+            COLLAPSIBLE_TOOLBAR_TEMPLATE,
+            toggle_id,
+            gettext("Special characters"),
+            groups,
+        )
 
         if language.direction == "rtl":
             result = format_html("{}{}", self.get_rtl_toolbar(fieldname), result)
@@ -700,7 +716,9 @@ class TranslationForm(UnitForm):
         required=False,
     )
 
-    def __init__(self, user: User, unit: Unit, *args, **kwargs) -> None:
+    def __init__(
+        self, user: User, unit: Unit, *args, judged: bool = False, **kwargs
+    ) -> None:
         translation = unit.translation
         component = translation.component
         kwargs["initial"] = {
@@ -786,6 +804,19 @@ class TranslationForm(UnitForm):
             commit_policy = f" {component.project.get_commit_policy_description()}"
             self.fields["review"].help_text += commit_policy
             self.fields["fuzzy"].help_text += commit_policy
+        if judged and user_can_edit and user_can_review and not unit.readonly:
+            # A judged string takes its release state from the judge, not from
+            # a human radio choice: the producer saves text, the re-check
+            # decides. The hidden field posts the state the string already
+            # has, so a save that changes nothing never releases a string the
+            # judge is holding; perform_translation lifts changed text to
+            # translated and queues the re-check. An untranslated string has
+            # no state to keep, so it starts from translated.
+            self.fields["review"].widget = forms.HiddenInput()
+            self.initial["review"] = (
+                unit.state if unit.state >= STATE_FUZZY else STATE_TRANSLATED
+            )
+            self.fields["review"].help_text = ""
 
     def clean(self) -> None:
         super().clean()
@@ -1443,7 +1474,7 @@ class JudgeResolutionForm(forms.Form):
         choices=(
             (
                 JudgeVerdict.Resolution.ESCALATED,
-                gettext_lazy("Escalate for review"),
+                gettext_lazy("Send back to queue"),
             ),
             (
                 JudgeVerdict.Resolution.ACCEPTED_AS_IS,
@@ -1452,7 +1483,8 @@ class JudgeResolutionForm(forms.Form):
         ),
     )
     reason = forms.CharField(
-        label=gettext_lazy("Reason"),
+        label=gettext_lazy("Reason (optional)"),
+        required=False,
         widget=forms.Textarea(attrs={"rows": 2}),
     )
 

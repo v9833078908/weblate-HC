@@ -12,10 +12,11 @@ from typing import TYPE_CHECKING, cast
 from unittest import TestCase
 from unittest.mock import patch
 
+import pytest
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from lxml import html
 
 from weblate.addons.resx import ResxUpdateAddon
@@ -82,7 +83,15 @@ class SearchSessionTest(TestCase):
 class EditScreenshotContextTest(ViewTestCase):
     def test_screenshot_context_has_documentation_link(self) -> None:
         self.make_manager()
-        response = self.client.get(self.translation.get_translate_url())
+        unit = self.get_unit()
+        screenshot = Screenshot.objects.create(
+            name="Documented screenshot",
+            image="screenshots/test.png",
+            translation=unit.source_unit.translation,
+            user=self.user,
+        )
+        screenshot.units.add(unit.source_unit)
+        response = self.client.get(unit.get_absolute_url())
         self.assertContains(
             response, get_doc_url("admin/translating", "screenshots", user=self.user)
         )
@@ -423,53 +432,315 @@ class EditTest(ViewTestCase):
         else:
             self.skipTest("Not supported")
 
-    def test_dismiss_automatically_translated(self) -> None:
-        """Test dismissing automatically translated flag."""
-        unit = self.get_unit(self.source)
-        unit.automatically_translated = True
-        unit.save(update_fields=["automatically_translated"])
-
-        response = self.client.post(
-            reverse("js-dismiss-automatically-translated", kwargs={"unit_id": unit.id})
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["Content-Type"], "application/json")
-
-        unit = self.get_unit(self.source)
-        self.assertFalse(unit.automatically_translated)
-
-    def test_dismiss_automatically_translated_no_permission(self) -> None:
-        """Test dismissing automatically translated without permission."""
-        unit = self.get_unit(self.source)
-        unit.automatically_translated = True
-        unit.save(update_fields=["automatically_translated"])
-
-        # Remove edit permission
+    def grant_only(self, codenames) -> None:
+        """Replace the user's permissions with exactly these codenames."""
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
         self.user.groups.clear()
-
-        response = self.client.post(
-            reverse("js-dismiss-automatically-translated", kwargs={"unit_id": unit.id})
+        role = Role.objects.create(name="Editor reduction test role")
+        for codename in codenames:
+            role.permissions.add(Permission.objects.get(codename=codename))
+        group = Group.objects.create(
+            name="Editor reduction testers",
+            project_selection=SELECTION_ALL,
+            language_selection=SELECTION_ALL,
         )
-        self.assertEqual(response.status_code, 403)
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
 
+    def test_suggest_button_hidden_for_editor(self) -> None:
+        """A user who can edit the unit is not offered the Suggest button."""
         unit = self.get_unit(self.source)
-        self.assertTrue(unit.automatically_translated)
+        self.assertTrue(self.user.has_perm("unit.edit", unit))
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, 'name="save"')
+        self.assertNotContains(response, 'name="suggest"')
 
-    def test_dismiss_automatically_translated_not_authenticated(self) -> None:
-        """Test dismissing automatically translated without authentication."""
+    def test_suggest_button_shown_without_edit(self) -> None:
+        """Suggesting is the only action a suggestion-only user has."""
+        self.grant_only(["suggestion.add"])
+        unit = self.get_unit(self.source)
+        self.assertFalse(self.user.has_perm("unit.edit", unit))
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, 'name="suggest"')
+
+    def test_screenshots_card_hidden_when_empty(self) -> None:
+        """The Screenshots card renders only for a string that has one."""
+        self.make_manager()
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        self.assertEqual(
+            tree.xpath("//h4[contains(normalize-space(.), 'Screenshots')]"), []
+        )
+        screenshot = Screenshot.objects.create(
+            name="Shown screenshot",
+            image="screenshots/test.png",
+            translation=unit.source_unit.translation,
+            user=self.user,
+        )
+        screenshot.units.add(unit.source_unit)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        self.assertEqual(
+            len(tree.xpath("//h4[contains(normalize-space(.), 'Screenshots')]")),
+            1,
+        )
+
+    def test_automatically_translated_block_absent(self) -> None:
+        """The dismissed-by-design notice and its endpoint are gone."""
         unit = self.get_unit(self.source)
         unit.automatically_translated = True
         unit.save(update_fields=["automatically_translated"])
-
-        self.client.logout()
-
-        response = self.client.post(
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "check-automatically-translated")
+        with pytest.raises(NoReverseMatch):
             reverse("js-dismiss-automatically-translated", kwargs={"unit_id": unit.id})
-        )
-        self.assertEqual(response.status_code, 302)
 
+    def test_machinery_tab_in_more_dropdown(self) -> None:
+        """The automatic suggestions tab lives in the More dropdown."""
+        self.assertTrue(self.user.has_perm("machinery.view", self.translation))
+        response = self.client.get(self.get_unit(self.source).get_absolute_url())
+        self.assertContains(response, 'id="toggle-machinery"')
+        self.assertContains(response, 'data-load="machinery"')
+        tree = html.fromstring(response.content)
+        self.assertEqual(
+            len(
+                tree.xpath(
+                    '//a[@id="toggle-machinery"][contains('
+                    'concat(" ", @class, " "), " dropdown-item ")]'
+                    "/ancestor::li[contains(concat(' ', @class, ' '), ' dropdown ')]"
+                    '/ancestor::ul[contains(concat(" ", @class, " "), " translation-tabs ")]'
+                )
+            ),
+            1,
+        )
+        self.grant_only(["unit.edit"])
+        self.assertFalse(self.user.has_perm("machinery.view", self.translation))
+        response = self.client.get(self.get_unit(self.source).get_absolute_url())
+        self.assertNotContains(response, 'id="toggle-machinery"')
+        self.assertNotContains(response, 'id="machinery"')
+
+    def test_bottom_tabs_reduced(self) -> None:
+        """Nearby and History stay direct; the rest fold into More."""
         unit = self.get_unit(self.source)
-        self.assertTrue(unit.automatically_translated)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        tabs_xpath = '//ul[contains(concat(" ", @class, " "), " translation-tabs ")]'
+        direct_ids = tree.xpath(
+            f'{tabs_xpath}/li[not(contains(concat(" ", @class, " "), " dropdown "))]'
+            "/a/@id"
+        )
+        self.assertIn("toggle-nearby", direct_ids)
+        self.assertIn("toggle-history", direct_ids)
+        self.assertNotIn("toggle-translations", direct_ids)
+        dropdown_ids = tree.xpath(
+            f'{tabs_xpath}//li[contains(concat(" ", @class, " "), " dropdown ")]'
+            '//a[contains(concat(" ", @class, " "), " dropdown-item ")]/@id'
+        )
+        for tab_id in ("toggle-translations", "toggle-machinery", "toggle-comments"):
+            self.assertIn(tab_id, dropdown_ids)
+            self.assertNotIn(tab_id, direct_ids)
+
+    def test_suggestions_tab_direct_only_when_present(self) -> None:
+        """Suggestions stays a direct item, but only when non-empty."""
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, 'id="toggle-suggestions"')
+        Suggestion.objects.add(unit, ["Suggested alternative"], request=None)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        tabs_xpath = '//ul[contains(concat(" ", @class, " "), " translation-tabs ")]'
+        direct_ids = tree.xpath(
+            f'{tabs_xpath}/li[not(contains(concat(" ", @class, " "), " dropdown "))]'
+            "/a/@id"
+        )
+        self.assertIn("toggle-suggestions", direct_ids)
+
+    def test_no_tab_open_on_load(self) -> None:
+        """No tab or pane is preselected; the first click opens one."""
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        tabs = tree.xpath(
+            '//ul[contains(concat(" ", @class, " "), " translation-tabs ")]'
+            '//a[contains(concat(" ", @class, " "), " nav-link active ")]'
+        )
+        self.assertEqual(tabs, [])
+        panes = tree.xpath(
+            '//div[contains(concat(" ", @class, " "), " tab-content ")]'
+            '/div[contains(concat(" ", @class, " "), " tab-pane active ")]'
+        )
+        self.assertEqual(panes, [])
+
+    def test_more_dropdown_absent_when_empty(self) -> None:
+        """No More dropdown once every folded entry would be empty."""
+        if type(self) is not EditTest:
+            # A template-structural claim (no sub-condition true -> no
+            # dropdown), not a per-format regression: each file format's
+            # own fixture data (keys, variants, comments) varies and is
+            # not what this test is protecting against.
+            self.skipTest("Verified once against the base po fixture")
+        self.grant_only(["unit.edit"])
+        # Keep only the source translation: from the source unit's own
+        # perspective there is then no "other language" left to offer.
+        self.component.translation_set.exclude(
+            language_code=self.component.source_language.code
+        ).delete()
+        unit = self.get_unit(self.source, language=self.component.source_language.code)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        self.assertEqual(
+            tree.xpath(
+                '//ul[contains(concat(" ", @class, " "), " translation-tabs ")]'
+                '//li[contains(concat(" ", @class, " "), " dropdown ")]'
+            ),
+            [],
+        )
+
+    def test_pager_reduced(self) -> None:
+        """The pager keeps only previous, position and next."""
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        self.assertContains(response, 'id="button-prev"')
+        self.assertContains(response, 'id="button-next"')
+        self.assertContains(response, "position-input")
+        self.assertNotContains(response, 'id="button-first"')
+        self.assertNotContains(response, 'id="button-end"')
+        self.assertNotContains(response, 'id="prev-section"')
+        self.assertNotContains(response, 'id="next-section"')
+        tree = html.fromstring(response.content)
+        pager = tree.xpath(
+            '//div[contains(concat(" ", @class, " "), " unit-pagination ")]'
+        )[0]
+        self.assertEqual(
+            pager.get("data-first-url"), response.context["first_unit_url"]
+        )
+        self.assertEqual(pager.get("data-last-url"), response.context["last_unit_url"])
+
+    def test_pager_first_and_last_disabled_states(self) -> None:
+        """The boundary buttons stay the only disabled-state signal."""
+        # prev_unit_url/next_unit_url on the single-unit translate view are
+        # always non-empty offset math (offset-1/offset+1 with no clamp);
+        # the boundary-aware None only exists on the browse listing, where
+        # a two-unit fixture fits on one page and hits both edges at once.
+        response = self.client.get(reverse("browse", kwargs=self.kw_translation))
+        tree = html.fromstring(response.content)
+        prev_button = tree.xpath('//a[@id="button-prev"]')[0]
+        self.assertIn("disabled", prev_button.get("class", "").split())
+        next_button = tree.xpath('//a[@id="button-next"]')[0]
+        self.assertIn("disabled", next_button.get("class", "").split())
+
+    def test_glossary_card_collapsed_when_no_terms(self) -> None:
+        """The Glossary header is a collapse toggle, closed with no matches."""
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        toggle = tree.xpath(f'//button[@aria-controls="glossary-card-body-{unit.id}"]')[
+            0
+        ]
+        self.assertEqual(toggle.get("aria-expanded"), "false")
+        self.assertIn("collapsed", toggle.get("class", "").split())
+        body = tree.xpath(f'//div[@id="glossary-card-body-{unit.id}"]')[0]
+        body_classes = body.get("class", "").split()
+        self.assertIn("collapse", body_classes)
+        self.assertNotIn("show", body_classes)
+
+    def test_glossary_card_expanded_with_matching_term(self) -> None:
+        """A matching term opens the Glossary card by default."""
+        if type(self) is not EditTest:
+            # A template-structural claim about the collapse wiring, not a
+            # per-format regression; some subclasses override self.source
+            # to text that would never match a "Hello" glossary term.
+            self.skipTest("Verified once against the base po fixture")
+        glossary = self.create_po(
+            name="Glossary",
+            project=self.project,
+            is_glossary=True,
+            manage_units=True,
+        )
+        glossary.source_translation.unit_set.create(
+            source="Hello",
+            target="Hello",
+            context="",
+            id_hash=calculate_hash("Hello", ""),
+            position=glossary.source_translation.unit_set.count() + 1,
+            state=STATE_TRANSLATED,
+        )
+        glossary.invalidate_glossary_cache()
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        toggle = tree.xpath(f'//button[@aria-controls="glossary-card-body-{unit.id}"]')[
+            0
+        ]
+        self.assertEqual(toggle.get("aria-expanded"), "true")
+        self.assertNotIn("collapsed", toggle.get("class", "").split())
+        body = tree.xpath(f'//div[@id="glossary-card-body-{unit.id}"]')[0]
+        body_classes = body.get("class", "").split()
+        self.assertIn("collapse", body_classes)
+        self.assertIn("show", body_classes)
+
+    def test_string_info_card_collapsed_when_empty(self) -> None:
+        """No explanation, labels or flags: the card body stays collapsed."""
+        if type(self) is not EditTest:
+            # A template-structural claim; the base po fixture bakes
+            # "#, c-format, max-length:100" onto self.source specifically
+            # for check tests elsewhere, so this uses the other, plain
+            # fixture string instead of assuming self.source is clean.
+            self.skipTest("Verified once against the base po fixture")
+        unit = self.get_unit("Thank you for using Weblate.")
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        toggle = tree.xpath(
+            f'//button[@aria-controls="string-info-card-body-{unit.id}"]'
+        )[0]
+        self.assertEqual(toggle.get("aria-expanded"), "false")
+        body = tree.xpath(f'//div[@id="string-info-card-body-{unit.id}"]')[0]
+        self.assertNotIn("show", body.get("class", "").split())
+
+    def test_string_info_card_shown_with_explanation(self) -> None:
+        """The explanation alone opens the card, without labels or flags."""
+        if type(self) is not EditTest:
+            # Same reason as the collapsed case: self.source carries baked
+            # flags in the po fixture, which would open the card anyway.
+            self.skipTest("Verified once against the base po fixture")
+        unit = self.get_unit("Thank you for using Weblate.")
+        self.assertFalse(unit.all_flags)
+        self.assertFalse(unit.all_labels)
+        unit.source_unit.update_explanation("Some explanation.", self.user)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        toggle = tree.xpath(
+            f'//button[@aria-controls="string-info-card-body-{unit.id}"]'
+        )[0]
+        self.assertEqual(toggle.get("aria-expanded"), "true")
+        body = tree.xpath(f'//div[@id="string-info-card-body-{unit.id}"]')[0]
+        self.assertIn("show", body.get("class", "").split())
+
+    def test_save_and_stay_is_secondary(self) -> None:
+        """Save and stay is secondary; Save stays the only primary action."""
+        unit = self.get_unit(self.source)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        footer = tree.xpath(
+            '//form[contains(concat(" ", @class, " "), " translator ")]'
+            '//div[contains(concat(" ", @class, " "), " card-footer ")]'
+        )[0]
+        save_button = footer.xpath('.//button[@name="save"]')[0]
+        save_stay_button = footer.xpath('.//button[@name="save-stay"]')[0]
+        skip_link = footer.xpath('.//a[contains(concat(" ", @class, " "), " skip ")]')[
+            0
+        ]
+        self.assertIn("btn-primary", save_button.get("class", "").split())
+        self.assertIn("btn-link", save_stay_button.get("class", "").split())
+        self.assertNotIn("btn-primary", save_stay_button.get("class", "").split())
+        self.assertIn("btn-link", skip_link.get("class", "").split())
+        primary_buttons = footer.xpath(
+            './/button[contains(concat(" ", @class, " "), " btn-primary ")]'
+        )
+        self.assertEqual(len(primary_buttons), 1)
 
 
 class EditAccessTest(ViewTestCase):
@@ -477,7 +748,6 @@ class EditAccessTest(ViewTestCase):
         check = Check.objects.create(unit=unit, name="same")
 
         urls = (
-            reverse("js-dismiss-automatically-translated", kwargs={"unit_id": unit.pk}),
             reverse("delete-unit", kwargs={"unit_id": unit.source_unit.pk}),
             reverse("js-ignore-check", kwargs={"check_id": check.pk}),
             reverse("js-ignore-check-source", kwargs={"check_id": check.pk}),

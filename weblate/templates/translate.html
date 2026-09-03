@@ -256,14 +256,14 @@
                   {% translate "Save and continue" %}
                 </button>
 
-                <button class="btn btn-primary btn-spaced"
+                <button class="btn btn-link btn-spaced"
                         type="submit"
                         name="save-stay"
                         {% if locked %} disabled="disabled" {% elif not user_can_translate and not user_can_edit_flags %} disabled="disabled" {% elif not user_can_translate and user_can_edit_flags and not unit.translation.component.is_glossary %} disabled="disabled" {% endif %}>
                   {% translate "Save and stay" %}
                 </button>
 
-                {% if unit.translation.enable_suggestions %}
+                {% if unit.translation.enable_suggestions and not user_can_translate %}
                   <button class="btn btn-warning btn-spaced" type="submit" name="suggest" {% if project_locked or not user_can_suggest or unit.readonly %}disabled="disabled"{% endif %} {% if not user_can_suggest %} title="{% if user_can_suggest.reason %}{{ user_can_suggest.reason }}{% else %}{% translate "You do not have permission to add suggestions." %}{% endif %}" {% elif project_locked %} title="{% translate "This translation is currently locked." %}" {% elif unit.readonly %} title="{% translate "Read-only" %}" {% endif %}>
                     {% translate "Suggest" %}
                   </button>
@@ -277,6 +277,9 @@
                     {% icon "fast-forward.svg" %}
                   {% endif %}
                 {% translate "Skip" %}</a>
+                {% if judge_round and user_can_translate %}
+                  <span class="text-muted small">{% translate "Changed text is re-checked by the judge automatically." %}</span>
+                {% endif %}
               </div>
             </div>
           </div>
@@ -284,33 +287,13 @@
 
         <ul class="nav nav-pills translation-tabs">
           <li class="nav-item">
-            <a class="nav-link active"
+            <a class="nav-link"
                data-bs-target="#nearby"
                data-bs-toggle="tab"
                id="toggle-nearby"
                href="#"
                title="{% translate "Messages placed around this one" %}">{% translate "Nearby strings" %} <span class="badge text-bg-secondary">{{ nearby|length }}</span></a>
           </li>
-          {% if nearby_keys %}
-            <li class="nav-item">
-              <a class="nav-link"
-                 data-bs-target="#keys"
-                 data-bs-toggle="tab"
-                 id="toggle-keys"
-                 href="#"
-                 title="{% translate "Strings with similar keys" %}">{% translate "Similar keys" %} <span class="badge text-bg-secondary">{{ nearby_keys|length }}</span></a>
-            </li>
-          {% endif %}
-          {% if variants|length > 1 %}
-            <li class="nav-item">
-              <a class="nav-link"
-                 data-bs-target="#variants"
-                 data-bs-toggle="tab"
-                 id="toggle-variants"
-                 href="#"
-                 title="{% translate "Variants of the string" %}">{% translate "Variants" %} <span class="badge text-bg-secondary">{{ variants|length }}</span></a>
-            </li>
-          {% endif %}
           {% if unit.suggestions %}
             <li class="nav-item">
               <a class="nav-link"
@@ -320,46 +303,6 @@
                  href="#">{% translate "Suggestions" %} <span class="badge text-bg-secondary">{{ unit.suggestions|length }}</span></a>
             </li>
           {% endif %}
-          {% if others.total %}
-            <li class="nav-item">
-              <a class="nav-link"
-                 data-bs-target="#others"
-                 data-bs-toggle="tab"
-                 id="toggle-others"
-                 href="#">{% translate "Other occurrences" %} <span class="badge text-bg-secondary">{{ others.total }}</span></a>
-            </li>
-          {% endif %}
-          {% if unit.all_comments or user_can_add_comment %}
-            <li class="nav-item">
-              <a class="nav-link"
-                 data-bs-target="#comments"
-                 data-bs-toggle="tab"
-                 id="toggle-comments"
-                 href="#">{% translate "Comments" %}
-                {% if unit.all_comments %}<span class="badge text-bg-secondary">{{ unit.all_comments|length }}</span>{% endif %}
-              </a>
-            </li>
-          {% endif %}
-          {% if user_can_use_machinery %}
-            <li class="nav-item">
-              <a class="nav-link"
-                 data-bs-target="#machinery"
-                 data-bs-toggle="tab"
-                 id="toggle-machinery"
-                 data-load="machinery"
-                 href="#"
-                 title="{% translate "Computer-aided translation suggestions" %}">{% translate "Automatic suggestions" %}</a>
-            </li>
-          {% endif %}
-          <li class="nav-item">
-            <a class="nav-link"
-               data-bs-target="#translations"
-               data-bs-toggle="tab"
-               id="toggle-translations"
-               data-href="{% url 'js-unit-translations' unit_id=unit.id %}"
-               href="#"
-               title="{% translate "Translations of this string in the other languages" %}">{% translate "Other languages" %} <span class="badge text-bg-secondary">{{ other_languages_count }}</span> </a>
-          </li>
           <li class="nav-item">
             <a class="nav-link"
                data-bs-target="#history"
@@ -368,11 +311,84 @@
                href="#"
                title="{% translate "List of recent changes done in Weblate" %}">{% translate "History" %}</a>
           </li>
+          {% if nearby_keys or variants|length > 1 or others.total or unit.all_comments or user_can_add_comment or other_languages_count or user_can_use_machinery %}
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle"
+                 data-bs-toggle="dropdown"
+                 href="#"
+                 role="button"
+                 aria-expanded="false">{% translate "More" %}</a>
+              <ul class="dropdown-menu">
+                {% if nearby_keys %}
+                  <li>
+                    <a class="dropdown-item"
+                       data-bs-target="#keys"
+                       data-bs-toggle="tab"
+                       id="toggle-keys"
+                       href="#"
+                       title="{% translate "Strings with similar keys" %}">{% translate "Similar keys" %} <span class="badge text-bg-secondary">{{ nearby_keys|length }}</span></a>
+                  </li>
+                {% endif %}
+                {% if variants|length > 1 %}
+                  <li>
+                    <a class="dropdown-item"
+                       data-bs-target="#variants"
+                       data-bs-toggle="tab"
+                       id="toggle-variants"
+                       href="#"
+                       title="{% translate "Variants of the string" %}">{% translate "Variants" %} <span class="badge text-bg-secondary">{{ variants|length }}</span></a>
+                  </li>
+                {% endif %}
+                {% if others.total %}
+                  <li>
+                    <a class="dropdown-item"
+                       data-bs-target="#others"
+                       data-bs-toggle="tab"
+                       id="toggle-others"
+                       href="#">{% translate "Other occurrences" %} <span class="badge text-bg-secondary">{{ others.total }}</span></a>
+                  </li>
+                {% endif %}
+                {% if unit.all_comments or user_can_add_comment %}
+                  <li>
+                    <a class="dropdown-item"
+                       data-bs-target="#comments"
+                       data-bs-toggle="tab"
+                       id="toggle-comments"
+                       href="#">{% translate "Comments" %}
+                      {% if unit.all_comments %}<span class="badge text-bg-secondary">{{ unit.all_comments|length }}</span>{% endif %}
+                    </a>
+                  </li>
+                {% endif %}
+                {% if other_languages_count %}
+                  <li>
+                    <a class="dropdown-item"
+                       data-bs-target="#translations"
+                       data-bs-toggle="tab"
+                       id="toggle-translations"
+                       data-href="{% url 'js-unit-translations' unit_id=unit.id %}"
+                       href="#"
+                       title="{% translate "Translations of this string in the other languages" %}">{% translate "Other languages" %} <span class="badge text-bg-secondary">{{ other_languages_count }}</span> </a>
+                  </li>
+                {% endif %}
+                {% if user_can_use_machinery %}
+                  <li>
+                    <a class="dropdown-item"
+                       data-bs-target="#machinery"
+                       data-bs-toggle="tab"
+                       id="toggle-machinery"
+                       data-load="machinery"
+                       href="#"
+                       title="{% translate "Computer-aided translation suggestions" %}">{% translate "Automatic suggestions" %}</a>
+                  </li>
+                {% endif %}
+              </ul>
+            </li>
+          {% endif %}
         </ul>
 
         <div class="tab-content">
 
-          <div class="tab-pane active" id="nearby">
+          <div class="tab-pane" id="nearby">
             {% include "snippets/embed-units.html" with current_unit=unit units=nearby translation=unit.translation component=unit.translation.component actions_template="snippets/embed-units-clone.html" %}
           </div>
 
@@ -600,7 +616,7 @@
 
         {% include "snippets/judge-verdict.html" %}
 
-        {% if unit.deterministic_checks or comments_to_check or unit.suggestions or variants|length > 1 or display_checks or unit.automatically_translated or unit.is_blocked_by_commit_policy %}
+        {% if unit.deterministic_checks or comments_to_check or unit.suggestions or variants|length > 1 or display_checks or unit.is_blocked_by_commit_policy %}
           <div class="card">
             <div class="card-header">
               <h4 class="card-title">{% translate "Things to check" %}</h4>
@@ -722,32 +738,6 @@
                 </div>
               {% endif %}
 
-              {% if unit.automatically_translated %}
-                <div class="list-group-item check check-item check-automatically-translated">
-                  <h5>
-                    <span class="green">{% icon "check.svg" %}</span>
-                    {% translate "Automatically translated" %}
-                  </h5>
-                  <p class="list-group-item-text check-description">
-                    {% with author=unit.get_last_author %}
-                      {% if not author or author.is_anonymous %}
-                        {% blocktranslate %}This string was translated automatically.{% endblocktranslate %}
-                      {% elif author.is_bot %}
-                        {% blocktranslate %}This string was translated automatically using {{ author }}.{% endblocktranslate %}
-                      {% else %}
-                        {% blocktranslate %}This string was translated automatically by {{ author }}.{% endblocktranslate %}
-                      {% endif %}
-                    {% endwith %}
-                  </p>
-                  {% if user_can_translate %}
-                    <p class="list-group-item-text list-buttons">
-                      <a href="{% url 'js-dismiss-automatically-translated' unit_id=unit.id %}"
-                         class="btn btn-warning dismiss-automatically-translated">{% translate "Dismiss" %}</a>
-                    </p>
-                  {% endif %}
-                </div>
-              {% endif %}
-
 
               {% if unit.is_blocked_by_commit_policy %}
                 <div class="list-group-item check check-item">
@@ -771,10 +761,16 @@
               <h4 class="card-title">
                 {% documentation_icon 'user/glossary' right=True %}
                 {% loading_icon "glossary-add" %}
-                {% translate "Glossary" %}
+                <button type="button"
+                        class="accordion-button {% if not glossary %}collapsed{% endif %}"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#glossary-card-body-{{ unit.id }}"
+                        aria-expanded="{% if glossary %}true{% else %}false{% endif %}"
+                        aria-controls="glossary-card-body-{{ unit.id }}">{% translate "Glossary" %}</button>
               </h4>
             </div>
-            <div class="list-group">
+            <div class="list-group collapse {% if glossary %}show{% endif %}"
+                 id="glossary-card-body-{{ unit.id }}">
               <div class="list-group-item">
                 <table class="table table-sm table-simple">
                   <thead>
@@ -817,7 +813,7 @@
           </div>
         {% endif %}
 
-        {% if screenshots or user_can_add_screenshot %}
+        {% if screenshots %}
           <div class="card string-info">
             <div class="card-header">
               <h4 class="card-title">
@@ -852,10 +848,16 @@
           <div class="card-header">
             <h4 class="card-title">
               {% documentation_icon 'user/translating' 'source-context' right=True %}
-              {% translate "String information" %}
+              <button type="button"
+                      class="accordion-button {% if not unit.source_unit.explanation and not unit.all_labels and not unit.all_flags %}collapsed{% endif %}"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#string-info-card-body-{{ unit.id }}"
+                      aria-expanded="{% if unit.source_unit.explanation or unit.all_labels or unit.all_flags %}true{% else %}false{% endif %}"
+                      aria-controls="string-info-card-body-{{ unit.id }}">{% translate "String information" %}</button>
             </h4>
           </div>
-          <div class="list-group">
+          <div class="list-group collapse {% if unit.source_unit.explanation or unit.all_labels or unit.all_flags %}show{% endif %}"
+               id="string-info-card-body-{{ unit.id }}">
             {% if path_object != unit.translation %}
               <div class="list-group-item">
                 <h5>{% translate "Component" %}</h5>
@@ -1154,6 +1156,7 @@
   {% if not unit.translation.component.hide_glossary_matches and addterm_form %}
     <form action="{% url 'js-add-glossary' unit_id=unit.id %}"
           method="post"
+          data-glossary-body="glossary-card-body-{{ unit.id }}"
           class="add-dict-inline double-submission">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ this_unit_url }}" />

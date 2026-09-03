@@ -25,6 +25,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.html import format_html
+from django.utils.text import normalize_newlines
 from django.utils.translation import gettext, gettext_lazy, ngettext
 from django.views.decorators.http import require_GET, require_POST
 
@@ -878,6 +879,30 @@ def perform_suggestion(unit, form, request: AuthenticatedHttpRequest):
     return result == SuggestionAddResult.CREATED
 
 
+def _queue_manual_save_recheck(request: AuthenticatedHttpRequest, unit: Unit) -> None:
+    """Queue the judge re-check of a manual fix, or explain why it will not run."""
+    user = request.user
+    if not user.has_perm("unit.review", unit) or not user.has_perm(
+        "translation.auto", unit.translation
+    ):
+        messages.info(
+            request,
+            gettext(
+                "The changed text awaits a judge re-check by a user who may run it."
+            ),
+        )
+        return
+    try:
+        validate_judge_configuration()
+    except JudgeError as error:
+        messages.error(request, str(error))
+        return
+    queue_judge_recheck(unit, user)
+    messages.info(
+        request, gettext("The changed text has been queued for a judge re-check.")
+    )
+
+
 def perform_translation(unit, form, request: AuthenticatedHttpRequest) -> bool:
     """Handle translation and stores it to a backend."""
     user = request.user
@@ -887,6 +912,20 @@ def perform_translation(unit, form, request: AuthenticatedHttpRequest) -> bool:
     # Alternative translations handling
     add_alternative = "add_alternative" in request.POST
 
+    # A judged string takes its release state from the judge, not from a
+    # human radio choice: changed text is always stored as translated (an
+    # approved string is demoted, a held one is lifted) and the queued
+    # re-check decides from there. A save that changes nothing keeps the
+    # state the judge left behind. The stored target is normalized the same
+    # way the posted one is, so a stray CRLF is not mistaken for an edit.
+    judged = bool(latest_round(unit))
+    target_changed = form.cleaned_data["target"] != [
+        normalize_newlines(text) for text in unit.get_target_plurals()
+    ]
+    state = form.cleaned_data["state"]
+    if judged and target_changed and not unit.readonly:
+        state = STATE_TRANSLATED
+
     # Update explanation for glossary
     change_explanation = (
         component.is_glossary and unit.explanation != form.cleaned_data["explanation"]
@@ -895,7 +934,7 @@ def perform_translation(unit, form, request: AuthenticatedHttpRequest) -> bool:
     saved = unit.translate(
         user,
         form.cleaned_data["target"],
-        form.cleaned_data["state"],
+        state,
         request=request,
         add_alternative=add_alternative,
     )
@@ -911,6 +950,11 @@ def perform_translation(unit, form, request: AuthenticatedHttpRequest) -> bool:
     if not saved:
         revert_rate_limit("translate", request)
         return True
+
+    # A manual fix of a judged string belongs to the judge to release:
+    # queue the re-check right after the save lands.
+    if judged and target_changed:
+        _queue_manual_save_recheck(request, unit)
 
     # Auto subscribe user
     if not profile.all_languages:
@@ -1392,6 +1436,7 @@ def _judge_view_context(
         "judge_context_changed": judge_context_changed,
         "judge_current_verdict": judge_current_verdict,
         "judge_can_resolve": judge_can_resolve,
+        "judge_resolution_choices": judge_resolution_choices,
         "judge_resolution_form": judge_resolution_form,
         "judge_repair_evidence": repair_evidence(unit, active=judge_verdict),
         "judge_candidate": active_judge_candidate(unit, judge_current_verdict),
@@ -1464,9 +1509,6 @@ def translate(request: AuthenticatedHttpRequest, path: list[str]) -> HttpRespons
     # Show secondary languages for signed in users
     secondary = unit.get_secondary_units(user) if user.is_authenticated else None
 
-    # Prepare form
-    form = TranslationForm(user, unit)
-
     screenshot_form = None
     if user.has_perm("screenshot.add", unit.translation):
         screenshot_form = ScreenshotForm(
@@ -1484,8 +1526,8 @@ def translate(request: AuthenticatedHttpRequest, path: list[str]) -> HttpRespons
         )
     other_languages_count = max(unit.source_unit.unit_set.count() - 1, 0)
     prepare_glossary_terms([unit], project, full=True)
-
     judge_context = _judge_view_context(request, unit)
+    form = TranslationForm(user, unit, judged=bool(judge_context["judge_round"]))
 
     return render(
         request,

@@ -136,6 +136,36 @@ class JudgeSeverityGateTest(SimpleTestCase):
         )
 
 
+class JudgePrimaryErrorTest(SimpleTestCase):
+    def test_primary_error_picks_max_severity(self) -> None:
+        verdict = JudgeVerdict(
+            max_severity="critical",
+            errors=[
+                {"category": "style", "severity": "minor", "description": "a"},
+                {
+                    "category": "mistranslation",
+                    "severity": "critical",
+                    "description": "b",
+                },
+            ],
+        )
+        self.assertEqual(verdict.primary_error["category"], "mistranslation")
+
+    def test_primary_error_empty_list_returns_none(self) -> None:
+        verdict = JudgeVerdict(max_severity="critical", errors=[])
+        self.assertIsNone(verdict.primary_error)
+
+    def test_primary_error_ties_return_the_first_listed(self) -> None:
+        verdict = JudgeVerdict(
+            max_severity="critical",
+            errors=[
+                {"category": "first", "severity": "critical", "description": "a"},
+                {"category": "second", "severity": "critical", "description": "b"},
+            ],
+        )
+        self.assertEqual(verdict.primary_error["category"], "first")
+
+
 class JudgeHashTest(SimpleTestCase):
     def test_target_hash_is_stable(self) -> None:
         self.assertEqual(
@@ -277,19 +307,45 @@ class JudgeResolutionTest(ViewTestCase):
                 reason="needs a look",
             )
 
-    def test_blank_reason_rejected(self) -> None:
+    def test_blank_reason_accepted(self) -> None:
         self.enable_review()
         unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
         verdict = self.make_verdict(unit, "critical")
-        with self.assertRaises(JudgeResolutionError) as cm:
-            resolve_verdict(
-                unit=unit,
-                expected_verdict_id=verdict.pk,
-                actor=self.user,
-                resolution=JudgeVerdict.Resolution.ESCALATED,
-                reason="   ",
-            )
-        self.assertEqual(cm.exception.code, "blank_reason")
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ESCALATED,
+            reason="",
+        )
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.resolution_reason, "")
+        change = (
+            Change.objects.filter(unit=unit, action=ActionEvents.JUDGE_RESOLUTION)
+            .order_by("-pk")
+            .first()
+        )
+        self.assertIsNotNone(change)
+        self.assertEqual(change.details["reason"], "")
+
+    def test_whitespace_reason_is_stored_as_blank(self) -> None:
+        """A reason of spaces is the same decision as no reason at all."""
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ESCALATED,
+            reason="   \n ",
+        )
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.resolution_reason, "")
 
     def test_unsupported_resolution_value_rejected(self) -> None:
         self.enable_review()
@@ -739,11 +795,13 @@ class JudgeResolutionLocalizationTest(SimpleTestCase):
             )
             form = JudgeResolutionForm()
             self.assertEqual(str(form.fields["resolution"].label), "Решение")
-            self.assertEqual(str(form.fields["reason"].label), "Причина")
+            self.assertEqual(
+                str(form.fields["reason"].label), "Причина (необязательно)"
+            )
             choice_labels = {
                 value: str(label) for value, label in form.fields["resolution"].choices
             }
-            self.assertEqual(choice_labels["escalated"], "Эскалировать на проверку")
+            self.assertEqual(choice_labels["escalated"], "Вернуть в очередь")
             self.assertEqual(choice_labels["accepted_as_is"], "Принять как есть")
             self.assertEqual(
                 str(RenderJudgeResolution.RESOLUTION_LABELS["escalated"]),
@@ -756,14 +814,6 @@ class JudgeResolutionLocalizationTest(SimpleTestCase):
 
     def test_domain_helper_errors_render_in_russian(self) -> None:
         with translation.override("ru"):
-            self.assertEqual(
-                str(
-                    JudgeResolutionError(
-                        "blank_reason", gettext("A reason is required.")
-                    )
-                ),
-                "Необходимо указать причину.",
-            )
             self.assertEqual(
                 str(
                     JudgeResolutionError(

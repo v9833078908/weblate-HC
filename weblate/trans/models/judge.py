@@ -788,6 +788,14 @@ class JudgeVerdict(models.Model):
             return self.Verdict.UNPARSED
         return verdict_for_severity(self.max_severity)
 
+    @property
+    def primary_error(self) -> dict | None:
+        """The first recorded error at the verdict's own maximum severity."""
+        for error in self.errors:
+            if error.get("severity") == self.max_severity:
+                return error
+        return self.errors[0] if self.errors else None
+
     def is_stale(self, target: Sequence[str]) -> bool:
         """Whether the judged text differs from the text stored now."""
         return self.target_hash != compute_target_hash(target)
@@ -1185,9 +1193,7 @@ def resolve_verdict(
     going through translate(), which would otherwise skip writing
     anything when neither state nor target changed.
     """
-    if not reason or not reason.strip():
-        msg = "blank_reason"
-        raise JudgeResolutionError(msg, gettext("A reason is required."))
+    reason = reason.strip()
     if resolution not in {
         JudgeVerdict.Resolution.ESCALATED,
         JudgeVerdict.Resolution.ACCEPTED_AS_IS,

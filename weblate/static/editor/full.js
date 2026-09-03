@@ -54,6 +54,7 @@
     this.initChecks();
     this.initGlossary();
     this.initSuggestions();
+    this.initJudgePending();
 
     const copyMachinery = (row, mark) => {
       const raw = getRawData(row);
@@ -129,9 +130,9 @@
     });
 
     hotkeys("alt+end", () => {
-      const button = document.getElementById("button-end");
-      if (button?.href) {
-        window.location = button.href;
+      const url = document.querySelector(".unit-pagination")?.dataset.lastUrl;
+      if (url) {
+        window.location = url;
       }
       return false;
     });
@@ -150,9 +151,9 @@
       return false;
     });
     hotkeys("alt+home", () => {
-      const button = document.getElementById("button-first");
-      if (button?.href) {
-        window.location = button.href;
+      const url = document.querySelector(".unit-pagination")?.dataset.firstUrl;
+      if (url) {
+        window.location = url;
       }
       return false;
     });
@@ -194,6 +195,18 @@
     });
     hotkeys("ctrl+m,command+m", () => {
       document.querySelector('.nav [data-bs-target="#machinery"]')?.click();
+      return false;
+    });
+    hotkeys("ctrl+alt+a,command+alt+a", () => {
+      document.getElementById("id_judge_accept_form")?.requestSubmit();
+      return false;
+    });
+    hotkeys("ctrl+alt+k,command+alt+k", () => {
+      document.getElementById("id_judge_keep_form")?.requestSubmit();
+      return false;
+    });
+    hotkeys("ctrl+alt+r,command+alt+r", () => {
+      document.getElementById("id_judge_recheck_form")?.requestSubmit();
       return false;
     });
   }
@@ -287,6 +300,25 @@
         return;
       }
       this.initMachinery();
+    }
+  };
+
+  FullEditor.prototype.initJudgePending = () => {
+    const judgeCard = document.getElementById("id_judge_card");
+    if (judgeCard && judgeCard.dataset.judgePending === "1") {
+      window.setTimeout(() => {
+        // Any draft the producer started - the translation itself, a
+        // comment, a glossary term - outranks the refresh.
+        const fields = document.querySelectorAll(
+          "textarea, input[type=text], input[type=search]",
+        );
+        const untouched = Array.from(fields).every(
+          (el) => el.value === el.defaultValue,
+        );
+        if (untouched) {
+          window.location.reload();
+        }
+      }, 5000);
     }
   };
 
@@ -532,47 +564,6 @@
       }
     });
 
-    /* Automatically translated dismissal */
-    delegate(
-      this.editors,
-      "click",
-      ".dismiss-automatically-translated",
-      (e) => {
-        e.preventDefault();
-        const el = e.target.closest(".dismiss-automatically-translated");
-        const url = el.getAttribute("href");
-        const check = el.closest(".check");
-
-        fetch(url, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            "X-Requested-With": "XMLHttpRequest",
-            Accept: "application/json",
-          },
-          body: new URLSearchParams({ csrfmiddlewaretoken: this.csrfToken }),
-        })
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}`);
-            }
-            const listGroup = check.closest(".list-group");
-            check.remove();
-
-            // Hide the entire "Things to check" panel if no checks remain
-            if (
-              listGroup &&
-              listGroup.querySelectorAll(".list-group-item").length === 0
-            ) {
-              listGroup.closest(".panel")?.remove();
-            }
-          })
-          .catch((error) => {
-            addAlert(error.message);
-          });
-      },
-    );
-
     /* Check fix */
     delegate(this.editors, "click", "[data-check-fixup]", (e) => {
       const el = e.target.closest("[data-check-fixup]");
@@ -723,6 +714,12 @@
               termsInput.setAttribute("value", data.terms);
             }
             form.reset();
+            if (form.dataset.glossaryBody) {
+              const body = document.getElementById(form.dataset.glossaryBody);
+              if (body) {
+                bootstrap.Collapse.getOrCreateInstance(body).show();
+              }
+            }
           } else {
             addAlert(data.responseDetails);
           }

@@ -3,6 +3,9 @@
 
 <details class="list-group-item-text">
   <summary>{% translate "Judge details" %}</summary>
+  {% if seats|length > 1 %}
+    <p class="list-group-item-text text-muted">{% translate "Both judges reviewed this string independently." %}</p>
+  {% endif %}
   {% for seat in seats %}
     <p class="list-group-item-text text-muted">
       {% blocktranslate with model=seat.judge_model when=seat.timestamp|naturaltime %}{{ model }} · {{ when }}{% endblocktranslate %}

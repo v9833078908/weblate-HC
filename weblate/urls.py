@@ -956,11 +956,6 @@ real_patterns = [
         name="js-translate",
     ),
     path(
-        "js/dismiss-automatically-translated/<int:unit_id>/",
-        weblate.trans.views.js.dismiss_automatically_translated,
-        name="js-dismiss-automatically-translated",
-    ),
-    path(
         "js/memory/<int:unit_id>/",
         weblate.machinery.views.memory,
         name="js-memory",

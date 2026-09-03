@@ -832,6 +832,47 @@ To install :ref:`mt-deepl`:
 
    :doc:`machine`
 
+judge_backfill_candidates
+--------------------------
+
+.. weblate-admin:: judge_backfill_candidates [--write] [--user USERNAME] [--limit N] <project|project/component>
+
+Backfills a stored, previewable repair candidate for the existing backlog of
+strings with a current, unresolved ``critical`` or ``major`` LLM judge
+verdict (see :ref:`llm-judge`) that do not have one yet - for example a
+string judged before the candidate-preview card existed. Dry-run by
+default: classifies every such string in scope and writes nothing. A
+string that already has an active candidate is reported ``existing``, and
+one still on the deterministic ``max-length`` repair path is reported
+``max-length``; both cost no call. A resolved verdict or a ``pass``/minor
+verdict is not part of the backlog and is not listed at all.
+
+.. weblate-admin-option:: --write
+
+   Generate the pending candidates found by the scan, spending one paid
+   repair call per string. Without it, nothing is written.
+
+.. weblate-admin-option:: --user USERNAME
+
+   The user to attribute generated candidates to. Required with ``--write``;
+   the user still needs the same :guilabel:`Review strings` and automatic
+   translation permissions the string page enforces.
+
+.. weblate-admin-option:: --limit N
+
+   Stop after this many paid repair attempts. Recommended on a large
+   backlog: without it every pending string is attempted in one run.
+
+A string whose generation raises is reported ``error`` on the standard error
+output and counted as a paid attempt; the run continues with the next one.
+
+Requires an explicit project or component argument; it never runs
+instance-wide.
+
+.. seealso::
+
+   :ref:`llm-judge`
+
 judge_release_advisory_holds
 -----------------------------
 
