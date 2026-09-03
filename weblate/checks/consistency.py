@@ -14,6 +14,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext, gettext_lazy, ngettext
 
 from weblate.checks.base import BatchCheckMixin, TargetCheck
+from weblate.logger import LOGGER
 from weblate.trans.actions import ACTIONS_REVERTABLE, ActionEvents
 from weblate.trans.util import split_plural
 from weblate.utils.html import format_html_join_comma
@@ -326,6 +327,63 @@ class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
     def check_single(self, source: str, target: str, unit: Unit) -> bool:
         """Target strings are checked in check_target_unit."""
         return False
+
+    def check_component(self, component: Component) -> Iterable[Unit]:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models import Translation, Unit
+
+        translation_ids_by_plural: dict[int, list[int]] = defaultdict(list)
+        for translation_id, plural_id in (
+            Translation.objects.filter(
+                component__project=component.project,
+                component__allow_translation_propagation=True,
+                component__is_glossary=False,
+            )
+            .exclude_source()
+            .values_list("id", "plural_id")
+        ):
+            translation_ids_by_plural[plural_id].append(translation_id)
+
+        for plural_id, translation_ids in sorted(translation_ids_by_plural.items()):
+            candidates = (
+                Unit.objects.filter(
+                    translation_id__in=translation_ids, state__gte=STATE_TRANSLATED
+                )
+                .annotate(source_md5=MD5(Lower("source")))
+                .values("source_md5")
+                .annotate(min_target=Min("target"), max_target=Max("target"))
+                .filter(min_target__lt=F("max_target"))
+                .order_by("source_md5")[: self.batch_limit]
+            )
+            hashes = [row["source_md5"] for row in candidates]
+            if not hashes:
+                continue
+            if len(hashes) == self.batch_limit:
+                LOGGER.warning(
+                    "repeat-drift: hit the %d group cap on %s (plural %d)",
+                    self.batch_limit,
+                    component.project.slug,
+                    plural_id,
+                )
+
+            units = (
+                Unit.objects.filter(
+                    translation_id__in=translation_ids, state__gte=STATE_TRANSLATED
+                )
+                .annotate(source_md5=MD5(Lower("source")))
+                .filter(source_md5__in=hashes)
+                .prefetch()
+                .prefetch_bulk()
+            )
+
+            # The aggregate narrows case-insensitively because that is the
+            # indexed expression; the decision is made on the exact source.
+            groups: dict[str, list[Unit]] = defaultdict(list)
+            for unit in units:
+                groups[unit.source].append(unit)
+            for members in groups.values():
+                if len({member.target for member in members}) > 1:
+                    yield from members
 
 
 class TranslatedCheck(TargetCheck, BatchCheckMixin):

@@ -431,3 +431,38 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
         second.run_checks()
 
         self.assertIn("repeat-drift", second.all_checks_names)
+
+    def test_check_component_finds_cross_component_drift(self) -> None:
+        check = RepeatDriftCheck()
+        self.assertEqual(list(check.check_component(self.component)), [])
+
+        first = self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+
+        self.assertEqual(
+            {unit.pk for unit in check.check_component(self.component)},
+            {first.pk, second.pk},
+        )
+
+    def test_check_component_ignores_agreeing_repeats(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        self.add_unit(self.translation_2, "greet_outro", "Hello", "Ahoj")
+
+        self.assertEqual(list(check.check_component(self.component)), [])
+
+    def test_aggregate_groups_by_source_not_context(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+
+        with CaptureQueriesContext(connection) as queries:
+            list(check.check_component(self.component))
+
+        aggregate_sql = next(
+            query["sql"].upper() for query in queries if "MIN(" in query["sql"].upper()
+        )
+        self.assertIn("MD5(LOWER", aggregate_sql)
+        self.assertNotIn('"TRANS_UNIT"."CONTEXT"', aggregate_sql)
+        self.assertNotIn('"TRANS_UNIT"."ID_HASH"', aggregate_sql)
+        self.assertNotIn('"TRANS_COMPONENT"', aggregate_sql)
