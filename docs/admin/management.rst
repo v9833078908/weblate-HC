@@ -1173,6 +1173,29 @@ By default the command reports what would change without writing anything.
 You can either define which project or component to update (for example
 ``weblate/application``), or use ``--all`` to update all existing components.
 
+audit_glossary
+--------------
+
+.. weblate-admin:: audit_glossary
+
+Reports glossary terms that contradict each other: one term translated two
+different ways in the same language, and two different terms sharing one
+translation. The command only reads, and exits with an error when it finds
+something that is not accepted in a baseline file. Run it after a glossary
+import and before a release; there is no scheduled job, because the audit
+needs a live instance database.
+
+.. weblate-admin-option:: --project PROJECT
+
+    Limits the audit to one project slug instead of every glossary on the
+    instance.
+
+.. weblate-admin-option:: --baseline PATH
+
+    Reads accepted findings from :file:`PATH`, one key per line, with ``#``
+    starting a comment. A deliberate homonym belongs here; every other finding
+    keeps the run failing.
+
 unlock_translation
 ------------------
 

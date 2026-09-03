@@ -188,6 +188,7 @@ class SameSourceUnitsMixin:
             state=STATE_TRANSLATED,
         )
 
+
 class ConsistencyCheckTest(SameSourceUnitsMixin, ComponentTestCase):
     def test_reuse(self) -> None:
         check = ReusedCheck()
@@ -536,9 +537,7 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
         second.translate(self.user, "Ahoj", STATE_TRANSLATED)
 
         self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 0)
-        self.assertNotIn(
-            "repeat-drift", Unit.objects.get(pk=first.pk).all_checks_names
-        )
+        self.assertNotIn("repeat-drift", Unit.objects.get(pk=first.pk).all_checks_names)
 
     def test_breaking_one_member_flags_the_sibling(self) -> None:
         self.enable_repeat_drift()
@@ -552,9 +551,7 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
         second.translate(self.user, "Nazdar", STATE_TRANSLATED)
 
         self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 2)
-        self.assertIn(
-            "repeat-drift", Unit.objects.get(pk=first.pk).all_checks_names
-        )
+        self.assertIn("repeat-drift", Unit.objects.get(pk=first.pk).all_checks_names)
 
     def test_description_lists_the_other_renderings(self) -> None:
         check = RepeatDriftCheck()

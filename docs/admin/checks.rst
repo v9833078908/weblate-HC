@@ -129,6 +129,22 @@ editing from being committed to the version control.
    * :ref:`additional`
    * :ref:`component-check_flags`
 
+.. _repeat-drift:
+
+Repeat drift
+------------
+
+The optional :ref:`check-repeat-drift` check finds translated strings that
+have the same source text under different keys but different targets within
+one project and language. It marks every member of a divergent group,
+including the translation that is already correct, so a reviewer can choose
+the intended rendering. Use ``ignore-repeat-drift`` on a string when the
+variation is intentional.
+
+Do not add this check to :ref:`component-enforced_checks`. Enforcing it would
+mark every divergent member as needing editing, including the correct
+translation.
+
 
 .. _llm-judge:
 
