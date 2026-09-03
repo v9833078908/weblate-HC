@@ -25634,6 +25634,197 @@ msgstr "Для этой строки не найден актуальный ве
 msgid "That decision does not apply to this verdict."
 msgstr "Это решение неприменимо к данному вердикту."
 
+#: weblate/trans/views/judge.py:92
+msgid "Addition"
+msgstr "Добавление"
+
+#: weblate/trans/views/judge.py:102
+msgid "Critical"
+msgstr "Критично"
+
+#: weblate/trans/views/judge.py:218
+msgid "Fix and re-check"
+msgstr "Исправить и перепроверить"
+
+#: weblate/trans/views/judge.py:93
+msgid "Fluency"
+msgstr "Естественность"
+
+#: weblate/templates/judge-run.html:106
+msgid "Links narrow by severity; the category itself is not a search field."
+msgstr "Ссылки фильтруют только по важности: категория не является полем поиска."
+
+#: weblate/trans/views/judge.py:103
+msgid "Major"
+msgstr "Важно"
+
+#: weblate/trans/views/judge.py:95
+msgid "Markup"
+msgstr "Разметка"
+
+#: weblate/trans/views/judge.py:104
+msgid "Minor"
+msgstr "Незначительно"
+
+#: weblate/trans/views/judge.py:90
+msgid "Mistranslation"
+msgstr "Неверный перевод"
+
+#: weblate/trans/views/judge.py:68
+msgid "Needs action"
+msgstr "Требует внимания"
+
+#: weblate/trans/views/judge.py:281
+msgid "No verdict was recorded."
+msgstr "Вердикт не был зафиксирован."
+
+#: weblate/templates/judge-run.html:58
+msgid "Nothing is blocked from shipping."
+msgstr "Ничего не блокирует выпуск."
+
+#: weblate/trans/views/judge.py:91
+msgid "Omission"
+msgstr "Пропуск"
+
+#: weblate/templates/judge-run.html:56
+msgid "Open the blocking strings"
+msgstr "Открыть блокирующие строки"
+
+#: weblate/templates/judge-run.html:59
+msgid "Open the flagged strings"
+msgstr "Открыть отмеченные строки"
+
+#: weblate/trans/views/judge.py:80
+msgid "Passed"
+msgstr "Пройдено"
+
+#: weblate/templates/judge-run.html:84
+msgid "Problem"
+msgstr "Проблема"
+
+#: weblate/trans/views/judge.py:94
+msgid "Punctuation"
+msgstr "Пунктуация"
+
+#: weblate/trans/views/judge.py:224
+msgid "Re-check"
+msgstr "Перепроверить"
+
+#: weblate/templates/judge-run.html:62
+msgid "Re-check them"
+msgstr "Перепроверить их"
+
+#: weblate/trans/views/judge.py:287
+msgid "Review the suggested fix"
+msgstr "Просмотреть предложенное исправление"
+
+#: weblate/trans/views/judge.py:289
+msgid "See the applied fix"
+msgstr "Посмотреть применённое исправление"
+
+#: weblate/trans/views/judge.py:74
+msgid "Suggested fixes"
+msgstr "Предложенные исправления"
+
+#: weblate/trans/views/judge.py:205
+msgid "The judge found no problems."
+msgstr "Судья не нашёл проблем."
+
+#: weblate/templates/judge-run.html:61
+msgid "The judge left no usable verdict for some strings."
+msgstr "Судья не оставил пригодного вердикта для некоторых строк."
+
+#: weblate/trans/views/judge.py:214
+msgid "The judge refused this string."
+msgstr "Судья отказался обрабатывать эту строку."
+
+#: weblate/trans/views/judge.py:208
+msgid "The judge reply for this string could not be used."
+msgstr "Ответ судьи по этой строке не удалось использовать."
+
+#: weblate/trans/views/judge.py:211
+msgid "The text changed while this run was in progress."
+msgstr "Текст изменился, пока выполнялся этот запуск."
+
+#: weblate/trans/views/judge.py:213
+msgid "This string was deferred by the judge."
+msgstr "Судья отложил эту строку."
+
+#: weblate/trans/views/judge.py:206
+msgid "This string was skipped before judging."
+msgstr "Эта строка была пропущена до проверки судьёй."
+
+#: weblate/templates/judge-run.html:38
+msgid "What to do"
+msgstr "Что делать"
+
+#: weblate/templates/judge-run.html:79
+msgid "Where the problems are"
+msgstr "Где проблемы"
+
+#: weblate/templates/judge-run.html:86
+msgid "Worst"
+msgstr "Худшая"
+
+#: weblate/templates/judge-run.html:169
+msgid "nothing to do"
+msgstr "нечего делать"
+
+#: weblate/trans/views/judge.py:98
+msgctxt "Judge error category"
+msgid "Register"
+msgstr "Регистр"
+
+#: weblate/trans/views/judge.py:222
+msgctxt "Judge report row action"
+msgid "Review"
+msgstr "Проверить"
+
+#: weblate/templates/judge-run.html:44
+#, python-format
+msgid "%(counter)s string will not ship until you fix it."
+msgid_plural "%(counter)s strings will not ship until you fix them."
+msgstr[0] "%(counter)s строка не будет опубликована, пока вы её не исправите."
+msgstr[1] "%(counter)s строки не будут опубликованы, пока вы их не исправите."
+msgstr[2] "%(counter)s строк не будут опубликованы, пока вы их не исправите."
+
+#: weblate/templates/judge-run.html:48
+#, python-format
+msgid "%(counter)s string is rejected and needs a fix before release."
+msgid_plural "%(counter)s strings are rejected and need a fix before release."
+msgstr[0] "%(counter)s строка отклонена и нуждается в исправлении перед релизом."
+msgstr[1] "%(counter)s строки отклонены и нуждаются в исправлении перед релизом."
+msgstr[2] "%(counter)s строк отклонены и нуждаются в исправлении перед релизом."
+
+#: weblate/templates/judge-run.html:53
+#, python-format
+msgid "Biggest problem: %(category)s (%(counter)s string)."
+msgid_plural "Biggest problem: %(category)s (%(counter)s strings)."
+msgstr[0] "Главная проблема: %(category)s (%(counter)s строка)."
+msgstr[1] "Главная проблема: %(category)s (%(counter)s строки)."
+msgstr[2] "Главная проблема: %(category)s (%(counter)s строк)."
+
+#: weblate/templates/judge-run.html:65
+#, python-format
+msgid "Nothing needs action. %(counter)s string passed."
+msgid_plural "Nothing needs action. %(counter)s strings passed."
+msgstr[0] "Ничего не требует внимания. %(counter)s строка прошла проверку."
+msgstr[1] "Ничего не требует внимания. %(counter)s строки прошли проверку."
+msgstr[2] "Ничего не требует внимания. %(counter)s строк прошли проверку."
+
+#: weblate/templates/judge-run.html:70
+#, python-format
+msgid "Review %(counter)s suggested fix"
+msgid_plural "Review %(counter)s suggested fixes"
+msgstr[0] "Просмотреть %(counter)s предложенное исправление"
+msgstr[1] "Просмотреть %(counter)s предложенных исправления"
+msgstr[2] "Просмотреть %(counter)s предложенных исправлений"
+
+#: weblate/templates/judge-run.html:126
+#, python-format
+msgid "Matched %(matched)s &middot; checked %(checked)s &middot; cached %(cached)s."
+msgstr "Совпало %(matched)s &middot; проверено %(checked)s &middot; из кэша %(cached)s."
+
 #~ msgid "Could not open a ticket, please try again later."
 #~ msgstr "Не удалось открыть заявку, попробуйте позже."
 
