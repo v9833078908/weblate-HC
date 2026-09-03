@@ -831,6 +831,7 @@ extend-exclude = [
   "analysis/data/autofix-backfill-*.json",
   "analysis/data/col4-*.json",
   "analysis/data/col4-*.jsonl",
+  "analysis/data/hub1-remediation-2026-08-25/glossary",
   "docs/changes/contributors",
   "docs/llm-first/measurements/2026-08-12-col4-judge-annotation.md",
   "docs/specs",
