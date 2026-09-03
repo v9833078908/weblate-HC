@@ -541,6 +541,32 @@
                   </tr>
                 </thead>
                 <tbody id="machinery-translations">
+                  {% if user_can_use_machinery and judge_can_triage and judge_candidate and not judge_recheck_pending and not judge_active_max_length %}
+                    <tr data-judge-candidate="1">
+                      <td class="target machinery-text"
+                          lang="{{ unit.translation.language.code }}"
+                          dir="{{ unit.translation.language.direction }}">
+                        {% format_unit_target unit value=judge_candidate.target simple=True %}
+                      </td>
+                      <td class="machinery-text">{% format_unit_target unit value=judge_candidate.target diff=unit.target %}</td>
+                      <td class="machinery-text"></td>
+                      <td>{% translate "AI judge" %}</td>
+                      <td class="number"></td>
+                      <td></td>
+                      <td>
+                        <form method="post"
+                              action="{% url 'judge-accept-candidate' pk=judge_candidate.pk %}"
+                              class="form-inline">
+                          {% csrf_token %}
+                          <input type="hidden" name="next" value="{{ this_unit_url }}" />
+                          <input type="hidden" name="success_next" value="{{ next_unit_url }}" />
+                          <button type="submit" class="btn btn-info">{% translate "Use suggested fix" %}</button>
+                        </form>
+                      </td>
+                      <td></td>
+                      <td></td>
+                    </tr>
+                  {% endif %}
                 </tbody>
               </table>
               <form action="" method="post" class="delete-url-form">

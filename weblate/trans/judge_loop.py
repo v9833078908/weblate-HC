@@ -72,7 +72,7 @@ from weblate.trans.models.judge import (
     has_complete_current_evidence,
     state_for_verdict,
 )
-from weblate.utils.state import STATE_FUZZY
+from weblate.utils.state import STATE_FUZZY, STATE_TRANSLATED
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -210,6 +210,39 @@ def repair_targets(units: list[Unit], user: User | None) -> dict[int, list[str]]
         if texts is not None:
             repairs[unit.id] = texts
     return repairs
+
+
+def unsupported_repair_language(units: list[Unit]) -> str | None:
+    """
+    Return the target language code an explicit routing map excludes.
+
+    A companion to repair_targets(): it writes nothing and makes no
+    network call, so it changes no cost (invariant 5). None when no units
+    were given, no repair engine is configured, or the engine's routing
+    setting is absent or empty - a project that has not opted into
+    per-language routing at all is a "no usable engine yet" situation the
+    caller's other checks already cover, not a language-specific refusal.
+    Only a *non-empty* routing map lacking both this translation's exact
+    language code and a "*" fallback names the language: that is what the
+    2026-09-03 investigation actually found (a configured but incomplete
+    routing table, not an absent one). This deliberately does not
+    replicate the engine's own base-subtag fallback (e.g. "pt-BR" -> "pt"),
+    so it can only under-report, never over-report, a real refusal.
+    """
+    if not units:
+        return None
+    translation = units[0].translation
+    settings_map = translation.component.project.get_machinery_settings()
+    engine_id = configured_routed_engine(settings_map)
+    if engine_id is None or engine_id not in MACHINERY:
+        return None
+    routing = settings_map[engine_id].get("routing")
+    if not isinstance(routing, dict) or not routing:
+        return None
+    language_code = translation.language.code
+    if "*" in routing or language_code in routing:
+        return None
+    return language_code
 
 
 def _repair_targets_per_unit(
@@ -1217,6 +1250,7 @@ class JudgeBatchResult(dict[int, JudgeVerdict]):  # ruff: ignore[subclass-builti
         self.initial_severity: dict[int, str] = {}
         self.repair_status: dict[int, str] = {}
         self.attempt_counts: dict[int, int] = {}
+        self.unsupported_repair_languages: set[str] = set()
 
 
 def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-many-statements]
@@ -1432,6 +1466,11 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
             )
         ]
         repairs = repair_targets(repairable_units, user) if repairable_units else {}
+        unsupported_language = (
+            unsupported_repair_language(repairable_units) if repairable_units else None
+        )
+        if unsupported_language is not None:
+            verdicts.unsupported_repair_languages.add(unsupported_language)
         candidate_engine = (
             configured_routed_engine(
                 units[0].translation.component.project.get_machinery_settings()
@@ -1465,7 +1504,11 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
             new_target = repairs.get(unit.id) if wants_repair else None
             if new_target is None:
                 if wants_repair:
-                    verdicts.repair_status[unit.id] = "no-candidate"
+                    verdicts.repair_status[unit.id] = (
+                        "no-engine-for-language"
+                        if unsupported_language is not None
+                        else "no-candidate"
+                    )
                 if unit.id in cached_ids:
                     verdicts.cached_unit_ids.add(unit.id)
                 else:
@@ -2057,12 +2100,13 @@ def accept_judge_candidate(
     representative JudgeVerdict, in that order (matching _store_candidate's
     and queue_judge_recheck's lock order), and only proceeds while that
     verdict is still the current unresolved REJECT/FLAG for this exact
-    target/context (invariant 2). Writes STATE_FUZZY with ActionEvents.ACCEPT
-    provenance and propagate=False (invariant 4), consumes the candidate, and
-    queues the one paid re-check that alone can make the string shippable
-    again (invariant 8). Every guard failure raises JudgeCandidateError with
-    a producer-facing message; callers translate it into their own response
-    shape.
+    target/context (invariant 2). Writes STATE_TRANSLATED with
+    ActionEvents.ACCEPT provenance and propagate=False (invariant 4),
+    consumes the candidate, and queues the one paid re-check that projects
+    the string's actual status afterwards (invariant 8): the string looks
+    finished immediately, and a failing re-check holds it again. Every
+    guard failure raises JudgeCandidateError with a producer-facing
+    message; callers translate it into their own response shape.
     """
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.models import Unit as UnitModel
@@ -2135,7 +2179,7 @@ def accept_judge_candidate(
         locked_unit.translate(
             user,
             locked_candidate.target_list,
-            STATE_FUZZY,
+            STATE_TRANSLATED,
             change_action=ActionEvents.ACCEPT,
             propagate=False,
             change_details={
@@ -2168,20 +2212,46 @@ def generate_candidate_for_verdict(
     Calls the repair engine exactly once, writes nothing but a candidate,
     and never mutates the target (invariant 1). Outcome codes are stable:
     generated / existing / stale / resolved / invalid-verdict / max-length /
-    no-engine / busy / failed / drift. A paid output that no longer matches
-    the judged snapshot is discarded, keeping any older candidate.
+    no-engine / busy / failed / drift / denied. A paid output that no
+    longer matches the judged snapshot is discarded, keeping any older
+    candidate. Every terminal outcome is also persisted onto the verdict
+    row (``generation_outcome``/``generation_outcome_at``) so a producer
+    who navigates away and back still sees why generation did or did not
+    leave a candidate; ``generated`` clears that pair instead of storing
+    it, because the stored candidate is then the state worth rendering.
     """
     from django.core.cache import cache  # ruff: ignore[import-outside-top-level]
 
     key = _generation_lock_key(unit_id, verdict_id)
     if not cache.add(key, "1", timeout=GENERATION_LOCK_TTL_SECONDS):
+        _record_generation_outcome(verdict_id, "busy")
         return "busy"
     try:
-        return _generate_candidate(
+        outcome = _generate_candidate(
             unit_id=unit_id, verdict_id=verdict_id, user=user, replace=replace
         )
+        _record_generation_outcome(verdict_id, outcome)
+        return outcome
     finally:
         cache.delete(key)
+
+
+def _record_generation_outcome(verdict_id: int, outcome: str) -> None:
+    """
+    Persist the terminal generation outcome, without touching the unit.
+
+    A targeted ``update()`` on the verdict row: it never touches the judged
+    snapshot or the unit, and it never raises if the verdict has since been
+    deleted (``update()`` on an empty queryset is a no-op).
+    """
+    if outcome == "generated":
+        JudgeVerdict.objects.filter(pk=verdict_id).update(
+            generation_outcome="", generation_outcome_at=None
+        )
+        return
+    JudgeVerdict.objects.filter(pk=verdict_id).update(
+        generation_outcome=outcome, generation_outcome_at=timezone.now()
+    )
 
 
 def _generate_candidate(

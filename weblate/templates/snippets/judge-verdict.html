@@ -1,4 +1,4 @@
-{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed', 'judge_current_verdict', 'judge_can_resolve', 'judge_resolution_choices', 'judge_repair_evidence', 'judge_candidate', 'judge_recheck_pending', 'judge_generation_pending', 'judge_can_triage', 'judge_active_verdict', 'judge_active_max_length', 'this_unit_url' in context #}
+{# requires 'unit', 'judge_verdict', 'judge_round', 'judge_seats', 'judge_stale', 'judge_unparsed', 'judge_context_changed', 'judge_current_verdict', 'judge_can_resolve', 'judge_resolution_choices', 'judge_repair_evidence', 'judge_candidate', 'judge_recheck_pending', 'judge_generation_pending', 'judge_generation_outcome', 'judge_can_triage', 'judge_active_verdict', 'judge_active_max_length', 'this_unit_url' in context #}
 
 {% load humanize i18n icons translations %}
 
@@ -165,6 +165,25 @@
               <small class="text-muted">{% translate "Paid model request" %}</small>
             </form>
           {% endif %}
+        </div>
+      {% endif %}
+      {% if judge_generation_outcome and not judge_generation_pending %}
+        <div class="list-group-item check">
+          <p class="list-group-item-text text-muted">
+            {% if judge_generation_outcome == "failed" %}
+              {% translate "The model did not return a usable fix. Try again." %}
+            {% elif judge_generation_outcome == "no-engine" %}
+              {% translate "No repair engine is configured for this language." %}
+            {% elif judge_generation_outcome == "max-length" %}
+              {% translate "This string fails a length check: a fix is derived automatically." %}
+            {% elif judge_generation_outcome == "denied" %}
+              {% translate "You do not have permission to generate a fix." %}
+            {% elif judge_generation_outcome == "stale" or judge_generation_outcome == "resolved" or judge_generation_outcome == "invalid-verdict" %}
+              {% translate "The verdict is no longer current for this string." %}
+            {% elif judge_generation_outcome == "drift" %}
+              {% translate "The string changed during generation; the fix was discarded." %}
+            {% endif %}
+          </p>
         </div>
       {% endif %}
       {% if judge_can_resolve and "accepted_as_is" in judge_resolution_choices %}

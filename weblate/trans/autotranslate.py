@@ -722,7 +722,7 @@ class AutoTranslate(BaseAutoTranslate):
             selected,
         )
 
-    def process_judge(  # ruff: ignore[too-many-locals]
+    def process_judge(  # ruff: ignore[too-many-locals, complex-structure]
         self, *, engines: list[str], threshold: int
     ) -> None:
         preview, units = self.preview_judge_scope()
@@ -810,6 +810,17 @@ class AutoTranslate(BaseAutoTranslate):
                 self.set_progress(self.progress_steps)
         finally:
             self.progress_range = (base_low, base_high)
+        for language_code in sorted(
+            getattr(verdicts, "unsupported_repair_languages", set())
+        ):
+            self.add_warning(
+                gettext(
+                    "No repair engine is configured for %(language)s; strings "
+                    "needing a repair candidate in this language were left "
+                    "without one."
+                )
+                % {"language": language_code}
+            )
         self.judge_summary = _summarize_verdicts(
             verdicts, cap_remainder=preview.remaining
         )

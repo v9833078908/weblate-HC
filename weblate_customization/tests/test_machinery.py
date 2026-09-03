@@ -234,9 +234,12 @@ class RoutedReplyFormatTest(SimpleTestCase):
     """
     Cover the reply-length ``json_schema`` shipped for the routed service.
 
-    Non-strict and array-rooted, applied unconditionally to every chat
-    payload; a hardening pass to ``strict`` mode plus an object envelope is
-    tracked separately and deliberately out of scope here (see
+    Non-strict, applied unconditionally to every chat payload. The root is
+    an object envelope (``{"translations": [...]}``), not a bare array,
+    because OpenAI-family providers reject an array-rooted schema outright
+    (see ``docs/llm-first/plans/2026-09-03-candidate-readiness-and-repair-visibility.md``,
+    task 2). A hardening pass to ``strict`` mode is tracked separately and
+    deliberately out of scope here (see
     ``docs/llm-first/plans/2026-08-12-phase0-implementation.md``, task 1).
     """
 
@@ -246,21 +249,34 @@ class RoutedReplyFormatTest(SimpleTestCase):
     def payload(self, content: str) -> dict[str, object]:
         return self.machine().get_chat_payload(GEMINI, "prompt", content, "", "")
 
-    def test_schema_fixes_element_count(self) -> None:
+    @staticmethod
+    def translations_schema(payload: dict[str, object]) -> dict:
+        response_format = cast("dict", payload["response_format"])
+        schema = response_format["json_schema"]["schema"]
+        return cast("dict", schema["properties"]["translations"])
+
+    def test_schema_root_is_an_object_envelope(self) -> None:
         payload = self.payload(batch_content(3))
         response_format = cast("dict", payload["response_format"])
         schema = response_format["json_schema"]["schema"]
 
         self.assertEqual(response_format["type"], "json_schema")
-        self.assertEqual(schema["minItems"], 3)
-        self.assertEqual(schema["maxItems"], 3)
+        self.assertEqual(schema["type"], "object")
+        self.assertEqual(schema["required"], ["translations"])
+        self.assertIs(schema["additionalProperties"], False)
+
+    def test_schema_fixes_element_count(self) -> None:
+        translations = self.translations_schema(self.payload(batch_content(3)))
+
+        self.assertEqual(translations["type"], "array")
+        self.assertEqual(translations["minItems"], 3)
+        self.assertEqual(translations["maxItems"], 3)
 
     def test_single_string_batch_still_gets_schema(self) -> None:
-        payload = self.payload(batch_content(1))
-        schema = cast("dict", payload["response_format"])["json_schema"]["schema"]
+        translations = self.translations_schema(self.payload(batch_content(1)))
 
-        self.assertEqual(schema["minItems"], 1)
-        self.assertEqual(schema["maxItems"], 1)
+        self.assertEqual(translations["minItems"], 1)
+        self.assertEqual(translations["maxItems"], 1)
 
     def test_provider_requires_parameters(self) -> None:
         payload = self.payload(batch_content(2))
@@ -278,9 +294,10 @@ class RoutedReplyFormatTest(SimpleTestCase):
         dropping a field from ``required`` drops it here too.
         """
         # ruff: ignore[private-member-access]
-        schema = cast(
+        root_schema = cast(
             "dict", RoutedLLMTranslation._reply_format(len(string_ids))["json_schema"]
         )["schema"]
+        schema = root_schema["properties"]["translations"]
         required = schema["items"]["required"]
         reply: list[dict[str, object]] = []
         for string_id in string_ids:
@@ -293,12 +310,55 @@ class RoutedReplyFormatTest(SimpleTestCase):
         return reply
 
     def test_schema_requires_the_echoed_id(self) -> None:
-        schema = cast("dict", self.payload(batch_content(3))["response_format"])[
-            "json_schema"
-        ]["schema"]
+        translations = self.translations_schema(self.payload(batch_content(3)))
 
-        self.assertIn("id", schema["items"]["properties"])
-        self.assertIn("id", schema["items"]["required"])
+        self.assertIn("id", translations["items"]["properties"])
+        self.assertIn("id", translations["items"]["required"])
+
+    def test_unwrap_reply_envelope_extracts_the_translations_array(self) -> None:
+        item = {"id": "0", "parts": [{"type": "text", "text": "hi"}]}
+        wrapped = json.dumps({"translations": [item]})
+
+        self.assertEqual(
+            # ruff: ignore[private-member-access]
+            self.machine()._unwrap_reply_envelope(wrapped),
+            json.dumps([item]),
+        )
+
+    def test_unwrap_reply_envelope_passes_through_a_bare_array(self) -> None:
+        bare = json.dumps([{"id": "0", "parts": [{"type": "text", "text": "hi"}]}])
+
+        self.assertEqual(
+            # ruff: ignore[private-member-access]
+            self.machine()._unwrap_reply_envelope(bare),
+            bare,
+        )
+
+    def test_unwrap_reply_envelope_leaves_a_non_translations_dict_alone(self) -> None:
+        other = json.dumps({"other": "shape"})
+
+        self.assertEqual(
+            # ruff: ignore[private-member-access]
+            self.machine()._unwrap_reply_envelope(other),
+            other,
+        )
+
+    def test_wrapped_and_bare_replies_parse_to_the_same_result(self) -> None:
+        item = {"id": "s0", "parts": [{"type": "text", "text": "Konnichiwa"}]}
+        sources = [("hello", None)]
+        machine = self.machine()
+
+        # ruff: ignore[private-member-access]
+        bare_result = machine._parse_llm_translations(
+            json.dumps([item]), sources, None, string_ids=["s0"]
+        )
+        # ruff: ignore[private-member-access]
+        wrapped_result = machine._parse_llm_translations(
+            json.dumps({"translations": [item]}), sources, None, string_ids=["s0"]
+        )
+
+        self.assertEqual(bare_result, wrapped_result)
+        self.assertEqual(bare_result["hello"][0]["text"], "Konnichiwa")
 
     def test_schema_shaped_reply_pairs_with_its_sources(self) -> None:
         """A reply the schema allows must satisfy the batch order validator."""

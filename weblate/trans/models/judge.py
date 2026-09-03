@@ -563,6 +563,10 @@ class JudgeRunUnit(models.Model):
     class RepairStatus(models.TextChoices):
         NOT_ATTEMPTED = "not-attempted"
         NO_CANDIDATE = "no-candidate"
+        # Additive: the engine's own routing map excludes this language
+        # outright, discovered without spending a call. Existing rows
+        # keep NO_CANDIDATE; only new runs can tell the two apart.
+        NO_ENGINE_FOR_LANGUAGE = "no-engine-for-language"
         CANDIDATE_STORED = "candidate-stored"
         APPLIED = "applied"
         ROLLED_BACK = "rolled-back"
@@ -592,7 +596,7 @@ class JudgeRunUnit(models.Model):
     outcome = models.CharField(max_length=20, choices=Outcome)
     skip_reason = models.CharField(max_length=20, choices=SkipReason, blank=True)
     repair_status = models.CharField(
-        max_length=20, choices=RepairStatus, default=RepairStatus.NOT_ATTEMPTED
+        max_length=24, choices=RepairStatus, default=RepairStatus.NOT_ATTEMPTED
     )
     initial_severity = models.CharField(
         max_length=10,
@@ -672,6 +676,22 @@ class JudgeVerdict(models.Model):
         SENT_BACK = "sent_back"
         ESCALATED = "escalated"
 
+    # Stable codes returned by generate_candidate_for_verdict; "generated"
+    # is deliberately absent because a successful generation clears this
+    # pair instead of storing it (the stored candidate is then the state
+    # worth rendering).
+    class GenerationOutcome(models.TextChoices):
+        EXISTING = "existing"
+        STALE = "stale"
+        DENIED = "denied"
+        INVALID_VERDICT = "invalid-verdict"
+        RESOLVED = "resolved"
+        MAX_LENGTH = "max-length"
+        NO_ENGINE = "no-engine"
+        BUSY = "busy"
+        FAILED = "failed"
+        DRIFT = "drift"
+
     unit = models.ForeignKey(
         "trans.Unit", on_delete=models.deletion.CASCADE, related_name="judge_verdicts"
     )
@@ -738,6 +758,10 @@ class JudgeVerdict(models.Model):
         related_name="judge_resolutions",
     )
     resolved_at = models.DateTimeField(null=True, blank=True)
+    generation_outcome = models.CharField(
+        max_length=20, choices=GenerationOutcome, blank=True
+    )
+    generation_outcome_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = gettext_lazy("Judge verdict")

@@ -1032,7 +1032,7 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
         ):
             accept_judge_candidate(candidate, request)
 
-    def test_accept_holds_fuzzy_consumes_candidate_and_queues_recheck(self) -> None:
+    def test_accept_translates_consumes_candidate_and_queues_recheck(self) -> None:
         self.enable_review()
         unit = self.get_unit()
         verdict = self.make_verdict(unit, "critical")
@@ -1041,7 +1041,7 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
         self.accept_as(candidate)
 
         refreshed = self.get_unit()
-        self.assertEqual(refreshed.state, STATE_FUZZY)
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
         self.assertEqual(refreshed.target, "Better translation\n")
         self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
         runs = JudgeRun.objects.filter(

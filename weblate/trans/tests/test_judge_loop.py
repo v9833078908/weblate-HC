@@ -39,6 +39,7 @@ from weblate.trans.judge_loop import (
     build_request,
     repair_targets,
     run_judge_batch,
+    unsupported_repair_language,
 )
 from weblate.trans.models.judge import (
     JudgeDeferral,
@@ -902,6 +903,65 @@ class JudgeLoopTest(ViewTestCase):
             )
         litellm_engine.assert_not_called()
 
+    def test_unsupported_repair_language_is_none_without_any_routing(self) -> None:
+        unit = self.get_unit()
+        self.enable_repair_engine()
+        with mock.patch(
+            "weblate.trans.judge_loop.MACHINERY", {"openrouter": mock.Mock()}
+        ):
+            self.assertIsNone(unsupported_repair_language([unit]))
+
+    def test_unsupported_repair_language_is_none_with_a_star_fallback(self) -> None:
+        unit = self.get_unit()
+        self.component.project.machinery_settings = {
+            "openrouter": {"key": "test", "routing": {"*": "vendor/model"}}
+        }
+        self.component.project.save(update_fields=["machinery_settings"])
+        with mock.patch(
+            "weblate.trans.judge_loop.MACHINERY", {"openrouter": mock.Mock()}
+        ):
+            self.assertIsNone(unsupported_repair_language([unit]))
+
+    def test_unsupported_repair_language_is_none_when_the_language_is_routed(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        code = unit.translation.language.code
+        self.component.project.machinery_settings = {
+            "openrouter": {"key": "test", "routing": {code: "vendor/model"}}
+        }
+        self.component.project.save(update_fields=["machinery_settings"])
+        with mock.patch(
+            "weblate.trans.judge_loop.MACHINERY", {"openrouter": mock.Mock()}
+        ):
+            self.assertIsNone(unsupported_repair_language([unit]))
+
+    def test_unsupported_repair_language_names_the_missing_language(self) -> None:
+        unit = self.get_unit()
+        code = unit.translation.language.code
+        self.component.project.machinery_settings = {
+            "openrouter": {"key": "test", "routing": {"zz": "vendor/model"}}
+        }
+        self.component.project.save(update_fields=["machinery_settings"])
+        with mock.patch(
+            "weblate.trans.judge_loop.MACHINERY", {"openrouter": mock.Mock()}
+        ):
+            self.assertEqual(unsupported_repair_language([unit]), code)
+
+    def test_unsupported_repair_language_is_none_for_an_unregistered_engine(
+        self,
+    ) -> None:
+        # configured_routed_engine() only reads the settings dict; an engine
+        # id it names but this instance never registered must not be
+        # diagnosed as a language-specific refusal either.
+        unit = self.get_unit()
+        self.component.project.machinery_settings = {
+            "openrouter": {"key": "test", "routing": {"zz": "vendor/model"}}
+        }
+        self.component.project.save(update_fields=["machinery_settings"])
+        with mock.patch("weblate.trans.judge_loop.MACHINERY", {}):
+            self.assertIsNone(unsupported_repair_language([unit]))
+
     def test_no_seat_may_lower_the_other(self) -> None:
         _, verdict, _ = self.run_batch([MAJOR, PASS])
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
@@ -1403,6 +1463,35 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdicts.repair_status[unit.id], "no-candidate")
         # A refusal is not drift: the critical verdict still stands.
         self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.REJECT)
+
+    @http_mock.activate
+    def test_an_incomplete_routing_map_is_no_engine_for_language_with_no_paid_call(
+        self,
+    ) -> None:
+        # ruff: ignore[import-outside-top-level]
+        from weblate_customization.machinery import RoutedLLMTranslation
+
+        unit = self.get_unit()
+        code = unit.translation.language.code
+        self.component.project.machinery_settings = {
+            "openrouter": {"key": "test", "routing": {"zz": "vendor/model"}}
+        }
+        self.component.project.save(update_fields=["machinery_settings"])
+        client = mock_request_verdicts([[CRITICAL], [CRITICAL]])
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.MACHINERY",
+                {"openrouter": RoutedLLMTranslation},
+            ),
+        ):
+            verdicts = run_judge_batch([unit], writable_ids=set(), user=self.user)
+        self.assertEqual(verdicts.repair_status[unit.id], "no-engine-for-language")
+        self.assertEqual(verdicts.unsupported_repair_languages, {code})
+        self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.REJECT)
+        self.assertEqual(self._candidates(unit).count(), 0)
+        # No chat-completion request was ever attempted for the repair.
+        self.assertEqual(len(http_mock.calls), 0)
 
     def test_a_fresh_verdict_rebinds_an_identical_candidate(self) -> None:
         self.enable_repair_engine()

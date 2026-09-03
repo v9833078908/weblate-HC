@@ -40,6 +40,7 @@ from weblate.trans.models.judge import (
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.models.suggestion import Suggestion
 from weblate.trans.models.unit import Unit
+from weblate.trans.tasks import generate_judge_candidate
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.views.basic import _judge_hand_off_blocked
 from weblate.utils.state import (
@@ -2001,6 +2002,31 @@ class JudgeRunReportViewTest(ViewTestCase):
         self.assertEqual(response.context["page_obj"].paginator.count, 1)
         self.assertContains(response, "cached")
 
+    def test_no_engine_for_language_warning_renders_once_for_many_strings(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        run.warnings = [
+            (
+                "No repair engine is configured for ru; strings needing a repair "
+                "candidate in this language were left without one."
+            )
+        ]
+        run.save(update_fields=["warnings"])
+        for index in range(3):
+            self.add_row(
+                run,
+                unit_id_snapshot=900010 + index,
+                outcome=JudgeRunUnit.Outcome.CRITICAL,
+                repair_status=JudgeRunUnit.RepairStatus.NO_ENGINE_FOR_LANGUAGE,
+            )
+
+        response = self.client.get(self.report_url(run))
+
+        self.assertContains(response, "No repair engine is configured for ru", count=1)
+        self.assertContains(response, "No Engine For Language", count=3)
+
     def test_refused_run_shows_the_refusal_and_no_unparsed_row(self) -> None:
         self.enable_review()
         run = self.create_run(status=JudgeRun.Status.FAILED)
@@ -2207,7 +2233,11 @@ class JudgeProducerTriageViewTest(ViewTestCase):
         role = Role.objects.create(name="Producer triage")
         for codename in codenames:
             role.permissions.add(Permission.objects.get(codename=codename))
-        group = Group.objects.create(name="Producer triagers")
+        group = Group.objects.create(
+            name="Producer triagers",
+            project_selection=SELECTION_ALL,
+            language_selection=SELECTION_ALL,
+        )
         group.roles.add(role)
         self.user.groups.add(group)
         self.user.clear_permissions_cache()
@@ -2497,6 +2527,77 @@ class JudgeProducerTriageViewTest(ViewTestCase):
         )
         self.assertContains(response, "generation has been queued", status_code=200)
 
+    def test_unit_page_shows_the_failure_line_after_an_async_failure(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.component.project.machinery_settings = {}
+        self.component.project.save(update_fields=["machinery_settings"])
+        with mock.patch("weblate.trans.judge_loop.repair_targets") as repair:
+            outcome = generate_judge_candidate(
+                unit_id=unit.pk,
+                verdict_id=verdict.pk,
+                user_id=self.user.pk,
+                replace=False,
+            )
+        repair.assert_not_called()
+        self.assertEqual(outcome, "no-engine")
+
+        response = self.client.get(unit.get_absolute_url())
+
+        self.assertContains(
+            response, "No repair engine is configured for this language."
+        )
+        self.assertIsNone(response.context["judge_candidate"])
+        self.assertFalse(response.context["judge_generation_pending"])
+        self.assertNotContains(response, 'data-judge-pending="1"')
+
+    def test_unit_page_shows_no_outcome_line_after_a_successful_generation(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
+        with mock.patch(
+            "weblate.trans.judge_loop.repair_targets",
+            return_value={unit.pk: ["better translation"]},
+        ):
+            outcome = generate_judge_candidate(
+                unit_id=unit.pk,
+                verdict_id=verdict.pk,
+                user_id=self.user.pk,
+                replace=False,
+            )
+        self.assertEqual(outcome, "generated")
+
+        response = self.client.get(unit.get_absolute_url())
+
+        self.assertIsNotNone(response.context["judge_candidate"])
+        self.assertEqual(response.context["judge_generation_outcome"], "")
+        self.assertNotContains(response, "did not return a usable fix")
+        self.assertNotContains(response, "not configured for this language")
+
+    def test_unit_page_shows_busy_as_pending_not_as_a_failure(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        with mock.patch("weblate.trans.judge_loop.repair_targets") as repair:
+            outcome = generate_judge_candidate(
+                unit_id=unit.pk,
+                verdict_id=verdict.pk,
+                user_id=self.user.pk,
+                replace=False,
+            )
+        repair.assert_not_called()
+        self.assertEqual(outcome, "busy")
+
+        response = self.client.get(unit.get_absolute_url())
+
+        self.assertEqual(response.context["judge_generation_outcome"], "busy")
+        self.assertTrue(response.context["judge_generation_pending"])
+        self.assertContains(response, "Generating a suggested fix")
+        self.assertNotContains(response, "did not return a usable fix")
+
     def test_generate_replace_bypasses_the_pending_gate(self) -> None:
         unit = self.get_unit()
         verdict = self.make_verdict(unit, "critical")
@@ -2584,7 +2685,7 @@ class JudgeProducerTriageViewTest(ViewTestCase):
         self.assertEqual(response.status_code, 405)
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
-    def test_accept_success_holds_fuzzy_queues_recheck_and_redirects(self) -> None:
+    def test_accept_success_translates_queues_recheck_and_redirects(self) -> None:
         unit = self.get_unit()
         verdict = self.make_verdict(unit, "critical")
         candidate = self.make_candidate(unit, verdict)
@@ -2601,9 +2702,131 @@ class JudgeProducerTriageViewTest(ViewTestCase):
             )
         self.assertContains(response, "suggested fix has been applied", status_code=200)
         refreshed = self.get_unit()
-        self.assertEqual(refreshed.state, STATE_FUZZY)
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
         self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
         self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 1)
+
+    def test_unit_page_renders_the_candidate_row_in_server_html(self) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        rows = tree.xpath(
+            '//tbody[@id="machinery-translations"]/tr[@data-judge-candidate="1"]'
+        )
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(len(row.xpath("./td")), 9)
+        forms = row.xpath(
+            f'.//form[@action="{reverse("judge-accept-candidate", kwargs={"pk": candidate.pk})}"]'
+        )
+        self.assertEqual(len(forms), 1)
+        self.assertEqual(
+            row.xpath('.//*[contains(@class, "js-copy-save-machinery")]'), []
+        )
+        self.assertEqual(row.xpath('.//*[contains(@class, "js-copy-machinery")]'), [])
+        self.assertContains(response, "Use suggested fix")
+
+    def test_candidate_row_absent_in_four_gated_scenarios(self) -> None:
+        # No stored candidate at all.
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        self.assertEqual(
+            html.fromstring(response.content).xpath('//tr[@data-judge-candidate="1"]'),
+            [],
+        )
+
+        # A candidate whose target hash no longer matches the live text.
+        second = self.get_unit(source="Thank you for using Weblate.")
+        second_verdict = self.make_verdict(second, "critical")
+        self.make_candidate(second, second_verdict)
+        second.translate(self.user, ["Drifted away"], STATE_TRANSLATED)
+        response = self.client.get(
+            self.get_unit(source="Thank you for using Weblate.").get_absolute_url()
+        )
+        self.assertEqual(
+            html.fromstring(response.content).xpath('//tr[@data-judge-candidate="1"]'),
+            [],
+        )
+
+        # A queued re-check on a unit that still has a fresh candidate.
+        third = self.get_unit(source="Hello, world!\n", language="de")
+        third_verdict = self.make_verdict(third, "critical")
+        self.make_candidate(third, third_verdict)
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-recheck"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.client.post(reverse("judge-recheck", kwargs={"pk": third.pk}))
+        response = self.client.get(third.get_absolute_url())
+        self.assertEqual(
+            html.fromstring(response.content).xpath('//tr[@data-judge-candidate="1"]'),
+            [],
+        )
+
+        # The unit is on the deterministic max-length path.
+        fourth = self.get_unit(source="Hello, world!\n", language="it")
+        fourth.translate(self.user, ["A longer translated target"], STATE_TRANSLATED)
+        fourth = Unit.objects.get(pk=fourth.pk)
+        fourth.extra_flags = "max-length:5"
+        fourth.save(update_fields=["extra_flags"])
+        fourth.run_checks()
+        fourth_verdict = self.make_verdict(fourth, "critical")
+        self.make_candidate(fourth, fourth_verdict)
+        response = self.client.get(fourth.get_absolute_url())
+        self.assertEqual(
+            html.fromstring(response.content).xpath('//tr[@data-judge-candidate="1"]'),
+            [],
+        )
+
+    def test_candidate_row_absent_without_machinery_view_but_card_accept_still_works(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        candidate = self.make_candidate(unit, verdict)
+        self.user.is_superuser = False
+        self.user.save(update_fields=["is_superuser"])
+        self.user.groups.clear()
+        role = Role.objects.create(name="Card-only triage")
+        for codename in ("unit.review", "translation.auto"):
+            role.permissions.add(Permission.objects.get(codename=codename))
+        group = Group.objects.create(
+            name="Card-only triagers",
+            project_selection=SELECTION_ALL,
+            language_selection=SELECTION_ALL,
+        )
+        group.roles.add(role)
+        self.user.groups.add(group)
+        self.user.clear_permissions_cache()
+
+        response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, 'data-load="machinery"')
+        self.assertEqual(
+            html.fromstring(response.content).xpath('//tr[@data-judge-candidate="1"]'),
+            [],
+        )
+
+        with (
+            mock.patch(
+                "weblate.trans.tasks.auto_translate.delay",
+                return_value=SimpleNamespace(id="task-1"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            accept_response = self.client.post(
+                reverse("judge-accept-candidate", kwargs={"pk": candidate.pk}),
+                follow=True,
+            )
+        self.assertContains(
+            accept_response, "suggested fix has been applied", status_code=200
+        )
+        self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
 
     def test_accept_stale_target_shows_error_and_keeps_candidate(self) -> None:
         unit = self.get_unit()

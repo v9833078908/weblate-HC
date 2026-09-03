@@ -341,7 +341,16 @@
 
       increaseLoading("machinery");
       this.machinery.setState({ translations: [] });
-      document.getElementById("machinery-translations").replaceChildren();
+      const machineryTranslations = document.getElementById(
+        "machinery-translations",
+      );
+      const judgeCandidateRow = machineryTranslations.querySelector(
+        '[data-judge-candidate="1"]',
+      );
+      machineryTranslations.replaceChildren();
+      if (judgeCandidateRow) {
+        machineryTranslations.append(judgeCandidateRow);
+      }
       fetch(form.getAttribute("action"), {
         method: "POST",
         credentials: "same-origin",
@@ -461,7 +470,7 @@
 
     const translationRows = childRows(
       document.getElementById("machinery-translations"),
-    );
+    ).filter((row) => !row.dataset.judgeCandidate);
 
     translationRows.forEach((row, idx) => {
       const numberEl = row.querySelector(".machinery-number");
@@ -910,6 +919,9 @@
 
         /* This is the merging and insert sort logic */
         for (const row of childRows(translationsEl)) {
+          if (row.dataset.judgeCandidate) {
+            continue;
+          }
           const base = getRawData(row);
           if (
             base.text === translation.text &&

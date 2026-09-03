@@ -25517,6 +25517,9 @@ msgstr "Предложенное исправление"
 msgid "Use suggested fix"
 msgstr "Принять исправление"
 
+msgid "The suggested fix has been applied; one judge re-check has been queued."
+msgstr "Исправление принято; поставлена в очередь одна перепроверка судьёй."
+
 msgid "Generate suggested fix"
 msgstr "Сгенерировать исправление"
 
@@ -25585,6 +25588,32 @@ msgstr "Оставить текущий текст как есть."
 
 msgid "Re-check this string with the judge."
 msgstr "Перепроверить строку судьёй."
+
+msgid "The model did not return a usable fix. Try again."
+msgstr "Модель не вернула пригодного исправления. Попробуйте ещё раз."
+
+msgid "No repair engine is configured for this language."
+msgstr "Движок исправлений не настроен для этого языка."
+
+msgid "This string fails a length check: a fix is derived automatically."
+msgstr "Строка не проходит по длине: исправление подбирается автоматически."
+
+msgid "You do not have permission to generate a fix."
+msgstr "Нет прав на генерацию исправления."
+
+msgid "The verdict is no longer current for this string."
+msgstr "Вердикт больше не актуален для этой строки."
+
+msgid "The string changed during generation; the fix was discarded."
+msgstr "Строка изменилась во время генерации; исправление отброшено."
+
+#, python-format
+msgid ""
+"No repair engine is configured for %(language)s; strings needing a repair "
+"candidate in this language were left without one."
+msgstr ""
+"Для языка %(language)s не настроен движок исправлений; строки, которым "
+"требовалось исправление на этом языке, остались без него."
 
 #: weblate/templates/snippets/judge-readiness.html:6
 msgid "AI judge"

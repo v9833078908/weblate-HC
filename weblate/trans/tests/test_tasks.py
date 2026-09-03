@@ -775,6 +775,51 @@ class JudgeCandidateGenerationTest(ComponentTestCase):
         self.assertEqual(refreshed.target.strip(), "concurrent edit")
         self.assertEqual(refreshed.suggestion_set.count(), 0)
 
+    def test_failure_outcome_is_persisted_on_the_verdict(self) -> None:
+        unit, verdict = self.critical_verdict()
+        self.project.machinery_settings = {}
+        self.project.save(update_fields=["machinery_settings"])
+        before = timezone.now()
+        with mock.patch("weblate.trans.judge_loop.repair_targets") as repair:
+            self.assertEqual(self.outcome(unit, verdict), "no-engine")
+        repair.assert_not_called()
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.generation_outcome, "no-engine")
+        self.assertGreaterEqual(verdict.generation_outcome_at, before)
+
+    def test_generated_outcome_clears_any_stored_generation_outcome(self) -> None:
+        unit, verdict = self.critical_verdict()
+        self.project.machinery_settings = {}
+        self.project.save(update_fields=["machinery_settings"])
+        self.assertEqual(self.outcome(unit, verdict), "no-engine")
+        self.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.project.save(update_fields=["machinery_settings"])
+        with mock.patch(
+            "weblate.trans.judge_loop.repair_targets",
+            return_value={unit.pk: ["better translation"]},
+        ):
+            self.assertEqual(self.outcome(unit, verdict), "generated")
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.generation_outcome, "")
+        self.assertIsNone(verdict.generation_outcome_at)
+
+    def test_busy_outcome_is_persisted_without_touching_the_unit(self) -> None:
+        unit, verdict = self.critical_verdict()
+        cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        before = timezone.now()
+        with mock.patch("weblate.trans.judge_loop.repair_targets") as repair:
+            self.assertEqual(self.outcome(unit, verdict), "busy")
+        repair.assert_not_called()
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.generation_outcome, "busy")
+        self.assertGreaterEqual(verdict.generation_outcome_at, before)
+        self.assertEqual(
+            Unit.objects.get(pk=unit.pk)
+            .suggestion_set.filter(userdetails__kind="judge-repair")
+            .count(),
+            0,
+        )
+
 
 class JudgeDeferralCleanupTest(ComponentTestCase):
     """The observability cleanup prunes only expired closed deferrals."""

@@ -7,11 +7,11 @@
 producer opens the string, and make its absence explain itself instead of
 looking like a page that does nothing.
 
-**Status:** proposed on 2026-09-03 and reviewed against the code the same
-day. Four tasks, none started. The acceptance semantics of Task 4 were
-decided on 2026-09-03 (decision 1); its label, its gating and its third JS
-collision come from that review (decisions 6-7). The plan is not approved
-for implementation yet.
+**Status:** implemented on 2026-09-03 in worktree
+`feat/candidate-readiness-and-repair-visibility`, all four tasks done and
+verified. The acceptance semantics of Task 4 were decided on 2026-09-03
+(decision 1); its label, its gating and its third JS collision come from that
+review (decisions 6-7). The implementation is not merged or deployed yet.
 
 **Origin:** a producer pressed :guilabel:`Сгенерировать исправление` on
 `need-for-greed/orders/ru`, navigated away, came back, and found the card

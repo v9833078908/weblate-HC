@@ -1445,6 +1445,11 @@ def _judge_view_context(
             judge_current_verdict is not None
             and generation_pending(unit.pk, judge_current_verdict.pk)
         ),
+        "judge_generation_outcome": (
+            judge_current_verdict.generation_outcome
+            if judge_current_verdict is not None
+            else ""
+        ),
         "judge_can_triage": judge_can_triage,
         "judge_active_verdict": judge_active_verdict,
         "judge_active_max_length": judge_active_max_length,
@@ -2098,7 +2103,9 @@ def judge_accept_candidate(request: AuthenticatedHttpRequest, pk):
 
     messages.success(
         request,
-        gettext("The suggested fix has been applied and held for a fresh re-check."),
+        gettext(
+            "The suggested fix has been applied; one judge re-check has been queued."
+        ),
     )
     # Auto-advance only on success (Task 8): applying the candidate is a
     # completed decision, so the producer moves on to the next string.

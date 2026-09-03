@@ -318,39 +318,82 @@ class RoutedLLMTranslation(OpenAITranslation):
             "json_schema": {
                 "name": "translations",
                 "schema": {
-                    "type": "array",
-                    "minItems": count,
-                    "maxItems": count,
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "id": {"type": "string"},
-                            "parts": {
-                                "type": "array",
-                                "minItems": 1,
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "type": {
-                                            "type": "string",
-                                            "enum": ["text", "placeholder"],
+                    "type": "object",
+                    "properties": {
+                        "translations": {
+                            "type": "array",
+                            "minItems": count,
+                            "maxItems": count,
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string"},
+                                    "parts": {
+                                        "type": "array",
+                                        "minItems": 1,
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "type": {
+                                                    "type": "string",
+                                                    "enum": ["text", "placeholder"],
+                                                },
+                                                "text": {"type": "string"},
+                                                "id": {"type": "string"},
+                                                "kind": {"type": "string"},
+                                                "role": {"type": "string"},
+                                                "close_id": {"type": "string"},
+                                                "translatable": {"type": "boolean"},
+                                            },
+                                            "required": ["type", "text"],
                                         },
-                                        "text": {"type": "string"},
-                                        "id": {"type": "string"},
-                                        "kind": {"type": "string"},
-                                        "role": {"type": "string"},
-                                        "close_id": {"type": "string"},
-                                        "translatable": {"type": "boolean"},
                                     },
-                                    "required": ["type", "text"],
                                 },
+                                "required": ["id", "parts"],
                             },
                         },
-                        "required": ["id", "parts"],
                     },
+                    "required": ["translations"],
+                    "additionalProperties": False,
                 },
             },
         }
+
+    def _parse_llm_translations(
+        self,
+        translations_string: str | None,
+        sources: list[tuple[str, Unit | None]],
+        source_occurrences: list[int] | None,
+        *,
+        string_ids: list[str],
+    ) -> DownloadMultipleTranslations:
+        """
+        Unwrap the object envelope before the base parser runs.
+
+        The schema now declares ``{"translations": [...]}`` (an object,
+        which OpenAI-family providers require), but a provider that still
+        answers with the bare array this schema shipped before keeps
+        working: only a dict carrying a list under ``translations`` is
+        unwrapped, everything else reaches the base parser unchanged.
+        """
+        return super()._parse_llm_translations(
+            self._unwrap_reply_envelope(translations_string),
+            sources,
+            source_occurrences,
+            string_ids=string_ids,
+        )
+
+    @staticmethod
+    def _unwrap_reply_envelope(translations_string: str | None) -> str | None:
+        if not translations_string:
+            return translations_string
+        try:
+            parsed = json.loads(translations_string)
+        except json.JSONDecodeError:
+            return translations_string
+        if isinstance(parsed, dict) and isinstance(parsed.get("translations"), list):
+            return json.dumps(parsed["translations"])
+        return translations_string
 
 
 class RoutedLiteLLMTranslation(RoutedLLMTranslation):
