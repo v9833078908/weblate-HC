@@ -3273,33 +3273,28 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         # normal editor access is untouched
         self.assertContains(response, 'name="target_0"')
 
-    def test_no_candidate_shows_generate_and_resolution(self) -> None:
+    def test_no_candidate_offers_no_paid_generation(self) -> None:
+        # The on-demand paid generate button was removed: on a no-candidate
+        # string the producer accepts a variant from the Automatic
+        # suggestions tab instead, so the card only carries the decision.
         unit = self.get_unit()
         self.make_verdict(unit, "critical")
         response = self.client.get(unit.get_absolute_url())
         card = html.fromstring(response.content).get_element_by_id("id_judge_card")
         card_html = html.tostring(card, encoding="unicode")
-        self.assertIn("Generate suggested fix", card_html)
+        self.assertNotIn("Generate suggested fix", card_html)
+        self.assertNotIn("judge-generate-candidate", card_html)
         self.assertIn("Keep as is", card_html)
         self.assertNotIn("Use suggested fix", card_html)
-        self.assertEqual(card_html.count("btn-primary"), 1)
         self.assertLess(card_html.index("Keep as is"), card_html.index("More actions"))
         # The card no longer links to the machinery tab in any state; the
         # automatic suggestions entry lives under the More dropdown instead.
         self.assertNotIn("Computer-aided translation suggestions", card_html)
 
-    # -- Task 15: paid-request hints and triage keyboard shortcuts ---------
+    # -- Task 15 revisited: the paid-request hint was removed from the UI --
 
-    def test_paid_hint_on_paid_buttons(self) -> None:
-        """Only the three LLM-calling buttons carry the paid-request hint."""
-
-        def assert_paid(tree, text: str) -> None:
-            button = tree.xpath(f'//button[normalize-space(text())="{text}"]')[0]
-            self.assertEqual(button.get("title"), "Paid model request")
-            small = button.getnext()
-            self.assertIsNotNone(small)
-            self.assertEqual(small.tag, "small")
-            self.assertEqual(small.text, "Paid model request")
+    def test_no_button_carries_a_paid_request_hint(self) -> None:
+        """No judge-card button advertises itself as a paid model request."""
 
         def assert_free(tree, text: str) -> None:
             button = tree.xpath(f'//button[normalize-space(text())="{text}"]')[0]
@@ -3314,15 +3309,15 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         unit = self.get_unit()
         verdict = self.make_verdict(unit, "critical")
         response = self.client.get(unit.get_absolute_url())
-        tree = html.fromstring(response.content)
-        assert_paid(tree, "Generate suggested fix")
-        assert_free(tree, "Keep as is")
+        self.assertNotContains(response, "Paid model request")
+        assert_free(html.fromstring(response.content), "Keep as is")
 
         self.make_candidate(unit, verdict)
         response = self.client.get(unit.get_absolute_url())
+        self.assertNotContains(response, "Paid model request")
         tree = html.fromstring(response.content)
-        assert_paid(tree, "Generate another")
-        assert_paid(tree, "Re-check this string")
+        assert_free(tree, "Generate another")
+        assert_free(tree, "Re-check this string")
         assert_free(tree, "Use suggested fix")
         self.assertContains(response, "Accepting queues one judge re-check.")
 
@@ -3350,15 +3345,20 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         self.grant_only(["unit.review", "translation.auto"])
         self.assertFalse(self.user.has_perm("machinery.view", unit.translation))
         response = self.client.get(unit.get_absolute_url())
-        self.assertContains(response, "Generate suggested fix")
         # Without machinery.view neither the card nor the More dropdown
-        # offers the automatic suggestions entry.
+        # offers the automatic suggestions entry - and the card no longer
+        # offers a paid generate button as a substitute either.
         self.assertNotContains(response, "Computer-aided translation suggestions")
+        self.assertNotContains(response, "Generate suggested fix")
 
-    def test_generation_pending_hides_generate_button(self) -> None:
+    def test_generation_pending_still_reports_itself(self) -> None:
+        # A generation started elsewhere (backfill, or a replace from More
+        # actions) is the only way this state is reached now, but it must
+        # still say so instead of leaving the card silent.
         unit = self.get_unit()
         verdict = self.make_verdict(unit, "critical")
         cache.add(_generation_lock_key(unit.pk, verdict.pk), "1", timeout=60)
+        self.addCleanup(cache.delete, _generation_lock_key(unit.pk, verdict.pk))
         response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "Generating a suggested fix")
         self.assertNotContains(response, "Generate suggested fix<")

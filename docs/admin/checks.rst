@@ -191,11 +191,17 @@ visible as ``judge-note``; no action is expected.
 A fresh, unresolved ``critical`` or ``major`` on a writable string gets one
 stored, previewable repair candidate through the project's configured
 machine translation engine - a suggestion, never an automatic edit to the
-string. The verdict card shows the candidate's diff and provenance;
-:guilabel:`Use suggested fix` applies it, holding the string at
-:ref:`needs editing <states>` until a fresh, producer-triggered one-string
-re-check confirms it, and :guilabel:`Generate another` discards it for a
-new attempt. The one exception is a string with an active ``max-length``
+string. The verdict card shows the candidate's diff and provenance, and
+the same candidate is also offered as the first row of the
+:guilabel:`Automatic suggestions` tab. :guilabel:`Use suggested fix`
+applies it, leaving the string :ref:`translated <states>` and queueing one
+fresh producer-triggered re-check that can hold it again if it disagrees;
+:guilabel:`Generate another` discards it for a new attempt. The card
+offers no on-demand generate button for a string that has no candidate at
+all: that backlog is filled by :wladmin:`judge_backfill_candidates`, and a
+producer otherwise accepts a machine-translation variant from the
+:guilabel:`Automatic suggestions` tab. The one exception is a string with
+an active ``max-length``
 check: only editing the stored text can satisfy that check, so it keeps
 the repair-then-rejudge behavior instead and never gets a candidate. Either
 way, an unresolved ``major`` or ``critical`` stays in the human queue,

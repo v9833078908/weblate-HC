@@ -150,21 +150,14 @@
             <p class="list-group-item-text text-muted">{% translate "Accepting queues one judge re-check." %}</p>
           {% endif %}
         </div>
-      {% elif judge_active_verdict %}
+      {% elif judge_active_verdict and judge_generation_pending %}
+        {# The producer asks for a fix in the Automatic suggestions tab, not
+           here: a paid on-demand generate button was removed because the
+           machinery tab already offers an acceptable variant for almost
+           every string. Only an in-flight generation (backfill, or a
+           replace from More actions) still reports itself. #}
         <div class="list-group-item check">
-          {% if judge_generation_pending %}
-            <p class="list-group-item-text">{% translate "Generating a suggested fix…" %}</p>
-          {% elif judge_can_triage %}
-            <form method="post"
-                  action="{% url 'judge-generate-candidate' pk=judge_current_verdict.pk %}">
-              {% csrf_token %}
-              <input type="hidden" name="next" value="{{ this_unit_url }}" />
-              <button type="submit"
-                      class="btn btn-primary"
-                      title="{% translate "Paid model request" %}">{% translate "Generate suggested fix" %}</button>
-              <small class="text-muted">{% translate "Paid model request" %}</small>
-            </form>
-          {% endif %}
+          <p class="list-group-item-text">{% translate "Generating a suggested fix…" %}</p>
         </div>
       {% endif %}
       {% if judge_generation_outcome and not judge_generation_pending %}
@@ -222,8 +215,7 @@
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ this_unit_url }}" />
                     <input type="hidden" name="replace" value="1" />
-                    <button type="submit" class="btn btn-link" title="{% translate "Paid model request" %}">{% translate "Generate another" %}</button>
-                    <small class="text-muted">{% translate "Paid model request" %}</small>
+                    <button type="submit" class="btn btn-link">{% translate "Generate another" %}</button>
                   </form>
                 {% endif %}
               {% endif %}
@@ -251,8 +243,7 @@
                       id="id_judge_recheck_form">
                   {% csrf_token %}
                   <input type="hidden" name="next" value="{{ this_unit_url }}" />
-                  <button type="submit" class="btn btn-link" title="{% translate "Paid model request" %}">{% translate "Re-check this string" %}</button>
-                  <small class="text-muted">{% translate "Paid model request" %}</small>
+                  <button type="submit" class="btn btn-link">{% translate "Re-check this string" %}</button>
                 </form>
               {% endif %}
             </details>
@@ -269,8 +260,7 @@
                 id="id_judge_recheck_form">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ this_unit_url }}" />
-            <button type="submit" class="btn btn-link" title="{% translate "Paid model request" %}">{% translate "Re-check this string" %}</button>
-            <small class="text-muted">{% translate "Paid model request" %}</small>
+            <button type="submit" class="btn btn-link">{% translate "Re-check this string" %}</button>
           </form>
         </div>
       {% endif %}
@@ -303,8 +293,7 @@
                   id="id_judge_recheck_form">
               {% csrf_token %}
               <input type="hidden" name="next" value="{{ this_unit_url }}" />
-              <button type="submit" class="btn btn-link" title="{% translate "Paid model request" %}">{% translate "Re-check this string" %}</button>
-              <small class="text-muted">{% translate "Paid model request" %}</small>
+              <button type="submit" class="btn btn-link">{% translate "Re-check this string" %}</button>
             </form>
           {% endif %}
         </div>

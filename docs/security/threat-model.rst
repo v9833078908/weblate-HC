@@ -127,13 +127,17 @@ Scope and intended use
        stores no candidate at all. Applying it
        (:guilabel:`Use suggested fix`) is a separate CSRF-protected POST
        requiring both :guilabel:`unit.review` and automatic-translation
-       permission together (stronger than plain suggestion acceptance),
-       writes the string to Fuzzy, is refused under the same
-       stale/superseded/already-resolved guard, and makes no outbound
-       request itself. Producer-triggered candidate (re)generation and a
-       one-string re-check are each a separate CSRF-protected POST gated by
-       the same two permissions, and neither can be aimed at more than the
-       one requesting string. Deduplication is scoped to work already in
+       permission together (stronger than plain suggestion acceptance), is
+       refused under the same stale/superseded/already-resolved guard,
+       writes the string to Translated, and makes no outbound request
+       itself. Candidate
+       regeneration (:guilabel:`Generate another`, offered only for a
+       string that already has a candidate) and a one-string re-check are
+       each a separate CSRF-protected POST gated by the same two
+       permissions, and neither can be aimed at more than the one
+       requesting string; the card offers no on-demand generate button for
+       a string with no candidate, so that path cannot be reached from the
+       string page at all. Deduplication is scoped to work already in
        flight - a cache lock for generation, a single queued or running
        capped run for re-check - so a double-click or a reloaded form cannot
        multiply outbound spend. A deliberate repeat after the previous

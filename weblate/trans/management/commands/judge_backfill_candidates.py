@@ -7,10 +7,10 @@ Backfill stored judge repair candidates for the existing REJECT/FLAG backlog.
 
 A unit judged REJECT or FLAG before the candidate-preview card existed (or
 whose candidate expired without anyone generating a fresh one) has no
-suggested fix to preview on the translate page: the producer sees only
-"Generate suggested fix" and has to spend the paid call themselves. This
-command finds that backlog and, only with ``--write``, spends exactly one
-paid repair call per unit to store a fresh candidate.
+suggested fix to preview on the translate page. The card offers no
+on-demand paid generate button, so this command is now the only way to
+fill that backlog: it finds those units and, only with ``--write``, spends
+exactly one paid repair call per unit to store a fresh candidate.
 
 Dry-run by default: prints the classification of every current, unresolved
 REJECT/FLAG unit in scope, and stores nothing. A unit that already has an
