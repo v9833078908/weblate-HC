@@ -1,0 +1,32 @@
+# Accepted glossary audit findings for need-for-greed.
+#
+# Both subjects are intentional homonyms of the ru-source migration: one
+# Russian term deliberately carries two renderings per language (a
+# transliteration and a translation), recorded in
+# docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md (R7).
+#
+# Only these are accepted. The collapsed-term findings the audit still
+# reports (скупщик/торговец, яйца/яйцо, лошадь/скакуха) are genuine
+# defects and must be fixed in the glossary, not baselined.
+duplicate-term	need-for-greed/glossary	bg	белоземье
+duplicate-term	need-for-greed/glossary	cs	белоземье
+duplicate-term	need-for-greed/glossary	de	белоземье
+duplicate-term	need-for-greed/glossary	de	сундук конунга
+duplicate-term	need-for-greed/glossary	en	белоземье
+duplicate-term	need-for-greed/glossary	en	сундук конунга
+duplicate-term	need-for-greed/glossary	es	белоземье
+duplicate-term	need-for-greed/glossary	fil	белоземье
+duplicate-term	need-for-greed/glossary	fr	белоземье
+duplicate-term	need-for-greed/glossary	hu	белоземье
+duplicate-term	need-for-greed/glossary	hu	сундук конунга
+duplicate-term	need-for-greed/glossary	id	белоземье
+duplicate-term	need-for-greed/glossary	it	белоземье
+duplicate-term	need-for-greed/glossary	lt	белоземье
+duplicate-term	need-for-greed/glossary	lv	белоземье
+duplicate-term	need-for-greed/glossary	nl	белоземье
+duplicate-term	need-for-greed/glossary	nl	сундук конунга
+duplicate-term	need-for-greed/glossary	pl	белоземье
+duplicate-term	need-for-greed/glossary	pt	белоземье
+duplicate-term	need-for-greed/glossary	ro	белоземье
+duplicate-term	need-for-greed/glossary	tr	белоземье
+duplicate-term	need-for-greed/glossary	tr	сундук конунга
