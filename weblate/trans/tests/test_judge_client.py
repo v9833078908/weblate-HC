@@ -2252,6 +2252,64 @@ class JudgeUsageLogTest(TestCase):
         JUDGE_REQUEST_SLEEP=0.0,
     )
     @http_mock.activate
+    def test_usage_prices_a_header_only_cost(self) -> None:
+        """LiteLLM reports the cost in a header, never in `usage`."""
+        payload = _reply(
+            [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+        )
+        payload["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=payload,
+            headers={"x-litellm-response-cost": "9.29943e-06"},
+        )
+
+        request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
+
+        self.assertEqual(
+            LLMUsageLog.objects.get(model="vendor/model-a").cost_usd,
+            Decimal("9.29943e-06"),
+        )
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_cost_field_wins_over_the_header(self) -> None:
+        """A provider that reports both is trusted on its own payload."""
+        payload = _reply(
+            [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+        )
+        payload["usage"] = {
+            "prompt_tokens": 11,
+            "completion_tokens": 7,
+            "cost": 0.0025,
+        }
+        http_mock.register(
+            "POST",
+            CHAT_URL,
+            json=payload,
+            headers={"x-litellm-response-cost": "9.29943e-06"},
+        )
+
+        request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
+
+        self.assertEqual(
+            LLMUsageLog.objects.get(model="vendor/model-a").cost_usd,
+            Decimal("0.0025"),
+        )
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
     def test_usage_leaves_a_mixed_batch_unattributed(self) -> None:
         payload = _reply(
             [

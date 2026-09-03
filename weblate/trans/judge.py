@@ -1014,6 +1014,7 @@ class _BatchResponse:
     elapsed_ms: int = 0
     retry_after: float | None = None
     transport_succeeded: bool = False
+    provider_cost: Decimal | None = None
 
 
 def _retry_after(headers: object) -> float | None:
@@ -1022,6 +1023,16 @@ def _retry_after(headers: object) -> float | None:
         return max(0.0, float(value)) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+# LiteLLM prices the call in a response header instead of `usage.cost`
+# (verified against hcbifrost 2026-09-03: `usage` carries only token counts).
+def _response_cost(headers: object) -> Decimal | None:
+    try:
+        value = cast("dict[str, str]", headers).get("x-litellm-response-cost")
+    except (AttributeError, TypeError):
+        return None
+    return parse_provider_cost(value)
 
 
 def _read_body(
@@ -1328,6 +1339,7 @@ def _post_response(
             int((time.monotonic() - started) * 1000),
             _retry_after(response.headers),
             200 <= response.status_code < 300,
+            _response_cost(response.headers),
         )
 
 
@@ -1427,8 +1439,12 @@ def _write_llm_usage(
     project_slug: str,
     batch: Sequence[JudgeRequest],
     request_attempt: JudgeRequestAttempt | None,
+    header_cost: Decimal | None = None,
 ) -> None:
     usage = _usage_values(payload)
+    reported_cost = parse_provider_cost(usage.get("cost"))
+    if reported_cost is None:
+        reported_cost = header_cost
     prompt_tokens = _usage_integer(usage.get("prompt_tokens"))
     completion_tokens = _usage_integer(usage.get("completion_tokens"))
     if not prompt_tokens and not completion_tokens:
@@ -1458,7 +1474,7 @@ def _write_llm_usage(
         completion_tokens=completion_tokens,
         total_tokens=_usage_integer(usage.get("total_tokens"))
         or (prompt_tokens + completion_tokens),
-        cost_usd=parse_provider_cost(usage.get("cost")),
+        cost_usd=reported_cost,
         response_id=str(payload.get("id") or ""),
         cached_tokens=_usage_integer(details.get("cached_tokens")),
         reasoning_tokens=_usage_integer(completion_details.get("reasoning_tokens")),
@@ -1538,11 +1554,14 @@ def _record_usage(
     project_slug: str,
     batch: Sequence[JudgeRequest],
     attempt: JudgeRequestAttempt | None,
+    header_cost: Decimal | None = None,
 ) -> None:
     if payload is None:
         return
     try:
-        _write_llm_usage(payload, service, model, project_slug, batch, attempt)
+        _write_llm_usage(
+            payload, service, model, project_slug, batch, attempt, header_cost
+        )
     except Exception:
         LOGGER.exception("Failed to record LLM usage")
 
@@ -1771,6 +1790,7 @@ def _run_batch(  # ruff: ignore[complex-structure]
                 project_slug,
                 batch,
                 cast("JudgeRequestAttempt | None", attempt),
+                response.provider_cost,
             )
         _log_attempt(
             response,
