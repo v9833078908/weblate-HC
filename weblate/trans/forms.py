@@ -282,7 +282,7 @@ TOOLBAR_TEMPLATE = """
 # never share a collapse target.
 COLLAPSIBLE_TOOLBAR_TEMPLATE = """
 <div class="float-end editor-toolbar">
-<button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#{0}" aria-expanded="false" aria-controls="{0}" title="{1}" tabindex="-1">…</button>
+<button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#{0}" aria-expanded="false" aria-controls="{0}" aria-label="{1}" title="{1}">…</button>
 <div class="collapse btn-toolbar" id="{0}">{2}</div>
 </div>
 """
@@ -807,10 +807,15 @@ class TranslationForm(UnitForm):
         if judged and user_can_edit and user_can_review and not unit.readonly:
             # A judged string takes its release state from the judge, not from
             # a human radio choice: the producer saves text, the re-check
-            # decides. An untouched approved string keeps its state on a no-op
-            # save; anything below translated is lifted to translated.
+            # decides. The hidden field posts the state the string already
+            # has, so a save that changes nothing never releases a string the
+            # judge is holding; perform_translation lifts changed text to
+            # translated and queues the re-check. An untranslated string has
+            # no state to keep, so it starts from translated.
             self.fields["review"].widget = forms.HiddenInput()
-            self.initial["review"] = max(unit.state, STATE_TRANSLATED)
+            self.initial["review"] = (
+                unit.state if unit.state >= STATE_FUZZY else STATE_TRANSLATED
+            )
             self.fields["review"].help_text = ""
 
     def clean(self) -> None:

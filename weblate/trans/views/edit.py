@@ -25,6 +25,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.html import format_html
+from django.utils.text import normalize_newlines
 from django.utils.translation import gettext, gettext_lazy, ngettext
 from django.views.decorators.http import require_GET, require_POST
 
@@ -912,12 +913,17 @@ def perform_translation(unit, form, request: AuthenticatedHttpRequest) -> bool:
     add_alternative = "add_alternative" in request.POST
 
     # A judged string takes its release state from the judge, not from a
-    # human radio choice: editing the text demotes anything above
-    # translated back to translated, and the re-check decides from there.
+    # human radio choice: changed text is always stored as translated (an
+    # approved string is demoted, a held one is lifted) and the queued
+    # re-check decides from there. A save that changes nothing keeps the
+    # state the judge left behind. The stored target is normalized the same
+    # way the posted one is, so a stray CRLF is not mistaken for an edit.
     judged = bool(latest_round(unit))
-    target_changed = form.cleaned_data["target"] != unit.get_target_plurals()
+    target_changed = form.cleaned_data["target"] != [
+        normalize_newlines(text) for text in unit.get_target_plurals()
+    ]
     state = form.cleaned_data["state"]
-    if judged and target_changed and state > STATE_TRANSLATED:
+    if judged and target_changed and not unit.readonly:
         state = STATE_TRANSLATED
 
     # Update explanation for glossary

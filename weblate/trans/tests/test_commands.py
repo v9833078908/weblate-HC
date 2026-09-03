@@ -1111,6 +1111,17 @@ class JudgeBackfillCandidatesCommandTest(ComponentTestCase):
                 "judge_backfill_candidates", "--all", "--write", "--user", "someone"
             )
 
+    def test_rejects_file_format_scope(self) -> None:
+        with self.assertRaises(CommandError):
+            call_command(
+                "judge_backfill_candidates",
+                "--file-format",
+                "po",
+                "--write",
+                "--user",
+                "someone",
+            )
+
 
 class WeblateComponentCommandMixin:
     """Base class for handling tests of WeblateComponentCommand based commands."""

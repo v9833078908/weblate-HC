@@ -307,10 +307,12 @@
     const judgeCard = document.getElementById("id_judge_card");
     if (judgeCard && judgeCard.dataset.judgePending === "1") {
       window.setTimeout(() => {
-        const editors = document.querySelectorAll(
-          "textarea.translation-editor",
+        // Any draft the producer started - the translation itself, a
+        // comment, a glossary term - outranks the refresh.
+        const fields = document.querySelectorAll(
+          "textarea, input[type=text], input[type=search]",
         );
-        const untouched = Array.from(editors).every(
+        const untouched = Array.from(fields).every(
           (el) => el.value === el.defaultValue,
         );
         if (untouched) {

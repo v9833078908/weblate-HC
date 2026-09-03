@@ -2750,6 +2750,19 @@ class JudgeManualSaveTest(ViewTestCase):
         self.assertEqual(inputs[0].get("value"), str(STATE_TRANSLATED))
         self.assertNotContains(response, "not written to the translation file")
 
+    def test_review_hidden_field_keeps_a_held_state(self) -> None:
+        """The hidden field posts the state the judge left, not a promotion."""
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        response = self.client.get(unit.get_absolute_url())
+        tree = html.fromstring(response.content)
+        inputs = tree.xpath('//input[@name="review"]')
+        self.assertEqual(len(inputs), 1)
+        self.assertEqual(inputs[0].get("value"), str(STATE_FUZZY))
+
     def test_review_radios_shown_when_not_judged(self) -> None:
         self.grant_only(["unit.edit", "unit.review", "translation.auto"])
         self.project.commit_policy = 20
@@ -2769,6 +2782,44 @@ class JudgeManualSaveTest(ViewTestCase):
         # The stored target carries the source trailing newline, and that is
         # what the textarea posts back for an unchanged string.
         self.edit_unit("Hello, world!\n", "Ahoj\n", review=str(STATE_APPROVED))
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_APPROVED)
+        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 0)
+
+    def test_unchanged_save_keeps_a_held_fuzzy_string(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        self.edit_unit("Hello, world!\n", "Ahoj\n", review=str(STATE_FUZZY))
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_FUZZY)
+        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 0)
+
+    def test_manual_save_of_changed_text_lifts_a_held_string(self) -> None:
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        self.make_verdict(unit, "critical")
+        self.edit_unit("Hello, world!\n", "Nový cíl po opravě", review=str(STATE_FUZZY))
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_TRANSLATED)
+        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 1)
+
+    def test_crlf_target_is_not_mistaken_for_an_edit(self) -> None:
+        """A stored CRLF must not make an identical save look like a fix."""
+        self.grant_only(["unit.edit", "unit.review", "translation.auto"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj\r\nsvete"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj\r\nsvete"], STATE_APPROVED)
+        unit = self.get_unit()
+        self.assertEqual(unit.state, STATE_APPROVED)
+        self.assertEqual(unit.get_target_plurals(), ["Ahoj\r\nsvete\n"])
+        self.make_verdict(unit, "critical")
+        self.edit_unit("Hello, world!\n", "Ahoj\nsvete\n", review=str(STATE_APPROVED))
         unit = self.get_unit()
         self.assertEqual(unit.state, STATE_APPROVED)
         self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 0)
@@ -3400,6 +3451,16 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         response = self.client.get(unit.get_absolute_url())
         card = html.fromstring(response.content).get_element_by_id("id_judge_card")
         self.assertIsNone(card.get("data-judge-pending"))
+
+    def test_unparsed_card_marks_pending_recheck(self) -> None:
+        """The unparsed-round card self-refreshes while a re-check is running."""
+        unit = self.get_unit()
+        self.make_verdict(unit, "none", unparsed=True)
+        self._completed_recheck(unit)
+        response = self.client.get(unit.get_absolute_url())
+        card = html.fromstring(response.content).get_element_by_id("id_judge_card")
+        self.assertIn("was not parsed", html.tostring(card, encoding="unicode"))
+        self.assertEqual(card.get("data-judge-pending"), "1")
 
 
 @override_settings(

@@ -860,7 +860,11 @@ verdict is not part of the backlog and is not listed at all.
 
 .. weblate-admin-option:: --limit N
 
-   Stop after this many paid repair attempts.
+   Stop after this many paid repair attempts. Recommended on a large
+   backlog: without it every pending string is attempted in one run.
+
+A string whose generation raises is reported ``error`` on the standard error
+output and counted as a paid attempt; the run continues with the next one.
 
 Requires an explicit project or component argument; it never runs
 instance-wide.

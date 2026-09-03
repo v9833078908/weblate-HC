@@ -25480,7 +25480,7 @@ msgstr "Эскалировано на проверку"
 
 #: weblate/templates/snippets/judge-verdict.html:119
 msgid "Accepted as-is"
-msgstr "Принято как есть"
+msgstr "Оставлено как есть"
 
 #: weblate/templates/snippets/judge-verdict.html:144
 msgid "Record decision"
@@ -25558,6 +25558,11 @@ msgstr "Изменённый текст судья перепроверит ав
 
 msgid "The changed text has been queued for a judge re-check."
 msgstr "Изменённый текст поставлен в очередь на перепроверку судьёй."
+
+msgid "The changed text awaits a judge re-check by a user who may run it."
+msgstr ""
+"Изменённый текст ждёт перепроверки судьёй: её запустит пользователь с "
+"нужными правами."
 
 msgid "Relates to a previous version"
 msgstr "Относится к предыдущей версии"

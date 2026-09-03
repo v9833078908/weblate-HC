@@ -156,13 +156,21 @@ class Command(WeblateComponentCommand):
         for unit, verdict_id in pending:
             if limit is not None and paid_attempts >= limit:
                 break
-            outcome = generate_candidate_for_verdict(
-                unit_id=unit.pk, verdict_id=verdict_id, user=user, replace=False
-            )
-            tally[outcome] = tally.get(outcome, 0) + 1
-            self.stdout.write(f"{unit.pk} {unit.context} {outcome}")
-            if outcome in PAID_OUTCOMES:
+            try:
+                outcome = generate_candidate_for_verdict(
+                    unit_id=unit.pk, verdict_id=verdict_id, user=user, replace=False
+                )
+            except Exception as error:
+                # One unit must not strand the rest of the backlog, and the
+                # tally of what was already paid for must still be printed.
+                outcome = "error"
+                self.stderr.write(f"{unit.pk} {unit.context} error: {error}")
                 paid_attempts += 1
+            else:
+                self.stdout.write(f"{unit.pk} {unit.context} {outcome}")
+                if outcome in PAID_OUTCOMES:
+                    paid_attempts += 1
+            tally[outcome] = tally.get(outcome, 0) + 1
 
         summary = ", ".join(
             f"{count} {outcome}" for outcome, count in sorted(tally.items())

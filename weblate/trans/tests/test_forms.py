@@ -6,12 +6,53 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+from django.template.loader import render_to_string
 from django.test import SimpleTestCase
+from django.utils.safestring import SafeString
 from lxml import html
 
 from weblate.lang.models import Language
-from weblate.trans.forms import PluralTextarea
+from weblate.trans.forms import PluralTextarea, get_inherited_settings_label
 from weblate.trans.tests.test_views import ViewTestCase
+
+
+class FormRenderingTest(SimpleTestCase):
+    def test_icon_help_text_escapes_title_attribute(self) -> None:
+        # Safe help text must still be escaped when reused in an HTML attribute.
+        field = SimpleNamespace(
+            auto_id="id_fuzzy",
+            field=SimpleNamespace(help_as_icon=True),
+            help_text=SafeString(
+                'Quote "Needs editing" and <strong>HTML help text</strong>.'
+            ),
+        )
+
+        rendered = render_to_string(
+            "bootstrap5/layout/help_text.html", {"field": field}
+        )
+
+        self.assertIn(
+            'title="Quote &quot;Needs editing&quot; and '
+            '&lt;strong&gt;HTML help text&lt;/strong&gt;."',
+            rendered,
+        )
+        self.assertNotIn('title="Quote "Needs editing"', rendered)
+        self.assertNotIn("<strong>HTML help text</strong>", rendered)
+
+
+class InheritedSettingsLabelTest(SimpleTestCase):
+    def test_inherited_settings_labels_are_complete_translatable_strings(self) -> None:
+        self.assertEqual(
+            get_inherited_settings_label("workspace"), "Inherit from workspace"
+        )
+        self.assertEqual(
+            get_inherited_settings_label("project"), "Inherit from project"
+        )
+        self.assertEqual(
+            get_inherited_settings_label("category"), "Inherit from category"
+        )
 
 
 class ToolbarCollapseTest(ViewTestCase):
@@ -49,16 +90,37 @@ class ToolbarCollapseTest(ViewTestCase):
         self.assertContains(response, "data-value=")
 
 
-class RtlToggleOutsideCollapseTest(SimpleTestCase):
-    """The direction toggle changes the editor, not the text: never collapsed."""
+class RtlToolbarOutsideCollapseTest(ViewTestCase):
+    """RTL editor controls change the editor, not the text: never collapsed."""
 
-    def test_toolbar_rtl_toggle_outside_collapse(self) -> None:
+    def test_rtl_toolbar_outside_collapse(self) -> None:
+        unit = self.get_unit()
         widget = PluralTextarea()
-        rtl_html = str(
-            widget.get_rtl_toggle(Language(code="ar", direction="rtl"), "field")
+        widget.profile = self.user.profile
+        markup = widget.get_toolbar(
+            Language(code="ar", direction="rtl"), "field", unit, 0, unit.source
         )
-        self.assertIn("direction-toggle", rtl_html)
-        self.assertNotIn("collapse", rtl_html)
+        tree = html.fromstring(f"<div>{markup}</div>")
+        collapsed = tree.xpath(
+            '//div[contains(concat(" ", @class, " "), " collapse ")]'
+        )
+        self.assertEqual(len(collapsed), 1)
+        outside = [
+            button
+            for button in tree.xpath(
+                '//*[contains(concat(" ", @class, " "), " specialchar ")]'
+            )
+            if not button.xpath(
+                'ancestor::div[contains(concat(" ", @class, " "), " collapse ")]'
+            )
+        ]
+        # The RTL mark buttons stay reachable without opening the collapse.
+        self.assertTrue(outside)
+        self.assertTrue(
+            collapsed[0].xpath(
+                './/*[contains(concat(" ", @class, " "), " specialchar ")]'
+            )
+        )
 
     def test_rtl_toggle_absent_for_ltr_language(self) -> None:
         widget = PluralTextarea()

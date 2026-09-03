@@ -258,7 +258,9 @@
     </div>
   </div>
 {% elif judge_round %}
-  <div class="card" id="id_judge_card">
+  <div class="card"
+       id="id_judge_card"
+       {% if judge_recheck_pending %}data-judge-pending="1"{% endif %}>
     <div class="card-header">
       <h4 class="card-title">{% translate "AI judge verdict" %}</h4>
     </div>

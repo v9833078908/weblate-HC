@@ -33,10 +33,13 @@ chat on 2026-09-02 recorded below.
 (live inventory, the three scout reports, verified facts, and the full
 recommendation including the deferred waves).
 
-**Status:** waves 0 and 1 approved on 2026-09-02 (second round: every wave 0
-and wave 1 proposal, including the ones first parked as deferred); wave 2
-items approved individually (see "Waves"). Not started. Items outside the
-approved list are kept in "Deferred" at the end and need their own approval.
+**Status:** implemented on 2026-09-02 (waves 0-2, tasks 1-15) on branch
+`feat/producer-editor-pareto`; reviewed on 2026-09-03 and the review findings
+fixed in the same branch. Not deployed anywhere: Task 1 still needs a
+`./rundev.sh` recreate, Task 7 a `./rundev.sh compilemessages`, and Task 8 is
+approval-gated per run. The browser pass and the DOM action count of Task 9
+are still outstanding. Items outside the approved list are kept in "Deferred"
+at the end and need their own approval.
 
 **Out of scope:** Zen mode (the 2026-09-01 research decision "leave Zen
 untouched" stands), a persistent Producer/Advanced mode toggle, judge prompt or

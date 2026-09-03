@@ -539,7 +539,9 @@ class EditTest(ViewTestCase):
             f'{tabs_xpath}//li[contains(concat(" ", @class, " "), " dropdown ")]'
             '//a[contains(concat(" ", @class, " "), " dropdown-item ")]/@id'
         )
-        self.assertIn("toggle-translations", dropdown_ids)
+        for tab_id in ("toggle-translations", "toggle-machinery", "toggle-comments"):
+            self.assertIn(tab_id, dropdown_ids)
+            self.assertNotIn(tab_id, direct_ids)
 
     def test_suggestions_tab_direct_only_when_present(self) -> None:
         """Suggestions stays a direct item, but only when non-empty."""
@@ -699,8 +701,14 @@ class EditTest(ViewTestCase):
         self.assertNotIn("show", body.get("class", "").split())
 
     def test_string_info_card_shown_with_explanation(self) -> None:
-        """Any of explanation, labels or flags opens the card by default."""
-        unit = self.get_unit(self.source)
+        """The explanation alone opens the card, without labels or flags."""
+        if type(self) is not EditTest:
+            # Same reason as the collapsed case: self.source carries baked
+            # flags in the po fixture, which would open the card anyway.
+            self.skipTest("Verified once against the base po fixture")
+        unit = self.get_unit("Thank you for using Weblate.")
+        self.assertFalse(unit.all_flags)
+        self.assertFalse(unit.all_labels)
         unit.source_unit.update_explanation("Some explanation.", self.user)
         response = self.client.get(unit.get_absolute_url())
         tree = html.fromstring(response.content)
