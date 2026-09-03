@@ -34,7 +34,7 @@ from weblate.glossary.tasks import (
 )
 from weblate.lang.models import Language
 from weblate.trans.alerts.registry import update_alerts
-from weblate.trans.models import PendingUnitChange, Unit, Variant
+from weblate.trans.models import PendingUnitChange, Project, Unit, Variant
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.tests.utils import get_test_file
 from weblate.utils.hash import calculate_hash
@@ -1290,6 +1290,24 @@ class AuditGlossaryCommandTest(GlossaryTest):
     def test_unknown_project_fails_loudly(self) -> None:
         with self.assertRaises(CommandError):
             self.run_command(project="no-such-project")
+
+    def test_project_limits_the_audit(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "Yashchik", context="ui")
+        other = Project.objects.create(
+            name="Other",
+            slug="other",
+            web="https://nonexisting.weblate.org/",
+        )
+        other.scratch_create_component(
+            name="Other glossary",
+            slug="other-glossary",
+            source_language=self.component.source_language,
+            file_format="po",
+            is_glossary=True,
+        )
+
+        self.assertIn("no findings", self.run_command(project=other.slug))
 
     def test_the_audit_writes_nothing(self) -> None:
         self.add_term("Chest", "Sunduk", context="loot")
