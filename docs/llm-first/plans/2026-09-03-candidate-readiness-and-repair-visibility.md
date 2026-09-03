@@ -7,9 +7,11 @@
 producer opens the string, and make its absence explain itself instead of
 looking like a page that does nothing.
 
-**Status:** proposed on 2026-09-03. Four tasks, none started. The acceptance
-semantics of Task 4 were decided on 2026-09-03 (decision 1); the plan itself
-is not approved for implementation yet.
+**Status:** proposed on 2026-09-03 and reviewed against the code the same
+day. Four tasks, none started. The acceptance semantics of Task 4 were
+decided on 2026-09-03 (decision 1); its label, its gating and its third JS
+collision come from that review (decisions 6-7). The plan is not approved
+for implementation yet.
 
 **Origin:** a producer pressed :guilabel:`Сгенерировать исправление` on
 `need-for-greed/orders/ru`, navigated away, came back, and found the card
@@ -46,6 +48,8 @@ never broken; it was starved by configuration and silent about it.
 | 3 | The reply schema must be provider-portable | An OpenAI-family model in any routing entry currently breaks all machine translation and all repair for that language, silently |
 | 4 | A language with no usable routing entry is a configuration error, reported once | Not a per-string failure the producer has to interpret |
 | 5 | Backfill stays the only way to fill a historical gap | `judge_backfill_candidates` already exists; this plan does not re-judge anything |
+| 6 | The card keeps :guilabel:`Сгенерировать исправление`; the tab row is a second place to see the one candidate, not a second way to create one | `snippets/judge-verdict.html` renders generate and accept as mutually exclusive branches (`{% elif judge_candidate %}` at line 130, `{% elif judge_active_verdict %}` at line 153), so the generate button is visible exactly when no candidate exists - the state this plan exists to repair. Removing it would strand every `no-candidate` string with no way to ask for a fix. :guilabel:`Сгенерировать другой вариант` (line 206) stays the paired action for when a candidate is already there |
+| 7 | The row's button is labelled :guilabel:`Принять исправление`, never a bare :guilabel:`Принять` | The engine rows in the same table already carry :guilabel:`Принять` (`js-copy-save-machinery`, `full.js:815-817`), which only copies, saves and skips every guard. Two identically labelled buttons with different semantics in one table is the worst outcome available. The existing `Use suggested fix` -> `Принять исправление` msgid is reused, and the origin column says `AI judge` -> `ИИ-судья` |
 
 ## Invariants that stay
 
@@ -229,23 +233,52 @@ the string translated rather than held.
 
 - Modify: `weblate/templates/translate.html` (the `#machinery` pane,
   `tbody#machinery-translations` at line 543)
-- Modify: `weblate/trans/views/edit.py` (`_judge_view_context` already
-  resolves `judge_candidate`; the pane needs it in the template context)
 - Modify: `weblate/trans/judge_loop.py` (`accept_judge_candidate`:
-  `STATE_FUZZY` at line 2138 becomes `STATE_TRANSLATED`)
-- Modify: `weblate/static/editor/full.js` (`Machinery.render` merge loop and
-  the memory-search handler)
-- Modify: `weblate/locale/ru/LC_MESSAGES/django.po`
+  `STATE_FUZZY` at line 2138 becomes `STATE_TRANSLATED`, and the docstring
+  at line 2060, which states the old value)
+- Modify: `weblate/static/editor/full.js` (`Machinery.render` merge loop,
+  the memory-search handler, the hotkey numbering pass)
+- Modify: `weblate/locale/ru/LC_MESSAGES/django.po` only if a new msgid is
+  unavoidable; `Use suggested fix`, `Suggested fix` and `AI judge` are
+  already translated, and a needed entry is added by a targeted edit plus
+  `compilemessages`, never by a repository-wide `makemessages` run
 - Modify: `docs/guides/producer-guide-weblate.md`, `docs/changes.rst`
 - Tests: `weblate/trans/tests/test_judge_views.py`,
   `weblate/trans/tests/test_judge.py`, `weblate/trans/tests/test_edit.py`
+- No view change: `_judge_view_context` already resolves `judge_candidate`
+  (`views/edit.py:1442`) and the whole dict is merged into the
+  `translate.html` context by `**judge_context` (`views/edit.py:1573`), so
+  the pane reads `judge_candidate`, `judge_can_triage`,
+  `judge_recheck_pending` and `judge_active_max_length` as they are
 
 **The row.** Server-rendered inside `tbody#machinery-translations`, so it is
 present the moment the tab opens and costs no call - the text is already in
 the database. Columns reuse the existing table: target text, the diff against
 the current text (the card's own rendering, which the row can carry after all
 because it is server-side), an empty source column, the judge as origin, and
-no similarity. Marked `data-judge-candidate="1"`.
+no similarity. It must carry the same cell count as a JS-rendered row - nine
+`<td>` (`full.js:781-840`: target, diff, source diff, origin, similarity,
+clone, accept, approve-or-empty, delete-or-empty) - or the table skews the
+moment engine rows arrive. Marked `data-judge-candidate="1"`.
+
+**When the row renders.** Under `user_can_use_machinery` and
+`judge_can_triage`, and only while the card itself would show the candidate:
+`judge_candidate and not judge_recheck_pending and not
+judge_active_max_length`, mirroring the branch order in
+`snippets/judge-verdict.html:121-130`. Two consequences the acceptance
+criteria have to carry:
+
+- `machinery.view` gates the tab and the pane alike
+  (`translate.html:42,325,518`). A producer holding `unit.review` and
+  `translation.auto` but not `machinery.view` sees no tab at all, so the card
+  stays the only guaranteed acceptance path: the row is an addition, never a
+  replacement.
+- While a re-check is in flight the verdict behind the candidate is about to
+  change, and the card deliberately shows `Re-checking this string…` instead
+  of the candidate. `active_judge_candidate` (`judge_loop.py:1944-1979`) does
+  not cover this on its own: it hash-matches the candidate against the unit
+  and the current verdict, and a queued re-check changes neither, so the
+  template condition has to say so.
 
 **The action.** A form posting to `judge-accept-candidate`, the same endpoint
 the card uses - never the `js-copy-save-machinery` handler. `markTranslated`
@@ -265,16 +298,33 @@ changes". The card's :guilabel:`Принять исправление` gets the 
 two acceptance paths with different states would be worse than either
 choice.
 
-**Two JS collisions to handle, both in `full.js`:**
+**What the card keeps.** Both of its buttons, exactly where they are.
+Generate and accept are already mutually exclusive branches
+(`snippets/judge-verdict.html:130,153`), so the new row never sits next to a
+generate button for the same string; and on a `no-candidate` string - the
+case this plan exists for - the card's
+:guilabel:`Сгенерировать исправление` is the only way to ask for a fix at
+all (decision 6). Task 4 adds a second place to see one candidate, not a
+second candidate and not a second way to make one.
+
+**Three JS collisions to handle, all in `full.js`:**
 
 1. `Machinery.render` (line 904) walks every existing row through
    `getRawData(row)` and reads `base.quality`/`base.plural_forms` to merge
-   and insert-sort. A server-rendered row without that payload throws.
+   and insert-sort. `getRawData` returns `undefined` for a row without
+   `data-raw` (lines 38-40), so `base.text` at line 915 throws a TypeError.
    Skip rows carrying `data-judge-candidate` in the merge loop, and keep them
    first regardless of quality.
 2. The memory-search handler calls
    `document.getElementById("machinery-translations").replaceChildren()`
    (line 344), which would wipe the candidate row. Preserve it.
+3. `processMachineryResults` numbers every child row by index and writes
+   `data-machinery-key` (lines 466-490). The candidate row would take key
+   `1`, and the `Ctrl+M` then digit handler looks for `.js-copy-machinery`
+   inside the matched row and `break`s when it is absent (lines 377-386), so
+   the first hotkey slot would silently do nothing. Skip
+   `data-judge-candidate` rows in the numbering pass so the engine rows keep
+   `1`-`9`.
 
 **Acceptance:**
 
@@ -283,11 +333,18 @@ choice.
 - The row's only action posts to `judge-accept-candidate`; the accepted string
   ends in `STATE_TRANSLATED`, the candidate row is gone, one re-check is
   queued, and the Change carries the verdict and run ids.
-- A string with no stored candidate, and a string whose candidate is stale,
-  render no such row.
+- A string with no stored candidate, a string whose candidate no longer
+  hash-matches, a string with a queued re-check and a string on the
+  max-length path all render no such row.
+- A producer without `machinery.view` gets neither the tab nor the row, and
+  the card's own acceptance still works for them.
+- The row's button reads :guilabel:`Принять исправление`, the engine rows
+  keep :guilabel:`Принять`, and the row carries neither
+  `js-copy-save-machinery` nor `js-copy-machinery`.
 - A JS test or a browser pass shows machinery results loading around the
-  candidate row without throwing and without displacing it, and a memory
-  search leaving it in place.
+  candidate row without throwing and without displacing it, a memory search
+  leaving it in place, and `Ctrl+M` then `1` still reaching the first engine
+  row.
 - `docs/changes.rst` records the state change as a behaviour change, not as a
   UI tweak.
 
