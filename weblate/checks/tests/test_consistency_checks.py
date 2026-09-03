@@ -18,10 +18,10 @@ from weblate.checks.consistency import (
     SamePluralsCheck,
     TranslatedCheck,
 )
-from weblate.checks.models import Check
+from weblate.checks.models import CHECKS, Check
 from weblate.lang.models import Language
 from weblate.trans.actions import ActionEvents
-from weblate.trans.models import Unit
+from weblate.trans.models import Component, Translation, Unit
 from weblate.trans.tests.factories import make_unit
 from weblate.trans.tests.test_views import (
     ComponentTestCase,
@@ -418,3 +418,16 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
         unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Ahoj")
 
         self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_registered_and_reachable_through_run_checks(self) -> None:
+        self.assertIn("repeat-drift", CHECKS)
+        Component.objects.filter(project=self.project).update(
+            check_flags="repeat-drift"
+        )
+        translation = Translation.objects.get(pk=self.translation_1.pk)
+        self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(translation, "greet_outro", "Hello", "Nazdar")
+
+        second.run_checks()
+
+        self.assertIn("repeat-drift", second.all_checks_names)

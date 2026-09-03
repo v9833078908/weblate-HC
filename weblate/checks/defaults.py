@@ -55,6 +55,7 @@ DEFAULT_CHECK_LIST: tuple[str, ...] = (
     "weblate.checks.consistency.SamePluralsCheck",
     "weblate.checks.consistency.ConsistencyCheck",
     "weblate.checks.consistency.ReusedCheck",
+    "weblate.checks.consistency.RepeatDriftCheck",
     "weblate.checks.consistency.TranslatedCheck",
     "weblate.checks.chars.EscapedNewlineCountingCheck",
     "weblate.checks.chars.NewLineCountCheck",
