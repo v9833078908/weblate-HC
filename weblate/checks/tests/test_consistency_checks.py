@@ -13,6 +13,7 @@ from django.test.utils import CaptureQueriesContext
 from weblate.checks.consistency import (
     ConsistencyCheck,
     PluralsCheck,
+    RepeatDriftCheck,
     ReusedCheck,
     SamePluralsCheck,
     TranslatedCheck,
@@ -149,7 +150,9 @@ class ReusedCheckGuardTest(SimpleTestCase):
         handle_batch.assert_not_called()
 
 
-class ConsistencyCheckTest(ComponentTestCase):
+class SameSourceUnitsMixin:
+    """Create units with an explicit context, source and target."""
+
     def setUp(self) -> None:
         super().setUp()
         self.other = self.create_link_existing()
@@ -185,6 +188,7 @@ class ConsistencyCheckTest(ComponentTestCase):
             state=STATE_TRANSLATED,
         )
 
+class ConsistencyCheckTest(SameSourceUnitsMixin, ComponentTestCase):
     def test_reuse(self) -> None:
         check = ReusedCheck()
         self.assertEqual(list(check.check_component(self.component)), [])
@@ -342,3 +346,26 @@ class ConsistencyCheckTest(ComponentTestCase):
 
         sql = "\n".join(query["sql"].upper() for query in queries)
         self.assertNotIn("MIN(", sql)
+
+
+class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
+    def test_same_source_different_key_drifts(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Nazdar")
+
+        self.assertTrue(check.check_target_unit([], [], unit))
+
+    def test_same_source_same_translation_is_clean(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Ahoj")
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_case_distinct_sources_are_not_one_group(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_1, "greet_outro", "hello", "Nazdar")
+
+        self.assertFalse(check.check_target_unit([], [], unit))

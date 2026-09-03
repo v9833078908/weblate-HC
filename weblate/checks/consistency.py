@@ -291,6 +291,43 @@ class ReusedCheck(TargetCheck, BatchCheckMixin):
                 yield unit
 
 
+REPEAT_DRIFT_CHECK_ID = "repeat-drift"
+
+
+class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
+    """Check whether a repeated source string has different translations."""
+
+    check_id = REPEAT_DRIFT_CHECK_ID
+    name = gettext_lazy("Inconsistent repeat")
+    description = gettext_lazy(
+        "The same source string is translated differently under a different key."
+    )
+    default_disabled = True
+    batch_project_wide = True
+    skip_suggestions = True
+    batch_limit = 200
+
+    def check_target_unit(
+        self, sources: list[str], targets: list[str], unit: Unit
+    ) -> bool:
+        component = unit.translation.component
+        if component.is_glossary or not component.allow_translation_propagation:
+            return False
+        if unit.state < STATE_TRANSLATED:
+            # The batch pass compares translated units only; flagging a
+            # needs-editing unit here would flap on the next batch.
+            return False
+
+        if component.batch_checks:
+            return self.handle_batch(unit, component)
+
+        return unit.repeat_units.exclude(target=unit.target).exists()
+
+    def check_single(self, source: str, target: str, unit: Unit) -> bool:
+        """Target strings are checked in check_target_unit."""
+        return False
+
+
 class TranslatedCheck(TargetCheck, BatchCheckMixin):
     """Check for inconsistent translations."""
 

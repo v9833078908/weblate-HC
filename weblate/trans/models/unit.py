@@ -14,7 +14,7 @@ from django.contrib.postgres import indexes as postgres_indexes
 from django.core.cache import cache
 from django.db import Error as DjangoDatabaseError
 from django.db import models, transaction
-from django.db.models import Count, ManyToManyField, Max, Q, Sum, Value
+from django.db.models import Count, F, ManyToManyField, Max, Q, Sum, Value
 from django.db.models.functions import MD5, Length, Lower
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -2583,6 +2583,28 @@ class Unit(models.Model, LoggerMixin):
                 translation__component__allow_translation_propagation=True,
                 translation__plural_id=self.translation.plural_id,
             )
+        )
+
+    @cached_property
+    def repeat_units(self) -> UnitQuerySet:
+        """Units with the same source text under another key, project-wide."""
+        translation = self.translation
+        component = translation.component
+        return (
+            Unit.objects.filter(
+                translation__component__project_id=component.project_id,
+                translation__component__allow_translation_propagation=True,
+                translation__component__is_glossary=False,
+                translation__plural_id=translation.plural_id,
+                source__lower__md5=MD5(Lower(Value(self.source))),
+                source=self.source,
+                state__gte=STATE_TRANSLATED,
+            )
+            .exclude(
+                translation__language_id=F("translation__component__source_language_id")
+            )
+            .exclude(pk=self.pk)
+            .prefetch()
         )
 
     def get_max_length(self):
