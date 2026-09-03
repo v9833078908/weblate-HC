@@ -150,21 +150,27 @@ WEBLATE_JUDGE_MAY_APPROVE=0
 # `invalid-envelope`, where `segments` arrived as an object keyed by index
 # instead of an array, and 5 `invalid-segment`, where an error object omitted
 # `span`.
-# Seat 2 sends no reasoning control at all: the `atlas/qwen3.8-max` model
-# group rejects a top-level `enable_thinking` key with HTTP 500.
+# Reasoning control on this proxy is a passthrough question, not an effort
+# level. A top-level `enable_thinking` is rejected with HTTP 500 and a
+# top-level `thinking` is accepted and then dropped, which is why both seats
+# kept reporting ~90% reasoning tokens while configured "off". Only
+# `extra_body.enable_thinking=false` reaches the upstream deployment.
+# Seat 2 uses it: 12x faster with equal-or-better recall. Seat 1 does not:
+# the same shape works but costs recall, so DeepSeek keeps its reasoning.
+# docs/llm-first/measurements/2026-09-03-judge-thinking-passthrough.md
 WEBLATE_JUDGE_REASONING_EFFORT=
 WEBLATE_JUDGE_RESPONSE_FORMAT=json_schema
 WEBLATE_JUDGE_STREAM=0
 WEBLATE_JUDGE_TEMPERATURE=0
 WEBLATE_JUDGE_MAX_TOKENS=0
-WEBLATE_JUDGE_REASONING_EFFORT_SEAT_1=thinking.disabled
+WEBLATE_JUDGE_REASONING_EFFORT_SEAT_1=
 WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_1=json_schema
 WEBLATE_JUDGE_STREAM_SEAT_1=true
 WEBLATE_JUDGE_BATCH_SIZE_SEAT_1=2
 WEBLATE_JUDGE_REQUEST_DEADLINE_SEAT_1=120
 WEBLATE_JUDGE_TEMPERATURE_SEAT_1=0
 WEBLATE_JUDGE_MAX_TOKENS_SEAT_1=0
-WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2=
+WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2=extra_body.enable_thinking=false
 WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_2=json_schema
 WEBLATE_JUDGE_STREAM_SEAT_2=true
 # Measured 2026-09-01 over 25 single-string production requests to

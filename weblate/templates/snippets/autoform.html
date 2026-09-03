@@ -54,17 +54,18 @@
           {% translate "This translation already has judge verdicts. Running translate or approved modes with a broad filter will overwrite judge-approved strings." %}
         </div>
       {% endif %}
-      {% if judge_last_run %}
-        <p class="text-muted" id="id_auto_last_run">
-          <a href="{% url 'judge-run' pk=judge_last_run.pk %}">{% translate "Last run" %}</a>
-        </p>
+      {% if judge_runs %}
+        {% include "snippets/judge-runs-menu.html" with runs=judge_runs current_path=request.path %}
       {% endif %}
       <p class="d-none" id="id_auto_judge_preview" aria-live="polite"></p>
       {% crispy autoform %}
       {{ autoform.next }}
     </div>
     <div class="card-footer">
-      <input id="id_auto_apply" type="submit" value="{% translate "Apply" %}" class="btn btn-primary" />
+      <input id="id_auto_apply"
+             type="submit"
+             value="{% translate "Apply" %}"
+             class="btn btn-primary" />
     </div>
   </div>
 </form>

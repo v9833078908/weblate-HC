@@ -22,7 +22,7 @@
 Все шесть аддитивные (AddField/AlterField с дефолтом/blank) - схема впереди
 безопасна для отката кода на предыдущий образ.
 
-## Что едет (три линии)
+## Что едет (четыре линии)
 
 1. **Judge zero-unparsed** (Tasks 1-6, merge `c12e8c7`): fail-fast на refused
    HTTP (400/401/422 и др. -> `http-request-invalid`, без вердикта, без
@@ -38,6 +38,13 @@
    `TranslatedCheck` для продюсеров, фикс API коммита explanation/flags,
    русская локаль карточки вердикта (33 новых msgstr, mo пересобран
    2026-09-03 09:59).
+4. **Thinking-passthrough для судей** (`78b811d`, замер `39fbeaa`): в
+   LiteLLM-allowlist добавлено `extra_body.enable_thinking=false` - единственная
+   форма, доходящая до AtlasCloud-деплоя (топ-левел `enable_thinking` -> HTTP
+   500, топ-левел `thinking` принимается и молча выбрасывается). Код только
+   разрешает значение; включает его правка `.env` в фазе 4. Seat 2: 945 -> 72
+   output-токенов, 34.8 s -> 2.9 s, доля ризонинга 92.1% -> 0%, 16/16
+   распарсено. Seat 1 остаётся с ризонингом (та же форма теряет recall).
 
 ## Поведенческие изменения без всякой настройки
 
@@ -59,9 +66,11 @@
 - `WEBLATE_JUDGE_ENABLED=1`, `WEBLATE_JUDGE_DEFERRAL_ENABLED=0` (не трогать:
   включение очереди - Task 7 плана zero-unparsed, отдельное одобрение).
 - Ноль `WEBLATE_JUDGE_FALLBACK_*` в `/srv/hcgameloc/deploy/.env` - fallback
-  физически неактивен до фазы 5.
+  физически неактивен до фазы 6.
 - Очередь отложек пуста (`JudgeDeferral` незакрытых: 0).
 - Бэклог ложных refused-вердиктов: **100** (`unparsed=True` + HTTP 400/401).
+- Ризонинг seat 1/seat 2 в проде инертен: `thinking.disabled` (принимается и
+  выбрасывается прокси) и пусто. Требует правки `.env` - фаза 4.
 - `.env` правок для фазы 1 не требует; новые ключи в
   `deploy/environment.example` информационные (дефолты пустые/выключенные).
 - Замечание: `WEBLATE_REMOVE_CHECK` в продовом `.env` не содержит
@@ -120,7 +129,32 @@ docker compose exec -T weblate weblate llm_usage_report --summary --days 1
 `available: false`, пока не накопится пять priced-строк нового ledger на
 каждый `(project_id_snapshot, service, model, operation)`.
 
-### Фаза 4. Историческая чистка refused-вердиктов (деструктивная, guarded)
+### Фаза 4. Отключение ризонинга seat 2 (обязательна, .env + recreate)
+
+Код `78b811d` только *разрешает* значение; включает его `.env`. Прод сейчас
+держит инертную пару (`SEAT_1=thinking.disabled` - proxy принимает и молча
+выбрасывает, `SEAT_2=` - пусто), поэтому без этой правки деплой не даст
+ускорения. Заменить в `/srv/hcgameloc/deploy/.env` (предварительно
+`cp .env .env.bak-$(date +%Y%m%dT%H%M%SZ)-nothink`):
+
+```sh
+WEBLATE_JUDGE_REASONING_EFFORT_SEAT_1=
+WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2=extra_body.enable_thinking=false
+```
+
+Seat 1 (DeepSeek) остаётся с ризонингом сознательно: та же форма быстрая, но
+превратила 6 из 20 сохранённых детекций в `pass`. Пустое значение -
+констатация факта, что прежний `thinking.disabled` был no-op. Контейнер
+**пересоздаётся** (`docker compose up -d weblate` из `deploy/`).
+
+Приёмка (после первого нового батча): в `llm_usage_report` доля reasoning-
+токенов seat 2 == 0 (было ~92%), время на строку падает с ~30 s до ~3 s,
+все батчи парсятся, ни одна чистая строка не помечена. Замер-эталон:
+`docs/llm-first/measurements/2026-09-03-judge-thinking-passthrough.md`.
+Порядок важен: канарейка фазы 2 обязана пройти **до** этой правки - она
+проверяет, что рефактор ничего не изменил при неизменной конфигурации.
+
+### Фаза 5. Историческая чистка refused-вердиктов (деструктивная, guarded)
 
 `--expected-count` обязателен при любом вызове (в dry-run не сверяется,
 поэтому ведём его от замера 2026-09-03 и сверяем глазами с напечатанным
@@ -135,7 +169,7 @@ weblate judge_close_refused_verdicts --expected-count <total> --confirm
 удалено, run-unit строки реклассифицированы в `refused`, attempt ledger цел.
 Mismatch = автоматический abort.
 
-### Фаза 5. Включение fallback на OpenRouter (обязательна, .env + recreate)
+### Фаза 6. Включение fallback на OpenRouter (обязательна, .env + recreate)
 
 Primary остаётся на LiteLLM. Дописать в `/srv/hcgameloc/deploy/.env` (предварительно
 `cp .env .env.bak-$(date +%Y%m%dT%H%M%SZ)-fallback`):
@@ -167,7 +201,7 @@ WEBLATE_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2=json_schema
 `docs/operations/plans/2026-09-02-judge-fallback-and-triage-rollout.md`
 (фазы 4-6).
 
-### Фаза 6. Backfill кандидатов для бэклога (опционально, тратит деньги)
+### Фаза 7. Backfill кандидатов для бэклога (опционально, тратит деньги)
 
 ```sh
 weblate judge_backfill_candidates <project>/<component>            # dry-run классификация
@@ -177,27 +211,33 @@ weblate judge_backfill_candidates <project>/<component> --write --user <u> --lim
 Только явный scope (`--all` отвергается). Сначала dry-run, потом write с
 лимитом.
 
-### Фаза 7. Финальная проверка включения
+### Фаза 8. Финальная проверка включения
 
 После всех фаз, одним заходом:
 
 ```sh
 docker compose exec -T weblate weblate shell -c "
-from weblate.trans.judge import judge_configuration_snapshot, judge_fallback_endpoint
+from weblate.trans.judge import (
+    judge_configuration_snapshot,
+    judge_fallback_endpoint,
+    judge_seat_profiles,
+)
 from weblate.trans.models.judge import JudgeVerdict
 snap = judge_configuration_snapshot()
 print('judge enabled:', snap['enabled'])
 print('fallback configured:', judge_fallback_endpoint() is not None)
+print('reasoning per seat:', [p.reasoning for p in judge_seat_profiles()])
 print('openrouter-served verdicts:', JudgeVerdict.objects.filter(judge_provider='openrouter').count())
 "
 ```
 
-Приёмка: `judge enabled: True`; `fallback configured: True`; канарейка после
-recreate по-прежнему даёт ноль openrouter-вердиктов (fallback в резерве, не в
-работе); `llm_usage_report --summary --days 1` зелёный; triage-карточка
-видна на странице перевода юнита с активным REJECT/FLAG (кандидат -
-`Suggestion` со специальным автором, кнопки Use/Keep/Re-check); русская
-локаль карточки на месте.
+Приёмка: `judge enabled: True`; `fallback configured: True`;
+`reasoning per seat: ['', 'extra_body.enable_thinking=false']`; канарейка
+после recreate по-прежнему даёт ноль openrouter-вердиктов (fallback в
+резерве, не в работе); `llm_usage_report --summary --days 1` зелёный, доля
+reasoning-токенов seat 2 нулевая; triage-карточка видна на странице перевода
+юнита с активным REJECT/FLAG (кандидат - `Suggestion` со специальным
+автором, кнопки Use/Keep/Re-check); русская локаль карточки на месте.
 
 ### Очередь отложек - НЕ в этой выкатке
 
@@ -213,6 +253,11 @@ scheduler proof, controlled drain (два отдельных одобрения)
   Переключение primary на OpenRouter - отдельная операция: сначала очистка
   fallback-полей, потом полный provider-профиль primary (валидатор отвергает
   равенство base URL, очистка обязана идти первой).
+- **Ризонинг seat 2**: вернуть `WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2=` (пусто)
+  из бэкапа `.env.bak-*-nothink` и пересоздать контейнер; откат кода для этого
+  не нужен, а на старом образе значение `extra_body.enable_thinking=false`
+  отвергается валидатором - поэтому при откате образа эту правку `.env`
+  обязательно снять.
 - **Отложки** (если когда-либо включены): `JUDGE_DEFERRAL_OPERATOR_STOPPED=1`
   - recreate - блокирует платные drain-вызовы, строки сохраняются.
 

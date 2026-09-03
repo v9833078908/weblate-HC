@@ -46,6 +46,24 @@ JUDGE_SEATS = (1, 2)
 MAX_BATCH_RESPONSE_BYTES = 8 * 1024 * 1024
 PROMPT_SCHEMA_REVISION = "judge-verdict-v2"
 
+# LiteLLM aliases declare the exact reasoning control they support, so the
+# accepted values are a closed set rather than a free-form effort level.
+# `""` sends no field and leaves the alias on its own default.
+# `extra_body.enable_thinking=false` is the only shape measured to reach the
+# AtlasCloud passthrough behind `hcbifrost`: a bare `enable_thinking` is
+# rejected with HTTP 500, and a bare `thinking` is accepted and then silently
+# dropped, which is why two seats configured "off" kept reporting ~90%
+# reasoning tokens. See
+# docs/llm-first/measurements/2026-09-03-judge-thinking-passthrough.md.
+_LITELLM_REASONING_VALUES = frozenset(
+    {
+        "",
+        "thinking.disabled",
+        "enable_thinking=false",
+        "extra_body.enable_thinking=false",
+    }
+)
+
 # This is deliberately the complete closed set in JudgeRequestAttempt.FailureKind.
 FAILURE_KINDS = frozenset(
     {
@@ -480,11 +498,7 @@ def _resolve_profile(
     reasoning = reasoning.strip()
     # LiteLLM aliases declare the exact control they support; inference from
     # model names made configuration changes silently alter paid requests.
-    if provider == "litellm" and reasoning not in {
-        "",
-        "thinking.disabled",
-        "enable_thinking=false",
-    }:
+    if provider == "litellm" and reasoning not in _LITELLM_REASONING_VALUES:
         raise JudgeError(_("The LLM judge is not configured."))
     upstream_model, alias_revision = resolve_judge_alias(
         base_url, model, endpoint.api_key
@@ -626,11 +640,7 @@ def _resolve_fallback_profile(
         raise JudgeError(_("The LLM judge is not configured."))
     # Same LiteLLM allowlist as the primary: aliases declare the exact
     # control they support.
-    if endpoint.provider == "litellm" and reasoning not in {
-        "",
-        "thinking.disabled",
-        "enable_thinking=false",
-    }:
+    if endpoint.provider == "litellm" and reasoning not in _LITELLM_REASONING_VALUES:
         raise JudgeError(_("The LLM judge is not configured."))
     upstream_model, alias_revision = resolve_judge_alias(
         endpoint.base_url, model, endpoint.api_key
@@ -1580,6 +1590,10 @@ def _reasoning_payload(profile: JudgeSeatProfile) -> dict:
             return {"thinking": {"type": "disabled"}}
         if profile.reasoning == "enable_thinking=false":
             return {"enable_thinking": False}
+        if profile.reasoning == "extra_body.enable_thinking=false":
+            # The proxy forwards `extra_body` to the upstream deployment
+            # verbatim; a top-level field is either rejected or eaten.
+            return {"extra_body": {"enable_thinking": False}}
         return {}
     if profile.reasoning:
         return {"reasoning": {"effort": profile.reasoning, "exclude": True}}

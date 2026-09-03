@@ -27,6 +27,7 @@ from weblate.trans.judge_loop import (
     queue_judge_recheck,
     recheck_query,
 )
+from weblate.trans.models import Component, Project, Translation
 from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
     JudgeRun,
@@ -38,6 +39,7 @@ from weblate.trans.models.judge import (
     resolve_verdict,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.models.project import CommitPolicyChoices
 from weblate.trans.models.suggestion import Suggestion
 from weblate.trans.models.unit import Unit
 from weblate.trans.tasks import generate_judge_candidate
@@ -1526,61 +1528,343 @@ class JudgeQueueStripViewTest(ViewTestCase):
         self.assertEqual(response.context["judge_queue"]["last_run"].pk, run.pk)
         self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
 
-    def test_last_run_shows_the_newest_own_launch_over_someone_elses(self) -> None:
-        # Review: last_run must be an exact identity match to the requesting
-        # user's own launch, not merely "newest for this scope" - a
-        # concurrent launch by someone else on a shared component must
-        # never surface as "my" last run after a reload. own_run's
-        # ``created`` is forced strictly earlier than the other actor's
-        # run via a queryset update (bypassing auto_now_add):
-        # order_by("-created") has no tie-breaker, so relying on
-        # sequential auto_now_add timestamps alone would make the
+    def test_latest_report_is_a_newer_run_launched_by_someone_else(self) -> None:
+        # The run menu lists every actor's runs (confirmed decision 2): on a
+        # shared component, "someone judged this after me" is exactly what a
+        # producer returning to the page came for, so another actor's newer
+        # run is the latest report whoever launched it. The rows are data:
+        # the newest run is the button, the middle row is the other actor's
+        # and therefore names them, the oldest is the viewer's own and does
+        # not. Every ``created`` is forced via a queryset update (bypassing
+        # auto_now_add): order_by("-created") has no tie-breaker, so relying
+        # on sequential auto_now_add timestamps alone would make the
         # comparison this test exists to prove non-deterministic.
         self.enable_review()
         other_user = self.anotheruser
         now = timezone.now()
-        own_run = JudgeRun.objects.create(
-            actor=self.user,
-            scope_type=JudgeRun.ScopeType.COMPONENT,
-            scope_id=str(self.component.pk),
-            scope_label=str(self.component),
-            scope_path=self.component.get_absolute_url(),
+        own_run = self.make_judge_run(self.user)
+        other_run = self.make_judge_run(other_user)
+        earlier_other_run = self.make_judge_run(other_user)
+        JudgeRun.objects.filter(pk=own_run.pk).update(
+            created=now - timedelta(minutes=2)
+        )
+        JudgeRun.objects.filter(pk=other_run.pk).update(created=now)
+        JudgeRun.objects.filter(pk=earlier_other_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        judge_queue = response.context["judge_queue"]
+        self.assertEqual(judge_queue["last_run"].pk, other_run.pk)
+        self.assertEqual(
+            [run.pk for run in judge_queue["runs"]],
+            [other_run.pk, earlier_other_run.pk, own_run.pk],
+        )
+        tree = html.fromstring(response.content)
+        (menu,) = tree.xpath(
+            '//section[@aria-labelledby="judge-queue-heading"]'
+            '//ul[contains(@class, "dropdown-menu")]'
+        )
+        menu_markup = html.tostring(menu, encoding="unicode")
+        self.assertIn(other_user.profile.get_user_name(), menu_markup)
+        self.assertNotIn(self.user.profile.get_user_name(), menu_markup)
+
+    def make_judge_run(
+        self, actor, scope=None, status=JudgeRun.Status.COMPLETED
+    ) -> JudgeRun:
+        if scope is None:
+            scope = self.component
+        scope_types = {
+            Translation: JudgeRun.ScopeType.TRANSLATION,
+            Component: JudgeRun.ScopeType.COMPONENT,
+            Project: JudgeRun.ScopeType.PROJECT,
+            Workspace: JudgeRun.ScopeType.WORKSPACE,
+        }
+        return JudgeRun.objects.create(
+            actor=actor,
+            scope_type=scope_types[type(scope)],
+            scope_id=str(scope.pk),
+            scope_label=str(scope),
+            scope_path=scope.get_absolute_url(),
             requested_mode="judge",
             cap=10,
-            status=JudgeRun.Status.COMPLETED,
+            status=status,
         )
-        other_run = JudgeRun.objects.create(
-            actor=other_user,
-            scope_type=JudgeRun.ScopeType.COMPONENT,
-            scope_id=str(self.component.pk),
-            scope_label=str(self.component),
-            scope_path=self.component.get_absolute_url(),
-            requested_mode="judge",
-            cap=10,
-            status=JudgeRun.Status.COMPLETED,
-        )
+
+    def test_a_run_launched_by_someone_else_is_listed(self) -> None:
+        # The superseded rule hid another actor's run from the page
+        # entirely; the new contract lists it, newest first, with the
+        # author named on the rows that are not the viewer's own. One run
+        # is the button alone, so the naming rides on the other rewrite.
+        self.enable_review()
+        other_user = self.anotheruser
+        other_run = self.make_judge_run(other_user)
+        own_run = self.make_judge_run(self.user)
+        now = timezone.now()
+        JudgeRun.objects.filter(pk=other_run.pk).update(created=now)
         JudgeRun.objects.filter(pk=own_run.pk).update(
             created=now - timedelta(minutes=1)
         )
-        JudgeRun.objects.filter(pk=other_run.pk).update(created=now)
         response = self.client.get(self.component.get_absolute_url())
-        self.assertEqual(response.context["judge_queue"]["last_run"].pk, own_run.pk)
+        judge_queue = response.context["judge_queue"]
+        self.assertEqual(judge_queue["last_run"].pk, other_run.pk)
+        self.assertEqual(
+            [run.pk for run in judge_queue["runs"]],
+            [other_run.pk, own_run.pk],
+        )
 
-    def test_last_run_hides_a_run_launched_by_someone_else_only(self) -> None:
+    # -- Run menu (the judge run navigation) ------------------------------
+
+    RUN_MENU_XPATH = (
+        '//section[@aria-labelledby="judge-queue-heading"]'
+        '//ul[contains(@class, "dropdown-menu")]'
+    )
+
+    def run_menu_markup(self, response) -> str:
+        # Decode explicitly: lxml's fromstring sniffs bytes without a
+        # declaration and reads the em dash of a scope label as cp1252.
+        (menu,) = html.fromstring(response.content.decode("utf-8")).xpath(
+            self.RUN_MENU_XPATH
+        )
+        return html.tostring(menu, encoding="unicode")
+
+    def test_translation_scoped_run_surfaces_on_every_ancestor_page(self) -> None:
+        # A run's scope is matched against the page's subtree, so a
+        # translation-scoped launch is reachable from its component, its
+        # project and the workspace above both - the surfaces a producer
+        # returns to (the workspace strip comes from
+        # weblate/workspaces/views.py:309, whose attach_workspace()
+        # scaffolding lives in this file).
         self.enable_review()
-        other_user = self.anotheruser
-        JudgeRun.objects.create(
-            actor=other_user,
-            scope_type=JudgeRun.ScopeType.COMPONENT,
-            scope_id=str(self.component.pk),
-            scope_label=str(self.component),
-            scope_path=self.component.get_absolute_url(),
-            requested_mode="judge",
-            cap=10,
-            status=JudgeRun.Status.COMPLETED,
+        translation = self.get_unit().translation
+        run = self.make_judge_run(self.user, scope=translation)
+        run_url = reverse("judge-run", kwargs={"pk": run.pk})
+        # The translation page carries the runs in its own context key
+        # (judge_runs, the list itself); component and project pages reach
+        # them through the strip's judge_queue.
+        for page_url, runs_key in (
+            (translation.get_absolute_url(), "judge_runs"),
+            (self.component.get_absolute_url(), "judge_queue"),
+            (self.project.get_absolute_url(), "judge_queue"),
+        ):
+            response = self.client.get(page_url)
+            runs = (
+                response.context[runs_key]
+                if runs_key == "judge_runs"
+                else response.context[runs_key]["runs"]
+            )
+            self.assertEqual(runs[0].pk, run.pk)
+            self.assertContains(response, run_url)
+
+    def test_workspace_page_lists_a_translation_scoped_run(self) -> None:
+        self.enable_review()
+        workspace = self.attach_workspace()
+        translation = self.get_unit().translation
+        run = self.make_judge_run(self.user, scope=translation)
+        response = self.client.get(workspace.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["runs"][0].pk, run.pk)
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_runs_order_newest_first_across_components(self) -> None:
+        # order_by("-created") has no tie-breaker, so sequential
+        # auto_now_add timestamps would make newest-first
+        # non-deterministic: every ``created`` is forced via a queryset
+        # update, the pattern the Task 6 rewrites use.
+        self.enable_review()
+        other_component = self.create_json_mono(
+            name="Other component", project=self.project
+        )
+        sibling_translation = other_component.translation_set.all()[0]
+        older = self.make_judge_run(self.user, scope=sibling_translation)
+        newer = self.make_judge_run(self.user)
+        now = timezone.now()
+        JudgeRun.objects.filter(pk=older.pk).update(created=now - timedelta(minutes=1))
+        JudgeRun.objects.filter(pk=newer.pk).update(created=now)
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertEqual(
+            [run.pk for run in response.context["judge_queue"]["runs"]],
+            [newer.pk, older.pk],
+        )
+
+    def test_a_run_in_another_project_does_not_leak(self) -> None:
+        self.enable_review()
+        other_project = Project.objects.create(
+            name="Judge run other project", slug="judge-run-other-project"
+        )
+        run = self.make_judge_run(self.user, scope=other_project)
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertEqual(response.context["judge_queue"]["runs"], [])
+        self.assertNotContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_single_run_renders_no_dropdown(self) -> None:
+        self.enable_review()
+        run = self.make_judge_run(self.user)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+        (card,) = html.fromstring(response.content).xpath(
+            '//section[@aria-labelledby="judge-queue-heading"]'
+        )
+        self.assertNotIn("dropdown-toggle", html.tostring(card, encoding="unicode"))
+
+    def test_single_queued_run_labels_its_status_after_the_report_link(self) -> None:
+        # The one place a failed newest run is visible without opening a
+        # menu: with one run the button is the newest run regardless of
+        # status, and its status word follows the label, muted.
+        self.enable_review()
+        run = self.make_judge_run(self.user, status=JudgeRun.Status.QUEUED)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+        self.assertContains(response, "Queued")
+
+    def test_menu_row_for_a_non_completed_run_carries_its_status_word(self) -> None:
+        self.enable_review()
+        completed = self.make_judge_run(self.user)
+        failed = self.make_judge_run(self.user)
+        now = timezone.now()
+        JudgeRun.objects.filter(pk=completed.pk).update(created=now)
+        JudgeRun.objects.filter(pk=failed.pk).update(
+            status=JudgeRun.Status.FAILED, created=now - timedelta(minutes=1)
         )
         response = self.client.get(self.component.get_absolute_url())
-        self.assertIsNone(response.context["judge_queue"]["last_run"])
+        menu_markup = self.run_menu_markup(response)
+        self.assertIn(reverse("judge-run", kwargs={"pk": failed.pk}), menu_markup)
+        self.assertIn("Failed", menu_markup)
+        # The button stays blind by design: with two or more runs its label
+        # carries no status word, the rows own the statuses.
+        self.assertNotIn(reverse("judge-run", kwargs={"pk": completed.pk}), menu_markup)
+
+    def test_a_run_whose_actor_was_deleted_renders_without_an_author(self) -> None:
+        # JudgeRun.actor is SET_NULL and the menu lists every actor's runs,
+        # so a run whose launcher has since been deleted reaches the menu
+        # with actor=None. The row must then drop the whole author segment:
+        # rendering the separator against a silently empty
+        # run.actor.profile would leave a dangling "·" at the row's end.
+        self.enable_review()
+        own_run = self.make_judge_run(self.user)
+        deleted_run = self.make_judge_run(None)
+        now = timezone.now()
+        JudgeRun.objects.filter(pk=own_run.pk).update(created=now)
+        JudgeRun.objects.filter(pk=deleted_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        menu_markup = self.run_menu_markup(response)
+        self.assertIn(reverse("judge-run", kwargs={"pk": deleted_run.pk}), menu_markup)
+        self.assertNotIn("·", menu_markup)
+
+    def test_project_page_leads_a_child_scope_row_with_its_scope_label(self) -> None:
+        # On a project page "which component and language" is what
+        # distinguishes one run from another: the child scope's label leads
+        # its row and the rest is muted beneath it, while the project's own
+        # run leads with the timestamp, the only differentiator there. The
+        # newest run is the button alone, so both hierarchy rows need a
+        # third run behind them.
+        self.enable_review()
+        translation = self.get_unit().translation
+        newest = self.make_judge_run(self.user)
+        project_run = self.make_judge_run(self.user, scope=self.project)
+        child_run = self.make_judge_run(self.user, scope=translation)
+        now = timezone.now()
+        JudgeRun.objects.filter(pk=newest.pk).update(created=now)
+        JudgeRun.objects.filter(pk=project_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        JudgeRun.objects.filter(pk=child_run.pk).update(
+            created=now - timedelta(minutes=2)
+        )
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertEqual(
+            [run.pk for run in response.context["judge_queue"]["runs"]],
+            [newest.pk, project_run.pk, child_run.pk],
+        )
+        menu_markup = self.run_menu_markup(response)
+        label = f'<span class="d-block">{translation}</span>'
+        self.assertIn(label, menu_markup)
+        self.assertIn('class="d-block text-muted"', menu_markup)
+        self.assertLess(
+            menu_markup.find(label), menu_markup.find('class="d-block text-muted"')
+        )
+        # The project's own row leads with the timestamp: its scope is the
+        # page, so it carries no scope label.
+        self.assertEqual(menu_markup.count('class="d-block"'), 1)
+
+    def test_component_page_leads_an_own_scope_row_with_its_timestamp(self) -> None:
+        # Where the scope is the page, the timestamp leads, because it is
+        # then the only differentiator: the component's own row carries no
+        # scope label, while a child scope's label leads its row and the
+        # rest is muted beneath it.
+        self.enable_review()
+        translation = self.get_unit().translation
+        child_run = self.make_judge_run(self.user, scope=translation)
+        own_run = self.make_judge_run(self.user)
+        newest = self.make_judge_run(self.user, scope=translation)
+        now = timezone.now()
+        JudgeRun.objects.filter(pk=newest.pk).update(created=now)
+        JudgeRun.objects.filter(pk=own_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        JudgeRun.objects.filter(pk=child_run.pk).update(
+            created=now - timedelta(minutes=2)
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(
+            [run.pk for run in response.context["judge_queue"]["runs"]],
+            [newest.pk, own_run.pk, child_run.pk],
+        )
+        menu_markup = self.run_menu_markup(response)
+        label = f'<span class="d-block">{translation}</span>'
+        self.assertIn(label, menu_markup)
+        self.assertIn('class="d-block text-muted"', menu_markup)
+        self.assertLess(
+            menu_markup.find(label), menu_markup.find('class="d-block text-muted"')
+        )
+
+    def test_run_menu_ceiling_is_ten_rows(self) -> None:
+        # Older runs stay unreachable, which is the honest limit of a menu
+        # and the point where a paginated per-scope history page earns its
+        # own plan.
+        self.enable_review()
+        for index in range(12):
+            run = self.make_judge_run(self.user)
+            JudgeRun.objects.filter(pk=run.pk).update(
+                created=timezone.now() - timedelta(minutes=12 - index)
+            )
+        response = self.client.get(self.component.get_absolute_url())
+        runs = response.context["judge_queue"]["runs"]
+        self.assertEqual(len(runs), 10)
+        self.assertEqual(
+            len(self.run_menu_markup(response).split('class="dropdown-item"')) - 1, 9
+        )
+
+    def test_breakdown_button_only_with_zero_runs(self) -> None:
+        self.enable_review()
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertContains(response, "Breakdown by check")
+        run = self.make_judge_run(self.user)
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertNotContains(response, "Breakdown by check")
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_project_page_query_count_is_unchanged_by_menu_runs(self) -> None:
+        # ``runs`` is materialized once and ``last_run`` is its first
+        # element, so the menu's LIMIT 10 fills the query slot the old
+        # ``LIMIT 1`` last-run lookup already paid for: a project page with
+        # N runs issues the same number of queries as with zero runs. The
+        # existing pins compare within one run, in the relative
+        # CaptureQueriesContext style of
+        # test_hand_off_query_count_stays_bounded; both captures sit on a
+        # page that renders the menu.
+        self.enable_review()
+        translation = self.get_unit().translation
+        self.client.get(self.project.get_absolute_url())
+        with CaptureQueriesContext(connection) as empty:
+            self.client.get(self.project.get_absolute_url())
+        self.make_judge_run(self.user, scope=translation)
+        self.make_judge_run(self.user, scope=self.component)
+        self.client.get(self.project.get_absolute_url())
+        with CaptureQueriesContext(connection) as with_runs:
+            self.client.get(self.project.get_absolute_url())
+        self.assertTrue(with_runs.captured_queries)
+        self.assertEqual(len(empty), len(with_runs))
 
     def test_last_run_does_not_leak_across_components(self) -> None:
         self.enable_review()
@@ -1865,11 +2149,17 @@ class JudgeRunReportViewTest(ViewTestCase):
         self.component.project.translation_review = True
         self.component.project.save(update_fields=["translation_review"])
 
-    def create_run(self, scope=None, *, status=JudgeRun.Status.COMPLETED) -> JudgeRun:
+    def create_run(
+        self,
+        scope=None,
+        *,
+        status=JudgeRun.Status.COMPLETED,
+        scope_type=JudgeRun.ScopeType.COMPONENT,
+    ) -> JudgeRun:
         scope = scope or self.component
         return JudgeRun.objects.create(
             actor=self.user,
-            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_type=scope_type,
             scope_id=str(scope.pk),
             scope_label=str(scope),
             scope_path=scope.get_absolute_url(),
@@ -1935,6 +2225,31 @@ class JudgeRunReportViewTest(ViewTestCase):
             target_hash=compute_target_hash(unit.get_target_plurals()),
             context_hash=judge_context_hash(unit),
             resolution=resolution,
+        )
+
+    def make_verdict_with_error(
+        self, unit, *, severity: str, category: str, seat: int = 1
+    ) -> JudgeVerdict:
+        return JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity=severity,
+            model_verdict=(
+                JudgeVerdict.Verdict.REJECT
+                if severity == "critical"
+                else JudgeVerdict.Verdict.FLAG
+            ),
+            judge_model="vendor/model-a",
+            seat=seat,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash=judge_context_hash(unit),
+            errors=[
+                {
+                    "span": "x",
+                    "category": category,
+                    "severity": severity,
+                    "description": f"{category} problem",
+                }
+            ],
         )
 
     # -- Counts --------------------------------------------------------
@@ -2055,7 +2370,9 @@ class JudgeRunReportViewTest(ViewTestCase):
         [older_row] = list(older_response.context["page_obj"])
         self.assertEqual(older_row.outcome, JudgeRunUnit.Outcome.MAJOR)
 
-        newer_response = self.client.get(self.report_url(newer))
+        # The default bucket is "actionable"; PASSED rows need an explicit
+        # filter to prove the newer run's own report still finds them.
+        newer_response = self.client.get(self.report_url(newer), {"outcome": "matched"})
         [newer_row] = list(newer_response.context["page_obj"])
         self.assertEqual(newer_row.outcome, JudgeRunUnit.Outcome.PASSED)
 
@@ -2076,7 +2393,9 @@ class JudgeRunReportViewTest(ViewTestCase):
         gone = self.add_row(
             run, unit_id_snapshot=900010, outcome=JudgeRunUnit.Outcome.MAJOR
         )
-        response = self.client.get(self.report_url(run))
+        # "matched" (every row) so the drifted PASSED rows are visible too:
+        # the default "actionable" bucket would hide them.
+        response = self.client.get(self.report_url(run), {"outcome": "matched"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "900010")
         self.assertContains(response, "current text changed since this run")
@@ -2201,6 +2520,198 @@ class JudgeRunReportViewTest(ViewTestCase):
             self.client.get(self.report_url(run2))
 
         self.assertEqual(len(small), len(large))
+
+    # -- Task 9: triage, categories, review URLs, actions --------------
+
+    def test_actionable_is_the_default_bucket_and_matches_its_own_count(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL)
+        self.add_row(run, unit_id_snapshot=900200, outcome=JudgeRunUnit.Outcome.MAJOR)
+        self.add_row(run, unit_id_snapshot=900201, outcome=JudgeRunUnit.Outcome.MINOR)
+        self.add_row(
+            run, unit_id_snapshot=900202, outcome=JudgeRunUnit.Outcome.UNPARSED
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900203,
+            outcome=JudgeRunUnit.Outcome.STALE_CONFLICT,
+        )
+        self.add_row(run, unit_id_snapshot=900204, outcome=JudgeRunUnit.Outcome.PASSED)
+
+        default_response = self.client.get(self.report_url(run))
+        self.assertEqual(default_response.context["outcome"], "")
+        self.assertEqual(default_response.context["bucket"], "actionable")
+        self.assertEqual(default_response.context["page_obj"].paginator.count, 5)
+
+        explicit_response = self.client.get(
+            self.report_url(run), {"outcome": "actionable"}
+        )
+        self.assertEqual(
+            explicit_response.context["page_obj"].paginator.count,
+            default_response.context["page_obj"].paginator.count,
+        )
+
+    def test_zero_count_buckets_render_no_button_and_technical_trio_is_text(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(
+            run, unit_id_snapshot=900210, outcome=JudgeRunUnit.Outcome.CRITICAL
+        )
+        response = self.client.get(self.report_url(run))
+        # "Repaired" has zero rows in this run: no filter button for it.
+        self.assertNotContains(response, "outcome=repaired")
+        # matched/checked/cached never render as buttons, even though their
+        # counts are non-zero: they move to the plain-text technical line.
+        self.assertNotContains(response, "outcome=matched")
+        self.assertNotContains(response, "outcome=checked")
+        self.assertNotContains(response, "outcome=cached")
+        self.assertContains(response, "Matched 1")
+
+    def test_blocks_release_reflects_the_scope_project_commit_policy(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(
+            run, unit_id_snapshot=900220, outcome=JudgeRunUnit.Outcome.CRITICAL
+        )
+
+        self.project.commit_policy = CommitPolicyChoices.WITHOUT_NEEDS_EDITING
+        self.project.save(update_fields=["commit_policy"])
+        blocking_response = self.client.get(self.report_url(run))
+        self.assertTrue(blocking_response.context["triage"]["blocks_release"])
+
+        self.project.commit_policy = CommitPolicyChoices.ALL
+        self.project.save(update_fields=["commit_policy"])
+        shipping_response = self.client.get(self.report_url(run))
+        self.assertFalse(shipping_response.context["triage"]["blocks_release"])
+
+    def test_blocking_excludes_critical_rows_accepted_as_is(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        accepted_verdict = self.make_verdict(
+            unit, resolution=JudgeVerdict.Resolution.ACCEPTED_AS_IS
+        )
+        self.add_row(
+            run,
+            unit,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+            verdict=accepted_verdict,
+        )
+        self.add_row(
+            run, unit_id_snapshot=900230, outcome=JudgeRunUnit.Outcome.CRITICAL
+        )
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.context["triage"]["blocking"], 1)
+        self.assertEqual(response.context["counts"]["critical"], 2)
+
+    def test_category_list_is_ordered_by_count_with_worst_severity(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict_a = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900240,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+            verdict=verdict_a,
+        )
+        verdict_b = self.make_verdict_with_error(
+            unit, severity="major", category="mistranslation"
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900241,
+            outcome=JudgeRunUnit.Outcome.MAJOR,
+            verdict=verdict_b,
+        )
+        verdict_c = self.make_verdict_with_error(
+            unit, severity="minor", category="omission"
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900242,
+            outcome=JudgeRunUnit.Outcome.MINOR,
+            verdict=verdict_c,
+        )
+
+        response = self.client.get(self.report_url(run))
+        categories = response.context["categories"]
+        self.assertEqual(
+            [entry["category"] for entry in categories],
+            ["mistranslation", "omission"],
+        )
+        self.assertEqual(categories[0]["count"], 2)
+        self.assertEqual(categories[0]["worst"], "critical")
+        self.assertTrue(categories[0]["review_url"])
+        self.assertEqual(categories[1]["count"], 1)
+        self.assertEqual(categories[1]["worst"], "minor")
+
+    def test_review_urls_are_scope_correct_for_translation_and_component(
+        self,
+    ) -> None:
+        self.enable_review()
+        component_run = self.create_run()
+        self.add_row(
+            component_run,
+            unit_id_snapshot=900250,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+        )
+        component_response = self.client.get(self.report_url(component_run))
+        self.assertIn("/search/", component_response.context["blocking_review_url"])
+
+        translation_run = self.create_run(
+            self.translation, scope_type=JudgeRun.ScopeType.TRANSLATION
+        )
+        self.add_row(
+            translation_run,
+            unit_id_snapshot=900251,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+        )
+        translation_response = self.client.get(self.report_url(translation_run))
+        blocking_url = translation_response.context["blocking_review_url"]
+        self.assertIn("/translate/", blocking_url)
+        self.assertNotIn("/search/", blocking_url)
+        # The translate view canonicalizes to an explicit offset (302).
+        resolved = self.client.get(blocking_url, follow=True)
+        self.assertEqual(resolved.status_code, 200)
+
+    def test_candidate_stored_row_shows_review_the_suggested_fix_action(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        self.add_row(
+            run,
+            unit,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+            repair_status=JudgeRunUnit.RepairStatus.CANDIDATE_STORED,
+        )
+        response = self.client.get(self.report_url(run), {"outcome": "candidates"})
+        self.assertContains(response, "Review the suggested fix")
+
+    def test_row_without_verdict_renders_an_explicit_sentence(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(
+            run, unit_id_snapshot=900260, outcome=JudgeRunUnit.Outcome.UNPARSED
+        )
+        response = self.client.get(self.report_url(run), {"outcome": "unparsed"})
+        self.assertContains(
+            response, "The judge reply for this string could not be used."
+        )
 
 
 @override_settings(

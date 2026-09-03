@@ -86,14 +86,25 @@ services:
       WEBLATE_JUDGE_STREAM: 0
       WEBLATE_JUDGE_TEMPERATURE: 0
       WEBLATE_JUDGE_MAX_TOKENS: 0
-      WEBLATE_JUDGE_REASONING_EFFORT_SEAT_1: thinking.disabled
+      # Measured no-op: the proxy accepts a top-level `thinking` and drops it,
+      # so seat 1 reported ~87% reasoning tokens while configured "off". The
+      # `extra_body` shape does reach DeepSeek, but it costs recall (6 of 20
+      # stored detections became `pass`), so seat 1 keeps its reasoning.
+      WEBLATE_JUDGE_REASONING_EFFORT_SEAT_1: ''
       WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_1: json_schema
       WEBLATE_JUDGE_STREAM_SEAT_1: 'true'
       WEBLATE_JUDGE_BATCH_SIZE_SEAT_1: '2'
       WEBLATE_JUDGE_REQUEST_DEADLINE_SEAT_1: '120'
       WEBLATE_JUDGE_TEMPERATURE_SEAT_1: '0'
       WEBLATE_JUDGE_MAX_TOKENS_SEAT_1: '0'
-      WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2: ''
+      # `extra_body` is the only shape that reaches the AtlasCloud passthrough:
+      # a top-level `enable_thinking` is rejected with HTTP 500 and a top-level
+      # `thinking` is silently dropped. Measured on 16 paired requests: output
+      # 945 -> 72 tokens, 34.8s -> 2.9s, reasoning share 92.1% -> 0%, 16/16
+      # parsed, no clean string false-flagged, and two majors caught that the
+      # thinking arm missed.
+      # docs/llm-first/measurements/2026-09-03-judge-thinking-passthrough.md
+      WEBLATE_JUDGE_REASONING_EFFORT_SEAT_2: extra_body.enable_thinking=false
       WEBLATE_JUDGE_RESPONSE_FORMAT_SEAT_2: json_schema
       WEBLATE_JUDGE_STREAM_SEAT_2: 'true'
       # Production measurement over 25 single-string requests: median 16.740s,

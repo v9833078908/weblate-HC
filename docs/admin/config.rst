@@ -2032,13 +2032,33 @@ JUDGE_REASONING_EFFORT
 
 .. versionadded:: 2026.8.1
 
-Reasoning budget requested from a model that supports one, as an OpenRouter
-``effort`` level (``minimal``, ``low``, ``medium`` or ``high``). Empty by
-default, which sends no reasoning parameter at all and leaves each model on
-its own default. Set it to cap the spend: on the first production-shaped run
-reasoning tokens accounted for most of the cost of one seat. The reasoning
-trace itself is always excluded from the response, because the judge reads
-only the structured verdict.
+Reasoning budget requested from a model that supports one. Empty by default,
+which sends no reasoning parameter at all and leaves each model on its own
+default. Set it to cap the spend: on the first production-shaped run reasoning
+tokens accounted for most of the cost of one seat. The reasoning trace itself
+is always excluded from the response, because the judge reads only the
+structured verdict.
+
+The accepted values depend on the provider behind :setting:`JUDGE_BASE_URL`.
+On OpenRouter this is an ``effort`` level (``minimal``, ``low``, ``medium`` or
+``high``). On a LiteLLM endpoint an effort level is meaningless, because each
+alias declares the control it supports, so the value is instead one of a
+closed set naming the exact request field to send:
+
+``thinking.disabled``
+    Sends ``thinking: {"type": "disabled"}`` at the top level.
+``enable_thinking=false``
+    Sends ``enable_thinking: false`` at the top level.
+``extra_body.enable_thinking=false``
+    Sends ``enable_thinking: false`` nested under ``extra_body``, which a
+    proxy forwards to the upstream deployment verbatim.
+
+Any other value raises before a request is sent. Which of the three a given
+alias honours is a property of that alias and has to be measured: a top-level
+field may be rejected outright, or accepted and then dropped, in which case
+reasoning stays on while the setting reads as if it were off. Verify with the
+``reasoning_tokens`` recorded on the judge's request attempts rather than from
+the setting alone.
 
 .. seealso::
 

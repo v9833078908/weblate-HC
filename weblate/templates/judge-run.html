@@ -10,111 +10,161 @@
 {% endblock breadcrumbs %}
 
 {% block content %}
-  <div class="card">
-    <div class="card-header">
-      <h4 class="card-title">{% translate "Judge run" %}</h4>
+  <p id="judge-run-metadata" class="text-muted">
+    <a href="{{ scope.get_absolute_url }}">{{ run.scope_label }}</a>
+    · {{ run.requested_query|default:"-" }}
+    · {{ run.get_status_display }}
+    · {{ run.started|date:"DATETIME_FORMAT"|default:"-" }}
+    {% if run.finished %}· {{ run.finished|timeuntil:run.started }}{% endif %}
+    {% if run.actor %}· {{ run.actor.profile.get_user_display_link }}{% endif %}
+  </p>
+  {% if run.status == "queued" or run.status == "running" %}
+    <div class="alert alert-info">{% translate "This run is still in progress; counts may be incomplete." %}</div>
+  {% endif %}
+  {% if run.status == "failed" %}
+    <div class="alert alert-danger">
+      {% translate "This run failed." %}
+      {% if run.failure %}{{ run.failure }}{% endif %}
     </div>
-    <table class="table" id="judge-run-metadata">
-      <tr>
-        <th scope="row">{% translate "Scope" %}</th>
-        <td><a href="{{ scope.get_absolute_url }}">{{ run.scope_label }}</a></td>
-      </tr>
-      <tr>
-        <th scope="row">{% translate "Filter" %}</th>
-        <td>{{ run.requested_query|default:"-" }}</td>
-      </tr>
-      <tr>
-        <th scope="row">{% translate "Launched by" %}</th>
-        <td>
-          {% if run.actor %}
-            {{ run.actor.profile.get_user_display_link }}
-          {% else %}
-            {% translate "Unknown" %}
-          {% endif %}
-        </td>
-      </tr>
-      <tr>
-        <th scope="row">{% translate "Status" %}</th>
-        <td>{{ run.get_status_display }}</td>
-      </tr>
-      <tr>
-        <th scope="row">{% translate "Started" %}</th>
-        <td>{{ run.started|date:"DATETIME_FORMAT"|default:"-" }}</td>
-      </tr>
-      <tr>
-        <th scope="row">{% translate "Finished" %}</th>
-        <td>
-          {% if run.finished %}
-            {{ run.finished|date:"DATETIME_FORMAT" }}
-            ({{ run.finished|timeuntil:run.started }})
-          {% else %}
-            -
-          {% endif %}
-        </td>
-      </tr>
-    </table>
-    {% if run.status == "queued" or run.status == "running" %}
-      <div class="card-body">
-        {% translate "This run is still in progress; counts may be incomplete." %}
-      </div>
-    {% endif %}
-    {% if run.status == "failed" %}
-      <div class="card-body">
-        {% translate "This run failed." %}
-        {% if run.failure %}{{ run.failure }}{% endif %}
-      </div>
-    {% endif %}
-    {% for warning in run.warnings %}
-      <div class="card-body">{{ warning }}</div>
-    {% endfor %}
+  {% endif %}
+  {% for warning in run.warnings %}
+    <div class="alert alert-warning">{{ warning }}</div>
+  {% endfor %}
+
+  <div class="card mb-3">
+    <div class="card-header">
+      <h4 class="card-title">{% translate "What to do" %}</h4>
+    </div>
+    <div class="card-body">
+      {% if triage.blocking %}
+        {% if triage.blocks_release %}
+          <p>
+            {% blocktranslate count counter=triage.blocking %}{{ counter }} string will not ship until you fix it.{% plural %}{{ counter }} strings will not ship until you fix them.{% endblocktranslate %}
+          </p>
+        {% else %}
+          <p>
+            {% blocktranslate count counter=triage.blocking %}{{ counter }} string is rejected and needs a fix before release.{% plural %}{{ counter }} strings are rejected and need a fix before release.{% endblocktranslate %}
+          </p>
+        {% endif %}
+        {% if triage.top_category %}
+          <p class="text-muted">
+            {% blocktranslate with category=triage.top_category.label count counter=triage.top_category.count %}Biggest problem: {{ category }} ({{ counter }} string).{% plural %}Biggest problem: {{ category }} ({{ counter }} strings).{% endblocktranslate %}
+          </p>
+        {% endif %}
+        <a class="btn btn-primary" href="{{ blocking_review_url }}">{% translate "Open the blocking strings" %}</a>
+      {% elif triage.major or triage.minor %}
+        <p>{% translate "Nothing is blocked from shipping." %}</p>
+        <a class="btn btn-primary" href="{{ needs_review_url }}">{% translate "Open the flagged strings" %}</a>
+      {% elif triage.needs_recheck %}
+        <p>{% translate "The judge left no usable verdict for some strings." %}</p>
+        <a class="btn btn-primary" href="{{ recheck_review_url }}">{% translate "Re-check them" %}</a>
+      {% else %}
+        <p>
+          {% blocktranslate count counter=triage.passed %}Nothing needs action. {{ counter }} string passed.{% plural %}Nothing needs action. {{ counter }} strings passed.{% endblocktranslate %}
+        </p>
+      {% endif %}
+      {% if triage.candidates %}
+        <a class="btn btn-outline-primary" href="?outcome=candidates">
+          {% blocktranslate count counter=triage.candidates %}Review {{ counter }} suggested fix{% plural %}Review {{ counter }} suggested fixes{% endblocktranslate %}
+        </a>
+      {% endif %}
+    </div>
   </div>
+
+  {% if categories %}
+    <div class="card mb-3">
+      <div class="card-header">
+        <h4 class="card-title">{% translate "Where the problems are" %}</h4>
+      </div>
+      <table class="table mb-0">
+        <thead>
+          <tr>
+            <th>{% translate "Problem" %}</th>
+            <th>{% translate "Strings" %}</th>
+            <th>{% translate "Worst" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in categories %}
+            <tr>
+              <td>
+                {% if entry.review_url %}
+                  <a href="{{ entry.review_url }}">{{ entry.label }}</a>
+                {% else %}
+                  {{ entry.label }}
+                {% endif %}
+              </td>
+              <td>{{ entry.count }}</td>
+              <td>{{ entry.worst_label }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="card-footer text-muted">
+        {% translate "Links narrow by severity; the category itself is not a search field." %}
+      </div>
+    </div>
+  {% endif %}
 
   <div class="card">
     <div class="card-header">
-      <h4 class="card-title">{% translate "Outcomes" %}</h4>
+      <h4 class="card-title">{% translate "Strings" %}</h4>
     </div>
     <div class="card-body">
       {% for key, label, count in stats %}
-        <a class="btn btn-sm {% if key == outcome %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-           href="?outcome={{ key }}">{{ label }}: {{ count }}</a>
+        {% if count and key != "matched" and key != "checked" and key != "cached" %}
+          <a class="btn btn-sm {% if key == bucket %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+             href="?outcome={{ key }}">{{ label }}: {{ count }}</a>
+        {% endif %}
       {% endfor %}
       {% if outcome %}
         <a class="btn btn-sm btn-outline-secondary" href="?">{% translate "Clear filter" %}</a>
       {% endif %}
+      <p class="text-muted small mt-2 mb-0">
+        {% blocktranslate with matched=counts.matched checked=counts.checked cached=counts.cached %}Matched {{ matched }} &middot; checked {{ checked }} &middot; cached {{ cached }}.{% endblocktranslate %}
+      </p>
     </div>
     <div class="table-responsive">
       <table class="table table-striped" id="judge-run-units">
         <thead>
           <tr>
-            <th>{% translate "String" %}</th>
-            <th>{% translate "Outcome" %}</th>
-            <th>{% translate "Repair" %}</th>
-            <th>{% translate "Text" %}</th>
+            <th>{% translate "Source" %}</th>
+            <th>{% translate "Translation" %}</th>
+            <th>{% translate "Problem" %}</th>
+            <th>{% translate "Action" %}</th>
           </tr>
         </thead>
         <tbody>
           {% for row in page_obj %}
             <tr>
               <td>
-                {% if row.unit %}
-                  <a href="{{ row.unit.get_absolute_url }}">{{ row.unit_id_snapshot }}</a>
+                {% if row.editor_url %}
+                  <a href="{{ row.editor_url }}">{{ row.source_text|truncatechars:90 }}</a>
                 {% else %}
                   {% blocktranslate with id=row.unit_id_snapshot %}{{ id }} (deleted){% endblocktranslate %}
                 {% endif %}
               </td>
               <td>
-                {{ row.get_outcome_display }}
-                {% if row.cached %}({% translate "cached" %}){% endif %}
-                {% if row.verdict.resolution %}({{ row.verdict.get_resolution_display }}){% endif %}
+                {{ row.target_text|truncatechars:90 }}
+                {% if row.unit and not row.current_target_matches %}
+                  <br>
+                  <span class="text-muted small">({% translate "current text changed since this run" %})</span>
+                {% endif %}
               </td>
-              <td>{{ row.get_repair_status_display }}</td>
               <td>
-                {% if not row.unit %}
-                  {% translate "unit deleted" %}
-                {% elif row.current_target_matches %}
-                  {% translate "matches this run" %}
+                {{ row.problem }}
+                {% if row.cached %}
+                  <span class="text-muted small">({% translate "cached" %})</span>
+                {% endif %}
+                {% if row.verdict.resolution %}
+                  <span class="text-muted small">({{ row.verdict.get_resolution_display }})</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if row.editor_url %}
+                  <a href="{{ row.editor_url }}">{{ row.action }}</a>
                 {% else %}
-                  {% translate "current text changed since this run" %}
+                  {% translate "nothing to do" %}
                 {% endif %}
               </td>
             </tr>
@@ -126,8 +176,6 @@
         </tbody>
       </table>
     </div>
-    <div class="card-footer">
-      {% include "paginator.html" %}
-    </div>
+    <div class="card-footer">{% include "paginator.html" %}</div>
   </div>
 {% endblock content %}

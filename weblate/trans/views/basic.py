@@ -65,6 +65,7 @@ from weblate.trans.models import (
     Change,
     Component,
     ComponentList,
+    JudgeRun,
     JudgeVerdict,
     Project,
     Translation,
@@ -78,7 +79,7 @@ from weblate.trans.models.judge import active_verdict, compute_context_hash
 from weblate.trans.models.project import prefetch_project_flags
 from weblate.trans.models.translation import GhostTranslation
 from weblate.trans.util import render, sort_unicode, translation_percent
-from weblate.trans.views.judge import last_judge_run
+from weblate.trans.views.judge import recent_judge_runs
 from weblate.trans.views.reports import get_reports_context
 from weblate.trans.workspace_move import can_offer_project_move
 from weblate.utils import messages
@@ -796,6 +797,13 @@ def judge_queue_strip_context(
     Building one is outside this task's file list. The two real, exactly
     corresponding links are ``breakdown_url`` and ``run_url`` below.
 
+    ``breakdown_url`` is now conditional: the :guilabel:`Breakdown by check`
+    link renders only while no run exists, because a finished page's run
+    menu replaces it (once any run does, the menu is the history surface and
+    a second link to the checks breakdown would only compete with it). The
+    link is kept in the context unconditionally so the zero-run rendering
+    stays a template decision, not a view one.
+
     ``hand_off_ready`` (Task 9) is deliberately conservative: cached counts
     decide *display* only. The CTA itself only ever appears when the cached
     counts already read clean (no critical, no escalation, every string
@@ -817,6 +825,7 @@ def judge_queue_strip_context(
         return None
     counts = None
     hand_off_ready = False
+    runs = recent_judge_runs(obj)
     if translations is not None:
         needs_human = not_reviewed = unparsed = judge_total = 0
         for translation in translations:
@@ -840,7 +849,8 @@ def judge_queue_strip_context(
         "breakdown_url": reverse("checks", kwargs={"path": obj.get_url_path()}),
         "run_url": f"{obj.get_absolute_url()}?{run_query}#auto",
         "counts": counts,
-        "last_run": last_judge_run(obj, actor=user),
+        "runs": runs,
+        "last_run": runs[0] if runs else None,
         "hand_off_ready": hand_off_ready,
         "download_url": reverse("download", kwargs={"path": obj.get_url_path()}),
     }
@@ -998,13 +1008,18 @@ def show_translation(
         )
         judge_request_estimate = judge_request_upper_bound(judge_row_count)
     judge_verdicts_exist = JudgeVerdict.objects.filter(unit__translation=obj).exists()
-    judge_last_run = None
+    # The autoform menu lists every actor's runs, newest first; the newest
+    # run doubles as the translation page's "latest report". The permission
+    # gate is the strip's own: without translation.auto and unit.review the
+    # list stays empty and the include renders nothing.
+    judge_runs: list[JudgeRun] = []
     if (
         settings.JUDGE_ENABLED
         and user.has_perm("translation.auto", obj)
         and user.has_perm("unit.review", obj)
     ):
-        judge_last_run = last_judge_run(obj, actor=user)
+        judge_runs = recent_judge_runs(obj)
+    judge_last_run = judge_runs[0] if judge_runs else None
     form = get_upload_form(user, obj)
 
     search_form = SearchForm(
@@ -1112,6 +1127,7 @@ def show_translation(
             "judge_row_count": judge_row_count,
             "judge_request_estimate": judge_request_estimate,
             "judge_verdicts_exist": judge_verdicts_exist,
+            "judge_runs": judge_runs,
             "judge_last_run": judge_last_run,
         },
     )
