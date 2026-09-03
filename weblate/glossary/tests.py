@@ -1249,6 +1249,14 @@ class AuditGlossaryCommandTest(GlossaryTest):
 
         self.assertIn("no findings", self.run_command())
 
+    def test_one_target_for_two_terms(self) -> None:
+        self.add_term("Dealer", "Trader", context="buyer")
+        self.add_term("Merchant", "Trader", context="ui")
+
+        output = self.run_command_expecting_findings()
+
+        self.assertIn("collapsed-terms", output)
+
 
 class GlossaryStemMatcherTest(ViewTestCase):
     """

@@ -126,4 +126,20 @@ class Command(BaseCommand):
                             " | ".join(values),
                         )
                     )
+            by_target: dict[str, set[str]] = defaultdict(set)
+            for source_unit_id, target in targets.items():
+                source = terms.get(source_unit_id)
+                if source:
+                    by_target[target.lower()].add(source.lower())
+            for target, sources in sorted(by_target.items()):
+                if len(sources) > 1:
+                    findings.append(
+                        Finding(
+                            "collapsed-terms",
+                            label,
+                            language,
+                            target,
+                            " | ".join(sorted(sources)),
+                        )
+                    )
         return findings
