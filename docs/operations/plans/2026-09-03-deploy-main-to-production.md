@@ -22,7 +22,7 @@
 Все шесть аддитивные (AddField/AlterField с дефолтом/blank) - схема впереди
 безопасна для отката кода на предыдущий образ.
 
-## Что едет (четыре линии)
+## Что едет (пять линий)
 
 1. **Judge zero-unparsed** (Tasks 1-6, merge `c12e8c7`): fail-fast на refused
    HTTP (400/401/422 и др. -> `http-request-invalid`, без вердикта, без
@@ -45,6 +45,14 @@
    разрешает значение; включает его правка `.env` в фазе 4. Seat 2: 945 -> 72
    output-токенов, 34.8 s -> 2.9 s, доля ризонинга 92.1% -> 0%, 16/16
    распарсено. Seat 1 остаётся с ризонингом (та же форма теряет recall).
+5. **`repeat-drift` + аудит глоссария** (merge `1254a44`, план
+   `docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md`):
+   проектный батч-чек «один и тот же текст источника переведён по-разному под
+   другим ключом» (`default_disabled=True`, режим распространения
+   `propagates = "repeat"`, кап 200 групп на языковую группу, в промпт MT не
+   передаётся, в `enforced_checks` не ставится) и read-only команда
+   `audit_glossary`. Чек **выключен по умолчанию** - включает флаг
+   `repeat-drift` на проекте, фаза 7.
 
 ## Поведенческие изменения без всякой настройки
 
@@ -201,7 +209,69 @@ WEBLATE_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2=json_schema
 `docs/operations/plans/2026-09-02-judge-fallback-and-triage-rollout.md`
 (фазы 4-6).
 
-### Фаза 7. Backfill кандидатов для бэклога (опционально, тратит деньги)
+### Фаза 7. Включение `repeat-drift` на проде (флаг проекта + updatechecks)
+
+Код регистрирует чек как `default_disabled=True`: без флага на проде он не
+даст ни одной строки. Порядок по задаче 15 плана.
+
+Шаг 1 - повторить пробу (read-only, с хоста, ничего не меняет):
+
+```sh
+PROD_WEBLATE_API_TOKEN=... uv run python analysis/probes/source-repeat-drift.py \
+    --captured-at <дата>
+```
+
+Ожидание для `need-for-greed` при исключённом глоссарии: **122 группы, 259
+юнитов**. Расхождение больше +-10% = корпус изменился, приёмочное число
+пересчитывается до включения.
+
+Шаг 2 - включить флаг на проекте (`check_flags` у всех восьми проектов сейчас
+пуст):
+
+```sh
+docker compose exec -T weblate weblate shell -c "
+from weblate.trans.models import Project
+p = Project.objects.get(slug='need-for-greed')
+p.check_flags = 'repeat-drift'
+p.save(update_fields=['check_flags'])
+print(repr(p.check_flags))
+"
+```
+
+Шаг 3 - пересчитать чеки по проекту и сверить число строк:
+
+```sh
+docker compose exec -T weblate weblate updatechecks --project need-for-greed
+docker compose exec -T weblate weblate shell -c "
+from weblate.checks.models import Check
+print(Check.objects.filter(name='repeat-drift', unit__translation__component__project__slug='need-for-greed').count())
+"
+```
+
+Приёмка: число строк совпадает с пробой шага 1 в пределах +-10%; чек виден в
+UI как :guilabel:`Inconsistent repeat` со списком других переводов; правка
+одного члена группы снимает карточку с соседей сразу; ни одна строка
+`repeat-drift` не попадает в промпт MT.
+
+Остальные семь проектов включаются только после собственной пробы
+(`--project <slug>`): приёмочного числа для них нет. `korotkij-test` пустой.
+
+Шаг 4 - аудит глоссария (read-only, отдельно от чека):
+
+```sh
+docker compose exec -T weblate weblate audit_glossary --project need-for-greed
+```
+
+Ожидание по плану: две находки класса A - намеренные омонимы миграции
+(`Белоземье`, `Сундук Конунга`). Принять их в
+`analysis/data/glossary-audit/need-for-greed.baseline` и перезапустить с
+`--baseline`, чтобы команда стала пригодна как гейт. Непринятая находка даёт
+`CommandError`.
+
+Откат: `p.check_flags = ''` + `updatechecks --project need-for-greed`; строки
+чека удаляются батч-проходом, правки переводов чек не делает.
+
+### Фаза 8. Backfill кандидатов для бэклога (опционально, тратит деньги)
 
 ```sh
 weblate judge_backfill_candidates <project>/<component>            # dry-run классификация
@@ -211,7 +281,7 @@ weblate judge_backfill_candidates <project>/<component> --write --user <u> --lim
 Только явный scope (`--all` отвергается). Сначала dry-run, потом write с
 лимитом.
 
-### Фаза 8. Финальная проверка включения
+### Фаза 9. Финальная проверка включения
 
 После всех фаз, одним заходом:
 
@@ -222,12 +292,16 @@ from weblate.trans.judge import (
     judge_fallback_endpoint,
     judge_seat_profiles,
 )
+from weblate.checks.models import Check
+from weblate.trans.models import Project
 from weblate.trans.models.judge import JudgeVerdict
 snap = judge_configuration_snapshot()
 print('judge enabled:', snap['enabled'])
 print('fallback configured:', judge_fallback_endpoint() is not None)
 print('reasoning per seat:', [p.reasoning for p in judge_seat_profiles()])
 print('openrouter-served verdicts:', JudgeVerdict.objects.filter(judge_provider='openrouter').count())
+print('repeat-drift flags:', {p.slug: p.check_flags for p in Project.objects.exclude(check_flags='')})
+print('repeat-drift rows:', Check.objects.filter(name='repeat-drift').count())
 "
 ```
 
@@ -237,7 +311,9 @@ print('openrouter-served verdicts:', JudgeVerdict.objects.filter(judge_provider=
 резерве, не в работе); `llm_usage_report --summary --days 1` зелёный, доля
 reasoning-токенов seat 2 нулевая; triage-карточка видна на странице перевода
 юнита с активным REJECT/FLAG (кандидат - `Suggestion` со специальным
-автором, кнопки Use/Keep/Re-check); русская локаль карточки на месте.
+автором, кнопки Use/Keep/Re-check); русская локаль карточки на месте;
+`repeat-drift flags` содержит включённые проекты и `repeat-drift rows`
+совпадает с пробой фазы 7.
 
 ### Очередь отложек - НЕ в этой выкатке
 
