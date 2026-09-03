@@ -27,7 +27,7 @@ from weblate.trans.tests.test_views import (
     ComponentTestCase,
     FixtureTestCase,
 )
-from weblate.utils.state import STATE_EMPTY, STATE_TRANSLATED
+from weblate.utils.state import STATE_EMPTY, STATE_FUZZY, STATE_TRANSLATED
 
 
 class PluralsCheckTest(TestCase):
@@ -367,5 +367,54 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
         check = RepeatDriftCheck()
         self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
         unit = self.add_unit(self.translation_1, "greet_outro", "hello", "Nazdar")
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_glossary_component_is_ignored(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Nazdar")
+        unit.translation.component.is_glossary = True
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_propagation_disabled_is_ignored(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Nazdar")
+        unit.translation.component.allow_translation_propagation = False
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_needs_editing_unit_is_ignored(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Nazdar")
+        unit.state = STATE_FUZZY
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_other_language_is_not_a_repeat(self) -> None:
+        check = RepeatDriftCheck()
+        german = self.component.translation_set.get(language__code="de")
+        self.add_unit(german, "greet_intro", "Hello", "Hallo")
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Ahoj")
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_source_language_translation_is_excluded(self) -> None:
+        check = RepeatDriftCheck()
+        czech = Language.objects.get(code="cs")
+        self.other.source_language = czech
+        self.other.save(update_fields=["source_language"])
+        self.translation_2.unit_set.create(
+            id_hash=9001,
+            position=9001,
+            context="greet_source",
+            source="Hello",
+            target="Nazdar",
+            state=STATE_TRANSLATED,
+        )
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Ahoj")
 
         self.assertFalse(check.check_target_unit([], [], unit))
