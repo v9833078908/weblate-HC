@@ -349,6 +349,12 @@ class ConsistencyCheckTest(SameSourceUnitsMixin, ComponentTestCase):
 
 
 class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
+    def enable_repeat_drift(self):
+        Component.objects.filter(project=self.project).update(
+            check_flags="repeat-drift"
+        )
+        return Component.objects.get(pk=self.component.pk)
+
     def test_same_source_different_key_drifts(self) -> None:
         check = RepeatDriftCheck()
         self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
@@ -466,3 +472,53 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
         self.assertNotIn('"TRANS_UNIT"."CONTEXT"', aggregate_sql)
         self.assertNotIn('"TRANS_UNIT"."ID_HASH"', aggregate_sql)
         self.assertNotIn('"TRANS_COMPONENT"', aggregate_sql)
+
+    def test_batch_pass_creates_and_clears_rows(self) -> None:
+        check = RepeatDriftCheck()
+        first = self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+
+        check.perform_batch(self.enable_repeat_drift())
+        self.assertEqual(
+            set(
+                Check.objects.filter(name="repeat-drift").values_list(
+                    "unit_id", flat=True
+                )
+            ),
+            {first.pk, second.pk},
+        )
+
+        Unit.objects.filter(pk=second.pk).update(target="Ahoj")
+        check.perform_batch(self.enable_repeat_drift())
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 0)
+
+    def test_ignore_flag_keeps_the_unit_clean(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+        Unit.objects.filter(pk=second.pk).update(extra_flags="ignore-repeat-drift")
+
+        check.perform_batch(self.enable_repeat_drift())
+
+        self.assertEqual(
+            list(
+                Check.objects.filter(name="repeat-drift").values_list(
+                    "unit_id", flat=True
+                )
+            ),
+            [self.translation_1.unit_set.get(context="greet_intro").pk],
+        )
+
+    def test_group_cap_is_reported(self) -> None:
+        check = RepeatDriftCheck()
+        check.batch_limit = 1
+        self.add_unit(self.translation_1, "one_a", "One", "Jeden")
+        self.add_unit(self.translation_1, "one_b", "One", "Jedna")
+        self.add_unit(self.translation_1, "two_a", "Two", "Dva")
+        self.add_unit(self.translation_1, "two_b", "Two", "Dvě")
+
+        with self.assertLogs("weblate", level="WARNING") as logs:
+            units = list(check.check_component(self.component))
+
+        self.assertIn("hit the 1 group cap", "\n".join(logs.output))
+        self.assertEqual(len(units), 2)
