@@ -4977,6 +4977,31 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual([item["check_id"] for item in failing], ["check_glossary"])
         self.assertEqual(advisories, [])
 
+    def test_repeat_drift_is_not_a_machine_defect(self) -> None:
+        machine = self.get_machine()
+
+        class NamedCheck:
+            dismissed = False
+            name = "repeat-drift"
+
+            def get_name(self) -> str:
+                return self.name
+
+            def get_machine_description(self) -> str:
+                return "Inconsistent repeat"
+
+        unit = make_unit(code="cs", source="Hello, world!", target="Nazdar světe!")
+        unit.__dict__["all_checks"] = [NamedCheck()]
+        typed_unit = cast("Unit", unit)
+
+        # ruff: ignore[private-member-access]
+        failing, advisories = machine._get_failing_checks_context(
+            typed_unit, typed_unit.source
+        )
+
+        self.assertEqual(failing, [])
+        self.assertEqual(advisories, [])
+
     def test_batch_size(self) -> None:
         # Measured, see analysis/data/col4-batch-size-eval.json: the generic 20 wasted
         # replies on truncation and the content filter, and answered no faster.
