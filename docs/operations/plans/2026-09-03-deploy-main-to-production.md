@@ -59,7 +59,7 @@
 - `WEBLATE_JUDGE_ENABLED=1`, `WEBLATE_JUDGE_DEFERRAL_ENABLED=0` (не трогать:
   включение очереди - Task 7 плана zero-unparsed, отдельное одобрение).
 - Ноль `WEBLATE_JUDGE_FALLBACK_*` в `/srv/hcgameloc/deploy/.env` - fallback
-  физически неактивен до фазы 4.
+  физически неактивен до фазы 5.
 - Очередь отложек пуста (`JudgeDeferral` незакрытых: 0).
 - Бэклог ложных refused-вердиктов: **100** (`unparsed=True` + HTTP 400/401).
 - `.env` правок для фазы 1 не требует; новые ключи в
@@ -91,18 +91,7 @@
 деплоя как `checkout:`); `weblate showmigrations trans` - `[X]` на
 `0113`..`0118`; логин 200.
 
-### Фаза 2. Smoke атрибуции (гейт варианта A)
-
-После первого нового LLM-батча:
-
-```sh
-docker compose exec -T weblate weblate llm_usage_report --summary --days 1
-```
-
-Приёмка: `priced_complete=yes`, `attribution_complete=yes`. Иначе - назвать
-строки и причину до попадания суммы в отчёт.
-
-### Фаза 3. Канарейка "рефактор ничего не изменил"
+### Фаза 2. Канарейка "рефактор ничего не изменил" + генерация новых LLM-строк
 
 ```sh
 docker compose exec -T weblate env JUDGE_CANARY_TRANSLATION_ID=<id> \
@@ -111,8 +100,25 @@ docker compose exec -T weblate env JUDGE_CANARY_TRANSLATION_ID=<id> \
 
 Компонент с уже распарсенными вердиктами; read-only
 (`writable_ids=set()`, `candidate_severities=()` - обязательно, иначе покупает
-MT). Приёмка: fallback не настроен по `judge_configuration_snapshot()`, ноль
-строк `judge_provider="openrouter"`, ноль отказов.
+MT). Этот прогон сам создаёт свежие `LLMUsageLog`-строки нового ledger
+(миграция `0113`), которые нужны фазе 3. Приёмка: fallback не настроен по
+`judge_configuration_snapshot()`, ноль строк `judge_provider="openrouter"`,
+ноль отказов, числа воспроизводят 2026-09-01.
+
+### Фаза 3. Smoke атрибуции LLM-расходов (включение llm costs)
+
+Ledger пишется всеми writers сразу после деплоя, но новый scope (`0113`)
+накапливается только на новых строках. После канарейки фазы 2:
+
+```sh
+docker compose exec -T weblate weblate llm_usage_report --summary --days 1
+```
+
+Приёмка: `priced_complete=yes`, `attribution_complete=yes` на свежих строках.
+Иначе - назвать конкретные строки и причину до попадания суммы в отчёт.
+Ожидаемый временный эффект, не регрессия: observed-cost preview в UI остаётся
+`available: false`, пока не накопится пять priced-строк нового ledger на
+каждый `(project_id_snapshot, service, model, operation)`.
 
 ### Фаза 4. Историческая чистка refused-вердиктов (деструктивная, guarded)
 
@@ -129,12 +135,33 @@ weblate judge_close_refused_verdicts --expected-count <total> --confirm
 удалено, run-unit строки реклассифицированы в `refused`, attempt ledger цел.
 Mismatch = автоматический abort.
 
-### Фаза 5. Настройка fallback (опционально, отдельное одобрение)
+### Фаза 5. Включение fallback на OpenRouter (обязательна, .env + recreate)
 
-Восемь `WEBLATE_JUDGE_FALLBACK_*` в `.env` (историческая пара
-`deepseek/deepseek-v4-pro` + `qwen/qwen3-235b-a22b-2507`, ключ из бэкапа
-канарейки), пересоздание контейнера, повтор канарейки: ноль
-`judge_provider="openrouter"` (настроен и простаивает). Детали и стоп-условия:
+Primary остаётся на LiteLLM. Дописать в `/srv/hcgameloc/deploy/.env` (предварительно
+`cp .env .env.bak-$(date +%Y%m%dT%H%M%SZ)-fallback`):
+
+```sh
+WEBLATE_JUDGE_FALLBACK_BASE_URL=https://openrouter.ai/api/v1
+WEBLATE_JUDGE_FALLBACK_API_KEY=<openrouter-key>
+WEBLATE_JUDGE_FALLBACK_MODEL_SEAT_1=deepseek/deepseek-v4-pro
+WEBLATE_JUDGE_FALLBACK_MODEL_SEAT_2=qwen/qwen3-235b-a22b-2507
+WEBLATE_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_1=
+WEBLATE_JUDGE_FALLBACK_REASONING_EFFORT_SEAT_2=
+WEBLATE_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1=json_schema
+WEBLATE_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2=json_schema
+```
+
+Историческая пара проверена живьём 2026-09-02: оба эндпоинта ответили 200 и
+распарсились. Ключ нужен OpenRouter-аккаунтовый (в продовом `.env` и бэкапах
+его нет - в бэкапе канарейки лежит только loc-kit-ключ; валидатор требует
+непустой `JUDGE_FALLBACK_API_KEY`, иначе `JudgeError` до первого запроса).
+Контейнер **пересоздаётся** (`docker compose up -d weblate` из `deploy/`):
+environment запекается при создании.
+
+Приёмка: `judge_configuration_snapshot()` показывает оба эндпоинта; повтор
+канарейки фазы 2 даёт ноль строк `judge_provider="openrouter"` - fallback
+настроен и простаивает (срабатывает только при сбое primary). Детали,
+наблюдение и стоп-условия:
 `docs/operations/plans/2026-09-02-judge-fallback-and-triage-rollout.md`
 (фазы 4-6).
 
@@ -148,7 +175,29 @@ weblate judge_backfill_candidates <project>/<component> --write --user <u> --lim
 Только явный scope (`--all` отвергается). Сначала dry-run, потом write с
 лимитом.
 
-### Фаза 7. Очередь отложек - НЕ в этой выкатке
+### Фаза 7. Финальная проверка включения
+
+После всех фаз, одним заходом:
+
+```sh
+docker compose exec -T weblate weblate shell -c "
+from weblate.trans.judge import judge_configuration_snapshot, judge_fallback_endpoint
+from weblate.trans.models.judge import JudgeVerdict
+snap = judge_configuration_snapshot()
+print('judge enabled:', snap['enabled'])
+print('fallback configured:', judge_fallback_endpoint() is not None)
+print('openrouter-served verdicts:', JudgeVerdict.objects.filter(judge_provider='openrouter').count())
+"
+```
+
+Приёмка: `judge enabled: True`; `fallback configured: True`; канарейка после
+recreate по-прежнему даёт ноль openrouter-вердиктов (fallback в резерве, не в
+работе); `llm_usage_report --summary --days 1` зелёный; triage-карточка
+видна на странице перевода юнита с активным REJECT/FLAG (кандидат -
+`Suggestion` со специальным автором, кнопки Use/Keep/Re-check); русская
+локаль карточки на месте.
+
+### Очередь отложек - НЕ в этой выкатке
 
 `WEBLATE_JUDGE_DEFERRAL_ENABLED=1` - Task 7 плана
 `docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`: dev-lifecycle,
@@ -157,9 +206,11 @@ scheduler proof, controlled drain (два отдельных одобрения)
 ## Откат
 
 - **Код**: предыдущий образ (`53f2ac1`); схема впереди безопасна.
-- **Fallback**: сначала очистить все восемь `WEBLATE_JUDGE_FALLBACK_*`, потом
-  полный primary-профиль, пересоздать контейнер (валидатор отвергает равенство
-  base URL, очистка обязана идти первой).
+- **Fallback**: очистить все восемь `WEBLATE_JUDGE_FALLBACK_*` в `.env` и
+  пересоздать контейнер; primary (LiteLLM) при этом не меняется.
+  Переключение primary на OpenRouter - отдельная операция: сначала очистка
+  fallback-полей, потом полный provider-профиль primary (валидатор отвергает
+  равенство base URL, очистка обязана идти первой).
 - **Отложки** (если когда-либо включены): `JUDGE_DEFERRAL_OPERATOR_STOPPED=1`
   - recreate - блокирует платные drain-вызовы, строки сохраняются.
 
