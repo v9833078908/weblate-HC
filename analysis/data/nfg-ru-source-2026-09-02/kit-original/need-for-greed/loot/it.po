@@ -1,0 +1,632 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-25 18:39+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Italian <http://l10n.herocraft.com/projects/need-for-greed/"
+"loot/it/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: it\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 145034502144
+msgid "ring"
+msgstr "Anello"
+
+#: 180082106368
+msgid "dagger"
+msgstr "Pugnale"
+
+#: 269412392960
+msgid "necklace"
+msgstr "Collana"
+
+#: 317432979456
+msgid "treasureGoldScepter3GT1.1"
+msgstr "Scettro d'oro"
+
+#: 391995121664
+msgid "bracelet"
+msgstr "Braccialetto"
+
+#: 430343643136
+msgid "brooch"
+msgstr "Spilla"
+
+#: 479966453760
+msgid "diadem"
+msgstr "Diadema"
+
+#: 549466071040
+msgid "casket"
+msgstr "Cofanetto"
+
+#: 610409308160
+msgid "treasureGoldCrownT1.1"
+msgstr "Corona d'oro"
+
+#: 877821353984
+msgid "diamondBig"
+msgstr "Diamante puro (grande)"
+
+#: 918229278720
+msgid "diamondMedium"
+msgstr "Diamante puro (medio)"
+
+#: 966572826624
+msgid "diamondSmall"
+msgstr "Diamante puro (piccolo)"
+
+#: 1109162385408
+msgid "rubyBig"
+msgstr "Rubino Cremisi (Grande)"
+
+#: 1112484274176
+msgid "rubyMedium"
+msgstr "Rubino Cremisi (Medio)"
+
+#: 1118599569408
+msgid "rubySmall"
+msgstr "Rubino cremisi (piccolo)"
+
+#: 1382245130240
+msgid "sapphireBig"
+msgstr "Zaffiro blu (grande)"
+
+#: 1385105645568
+msgid "sapphireMedium"
+msgstr "Zaffiro blu (medio)"
+
+#: 1387160854528
+msgid "sapphireSmall"
+msgstr "Zaffiro blu (piccolo)"
+
+#: 1624038367232
+msgid "emeraldBig"
+msgstr "Smeraldo (grande)"
+
+#: 1626538172416
+msgid "emeraldMedium"
+msgstr "Smeraldo (medio)"
+
+#: 1628039733248
+msgid "emeraldSmall"
+msgstr "Smeraldo (piccolo)"
+
+#: 1775394021376
+msgid "amethystBig"
+msgstr "Ametista (grande)"
+
+#: 1778531360768
+msgid "amethystMedium"
+msgstr "Ametista (media)"
+
+#: 1781240881152
+msgid "amethystSmall"
+msgstr "Ametista (piccola)"
+
+#: 1975328104448
+msgid "opalBig"
+msgstr "Opale (grande)"
+
+#: 1977366536192
+msgid "opalMedium"
+msgstr "Opale (medio)"
+
+#: 1978461249536
+msgid "opalSmall"
+msgstr "Opale (piccolo)"
+
+#: 90993176100474880
+msgid "diamondRough"
+msgstr "Diamante (grezzo)"
+
+#: 90994685357854720
+msgid "amethystRough"
+msgstr "Ametista (grezza)"
+
+#: 90995679407902720
+msgid "emeraldRough"
+msgstr "Smeraldo (grezzo)"
+
+#: 90995991497674752
+msgid "opalRough"
+msgstr "Opale (grezzo)"
+
+#: 90996287313547264
+msgid "rubyRough"
+msgstr "Rubino (grezzo)"
+
+#: 90996648090800128
+msgid "sapphireRough"
+msgstr "Zaffiro (grezzo)"
+
+#: 91104301592875008
+msgid "goldSmall"
+msgstr "Pepita d'oro (piccola)"
+
+#: 170368899466137600
+msgid "eggBird"
+msgstr "Uovo di uccello del paradiso"
+
+#: 184508261447503872
+msgid "goldMedium"
+msgstr "Pezzo d'oro grande"
+
+#: 184510784782733312
+msgid "goldBig"
+msgstr "Pepita d'oro (grande)"
+
+#: 223644980889260032
+msgid "trash"
+msgstr "Spazzatura"
+
+#: 226530276224012288
+msgid "pin"
+msgstr "Spilla"
+
+#: 226809520472723456
+msgid "earring"
+msgstr "Orecchino"
+
+#: 231192180821331968
+msgid "glasses"
+msgstr "Occhiali"
+
+#: 236643067328991232
+msgid "loveBig"
+msgstr "Pietra del legame (grande)"
+
+#: 236643187822956544
+msgid "loveMedium"
+msgstr "Pietra del legame (media)"
+
+#: 236643238079107072
+msgid "gemBirdSmall"
+msgstr "Gemma aviaria"
+
+#: 253417221730340864
+msgid "geodeMedium"
+msgstr "Geode (medio)"
+
+#: 254185922679279616
+msgid "gemRoughMedium"
+msgstr "Gemma selvatica (media)"
+
+#: 254905974785314816
+msgid "artifact"
+msgstr "Artefatto"
+
+#: 255083397128654848
+msgid "meteoriteIronSmall"
+msgstr "Ferro stellare (piccolo)"
+
+#: 256721089700564992
+msgid "mask"
+msgstr "Maschera"
+
+#: 256721248970870784
+msgid "treasureGoldGlove5GT1.1"
+msgstr "Guanto d'oro"
+
+#: 257443856536309760
+msgid "silverSmall"
+msgstr "Pepita d'argento (piccola)"
+
+#: 258521155209793536
+msgid "idol"
+msgstr "Idolo"
+
+#: 300784345364566016
+msgid "goldSmallCoin"
+msgstr "Moneta antica (oro)"
+
+#: 300784550382145536
+msgid "silverSmallCoin"
+msgstr "Moneta antica (argento)"
+
+#: 300785063425216512
+msgid "gemLoveSmall"
+msgstr "Pietra del legame (piccola)"
+
+#: 301130818094632960
+msgid "artifactBirdEntity"
+msgstr "Tuorlo della fortuna"
+
+#: 301131059615240192
+msgid "artifactWormEntity"
+msgstr "Larva di Palude"
+
+#: 301131351488466944
+msgid "artifactGalaxyMechanism"
+msgstr "Nucleo di Meteora"
+
+#: 301131515259260928
+msgid "artifactBook"
+msgstr "Tomo antico"
+
+#: 301131609035509760
+msgid "artifactManuscript"
+msgstr "Pergamena logora"
+
+#: 301131692661542912
+msgid "artifactTablet"
+msgstr "Pietra del Patto"
+
+#: 301131928431759360
+msgid "cursedItem"
+msgstr "Reliquia maledetta"
+
+#: 301134437837705216
+msgid "chest"
+msgstr "Forziere sepolto"
+
+#: 301134754209861632
+msgid "eggWorm"
+msgstr "Uovo di verme"
+
+#: 301134952529137664
+msgid "geodeSmall"
+msgstr "Geode (piccolo)"
+
+#: 301135305941192704
+msgid "geodeGemSmall"
+msgstr "Geode prezioso (piccolo)"
+
+#: 301135432625950720
+msgid "geodeGemMedium"
+msgstr "Geode prezioso (medio)"
+
+#: 301136788187254784
+msgid "goldSmallScarab"
+msgstr "Scarabeo d'oro"
+
+#: 301138401769558016
+msgid "gemRoughSmall"
+msgstr "Gemma selvatica (piccola)"
+
+#: 301138758054711296
+msgid "roughDaggerT1"
+msgstr "Pugnale della Volontà fratturato"
+
+#: 301138888757612544
+msgid "roughMaskT1"
+msgstr "Maschera del volto rotta"
+
+#: 301139046975148032
+msgid "roughtScepterT1"
+msgstr "Scettro Frantumato"
+
+#: 301139166772858880
+msgid "roughCrownT1"
+msgstr "Corona fratturata"
+
+#: 301139272288964608
+msgid "roughGloveT1"
+msgstr "Guanto Incrinato"
+
+#: 301139595988570112
+msgid "unknownItem"
+msgstr "Oggetto sconosciuto"
+
+#: 301139858380034048
+msgid "treasureGoldEarring1GT1.1"
+msgstr "Medaglione radioso (oro)"
+
+#: 301140049422192640
+msgid "treasureGoldNecklace1GT1.1"
+msgstr "Spilla da giardino fiorito (oro)"
+
+#: 301140236874027008
+msgid "treasureGoldNecklace1GT1.2"
+msgstr "Ciondolo di luce nascosta (oro)"
+
+#: 301140518961942528
+msgid "treasureGoldPin1GT1.1"
+msgstr "Spilla con Gemma Nascosta (Oro)"
+
+#: 301140708619980800
+msgid "treasureGoldRing1GT1.1"
+msgstr "Anello (oro)"
+
+#: 301157185821609984
+msgid "treasureGoldRing1GT1.2"
+msgstr "Braccialetto di pietra stretto (oro)"
+
+#: 301157418504818688
+msgid "treasureGoldRing1GT1.3"
+msgstr "Sigillo del Re (Oro)"
+
+#: 301157807581040640
+msgid "treasureGoldRing1GT1.4"
+msgstr "Sigillo del Sovrano (Oro)"
+
+#: 301157950980100096
+msgid "treasureGoldBrooch2GT1.1"
+msgstr "Spilla a Raggi di Sole (Oro)"
+
+#: 301159108893216768
+msgid "treasureGoldDagger2GT1.1"
+msgstr "Pugnale d'oro della Volontà"
+
+#: 301159380533121024
+msgid "treasureGoldEarring2GT1.1"
+msgstr "Orecchini risonanti (oro)"
+
+#: 301159536917745664
+msgid "treasureGoldGlasses2GT1.1"
+msgstr "Occhiali della vanità (Oro)"
+
+#: 301159731252432896
+msgid "treasureGoldMask2GT1.1"
+msgstr "Maschera del volto d'oro"
+
+#: 301159892582141952
+msgid "treasureGoldRing2GT1.1"
+msgstr "Anello dei Destini Gemelli (Oro)"
+
+#: 301160906458664960
+msgid "treasureMeteoriteIron1GT1.1"
+msgstr "Anello Celeste"
+
+#: 301161084104216576
+msgid "treasureMeteoriteIron2GT1.1"
+msgstr "Anello Celeste"
+
+#: 301161408911118336
+msgid "treasureSilverNecklace1GT1.1"
+msgstr "Cintura legata (argento)"
+
+#: 301161581187960832
+msgid "treasureSilverRing1GT1.1"
+msgstr "Anello al Chiaro di Luna (Argento)"
+
+#: 301161692269907968
+msgid "treasureSilverRing1GT1.2"
+msgstr "Anello del Serpente (Argento)"
+
+#: 301161856397217792
+msgid "treasureSilverRing1GT1.3"
+msgstr "Sigillo a Tentacolo (Argento)"
+
+#: 301162192604237824
+msgid "treasureSilverPin1GT1.1"
+msgstr "Ago d'onore (argento)"
+
+#: 304825262794870784
+msgid "artifactGoldCoinCheap"
+msgstr "Moneta Muschiosa"
+
+#: 304825379492990976
+msgid "artifactGoldCoin"
+msgstr "Moneta Stregata"
+
+#: 304825491313135616
+msgid "artifactGoldCoinBest"
+msgstr "Moneta di antica gloria"
+
+#: 304826479935754240
+msgid "treasure2GIdolCheapT1.1"
+msgstr "Idolo del cinghiale del pover'uomo"
+
+#: 304826631895388160
+msgid "treasure2GIdolT1.1"
+msgstr "Idolo del Grande Cinghiale"
+
+#: 304826724413345792
+msgid "treasure2GIdolCheapT1.2"
+msgstr "Idolo della Testa Bruciacchiata"
+
+#: 304827057936011264
+msgid "treasure2GIdolT1.2"
+msgstr "Idolo del Teschio Fiammeggiante"
+
+#: 308071776790249472
+msgid "Lem"
+msgstr "Scatola dei ricordi"
+
+#: 308087884024905728
+msgid "Tablet.Cheap"
+msgstr "Pietra misteriosa"
+
+#: 308103528141291520
+msgid "Flop"
+msgstr "Floppy con Flopcoin"
+
+#: 308105688279154688
+msgid "Flop.Cheap"
+msgstr "Unità fittizia"
+
+#: 308108977548820480
+msgid "Shit"
+msgstr "Sacro Cioccolato di Dubai"
+
+#: 308109676152094720
+msgid "Shit.Cheap"
+msgstr "Torta di sterco"
+
+#: 308112391376732160
+msgid "Frid"
+msgstr "Maschera del venerdì sera"
+
+#: 308113442167324672
+msgid "Frid.Cheap"
+msgstr "Maschera di lunedì 12"
+
+#: 308116274564038656
+msgid "Jur"
+msgstr "Fonte del Sangue Antico"
+
+#: 308116311943675904
+msgid "Jur.Cheap"
+msgstr "Zanzara di Colofonia"
+
+#: 308118123144806400
+msgid "Tooth"
+msgstr "Dente di Gengis Khan"
+
+#: 308118125929824256
+msgid "Tooth.Cheap"
+msgstr "Il tuo dente?!?"
+
+#: 331272749512396800
+msgid "cryolisSmall"
+msgstr "Pepita di Cryolis (piccola)"
+
+#: 332799018326560768
+msgid "frozenItem"
+msgstr "Oggetto congelato"
+
+#: 344256652787322880
+msgid "emberSphere"
+msgstr "Sfera Solare"
+
+#: 344256998452498432
+msgid "gemIdolHearthSmall"
+msgstr "Focolare dell'Idolo"
+
+#: 344257252614737920
+msgid "sparkwing"
+msgstr "Sparkwing"
+
+#: 345838386553294848
+msgid "collected"
+msgstr "Raccolto"
+
+#: 352860554265776128
+msgid "treasure.3g.idol.cheap.t1.1"
+msgstr "Idolo della Baffutosità"
+
+#: 352861521468084224
+msgid "treasure.3g.idol.t1.1"
+msgstr "Idolo della Saggezza"
+
+#: 355564928933298176
+msgid "winter.chest"
+msgstr "Forziere dello Jarl"
+
+#: 355819897745833984
+msgid "gold.medium.t1.2"
+msgstr "Pezzo d'oro contorto"
+
+#: 355820315255242752
+msgid "gold.medium.t1.3"
+msgstr "Pezzo d'oro splendido"
+
+#: 355820677206900736
+msgid "gold.small.t1.bad"
+msgstr "Oro sbriciolato"
+
+#: 355820843536220160
+msgid "gold.small.t1.good"
+msgstr "Pepita d'oro incontaminata"
+
+#: 355821218943205376
+msgid "silver.small.t1.bad"
+msgstr "Argento opaco"
+
+#: 355821334773104640
+msgid "silver.small.t1.good"
+msgstr "Pepita d'argento scintillante"
+
+#: 355823949699350528
+msgid "gem.diamond.big.bad"
+msgstr "Diamante grande scheggiato"
+
+#: 355824022109814784
+msgid "gem.diamond.big.good"
+msgstr "Diamante Colossale"
+
+#: 355825018307346432
+msgid "gem.diamond.medium.t1.bad"
+msgstr "Diamante imperfetto (medio)"
+
+#: 355825051593342976
+msgid "gem.diamond.medium.t1.good"
+msgstr "Diamante impeccabile (medio)"
+
+#: 355825892232527872
+msgid "gem.opal.small.t1.bad"
+msgstr "Opale torbido"
+
+#: 355825926491602944
+msgid "gem.opal.small.t1.good"
+msgstr "Opale Luminoso"
+
+#: 355831675162722304
+msgid "gem.ruby.small.t1.bad"
+msgstr "Rubino marrone"
+
+#: 355831712475250688
+msgid "gem.ruby.small.t1.good"
+msgstr "Rubino color sangue cremisi"
+
+#: 355835925297102848
+msgid "gem.sapphire.medium.t1.bad"
+msgstr "Zaffiro sbilenco"
+
+#: 355835927612358656
+msgid "gem.sapphire.medium.t1.good"
+msgstr "Zaffiro Celeste"
+
+#: 360176275164499968
+msgid "frozen.artifact.book.t4.1"
+msgstr "Tomo antico congelato"
+
+#: 360177589508378624
+msgid "frozen.daimond.big.t1.1"
+msgstr "Diamante congelato (grande)"
+
+#: 360177807297613824
+msgid "frozen.daimond.medium.t1.1"
+msgstr "Diamante congelato (medio)"
+
+#: 360177937186820096
+msgid "frozen.gold.medium.t1.1"
+msgstr "Pezzo d'oro grande congelato"
+
+#: 360178211246837760
+msgid "frozen.gold.small.t1"
+msgstr "Pepita d'oro congelata (piccola)"
+
+#: 360178467921465344
+msgid "frozen.silver.small.t1"
+msgstr "Pepita d'argento ghiacciata (piccola)"
+
+#: 360179617257230336
+msgid "frozen.opal.small.t1.1"
+msgstr "Opale congelato (piccolo)"
+
+#: 360179817572995072
+msgid "frozen.ruby.small.t1.1"
+msgstr "Rubino congelato (piccolo)"
+
+#: 360180105012842496
+msgid "frozen.sapphire.small.t1.1"
+msgstr "Zaffiro ghiacciato (piccolo)"
+
+#: 360180385796329472
+msgid "frozen.treasure.1g.idol"
+msgstr "Idolo congelato"
+
+#: 366715237467164672
+msgid "treasureCryolisEarring2GT1.1"
+msgstr "Orecchini Scintillanti"
+
+#: 366715787273310208
+msgid "treasureCryolisEarring2GT1.2"
+msgstr "Orecchini al Chiaro di Luna"
+
+#: 366715935038640128
+msgid "treasureCryolisEarring2GT1.3"
+msgstr "Sguardo Glaciale"
+
+#: 366716149346603008
+msgid "treasureCryolisEarring2GT1.4"
+msgstr "Lago al Chiaro di Luna"

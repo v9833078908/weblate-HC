@@ -1,0 +1,1525 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE martif PUBLIC "ISO 12200:1999A//DTD MARTIF core (DXFcdV04)//EN" "TBXcdv04.dtd">
+<martif type="TBX" xml:lang="en">
+    <martifHeader>
+        <fileDesc>
+            <sourceDesc>
+                <p>Weblate Glossary</p>
+            </sourceDesc>
+        </fileDesc>
+    </martifHeader>
+    <text>
+        <body>
+            <termEntry id="[&quot;&quot;,&quot;Coins&quot;]">
+                <langSet xml:lang="en"><tig><term>Coins</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Monete</term></tig></langSet>
+                <descrip>[UI] coins</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Forge&quot;]">
+                <langSet xml:lang="en"><tig><term>Forge</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Fucina</term></tig></langSet>
+                <descrip>[UI] forge</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Idol&quot;]">
+                <langSet xml:lang="en"><tig><term>Idol</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Idolo</term></tig></langSet>
+                <descrip>[Loot] idol</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Necklace&quot;]">
+                <langSet xml:lang="en"><tig><term>Necklace</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Collana</term></tig></langSet>
+                <descrip>[Loot] necklace</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Pure Diamond (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Pure Diamond (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Diamante puro (piccolo)</term></tig></langSet>
+                <descrip>[Loot] diamondSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;A New Glasses&quot;]">
+                <langSet xml:lang="en"><tig><term>A New Glasses</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Un nuovo paio di occhiali</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.1Step2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;All about the likes!&quot;]">
+                <langSet xml:lang="en"><tig><term>All about the likes!</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Tutto sui mi piace!</term></tig></langSet>
+                <descrip>[UI] upgradeTradeMoreLikesStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Altar&quot;]">
+                <langSet xml:lang="en"><tig><term>Altar</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Altare</term></tig></langSet>
+                <descrip>[UI] upgradeCraftCurseRemovalSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Amethyst (Big)&quot;]">
+                <langSet xml:lang="en"><tig><term>Amethyst (Big)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Ametista (grande)</term></tig></langSet>
+                <descrip>[Loot] amethystBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Big bag&quot;]">
+                <langSet xml:lang="en"><tig><term>Big bag</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Borsa grande</term></tig></langSet>
+                <descrip>[UI] upgradeVehicleWeightStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Covenant Stone&quot;]">
+                <langSet xml:lang="en"><tig><term>Covenant Stone</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pietra del Patto</term></tig></langSet>
+                <descrip>[Loot] artifactTablet</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Horse&quot;]">
+                <langSet xml:lang="en"><tig><term>Horse</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Cavallo</term></tig></langSet>
+                <descrip>[Tutorial] horse</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Ice Cubes&quot;]">
+                <langSet xml:lang="en"><tig><term>Ice Cubes</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Cubetti di ghiaccio</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.1Step1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Mangled Gold Chunk&quot;]">
+                <langSet xml:lang="en"><tig><term>Mangled Gold Chunk</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pezzo d'oro contorto</term></tig></langSet>
+                <descrip>[Loot] gold.medium.t1.2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Opal (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Opal (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Opale (piccolo)</term></tig></langSet>
+                <descrip>[Loot] opalSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Silver coins&quot;]">
+                <langSet xml:lang="en"><tig><term>Silver coins</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Monete d'argento</term></tig></langSet>
+                <descrip>[UI] softCurrency</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Trash&quot;]">
+                <langSet xml:lang="en"><tig><term>Trash</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Spazzatura</term></tig></langSet>
+                <descrip>[Loot] trash; [UI] trash</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Amethyst (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Amethyst (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Ametista (media)</term></tig></langSet>
+                <descrip>[Loot] amethystMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Amethyst (Rough)&quot;]">
+                <langSet xml:lang="en"><tig><term>Amethyst (Rough)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Ametista (grezza)</term></tig></langSet>
+                <descrip>[Loot] amethystRough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Amethyst (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Amethyst (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Ametista (piccola)</term></tig></langSet>
+                <descrip>[Loot] amethystSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Ancient Coin (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>Ancient Coin (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Moneta antica (oro)</term></tig></langSet>
+                <descrip>[Loot] goldSmallCoin</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Ancient Coin (Silver)&quot;]">
+                <langSet xml:lang="en"><tig><term>Ancient Coin (Silver)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Moneta antica (argento)</term></tig></langSet>
+                <descrip>[Loot] silverSmallCoin</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Ancient Money&quot;]">
+                <langSet xml:lang="en"><tig><term>Ancient Money</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Denaro antico</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Ancient Tome&quot;]">
+                <langSet xml:lang="en"><tig><term>Ancient Tome</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Tomo antico</term></tig></langSet>
+                <descrip>[Loot] artifactBook</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Appraisal&quot;]">
+                <langSet xml:lang="en"><tig><term>Appraisal</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Valutazione</term></tig></langSet>
+                <descrip>[UI] unknownSlot</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Artifact&quot;]">
+                <langSet xml:lang="en"><tig><term>Artifact</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Artefatto</term></tig></langSet>
+                <descrip>[Loot] artifact; [UI] artifact</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Artifacts&quot;]">
+                <langSet xml:lang="en"><tig><term>Artifacts</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Artefatti</term></tig></langSet>
+                <descrip>[UI] artifacts</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Avian Gemstone&quot;]">
+                <langSet xml:lang="en"><tig><term>Avian Gemstone</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Gemma aviaria</term></tig></langSet>
+                <descrip>[Loot] gemBirdSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Backpack&quot;]">
+                <langSet xml:lang="en"><tig><term>Backpack</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Zaino</term></tig></langSet>
+                <descrip>[UI] backpack</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Bad profit&quot;]">
+                <langSet xml:lang="en"><tig><term>Bad profit</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Cattivo profitto</term></tig></langSet>
+                <descrip>[UI] badProfit</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Ball-Roller&quot;]">
+                <langSet xml:lang="en"><tig><term>Ball-Roller</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Rullo di sfere</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Beacon&quot;]">
+                <langSet xml:lang="en"><tig><term>Beacon</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Faro</term></tig></langSet>
+                <descrip>[UI] terrain2Biome2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Belomar&quot;]">
+                <langSet xml:lang="en"><tig><term>Belomar</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Belomar</term></tig></langSet>
+                <descrip>[UI] terrain2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Best Heater&quot;]">
+                <langSet xml:lang="en"><tig><term>Best Heater</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Miglior riscaldatore</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Best profit&quot;]">
+                <langSet xml:lang="en"><tig><term>Best profit</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Miglior profitto</term></tig></langSet>
+                <descrip>[UI] bestProfit</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Big Deal&quot;]">
+                <langSet xml:lang="en"><tig><term>Big Deal</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Grande affare</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step7Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Big Owl&quot;]">
+                <langSet xml:lang="en"><tig><term>Big Owl</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Grande gufo</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step6Thank</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Bird&quot;]">
+                <langSet xml:lang="en"><tig><term>Bird</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Uccello</term></tig></langSet>
+                <descrip>[UI] bird</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Bleed&quot;]">
+                <langSet xml:lang="en"><tig><term>Bleed</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Sanguinamento</term></tig></langSet>
+                <descrip>[UI] statEffectDamageBleed</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Blooming Garden Brooch (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>Blooming Garden Brooch (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Spilla da giardino fiorito (oro)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldNecklace1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Blue Sapphire (Big)&quot;]">
+                <langSet xml:lang="en"><tig><term>Blue Sapphire (Big)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Zaffiro blu (grande)</term></tig></langSet>
+                <descrip>[Loot] sapphireBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Blue Sapphire (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Blue Sapphire (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Zaffiro blu (medio)</term></tig></langSet>
+                <descrip>[Loot] sapphireMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Blue Sapphire (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Blue Sapphire (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Zaffiro blu (piccolo)</term></tig></langSet>
+                <descrip>[Loot] sapphireSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Bonded Belt (Silver)&quot;]">
+                <langSet xml:lang="en"><tig><term>Bonded Belt (Silver)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Cintura legata (argento)</term></tig></langSet>
+                <descrip>[Loot] treasureSilverNecklace1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Bondstone (Big)&quot;]">
+                <langSet xml:lang="en"><tig><term>Bondstone (Big)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pietra del legame (grande)</term></tig></langSet>
+                <descrip>[Loot] loveBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Bondstone (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Bondstone (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pietra del legame (media)</term></tig></langSet>
+                <descrip>[Loot] loveMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Bondstone (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Bondstone (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pietra del legame (piccola)</term></tig></langSet>
+                <descrip>[Loot] gemLoveSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Bracelet&quot;]">
+                <langSet xml:lang="en"><tig><term>Bracelet</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Braccialetto</term></tig></langSet>
+                <descrip>[Loot] bracelet</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Broken Visage Mask&quot;]">
+                <langSet xml:lang="en"><tig><term>Broken Visage Mask</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Maschera del volto rotta</term></tig></langSet>
+                <descrip>[Loot] roughMaskT1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Brooch&quot;]">
+                <langSet xml:lang="en"><tig><term>Brooch</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Spilla</term></tig></langSet>
+                <descrip>[Loot] brooch</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Brown Ruby&quot;]">
+                <langSet xml:lang="en"><tig><term>Brown Ruby</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Rubino marrone</term></tig></langSet>
+                <descrip>[Loot] gem.ruby.small.t1.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Buried Chest&quot;]">
+                <langSet xml:lang="en"><tig><term>Buried Chest</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Forziere sepolto</term></tig></langSet>
+                <descrip>[Loot] chest</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Buyer&quot;]">
+                <langSet xml:lang="en"><tig><term>Buyer</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Acquirente</term></tig></langSet>
+                <descrip>[Tutorial] buyer</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Canary&quot;]">
+                <langSet xml:lang="en"><tig><term>Canary</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Canarino</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step3Description; [Tutorial] DialogueBeforeBirdCharacter2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Capacity&quot;]">
+                <langSet xml:lang="en"><tig><term>Capacity</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Capacità</term></tig></langSet>
+                <descrip>[UI] upgradeStorageWeightStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Casket&quot;]">
+                <langSet xml:lang="en"><tig><term>Casket</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Cofanetto</term></tig></langSet>
+                <descrip>[Loot] casket</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Celestial Ring&quot;]">
+                <langSet xml:lang="en"><tig><term>Celestial Ring</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Anello Celeste</term></tig></langSet>
+                <descrip>[Loot] treasureMeteoriteIron1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Character&quot;]">
+                <langSet xml:lang="en"><tig><term>Character</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Personaggio</term></tig></langSet>
+                <descrip>[Tutorial] character</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Character Status&quot;]">
+                <langSet xml:lang="en"><tig><term>Character Status</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Stato del personaggio</term></tig></langSet>
+                <descrip>[UI] effects</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Chest&quot;]">
+                <langSet xml:lang="en"><tig><term>Chest</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Forziere</term></tig></langSet>
+                <descrip>[UI] chest</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Chest of the Jarl&quot;]">
+                <langSet xml:lang="en"><tig><term>Chest of the Jarl</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Forziere dello Jarl</term></tig></langSet>
+                <descrip>[Loot] winter.chest</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Chest slot&quot;]">
+                <langSet xml:lang="en"><tig><term>Chest slot</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Slot forziere</term></tig></langSet>
+                <descrip>[UI] upgradeCraftChestSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Chests&quot;]">
+                <langSet xml:lang="en"><tig><term>Chests</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Forzieri</term></tig></langSet>
+                <descrip>[UI] chests</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Chipped Big Diamond&quot;]">
+                <langSet xml:lang="en"><tig><term>Chipped Big Diamond</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Diamante grande scheggiato</term></tig></langSet>
+                <descrip>[Loot] gem.diamond.big.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Coco&quot;]">
+                <langSet xml:lang="en"><tig><term>Coco</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Coco</term></tig></langSet>
+                <descrip>[UI] upgradeCraftEggSlotsStatDescription</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Coin of Ancient Glory&quot;]">
+                <langSet xml:lang="en"><tig><term>Coin of Ancient Glory</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Moneta di antica gloria</term></tig></langSet>
+                <descrip>[Loot] artifactGoldCoinBest</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Collected&quot;]">
+                <langSet xml:lang="en"><tig><term>Collected</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Raccolto</term></tig></langSet>
+                <descrip>[Loot] collected</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Colophony Mosquito&quot;]">
+                <langSet xml:lang="en"><tig><term>Colophony Mosquito</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Zanzara di Colofonia</term></tig></langSet>
+                <descrip>[Loot] Jur.Cheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Colossal Diamond&quot;]">
+                <langSet xml:lang="en"><tig><term>Colossal Diamond</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Diamante Colossale</term></tig></langSet>
+                <descrip>[Loot] gem.diamond.big.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Common&quot;]">
+                <langSet xml:lang="en"><tig><term>Common</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Comune</term></tig></langSet>
+                <descrip>[UI] common</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Cosmic Intruder&quot;]">
+                <langSet xml:lang="en"><tig><term>Cosmic Intruder</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Intruso Cosmico</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Count Blingula&quot;]">
+                <langSet xml:lang="en"><tig><term>Count Blingula</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Conte Blingula</term></tig></langSet>
+                <descrip>[Buyers] Buyer10</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Crab Metal&quot;]">
+                <langSet xml:lang="en"><tig><term>Crab Metal</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Metallo di Granchio</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Crab Warmcoat&quot;]">
+                <langSet xml:lang="en"><tig><term>Crab Warmcoat</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Cappotto caldo di Granchio</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step6Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Crab Warmth&quot;]">
+                <langSet xml:lang="en"><tig><term>Crab Warmth</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Calore di Granchio</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step4Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Cracked Gauntlet&quot;]">
+                <langSet xml:lang="en"><tig><term>Cracked Gauntlet</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Guanto Incrinato</term></tig></langSet>
+                <descrip>[Loot] roughGloveT1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Craft&quot;]">
+                <langSet xml:lang="en"><tig><term>Craft</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Crea</term></tig></langSet>
+                <descrip>[UI] craft</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Craft slot&quot;]">
+                <langSet xml:lang="en"><tig><term>Craft slot</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Slot di creazione</term></tig></langSet>
+                <descrip>[UI] craftSlot; [UI] upgradeCraftCraftSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Crimson Ruby (Big)&quot;]">
+                <langSet xml:lang="en"><tig><term>Crimson Ruby (Big)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Rubino Cremisi (Grande)</term></tig></langSet>
+                <descrip>[Loot] rubyBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Crimson Ruby (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Crimson Ruby (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Rubino Cremisi (Medio)</term></tig></langSet>
+                <descrip>[Loot] rubyMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Crimson Ruby (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Crimson Ruby (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Rubino cremisi (piccolo)</term></tig></langSet>
+                <descrip>[Loot] rubySmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Crimson-blood Ruby&quot;]">
+                <langSet xml:lang="en"><tig><term>Crimson-blood Ruby</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Rubino color sangue cremisi</term></tig></langSet>
+                <descrip>[Loot] gem.ruby.small.t1.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Crumbled Gold&quot;]">
+                <langSet xml:lang="en"><tig><term>Crumbled Gold</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Oro sbriciolato</term></tig></langSet>
+                <descrip>[Loot] gold.small.t1.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Cryolis&quot;]">
+                <langSet xml:lang="en"><tig><term>Cryolis</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Cryolis</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step2Description; [Orders] orderTerrain2.2Step4Description; [Loot] cryolisSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Cryolis Nugget (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Cryolis Nugget (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pepita di Cryolis (piccola)</term></tig></langSet>
+                <descrip>[Loot] cryolisSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Cursed&quot;]">
+                <langSet xml:lang="en"><tig><term>Cursed</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Maledetto</term></tig></langSet>
+                <descrip>[UI] cursed</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Cursed Relic&quot;]">
+                <langSet xml:lang="en"><tig><term>Cursed Relic</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Reliquia maledetta</term></tig></langSet>
+                <descrip>[Loot] cursedItem</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Dagger&quot;]">
+                <langSet xml:lang="en"><tig><term>Dagger</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pugnale</term></tig></langSet>
+                <descrip>[Loot] dagger</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Dead Man’s Chest&quot;]">
+                <langSet xml:lang="en"><tig><term>Dead Man’s Chest</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Forziere del morto</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.1Step4Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Dealer&quot;]">
+                <langSet xml:lang="en"><tig><term>Dealer</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Commerciante</term></tig></langSet>
+                <descrip>[Tutorial] tip7; [UI] dealerWillBuyTheRest</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Dexterity&quot;]">
+                <langSet xml:lang="en"><tig><term>Dexterity</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Destrezza</term></tig></langSet>
+                <descrip>[UI] statEffectToolSpeedPositive</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Diadem&quot;]">
+                <langSet xml:lang="en"><tig><term>Diadem</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Diadema</term></tig></langSet>
+                <descrip>[Loot] diadem</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Diamond (Rough)&quot;]">
+                <langSet xml:lang="en"><tig><term>Diamond (Rough)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Diamante (grezzo)</term></tig></langSet>
+                <descrip>[Loot] diamondRough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Dull Silver&quot;]">
+                <langSet xml:lang="en"><tig><term>Dull Silver</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Argento opaco</term></tig></langSet>
+                <descrip>[Loot] silver.small.t1.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Dummy drive&quot;]">
+                <langSet xml:lang="en"><tig><term>Dummy drive</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Unità fittizia</term></tig></langSet>
+                <descrip>[Loot] Flop.Cheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Dung Pie&quot;]">
+                <langSet xml:lang="en"><tig><term>Dung Pie</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Torta di sterco</term></tig></langSet>
+                <descrip>[Loot] Shit.Cheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Earring&quot;]">
+                <langSet xml:lang="en"><tig><term>Earring</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Orecchino</term></tig></langSet>
+                <descrip>[Loot] earring</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Egg&quot;]">
+                <langSet xml:lang="en"><tig><term>Egg</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Uovo</term></tig></langSet>
+                <descrip>[UI] egg</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Eggs&quot;]">
+                <langSet xml:lang="en"><tig><term>Eggs</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Uova</term></tig></langSet>
+                <descrip>[UI] eggs</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Elf Lustro&quot;]">
+                <langSet xml:lang="en"><tig><term>Elf Lustro</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Lustro elfico</term></tig></langSet>
+                <descrip>[Buyers] Buyer6</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Elite slot&quot;]">
+                <langSet xml:lang="en"><tig><term>Elite slot</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Slot élite</term></tig></langSet>
+                <descrip>[UI] eliteSlot</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Eliza Glitterford&quot;]">
+                <langSet xml:lang="en"><tig><term>Eliza Glitterford</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Eliza Glitterford</term></tig></langSet>
+                <descrip>[Buyers] Buyer4</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Emerald (Big)&quot;]">
+                <langSet xml:lang="en"><tig><term>Emerald (Big)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Smeraldo (grande)</term></tig></langSet>
+                <descrip>[Loot] emeraldBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Emerald (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Emerald (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Smeraldo (medio)</term></tig></langSet>
+                <descrip>[Loot] emeraldMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Emerald (Rough)&quot;]">
+                <langSet xml:lang="en"><tig><term>Emerald (Rough)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Smeraldo (grezzo)</term></tig></langSet>
+                <descrip>[Loot] emeraldRough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Emerald (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Emerald (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Smeraldo (piccolo)</term></tig></langSet>
+                <descrip>[Loot] emeraldSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Epic&quot;]">
+                <langSet xml:lang="en"><tig><term>Epic</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Epico</term></tig></langSet>
+                <descrip>[UI] epic</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Essence of Flame&quot;]">
+                <langSet xml:lang="en"><tig><term>Essence of Flame</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Essenza di Fiamma</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step4Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Exhaustion&quot;]">
+                <langSet xml:lang="en"><tig><term>Exhaustion</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Esaurimento</term></tig></langSet>
+                <descrip>[UI] statEffectDamageCurse</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Fatigue&quot;]">
+                <langSet xml:lang="en"><tig><term>Fatigue</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Fatica</term></tig></langSet>
+                <descrip>[UI] statEffectToolSpeedNegative</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Fenmar Swamp&quot;]">
+                <langSet xml:lang="en"><tig><term>Fenmar Swamp</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Palude di Fenmar</term></tig></langSet>
+                <descrip>[UI] terrain1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Flawed Diamond (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Flawed Diamond (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Diamante imperfetto (medio)</term></tig></langSet>
+                <descrip>[Loot] gem.diamond.medium.t1.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Flawless Diamond (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Flawless Diamond (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Diamante impeccabile (medio)</term></tig></langSet>
+                <descrip>[Loot] gem.diamond.medium.t1.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Floppy with Flopcoins&quot;]">
+                <langSet xml:lang="en"><tig><term>Floppy with Flopcoins</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Floppy con Flopcoin</term></tig></langSet>
+                <descrip>[Loot] Flop</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Fractured Crown&quot;]">
+                <langSet xml:lang="en"><tig><term>Fractured Crown</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Corona fratturata</term></tig></langSet>
+                <descrip>[Loot] roughCrownT1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Fractured Dagger of Will&quot;]">
+                <langSet xml:lang="en"><tig><term>Fractured Dagger of Will</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pugnale della Volontà fratturato</term></tig></langSet>
+                <descrip>[Loot] roughDaggerT1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Friday Night Mask&quot;]">
+                <langSet xml:lang="en"><tig><term>Friday Night Mask</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Maschera del venerdì sera</term></tig></langSet>
+                <descrip>[Loot] Frid</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frostbite&quot;]">
+                <langSet xml:lang="en"><tig><term>Frostbite</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Congelamento</term></tig></langSet>
+                <descrip>[UI] statEffectAccumulationFreeze</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frosty Gold&quot;]">
+                <langSet xml:lang="en"><tig><term>Frosty Gold</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Oro ghiacciato</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.1Step3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frosty Silver&quot;]">
+                <langSet xml:lang="en"><tig><term>Frosty Silver</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Argento ghiacciato</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.1Step2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Congelato</term></tig></langSet>
+                <descrip>[UI] frozen</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen Ancient Tome&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen Ancient Tome</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Tomo antico congelato</term></tig></langSet>
+                <descrip>[Loot] frozen.artifact.book.t4.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen Diamond (Big)&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen Diamond (Big)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Diamante congelato (grande)</term></tig></langSet>
+                <descrip>[Loot] frozen.daimond.big.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen Diamond (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen Diamond (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Diamante congelato (medio)</term></tig></langSet>
+                <descrip>[Loot] frozen.daimond.medium.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen Gold Nugget (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen Gold Nugget (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pepita d'oro congelata (piccola)</term></tig></langSet>
+                <descrip>[Loot] frozen.gold.small.t1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen Idol&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen Idol</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Idolo congelato</term></tig></langSet>
+                <descrip>[Loot] frozen.treasure.1g.idol</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen item&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen item</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Oggetto congelato</term></tig></langSet>
+                <descrip>[Loot] frozenItem</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen Large Gold Chunk&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen Large Gold Chunk</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pezzo d'oro grande congelato</term></tig></langSet>
+                <descrip>[Loot] frozen.gold.medium.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen Opal (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen Opal (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Opale congelato (piccolo)</term></tig></langSet>
+                <descrip>[Loot] frozen.opal.small.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen Ruby (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen Ruby (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Rubino congelato (piccolo)</term></tig></langSet>
+                <descrip>[Loot] frozen.ruby.small.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen Sapphire (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen Sapphire (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Zaffiro ghiacciato (piccolo)</term></tig></langSet>
+                <descrip>[Loot] frozen.sapphire.small.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen Shipyard&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen Shipyard</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Cantiere navale ghiacciato</term></tig></langSet>
+                <descrip>[UI] terrain2Biome1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Frozen Silver Nugget (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Frozen Silver Nugget (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pepita d'argento ghiacciata (piccola)</term></tig></langSet>
+                <descrip>[Loot] frozen.silver.small.t1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Gem&quot;]">
+                <langSet xml:lang="en"><tig><term>Gem</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Gemma</term></tig></langSet>
+                <descrip>[UI] gem</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Gem Seeker&quot;]">
+                <langSet xml:lang="en"><tig><term>Gem Seeker</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Cercatore di gemme</term></tig></langSet>
+                <descrip>[UI] upgradeDetectorGemsAmountStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Gems&quot;]">
+                <langSet xml:lang="en"><tig><term>Gems</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Gemme</term></tig></langSet>
+                <descrip>[UI] gems</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Generous buyers&quot;]">
+                <langSet xml:lang="en"><tig><term>Generous buyers</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Acquirenti generosi</term></tig></langSet>
+                <descrip>[UI] upgradeTradeNewBuyersStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Genghis Khan Tooth&quot;]">
+                <langSet xml:lang="en"><tig><term>Genghis Khan Tooth</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Dente di Gengis Khan</term></tig></langSet>
+                <descrip>[Loot] Tooth</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Geode&quot;]">
+                <langSet xml:lang="en"><tig><term>Geode</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Geode</term></tig></langSet>
+                <descrip>[UI] geode</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Geode (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Geode (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Geode (medio)</term></tig></langSet>
+                <descrip>[Loot] geodeMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Geode (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Geode (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Geode (piccolo)</term></tig></langSet>
+                <descrip>[Loot] geodeSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Geodes&quot;]">
+                <langSet xml:lang="en"><tig><term>Geodes</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Geodi</term></tig></langSet>
+                <descrip>[UI] geodes</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Getting Used to the Land&quot;]">
+                <langSet xml:lang="en"><tig><term>Getting Used to the Land</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Abituarsi alla terra</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.1Step3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Glasses&quot;]">
+                <langSet xml:lang="en"><tig><term>Glasses</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Occhiali</term></tig></langSet>
+                <descrip>[Loot] glasses</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Gleam of Dawn&quot;]">
+                <langSet xml:lang="en"><tig><term>Gleam of Dawn</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Bagliore dell'alba</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.1Step1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Gleaming Silver Nugget&quot;]">
+                <langSet xml:lang="en"><tig><term>Gleaming Silver Nugget</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pepita d'argento scintillante</term></tig></langSet>
+                <descrip>[Loot] silver.small.t1.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Going Big&quot;]">
+                <langSet xml:lang="en"><tig><term>Going Big</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Andare in grande</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Gold&quot;]">
+                <langSet xml:lang="en"><tig><term>Gold</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Oro</term></tig></langSet>
+                <descrip>[UI] gold</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Gold Nugget (Big)&quot;]">
+                <langSet xml:lang="en"><tig><term>Gold Nugget (Big)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pepita d'oro (grande)</term></tig></langSet>
+                <descrip>[Loot] goldBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Gold Nugget (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Gold Nugget (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pepita d'oro (piccola)</term></tig></langSet>
+                <descrip>[Loot] goldSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Golden coins&quot;]">
+                <langSet xml:lang="en"><tig><term>Golden coins</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Monete d'oro</term></tig></langSet>
+                <descrip>[UI] hardCurrency</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Golden Crown&quot;]">
+                <langSet xml:lang="en"><tig><term>Golden Crown</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Corona d'oro</term></tig></langSet>
+                <descrip>[Loot] treasureGoldCrownT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Golden Dagger of Will&quot;]">
+                <langSet xml:lang="en"><tig><term>Golden Dagger of Will</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pugnale d'oro della Volontà</term></tig></langSet>
+                <descrip>[Loot] treasureGoldDagger2GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Golden Gauntlet&quot;]">
+                <langSet xml:lang="en"><tig><term>Golden Gauntlet</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Guanto d'oro</term></tig></langSet>
+                <descrip>[Loot] treasureGoldGlove5GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Golden Omelette&quot;]">
+                <langSet xml:lang="en"><tig><term>Golden Omelette</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Omelette d'oro</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step4Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Golden Scarab&quot;]">
+                <langSet xml:lang="en"><tig><term>Golden Scarab</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Scarabeo d'oro</term></tig></langSet>
+                <descrip>[Loot] goldSmallScarab</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Golden Scepter&quot;]">
+                <langSet xml:lang="en"><tig><term>Golden Scepter</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Scettro d'oro</term></tig></langSet>
+                <descrip>[Loot] treasureGoldScepter3GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Golden toilet&quot;]">
+                <langSet xml:lang="en"><tig><term>Golden toilet</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Toilette d'oro</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step7Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Golden Visage Mask&quot;]">
+                <langSet xml:lang="en"><tig><term>Golden Visage Mask</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Maschera del volto d'oro</term></tig></langSet>
+                <descrip>[Loot] treasureGoldMask2GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Goldmine&quot;]">
+                <langSet xml:lang="en"><tig><term>Goldmine</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Miniera d'oro</term></tig></langSet>
+                <descrip>[UI] upgradeCraftCostStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Good profit&quot;]">
+                <langSet xml:lang="en"><tig><term>Good profit</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Buon profitto</term></tig></langSet>
+                <descrip>[UI] goodProfit</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Graves&quot;]">
+                <langSet xml:lang="en"><tig><term>Graves</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Tombe</term></tig></langSet>
+                <descrip>[UI] terrain1Biome1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Grimdal&quot;]">
+                <langSet xml:lang="en"><tig><term>Grimdal</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Grimdal</term></tig></langSet>
+                <descrip>[UI] terrain3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Grounded Astrology&quot;]">
+                <langSet xml:lang="en"><tig><term>Grounded Astrology</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Astrologia Terrestre</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Heaven’s Grace&quot;]">
+                <langSet xml:lang="en"><tig><term>Heaven’s Grace</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Grazia del Cielo</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step6Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Hexed Coin&quot;]">
+                <langSet xml:lang="en"><tig><term>Hexed Coin</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Moneta Stregata</term></tig></langSet>
+                <descrip>[Loot] artifactGoldCoin</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Hidden Gem Pin (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>Hidden Gem Pin (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Spilla con Gemma Nascosta (Oro)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldPin1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Holy Dubai Choco&quot;]">
+                <langSet xml:lang="en"><tig><term>Holy Dubai Choco</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Sacro Cioccolato di Dubai</term></tig></langSet>
+                <descrip>[Loot] Shit</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Horse cargo bag&quot;]">
+                <langSet xml:lang="en"><tig><term>Horse cargo bag</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Borsa da carico del cavallo</term></tig></langSet>
+                <descrip>[UI] horseCargoBag</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;ice crab&quot;]">
+                <langSet xml:lang="en"><tig><term>ice crab</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>granchio di ghiaccio</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step2Description; [Orders] orderTerrain2.2Step4Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Idol Hearth&quot;]">
+                <langSet xml:lang="en"><tig><term>Idol Hearth</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Focolare dell'Idolo</term></tig></langSet>
+                <descrip>[Loot] gemIdolHearthSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Idol of the Blazing Skull&quot;]">
+                <langSet xml:lang="en"><tig><term>Idol of the Blazing Skull</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Idolo del Teschio Fiammeggiante</term></tig></langSet>
+                <descrip>[Loot] treasure2GIdolT1.2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Idol of the Great Boar&quot;]">
+                <langSet xml:lang="en"><tig><term>Idol of the Great Boar</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Idolo del Grande Cinghiale</term></tig></langSet>
+                <descrip>[Loot] treasure2GIdolT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Idol of the Mustachedness&quot;]">
+                <langSet xml:lang="en"><tig><term>Idol of the Mustachedness</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Idolo della Baffutosità</term></tig></langSet>
+                <descrip>[Loot] treasure.3g.idol.cheap.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Idol of the Singed Noggin&quot;]">
+                <langSet xml:lang="en"><tig><term>Idol of the Singed Noggin</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Idolo della Nuca Bruciacchiata</term></tig></langSet>
+                <descrip>[Loot] treasure2GIdolCheapT1.2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Idol of the Wisdom&quot;]">
+                <langSet xml:lang="en"><tig><term>Idol of the Wisdom</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Idolo della Saggezza</term></tig></langSet>
+                <descrip>[Loot] treasure.3g.idol.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Idol Spark&quot;]">
+                <langSet xml:lang="en"><tig><term>Idol Spark</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Scintilla dell'Idolo</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step4Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Incubator&quot;]">
+                <langSet xml:lang="en"><tig><term>Incubator</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Incubatrice</term></tig></langSet>
+                <descrip>[UI] upgradeCraftEggSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Insert&quot;]">
+                <langSet xml:lang="en"><tig><term>Insert</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Inserto</term></tig></langSet>
+                <descrip>[UI] upgradeCraftInlaySlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Inventory&quot;]">
+                <langSet xml:lang="en"><tig><term>Inventory</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Inventario</term></tig></langSet>
+                <descrip>[UI] inventory</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Invisible Gem&quot;]">
+                <langSet xml:lang="en"><tig><term>Invisible Gem</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Gemma invisibile</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.1Step4Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Iridescent Stone&quot;]">
+                <langSet xml:lang="en"><tig><term>Iridescent Stone</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pietra iridescente</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step5Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;It Left Offspring!&quot;]">
+                <langSet xml:lang="en"><tig><term>It Left Offspring!</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Ha lasciato la prole!</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step6Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Jarl Chest&quot;]">
+                <langSet xml:lang="en"><tig><term>Jarl Chest</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Forziere dello Jarl</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step3Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Jewelry&quot;]">
+                <langSet xml:lang="en"><tig><term>Jewelry</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Gioielli</term></tig></langSet>
+                <descrip>[UI] treasure</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Jewelry Sprint&quot;]">
+                <langSet xml:lang="en"><tig><term>Jewelry Sprint</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Scatto di gioielli</term></tig></langSet>
+                <descrip>[UI] upgradeCraftTimeStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Keepsake Box&quot;]">
+                <langSet xml:lang="en"><tig><term>Keepsake Box</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Scatola dei ricordi</term></tig></langSet>
+                <descrip>[Loot] Lem</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;King’s Signet (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>King’s Signet (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Sigillo del Re (Oro)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldRing1GT1.3</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Labyrinth&quot;]">
+                <langSet xml:lang="en"><tig><term>Labyrinth</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Labirinto</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step8Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Lady Amethysta&quot;]">
+                <langSet xml:lang="en"><tig><term>Lady Amethysta</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Lady Amethysta</term></tig></langSet>
+                <descrip>[Buyers] Buyer2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Large Gold Chunk&quot;]">
+                <langSet xml:lang="en"><tig><term>Large Gold Chunk</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pezzo d'oro grande</term></tig></langSet>
+                <descrip>[Loot] goldMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Leaders&quot;]">
+                <langSet xml:lang="en"><tig><term>Leaders</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Leader</term></tig></langSet>
+                <descrip>[UI] leaders</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Legendary&quot;]">
+                <langSet xml:lang="en"><tig><term>Legendary</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Leggendario</term></tig></langSet>
+                <descrip>[UI] legendary</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Leonard Goldstein&quot;]">
+                <langSet xml:lang="en"><tig><term>Leonard Goldstein</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Leonard Goldstein</term></tig></langSet>
+                <descrip>[Buyers] Buyer3</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Likes&quot;]">
+                <langSet xml:lang="en"><tig><term>Likes</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Mi piace</term></tig></langSet>
+                <descrip>[UI] hearthCurrency</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Lion’s Blood&quot;]">
+                <langSet xml:lang="en"><tig><term>Lion’s Blood</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Sangue di Leone</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step5Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Loot&quot;]">
+                <langSet xml:lang="en"><tig><term>Loot</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Bottino</term></tig></langSet>
+                <descrip>[UI] loot</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Lopsided Sapphire&quot;]">
+                <langSet xml:lang="en"><tig><term>Lopsided Sapphire</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Zaffiro sbilenco</term></tig></langSet>
+                <descrip>[Loot] gem.sapphire.medium.t1.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Lord Glimo&quot;]">
+                <langSet xml:lang="en"><tig><term>Lord Glimo</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Lord Glimo</term></tig></langSet>
+                <descrip>[Buyers] Buyer5</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Lostwood&quot;]">
+                <langSet xml:lang="en"><tig><term>Lostwood</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Lostwood</term></tig></langSet>
+                <descrip>[UI] terrain2Biome3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Luminous Opal&quot;]">
+                <langSet xml:lang="en"><tig><term>Luminous Opal</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Opale Luminoso</term></tig></langSet>
+                <descrip>[Loot] gem.opal.small.t1.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Map&quot;]">
+                <langSet xml:lang="en"><tig><term>Map</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Mappa</term></tig></langSet>
+                <descrip>[UI] map</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Mask&quot;]">
+                <langSet xml:lang="en"><tig><term>Mask</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Maschera</term></tig></langSet>
+                <descrip>[Loot] mask</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Metal&quot;]">
+                <langSet xml:lang="en"><tig><term>Metal</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Metallo</term></tig></langSet>
+                <descrip>[UI] metal</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Metals&quot;]">
+                <langSet xml:lang="en"><tig><term>Metals</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Metalli</term></tig></langSet>
+                <descrip>[UI] metals</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Meteor Core&quot;]">
+                <langSet xml:lang="en"><tig><term>Meteor Core</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Nucleo di Meteora</term></tig></langSet>
+                <descrip>[Loot] artifactGalaxyMechanism</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Meteorfall&quot;]">
+                <langSet xml:lang="en"><tig><term>Meteorfall</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Caduta di Meteore</term></tig></langSet>
+                <descrip>[UI] terrain1Biome2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Monday 12th Mask&quot;]">
+                <langSet xml:lang="en"><tig><term>Monday 12th Mask</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Maschera del 12° Lunedì</term></tig></langSet>
+                <descrip>[Loot] Frid.Cheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Moonlit Ring (Silver)&quot;]">
+                <langSet xml:lang="en"><tig><term>Moonlit Ring (Silver)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Anello al Chiaro di Luna (Argento)</term></tig></langSet>
+                <descrip>[Loot] treasureSilverRing1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Mossy Coin&quot;]">
+                <langSet xml:lang="en"><tig><term>Mossy Coin</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Moneta Muschiosa</term></tig></langSet>
+                <descrip>[Loot] artifactGoldCoinCheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Murky Opal&quot;]">
+                <langSet xml:lang="en"><tig><term>Murky Opal</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Opale torbido</term></tig></langSet>
+                <descrip>[Loot] gem.opal.small.t1.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Mystery-Crap Stone&quot;]">
+                <langSet xml:lang="en"><tig><term>Mystery-Crap Stone</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pietra misteriosa</term></tig></langSet>
+                <descrip>[Loot] Tablet.Cheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Mythic&quot;]">
+                <langSet xml:lang="en"><tig><term>Mythic</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Mitico</term></tig></langSet>
+                <descrip>[UI] mythic</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Narrow Stone Bracelet (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>Narrow Stone Bracelet (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Braccialetto di pietra stretto (oro)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldRing1GT1.2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Needle of Honor (Silver)&quot;]">
+                <langSet xml:lang="en"><tig><term>Needle of Honor (Silver)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Ago d'onore (argento)</term></tig></langSet>
+                <descrip>[Loot] treasureSilverPin1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;New Sensors&quot;]">
+                <langSet xml:lang="en"><tig><term>New Sensors</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Nuovi sensori</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step5Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;New slot&quot;]">
+                <langSet xml:lang="en"><tig><term>New slot</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Nuovo slot</term></tig></langSet>
+                <descrip>[UI] upgradeTradeSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Noisy Tool&quot;]">
+                <langSet xml:lang="en"><tig><term>Noisy Tool</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Strumento rumoroso</term></tig></langSet>
+                <descrip>[UI] statEffectToolNoiseNegative</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Opal (Big)&quot;]">
+                <langSet xml:lang="en"><tig><term>Opal (Big)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Opale (grande)</term></tig></langSet>
+                <descrip>[Loot] opalBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Opal (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Opal (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Opale (medio)</term></tig></langSet>
+                <descrip>[Loot] opalMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Opal (Rough)&quot;]">
+                <langSet xml:lang="en"><tig><term>Opal (Rough)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Opale (grezzo)</term></tig></langSet>
+                <descrip>[Loot] opalRough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Ore Seeker&quot;]">
+                <langSet xml:lang="en"><tig><term>Ore Seeker</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Cercatore di minerali</term></tig></langSet>
+                <descrip>[UI] upgradeDetectorGoldAmountStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Owl Chick&quot;]">
+                <langSet xml:lang="en"><tig><term>Owl Chick</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pulcino di gufo</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step6Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Paradise Bird Egg&quot;]">
+                <langSet xml:lang="en"><tig><term>Paradise Bird Egg</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Uovo di uccello del paradiso</term></tig></langSet>
+                <descrip>[Loot] eggBird</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Pendant of Hidden Light (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>Pendant of Hidden Light (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Ciondolo di luce nascosta (oro)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldNecklace1GT1.2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Pick&quot;]">
+                <langSet xml:lang="en"><tig><term>Pick</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Piccone</term></tig></langSet>
+                <descrip>[UI] Pick</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Pin&quot;]">
+                <langSet xml:lang="en"><tig><term>Pin</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Spilla</term></tig></langSet>
+                <descrip>[Loot] pin</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Polishing&quot;]">
+                <langSet xml:lang="en"><tig><term>Polishing</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Lucidatura</term></tig></langSet>
+                <descrip>[UI] upgradeCraftPolishingSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Poor Man's Boar Idol&quot;]">
+                <langSet xml:lang="en"><tig><term>Poor Man's Boar Idol</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Idolo del cinghiale del pover'uomo</term></tig></langSet>
+                <descrip>[Loot] treasure2GIdolCheapT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Pristine Gold Nugget&quot;]">
+                <langSet xml:lang="en"><tig><term>Pristine Gold Nugget</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pepita d'oro incontaminata</term></tig></langSet>
+                <descrip>[Loot] gold.small.t1.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Prospectors&quot;]">
+                <langSet xml:lang="en"><tig><term>Prospectors</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Prospettori</term></tig></langSet>
+                <descrip>[UI] prospectors</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Pure Diamond (Big)&quot;]">
+                <langSet xml:lang="en"><tig><term>Pure Diamond (Big)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Diamante puro (grande)</term></tig></langSet>
+                <descrip>[Loot] diamondBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Pure Diamond (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Pure Diamond (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Diamante puro (medio)</term></tig></langSet>
+                <descrip>[Loot] diamondMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Quietwood&quot;]">
+                <langSet xml:lang="en"><tig><term>Quietwood</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Quietwood</term></tig></langSet>
+                <descrip>[UI] terrain0Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Radiant Medallion (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>Radiant Medallion (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Medaglione radioso (oro)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldEarring1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Rare&quot;]">
+                <langSet xml:lang="en"><tig><term>Rare</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Raro</term></tig></langSet>
+                <descrip>[UI] rare</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Rarity&quot;]">
+                <langSet xml:lang="en"><tig><term>Rarity</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Rarità</term></tig></langSet>
+                <descrip>[UI] upgradeCraftRarityStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Recipe&quot;]">
+                <langSet xml:lang="en"><tig><term>Recipe</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Ricetta</term></tig></langSet>
+                <descrip>[UI] recipe</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Recipe book&quot;]">
+                <langSet xml:lang="en"><tig><term>Recipe book</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Libro di ricette</term></tig></langSet>
+                <descrip>[UI] upgradeCraftRecipesStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Regeneration&quot;]">
+                <langSet xml:lang="en"><tig><term>Regeneration</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Rigenerazione</term></tig></langSet>
+                <descrip>[UI] statEffectHeal</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Resonant Earrings (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>Resonant Earrings (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Orecchini risonanti (oro)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldEarring2GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Ring&quot;]">
+                <langSet xml:lang="en"><tig><term>Ring</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Anello</term></tig></langSet>
+                <descrip>[Loot] ring</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Ring (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>Ring (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Anello (oro)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldRing1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Roman von Valiant&quot;]">
+                <langSet xml:lang="en"><tig><term>Roman von Valiant</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Roman von Valiant</term></tig></langSet>
+                <descrip>[Buyers] Buyer1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Rough&quot;]">
+                <langSet xml:lang="en"><tig><term>Rough</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Grezzo</term></tig></langSet>
+                <descrip>[UI] rough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Ruby (Rough)&quot;]">
+                <langSet xml:lang="en"><tig><term>Ruby (Rough)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Rubino (grezzo)</term></tig></langSet>
+                <descrip>[Loot] rubyRough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Ruby Ray&quot;]">
+                <langSet xml:lang="en"><tig><term>Ruby Ray</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Raggio rubino</term></tig></langSet>
+                <descrip>[Buyers] Buyer8</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Rubybeard&quot;]">
+                <langSet xml:lang="en"><tig><term>Rubybeard</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Barbarossa</term></tig></langSet>
+                <descrip>[Buyers] Buyer9</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Sapphire (Rough)&quot;]">
+                <langSet xml:lang="en"><tig><term>Sapphire (Rough)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Zaffiro (grezzo)</term></tig></langSet>
+                <descrip>[Loot] sapphireRough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Sawmill&quot;]">
+                <langSet xml:lang="en"><tig><term>Sawmill</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Segheria</term></tig></langSet>
+                <descrip>[UI] terrain2Biome0Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Serpent Ring (Silver)&quot;]">
+                <langSet xml:lang="en"><tig><term>Serpent Ring (Silver)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Anello del Serpente (Argento)</term></tig></langSet>
+                <descrip>[Loot] treasureSilverRing1GT1.2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Shattered Scepter&quot;]">
+                <langSet xml:lang="en"><tig><term>Shattered Scepter</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Scettro Frantumato</term></tig></langSet>
+                <descrip>[Loot] roughtScepterT1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Shrine&quot;]">
+                <langSet xml:lang="en"><tig><term>Shrine</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Santuario</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step2Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Silent Tool&quot;]">
+                <langSet xml:lang="en"><tig><term>Silent Tool</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Strumento Silenzioso</term></tig></langSet>
+                <descrip>[UI] statEffectToolNoisePositive</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Silver for Tempering&quot;]">
+                <langSet xml:lang="en"><tig><term>Silver for Tempering</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Argento per Tempra</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.1Step5Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Silver Nugget (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Silver Nugget (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pepita d'argento (piccola)</term></tig></langSet>
+                <descrip>[Loot] silverSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Sir Maxillion&quot;]">
+                <langSet xml:lang="en"><tig><term>Sir Maxillion</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Sir Maxillion</term></tig></langSet>
+                <descrip>[Buyers] Buyer7</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Skyborn Sapphire&quot;]">
+                <langSet xml:lang="en"><tig><term>Skyborn Sapphire</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Zaffiro Celeste</term></tig></langSet>
+                <descrip>[Loot] gem.sapphire.medium.t1.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Slot&quot;]">
+                <langSet xml:lang="en"><tig><term>Slot</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Slot</term></tig></langSet>
+                <descrip>[UI] slot</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Slowdown&quot;]">
+                <langSet xml:lang="en"><tig><term>Slowdown</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Rallentamento</term></tig></langSet>
+                <descrip>[UI] statEffectMovementSpeedNegative</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Source of the Old Blood&quot;]">
+                <langSet xml:lang="en"><tig><term>Source of the Old Blood</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Fonte del Sangue Antico</term></tig></langSet>
+                <descrip>[Loot] Jur</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Sovereign’s Signet (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>Sovereign’s Signet (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Sigillo del Sovrano (Oro)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldRing1GT1.4</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Sparkwing&quot;]">
+                <langSet xml:lang="en"><tig><term>Sparkwing</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Sparkwing</term></tig></langSet>
+                <descrip>[Loot] sparkwing</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Speed Boost&quot;]">
+                <langSet xml:lang="en"><tig><term>Speed Boost</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Aumento di velocità</term></tig></langSet>
+                <descrip>[UI] statEffectMovementSpeedPositive</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Splendid Gold Chunk&quot;]">
+                <langSet xml:lang="en"><tig><term>Splendid Gold Chunk</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pezzo d'oro splendido</term></tig></langSet>
+                <descrip>[Loot] gold.medium.t1.3</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Star Iron (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Star Iron (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Ferro stellare (piccolo)</term></tig></langSet>
+                <descrip>[Loot] meteoriteIronSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Starfall&quot;]">
+                <langSet xml:lang="en"><tig><term>Starfall</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Caduta di stelle</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step1Description; [Orders] orderTerrain2.2Step3Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Stone Bowling&quot;]">
+                <langSet xml:lang="en"><tig><term>Stone Bowling</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Bowling di pietre</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Storage&quot;]">
+                <langSet xml:lang="en"><tig><term>Storage</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Magazzino</term></tig></langSet>
+                <descrip>[UI] storage</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Sun Cult&quot;]">
+                <langSet xml:lang="en"><tig><term>Sun Cult</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Culto del Sole</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step7Description; [Orders] orderTerrain2.3Step8Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Sun Sphere&quot;]">
+                <langSet xml:lang="en"><tig><term>Sun Sphere</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Sfera Solare</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step2Description; [Orders] orderTerrain2.3Step4Description; [Orders] orderTerrain2.3Step6Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Sunburst Brooch (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>Sunburst Brooch (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Spilla a Raggi di Sole (Oro)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldBrooch2GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Super slot&quot;]">
+                <langSet xml:lang="en"><tig><term>Super slot</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Super slot</term></tig></langSet>
+                <descrip>[UI] upgradeCraftSuperSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Swamp&quot;]">
+                <langSet xml:lang="en"><tig><term>Swamp</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Palude</term></tig></langSet>
+                <descrip>[UI] terrain1Biome0Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Swamp Larva&quot;]">
+                <langSet xml:lang="en"><tig><term>Swamp Larva</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Larva di Palude</term></tig></langSet>
+                <descrip>[Loot] artifactWormEntity</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Tentacle Signet (Silver)&quot;]">
+                <langSet xml:lang="en"><tig><term>Tentacle Signet (Silver)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Sigillo a Tentacolo (Argento)</term></tig></langSet>
+                <descrip>[Loot] treasureSilverRing1GT1.3</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Trader&quot;]">
+                <langSet xml:lang="en"><tig><term>Trader</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Commerciante</term></tig></langSet>
+                <descrip>[Tutorial] trader</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Trading&quot;]">
+                <langSet xml:lang="en"><tig><term>Trading</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Commercio</term></tig></langSet>
+                <descrip>[UI] trading</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Trading shop&quot;]">
+                <langSet xml:lang="en"><tig><term>Trading shop</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Negozio di commercio</term></tig></langSet>
+                <descrip>[UI] tradingShop</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Treasure detector&quot;]">
+                <langSet xml:lang="en"><tig><term>Treasure detector</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Rilevatore di tesori</term></tig></langSet>
+                <descrip>[UI] treasureDetector</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Twin Fates Ring (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>Twin Fates Ring (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Anello dei Destini Gemelli (Oro)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldRing2GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Uncommon&quot;]">
+                <langSet xml:lang="en"><tig><term>Uncommon</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Non comune</term></tig></langSet>
+                <descrip>[UI] uncommon</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Unknown&quot;]">
+                <langSet xml:lang="en"><tig><term>Unknown</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Sconosciuto</term></tig></langSet>
+                <descrip>[UI] unknown</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Unknown item&quot;]">
+                <langSet xml:lang="en"><tig><term>Unknown item</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Oggetto sconosciuto</term></tig></langSet>
+                <descrip>[Loot] unknownItem</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Valuable Geode (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Valuable Geode (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Geode prezioso (medio)</term></tig></langSet>
+                <descrip>[Loot] geodeGemMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Valuable Geode (Small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Valuable Geode (Small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Geode prezioso (piccolo)</term></tig></langSet>
+                <descrip>[Loot] geodeGemSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Vanity Spectacles (Gold)&quot;]">
+                <langSet xml:lang="en"><tig><term>Vanity Spectacles (Gold)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Occhiali della vanità (Oro)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldGlasses2GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Wasteland&quot;]">
+                <langSet xml:lang="en"><tig><term>Wasteland</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Terra desolata</term></tig></langSet>
+                <descrip>[UI] terrain0Biome0Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;We Need More Gold!&quot;]">
+                <langSet xml:lang="en"><tig><term>We Need More Gold!</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Abbiamo bisogno di più oro!</term></tig></langSet>
+                <descrip>[Orders] orderTerrain0.1Step1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Whitelands&quot;]">
+                <langSet xml:lang="en"><tig><term>Whitelands</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Terre Bianche</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step3Title; [Orders] orderTerrain2.3Step3Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Whitelands Treasure&quot;]">
+                <langSet xml:lang="en"><tig><term>Whitelands Treasure</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Tesoro delle Terre Bianche</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Wild Gemstone (Medium)&quot;]">
+                <langSet xml:lang="en"><tig><term>Wild Gemstone (Medium)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Gemma selvatica (media)</term></tig></langSet>
+                <descrip>[Loot] gemRoughMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Wild Gemstone (small)&quot;]">
+                <langSet xml:lang="en"><tig><term>Wild Gemstone (small)</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Gemma selvatica (piccola)</term></tig></langSet>
+                <descrip>[Loot] gemRoughSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Wise notes&quot;]">
+                <langSet xml:lang="en"><tig><term>Wise notes</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Note sagge</term></tig></langSet>
+                <descrip>[UI] wiseNotes</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Worm&quot;]">
+                <langSet xml:lang="en"><tig><term>Worm</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Verme</term></tig></langSet>
+                <descrip>[Tutorial] tip2; [UI] terrain1Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Worm Egg&quot;]">
+                <langSet xml:lang="en"><tig><term>Worm Egg</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Uovo di verme</term></tig></langSet>
+                <descrip>[Loot] eggWorm</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Worn Scroll&quot;]">
+                <langSet xml:lang="en"><tig><term>Worn Scroll</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Pergamena logora</term></tig></langSet>
+                <descrip>[Loot] artifactManuscript</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Yolk of Fortune&quot;]">
+                <langSet xml:lang="en"><tig><term>Yolk of Fortune</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Tuorlo della fortuna</term></tig></langSet>
+                <descrip>[Loot] artifactBirdEntity</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;You reek of riches&quot;]">
+                <langSet xml:lang="en"><tig><term>You reek of riches</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Puzzi di ricchezze</term></tig></langSet>
+                <descrip>[UI] upgradeTradeBestBuyersRateStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Your tooth?!?&quot;]">
+                <langSet xml:lang="en"><tig><term>Your tooth?!?</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Il tuo dente?!?</term></tig></langSet>
+                <descrip>[Loot] Tooth.Cheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Zlatovich the Dealer&quot;]">
+                <langSet xml:lang="en"><tig><term>Zlatovich the Dealer</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Zlatovich il Commerciante</term></tig></langSet>
+                <descrip>[UI] traderName</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;,&quot;Zlatovich’s Trading Shop&quot;]">
+                <langSet xml:lang="en"><tig><term>Zlatovich’s Trading Shop</term></tig></langSet>
+                <langSet xml:lang="it"><tig><term>Negozio di Commercio di Zlatovich</term></tig></langSet>
+                <descrip>[UI] tradingShopInfoTitle</descrip>
+            </termEntry>
+        </body>
+    </text>
+</martif>

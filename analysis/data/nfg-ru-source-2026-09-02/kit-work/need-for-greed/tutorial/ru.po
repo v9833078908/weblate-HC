@@ -1,0 +1,343 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: ru\n"
+
+msgid "DialogueIntroCharacter1"
+msgstr ""
+"Ну что, кобыла, нюхаешь? Золото! Оно где-то рядом… И любовь… вон в той скале!"
+
+msgid "DialogueIntroHorse1"
+msgstr "Фррр!"
+
+msgid "DialogueIntroCharacter2"
+msgstr ""
+"Что значит “если я снова услышу там женщину, ты меня сбросишь”? Там же точно "
+"кто-то скучал."
+
+msgid "DialogueIntroHorse2"
+msgstr "И-го-го-о-о! Ррр-ха!"
+
+msgid "DialogueIntroCharacter3"
+msgstr "Ладно, ладно! Это было просто эхо… моего величия!"
+
+msgid "DialogueMineFoundCharacter1"
+msgstr ""
+"Камень! Божественный! Как бедро Афродиты! Там точно что-то блестит, у меня "
+"аж печень вздрогнула!"
+
+msgid "DialogueMineFoundHorse1"
+msgstr "Фррр! Пффууу.."
+
+msgid "DialogueMineFoundCharacter2"
+msgstr "Ну прости, что организм реагирует на красоту!"
+
+msgid "DialogueTimeIsUpHorse1"
+msgstr "И-го-го!"
+
+msgid "DialogueTimeIsUpCharacter1"
+msgstr "Что? Уже закат?"
+
+msgid "DialogueTimeIsUpHorse2"
+msgstr "Ых-ых! Ииии-их!"
+
+msgid "DialogueTimeIsUpCharacter2"
+msgstr ""
+"Москиты… Опять они! Да-да, я помню что ты - зеленый домик, иду к тебе! "
+"Только не удирай!"
+
+msgid "DialoguePickLootIntroTrader1"
+msgstr "Хэй! Слишком много добра. В сумку лошади влезет не всё."
+
+msgid "DialoguePickLootIntroTrader2"
+msgstr "Выбирай лучшее, что сможешь унести на склад."
+
+msgid "DialoguePrepareToOpenCraftCharacter1"
+msgstr ""
+"Сейчас… Сейчас я сотворю шедевр! Украшение, которое заставит Её пожалеть!"
+
+msgid "DialoguePrepareToOpenCraftHorse1"
+msgstr "Бррр-р-р."
+
+msgid "DialoguerAfterCraftCharacter1"
+msgstr "ГЛЯДИ, КОНИНА! Оно светится, как мои глаза до встречи с бывшей!"
+
+msgid "DialoguerAfterCraftHorse1"
+msgstr "Фррр!"
+
+msgid "DialoguerAfterCraftCharacter2"
+msgstr "Это… это божественный свет моей мести!"
+
+msgid "DialoguerAfterCraftHorse2"
+msgstr "Гррр-хрр! Бррр..."
+
+msgid "DialoguerAfterCraftCharacter3"
+msgstr ""
+"Просто завидуешь - у тебя же пальцев нет, чтоб носить такое великолепие. "
+"Осталось найти покупателя с пальцами!"
+
+msgid "DialoguerAfterTradeBuyer1"
+msgstr "Ты сам сделал? Красиво, беру."
+
+msgid "DialoguerAfterTradeCharacter1"
+msgstr ""
+"Он… он понял! Внутри украшения — я. Внутри меня — золото. Внутри золота — "
+"бог."
+
+msgid "DialoguerAfterTradeHorse1"
+msgstr "Фррр! И-го-го-о-о!"
+
+msgid "DialoguerAfterTradeCharacter2"
+msgstr "Ты права, конина. Они не готовы к истине…"
+
+msgid "DialogueBeforeUpgradeHorse1"
+msgstr "Фррр!"
+
+msgid "DialogueBeforeUpgradeCharacter1"
+msgstr "Деньги? У меня? Ты знаешь, что будет, если Она узнает, что я богат?"
+
+msgid "DialogueBeforeUpgradeHorse2"
+msgstr "Гррр-хрр!"
+
+msgid "DialogueBeforeUpgradeCharacter2"
+msgstr "Ладно, вложу в себя - но только чтобы ты перестала меня донимать!"
+
+msgid "DialogueAfterUpgradeCharacter1"
+msgstr "Я стал быстрее, сильнее и дешевле в производстве! Ей бы понравилось."
+
+msgid "DialogueAfterUpgradeHorse1"
+msgstr "Гррр-хрр!"
+
+msgid "DialogueAfterUpgradeCharacter2"
+msgstr "Ну и нечего было настаивать! У тебя вообще свои фетиши — копыта и овёс."
+
+msgid "DialogueLobbyLikesCharacter1"
+msgstr "Видишь, кобыла? Они меня любят!"
+
+msgid "DialogueLobbyLikesHorse1"
+msgstr "Фррр! Пффууу.."
+
+msgid "DialogueLobbyLikesCharacter2"
+msgstr "Ты права! Это только начало! Скоро все они станут моими фанатами…"
+
+msgid "character"
+msgstr "Искатель"
+
+msgid "horse"
+msgstr "Лошадь"
+
+msgid "trader"
+msgstr "Торговец"
+
+msgid "buyer"
+msgstr "Покупатель"
+
+msgid "terrainDispenserFound"
+msgstr "Ооо! Добыча!"
+
+msgid "terrainDispenserCollecting"
+msgstr "Давай! Давай!"
+
+msgid "exitDoorDescription"
+msgstr "Надо бежать в сторону дома!"
+
+msgid "exitDoorDescription2"
+msgstr "Что за дом-то, конюшня?"
+
+msgid "DialoguePickLootSelectItemsTrader1"
+msgstr "Нажимай на предметы, чтобы положить их в сумку лошади."
+
+msgid "DialoguePickLootSelectedItemsCharacter1"
+msgstr "Это всё, что влезло? Кобыле нужна сумка побольше!"
+
+msgid "DialoguePickLootClaimItemsTrader1"
+msgstr "Не переживай! Остальное куплю я. Даже накину сверху."
+
+msgid "terrainWantMoreItems"
+msgstr "Хочу больше золота!"
+
+msgid "terrainRoadIsClue"
+msgstr "Тропа ведет к богатству!"
+
+msgid "DialogueOrdersIntroBuyer1"
+msgstr "О, новое лицо! Есть для тебя заказ. Поможешь пополнить мою коллекцию?"
+
+msgid "DialogueOrdersIntroCharacter1"
+msgstr "Смотри, кобыла, они и дня не могут прожить без моей помощи!"
+
+msgid "DialogueOrdersIntroHorse1"
+msgstr "Фрррр!"
+
+msgid "DialogueOrdersIntroCharacter2"
+msgstr "Да, да, без твоей тоже."
+
+msgid "DialogueOrdersThanksBuyer1"
+msgstr ""
+"Ты очень мне помог, а я помогу тебе — отметил место, где камни звенят громче "
+"обычного."
+
+msgid "DialogueOrdersThanksCharacter1"
+msgstr "ОНИ НАСТОЛЬКО ЛЮБЯТ МЕНЯ, ЧТО ГОТОВЫ ОТДАТЬ СВОИ МЫСЛИ!"
+
+msgid "DialogueOrdersThanksCharacter2"
+msgstr "Нет, деньги в карман не положишь, а знания - еще как!"
+
+msgid "DialogueOrdersThanksHorse1"
+msgstr "И-го-го!"
+
+msgid "DialogueBeforeBirdCharacter1"
+msgstr ""
+"Это место указал на карте тот странный парень. Не похоже на те места, где мы "
+"были - и я уже чую СОКРОВИЩА!"
+
+msgid "DialogueBeforeBirdHorse1"
+msgstr "Фррр!"
+
+msgid "DialogueBeforeBirdCharacter2"
+msgstr ""
+"Клетка на моей спине? Это Кладоискательная Канарейка! Сейчас посмотрим, где "
+"собака зарыта."
+
+msgid "DialogueUseBirdCharacter1"
+msgstr "Теперь идем по следам из перьев и клад мой!"
+
+msgid "DialogueAfterChestCharacter1"
+msgstr "ВИДАЛА, КОНИНА!"
+
+msgid "DialogueAfterChestCharacter2"
+msgstr "Тебе не только меня тащить придется, но и этот сундук"
+
+msgid "DialogueAfterChestHorse1"
+msgstr "Гррр-хрр! Бррр..."
+
+msgid "chestCollecting"
+msgstr "КЛАД! КЛАД!"
+
+msgid "DialogueClaimedChestHorse1"
+msgstr "Гррр-хрр!"
+
+msgid "DialogueClaimedChestCharacter1"
+msgstr ""
+"Да, сундук есть, а ключа нет - но ты забыла про магическую кузню, кобыла! "
+"Она сделает что угодно с чем угодно."
+
+msgid "DialogueAfterCraftChestCharacter1"
+msgstr "ЭТО ДЖЕКПОТ! Надо скорее его продать!"
+
+msgid "DialogueAfterTradeChestCharacter1"
+msgstr ""
+"ДА! Меня признали. СЕГОДНЯ ЭТО БОЛОТО, А ЗАВТРА ВЕСЬ МИР! КОБЫЛА, ВПЕРЕД!"
+
+msgid "DialogueAfterTradeChestBuyer1"
+msgstr ""
+"Ха-ха - кажется, все местные носят твои блестяшки. Ведь я тут один живу, Ха-"
+"ха-ха."
+
+msgid "DialogueNewTerrainOpenedHorse1"
+msgstr "Бррр-р-р!"
+
+msgid "DialogueNewTerrainOpenedCharacter1"
+msgstr "Пахнет… дымом?"
+
+msgid "DialogueNewTerrainOpenedHorse2"
+msgstr "Ых-ых! Ииии-их!"
+
+msgid "DialogueNewTerrainOpenedCharacter2"
+msgstr "Ты хочешь сказать, я бросил угли на крышу склада?"
+
+msgid "DialogueNewTerrainOpenedHorse3"
+msgstr "Гррр-хрр!"
+
+msgid "DialogueNewTerrainOpenedCharacter3"
+msgstr "Оу… Пожалуй, назад нам не стоит возвращаться."
+
+msgid "DialogueNewTerrainStartedCharacter1"
+msgstr "Местность другая. Почва жидкая. Фу, воздух воняет смыслом!"
+
+msgid "DialogueNewTerrainStartedHorse1"
+msgstr "Гррр-хрр!"
+
+msgid "DialogueNewTerrainStartedCharacter2"
+msgstr "Хорошо, быстро забираем ценности и бежим."
+
+msgid "NewTerrainDispenserCollectingCharacter1"
+msgstr "Какая звонкая скала! Как будто сама природа рукоплещет мне!"
+
+msgid "DialoguePrepareToWormCharacter1"
+msgstr "Что это было?!"
+
+msgid "DialoguePrepareToWormHorse1"
+msgstr "Гррр-хрр!"
+
+msgid "DialoguePrepareToWormCharacter3"
+msgstr "О нет… Это была… она?"
+
+msgid "DialogueWormAppearHorse1"
+msgstr "Гррр-хрр! Бррр..."
+
+msgid "DialogueWormAppearCharacter1"
+msgstr "Господи. Я разбудил смерть. Опять."
+
+msgid "DialoguePlayerDeathCharacter1"
+msgstr "СКАЖИ ЕЙ, ЧТО Я ЖАЛЕЛ ОБ ЭТОМ!!!"
+
+msgid "DialoguePlayerReviveCharacter1"
+msgstr "Это рай? Почему тогда так воняет…"
+
+msgid "DialoguePlayerReviveCharacter2"
+msgstr "Понял. Не умер. Ещё хуже — жив!"
+
+msgid "DialoguePlayerRevivedCharacter1"
+msgstr ""
+"Это было близко, но теперь я готов ко всему! Постараюсь бить киркой потише…"
+
+msgid "tip1"
+msgstr "Вазу можно толкнуть. Толкни дважды, чтобы разбить."
+
+msgid "tip2"
+msgstr "Червь не пойдет за тобой в воду или болото."
+
+msgid "tip3"
+msgstr "Дави жуков - из них выпадают монеты."
+
+msgid "tip4"
+msgstr "В некоторых кустах гнездятся птицы, несущие золотые яйца."
+
+msgid "tip5"
+msgstr "Шум привлекает опасных врагов."
+
+msgid "tip6"
+msgstr "Тропы ведут к интересным местам."
+
+msgid "tip7"
+msgstr "Скупщик купит лишнее из сумки."
+
+msgid "tip8"
+msgstr "Выполняй заказы — открывай новые места."
+
+msgid "tip9"
+msgstr "Улучшай кузницу, чтобы открыть новые рецепты украшений."
+
+msgid "tip10"
+msgstr "Снимай проклятие в Алтаре или Супер-слоте."
+
+msgid "tip11"
+msgstr "Предмет с «?» можно оценить у торговца."
+
+msgid "tip12"
+msgstr "Улучшай склад — храни больше находок."
+
+msgid "tip13"
+msgstr "На паузе всегда можно посмотреть заказы и эффекты."
+
+msgid "tip14"
+msgstr "Элитная ячейка гарантирует лучшего покупателя."

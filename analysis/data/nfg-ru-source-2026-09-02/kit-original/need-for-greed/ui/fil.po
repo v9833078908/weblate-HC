@@ -1,0 +1,2105 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:02+0000\n"
+"PO-Revision-Date: 2026-08-28 09:39+0000\n"
+"Last-Translator: Hero Craft Localization user 14 "
+"<ivanbelov@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Filipino <http://l10n.herocraft.com/projects/need-for-greed/"
+"ui/fil/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: fil\n"
+"Plural-Forms: nplurals=2; plural=n != 1 && n != 2 && n != 3 && (n % 10 == 4 "
+"|| n % 10 == 6 || n % 10 == 9);\n"
+
+#: 142945292288
+msgid "vibration"
+msgstr "Pag-vibrate"
+
+#: 136857827676160
+msgid "loading"
+msgstr "Naglo-load"
+
+#: 140450844643328
+msgid "adsNotReady"
+msgstr "Hindi pa handa ang ad. Subukang muli mamaya."
+
+#: 340188151943168
+msgid "amount"
+msgstr "{value}"
+
+#: 368875517775872
+msgid "reviewTitle"
+msgstr "Mahalaga sa amin ang iyong opinyon!"
+
+#: 368997953703936
+msgid "reviewDescription"
+msgstr "Gusto mo ba ang larong ito?"
+
+#: 369514264137728
+msgid "reviewConfirm"
+msgstr "Oo, siyempre!"
+
+#: 369755633750016
+msgid "no"
+msgstr "Hindi"
+
+#: 406497292193792
+msgid "amountFormatted"
+msgstr "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+
+#: 483624632979456
+msgid "leaders"
+msgstr "Mga Pinuno"
+
+#: 483894125400064
+msgid "leaderboardAuth"
+msgstr ""
+"Ang leaderboard ay magagamit lamang sa mga awtorisadong user. \n"
+"Mag-log in sa iyong account sa mga setting."
+
+#: 693554757505024
+msgid "softCurrency"
+msgstr "Mga pilak na barya"
+
+#: 693648756051968
+msgid "gems"
+msgstr "Mga Hiyas"
+
+#: 2338581875265536
+msgid "day_N"
+msgstr "Araw {value}"
+
+#: 2340303519617024
+msgid "dailyRewards"
+msgstr "Araw-araw"
+
+#: 2340513616498688
+msgid "dailyRewardsDescription"
+msgstr ""
+"Bisitahin ang laro araw-araw\n"
+"at makakuha ng mga gantimpala."
+
+#: 2524665741578240
+msgid "tapToStart"
+msgstr "I-tap para magsimula"
+
+#: 2534199759474688
+msgid "settings"
+msgstr "Mga Setting"
+
+#: 2539217615065088
+msgid "sound"
+msgstr "SFX"
+
+#: 2539801025974272
+msgid "music"
+msgstr "Musika"
+
+#: 2606360020914176
+msgid "humanTimer"
+msgstr ""
+"{hours:cond:>0?{hours}o. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?"
+"{seconds}s.|} "
+
+#: 31188945265680384
+msgid "sell"
+msgstr "Ibenta"
+
+#: 39267299644215296
+msgid "trading"
+msgstr "Trading"
+
+#: 39267930052300800
+msgid "selectAmount"
+msgstr ""
+"Piliin ang dami ng Mga Hiyas <size=56><color=#fff>( {value} / {total} )</"
+"color></size>"
+
+#: 39432224572248064
+msgid "apply"
+msgstr "Ilapat"
+
+#: 88927433573797888
+msgid "exit"
+msgstr "Lumabas"
+
+#: 89108083400511488
+msgid "loot"
+msgstr "Loot"
+
+#: 89232802619592704
+msgid "inventory"
+msgstr "Imbentaryo"
+
+#: 89233049219502080
+msgid "add_amount"
+msgstr "+ {value}"
+
+#: 101508439312961536
+msgid "upgradeCharacterHealthStat"
+msgstr "Kalusugan"
+
+#: 101509164025778176
+msgid "Pick"
+msgstr "Piko"
+
+#: 103762241726451712
+msgid "unload"
+msgstr "I-unload"
+
+#: 105589950840573952
+msgid "continue"
+msgstr "magpatuloy"
+
+#: 105600782735511552
+msgid "continueWithoutTheBird"
+msgstr "Magpatuloy nang walang Ibon"
+
+#: 128992315220168704
+msgid "x_of_y"
+msgstr "{value} / {total}"
+
+#: 129852820621103104
+msgid "make"
+msgstr "Gumawa"
+
+#: 130612002970406912
+msgid "in_progress"
+msgstr "Isinasagawa..."
+
+#: 132250436289957888
+msgid "from_to_percent"
+msgstr "{from} -> {to}"
+
+#: 132393404065910784
+msgid "lvl_x"
+msgstr "antas. {value}"
+
+#: 133085114043469824
+msgid "take"
+msgstr "Kumuha"
+
+#: 168978456979443712
+msgid "tradeDescription"
+msgstr "I-drag at i-drop ang mga item para ibenta dito"
+
+#: 168979719083266048
+msgid "storage"
+msgstr "Imbakan"
+
+#: 168993254521704448
+msgid "backpack"
+msgstr "Backpack"
+
+#: 175428495763312640
+msgid "upgradeCharacterResistanceStat"
+msgstr "Paglaban"
+
+#: 175428883866456064
+msgid "completed"
+msgstr "Nakumpleto"
+
+#: 175429326734626816
+msgid "upgradeCharacterSpeedStat"
+msgstr "Bilis"
+
+#: 175429624488267776
+msgid "detectionRadius"
+msgstr "Radius ng pagtukoy ng bitag"
+
+#: 175437389508120576
+msgid "upgrade"
+msgstr "I-upgrade"
+
+#: 175444653988122624
+msgid "upgradeCharacterTitle"
+msgstr "Karakter lvl {value}"
+
+#: 175444893063450624
+msgid "upgradeToolTitle"
+msgstr "Tool lvl {value}"
+
+#: 175445052228898816
+msgid "bird"
+msgstr "Ibon"
+
+#: 175445211058802688
+msgid "craft"
+msgstr "Gawa"
+
+#: 175530141390475264
+msgid "upgradeBirdFlyAmountStat"
+msgstr "Karagdagang paglipad"
+
+#: 175535881710735360
+msgid "upgradeToolSpeedStat"
+msgstr "Bilis ng pagtama ng kasangkapan"
+
+#: 175536172950622208
+msgid "upgradeToolDamageStat"
+msgstr "Pinsala ng kasangkapan"
+
+#: 185307831437889536
+msgid "terrain1Title"
+msgstr "Fenmar Swamp"
+
+#: 185308054407090176
+msgid "terrain2Title"
+msgstr "Belomar"
+
+#: 185645691072417792
+msgid "start"
+msgstr "Simulan"
+
+#: 185658961254682624
+msgid "terrain1Description"
+msgstr ""
+"Isang swamp lang na nagiging swamp — maliban sa mga gold nugget at isang "
+"higanteng uod na nagre-react sa bawat “kalansing.”\n"
+"Sabi ng mga lokal: kung gusto mo ng ginto, huwag kang magkalansing na parang "
+"tindahan ng porselana."
+
+#: 185670435373060096
+msgid "howToOpenBiome"
+msgstr ""
+"Mga bagong lugar.\n"
+"Kumpletuhin ang mga order at alamin\n"
+"kung saan maghahanap."
+
+#: 185944937449394176
+msgid "revivalTitle"
+msgstr "Ito ay isang kabuuang pagkabigo!"
+
+#: 185946490252038144
+msgid "itemsInTheBackpack_x_of_y"
+msgstr "Mga item sa Backpack: {value} / {total}"
+
+#: 185949125390635008
+msgid "exitAndLoseItems"
+msgstr "Lumabas at mawalan ng mga item"
+
+#: 187764654040420352
+msgid "noBirdEnergy"
+msgstr "Walang ibon, walang mata"
+
+#: 187765165577736192
+msgid "noDetectorEnergy"
+msgstr "Treasure detector"
+
+#: 190252961852821504
+msgid "yes_leave"
+msgstr "Oo, umalis"
+
+#: 190253329051553792
+msgid "no_stay"
+msgstr "Hindi, manatili dito"
+
+#: 190253804719181824
+msgid "leave_location_confirmation"
+msgstr "Gusto mo bang umalis sa lokasyon?"
+
+#: 190609920439357440
+msgid "percentAmount"
+msgstr "{value}%"
+
+#: 190613197834948608
+msgid "pointsAmount"
+msgstr "{value} <size=70%>pt.</size>"
+
+#: 190999934906142720
+msgid "close"
+msgstr "Isara"
+
+#: 191001304602251264
+msgid "selectTheShape"
+msgstr "Piliin ang hugis ng kayamanan"
+
+#: 191001600908857344
+msgid "speedUp"
+msgstr "Pabilisin"
+
+#: 191062612982894592
+msgid "tutorial"
+msgstr "Tutorial"
+
+#: 214456412639858688
+msgid "terrainPickLootTitle"
+msgstr "Kunin ang lahat ng kasya sa iyong bag at Imbakan"
+
+#: 214474517843808256
+msgid "highlighted_x_of_y"
+msgstr "<color=#{hasEnough:E3BA59|E01114}>{value}</color> / {total}"
+
+#: 215688832034803712
+msgid "takeToStorageXofY"
+msgstr "Kunin ang {value}/ {total}"
+
+#: 215688944811249664
+msgid "upgradeBag"
+msgstr "I-upgrade ang bag"
+
+#: 216124892128743424
+msgid "dealerWillBuyTheRest"
+msgstr "Bibilhin ng Dealer ang lahat ng iba pa mula sa iyo"
+
+#: 216274536972423168
+msgid "information"
+msgstr "Impormasyon"
+
+#: 216281997183815680
+msgid "weightInformation"
+msgstr ""
+"Ang Kapasidad ng bag ng Kabayo ay isang mahalagang tagapagpahiwatig.\n"
+"Ang bigat ng mga nahanap na item ay nakakaapekto sa kanilang "
+"transportasyon.\n"
+"I-upgrade ang iyong bag upang madagdagan ang Kapasidad nito at makapagdala "
+"ng mas maraming item."
+
+#: 216292821260570624
+msgid "rank_x"
+msgstr "Ranggo {value}"
+
+#: 216295079784222720
+msgid "weight"
+msgstr "Timbang:"
+
+#: 216455391749607424
+msgid "vehicleUpgradeDescription"
+msgstr ""
+"Pagbutihin ang Kapasidad ng Bag ng kargamento ng kabayo para sa pagdadala ng "
+"mga karga."
+
+#: 216456296213516288
+msgid "capacity"
+msgstr "Kapasidad"
+
+#: 216456449876037632
+msgid "horseCargoBag"
+msgstr "Bag ng kargamento ng kabayo"
+
+#: 216464394802171904
+msgid "hardCurrency"
+msgstr "Mga gintong barya"
+
+#: 216827767398076416
+msgid "confirmation"
+msgstr "Kumpirmasyon"
+
+#: 216836939359457280
+msgid "attention!"
+msgstr "Pansin!"
+
+#: 216837051221544960
+msgid "skipSelectionTreasuresDescription"
+msgstr ""
+"Kung aalis ka ngayon, <color=#E01114>lahat ng nahanap na item ay ibebenta sa "
+"Dealer</color> sa mas mababang presyo kaysa karaniwan."
+
+#: 216843048690388992
+msgid "bayerDescription"
+msgstr "Gusto mo bang kumita pa? Bibilhin ko ang mga natira na may bonus."
+
+#: 217004942013239296
+msgid "bestProfit"
+msgstr "Best kita"
+
+#: 217005085059977216
+msgid "goodProfit"
+msgstr "Magandang kita"
+
+#: 217005221878173696
+msgid "badProfit"
+msgstr "Masamang kita"
+
+#: 217034757265166336
+msgid "profitPercent"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>{value:cond:>0?+|}{value}%</color>"
+
+#: 217067111195086848
+msgid "yourProfit"
+msgstr "Ang iyong kita:"
+
+#: 219330229052903424
+msgid "eliteSlot"
+msgstr "Elite slot"
+
+#: 219330557043281920
+msgid "tradingShopLevel"
+msgstr "Trading shop lvl {value}"
+
+#: 219331227683131392
+msgid "rent"
+msgstr "Rentahan"
+
+#: 219333990236295168
+msgid "slot"
+msgstr "Slot"
+
+#: 219334107282542592
+msgid "selectItem"
+msgstr "Pumili ng item"
+
+#: 219569917810446336
+msgid "checkOffer"
+msgstr "Tingnan"
+
+#: 221184956493467648
+msgid "shopLevel"
+msgstr "Antas ng tindahan {value}"
+
+#: 221731312916238336
+msgid "tradeOpenEliteSlotDialog"
+msgstr "Dito malaki magbayad ang mga mamimili, walang tawaran."
+
+#: 221732692687065088
+msgid "getASlot"
+msgstr "Kumuha ng Slot"
+
+#: 221745332360581120
+msgid "customerWillArriveIn"
+msgstr "Darating ang customer sa:"
+
+#: 221747748288073728
+msgid "speedUpBy"
+msgstr "Pabilisin ng"
+
+#: 221752584698073088
+msgid "decline?"
+msgstr "Tanggihan?"
+
+#: 221752816395620352
+msgid "tradeDeclineClientInfo"
+msgstr "Hanggang sa dumating ang susunod na customer:"
+
+#: 221785455785676800
+msgid "tradingShop"
+msgstr "Trading shop"
+
+#: 221785885429207040
+msgid "newSlot"
+msgstr "Bagong slot"
+
+#: 221786327613706240
+msgid "tradeUpgradeDescription"
+msgstr ""
+"I-upgrade ang trading shop para ma-unlock ang mas maraming slot para sa "
+"pagbebenta."
+
+#: 221790732488544256
+msgid "tradingShopShort"
+msgstr "Trading shop"
+
+#: 221791365350297600
+msgid "level_x"
+msgstr "Antas {value}"
+
+#: 221901028389556224
+msgid "buyersOffer"
+msgstr "Alok ng Mamimili:"
+
+#: 221902690122469376
+msgid "(profitPercent)"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>({value:cond:>0?+|}{value}%)</color>"
+
+#: 223520514767065088
+msgid "common"
+msgstr "Karaniwan"
+
+#: 223520659910955008
+msgid "uncommon"
+msgstr "Hindi Karaniwan"
+
+#: 223520713283473408
+msgid "rare"
+msgstr "Bihira"
+
+#: 223520767448715264
+msgid "epic"
+msgstr "Epiko"
+
+#: 223520826210914304
+msgid "legendary"
+msgstr "Legendary"
+
+#: 223520860377714688
+msgid "mythic"
+msgstr "Mito"
+
+#: 224246507228106752
+msgid "tradeSelectItemTitle"
+msgstr "Pumili ng item na ibebenta"
+
+#: 224277347911864320
+msgid "basePrice"
+msgstr "Base na presyo:"
+
+#: 226508435681972224
+msgid "map"
+msgstr "Mapa"
+
+#: 226574491591118848
+msgid "wiseNotes"
+msgstr "Mga matalinong tala"
+
+#: 226576404894191616
+msgid "emptyPickedItems"
+msgstr "Umalis nang walang dala?"
+
+#: 226580081470083072
+msgid "settingsDescription"
+msgstr "Hubugin ang mundo sa iyong paraan!"
+
+#: 226582087576326144
+msgid "tradeClosedSlotDescription"
+msgstr ""
+"I-upgrade ang iyong trading shop para i-unlock ang mas maraming sales slot — "
+"mas maraming istante ang idaragdag mo, mas malaki ang iyong kita!"
+
+#: 226633818465112064
+msgid "timer"
+msgstr "{hours:cond:>0?{hours:00}: |}{minutes:00}:{seconds:00}"
+
+#: 227954852267036672
+msgid "craftSlot"
+msgstr "Slot ng gawa"
+
+#: 227959361919782912
+msgid "superSlot"
+msgstr "Super slot"
+
+#: 228232787804819456
+msgid "forge"
+msgstr "Pandayan"
+
+#: 228312834624458752
+msgid "craftOpenEliteSlotDialog"
+msgstr ""
+"Pandayin ang mga kayamanan, buksan ang mga kaban at mahiwagang itlog — sino "
+"ang nakakaalam kung anong bihirang loot ang naghihintay sa loob!"
+
+#: 228318026984067072
+msgid "chestSlot"
+msgstr "Slot ng Kaban"
+
+#: 228318447752450048
+msgid "incubator"
+msgstr "Incubator"
+
+#: 228321113740152832
+msgid "craftOpenEliteSlotLabel"
+msgstr "Ilabas ang sukdulang kapangyarihan!"
+
+#: 228357165007769600
+msgid "cancel"
+msgstr "Kanselahin"
+
+#: 228360236127490048
+msgid "openChest"
+msgstr "Buksan ang kaban"
+
+#: 228385218756874240
+msgid "timeToOpen:"
+msgstr "Oras para buksan:"
+
+#: 228792391647367168
+msgid "craftSelectChestNotEnoughTitle"
+msgstr "Walang Mga Kaban sa stock"
+
+#: 228794249094893568
+msgid "storageChestNotEnoughWarningText"
+msgstr ""
+"Makahanap ng isa? I-drag ito sa Gawa at buksan ito\n"
+"(huwag lang gamitin ang palakol, okay?)"
+
+#: 228796285601452032
+msgid "select_x_of_y"
+msgstr ""
+"<color=#{hasEnough:00DE00|FFF}>{value} /</color> <color=#"
+"{hasEnough:00DE00|E01114}>{total}</color>"
+
+#: 229526591581196288
+msgid "craftSelectEggTitle"
+msgstr "Pumili ng Itlog na bubuksan"
+
+#: 229526902270070784
+msgid "craftSelectEggNotEnoughTitle"
+msgstr "Walang Mga Itlog sa stock"
+
+#: 229528260377317376
+msgid "storageEggNotEnoughWarningTitle"
+msgstr ""
+"Sa Itlog tayo pupunta — hindi mula sa kulungan, kundi isinilang ng mahika!"
+
+#: 229528854181711872
+msgid "storageEggNotEnoughWarningText"
+msgstr ""
+"Galugarin ang kaharian, tuklasin ang Bihira na Itlog, at ihatid ito sa Gawa. "
+"Ano ang nasa loob — simpleng pula ng itlog, o isang bagay na mas dakila?"
+
+#: 229530481219342336
+msgid "openEgg"
+msgstr "Buksan ang Itlog"
+
+#: 229879731472044032
+msgid "craftSelectRecipeTitle"
+msgstr "Pumili ng mga sangkap para sa paggawa"
+
+#: 229880209643671552
+msgid "craftSelectRecipeNotEnoughTitle"
+msgstr "Walang stock!"
+
+#: 229881107660935168
+msgid "craftItem"
+msgstr "Gawa ng item"
+
+#: 229881635711225856
+msgid "crafting:"
+msgstr "Paggawa:"
+
+#: 229882264282206208
+msgid "storageRecipeNotEnoughWarningText"
+msgstr "Hindi pa nakikita ang mga item na ito."
+
+#: 229887783071911936
+msgid "recipe"
+msgstr "Resipe"
+
+#: 230098234464538624
+msgid "craftClosedRecipeTitle"
+msgstr "Masyadong mahina ang pandayan!"
+
+#: 230098538715156480
+msgid "craftClosedRecipeDescription"
+msgstr ""
+"Hindi Sapat na Antas ng Pandayan\n"
+"\n"
+"Sa bawat pag-upgrade, makakagawa ka ng mas bihira at mas mahahalagang "
+"kayamanan. Panahon na para gawing pandayan ng mga alamat ang pugon na ito!"
+
+#: 230596136282624000
+msgid "craftClosedSlotTitle"
+msgstr "Naka-lock ang Slot!"
+
+#: 230596696704552960
+msgid "craftClosedSlotDescription"
+msgstr ""
+"Hindi pa sapat ang lakas ng iyong mga kasanayan sa paggawa. Kailangan mong i-"
+"level up ang mga ito."
+
+#: 230974103273869312
+msgid "or"
+msgstr "o"
+
+#: 231685619115626496
+msgid "craftSpeedUpTitle"
+msgstr "Maglagay ng karbon!"
+
+#: 231686505602748416
+msgid "craftSpeedUpDescription"
+msgstr "Para itong mga duwende na uminom ng espresso at nag-turbo mode!"
+
+#: 231700678231461888
+msgid "upgradeCraftCraftSlotsStatDescription"
+msgstr ""
+"Na-unlock ang Slot.\n"
+"Ang hurno ay nagtunaw ng Metal, ginagawa itong bagong Alahas para ibenta."
+
+#: 231701488554217472
+msgid "upgradeCraftTimeStatDescription"
+msgstr "Ang oras ay Ginto, ngunit mas mabilis na nagagawa ang Alahas"
+
+#: 231702447166590976
+msgid "upgradeCraftRarityStatDescription"
+msgstr "Pinapataas ang iyong pagkakataong makagawa ng isang Legendary na item."
+
+#: 231703302095769600
+msgid "upgradeCraftRecipesStatDescription"
+msgstr ""
+"Ang karunungan ng mga sinaunang tao ay dumadaloy sa iyo — mag-Forge ng mga "
+"kahanga-hangang bagay na hindi pa nakikita ng mundo!"
+
+#: 232003352147529728
+msgid "craftStockFullTitle"
+msgstr "Walang espasyo para sa kayamanan sa Imbakan!"
+
+#: 232004264790331392
+msgid "craftStockFullDescription"
+msgstr ""
+"Puno ang Imbakan hanggang sa huling piraso.\n"
+"Ibenta ang sobra sa Trading shop o i-upgrade ang Imbakan — pagkatapos ay "
+"kunin ang iyong makinang na tropeo!"
+
+#: 232054830455328768
+msgid "allItems"
+msgstr "Lahat ng item"
+
+#: 232055567298072576
+msgid "stockLevel"
+msgstr "Imbakan lvl {value}"
+
+#: 232285845522223104
+msgid "storageUpgradeDescription"
+msgstr ""
+"Ang bawat upgrade ay nagbibigay ng <color=#E01114>mas maraming espasyo</"
+"color> para sa mga kayamanang natagpuan at na-Forge. Mas maraming Ginto, mas "
+"kaunting pagdurusa!"
+
+#: 238220511437656064
+msgid "revivalDescription"
+msgstr "Muling mabuhay — o magpaalam sa iyong Loot."
+
+#: 238225411982757888
+msgid "noBirdEnergyDescription"
+msgstr "Dinala ka sa kayamanan at lumipad upang magpahinga."
+
+#: 238226013823438848
+msgid "callTheBird"
+msgstr "Bumalik na ngayon"
+
+#: 238228172388438016
+msgid "noDetectorEnergyDescription"
+msgstr "Sa tingin mo kaya mo pa ang isa?"
+
+#: 238229156124692480
+msgid "oreSeeker"
+msgstr "Tagahanap ng Ore"
+
+#: 238230435035090944
+msgid "gemSeeker"
+msgstr "Tagahanap ng Hiyas"
+
+#: 238805340126449664
+msgid "respawn"
+msgstr "Buhay muli"
+
+#: 238835918318080000
+msgid "deathExit"
+msgstr "Umalis nang walang dala"
+
+#: 241685352961806336
+msgid "terrain0Title"
+msgstr "Quietwood"
+
+#: 241686624016273408
+msgid "terrain2Description"
+msgstr ""
+"Isang malupit na hilagang kagubatan na nakakulong sa walang hanggang lamig. "
+"Sa gitna ng mga nagyeyelong labirint, madaling maligaw—at pagkatapos ng "
+"paglubog ng araw, mamatay sa lamig. Sa ganoong pagkakasunod-sunod… o baka "
+"baliktad."
+
+#: 241686676700925952
+msgid "terrain0Description"
+msgstr ""
+"Bawat bayani ay nagsisimula sa isang lugar!\r\n"
+"Nakalibing dito ang iyong mga unang kayamanan — at ang iyong mga unang "
+"problema. Dito mo matututunan ang pagmimina, pagtunaw, pagpapakitang-gilas, "
+"at pagkabuhay."
+
+#: 242168130602012672
+msgid "lockedTerrainTooltip"
+msgstr ""
+"Kamitin ang pabor ng mga taganayon,\n"
+" at isang bagong lungsod ang magbubukas ng mga tarangkahan nito sa iyo!"
+
+#: 242225089728483328
+msgid "upgradeToolNoiseStat"
+msgstr "Pagbawas ng ingay"
+
+#: 243276239902871552
+msgid "upgradeCharacterResistanceStatDescription"
+msgstr ""
+"Itaas ang iyong resistensya — at hindi ka mananakit kapag naging masama ang "
+"mundo!"
+
+#: 243276804422635520
+msgid "upgradeCharacterHealthStatDescription"
+msgstr ""
+"Mas maraming buhay — mas kaunting pagkakataon upang maging isang alamat... "
+"pagkatapos ng kamatayan."
+
+#: 243277089148768256
+msgid "upgradeCharacterSpeedStatDescription"
+msgstr ""
+"Mas mabilis na mga paa — mas kaunting pagkakataon na maging hapunan para sa "
+"lokal na wildlife!"
+
+#: 243277490971480064
+msgid "upgradeBirdFlyAmountStatDescription"
+msgstr ""
+"Kung mas marami kang may balahibong tagamanman, mas malaki ang iyong "
+"pagkakataong makahanap ng nakabaong mga kintab!"
+
+#: 243277858065354752
+msgid "upgradeToolSpeedStatDescription"
+msgstr ""
+"Kung mas mabilis ang pagpalo, mas maliit ang pagkakataong maunahan ka ng iba "
+"sa pagkuha ng ore!"
+
+#: 243278506789965824
+msgid "upgradeToolDamageStatDescription"
+msgstr ""
+"Kung mas malakas ang kasangkapan, mas maamo ang bato —\r\n"
+" at mas puno ang iyong bag!"
+
+#: 243278882293420032
+msgid "upgradeToolNoiseStatDescription"
+msgstr ""
+"Mas kaunting ingay ay nangangahulugang mas kaunting pagkakataong marinig ng "
+"mga mas gusto ang pagnguya ng buto kaysa sa tunog ng Ginto."
+
+#: 243286615193292800
+msgid "resistanceStatLevel"
+msgstr "Antas ng Resistance {value}"
+
+#: 243287048297123840
+msgid "healthStatLevel"
+msgstr "Antas ng Kalusugan {value}"
+
+#: 243287378833444864
+msgid "speedStatLevel"
+msgstr "Antas ng Bilis {value}"
+
+#: 243287648745295872
+msgid "upgradeBirdTitle"
+msgstr "Antas ng Ibon {value}"
+
+#: 243301960306135040
+msgid "amountPcs"
+msgstr "{value} piraso."
+
+#: 246550123938844672
+msgid "maxLevel"
+msgstr "Pinakamataas na antas"
+
+#: 246920055440543744
+msgid "treasureDetector"
+msgstr "Treasure detector"
+
+#: 246920748020797440
+msgid "amountSec"
+msgstr "{value} seg."
+
+#: 246921123041906688
+msgid "upgradeDetectorGoldAmountStat"
+msgstr "Tagahanap ng Ore"
+
+#: 246921489389195264
+msgid "upgradeDetectorGoldAmountStatDescription"
+msgstr ""
+"Ang mahiwagang gizmo na ito ay mas mahusay na nakakahanap ng mga ugat ng "
+"ginto kaysa sa isang dwarf na nakakahanap ng libreng tanghalian!"
+
+#: 246922080165302272
+msgid "upgradeDetectorGemsAmountStat"
+msgstr "Tagahanap ng Hiyas"
+
+#: 246922249237696512
+msgid "upgradeDetectorGemsAmountStatDescription"
+msgstr ""
+"Isang aparato na may ilong na mas matalas kaysa sa kasakiman ng isang "
+"mangangalakal. Walang hiyas na mananatiling nakatago nang matagal!"
+
+#: 246922743578365952
+msgid "upgradeDetectorGoldDurationStat"
+msgstr "Mas maraming oras para sa paghahanap ng ginto"
+
+#: 246922920854818816
+msgid "upgradeDetectorDurationStatDescription"
+msgstr ""
+"Mas tumatagal, mas mahusay maghanap, mas kaunting reklamo. Mas maraming "
+"oras, mas maraming loot!"
+
+#: 247080041558839296
+msgid "addPercentAmount"
+msgstr "{value:cond:>0?+|}{value}%"
+
+#: 247080534393753600
+msgid "addAmountPcs"
+msgstr "{value:cond:>0?+|}{value} pcs."
+
+#: 247080751339933696
+msgid "addAmountSec"
+msgstr "{value:cond:>0?+|}{value} seg."
+
+#: 247452846670483456
+msgid "gold"
+msgstr "Ginto"
+
+#: 247452991940202496
+msgid "chests"
+msgstr "Mga Kaban"
+
+#: 247453392370405376
+msgid "eggs"
+msgstr "Mga Itlog"
+
+#: 247453604342140928
+msgid "treasures"
+msgstr "Alahas"
+
+#: 247453698634289152
+msgid "artifacts"
+msgstr "Mga Artifact"
+
+#: 249822854419582976
+msgid "deathTitle"
+msgstr "Kamatayan — kinukuha ang lahat!"
+
+#: 249823090609229824
+msgid "deathDescription"
+msgstr "Ang iyong Loot ay isa nang alamat."
+
+#: 250055490891157504
+msgid "tradeEmptyStorageMessage"
+msgstr "Walang maibebenta sa ngayon"
+
+#: 250066987813965824
+msgid "craftNoEggs"
+msgstr "Walang Mga Itlog para sa Incubator"
+
+#: 250067227111591936
+msgid "craftNoChests"
+msgstr "Walang Mga Kaban na bubuksan"
+
+#: 250067363896233984
+msgid "craftNoItems"
+msgstr "Walang magagamit para sa Gawa"
+
+#: 250187845660315648
+msgid "upgradeDetectorGemsDurationStat"
+msgstr "Mas maraming oras para sa paghahanap ng Hiyas"
+
+#: 251259329547866112
+msgid "newLocationAvailableTitle"
+msgstr "May bagong lokasyon na available!"
+
+#: 251259543163768832
+msgid "newLocationAvailableDescription"
+msgstr "Sang-ayon ang mga taganayon: mas marami para sa iyo."
+
+#: 251632108633853952
+msgid "upgradeStock"
+msgstr "I-upgrade ang Imbakan"
+
+#: 252146625037996032
+msgid "storageOverflowedDesctiption"
+msgstr ""
+"Hindi kayang hawakan ng iyong imbakan ang lahat ng iyong kayamanan. Panahon "
+"na para mag-upgrade!"
+
+#: 252147840639569920
+msgid "throwAway"
+msgstr "Itapon"
+
+#: 259586112407998464
+msgid "upgradeCraftCostStatDescription"
+msgstr ""
+"Ang batayang presyo ng mga item ay tumataas tulad ng tinapay sa lebadura"
+
+#: 262490762970927104
+msgid "upgradeVehicleWeightStat"
+msgstr "Malaking bag"
+
+#: 262491576103866368
+msgid "upgradeVehicleWeightStatDescription"
+msgstr ""
+"Ang Kabayo ay kaya nang magdala ng mas maraming kayamanan. Mas maraming "
+"kalat, mas maraming kaligayahan!"
+
+#: 262491999908925440
+msgid "upgradeVehicleTitle"
+msgstr "Kabayo lvl {value}"
+
+#: 262492464646197248
+msgid "amountKg"
+msgstr "{value} kg."
+
+#: 262492710260445184
+msgid "addAmountKg"
+msgstr "{value:cond:>0?+|}{value} kg."
+
+#: 262493129695039488
+msgid "upgradeStorageWeightStat"
+msgstr "Kapasidad"
+
+#: 262493626518736896
+msgid "upgradeStorageWeightStatDescription"
+msgstr "Karagdagang espasyo para sa ganap na walang kwentang kayamanan!"
+
+#: 262495569987244032
+msgid "upgradeTradeNewBuyersStat"
+msgstr "Mapagbigay na mamimili"
+
+#: 262495864679043072
+msgid "upgradeTradeNewBuyersStatDescription"
+msgstr "Nag-aaway ang mga customer para sa iyong basura."
+
+#: 262496445971828736
+msgid "upgradeTradeTitle"
+msgstr "Trading shop lvl {value}"
+
+#: 262497898778071040
+msgid "upgradeTradeBestBuyersRateStat"
+msgstr "Amoy ka ng kayamanan"
+
+#: 262498326018265088
+msgid "upgradeTradeBestBuyersRateStatDescription"
+msgstr ""
+"Kumalat ang balita tungkol sa iyong pagkakayari — mas madalas na dumarating "
+"ang mga tunay na naglalakad na wallet."
+
+#: 262499250967154688
+msgid "upgradeTradeSlotsStat"
+msgstr "Bagong slot"
+
+#: 262499518630858752
+msgid "upgradeTradeSlotsStatDescription"
+msgstr ""
+"Nagbukas ang isang karagdagang trading slot. Mas maraming customer — mas "
+"maraming ginto!"
+
+#: 262503656592773120
+msgid "upgradeCraftTimeStat"
+msgstr "Pagmamadali sa Alahas"
+
+#: 262504135200608256
+msgid "upgradeCraftTitle"
+msgstr "Gawa lvl {value}"
+
+#: 262504539359547392
+msgid "upgradeCraftRarityStat"
+msgstr "Kadalasan"
+
+#: 262505217075187712
+msgid "upgradeCraftRecipesStat"
+msgstr "Aklat ng resipe"
+
+#: 262506098214572032
+msgid "upgradeCraftCostStat"
+msgstr "Goldmine"
+
+#: 262506924148527104
+msgid "upgradeCraftCraftSlotsStat"
+msgstr "Slot ng Gawa"
+
+#: 262507722794340352
+msgid "upgradeCraftChestSlotsStat"
+msgstr "Slot ng Kaban"
+
+#: 262508574351298560
+msgid "upgradeCraftChestSlotsStatDescription"
+msgstr ""
+"Na-unlock ang slot.\n"
+"Nagbubukas ng mga kaban at nakakandadong bagay ng anumang pinagmulan — kahit "
+"na ang mga hindi malinaw na mula sa planetang ito."
+
+#: 262508742647746560
+msgid "upgradeCraftEggSlotsStat"
+msgstr "Incubator"
+
+#: 262508816316502016
+msgid "upgradeCraftEggSlotsStatDescription"
+msgstr ""
+"Na-unlock ang slot.\n"
+"Huwag isipin na ang Coco ay para lang sa mga itlog. Kung kailangan mong "
+"tunawin ang yelo, painitin ang isang bagay, o tumulong sa iba pang gawain — "
+"palagi siyang kapaki-pakinabang. At pagdating sa pagbasag ng mga itlog, "
+"hindi man lang siya nagtatanong."
+
+#: 262509279946477568
+msgid "upgradeCraftSuperSlotsStatDescription"
+msgstr ""
+"Na-unlock ang slot.\n"
+"Ang pangunahing kasangkapan ng master craftsman.\n"
+"Kaya nitong gawin ang lahat: iproseso, ibalik, pakintabin, basagin, at "
+"muling gawin."
+
+#: 262509359629864960
+msgid "upgradeCraftSuperSlotsStat"
+msgstr "Super slot"
+
+#: 262698318934839296
+msgid "tradeLockedState"
+msgstr "Masyadong maliit ang trading shop!"
+
+#: 262791601379872768
+msgid "upgradeDetectorTitle"
+msgstr "Treasure detector lvl {value}"
+
+#: 262792683350921216
+msgid "upgradeStorageTitle"
+msgstr "Imbakan lvl {value}"
+
+#: 266500052736020480
+msgid "selectTrashTitle"
+msgstr "Maramihang Basura"
+
+#: 267774055178047488
+msgid "upgradeTradeMoreLikesStat"
+msgstr "Lahat ay tungkol sa mga likes!"
+
+#: 267774187718053888
+msgid "upgradeTradeMoreLikesDescription"
+msgstr "Ang mga manonood ay sumisigaw sa tuwa!"
+
+#: 286237360443887616
+msgid "metals"
+msgstr "Mga Metal"
+
+#: 289291316380307456
+msgid "craftSelectRoughTitle"
+msgstr "Pumili ng item na papakintabin"
+
+#: 289293923853275136
+msgid "craftNoRough"
+msgstr "Walang item na papakintabin"
+
+#: 302325393484156928
+msgid "curseRemovalSlot"
+msgstr "Altar"
+
+#: 302327188075843584
+msgid "inlaySlot"
+msgstr "Ipasok"
+
+#: 302327678603890688
+msgid "polishingSlot"
+msgstr "Kintab"
+
+#: 310688720811724800
+msgid "rough"
+msgstr "Magaspang"
+
+#: 310688991746985984
+msgid "cursedItems"
+msgstr "Sinumpa"
+
+#: 310861865698988032
+msgid "storageDescription"
+msgstr ""
+"Lahat ng natuklasang item ay nakaimbak dito.\n"
+"Limitado ang espasyo — hindi gawa sa goma ang bodega.\n"
+"I-upgrade ang iyong imbakan para hindi maubusan ng espasyo ang iyong "
+"kasakiman."
+
+#: 311007630727581696
+msgid "traderName"
+msgstr "Zlatovich ang Dealer"
+
+#: 311064004203384832
+msgid "storageRecipeNotEnoughWarningTitleText"
+msgstr "Talagang wala"
+
+#: 311066402032455680
+msgid "geodes"
+msgstr "Mga Geode"
+
+#: 311067011754233856
+msgid "unknownItems"
+msgstr "Hindi Kilala"
+
+#: 311247067034161152
+msgid "selectItems"
+msgstr "Pumili ng mga item"
+
+#: 311279184229175296
+msgid "proceed"
+msgstr "Magpatuloy"
+
+#: 313943879775948800
+msgid "upgradeCraftPolishingSlotsStat"
+msgstr "Pagpapakintab"
+
+#: 313944205258133504
+msgid "upgradeCraftPolishingSlotsStatDescription"
+msgstr ""
+"Na-unlock ang Slot.\n"
+"Nag-aayos, nagba-baras, at nagbibigay ng kinang — kahit ang pinakamadilim na "
+"natuklasan ay nagiging parang mga kayamanan muli."
+
+#: 313944426742550528
+msgid "upgradeCraftInlaySlotsStat"
+msgstr "Ipasok"
+
+#: 313944595185799168
+msgid "upgradeCraftInlaySlotsStatDescription"
+msgstr ""
+"Na-unlock ang Slot.\n"
+"Magpasok ng mga hiyas sa Alahas at gawing ganap na makinang na piraso ang "
+"mga magaspang na piraso na nagpapawala ng lahat ng pagpipigil sa sarili ng "
+"mga customer."
+
+#: 313944710864703488
+msgid "upgradeCraftCurseRemovalSlotsStat"
+msgstr "Altar"
+
+#: 313944844453285888
+msgid "upgradeCraftCurseRemovalSlotsStatDescription"
+msgstr ""
+"Na-unlock ang Slot.\n"
+"Nag-aalis ng mga sumpa at mahiwagang selyo mula sa mga sinumpaang item. "
+"Minsan… may mga sorpresa."
+
+#: 313950130396205056
+msgid "craftInfoDescription"
+msgstr ""
+"Dito, napagpasyahan ang kapalaran ng iyong natuklasan.\n"
+"Tunawin ito, isaksak ito, pakintabin ito, basagin ito, o hayaan itong lumaki "
+"— bawat Slot ay gumagawa ng isang kahina-hinalang kapaki-pakinabang sa iyong "
+"mga item.\n"
+"Ang mga natuklasang bagay ay nagiging Alahas, kayamanan, at kakaibang obra "
+"maestra na tiyak na bibilhin ng isang tao."
+
+#: 313951782213783552
+msgid "superSlotDescription"
+msgstr ""
+"Isang espesyal na Slot para sa lahat ng kakaiba at makinang.\n"
+"Nagpapatunaw ito ng Metal, nagpuputol ng Mga Hiyas, nag-aalis ng mga sumpa, "
+"nagpapanumbalik ng mga kayamanan, nagbabasag ng Mga Geode, nagbubukas ng Mga "
+"Kaban, at humahawak pa ng mga dayuhang Mga Artifact (na may mutual na "
+"pahintulot)."
+
+#: 313952177879257088
+msgid "chestSlotDescription"
+msgstr ""
+"Isang Kaban?\n"
+"Hulog mo lang — maiintindihan ng Slot.\n"
+"\n"
+"Ang lalabas ay tanging ito lang ang nakakaalam.\n"
+"Minsan, nakakabahala ang kasiyahan nito sa resulta."
+
+#: 313952634336972800
+msgid "curseRemovalSlotDescription"
+msgstr ""
+"Isang Sinumpa na item? Hulog mo lang!\n"
+"Ang Altar ay sisipsipin ang bawat patak ng mahika nito, hihinga at uungol — "
+"pagkatapos ay ibabalik ito nang walang pagsitsit.\n"
+"\n"
+"Minsan, sinasabi pa nitong “salamat”… na perpektong normal."
+
+#: 313953216909021184
+msgid "eggSlotDescription"
+msgstr ""
+"Pumili ng anumang Itlog — uupuan ito ng inahin, dahan-dahang hahaplusin, at "
+"mahinang hahuni…\n"
+"pagkatapos ay mapipisa ang isang bagay na interesante.\n"
+"\n"
+"Minsan, masyadong interesante."
+
+#: 313953702185799680
+msgid "inlaySlotDescription"
+msgstr ""
+"Pumili ng isang piraso ng Alahas at punuin ito ng mga hiyas — hindi uubra "
+"ang mga walang laman na Slot!\n"
+"Ang makukuha mo ay isang ganap na pinakintab na makinang na bagay na "
+"magpapasigaw sa tuwa ng mga mamimili."
+
+#: 313954530854440960
+msgid "craftSlotDescription"
+msgstr ""
+"Ihulog ang anumang Metal — tutunawin ito ng pugon, hahaluin, at gagawa ng "
+"bagong piraso ng Alahas.\n"
+"Sabi nila, gumagana ito sa inspirasyon… na wala naman ito. Gayunpaman, "
+"nagagawa nito ang trabaho!"
+
+#: 313954955250896896
+msgid "polishingSlotDescription"
+msgstr ""
+"Pumili ng anumang Geode, Magaspang na bato, o kahit isang sirang sinaunang "
+"kayamanan —\n"
+"papakintabin ito ng workbench, aayusin, at ilalabas ang kinang nito.\n"
+"\n"
+"Ang lalabas ay maaaring i-socket, i-craft, o ibenta para sa malaking kita."
+
+#: 314195955441471488
+msgid "unknownSlot"
+msgstr "Pagtatasa"
+
+#: 314210445310562304
+msgid "unknownSlotTitle"
+msgstr "Pumili ng item para sa Pagtatasa"
+
+#: 314211470289408000
+msgid "craftNoUnknown"
+msgstr "Walang item para sa Pagtatasa"
+
+#: 314211918601785344
+msgid "craftNoCursed"
+msgstr "Walang Sinumpa na item"
+
+#: 314214842253971456
+msgid "craftNoInlay"
+msgstr "Walang item na Ipasok"
+
+#: 314260890229936128
+msgid "tradingShopInfoDescription"
+msgstr ""
+"Ibenta ang Alahas at anumang iba pang nahanap, suriin ang kanilang halaga, "
+"at isara ang mga deal.\n"
+"I-upgrade ang Trading shop — i-unlock ang mga bagong slot at magbenta ng mas "
+"maraming produkto."
+
+#: 314261126486691840
+msgid "tradingShopInfoTitle"
+msgstr "Tindahan ng Trading ni Zlatovich"
+
+#: 314274887167643648
+msgid "tradeSpeedUp"
+msgstr "Mang-akit ng customer"
+
+#: 314278745457561600
+msgid "nextCustomer"
+msgstr "Susunod na customer"
+
+#: 314297063191089152
+msgid "upgradeTradeAppraisalSlotsStat"
+msgstr "Pagtatasa"
+
+#: 314297243575521280
+msgid "upgradeTradeAppraisalSlotsDescription"
+msgstr ""
+"Titingnan ng Trader na si Zlatovich ang anumang item, uungol nang may pag-"
+"iisip, at magbibigay ng presyo.\n"
+"Minsan… isang kaaya-aya."
+
+#: 314612693521928192
+msgid "timeToMoveOut"
+msgstr "Oras na para tumakbo!"
+
+#: 314914390584594432
+msgid "metal"
+msgstr "Metal"
+
+#: 314914695741181952
+msgid "gem"
+msgstr "Hiyas"
+
+#: 314915117155487744
+msgid "treasure"
+msgstr "Alahas"
+
+#: 314915322823184384
+msgid "chest"
+msgstr "Kaban"
+
+#: 314915636620038144
+msgid "trash"
+msgstr "Basura"
+
+#: 314915781340303360
+msgid "egg"
+msgstr "Itlog"
+
+#: 314915913649623040
+msgid "artifact"
+msgstr "Artifact"
+
+#: 314916000182308864
+msgid "geode"
+msgstr "Geode"
+
+#: 314916165517578240
+msgid "unknown"
+msgstr "Hindi Kilala"
+
+#: 314916328457900032
+msgid "cursed"
+msgstr "Sinumpa"
+
+#: 314925043173036032
+msgid "orders"
+msgstr "Mga Order"
+
+#: 315250694291722240
+msgid "giveItem"
+msgstr "Ibigay"
+
+#: 316337287538675712
+msgid "ordersInfoDescription"
+msgstr ""
+"Kumpletuhin ang mga order — at ituturo ng mga customer ang daan pasulong.\n"
+"Naghihintay na ang mga bagong lokasyon, mapagkukunan, at Alahas."
+
+#: 316378780114620416
+msgid "hearthCurrency"
+msgstr "Mga Likes"
+
+#: 316380499837980672
+msgid "reward"
+msgstr "Gantimpala"
+
+#: 316382146563674112
+msgid "claim"
+msgstr "I-claim"
+
+#: 316397921840140288
+msgid "terrain0Biome1Title"
+msgstr "Wasteland"
+
+#: 316402101459881984
+msgid "ordersClaimBiomeTitle"
+msgstr "Bukas ang daan patungo sa bagong lokasyon"
+
+#: 316402277297688576
+msgid "ordersClaimBiomeDescription"
+msgstr "Available ang mga bagong natuklasan"
+
+#: 317048656315551744
+msgid "terrain1Biome1Title"
+msgstr "Mga Libingan"
+
+#: 317908391516442624
+msgid "toTrade"
+msgstr "Ipagpalit"
+
+#: 319566851823898624
+msgid "skipSelectionTreasuresConfirm"
+msgstr "Oo, umalis"
+
+#: 319567663786627072
+msgid "skipSelectionTreasuresCancel"
+msgstr "Hindi, bumalik sa pagpili"
+
+#: 320015732638486528
+msgid "soldToDealer"
+msgstr "Nabenta!"
+
+#: 321539636750192640
+msgid "craftSelectBlockedWrongType"
+msgstr "Ang item na ito ay hindi angkop para sa ganitong uri ng Slot"
+
+#: 321540352067768320
+msgid "craftSelectBlockedAlreadySelectedType"
+msgstr "Nakapili ka na ng sapat na item mula sa grupong ito"
+
+#: 332999660336844800
+msgid "lockedTerrain0Tooltip"
+msgstr ""
+"Ang daanan ay tinubuan ng damo. Nagawa mo na ang lahat dito — oras na para "
+"magtrabaho."
+
+#: 333367357155315712
+msgid "terrain0Biome0Title"
+msgstr "Wasteland"
+
+#: 333367909771644928
+msgid "terrain1Biome0Title"
+msgstr "Swamp"
+
+#: 333368362697756672
+msgid "terrain1Biome2Title"
+msgstr "Meteorfall"
+
+#: 333841248503992320
+msgid "goldUsedIn"
+msgstr ""
+"Maaaring <color=#E3BA59>ibenta</color> sa Trading shop, gamitin sa "
+"<color=#E3BA59>Slot ng Gawa</color>, o ilagay sa <color=#E3BA59>Super Slot</"
+"color>."
+
+#: 333841848608231424
+msgid "meteoriteIronUsedIn"
+msgstr ""
+"Maaaring <color=#E3BA59>ibenta</color> sa Trading shop, gamitin sa "
+"<color=#E3BA59>Slot ng gawa</color>, o ilagay sa <color=#E3BA59>Super slot</"
+"color>."
+
+#: 333841973128728576
+msgid "silverUsedIn"
+msgstr ""
+"Maaaring <color=#E3BA59>ibenta</color> sa Trading shop, gamitin sa "
+"<color=#E3BA59>Slot ng Gawa</color>, o ilagay sa <color=#E3BA59>Super Slot</"
+"color>."
+
+#: 333842030875906048
+msgid "gemUsedIn"
+msgstr ""
+"Maaaring <color=#E3BA59>ibenta</color> sa Trading shop, gamitin sa "
+"<color=#E3BA59>Slot ng Gawa</color> o <color=#E3BA59>Super Slot</color>, o "
+"<color=#E3BA59>ipasok</color> sa isang Treasure."
+
+#: 333842074681217024
+msgid "gemRoughUsedIn"
+msgstr ""
+"Maaaring iproseso sa <color=#E3BA59>Pagpapakintab</color> o sa "
+"<color=#E3BA59>Super Slot</color> para ipakita ang tunay nitong halaga."
+
+#: 333842122626306048
+msgid "treasureEmptyUsedIn"
+msgstr ""
+"Maaaring <color=#E3BA59>ibenta</color> sa Trading shop o lagyan ng mga hiyas "
+"sa pamamagitan ng <color=#E3BA59>Ipasok</color> o ng <color=#E3BA59>Super "
+"Slot</color> para tumaas ang halaga nito."
+
+#: 333842171624165376
+msgid "treasureRoughUsedIn"
+msgstr ""
+"Maaaring kumpunihin sa <color=#E3BA59>Pagpapakintab</color> o sa "
+"<color=#E3BA59>Super Slot</color>."
+
+#: 333842234089934848
+msgid "chestUsedIn"
+msgstr ""
+"Maaaring buksan sa <color=#E3BA59>Slot ng Kaban</color> o sa <color=#E3BA59>"
+"Super Slot</color>."
+
+#: 333842279115788288
+msgid "trashUsedIn"
+msgstr "Maaari lang <color=#E3BA59>ibenta</color> sa dealer."
+
+#: 333842322942070784
+msgid "eggUsedIn"
+msgstr ""
+"Maaaring buksan sa <color=#E3BA59>Incubator</color> o sa <color=#E3BA59>"
+"Super Slot</color>."
+
+#: 333842403657256960
+msgid "artifactUsedIn"
+msgstr "Maaari lang <color=#E3BA59>ibenta</color> sa Trading shop."
+
+#: 333842449953984512
+msgid "geodeUsedIn"
+msgstr ""
+"Maaaring buksan sa <color=#E3BA59>Pagpapakintab</color> o sa <color=#E3BA59>"
+"Super Slot</color>."
+
+#: 333842496531730432
+msgid "unknownUsedIn"
+msgstr ""
+"Maaaring dalhin sa Trader para sa <color=#E3BA59>Pagtatasa</color> upang "
+"matukoy ang tunay na halaga nito."
+
+#: 333842548465602560
+msgid "cursedUsedIn"
+msgstr ""
+"Maaaring alisin ang sumpa sa <color=#E3BA59>Altar</color> o sa "
+"<color=#E3BA59>Super Slot</color>."
+
+#: 334624695946317824
+msgid "terrain2Biome0Title"
+msgstr "Sawmill"
+
+#: 334752689742417920
+msgid "perfect"
+msgstr "Perpekto"
+
+#: 334754742782922752
+msgid "decline"
+msgstr "Tanggihan"
+
+#: 334758932242501632
+msgid "putUpForSale"
+msgstr "Ibenta"
+
+#: 337073088274632704
+msgid "newLocationAvailable"
+msgstr "May lumabas na bagong lugar!"
+
+#: 338548608547950592
+msgid "retargetingTitle1"
+msgstr ":monocle: Kawili-wiling tanong…"
+
+#: 338548710087856128
+msgid "retargetingDescription1"
+msgstr "Gaano kalayo ang kaya mong marating?"
+
+#: 338548825884200960
+msgid "retargetingTitle2"
+msgstr ":sunglasses: Oras na para magpatuloy."
+
+#: 338548974257704960
+msgid "retargetingDescription2"
+msgstr "Nandito pa rin ang iyong pag-usad."
+
+#: 338549087440998400
+msgid "retargetingTitle3"
+msgstr ":sunglasses: Handa nang bumalik?"
+
+#: 338549137776840704
+msgid "retargetingDescription3"
+msgstr "Magpatuloy kung saan ka tumigil."
+
+#: 338569990488985600
+msgid "notificationCraftCompletedTitle"
+msgstr ":eyes: Kumpleto na ang paggawa!"
+
+#: 338570100794986496
+msgid "notificationCraftCompletedDescription"
+msgstr "Tingnan ang nakuha mo."
+
+#: 338570414583451648
+msgid "notificationTradeCompletedTitle"
+msgstr ":money-mouth: Mayroon kang Mamimili!"
+
+#: 338570498368868352
+msgid "notificationTradeCompletedDescription"
+msgstr "Nakahanap ng customer ang iyong mga produkto."
+
+#: 339457185953353728
+msgid "tradeSelectBlockedWrongType"
+msgstr "Hindi maaaring ibenta ang item na ito."
+
+#: 340628273341140992
+msgid "skip"
+msgstr "Laktawan"
+
+#: 354499398722654208
+msgid "daily"
+msgstr "Araw-araw"
+
+#: 354514538620784640
+msgid "available"
+msgstr "Available"
+
+#: 354514769508831232
+msgid "availableIn"
+msgstr "Available In"
+
+#: 355103206058233856
+msgid "dailyRewardClaimTitle"
+msgstr "Take it for profit"
+
+#: 355103597911085056
+msgid "dailyRewardClaimDescription"
+msgstr "Watch a video — get Х2 rewards"
+
+#: 355120760352935936
+msgid "withoutBonus"
+msgstr "No bonus"
+
+#: 355145440342315008
+msgid "claimWithBonus"
+msgstr "Claim with bonus"
+
+#: 355146771715067904
+msgid "x2Reward"
+msgstr "x2 Reward"
+
+#: 355255965734670336
+msgid "dailyRewardAlreadyReceived"
+msgstr "Reward already claimed!"
+
+#: 355256265493188608
+msgid "missedDailyReward"
+msgstr "Reward has already been missed!"
+
+#: 355256569236295680
+msgid "futureDailyReward"
+msgstr "Come back for this reward later!"
+
+#: 355276036993454080
+msgid "rateUs"
+msgstr "I-rate kami"
+
+#: 355276149157531648
+msgid "rateUsTitle"
+msgstr "I-rate kami gamit ang mga bituin"
+
+#: 355276400991932416
+msgid "rateUsDescription"
+msgstr "I-rate ang laro at tulungan kaming mapabuti."
+
+#: 356305037681758208
+msgid "specialOffers"
+msgstr "Mga espesyal na alok"
+
+#: 356313026543226880
+msgid "quickStart"
+msgstr "Mabilis na Pagsisimula!"
+
+#: 356313363102568448
+msgid "storePrice"
+msgstr "<color=#FEC60D>{currency}</color> {value}"
+
+#: 356342200381214720
+msgid "forever"
+msgstr "Habambuhay"
+
+#: 356345060842016768
+msgid "starterPack"
+msgstr "Starter Pack"
+
+#: 356346443771154432
+msgid "allInOneSupply"
+msgstr "Lahat-sa-Isang Suplay"
+
+#: 356350103481749504
+msgid "dealOfTheDay"
+msgstr "Deal ng Araw"
+
+#: 356354375627837440
+msgid "xAmount"
+msgstr "X{value}"
+
+#: 356354841824727040
+msgid "free!"
+msgstr "Libre!"
+
+#: 356357806572703744
+msgid "watch"
+msgstr "Panoorin"
+
+#: 356360805877551104
+msgid "coins"
+msgstr "Mga Barya"
+
+#: 356365108071632896
+msgid "mostPopular"
+msgstr "Pinakasikat"
+
+#: 356365403610681344
+msgid "bestPrice"
+msgstr "Best Presyo"
+
+#: 356519167105699840
+msgid "store"
+msgstr "Tindahan"
+
+#: 357424739636219904
+msgid "dealOfTheDayDescription"
+msgstr "Magiging available ang mga bagong alok sa"
+
+#: 357607511365521408
+msgid "health"
+msgstr "Kalusugan"
+
+#: 357784830910664704
+msgid "notificationDealOfTheDayTitle"
+msgstr "Gusto ni Mare ng shopping :sunglasses:"
+
+#: 357784932224077824
+msgid "notificationDealOfTheDayDescription"
+msgstr "Ang natitira na lang ay ang pumasok at kunin ang sa iyo."
+
+#: 357785735030640640
+msgid "notificationCoinsReadyTitle"
+msgstr "Nagbibigay ng goodies ang shop :heart-eyes:"
+
+#: 357785816504995840
+msgid "notificationCoinsReadyDescription"
+msgstr "Dumaan sa shop at kunin ang mga libreng bagay."
+
+#: 358713136833105920
+msgid "wantReceipt"
+msgstr "Gusto ko ng resibo (i-e-email namin ito)"
+
+#: 358722499958280192
+msgid "submit"
+msgstr "Isumite"
+
+#: 358723345383165952
+msgid "receiptEmaitTitle"
+msgstr "Ilagay ang Email"
+
+#: 358723657267417088
+msgid "receiptEmailDescription"
+msgstr ""
+"Gusto mo ng resibo?\n"
+"Ilagay ang iyong email at ipapadala namin ito pagkatapos ng iyong pagbili."
+
+#: 358900766250110976
+msgid "buy"
+msgstr "Bilhin"
+
+#: 358901413183754240
+msgid "starterPackHeadline"
+msgstr "Kunin ito sa oras!"
+
+#: 358901551423819776
+msgid "specialOfferHeadline"
+msgstr "Mas marami magpakailanman!"
+
+#: 359524475709165568
+msgid "open"
+msgstr "Buksan"
+
+#: 360153378165362688
+msgid "maximumResources"
+msgstr "Max na resources"
+
+#: 360200917140901888
+msgid "exchangeCurrencyTitle"
+msgstr "Hindi sapat ang Mga pilak na barya."
+
+#: 360201095897944064
+msgid "exchangeCurrencyDescription"
+msgstr "Medyo kulang lang."
+
+#: 360201375158898688
+msgid "exchangeCurrencyQuestion"
+msgstr "Bilhin ang natitira?"
+
+#: 360510317885919232
+msgid "bankingAwaitingTitle"
+msgstr "Paparating na ang Mga Barya"
+
+#: 360511732461080576
+msgid "bankingAwaitingDescription"
+msgstr ""
+"Niloload ang Ginto sa kariton…\n"
+"Maaaring tumagal ng ilang minuto ang paghahatid."
+
+#: 360689578840166400
+msgid "deleteItemConfirmationTitle"
+msgstr "Itapon ang item?"
+
+#: 360689668438888448
+msgid "deleteItemConfirmationDescription"
+msgstr ""
+"Mawawala nang tuluyan ang item.\n"
+"Hindi na mababawi ang pagkilos na ito."
+
+#: 360858085955473408
+msgid "noKeepIt"
+msgstr "Hindi, panatilihin ito"
+
+#: 361772904917241856
+msgid "allRegionsAvailable"
+msgstr "Lahat ng rehiyon ay available"
+
+#: 361805221660463104
+msgid "terrainProgressLabel"
+msgstr "Sa susunod na lokasyon"
+
+#: 361805489286418432
+msgid "terrainClosedLabel"
+msgstr "Hindi available ang lokasyon"
+
+#: 362095342867714048
+msgid "terrainProgressInfoSlide1"
+msgstr ""
+"<color=#E3BA59>Ang iyong pangunahing layunin ay pag-ibig!</color>\n"
+"Ibenta ang iyong mga nilikha sa mga lokal upang mapanalunan sila."
+
+#: 362097539907063808
+msgid "terrainProgressInfoSlide2"
+msgstr ""
+"Huwag huminto hangga't hindi ka nila <color=#E3BA59>SINASAMBA</color> — \n"
+"pagkatapos ay handa ka nang lupigin ang mga bagong lupain."
+
+#: 362500096244584448
+msgid "cryolisUsedIn"
+msgstr ""
+"Maaaring <color=#E3BA59>ibenta</color> sa Trading shop, gamitin sa "
+"<color=#E3BA59>Slot ng Gawa</color>, o ilagay sa <color=#E3BA59>Super Slot</"
+"color>."
+
+#: 362503199635279872
+msgid "craftSelectBlockedMissingRecipe"
+msgstr "Ang item na ito ay hindi angkop para sa napiling resipe."
+
+#: 362505392367079424
+msgid "craftSelectBlockedAnotherGroupSelected"
+msgstr "May isa pang item mula sa grupong ito na napili na."
+
+#: 362831462727421952
+msgid "failedPurchase"
+msgstr ""
+"Malungkot ang kabayo. Nabigo ang pagbili.\n"
+"Pakiulit."
+
+#: 363945774653116416
+msgid "frozenUsedIn"
+msgstr ""
+"Maaaring painitin sa <color=#E3BA59>Incubator</color> o sa <color=#E3BA59>"
+"Super Slot</color>."
+
+#: 363945781498220544
+msgid "frozen"
+msgstr "Nagyelo"
+
+#: 363947917120376832
+msgid "frozens"
+msgstr "Nagyelo"
+
+#: 371768236233199616
+msgid "language"
+msgstr "Wika"
+
+#: 371825767475318784
+msgid "termsOfUse"
+msgstr "Mga Tuntunin ng Paggamit"
+
+#: 371825915722993664
+msgid "privacyPolicy"
+msgstr "Patakaran sa Privacy"
+
+#: 371826077132394496
+msgid "deleteData"
+msgstr "Tanggalin ang data"
+
+#: 371826289473228800
+msgid "signInWithGoogle Play"
+msgstr "Mag-sign in gamit ang Google Play"
+
+#: 371936637333278720
+msgid "notLinked"
+msgstr "Hindi nakakonekta"
+
+#: 371936898659389440
+msgid "linked"
+msgstr "Nakakonekta"
+
+#: 371937387937533952
+msgid "switchGooglePlay"
+msgstr "Lumipat ng Google Play account"
+
+#: 372201325233180672
+msgid "resetProgressDescription"
+msgstr ""
+"Sigurado ka bang gusto mong burahin ang iyong pag-unlad? Hindi na ito "
+"mababawi!"
+
+#: 372201851437977600
+msgid "resetProgressConfirm"
+msgstr "Oo, burahin"
+
+#: 375231950777225216
+msgid "terrainInDevelopmentDescription"
+msgstr "Paumanhin. Ang lokasyong ito ay ginagawa pa."
+
+#: 375232378373935104
+msgid "terrain2Biome1Title"
+msgstr "Frozen Shipyard"
+
+#: 375232425010401280
+msgid "terrain2Biome2Title"
+msgstr "Beacon"
+
+#: 375232475627261952
+msgid "terrain2Biome3Title"
+msgstr "Lostwood"
+
+#: 376614903423963136
+msgid "collectAll"
+msgstr "Kolektahin Lahat"
+
+#: 376958824981204992
+msgid "healthStatReward"
+msgstr "Kalusugan +{value}"
+
+#: 376959365689905152
+msgid "storageStatReward"
+msgstr "Kapasidad ng Imbakan +{value}"
+
+#: 376968663052587008
+msgid "itemsLeft_x"
+msgstr "Mga natitirang item: {value}"
+
+#: 376983763331321856
+msgid "storageStatRewardSummary"
+msgstr "Imbakan magpakailanman"
+
+#: 376983951106117632
+msgid "healthStatRewardSummary"
+msgstr "Kalusugan magpakailanman"
+
+#: 379459050652569600
+msgid "prospectors"
+msgstr "Mga Prospector"
+
+#: 384582485728825344
+msgid "storeStockFullDescription"
+msgstr "Ang imbakan ay puno hanggang sa huling piraso."
+
+#: 384852464931966976
+msgid "terrain3Title"
+msgstr "Grimdal"
+
+#: 387215171681259520
+msgid "switchGooglePlayDescription"
+msgstr ""
+"1. Buksan ang mga setting ng iyong telepono\n"
+"2. Google - Lahat ng serbisyo - Play Games\n"
+"3. “Sign-in account” - \"Baguhin\" (sa tabi ng laro)\n"
+"4. I-restart ang laro"
+
+#: 388959282209755136
+msgid "versionAlertMessage"
+msgstr "May bagong bersyon ng laro na inilabas. Oras na para mag-update!"
+
+#: 390311463999508480
+msgid "treasureUsedIn"
+msgstr "Maaari lamang <color=#E3BA59>ibenta</color> sa Trading shop."
+
+#: 390630593516539904
+msgid "noInternetConnectionBlocking"
+msgstr "Walang internet — walang adventure"
+
+#: 390630963617730560
+msgid "noInternetConnectionReconnect"
+msgstr ""
+"Muling kumokonekta…\n"
+"{value}"
+
+#: 391415174540824576
+msgid "newsAndCommunication"
+msgstr "Balita at komunikasyon"
+
+#: 392040460349345792
+msgid "statEffectAccumulationFreeze"
+msgstr "Frostbite"
+
+#: 392040705481248768
+msgid "statEffectHeal"
+msgstr "Pagbabagong-buhay"
+
+#: 392040844430151680
+msgid "statEffectMovementSpeedNegative"
+msgstr "Pagbagal"
+
+#: 392041019248742400
+msgid "statEffectMovementSpeedPositive"
+msgstr "Pagpapabilis"
+
+#: 392041155999830016
+msgid "statEffectDamageCurse"
+msgstr "Pagkapagod"
+
+#: 392041334085783552
+msgid "statEffectDamageBleed"
+msgstr "Dugo"
+
+#: 392041534623846400
+msgid "statEffectToolNoiseNegative"
+msgstr "Maingay na Kasangkapan"
+
+#: 392041656803921920
+msgid "statEffectToolNoisePositive"
+msgstr "Tahimik na Kasangkapan"
+
+#: 392041855974641664
+msgid "statEffectToolSpeedNegative"
+msgstr "Pagod"
+
+#: 392042070265827328
+msgid "statEffectToolSpeedPositive"
+msgstr "Kasanayan"
+
+#: 392090295794405376
+msgid "pause"
+msgstr "I-pause"
+
+#: 392090376618643456
+msgid "pauseDescription"
+msgstr "Mga epekto, order, at setting — lahat ay narito."
+
+#: 392092595833278464
+msgid "effects"
+msgstr "Katayuan ng Karakter"
+
+#: 392119357174714368
+msgid "settingsDialogTitle"
+msgstr "Mga Setting"
+
+#: 393910691879456768
+msgid "russianPlaymentsBanner"
+msgstr "Available ang mga pagbabayad para sa mga manlalaro sa Russia."

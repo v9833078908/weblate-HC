@@ -1,0 +1,468 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-09-01 19:56+0000\n"
+"Last-Translator: Hero Craft Localization user 23 "
+"<matios_free@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: English <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/en/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: en\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 114226892800
+msgid "orderTerrain0.1Step1Title"
+msgstr "We Need More Gold!"
+
+#: 432712978432
+msgid "orderTerrain0.1Step1Description"
+msgstr "Bring me 3 Gold Nuggets."
+
+#: 410868545490944
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Excellent — these nuggets will add nicely to my collection."
+
+#: 4737438277963776
+msgid "orderTerrain1.1Step1Title"
+msgstr "Gleam of Dawn"
+
+#: 4737634734968832
+msgid "orderTerrain1.1Step1Description"
+msgstr "Bring me a Gold Nugget from any gold-bearing rock."
+
+#: 4737870236749824
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"Gold holds the glimmer of dawn inside it — if I can’t see it, at least I can "
+"feel it..."
+
+#: 4740504523902976
+msgid "orderTerrain0.1Step2Title"
+msgstr "Excellent work!"
+
+#: 4740632143990784
+msgid "orderTerrain0.1Step2Description"
+msgstr "Thanks for the help! I’ll share a curious place with you."
+
+#: 16787486734028800
+msgid "orderTerrain1.1Step2Title"
+msgstr "A New Glasses"
+
+#: 16787574239793152
+msgid "orderTerrain1.1Step2Description"
+msgstr "Bring me 2 Diamonds. They frequently drop from crystal rocks."
+
+#: 16788049915809792
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Let’s see if I’m ready to get used to this land..."
+
+#: 16788621414895616
+msgid "orderTerrain1.1Step3Title"
+msgstr "Getting Used to the Land"
+
+#: 16788663253078016
+msgid "orderTerrain1.1Step3Description"
+msgstr "Bring me a Small Geode. They can be found in ordinary rocks."
+
+#: 16788764000260096
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Let’s see if I’m ready to get used to this land..."
+
+#: 16789247150526464
+msgid "orderTerrain1.1Step4Title"
+msgstr "Dead Man’s Chest"
+
+#: 16789336237543424
+msgid "orderTerrain1.1Step4Description"
+msgstr "Bring me a Chest. A canary might help you find one."
+
+#: 16789441711706112
+msgid "orderTerrain1.1Step4Thank"
+msgstr "So that’s where I left my things..."
+
+#: 16789861523787776
+msgid "orderTerrain1.1Step5Title"
+msgstr "Silver for Tempering"
+
+#: 16790058245033984
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Bring me 3 Pieces of Silver. They can be found in geodes and ordinary rocks."
+
+#: 16790186938863616
+msgid "orderTerrain1.1Step6Title"
+msgstr "Excellent work!"
+
+#: 16790822405279744
+msgid "orderTerrain1.1Step5Thank"
+msgstr "This silver pleasantly stings the palms..."
+
+#: 16791339927867392
+msgid "orderTerrain1.1Step6Description"
+msgstr "Thank you! Stop by my house sometime — here’s the address."
+
+#: 16792386012450816
+msgid "orderTerrain1.2Step1Title"
+msgstr "Ancient Money"
+
+#: 16792448180424704
+msgid "orderTerrain1.2Step1Description"
+msgstr ""
+"Bring me 4 Ancient Coins. They are often found in ancient pots and vases."
+
+#: 16793192929431552
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Now I can finally give change to the ancients!"
+
+#: 16793381891215360
+msgid "orderTerrain1.2Step2Title"
+msgstr "Ball-Roller"
+
+#: 16793474094600192
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Bring me a Golden Scarab. They are large beetles that can be found crawling "
+"in the bushes."
+
+#: 16793779863556096
+msgid "orderTerrain1.2Step2Thank"
+msgstr "This beetle is a big ball-roller!"
+
+#: 16794392403906560
+msgid "orderTerrain1.2Step3Title"
+msgstr "Stone Bowling"
+
+#: 16794434028179456
+msgid "orderTerrain1.2Step3Description"
+msgstr "Bring me a Medium Geode. It sometimes appears in ordinary rocks."
+
+#: 16794517595492352
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Now I’ll finally be able to roll some balls!"
+
+#: 16794991149191168
+msgid "orderTerrain1.2Step4Title"
+msgstr "Golden Omelette"
+
+#: 16795063073116160
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Bring me a Golden Egg. Search through the bushes to find a nest containing "
+"such eggs."
+
+#: 16795116181393408
+msgid "orderTerrain1.2Step4Thank"
+msgstr "Now, that’s a breakfast for royalty!"
+
+#: 16795705460133888
+msgid "orderTerrain1.2Step5Title"
+msgstr "Lion’s Blood"
+
+#: 16795757985402880
+msgid "orderTerrain1.2Step5Description"
+msgstr "Bring me a Lion Ruby. It can be found in geodes with red crystals."
+
+#: 16795845432446976
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Now I’ll be brave as a lion!"
+
+#: 16797388357505024
+msgid "orderTerrain1.2Step6Title"
+msgstr "Heaven’s Grace"
+
+#: 16797558377811968
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Bring me a Heavenly Sapphire. It can be found in geodes with blue crystals."
+
+#: 16797646290423808
+msgid "orderTerrain1.2Step6Thank"
+msgstr "The heavens themselves are on my side!"
+
+#: 16798157601247232
+msgid "orderTerrain1.2Step7Title"
+msgstr "Golden toilet"
+
+#: 16798193798090752
+msgid "orderTerrain1.2Step7Description"
+msgstr "Bring me a 9 Gold Nugget from any gold-bearing rock."
+
+#: 16798263801024512
+msgid "orderTerrain1.2Step7Thank"
+msgstr "At last, I can get the restroom fixed!"
+
+#: 16798933543292928
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"If you want to make wishes — I know a place where stars fall all the time."
+
+#: 16799140129542144
+msgid "orderTerrain1.2Step8Title"
+msgstr "Excellent work!"
+
+#: 66701112705024000
+msgid "orderTerrain2.1Step5Title"
+msgstr "Excellent work!"
+
+#: 66701312781713408
+msgid "orderTerrain2.1Step5Description"
+msgstr "Ice reminds me of Granny... Drop by her cabin too!"
+
+#: 66701713186750464
+msgid "orderTerrain2.1Step1Description"
+msgstr "Bring me 2 Frozen Items from the frozen rocks"
+
+#: 66702356693647360
+msgid "orderTerrain2.1Step1Title"
+msgstr "Ice Cubes"
+
+#: 66702611300483072
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Perfect for my cocktails!"
+
+#: 66705370212990976
+msgid "orderTerrain2.2Step7Title"
+msgstr "Excellent work!"
+
+#: 66705373262249984
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"It seems crabs are connected to the Sun Cult — I know where their temple "
+"ruins are!"
+
+#: 66705376152125440
+msgid "orderTerrain2.2Step2Description"
+msgstr "Catch an ice crab — its shell is made of Cryolis."
+
+#: 66705379809558528
+msgid "orderTerrain2.2Step2Title"
+msgstr "Crab Metal"
+
+#: 66705384804974592
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ah, exometal! I love nature's mysteries!"
+
+#: 66706577295933440
+msgid "orderTerrain2.3Step8Title"
+msgstr "Excellent work!"
+
+#: 66706580684931072
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"The Sun Cult's most valuable treasures are hidden deep within the Labyrinth "
+"— I'll show you where!"
+
+#: 66706585684541440
+msgid "orderTerrain2.3Step2Description"
+msgstr "Light 3 torches at the Shrine and steal the Sun Sphere!"
+
+#: 66706589509746688
+msgid "orderTerrain2.3Step2Title"
+msgstr "Best Heater"
+
+msgid "orderTerrain2.3Step2HelpInfo"
+msgstr ""
+
+#: 66706594945564672
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Yeah, now that's a proper warm-up!"
+
+#: 70714473507717120
+msgid "orderTerrain2.1Step2Description"
+msgstr "Find 2 Silver Nuggets inside ice cubes and warm them."
+
+#: 70714539375067136
+msgid "orderTerrain2.1Step2Title"
+msgstr "Frosty Silver"
+
+#: 70714808414502912
+msgid "orderTerrain2.1Step2Thank"
+msgstr "It's like ice in foil... but backwards..."
+
+#: 70714878748786688
+msgid "orderTerrain2.1Step3Title"
+msgstr "Frosty Gold"
+
+#: 70714919110574080
+msgid "orderTerrain2.1Step3Thank"
+msgstr "Winter gold gets a very special... shine..."
+
+#: 70714983467974656
+msgid "orderTerrain2.1Step3Description"
+msgstr "Find 2 Gold Nuggets inside ice cubes and warm them."
+
+#: 70715014472269824
+msgid "orderTerrain2.1Step4Title"
+msgstr "Invisible Gem"
+
+#: 70715038832787456
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Clear within clear, ahahaha!"
+
+#: 70715070977933312
+msgid "orderTerrain2.1Step4Description"
+msgstr "Thaw a Medium Diamond. Frozen diamonds are often found in all rocks."
+
+#: 70718769544560640
+msgid "orderTerrain2.2Step1Title"
+msgstr "Grounded Astrology"
+
+#: 70718775819239424
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Bring me 2 Star Irons. They can be found in the Swamps during a Starfall."
+
+#: 70718777429852160
+msgid "orderTerrain2.2Step1Thank"
+msgstr "Astrometal is any scientist's dream!"
+
+#: 70721195022483456
+msgid "orderTerrain2.2Step3Title"
+msgstr "Cosmic Intruder"
+
+#: 70721197308379136
+msgid "orderTerrain2.2Step3Description"
+msgstr "Find a Cursed Meteor Core during a Starfall and bane the curse."
+
+#: 70721198948352000
+msgid "orderTerrain2.2Step3Thank"
+msgstr "A meteor is a machine, not just a celestial body! Amazing!"
+
+#: 70723998965039104
+msgid "orderTerrain2.2Step4Title"
+msgstr "Crab Warmth"
+
+#: 70724001313849344
+msgid "orderTerrain2.2Step4Description"
+msgstr "Collect 5 Cryolis shards from the shells of ice crabs."
+
+#: 70724003188703232
+msgid "orderTerrain2.2Step4Thank"
+msgstr "Are you also dying to know how crabs live in the snow?"
+
+#: 70724154619854848
+msgid "orderTerrain2.2Step5Title"
+msgstr "New Sensors"
+
+msgid "orderTerrain2.2Step5HelpInfo"
+msgstr ""
+
+#: 70724156297576448
+msgid "orderTerrain2.2Step5Description"
+msgstr ""
+"Bring me 9 Pieces of Silver. They can be found in geodes and simple rocks."
+
+#: 70724162102493184
+msgid "orderTerrain2.2Step5Thank"
+msgstr "My research instruments will finally stop glitching!"
+
+#: 70724346286964736
+msgid "orderTerrain2.2Step6Title"
+msgstr "Crab Warmcoat"
+
+msgid "orderTerrain2.2Step6HelpInfo"
+msgstr ""
+
+#: 70724348468002816
+msgid "orderTerrain2.2Step6Description"
+msgstr "Collect 8 Cryolis shards from the shells of ice crabs."
+
+#: 70724350279942144
+msgid "orderTerrain2.2Step6Thank"
+msgstr "Now I will finally understand how they survive the winter!"
+
+#: 70738013825007616
+msgid "orderTerrain2.3Step1Title"
+msgstr "Going Big"
+
+msgid "orderTerrain2.3Step1HelpInfo"
+msgstr ""
+
+#: 70738018996584448
+msgid "orderTerrain2.3Step1Description"
+msgstr "Bring me a Large Diamond. It can be found in all frozen rocks."
+
+#: 70738021307645952
+msgid "orderTerrain2.3Step1Thank"
+msgstr "Oh my god, it's the size of a head! But whose..."
+
+#: 70738580156710912
+msgid "orderTerrain2.3Step3Title"
+msgstr "Whitelands Treasure"
+
+msgid "orderTerrain2.3Step3HelpInfo"
+msgstr ""
+
+#: 70738582908174336
+msgid "orderTerrain2.3Step3Description"
+msgstr ""
+"Give me the Jarl Chest. The canary will help you find it in the Whitelands."
+
+#: 70738585055657984
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Reminds me of Grandfather..."
+
+#: 70742364090007552
+msgid "orderTerrain2.3Step4Title"
+msgstr "Essence of Flame"
+
+msgid "orderTerrain2.3Step4HelpInfo"
+msgstr ""
+
+#: 70742368280117248
+msgid "orderTerrain2.3Step4Description"
+msgstr "Extract an Idol Spark from the Sun Sphere."
+
+#: 70742370125611008
+msgid "orderTerrain2.3Step4Thank"
+msgstr "What a hot stone..."
+
+#: 70742532495507456
+msgid "orderTerrain2.3Step5Title"
+msgstr "Iridescent Stone"
+
+msgid "orderTerrain2.3Step5HelpInfo"
+msgstr ""
+
+#: 70742535381188608
+msgid "orderTerrain2.3Step5Description"
+msgstr "Bring me an Opal. It's a rare find in the frozen rocks."
+
+#: 70742539273502720
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Look how beautifully it shimmers..."
+
+#: 70743768674336768
+msgid "orderTerrain2.3Step6Title"
+msgstr "It Left Offspring!"
+
+msgid "orderTerrain2.3Step6HelpInfo"
+msgstr ""
+
+#: 70743771123810304
+msgid "orderTerrain2.3Step6Description"
+msgstr "Extract an Owl Chick from the Sun Sphere."
+
+#: 70743772839280640
+msgid "orderTerrain2.3Step6Thank"
+msgstr "The Big Owl brings the cold... Why is the chick so hot?"
+
+#: 70744648739979264
+msgid "orderTerrain2.3Step7Title"
+msgstr "Big Deal"
+
+msgid "orderTerrain2.3Step7HelpInfo"
+msgstr ""
+
+#: 70744655853518848
+msgid "orderTerrain2.3Step7Description"
+msgstr "Bring me 5 Gold Chunk. They are quite common in the frozen rocks."
+
+#: 70744658739200000
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Now I'll be the biggest man in the town."

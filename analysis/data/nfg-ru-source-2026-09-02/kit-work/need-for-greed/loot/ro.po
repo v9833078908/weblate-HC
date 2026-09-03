@@ -1,0 +1,632 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Romanian <http://l10n.herocraft.com/projects/need-for-greed/"
+"loot/ro/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: ro\n"
+"Plural-Forms: nplurals=3; plural=n==1 ? 0 : (n==0 || (n%100 > 0 && n%100 < "
+"20)) ? 1 : 2;\n"
+
+#: 145034502144
+msgid "ring"
+msgstr "Inel"
+
+#: 180082106368
+msgid "dagger"
+msgstr "Pumnal"
+
+#: 269412392960
+msgid "necklace"
+msgstr "Colier"
+
+#: 317432979456
+msgid "treasureGoldScepter3GT1.1"
+msgstr "Sceptru de aur"
+
+#: 391995121664
+msgid "bracelet"
+msgstr "Brățară"
+
+#: 430343643136
+msgid "brooch"
+msgstr "Broșă"
+
+#: 479966453760
+msgid "diadem"
+msgstr "Diademă"
+
+#: 549466071040
+msgid "casket"
+msgstr "Casetă"
+
+#: 610409308160
+msgid "treasureGoldCrownT1.1"
+msgstr "Coroană de Aur"
+
+#: 877821353984
+msgid "diamondBig"
+msgstr "Diamant pur (mare)"
+
+#: 918229278720
+msgid "diamondMedium"
+msgstr "Diamant pur (mediu)"
+
+#: 966572826624
+msgid "diamondSmall"
+msgstr "Diamant pur (mic)"
+
+#: 1109162385408
+msgid "rubyBig"
+msgstr "Rubin purpuriu (mare)"
+
+#: 1112484274176
+msgid "rubyMedium"
+msgstr "Rubin purpuriu (mediu)"
+
+#: 1118599569408
+msgid "rubySmall"
+msgstr "Rubin purpuriu (mic)"
+
+#: 1382245130240
+msgid "sapphireBig"
+msgstr "Safir albastru (mare)"
+
+#: 1385105645568
+msgid "sapphireMedium"
+msgstr "Safir albastru (mediu)"
+
+#: 1387160854528
+msgid "sapphireSmall"
+msgstr "Safir albastru (mic)"
+
+#: 1624038367232
+msgid "emeraldBig"
+msgstr "Smarald (mare)"
+
+#: 1626538172416
+msgid "emeraldMedium"
+msgstr "Smarald (Mediu)"
+
+#: 1628039733248
+msgid "emeraldSmall"
+msgstr "Smarald (Mic)"
+
+#: 1775394021376
+msgid "amethystBig"
+msgstr "Ametist (mare)"
+
+#: 1778531360768
+msgid "amethystMedium"
+msgstr "Ametist (Mediu)"
+
+#: 1781240881152
+msgid "amethystSmall"
+msgstr "Ametist (Mic)"
+
+#: 1975328104448
+msgid "opalBig"
+msgstr "Opal (mare)"
+
+#: 1977366536192
+msgid "opalMedium"
+msgstr "Opal (Mediu)"
+
+#: 1978461249536
+msgid "opalSmall"
+msgstr "Opal (Mic)"
+
+#: 90993176100474880
+msgid "diamondRough"
+msgstr "Diamant (Brut)"
+
+#: 90994685357854720
+msgid "amethystRough"
+msgstr "Ametist (Brut)"
+
+#: 90995679407902720
+msgid "emeraldRough"
+msgstr "Smarald (Brut)"
+
+#: 90995991497674752
+msgid "opalRough"
+msgstr "Opal (Brut)"
+
+#: 90996287313547264
+msgid "rubyRough"
+msgstr "Rubin (Brut)"
+
+#: 90996648090800128
+msgid "sapphireRough"
+msgstr "Safir (Brut)"
+
+#: 91104301592875008
+msgid "goldSmall"
+msgstr "Nugget de aur (mic)"
+
+#: 170368899466137600
+msgid "eggBird"
+msgstr "Ou de pasăre paradisiacă"
+
+#: 184508261447503872
+msgid "goldMedium"
+msgstr "Bucată mare de aur"
+
+#: 184510784782733312
+msgid "goldBig"
+msgstr "Nugget de aur (mare)"
+
+#: 223644980889260032
+msgid "trash"
+msgstr "Gunoi"
+
+#: 226530276224012288
+msgid "pin"
+msgstr "Pin"
+
+#: 226809520472723456
+msgid "earring"
+msgstr "Cercel"
+
+#: 231192180821331968
+msgid "glasses"
+msgstr "Ochelari"
+
+#: 236643067328991232
+msgid "loveBig"
+msgstr "Piatră de legătură (mare)"
+
+#: 236643187822956544
+msgid "loveMedium"
+msgstr "Piatră de legătură (mediu)"
+
+#: 236643238079107072
+msgid "gemBirdSmall"
+msgstr "Piatră prețioasă aviară"
+
+#: 253417221730340864
+msgid "geodeMedium"
+msgstr "Geodă (Medie)"
+
+#: 254185922679279616
+msgid "gemRoughMedium"
+msgstr "Piatră prețioasă sălbatică (Medie)"
+
+#: 254905974785314816
+msgid "artifact"
+msgstr "Artefact"
+
+#: 255083397128654848
+msgid "meteoriteIronSmall"
+msgstr "Fier stelar (mic)"
+
+#: 256721089700564992
+msgid "mask"
+msgstr "Masca"
+
+#: 256721248970870784
+msgid "treasureGoldGlove5GT1.1"
+msgstr "Mănușă de aur"
+
+#: 257443856536309760
+msgid "silverSmall"
+msgstr "Nugget de argint (mic)"
+
+#: 258521155209793536
+msgid "idol"
+msgstr "Idol"
+
+#: 300784345364566016
+msgid "goldSmallCoin"
+msgstr "Monedă antică (Aur)"
+
+#: 300784550382145536
+msgid "silverSmallCoin"
+msgstr "Monedă antică (Argint)"
+
+#: 300785063425216512
+msgid "gemLoveSmall"
+msgstr "Piatră de legătură (mică)"
+
+#: 301130818094632960
+msgid "artifactBirdEntity"
+msgstr "Gălbenușul Norocului"
+
+#: 301131059615240192
+msgid "artifactWormEntity"
+msgstr "Larvă de mlaștină"
+
+#: 301131351488466944
+msgid "artifactGalaxyMechanism"
+msgstr "Miez de meteorit"
+
+#: 301131515259260928
+msgid "artifactBook"
+msgstr "Tom antic"
+
+#: 301131609035509760
+msgid "artifactManuscript"
+msgstr "Pergament uzat"
+
+#: 301131692661542912
+msgid "artifactTablet"
+msgstr "Piatră de legământ"
+
+#: 301131928431759360
+msgid "cursedItem"
+msgstr "Relicvă blestemată"
+
+#: 301134437837705216
+msgid "chest"
+msgstr "Cufăr îngropat"
+
+#: 301134754209861632
+msgid "eggWorm"
+msgstr "Ou de vierme"
+
+#: 301134952529137664
+msgid "geodeSmall"
+msgstr "Geodă (Mică)"
+
+#: 301135305941192704
+msgid "geodeGemSmall"
+msgstr "Geodă valoroasă (Mică)"
+
+#: 301135432625950720
+msgid "geodeGemMedium"
+msgstr "Geodă valoroasă (Medie)"
+
+#: 301136788187254784
+msgid "goldSmallScarab"
+msgstr "Scarab de aur"
+
+#: 301138401769558016
+msgid "gemRoughSmall"
+msgstr "Piatră prețioasă sălbatică (mică)"
+
+#: 301138758054711296
+msgid "roughDaggerT1"
+msgstr "Pumnalul Voinței Fracturate"
+
+#: 301138888757612544
+msgid "roughMaskT1"
+msgstr "Masca Visajului Spart"
+
+#: 301139046975148032
+msgid "roughtScepterT1"
+msgstr "Sceptru sfărâmat"
+
+#: 301139166772858880
+msgid "roughCrownT1"
+msgstr "Coroană Fracturată"
+
+#: 301139272288964608
+msgid "roughGloveT1"
+msgstr "Mănușă crăpată"
+
+#: 301139595988570112
+msgid "unknownItem"
+msgstr "Obiect necunoscut"
+
+#: 301139858380034048
+msgid "treasureGoldEarring1GT1.1"
+msgstr "Medalion radiant (Aur)"
+
+#: 301140049422192640
+msgid "treasureGoldNecklace1GT1.1"
+msgstr "Broșă Grădină înflorită (Aur)"
+
+#: 301140236874027008
+msgid "treasureGoldNecklace1GT1.2"
+msgstr "Pandantiv de lumină ascunsă (Aur)"
+
+#: 301140518961942528
+msgid "treasureGoldPin1GT1.1"
+msgstr "Ac cu Gemă Ascunsă (Aur)"
+
+#: 301140708619980800
+msgid "treasureGoldRing1GT1.1"
+msgstr "Inel (Aur)"
+
+#: 301157185821609984
+msgid "treasureGoldRing1GT1.2"
+msgstr "Brățară îngustă de piatră (Aur)"
+
+#: 301157418504818688
+msgid "treasureGoldRing1GT1.3"
+msgstr "Inelul Regelui (Aur)"
+
+#: 301157807581040640
+msgid "treasureGoldRing1GT1.4"
+msgstr "Inelul Suveranului (Aur)"
+
+#: 301157950980100096
+msgid "treasureGoldBrooch2GT1.1"
+msgstr "Broșă Rază de Soare (Aur)"
+
+#: 301159108893216768
+msgid "treasureGoldDagger2GT1.1"
+msgstr "Pumnalul de Aur al Voinței"
+
+#: 301159380533121024
+msgid "treasureGoldEarring2GT1.1"
+msgstr "Cercei rezonanți (Aur)"
+
+#: 301159536917745664
+msgid "treasureGoldGlasses2GT1.1"
+msgstr "Ochelari de vanitate (Aur)"
+
+#: 301159731252432896
+msgid "treasureGoldMask2GT1.1"
+msgstr "Masca Visajului Auriu"
+
+#: 301159892582141952
+msgid "treasureGoldRing2GT1.1"
+msgstr "Inelul Destinelor Gemene (Aur)"
+
+#: 301160906458664960
+msgid "treasureMeteoriteIron1GT1.1"
+msgstr "Inel Ceresc"
+
+#: 301161084104216576
+msgid "treasureMeteoriteIron2GT1.1"
+msgstr "Inel Ceresc"
+
+#: 301161408911118336
+msgid "treasureSilverNecklace1GT1.1"
+msgstr "Curea legată (Argint)"
+
+#: 301161581187960832
+msgid "treasureSilverRing1GT1.1"
+msgstr "Inel Lunatic (Argint)"
+
+#: 301161692269907968
+msgid "treasureSilverRing1GT1.2"
+msgstr "Inelul Șarpelui (Argint)"
+
+#: 301161856397217792
+msgid "treasureSilverRing1GT1.3"
+msgstr "Inel cu sigiliu tentacul (Argint)"
+
+#: 301162192604237824
+msgid "treasureSilverPin1GT1.1"
+msgstr "Acul Onoarei (Argint)"
+
+#: 304825262794870784
+msgid "artifactGoldCoinCheap"
+msgstr "Monedă Mucegăită"
+
+#: 304825379492990976
+msgid "artifactGoldCoin"
+msgstr "Monedă Blestemată"
+
+#: 304825491313135616
+msgid "artifactGoldCoinBest"
+msgstr "Moneda Gloriei Antice"
+
+#: 304826479935754240
+msgid "treasure2GIdolCheapT1.1"
+msgstr "Idolul mistrețului săracului"
+
+#: 304826631895388160
+msgid "treasure2GIdolT1.1"
+msgstr "Idolul Mistrețului Mare"
+
+#: 304826724413345792
+msgid "treasure2GIdolCheapT1.2"
+msgstr "Idolul Capului Pârjolit"
+
+#: 304827057936011264
+msgid "treasure2GIdolT1.2"
+msgstr "Idolul Craniului Înflăcărat"
+
+#: 308071776790249472
+msgid "Lem"
+msgstr "Cutie de amintiri"
+
+#: 308087884024905728
+msgid "Tablet.Cheap"
+msgstr "Piatră misterioasă"
+
+#: 308103528141291520
+msgid "Flop"
+msgstr "Dischetă cu Flopcoins"
+
+#: 308105688279154688
+msgid "Flop.Cheap"
+msgstr "Unitate falsă"
+
+#: 308108977548820480
+msgid "Shit"
+msgstr "Sfântul Dubai Choco"
+
+#: 308109676152094720
+msgid "Shit.Cheap"
+msgstr "Plăcintă de bălegar"
+
+#: 308112391376732160
+msgid "Frid"
+msgstr "Masca de Vineri Seara"
+
+#: 308113442167324672
+msgid "Frid.Cheap"
+msgstr "Masca de Luni, 12"
+
+#: 308116274564038656
+msgid "Jur"
+msgstr "Sursa Sângelui Vechi"
+
+#: 308116311943675904
+msgid "Jur.Cheap"
+msgstr "Țânțar de Colofoniu"
+
+#: 308118123144806400
+msgid "Tooth"
+msgstr "Dintele lui Genghis Khan"
+
+#: 308118125929824256
+msgid "Tooth.Cheap"
+msgstr "Dinții tăi?!?"
+
+#: 331272749512396800
+msgid "cryolisSmall"
+msgstr "Nugget de Cryolis (mic)"
+
+#: 332799018326560768
+msgid "frozenItem"
+msgstr "Obiect înghețat"
+
+#: 344256652787322880
+msgid "emberSphere"
+msgstr "Sfera Soarelui"
+
+#: 344256998452498432
+msgid "gemIdolHearthSmall"
+msgstr "Vatră Idol"
+
+#: 344257252614737920
+msgid "sparkwing"
+msgstr "Sparkwing"
+
+#: 345838386553294848
+msgid "collected"
+msgstr "Colectat"
+
+#: 352860554265776128
+msgid "treasure.3g.idol.cheap.t1.1"
+msgstr "Idolul Mustăciosului"
+
+#: 352861521468084224
+msgid "treasure.3g.idol.t1.1"
+msgstr "Idolul Înțelepciunii"
+
+#: 355564928933298176
+msgid "winter.chest"
+msgstr "Cufărul Jarlului"
+
+#: 355819897745833984
+msgid "gold.medium.t1.2"
+msgstr "Bucată de aur deformată"
+
+#: 355820315255242752
+msgid "gold.medium.t1.3"
+msgstr "Bucată splendidă de aur"
+
+#: 355820677206900736
+msgid "gold.small.t1.bad"
+msgstr "Aur sfărâmat"
+
+#: 355820843536220160
+msgid "gold.small.t1.good"
+msgstr "Nugget de aur imaculat"
+
+#: 355821218943205376
+msgid "silver.small.t1.bad"
+msgstr "Argint mat"
+
+#: 355821334773104640
+msgid "silver.small.t1.good"
+msgstr "Nugget de argint strălucitor"
+
+#: 355823949699350528
+msgid "gem.diamond.big.bad"
+msgstr "Diamant mare ciobit"
+
+#: 355824022109814784
+msgid "gem.diamond.big.good"
+msgstr "Diamant Colosal"
+
+#: 355825018307346432
+msgid "gem.diamond.medium.t1.bad"
+msgstr "Diamant defect (Mediu)"
+
+#: 355825051593342976
+msgid "gem.diamond.medium.t1.good"
+msgstr "Diamant impecabil (Mediu)"
+
+#: 355825892232527872
+msgid "gem.opal.small.t1.bad"
+msgstr "Opal tulbure"
+
+#: 355825926491602944
+msgid "gem.opal.small.t1.good"
+msgstr "Opal Luminos"
+
+#: 355831675162722304
+msgid "gem.ruby.small.t1.bad"
+msgstr "Rubin maro"
+
+#: 355831712475250688
+msgid "gem.ruby.small.t1.good"
+msgstr "Rubin de culoarea sângelui"
+
+#: 355835925297102848
+msgid "gem.sapphire.medium.t1.bad"
+msgstr "Safir deformat"
+
+#: 355835927612358656
+msgid "gem.sapphire.medium.t1.good"
+msgstr "Safir ceresc"
+
+#: 360176275164499968
+msgid "frozen.artifact.book.t4.1"
+msgstr "Tom antic înghețat"
+
+#: 360177589508378624
+msgid "frozen.daimond.big.t1.1"
+msgstr "Diamant înghețat (mare)"
+
+#: 360177807297613824
+msgid "frozen.daimond.medium.t1.1"
+msgstr "Diamant înghețat (mediu)"
+
+#: 360177937186820096
+msgid "frozen.gold.medium.t1.1"
+msgstr "Bucată mare de aur înghețată"
+
+#: 360178211246837760
+msgid "frozen.gold.small.t1"
+msgstr "Nugget de aur înghețat (mic)"
+
+#: 360178467921465344
+msgid "frozen.silver.small.t1"
+msgstr "Nugget de argint înghețat (mic)"
+
+#: 360179617257230336
+msgid "frozen.opal.small.t1.1"
+msgstr "Opal înghețat (mic)"
+
+#: 360179817572995072
+msgid "frozen.ruby.small.t1.1"
+msgstr "Rubin înghețat (mic)"
+
+#: 360180105012842496
+msgid "frozen.sapphire.small.t1.1"
+msgstr "Safir înghețat (mic)"
+
+#: 360180385796329472
+msgid "frozen.treasure.1g.idol"
+msgstr "Idol înghețat"
+
+#: 366715237467164672
+msgid "treasureCryolisEarring2GT1.1"
+msgstr "Cercei Scânteietori"
+
+#: 366715787273310208
+msgid "treasureCryolisEarring2GT1.2"
+msgstr "Cercei Luminați de Lună"
+
+#: 366715935038640128
+msgid "treasureCryolisEarring2GT1.3"
+msgstr "Privire Înghețată"
+
+#: 366716149346603008
+msgid "treasureCryolisEarring2GT1.4"
+msgstr "Lac Lumina de Lună"

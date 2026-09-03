@@ -1,0 +1,632 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:43+0000\n"
+"Last-Translator: Hero Craft Localization user 14 "
+"<ivanbelov@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Hungarian <http://l10n.herocraft.com/projects/need-for-greed/"
+"loot/hu/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: hu\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 145034502144
+msgid "ring"
+msgstr "Gyűrű"
+
+#: 180082106368
+msgid "dagger"
+msgstr "Tőr"
+
+#: 269412392960
+msgid "necklace"
+msgstr "Nyaklánc"
+
+#: 317432979456
+msgid "treasureGoldScepter3GT1.1"
+msgstr "Arany jogar"
+
+#: 391995121664
+msgid "bracelet"
+msgstr "Karkötő"
+
+#: 430343643136
+msgid "brooch"
+msgstr "Bross"
+
+#: 479966453760
+msgid "diadem"
+msgstr "Diadém"
+
+#: 549466071040
+msgid "casket"
+msgstr "Koporsó"
+
+#: 610409308160
+msgid "treasureGoldCrownT1.1"
+msgstr "Aranykorona"
+
+#: 877821353984
+msgid "diamondBig"
+msgstr "Tiszta gyémánt (nagy)"
+
+#: 918229278720
+msgid "diamondMedium"
+msgstr "Tiszta gyémánt (közepes)"
+
+#: 966572826624
+msgid "diamondSmall"
+msgstr "Tiszta gyémánt (kicsi)"
+
+#: 1109162385408
+msgid "rubyBig"
+msgstr "Bíbor rubin (nagy)"
+
+#: 1112484274176
+msgid "rubyMedium"
+msgstr "Bíbor rubin (közepes)"
+
+#: 1118599569408
+msgid "rubySmall"
+msgstr "Bíbor rubin (kicsi)"
+
+#: 1382245130240
+msgid "sapphireBig"
+msgstr "Kék zafír (nagy)"
+
+#: 1385105645568
+msgid "sapphireMedium"
+msgstr "Kék zafír (közepes)"
+
+#: 1387160854528
+msgid "sapphireSmall"
+msgstr "Kék zafír (kicsi)"
+
+#: 1624038367232
+msgid "emeraldBig"
+msgstr "Smaragd (nagy)"
+
+#: 1626538172416
+msgid "emeraldMedium"
+msgstr "Smaragd (közepes)"
+
+#: 1628039733248
+msgid "emeraldSmall"
+msgstr "Smaragd (kicsi)"
+
+#: 1775394021376
+msgid "amethystBig"
+msgstr "Ametiszt (nagy)"
+
+#: 1778531360768
+msgid "amethystMedium"
+msgstr "Ametiszt (közepes)"
+
+#: 1781240881152
+msgid "amethystSmall"
+msgstr "Ametiszt (kicsi)"
+
+#: 1975328104448
+msgid "opalBig"
+msgstr "Opál (nagy)"
+
+#: 1977366536192
+msgid "opalMedium"
+msgstr "Opál (közepes)"
+
+#: 1978461249536
+msgid "opalSmall"
+msgstr "Opál (kicsi)"
+
+#: 90993176100474880
+msgid "diamondRough"
+msgstr "Gyémánt (nyers)"
+
+#: 90994685357854720
+msgid "amethystRough"
+msgstr "Ametiszt (durva)"
+
+#: 90995679407902720
+msgid "emeraldRough"
+msgstr "Smaragd (durva)"
+
+#: 90995991497674752
+msgid "opalRough"
+msgstr "Opál (durva)"
+
+#: 90996287313547264
+msgid "rubyRough"
+msgstr "Rubin (durva)"
+
+#: 90996648090800128
+msgid "sapphireRough"
+msgstr "Zafír (durva)"
+
+#: 91104301592875008
+msgid "goldSmall"
+msgstr "Aranyrög (kicsi)"
+
+#: 170368899466137600
+msgid "eggBird"
+msgstr "Paradicsommadár tojás"
+
+#: 184508261447503872
+msgid "goldMedium"
+msgstr "Nagy aranydarab"
+
+#: 184510784782733312
+msgid "goldBig"
+msgstr "Aranyrög (nagy)"
+
+#: 223644980889260032
+msgid "trash"
+msgstr "Szemét"
+
+#: 226530276224012288
+msgid "pin"
+msgstr "Kitűző"
+
+#: 226809520472723456
+msgid "earring"
+msgstr "Fülbevaló"
+
+#: 231192180821331968
+msgid "glasses"
+msgstr "Szemüveg"
+
+#: 236643067328991232
+msgid "loveBig"
+msgstr "Kötőkő (nagy)"
+
+#: 236643187822956544
+msgid "loveMedium"
+msgstr "Kötőkő (közepes)"
+
+#: 236643238079107072
+msgid "gemBirdSmall"
+msgstr "Madár drágakő"
+
+#: 253417221730340864
+msgid "geodeMedium"
+msgstr "Geóda (közepes)"
+
+#: 254185922679279616
+msgid "gemRoughMedium"
+msgstr "Vad drágakő (közepes)"
+
+#: 254905974785314816
+msgid "artifact"
+msgstr "Műtárgy"
+
+#: 255083397128654848
+msgid "meteoriteIronSmall"
+msgstr "Csillagvas (kicsi)"
+
+#: 256721089700564992
+msgid "mask"
+msgstr "Maszk"
+
+#: 256721248970870784
+msgid "treasureGoldGlove5GT1.1"
+msgstr "Aranykesztyű"
+
+#: 257443856536309760
+msgid "silverSmall"
+msgstr "Ezüströg (kicsi)"
+
+#: 258521155209793536
+msgid "idol"
+msgstr "Bálvány"
+
+#: 300784345364566016
+msgid "goldSmallCoin"
+msgstr "Ősi érme (arany)"
+
+#: 300784550382145536
+msgid "silverSmallCoin"
+msgstr "Ősi érme (ezüst)"
+
+#: 300785063425216512
+msgid "gemLoveSmall"
+msgstr "Kötőkő (kicsi)"
+
+#: 301130818094632960
+msgid "artifactBirdEntity"
+msgstr "A szerencse sárgája"
+
+#: 301131059615240192
+msgid "artifactWormEntity"
+msgstr "Mocsári lárva"
+
+#: 301131351488466944
+msgid "artifactGalaxyMechanism"
+msgstr "Meteor mag"
+
+#: 301131515259260928
+msgid "artifactBook"
+msgstr "Ősi kötet"
+
+#: 301131609035509760
+msgid "artifactManuscript"
+msgstr "Kopott tekercs"
+
+#: 301131692661542912
+msgid "artifactTablet"
+msgstr "Szövetségi kő"
+
+#: 301131928431759360
+msgid "cursedItem"
+msgstr "Átkozott ereklye"
+
+#: 301134437837705216
+msgid "chest"
+msgstr "Elásott láda"
+
+#: 301134754209861632
+msgid "eggWorm"
+msgstr "Féregtojás"
+
+#: 301134952529137664
+msgid "geodeSmall"
+msgstr "Geóda (kicsi)"
+
+#: 301135305941192704
+msgid "geodeGemSmall"
+msgstr "Értékes geóda (kicsi)"
+
+#: 301135432625950720
+msgid "geodeGemMedium"
+msgstr "Értékes geóda (közepes)"
+
+#: 301136788187254784
+msgid "goldSmallScarab"
+msgstr "Arany skarabeusz"
+
+#: 301138401769558016
+msgid "gemRoughSmall"
+msgstr "Vad drágakő (kicsi)"
+
+#: 301138758054711296
+msgid "roughDaggerT1"
+msgstr "Törött akarat tőr"
+
+#: 301138888757612544
+msgid "roughMaskT1"
+msgstr "Törött álarc"
+
+#: 301139046975148032
+msgid "roughtScepterT1"
+msgstr "Összetört jogar"
+
+#: 301139166772858880
+msgid "roughCrownT1"
+msgstr "Törött korona"
+
+#: 301139272288964608
+msgid "roughGloveT1"
+msgstr "Repedt kesztyű"
+
+#: 301139595988570112
+msgid "unknownItem"
+msgstr "Ismeretlen tárgy"
+
+#: 301139858380034048
+msgid "treasureGoldEarring1GT1.1"
+msgstr "Sugárzó medál (arany)"
+
+#: 301140049422192640
+msgid "treasureGoldNecklace1GT1.1"
+msgstr "Virágzó Kerti Bross (Arany)"
+
+#: 301140236874027008
+msgid "treasureGoldNecklace1GT1.2"
+msgstr "Rejtett fény medál (arany)"
+
+#: 301140518961942528
+msgid "treasureGoldPin1GT1.1"
+msgstr "Rejtett drágakő kitűző (arany)"
+
+#: 301140708619980800
+msgid "treasureGoldRing1GT1.1"
+msgstr "Gyűrű (arany)"
+
+#: 301157185821609984
+msgid "treasureGoldRing1GT1.2"
+msgstr "Keskeny kő karkötő (arany)"
+
+#: 301157418504818688
+msgid "treasureGoldRing1GT1.3"
+msgstr "Királyi pecsétgyűrű (arany)"
+
+#: 301157807581040640
+msgid "treasureGoldRing1GT1.4"
+msgstr "Szuverén pecsétgyűrű (arany)"
+
+#: 301157950980100096
+msgid "treasureGoldBrooch2GT1.1"
+msgstr "Napkitörés bross (arany)"
+
+#: 301159108893216768
+msgid "treasureGoldDagger2GT1.1"
+msgstr "Az akarat aranytőre"
+
+#: 301159380533121024
+msgid "treasureGoldEarring2GT1.1"
+msgstr "Rezonáns fülbevaló (arany)"
+
+#: 301159536917745664
+msgid "treasureGoldGlasses2GT1.1"
+msgstr "Hiúsági szemüveg (arany)"
+
+#: 301159731252432896
+msgid "treasureGoldMask2GT1.1"
+msgstr "Arany álarc"
+
+#: 301159892582141952
+msgid "treasureGoldRing2GT1.1"
+msgstr "Ikervégzet gyűrű (arany)"
+
+#: 301160906458664960
+msgid "treasureMeteoriteIron1GT1.1"
+msgstr "Égi gyűrű"
+
+#: 301161084104216576
+msgid "treasureMeteoriteIron2GT1.1"
+msgstr "Égi gyűrű"
+
+#: 301161408911118336
+msgid "treasureSilverNecklace1GT1.1"
+msgstr "Kötött öv (ezüst)"
+
+#: 301161581187960832
+msgid "treasureSilverRing1GT1.1"
+msgstr "Holdfényes gyűrű (ezüst)"
+
+#: 301161692269907968
+msgid "treasureSilverRing1GT1.2"
+msgstr "Kígyógyűrű (ezüst)"
+
+#: 301161856397217792
+msgid "treasureSilverRing1GT1.3"
+msgstr "Csáp pecsétgyűrű (ezüst)"
+
+#: 301162192604237824
+msgid "treasureSilverPin1GT1.1"
+msgstr "Becsület tűje (ezüst)"
+
+#: 304825262794870784
+msgid "artifactGoldCoinCheap"
+msgstr "Mohás érme"
+
+#: 304825379492990976
+msgid "artifactGoldCoin"
+msgstr "Átkozott érme"
+
+#: 304825491313135616
+msgid "artifactGoldCoinBest"
+msgstr "Az ősi dicsőség érméje"
+
+#: 304826479935754240
+msgid "treasure2GIdolCheapT1.1"
+msgstr "Szegény ember vadkan bálványa"
+
+#: 304826631895388160
+msgid "treasure2GIdolT1.1"
+msgstr "A nagy vadkan bálványa"
+
+#: 304826724413345792
+msgid "treasure2GIdolCheapT1.2"
+msgstr "A perzselt fejű Bálvány"
+
+#: 304827057936011264
+msgid "treasure2GIdolT1.2"
+msgstr "Az izzó koponya bálványa"
+
+#: 308071776790249472
+msgid "Lem"
+msgstr "Emlékdoboz"
+
+#: 308087884024905728
+msgid "Tablet.Cheap"
+msgstr "Rejtélyes-szar kő"
+
+#: 308103528141291520
+msgid "Flop"
+msgstr "Floppy flopcoinokkal"
+
+#: 308105688279154688
+msgid "Flop.Cheap"
+msgstr "Dummy meghajtó"
+
+#: 308108977548820480
+msgid "Shit"
+msgstr "Szent Dubai Csoki"
+
+#: 308109676152094720
+msgid "Shit.Cheap"
+msgstr "Trágya lepény"
+
+#: 308112391376732160
+msgid "Frid"
+msgstr "Péntek esti maszk"
+
+#: 308113442167324672
+msgid "Frid.Cheap"
+msgstr "Hétfő 12-i maszk"
+
+#: 308116274564038656
+msgid "Jur"
+msgstr "Az öreg vér forrása"
+
+#: 308116311943675904
+msgid "Jur.Cheap"
+msgstr "Kolofónium szúnyog"
+
+#: 308118123144806400
+msgid "Tooth"
+msgstr "Dzsingisz kán foga"
+
+#: 308118125929824256
+msgid "Tooth.Cheap"
+msgstr "A fogad?!"
+
+#: 331272749512396800
+msgid "cryolisSmall"
+msgstr "Kriolisz rög (kicsi)"
+
+#: 332799018326560768
+msgid "frozenItem"
+msgstr "Fagyott tárgy"
+
+#: 344256652787322880
+msgid "emberSphere"
+msgstr "Napgömb"
+
+#: 344256998452498432
+msgid "gemIdolHearthSmall"
+msgstr "Bálvány tűzhely"
+
+#: 344257252614737920
+msgid "sparkwing"
+msgstr "Szikraszárny"
+
+#: 345838386553294848
+msgid "collected"
+msgstr "Összegyűjtve"
+
+#: 352860554265776128
+msgid "treasure.3g.idol.cheap.t1.1"
+msgstr "A bajuszos Bálvány"
+
+#: 352861521468084224
+msgid "treasure.3g.idol.t1.1"
+msgstr "A Bölcsesség Bálványa"
+
+#: 355564928933298176
+msgid "winter.chest"
+msgstr "A Jarl ládája"
+
+#: 355819897745833984
+msgid "gold.medium.t1.2"
+msgstr "Megcsonkított aranydarab"
+
+#: 355820315255242752
+msgid "gold.medium.t1.3"
+msgstr "Ragyogó aranydarab"
+
+#: 355820677206900736
+msgid "gold.small.t1.bad"
+msgstr "Morzsolt arany"
+
+#: 355820843536220160
+msgid "gold.small.t1.good"
+msgstr "Érintetlen aranyrög"
+
+#: 355821218943205376
+msgid "silver.small.t1.bad"
+msgstr "Tompa ezüst"
+
+#: 355821334773104640
+msgid "silver.small.t1.good"
+msgstr "Csillogó ezüst rög"
+
+#: 355823949699350528
+msgid "gem.diamond.big.bad"
+msgstr "Csorba nagy gyémánt"
+
+#: 355824022109814784
+msgid "gem.diamond.big.good"
+msgstr "Kolosszális gyémánt"
+
+#: 355825018307346432
+msgid "gem.diamond.medium.t1.bad"
+msgstr "Hibás gyémánt (közepes)"
+
+#: 355825051593342976
+msgid "gem.diamond.medium.t1.good"
+msgstr "Hibátlan gyémánt (közepes)"
+
+#: 355825892232527872
+msgid "gem.opal.small.t1.bad"
+msgstr "Zavaros opál"
+
+#: 355825926491602944
+msgid "gem.opal.small.t1.good"
+msgstr "Fényes opál"
+
+#: 355831675162722304
+msgid "gem.ruby.small.t1.bad"
+msgstr "Barna rubin"
+
+#: 355831712475250688
+msgid "gem.ruby.small.t1.good"
+msgstr "Bíborvér rubin"
+
+#: 355835925297102848
+msgid "gem.sapphire.medium.t1.bad"
+msgstr "Féloldalas zafír"
+
+#: 355835927612358656
+msgid "gem.sapphire.medium.t1.good"
+msgstr "Égi zafír"
+
+#: 360176275164499968
+msgid "frozen.artifact.book.t4.1"
+msgstr "Fagyott ősi kötet"
+
+#: 360177589508378624
+msgid "frozen.daimond.big.t1.1"
+msgstr "Fagyott gyémánt (nagy)"
+
+#: 360177807297613824
+msgid "frozen.daimond.medium.t1.1"
+msgstr "Fagyott gyémánt (közepes)"
+
+#: 360177937186820096
+msgid "frozen.gold.medium.t1.1"
+msgstr "Fagyott nagy aranydarab"
+
+#: 360178211246837760
+msgid "frozen.gold.small.t1"
+msgstr "Fagyott aranyrög (kicsi)"
+
+#: 360178467921465344
+msgid "frozen.silver.small.t1"
+msgstr "Fagyott ezüströg (kicsi)"
+
+#: 360179617257230336
+msgid "frozen.opal.small.t1.1"
+msgstr "Fagyott opál (kicsi)"
+
+#: 360179817572995072
+msgid "frozen.ruby.small.t1.1"
+msgstr "Fagyott rubin (kicsi)"
+
+#: 360180105012842496
+msgid "frozen.sapphire.small.t1.1"
+msgstr "Fagyott zafír (kicsi)"
+
+#: 360180385796329472
+msgid "frozen.treasure.1g.idol"
+msgstr "Fagyott bálvány"
+
+#: 366715237467164672
+msgid "treasureCryolisEarring2GT1.1"
+msgstr "Csillogó fülbevaló"
+
+#: 366715787273310208
+msgid "treasureCryolisEarring2GT1.2"
+msgstr "Holdfényes fülbevaló"
+
+#: 366715935038640128
+msgid "treasureCryolisEarring2GT1.3"
+msgstr "Jeges tekintet"
+
+#: 366716149346603008
+msgid "treasureCryolisEarring2GT1.4"
+msgstr "Holdfényes tó"

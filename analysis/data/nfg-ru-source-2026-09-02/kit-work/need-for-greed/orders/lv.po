@@ -1,0 +1,469 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Latvian <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/lv/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: lv\n"
+"Plural-Forms: nplurals=3; plural=(n % 10 == 0 || n % 100 >= 11 && n % 100 <= "
+"19) ? 0 : ((n % 10 == 1 && n % 100 != 11) ? 1 : 2);\n"
+
+#: 114226892800
+msgid "orderTerrain0.1Step1Title"
+msgstr "Mums vajag vairāk zelta!"
+
+#: 432712978432
+msgid "orderTerrain0.1Step1Description"
+msgstr "Atnesiet man 3 zelta tīrradņus."
+
+#: 410868545490944
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Lieliski — šie tīrradņi lieliski papildinās manu kolekciju."
+
+#: 4737438277963776
+msgid "orderTerrain1.1Step1Title"
+msgstr "Rītausmas mirdzums"
+
+#: 4737634734968832
+msgid "orderTerrain1.1Step1Description"
+msgstr "Atnesiet man zelta tīrradni no jebkura zeltu saturoša ieža."
+
+#: 4737870236749824
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"Zelts sevī glabā rītausmas mirdzumu — ja es to neredzu, vismaz es to varu "
+"sajust..."
+
+#: 4740504523902976
+msgid "orderTerrain0.1Step2Title"
+msgstr "Lielisks darbs!"
+
+#: 4740632143990784
+msgid "orderTerrain0.1Step2Description"
+msgstr "Paldies par palīdzību! Es jums parādīšu kādu interesantu vietu."
+
+#: 16787486734028800
+msgid "orderTerrain1.1Step2Title"
+msgstr "Jaunas brilles"
+
+#: 16787574239793152
+msgid "orderTerrain1.1Step2Description"
+msgstr "Atnesiet man 2 dimantus. Tie bieži izkrīt no kristālu iežiem."
+
+#: 16788049915809792
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Paskatīsimies, vai esmu gatavs pierast pie šīs zemes..."
+
+#: 16788621414895616
+msgid "orderTerrain1.1Step3Title"
+msgstr "Pierod pie zemes"
+
+#: 16788663253078016
+msgid "orderTerrain1.1Step3Description"
+msgstr "Atnesiet man mazu Ģeodi. Tās var atrast parastos akmeņos."
+
+#: 16788764000260096
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Paskatīsimies, vai esmu gatavs pierast pie šīs zemes..."
+
+#: 16789247150526464
+msgid "orderTerrain1.1Step4Title"
+msgstr "Mirušā vīra lāde"
+
+#: 16789336237543424
+msgid "orderTerrain1.1Step4Description"
+msgstr "Atnesiet man Lādi. Kanārijputniņš varētu palīdzēt jums to atrast."
+
+#: 16789441711706112
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Tātad tur es atstāju savas mantas..."
+
+#: 16789861523787776
+msgid "orderTerrain1.1Step5Title"
+msgstr "Sudrabs rūdīšanai"
+
+#: 16790058245033984
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Atnesiet man 3 sudraba gabalus. Tos var atrast Ģeodes un parastos akmeņos."
+
+#: 16790186938863616
+msgid "orderTerrain1.1Step6Title"
+msgstr "Lielisks darbs!"
+
+#: 16790822405279744
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Šis sudrabs patīkami dzēš plaukstas..."
+
+#: 16791339927867392
+msgid "orderTerrain1.1Step6Description"
+msgstr "Paldies! Ienāciet pie manis kādreiz — šeit ir adrese."
+
+#: 16792386012450816
+msgid "orderTerrain1.2Step1Title"
+msgstr "Sena nauda"
+
+#: 16792448180424704
+msgid "orderTerrain1.2Step1Description"
+msgstr "Atnesiet man 4 senas Monētas. Tās bieži atrodamas senos podos un vāzēs."
+
+#: 16793192929431552
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Tagad es beidzot varu dot atlikumu senajiem!"
+
+#: 16793381891215360
+msgid "orderTerrain1.2Step2Title"
+msgstr "Bumbu rullis"
+
+#: 16793474094600192
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Atnesiet man Zelta skarabeju. Tie ir lieli vaboļi, kurus var atrast rāpojam "
+"krūmos."
+
+#: 16793779863556096
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Šis vabole ir liels bumbu rullis!"
+
+#: 16794392403906560
+msgid "orderTerrain1.2Step3Title"
+msgstr "Akmens boulinga"
+
+#: 16794434028179456
+msgid "orderTerrain1.2Step3Description"
+msgstr "Atnesiet man vidēju Ģeodi. Tā dažreiz parādās parastos akmeņos."
+
+#: 16794517595492352
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Tagad es beidzot varēšu ripināt bumbas!"
+
+#: 16794991149191168
+msgid "orderTerrain1.2Step4Title"
+msgstr "Zelta omlete"
+
+#: 16795063073116160
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Atnesiet man Zelta Olu. Meklējiet krūmos, lai atrastu ligzdu, kurā ir šādas "
+"olas."
+
+#: 16795116181393408
+msgid "orderTerrain1.2Step4Thank"
+msgstr "Nu, tās ir karaliskas brokastis!"
+
+#: 16795705460133888
+msgid "orderTerrain1.2Step5Title"
+msgstr "Lauvas asinis"
+
+#: 16795757985402880
+msgid "orderTerrain1.2Step5Description"
+msgstr ""
+"Atnesiet man Lauvas rubīnu. To var atrast Ģeodes ar sarkaniem kristāliem."
+
+#: 16795845432446976
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Tagad es būšu drosmīgs kā lauva!"
+
+#: 16797388357505024
+msgid "orderTerrain1.2Step6Title"
+msgstr "Debesu žēlastība"
+
+#: 16797558377811968
+msgid "orderTerrain1.2Step6Description"
+msgstr "Atnesiet man Debesu safīru. To var atrast Ģeodes ar ziliem kristāliem."
+
+#: 16797646290423808
+msgid "orderTerrain1.2Step6Thank"
+msgstr "Paši debesi ir manā pusē!"
+
+#: 16798157601247232
+msgid "orderTerrain1.2Step7Title"
+msgstr "Zelta tualete"
+
+#: 16798193798090752
+msgid "orderTerrain1.2Step7Description"
+msgstr "Atnesiet man 9 zelta tīrradņus no jebkura zeltu saturoša ieža."
+
+#: 16798263801024512
+msgid "orderTerrain1.2Step7Thank"
+msgstr "Beidzot varu salabot tualeti!"
+
+#: 16798933543292928
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"Ja vēlaties izteikt vēlēšanās — es zinu vietu, kur zvaigznes krīt visu laiku."
+
+#: 16799140129542144
+msgid "orderTerrain1.2Step8Title"
+msgstr "Lielisks darbs!"
+
+#: 66701112705024000
+msgid "orderTerrain2.1Step5Title"
+msgstr "Lielisks darbs!"
+
+#: 66701312781713408
+msgid "orderTerrain2.1Step5Description"
+msgstr "Ledus man atgādina vecmāmiņu... Ieskrējiet arī viņas namiņā!"
+
+#: 66701713186750464
+msgid "orderTerrain2.1Step1Description"
+msgstr "Atnesiet man 2 Saldētus priekšmetus no sasalušajiem iežiem"
+
+#: 66702356693647360
+msgid "orderTerrain2.1Step1Title"
+msgstr "Ledus kubi"
+
+#: 66702611300483072
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Ideāli piemērots maniem kokteiļiem!"
+
+#: 66705370212990976
+msgid "orderTerrain2.2Step7Title"
+msgstr "Lielisks darbs!"
+
+#: 66705373262249984
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Šķiet, ka krabji ir saistīti ar Saules kultu — es zinu, kur atrodas viņu "
+"tempļa drupas!"
+
+#: 66705376152125440
+msgid "orderTerrain2.2Step2Description"
+msgstr "Noķer ledus krabi — tā čaula ir veidota no Kriolis."
+
+#: 66705379809558528
+msgid "orderTerrain2.2Step2Title"
+msgstr "Krabs metāls"
+
+#: 66705384804974592
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ak, eksometāls! Man patīk dabas noslēpumi!"
+
+#: 66706577295933440
+msgid "orderTerrain2.3Step8Title"
+msgstr "Lielisks darbs!"
+
+#: 66706580684931072
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"Saules kulta visvērtīgākie dārgumi ir paslēpti dziļi Labirints — es jums "
+"parādīšu, kur!"
+
+#: 66706585684541440
+msgid "orderTerrain2.3Step2Description"
+msgstr "Iededz 3 lāpas Svētnīca un nozodz Saules sfēra!"
+
+#: 66706589509746688
+msgid "orderTerrain2.3Step2Title"
+msgstr "Labākais sildītājs"
+
+msgid "orderTerrain2.3Step2HelpInfo"
+msgstr ""
+
+#: 66706594945564672
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Jā, tagad tas ir kārtīgs iesildīšanās!"
+
+#: 70714473507717120
+msgid "orderTerrain2.1Step2Description"
+msgstr "Atrodiet 2 sudraba tīrradņus ledus kubos un sasildiet tos."
+
+#: 70714539375067136
+msgid "orderTerrain2.1Step2Title"
+msgstr "Sals sudrabs"
+
+#: 70714808414502912
+msgid "orderTerrain2.1Step2Thank"
+msgstr "Tas ir kā ledus folijā... bet otrādi..."
+
+#: 70714878748786688
+msgid "orderTerrain2.1Step3Title"
+msgstr "Sals zelts"
+
+#: 70714919110574080
+msgid "orderTerrain2.1Step3Thank"
+msgstr "Ziemas zelts iegūst ļoti īpašu... spīdumu..."
+
+#: 70714983467974656
+msgid "orderTerrain2.1Step3Description"
+msgstr "Atrodiet 2 zelta tīrradņus ledus kubos un sasildiet tos."
+
+#: 70715014472269824
+msgid "orderTerrain2.1Step4Title"
+msgstr "Neredzamais dārgakmens"
+
+#: 70715038832787456
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Skaidrs skaidrā, ahahaha!"
+
+#: 70715070977933312
+msgid "orderTerrain2.1Step4Description"
+msgstr "Atdzesējiet vidēju dimantu. Saldēti dimanti bieži atrodami visos iežos."
+
+#: 70718769544560640
+msgid "orderTerrain2.2Step1Title"
+msgstr "Zemes astroloģija"
+
+#: 70718775819239424
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Atnesiet man 2 Zvaigžņu dzelžus. Tos var atrast purvos Zvaigžņu krišanas "
+"laikā."
+
+#: 70718777429852160
+msgid "orderTerrain2.2Step1Thank"
+msgstr "Astrometāls ir katra zinātnieka sapnis!"
+
+#: 70721195022483456
+msgid "orderTerrain2.2Step3Title"
+msgstr "Kosmiskais iebrucējs"
+
+#: 70721197308379136
+msgid "orderTerrain2.2Step3Description"
+msgstr ""
+"Atrodiet Nolādētu Meteora kodolu Zvaigžņu krišanas laikā un atbrīvojieties "
+"no lāsta."
+
+#: 70721198948352000
+msgid "orderTerrain2.2Step3Thank"
+msgstr "Meteors ir mašīna, nevis tikai debesu ķermenis! Apbrīnojami!"
+
+#: 70723998965039104
+msgid "orderTerrain2.2Step4Title"
+msgstr "Krabs siltums"
+
+#: 70724001313849344
+msgid "orderTerrain2.2Step4Description"
+msgstr "Savāc 5 Kriolis šķembas no ledus krabju čaulām."
+
+#: 70724003188703232
+msgid "orderTerrain2.2Step4Thank"
+msgstr "Vai arī jūs mirstat no vēlmes uzzināt, kā krabji dzīvo sniegā?"
+
+#: 70724154619854848
+msgid "orderTerrain2.2Step5Title"
+msgstr "Jauni sensori"
+
+msgid "orderTerrain2.2Step5HelpInfo"
+msgstr ""
+
+#: 70724156297576448
+msgid "orderTerrain2.2Step5Description"
+msgstr ""
+"Atnesiet man 9 sudraba gabalus. Tos var atrast Ģeodes un vienkāršos akmeņos."
+
+#: 70724162102493184
+msgid "orderTerrain2.2Step5Thank"
+msgstr "Mani pētniecības instrumenti beidzot pārstās kļūdīties!"
+
+#: 70724346286964736
+msgid "orderTerrain2.2Step6Title"
+msgstr "Krabs siltais mētelis"
+
+msgid "orderTerrain2.2Step6HelpInfo"
+msgstr ""
+
+#: 70724348468002816
+msgid "orderTerrain2.2Step6Description"
+msgstr "Savāc 8 Kriolis šķembas no ledus krabju čaulām."
+
+#: 70724350279942144
+msgid "orderTerrain2.2Step6Thank"
+msgstr "Tagad es beidzot sapratīšu, kā viņi izdzīvo ziemu!"
+
+#: 70738013825007616
+msgid "orderTerrain2.3Step1Title"
+msgstr "Kļūstot liels"
+
+msgid "orderTerrain2.3Step1HelpInfo"
+msgstr ""
+
+#: 70738018996584448
+msgid "orderTerrain2.3Step1Description"
+msgstr "Atnes man lielu dimantu. To var atrast visos saldētos akmeņos."
+
+#: 70738021307645952
+msgid "orderTerrain2.3Step1Thank"
+msgstr "Ak dievs, tas ir galvas lielumā! Bet kura..."
+
+#: 70738580156710912
+msgid "orderTerrain2.3Step3Title"
+msgstr "Baltzemju dārgums"
+
+msgid "orderTerrain2.3Step3HelpInfo"
+msgstr ""
+
+#: 70738582908174336
+msgid "orderTerrain2.3Step3Description"
+msgstr "Dod man Jarla lāde. Kanārijputniņš palīdzēs tev to atrast Baltzemēs."
+
+#: 70738585055657984
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Atgādina man par vectēvu..."
+
+#: 70742364090007552
+msgid "orderTerrain2.3Step4Title"
+msgstr "Liesmas esence"
+
+msgid "orderTerrain2.3Step4HelpInfo"
+msgstr ""
+
+#: 70742368280117248
+msgid "orderTerrain2.3Step4Description"
+msgstr "Izvelciet Elka dzirksteli no Saules sfēras."
+
+#: 70742370125611008
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Ak, cik karsts akmens..."
+
+#: 70742532495507456
+msgid "orderTerrain2.3Step5Title"
+msgstr "Varavīksnes akmens"
+
+msgid "orderTerrain2.3Step5HelpInfo"
+msgstr ""
+
+#: 70742535381188608
+msgid "orderTerrain2.3Step5Description"
+msgstr "Atnesiet man opālu. Tas ir retais atradums saldētos iežos."
+
+#: 70742539273502720
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Paskaties, cik skaisti tas mirdz..."
+
+#: 70743768674336768
+msgid "orderTerrain2.3Step6Title"
+msgstr "Tas atstāja pēcnācējus!"
+
+msgid "orderTerrain2.3Step6HelpInfo"
+msgstr ""
+
+#: 70743771123810304
+msgid "orderTerrain2.3Step6Description"
+msgstr "Izvelciet Pūces cāli no Saules sfēras."
+
+#: 70743772839280640
+msgid "orderTerrain2.3Step6Thank"
+msgstr "Liela pūce nes aukstumu... Kāpēc cālis ir tik karsts?"
+
+#: 70744648739979264
+msgid "orderTerrain2.3Step7Title"
+msgstr "Liels darījums"
+
+msgid "orderTerrain2.3Step7HelpInfo"
+msgstr ""
+
+#: 70744655853518848
+msgid "orderTerrain2.3Step7Description"
+msgstr "Atnesiet man 5 Zelts gabalus. Tie ir diezgan Parasts Saldēts iežos."
+
+#: 70744658739200000
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Tagad es būšu lielākais vīrs pilsētā."

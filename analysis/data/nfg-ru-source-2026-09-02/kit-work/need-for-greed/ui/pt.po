@@ -1,0 +1,1613 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:02+0000\n"
+"PO-Revision-Date: 2026-08-28 09:39+0000\n"
+"Last-Translator: Hero Craft Localization user 14 "
+"<ivanbelov@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Portuguese <http://l10n.herocraft.com/projects/need-for-greed/"
+"ui/pt/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: pt\n"
+"Plural-Forms: nplurals=2; plural=n > 1;\n"
+
+msgid "vibration"
+msgstr "Vibração"
+
+msgid "loading"
+msgstr "A carregar"
+
+msgid "adsNotReady"
+msgstr "O anúncio não está pronto. Tente novamente mais tarde."
+
+msgid "amount"
+msgstr "{value}"
+
+msgid "reviewTitle"
+msgstr "A sua opinião é importante para nós!"
+
+msgid "reviewDescription"
+msgstr "Gosta deste jogo?"
+
+msgid "reviewConfirm"
+msgstr "Sim, claro!"
+
+msgid "no"
+msgstr "Não"
+
+msgid "amountFormatted"
+msgstr "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+
+msgid "leaders"
+msgstr "Líderes"
+
+msgid "leaderboardAuth"
+msgstr ""
+"O quadro de líderes só está disponível para utilizadores autorizados. \n"
+"Inicie sessão na sua conta nas definições."
+
+msgid "softCurrency"
+msgstr "Moedas de prata"
+
+msgid "gems"
+msgstr "Gemas"
+
+msgid "day_N"
+msgstr "Dia {value}"
+
+msgid "dailyRewards"
+msgstr "Recompensas diárias"
+
+msgid "dailyRewardsDescription"
+msgstr ""
+"Visite o jogo todos os dias\n"
+"e receba recompensas."
+
+msgid "tapToStart"
+msgstr "Toque para iniciar"
+
+msgid "settings"
+msgstr "Definições"
+
+msgid "sound"
+msgstr "Efeitos sonoros"
+
+msgid "music"
+msgstr "Música"
+
+msgid "humanTimer"
+msgstr ""
+"{hours:cond:>0?{hours}h. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?"
+"{seconds}s.|} "
+
+msgid "sell"
+msgstr "Vender"
+
+msgid "trading"
+msgstr "Comércio"
+
+msgid "selectAmount"
+msgstr ""
+"Selecione a quantidade de gemas <size=56><color=#fff>({value}/{total})</"
+"color></size>"
+
+msgid "apply"
+msgstr "Aplicar"
+
+msgid "exit"
+msgstr "Sair"
+
+msgid "loot"
+msgstr "Saquear"
+
+msgid "inventory"
+msgstr "Inventário"
+
+msgid "add_amount"
+msgstr "+{value}"
+
+msgid "upgradeCharacterHealthStat"
+msgstr "Saúde"
+
+msgid "Pick"
+msgstr "Picareta"
+
+msgid "unload"
+msgstr "Descarregar"
+
+msgid "continue"
+msgstr "continuar"
+
+msgid "continueWithoutTheBird"
+msgstr "Continuar sem o pássaro"
+
+msgid "x_of_y"
+msgstr "{value} / {total}"
+
+msgid "make"
+msgstr "Fazer"
+
+msgid "in_progress"
+msgstr "Em andamento..."
+
+msgid "from_to_percent"
+msgstr "{from} -> {to}"
+
+msgid "lvl_x"
+msgstr "nv. {value}"
+
+msgid "take"
+msgstr "Pegar"
+
+msgid "tradeDescription"
+msgstr "Arraste e solte itens para vender aqui"
+
+msgid "storage"
+msgstr "Depósito"
+
+msgid "backpack"
+msgstr "Mochila"
+
+msgid "upgradeCharacterResistanceStat"
+msgstr "Resistência"
+
+msgid "completed"
+msgstr "Concluído"
+
+msgid "upgradeCharacterSpeedStat"
+msgstr "Velocidade"
+
+msgid "detectionRadius"
+msgstr "Raio de detecção de armadilhas"
+
+msgid "upgrade"
+msgstr "Melhorar"
+
+msgid "upgradeCharacterTitle"
+msgstr "Nível do Personagem {value}"
+
+msgid "upgradeToolTitle"
+msgstr "Nível da Ferramenta {value}"
+
+msgid "bird"
+msgstr "Pássaro"
+
+msgid "craft"
+msgstr "Construir"
+
+msgid "upgradeBirdFlyAmountStat"
+msgstr "Voos adicionais"
+
+msgid "upgradeToolSpeedStat"
+msgstr "Velocidade de impacto da ferramenta"
+
+msgid "upgradeToolDamageStat"
+msgstr "Dano da ferramenta"
+
+msgid "terrain1Title"
+msgstr "Pântano de Fenmar"
+
+msgid "terrain2Title"
+msgstr "Belomar"
+
+msgid "start"
+msgstr "Iniciar"
+
+msgid "terrain1Description"
+msgstr ""
+"Apenas um pântano sendo um pântano — exceto com pepitas de ouro e um verme "
+"gigante que reage a cada “ tilintar.” Os locais dizem: se você quer ouro, "
+"não faça barulho como uma loja de porcelana."
+
+msgid "howToOpenBiome"
+msgstr ""
+"Novos lugares.\n"
+"Complete as ordens — e os locais mostrarão\n"
+"onde procurar em seguida."
+
+msgid "revivalTitle"
+msgstr "É um fracasso total!"
+
+msgid "itemsInTheBackpack_x_of_y"
+msgstr "Itens na mochila: {value} / {total}"
+
+msgid "exitAndLoseItems"
+msgstr "Sair e perder itens"
+
+msgid "noBirdEnergy"
+msgstr "Sem pássaros, sem olhos"
+
+msgid "noDetectorEnergy"
+msgstr "Detector de tesouros"
+
+msgid "yes_leave"
+msgstr "Sim, sair"
+
+msgid "no_stay"
+msgstr "Não, ficar aqui"
+
+msgid "leave_location_confirmation"
+msgstr "Deseja sair do local?"
+
+msgid "percentAmount"
+msgstr "{value}%"
+
+msgid "pointsAmount"
+msgstr "{value} <size=70%>pt.</size>"
+
+msgid "close"
+msgstr "Fechar"
+
+msgid "selectTheShape"
+msgstr "Escolha a forma do tesouro"
+
+msgid "speedUp"
+msgstr "Acelerar"
+
+msgid "tutorial"
+msgstr "Tutorial"
+
+msgid "terrainPickLootTitle"
+msgstr "Leve tudo o que cabe na sua sacola e no depósito"
+
+msgid "highlighted_x_of_y"
+msgstr "<color=#{hasEnough:E3BA59|E01114}>{value}</color> / {total}"
+
+msgid "takeToStorageXofY"
+msgstr "Levar {value}/{total}"
+
+msgid "upgradeBag"
+msgstr "Melhorar mochila"
+
+msgid "dealerWillBuyTheRest"
+msgstr "O negociante comprará todo o resto de você"
+
+msgid "information"
+msgstr "Informação"
+
+msgid "weightInformation"
+msgstr ""
+"A capacidade da sacola do cavalo é um indicador importante.\n"
+"O peso dos itens encontrados afeta o transporte.\n"
+"Melhore sua sacola para aumentar a capacidade e carregar mais itens."
+
+msgid "rank_x"
+msgstr "Classificação {value}"
+
+msgid "weight"
+msgstr "Peso:"
+
+msgid "vehicleUpgradeDescription"
+msgstr ""
+"Melhore a capacidade da sacola de carga do cavalo para transportar cargas."
+
+msgid "capacity"
+msgstr "Capacidade"
+
+msgid "horseCargoBag"
+msgstr "Sacola de carga do cavalo"
+
+msgid "hardCurrency"
+msgstr "Moedas de ouro"
+
+msgid "confirmation"
+msgstr "Confirmação"
+
+msgid "attention!"
+msgstr "Atenção!"
+
+msgid "skipSelectionTreasuresDescription"
+msgstr ""
+"Se você sair agora, <color=#E01114>todos os itens encontrados serão vendidos "
+"ao comerciante</color> por menos do que o habitual."
+
+msgid "bayerDescription"
+msgstr "Quer ganhar mais? Comprarei as sobras com um bônus."
+
+msgid "bestProfit"
+msgstr "Melhor lucro"
+
+msgid "goodProfit"
+msgstr "Bom lucro"
+
+msgid "badProfit"
+msgstr "Lucro baixo"
+
+msgid "profitPercent"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>{value:cond:>0?+|}{value}%</color>"
+
+msgid "yourProfit"
+msgstr "Seu lucro:"
+
+msgid "eliteSlot"
+msgstr "Espaço de elite"
+
+msgid "tradingShopLevel"
+msgstr "Loja de trocas Nível {value}"
+
+msgid "rent"
+msgstr "Aluguel"
+
+msgid "slot"
+msgstr "Espaço"
+
+msgid "selectItem"
+msgstr "Selecionar item"
+
+msgid "checkOffer"
+msgstr "Verificar"
+
+msgid "shopLevel"
+msgstr "Loja Nv. {value}"
+
+msgid "tradeOpenEliteSlotDialog"
+msgstr "Aqui, os compradores pagam bem e sem pechinchas."
+
+msgid "getASlot"
+msgstr "Obter uma vaga"
+
+msgid "customerWillArriveIn"
+msgstr "O cliente chegará em:"
+
+msgid "speedUpBy"
+msgstr "Acelerar por"
+
+msgid "decline?"
+msgstr "Recusar?"
+
+msgid "tradeDeclineClientInfo"
+msgstr "Até o próximo cliente chegar:"
+
+msgid "tradingShop"
+msgstr "Loja de trocas"
+
+msgid "newSlot"
+msgstr "Nova vaga"
+
+msgid "tradeUpgradeDescription"
+msgstr "Melhore a loja de trocas para liberar mais vagas para vendas."
+
+msgid "tradingShopShort"
+msgstr "Loja"
+
+msgid "level_x"
+msgstr "Nível {value}"
+
+msgid "buyersOffer"
+msgstr "Oferta do comprador:"
+
+msgid "(profitPercent)"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>({value:cond:>0?+|}{value}%)</color>"
+
+msgid "common"
+msgstr "Comum"
+
+msgid "uncommon"
+msgstr "Incomum"
+
+msgid "rare"
+msgstr "Raro"
+
+msgid "epic"
+msgstr "Épico"
+
+msgid "legendary"
+msgstr "Lendário"
+
+msgid "mythic"
+msgstr "Mítico"
+
+msgid "tradeSelectItemTitle"
+msgstr "Selecione um item à venda"
+
+msgid "basePrice"
+msgstr "Preço base:"
+
+msgid "map"
+msgstr "Mapa"
+
+msgid "wiseNotes"
+msgstr "Notas sábias"
+
+msgid "emptyPickedItems"
+msgstr "Sair de mãos vazias?"
+
+msgid "settingsDescription"
+msgstr "Modele o mundo à sua maneira!"
+
+msgid "tradeClosedSlotDescription"
+msgstr ""
+"Melhore a sua loja para desbloquear mais espaços de venda — quanto mais "
+"prateleiras adicionar, maiores serão os seus lucros!"
+
+msgid "timer"
+msgstr "{hours:cond:>0?{hours:00}:|}{minutes:00}:{seconds:00}"
+
+msgid "craftSlot"
+msgstr "Forno"
+
+msgid "superSlot"
+msgstr "Superespaço"
+
+msgid "forge"
+msgstr "Forja"
+
+msgid "craftOpenEliteSlotDialog"
+msgstr ""
+"Forje tesouros, abra baús e ovos mágicos — quem sabe que saques raros o "
+"aguardam!"
+
+msgid "chestSlot"
+msgstr "Espaço de baú"
+
+msgid "incubator"
+msgstr "Incubadora"
+
+msgid "craftOpenEliteSlotLabel"
+msgstr "Liberte o poder supremo!"
+
+msgid "cancel"
+msgstr "Cancelar"
+
+msgid "openChest"
+msgstr "Abrir baú"
+
+msgid "timeToOpen:"
+msgstr "Tempo para abrir:"
+
+msgid "craftSelectChestNotEnoughTitle"
+msgstr "Nenhum baú em estoque"
+
+msgid "storageChestNotEnoughWarningText"
+msgstr ""
+"Encontrou um? Arraste-o para Criar e abra-o\n"
+"(só não com um machado, ok?)"
+
+msgid "select_x_of_y"
+msgstr ""
+"<color=#{hasEnough:00DE00|FFF}>{value} /</color> <color=#"
+"{hasEnough:00DE00|E01114}>{total}</color>"
+
+msgid "craftSelectEggTitle"
+msgstr "Selecione um ovo para abrir"
+
+msgid "craftSelectEggNotEnoughTitle"
+msgstr "Nenhum ovo em estoque"
+
+msgid "storageEggNotEnoughWarningTitle"
+msgstr "Vamos ao ovo — não de um galinheiro, mas nascido da magia!"
+
+msgid "storageEggNotEnoughWarningText"
+msgstr ""
+"Explore o reino, descubra o ovo raro e leve-o para a Criação. O que há "
+"dentro — mera gema, ou algo muito maior?"
+
+msgid "openEgg"
+msgstr "Abrir ovo"
+
+msgid "craftSelectRecipeTitle"
+msgstr "Escolha os componentes para a criação"
+
+msgid "craftSelectRecipeNotEnoughTitle"
+msgstr "Nada em estoque!"
+
+msgid "craftItem"
+msgstr "Criar item"
+
+msgid "crafting:"
+msgstr "Criação:"
+
+msgid "storageRecipeNotEnoughWarningText"
+msgstr "Estes itens ainda não foram encontrados."
+
+msgid "recipe"
+msgstr "Receita"
+
+msgid "craftClosedRecipeTitle"
+msgstr "A forja é muito fraca!"
+
+msgid "craftClosedRecipeDescription"
+msgstr ""
+"Nível de Forja Insuficiente\n"
+"\n"
+"A cada melhoria, você poderá criar tesouros cada vez mais raros e valiosos. "
+"É hora de transformar esta fornalha em uma forja de lendas!"
+
+msgid "craftClosedSlotTitle"
+msgstr "Slot bloqueado!"
+
+msgid "craftClosedSlotDescription"
+msgstr ""
+"Suas habilidades de criação não são fortes o suficiente. Você precisa "
+"aumentá-las."
+
+msgid "or"
+msgstr "ou"
+
+msgid "craftSpeedUpTitle"
+msgstr "Jogue carvão!"
+
+msgid "craftSpeedUpDescription"
+msgstr ""
+"Será como se os anões tivessem bebido café expresso e ativado o modo turbo!"
+
+msgid "upgradeCraftCraftSlotsStatDescription"
+msgstr ""
+"Espaço desbloqueado.\n"
+"O forno derrete metal, transformando-o em joias novas para venda."
+
+msgid "upgradeCraftTimeStatDescription"
+msgstr "Tempo é dinheiro, mas as joias são fabricadas ainda mais rápido"
+
+msgid "upgradeCraftRarityStatDescription"
+msgstr "Aumente as suas chances de criar um item digno de lenda."
+
+msgid "upgradeCraftRecipesStatDescription"
+msgstr ""
+"A sabedoria dos antigos flui através de ti — forja maravilhas que o mundo "
+"nunca viu!"
+
+msgid "craftStockFullTitle"
+msgstr "Sem espaço para tesouros no depósito!"
+
+msgid "craftStockFullDescription"
+msgstr ""
+"O depósito está cheio até a última lasca.\n"
+"Venda o excesso na loja de trocas ou melhore o depósito — depois reivindique "
+"o seu troféu brilhante!"
+
+msgid "allItems"
+msgstr "Todos os itens"
+
+msgid "stockLevel"
+msgstr "Nível do Depósito {value}"
+
+msgid "storageUpgradeDescription"
+msgstr ""
+"Cada melhoria concede <color=#E01114>mais espaço</color> para tesouros "
+"encontrados e forjados. Mais ouro, menos sofrimento!"
+
+msgid "revivalDescription"
+msgstr "Reapareça — ou diga adeus ao seu saque."
+
+msgid "noBirdEnergyDescription"
+msgstr "Trouxe-te ao tesouro e partiu para descansar."
+
+msgid "callTheBird"
+msgstr "Voltar agora"
+
+msgid "noDetectorEnergyDescription"
+msgstr "Acha que aguenta mais um?"
+
+msgid "oreSeeker"
+msgstr "Explorador de Minérios"
+
+msgid "gemSeeker"
+msgstr "Explorador de Gemas"
+
+msgid "respawn"
+msgstr "Reaparecer"
+
+msgid "deathExit"
+msgstr "Partiu sem nada"
+
+msgid "terrain0Title"
+msgstr "Bosque Silencioso"
+
+msgid "terrain2Description"
+msgstr ""
+"Uma áspera região selvagem do norte, aprisionada num frio eterno. Entre "
+"labirintos gelados é fácil perder-se — e, depois do pôr do sol, morrer "
+"congelado. Nessa ordem… ou talvez ao contrário."
+
+msgid "terrain0Description"
+msgstr ""
+"Todo herói começa em algum lugar!\n"
+"Enterrados aqui estão os seus primeiros tesouros — e os seus primeiros "
+"problemas. Este é o lugar onde você aprenderá a minerar, fundir, exibir e "
+"sobreviver."
+
+msgid "lockedTerrainTooltip"
+msgstr ""
+"Conquiste o favor dos aldeões,\n"
+"e uma nova cidade abrirá as suas portas para você!"
+
+msgid "upgradeToolNoiseStat"
+msgstr "Redução de ruído"
+
+msgid "upgradeCharacterResistanceStatDescription"
+msgstr ""
+"Melhore o nível da sua resistência — e você não se intimidará quando o mundo "
+"se tornar hostil!"
+
+msgid "upgradeCharacterHealthStatDescription"
+msgstr "Mais vidas — menos chances de se tornar uma lenda... postumamente."
+
+msgid "upgradeCharacterSpeedStatDescription"
+msgstr "Pés mais rápidos — menos chances de se tornar o jantar da fauna local!"
+
+msgid "upgradeBirdFlyAmountStatDescription"
+msgstr ""
+"Quanto mais batedores emplumados tiver, maiores as suas chances de encontrar "
+"brilhos enterrados!"
+
+msgid "upgradeToolSpeedStatDescription"
+msgstr ""
+"Quanto mais rápido o golpe, menor a chance de alguém pegar o minério "
+"primeiro!"
+
+msgid "upgradeToolDamageStatDescription"
+msgstr ""
+"Quanto mais potente a ferramenta, mais dócil a pedra — e mais cheia a sua "
+"sacola!"
+
+msgid "upgradeToolNoiseStatDescription"
+msgstr ""
+"Menos barulho significa menos chances de ser ouvido por aqueles que preferem "
+"o estalar de ossos ao tilintar de ouro."
+
+msgid "resistanceStatLevel"
+msgstr "Resistência nível {value}"
+
+msgid "healthStatLevel"
+msgstr "Saúde nível {value}"
+
+msgid "speedStatLevel"
+msgstr "Velocidade nível {value}"
+
+msgid "upgradeBirdTitle"
+msgstr "Nível de pássaro {value}"
+
+msgid "amountPcs"
+msgstr "{value} unid."
+
+msgid "maxLevel"
+msgstr "Nível máximo"
+
+msgid "treasureDetector"
+msgstr "Detector de tesouros"
+
+msgid "amountSec"
+msgstr "{value} seg."
+
+msgid "upgradeDetectorGoldAmountStat"
+msgstr "Procurador de Minério"
+
+msgid "upgradeDetectorGoldAmountStatDescription"
+msgstr ""
+"Este engenhoca mágica deteta veios de ouro melhor do que um anão sente o "
+"cheiro de um almoço grátis!"
+
+msgid "upgradeDetectorGemsAmountStat"
+msgstr "Caçador de Gemas"
+
+msgid "upgradeDetectorGemsAmountStatDescription"
+msgstr ""
+"Um dispositivo com um faro mais apurado que a ganância de um mercador. "
+"Nenhuma gema fica escondida por muito tempo!"
+
+msgid "upgradeDetectorGoldDurationStat"
+msgstr "Mais tempo para caçar ouro"
+
+msgid "upgradeDetectorDurationStatDescription"
+msgstr ""
+"Funciona por mais tempo, busca melhor, resmunga menos. Mais tempo significa "
+"mais saque!"
+
+msgid "addPercentAmount"
+msgstr "{value:cond:>0?+|}{value}%"
+
+msgid "addAmountPcs"
+msgstr "{value:cond:>0?+|}{value} unid."
+
+msgid "addAmountSec"
+msgstr "{value:cond:>0?+|}{value} seg."
+
+msgid "gold"
+msgstr "Ouro"
+
+msgid "chests"
+msgstr "Baús"
+
+msgid "eggs"
+msgstr "Ovos"
+
+msgid "treasures"
+msgstr "Joias"
+
+msgid "artifacts"
+msgstr "Artefatos"
+
+msgid "deathTitle"
+msgstr "A morte é generosa — ela leva tudo!"
+
+msgid "deathDescription"
+msgstr "Seu saque agora é lendário."
+
+msgid "tradeEmptyStorageMessage"
+msgstr "Nada para vender agora"
+
+msgid "craftNoEggs"
+msgstr "Nenhum ovo para a incubadora"
+
+msgid "craftNoChests"
+msgstr "Nenhum baú para abrir"
+
+msgid "craftNoItems"
+msgstr "Nada para criar"
+
+msgid "upgradeDetectorGemsDurationStat"
+msgstr "Mais tempo para caçar gemas"
+
+msgid "newLocationAvailableTitle"
+msgstr "Um novo local está agora disponível!"
+
+msgid "newLocationAvailableDescription"
+msgstr "Os aldeãos concordam: você merece mais."
+
+msgid "upgradeStock"
+msgstr "Melhorar o depósito"
+
+msgid "storageOverflowedDesctiption"
+msgstr "Seu depósito não comporta todas as suas riquezas. Hora de melhorar!"
+
+msgid "throwAway"
+msgstr "Descartar"
+
+msgid "upgradeCraftCostStatDescription"
+msgstr "O preço base dos itens está subindo como pão no fermento"
+
+msgid "upgradeVehicleWeightStat"
+msgstr "Bolsa grande"
+
+msgid "upgradeVehicleWeightStatDescription"
+msgstr ""
+"O cavalo agora consegue carregar mais tesouros. Mais bagunça, mais "
+"felicidade!"
+
+msgid "upgradeVehicleTitle"
+msgstr "Cavalo nível {value}"
+
+msgid "amountKg"
+msgstr "{value} kg."
+
+msgid "addAmountKg"
+msgstr "{value:cond:>0?+|}{value} kg."
+
+msgid "upgradeStorageWeightStat"
+msgstr "Capacidade"
+
+msgid "upgradeStorageWeightStatDescription"
+msgstr "Espaço extra para tesouros absolutamente sem valor!"
+
+msgid "upgradeTradeNewBuyersStat"
+msgstr "Compradores generosos"
+
+msgid "upgradeTradeNewBuyersStatDescription"
+msgstr "Os clientes estão brigando pelo seu lixo."
+
+msgid "upgradeTradeTitle"
+msgstr "Loja de trocas nível {value}"
+
+msgid "upgradeTradeBestBuyersRateStat"
+msgstr "Você cheira a riquezas"
+
+msgid "upgradeTradeBestBuyersRateStatDescription"
+msgstr ""
+"A notícia do seu trabalho manual se espalhou — carteiras ambulantes de "
+"verdade aparecem com mais frequência."
+
+msgid "upgradeTradeSlotsStat"
+msgstr "Novo espaço"
+
+msgid "upgradeTradeSlotsStatDescription"
+msgstr "Um espaço de troca extra foi aberto. Mais clientes — mais ouro!"
+
+msgid "upgradeCraftTimeStat"
+msgstr "Corrida de joias"
+
+msgid "upgradeCraftTitle"
+msgstr "Nível de Fabrico {value}"
+
+msgid "upgradeCraftRarityStat"
+msgstr "Raridade"
+
+msgid "upgradeCraftRecipesStat"
+msgstr "Livro de receitas"
+
+msgid "upgradeCraftCostStat"
+msgstr "Mina de ouro"
+
+msgid "upgradeCraftCraftSlotsStat"
+msgstr "Espaço de Fabrico"
+
+msgid "upgradeCraftChestSlotsStat"
+msgstr "Espaço do baú"
+
+msgid "upgradeCraftChestSlotsStatDescription"
+msgstr ""
+"Espaço desbloqueado.\n"
+"Abre baús e objetos trancados de qualquer origem — até mesmo os que não são "
+"claramente deste planeta."
+
+msgid "upgradeCraftEggSlotsStat"
+msgstr "Incubadora"
+
+msgid "upgradeCraftEggSlotsStatDescription"
+msgstr ""
+"Espaço desbloqueado.\n"
+"Não penses que a Coco só serve para ovos. Se precisares de derreter gelo, "
+"aquecer algo, ou ajudar com outras tarefas — ela é sempre útil. E quando se "
+"trata de partir ovos, ela nem sequer faz perguntas."
+
+msgid "upgradeCraftSuperSlotsStatDescription"
+msgstr ""
+"Espaço desbloqueado.\n"
+"A ferramenta principal do mestre artesão.\n"
+"Consegue fazer tudo: processar, restaurar, polir, partir e retrabalhar."
+
+msgid "upgradeCraftSuperSlotsStat"
+msgstr "Superespaço"
+
+msgid "tradeLockedState"
+msgstr "A loja de troca é muito pequena!"
+
+msgid "upgradeDetectorTitle"
+msgstr "Nível de detector de tesouros {value}"
+
+msgid "upgradeStorageTitle"
+msgstr "Nível do Depósito {value}"
+
+msgid "selectTrashTitle"
+msgstr "Lixo em massa"
+
+msgid "upgradeTradeMoreLikesStat"
+msgstr "Tudo sobre os gostos!"
+
+msgid "upgradeTradeMoreLikesDescription"
+msgstr "O público está gritando de alegria!"
+
+msgid "metals"
+msgstr "Metais"
+
+msgid "craftSelectRoughTitle"
+msgstr "Escolha um item para polir"
+
+msgid "craftNoRough"
+msgstr "Nenhum item para polir"
+
+msgid "curseRemovalSlot"
+msgstr "Altar"
+
+msgid "inlaySlot"
+msgstr "Inserir"
+
+msgid "polishingSlot"
+msgstr "Polimento"
+
+msgid "rough"
+msgstr "Bruto"
+
+msgid "cursedItems"
+msgstr "Amaldiçoado"
+
+msgid "storageDescription"
+msgstr ""
+"Todos os itens descobertos são armazenados aqui.\n"
+"O espaço é limitado — o depósito não é feito de borracha.\n"
+"Melhore o seu depósito para que a sua ganância não bata no limite."
+
+msgid "traderName"
+msgstr "Zlatovich, o Negociante"
+
+msgid "storageRecipeNotEnoughWarningTitleText"
+msgstr "Absolutamente nada"
+
+msgid "geodes"
+msgstr "Geodos"
+
+msgid "unknownItems"
+msgstr "Desconhecido"
+
+msgid "selectItems"
+msgstr "Selecionar itens"
+
+msgid "proceed"
+msgstr "Prosseguir"
+
+msgid "upgradeCraftPolishingSlotsStat"
+msgstr "Polimento"
+
+msgid "upgradeCraftPolishingSlotsStatDescription"
+msgstr ""
+"Slot desbloqueado.\n"
+"Repara, tritura e dá brilho — até os achados mais duvidosos voltam a parecer "
+"tesouros."
+
+msgid "upgradeCraftInlaySlotsStat"
+msgstr "Inserir"
+
+msgid "upgradeCraftInlaySlotsStatDescription"
+msgstr ""
+"Slot desbloqueado.\n"
+"Insere pedras preciosas em joias e transforma peças brutas em peças "
+"brilhantes que fazem os clientes perder a força de vontade."
+
+msgid "upgradeCraftCurseRemovalSlotsStat"
+msgstr "Altar"
+
+msgid "upgradeCraftCurseRemovalSlotsStatDescription"
+msgstr ""
+"Slot desbloqueado.\n"
+"Remove maldições e selos mágicos de itens amaldiçoados. Às vezes… com "
+"surpresas."
+
+msgid "craftInfoDescription"
+msgstr ""
+"Aqui, o destino do que você encontra é decidido.\n"
+"Derrete, engasta, lustra, abre ou deixa crescer — cada slot faz algo "
+"suspeitosamente útil aos seus itens.\n"
+"Objetos encontrados transformam-se em joias, tesouros e estranhas obras-"
+"primas que alguém há de comprar."
+
+msgid "superSlotDescription"
+msgstr ""
+"Um slot especial para tudo o que é estranho e brilhante.\n"
+"Derrete metal, corta gemas, levanta maldições, restaura tesouros, quebra "
+"geodos, abre baús e até lida com artefactos alienígenas (com consentimento "
+"mútuo)."
+
+msgid "chestSlotDescription"
+msgstr ""
+"Um baú?\n"
+"Jogue-o dentro — o compartimento se encarrega.\n"
+"\n"
+"O que sai, só ele sabe.\n"
+"\n"
+"Às vezes, ele fica perturbadoramente satisfeito com o resultado."
+
+msgid "curseRemovalSlotDescription"
+msgstr ""
+"Um item amaldiçoado? Jogue-o!\n"
+"O altar sugará cada gota de sua magia, ofegará e gemerá — então o devolverá "
+"sem o chiado.\n"
+"\n"
+"Às vezes, ele até diz “obrigado”… o que é perfeitamente normal."
+
+msgid "eggSlotDescription"
+msgstr ""
+"Escolha qualquer ovo — a galinha vai chocá-lo, dar um tapinha gentil e "
+"cacarejar baixinho…\n"
+"depois chocar algo interessante.\n"
+"\n"
+"Às vezes, interessante demais."
+
+msgid "inlaySlotDescription"
+msgstr ""
+"Escolha uma joia e preencha-a com pedras preciosas — compartimentos vazios "
+"não servem!\n"
+"O que você obtém é uma coisa brilhante e totalmente polida que faz os "
+"compradores gritarem de alegria."
+
+msgid "craftSlotDescription"
+msgstr ""
+"Jogue qualquer metal — o forno vai derretê-lo, misturá-lo e forjar uma nova "
+"joia.\n"
+"Eles dizem que funciona por inspiração… o que não tem. Mesmo assim, dá conta "
+"do recado!"
+
+msgid "polishingSlotDescription"
+msgstr ""
+"Pegue qualquer geodo, pedra bruta ou até mesmo um tesouro antigo arruinado "
+"—\n"
+"a bancada de trabalho vai polir, reparar e realçar seu brilho.\n"
+"\n"
+"O que sai pode ser encaixado, trabalhado ou vendido por um bom lucro."
+
+msgid "unknownSlot"
+msgstr "Avaliação"
+
+msgid "unknownSlotTitle"
+msgstr "Selecione um item para avaliação"
+
+msgid "craftNoUnknown"
+msgstr "Sem itens para avaliar"
+
+msgid "craftNoCursed"
+msgstr "Sem itens amaldiçoados"
+
+msgid "craftNoInlay"
+msgstr "Sem itens para inserir"
+
+msgid "tradingShopInfoDescription"
+msgstr ""
+"Venda joias e quaisquer outros achados, verifique seu valor e feche "
+"negócios.\n"
+"Melhore a loja — desbloqueie novos espaços e venda ainda mais mercadorias."
+
+msgid "tradingShopInfoTitle"
+msgstr "Loja de Comércio de Zlatovich"
+
+msgid "tradeSpeedUp"
+msgstr "Atrair um cliente"
+
+msgid "nextCustomer"
+msgstr "Próximo cliente"
+
+msgid "upgradeTradeAppraisalSlotsStat"
+msgstr "Avaliação"
+
+msgid "upgradeTradeAppraisalSlotsDescription"
+msgstr ""
+"O comerciante Zlatovich vai dar uma olhada em qualquer item, grunhir "
+"pensativamente e dar um preço.\n"
+"Às vezes… um preço agradável."
+
+msgid "timeToMoveOut"
+msgstr "É hora de fugir!"
+
+msgid "metal"
+msgstr "Metal"
+
+msgid "gem"
+msgstr "Gema"
+
+msgid "treasure"
+msgstr "Joalheria"
+
+msgid "chest"
+msgstr "Baú"
+
+msgid "trash"
+msgstr "Lixo"
+
+msgid "egg"
+msgstr "Ovo"
+
+msgid "artifact"
+msgstr "Artefato"
+
+msgid "geode"
+msgstr "Geodo"
+
+msgid "unknown"
+msgstr "Desconhecido"
+
+msgid "cursed"
+msgstr "Amaldiçoado"
+
+msgid "orders"
+msgstr "Pedidos"
+
+msgid "giveItem"
+msgstr "Dar Item"
+
+msgid "ordersInfoDescription"
+msgstr ""
+"Conclua os pedidos — e os clientes apontarão o caminho a seguir.\n"
+"Novos locais, recursos e joias já estão esperando."
+
+msgid "hearthCurrency"
+msgstr "Curtidas"
+
+msgid "reward"
+msgstr "Recompensa"
+
+msgid "claim"
+msgstr "Reivindicar"
+
+msgid "terrain0Biome1Title"
+msgstr "Terreno baldio"
+
+msgid "ordersClaimBiomeTitle"
+msgstr "O caminho para um novo local está aberto"
+
+msgid "ordersClaimBiomeDescription"
+msgstr "Novas descobertas estão disponíveis"
+
+msgid "terrain1Biome1Title"
+msgstr "Sepulturas"
+
+msgid "toTrade"
+msgstr "Comércio"
+
+msgid "skipSelectionTreasuresConfirm"
+msgstr "Sim, sair"
+
+msgid "skipSelectionTreasuresCancel"
+msgstr "Não, voltar à seleção"
+
+msgid "soldToDealer"
+msgstr "Vendido!"
+
+msgid "craftSelectBlockedWrongType"
+msgstr "Este item não é adequado para este tipo de espaço"
+
+msgid "craftSelectBlockedAlreadySelectedType"
+msgstr "Já selecionaste itens suficientes deste grupo"
+
+msgid "lockedTerrain0Tooltip"
+msgstr ""
+"O caminho está tomado. Já dominaste tudo por aqui — é hora de trabalhar."
+
+msgid "terrain0Biome0Title"
+msgstr "Deserto"
+
+msgid "terrain1Biome0Title"
+msgstr "Pântano"
+
+msgid "terrain1Biome2Title"
+msgstr "Queda de Meteoros"
+
+msgid "goldUsedIn"
+msgstr ""
+"Pode ser <color=#E3BA59>vendido</color> na Loja de Comércio, usado na "
+"<color=#E3BA59>Espaço de Fabrico</color> ou colocado no <color=#E3BA59>"
+"Superespaço</color>."
+
+msgid "meteoriteIronUsedIn"
+msgstr ""
+"Pode ser <color=#E3BA59>vendido</color> na Loja de Trocas, usado no "
+"<color=#E3BA59>Espaço do Forno</color> ou colocado no <color=#E3BA59>Espaço "
+"Superior</color>."
+
+msgid "silverUsedIn"
+msgstr ""
+"Pode ser <color=#E3BA59>vendido</color> na Loja de Trocas, usado no "
+"<color=#E3BA59>Espaço do Forno</color> ou colocado no <color=#E3BA59>Espaço "
+"Superior</color>."
+
+msgid "gemUsedIn"
+msgstr ""
+"Pode ser <color=#E3BA59>vendido</color> na Loja de Comércio, usado na "
+"<color=#E3BA59>Espaço de Fabrico</color> ou <color=#E3BA59>Superespaço</"
+"color>, ou <color=#E3BA59>inserido</color> num Tesouro."
+
+msgid "gemRoughUsedIn"
+msgstr ""
+"Pode ser processado no <color=#E3BA59>Polimento</color> ou no <color=#E3BA59>"
+"Superespaço</color> para revelar o seu verdadeiro valor."
+
+msgid "treasureEmptyUsedIn"
+msgstr ""
+"Pode ser <color=#E3BA59>vendido</color> na Loja de Comércio ou encravado com "
+"gemas via <color=#E3BA59>Inserir</color> ou no <color=#E3BA59>Superespaço</"
+"color> para aumentar o seu valor."
+
+msgid "treasureRoughUsedIn"
+msgstr ""
+"Pode ser reparado no <color=#E3BA59>Polimento</color> ou no <color=#E3BA59>"
+"Superespaço</color>."
+
+msgid "chestUsedIn"
+msgstr ""
+"Pode ser aberto na <color=#E3BA59>Espaço de baú</color> ou no <color=#E3BA59>"
+"Superespaço</color>."
+
+msgid "trashUsedIn"
+msgstr "Só pode ser <color=#E3BA59>vendido</color> ao comerciante."
+
+msgid "eggUsedIn"
+msgstr ""
+"Pode ser aberto na <color=#E3BA59>Incubadora</color> ou no <color=#E3BA59>"
+"Superespaço</color>."
+
+msgid "artifactUsedIn"
+msgstr "Só pode ser <color=#E3BA59>vendido</color> na Loja de Comércio."
+
+msgid "geodeUsedIn"
+msgstr ""
+"Pode ser aberto no <color=#E3BA59>Polimento</color> ou no <color=#E3BA59>"
+"Superespaço</color>."
+
+msgid "unknownUsedIn"
+msgstr ""
+"Pode ser levado ao Comerciante para <color=#E3BA59>Avaliação</color> para "
+"determinar o seu verdadeiro valor."
+
+msgid "cursedUsedIn"
+msgstr ""
+"A maldição pode ser removida no <color=#E3BA59>Altar</color> ou na "
+"<color=#E3BA59>Super Slot</color>."
+
+msgid "terrain2Biome0Title"
+msgstr "Serralharia"
+
+msgid "perfect"
+msgstr "Perfeito"
+
+msgid "decline"
+msgstr "Recusar"
+
+msgid "putUpForSale"
+msgstr "Colocar à venda"
+
+msgid "newLocationAvailable"
+msgstr "Apareceu um novo local!"
+
+msgid "retargetingTitle1"
+msgstr ":monocle: Pergunta interessante…"
+
+msgid "retargetingDescription1"
+msgstr "Até onde consegue ir?"
+
+msgid "retargetingTitle2"
+msgstr ":sunglasses: Hora de continuar."
+
+msgid "retargetingDescription2"
+msgstr "O seu progresso continua aqui."
+
+msgid "retargetingTitle3"
+msgstr ":sunglasses: Pronto para voltar?"
+
+msgid "retargetingDescription3"
+msgstr "Continue de onde parou."
+
+msgid "notificationCraftCompletedTitle"
+msgstr ":eyes: Fabricação completa!"
+
+msgid "notificationCraftCompletedDescription"
+msgstr "Confira o que conseguiu."
+
+msgid "notificationTradeCompletedTitle"
+msgstr ":money-mouth: Tem um comprador!"
+
+msgid "notificationTradeCompletedDescription"
+msgstr "Os seus produtos encontraram um cliente."
+
+msgid "tradeSelectBlockedWrongType"
+msgstr "Este item não pode ser vendido."
+
+msgid "skip"
+msgstr "Saltar"
+
+msgid "daily"
+msgstr "Diário"
+
+msgid "available"
+msgstr "Disponível"
+
+msgid "availableIn"
+msgstr "Disponível em"
+
+msgid "dailyRewardClaimTitle"
+msgstr "Obtenha para lucrar"
+
+msgid "dailyRewardClaimDescription"
+msgstr "Assista a um vídeo — ganhe recompensas x2"
+
+msgid "withoutBonus"
+msgstr "Sem bónus"
+
+msgid "claimWithBonus"
+msgstr "Resgatar com bónus"
+
+msgid "x2Reward"
+msgstr "Recompensa x2"
+
+msgid "dailyRewardAlreadyReceived"
+msgstr "Recompensa já resgatada!"
+
+msgid "missedDailyReward"
+msgstr "Recompensa já perdida!"
+
+msgid "futureDailyReward"
+msgstr "Volte para esta recompensa mais tarde!"
+
+msgid "rateUs"
+msgstr "Avalie-nos"
+
+msgid "rateUsTitle"
+msgstr "Avalie-nos com estrelas"
+
+msgid "rateUsDescription"
+msgstr "Avalie o jogo e ajude-nos a melhorar."
+
+msgid "specialOffers"
+msgstr "Ofertas especiais"
+
+msgid "quickStart"
+msgstr "Início Rápido!"
+
+msgid "storePrice"
+msgstr "<color=#FEC60D>{currency}</color> {value}"
+
+msgid "forever"
+msgstr "Para sempre"
+
+msgid "starterPack"
+msgstr "Pacote inicial"
+
+msgid "allInOneSupply"
+msgstr "Suprimento Tudo-em-Um"
+
+msgid "dealOfTheDay"
+msgstr "Oferta do Dia"
+
+msgid "xAmount"
+msgstr "X{value}"
+
+msgid "free!"
+msgstr "Grátis!"
+
+msgid "watch"
+msgstr "Assistir"
+
+msgid "coins"
+msgstr "Moedas"
+
+msgid "mostPopular"
+msgstr "Mais popular"
+
+msgid "bestPrice"
+msgstr "Melhor Preço"
+
+msgid "store"
+msgstr "Loja"
+
+msgid "dealOfTheDayDescription"
+msgstr "Novas ofertas disponíveis em"
+
+msgid "health"
+msgstr "Saúde"
+
+msgid "notificationDealOfTheDayTitle"
+msgstr "Mare quer ir às compras :sunglasses:"
+
+msgid "notificationDealOfTheDayDescription"
+msgstr "Só resta entrar e reivindicar o que é seu."
+
+msgid "notificationCoinsReadyTitle"
+msgstr "A loja está dando brindes :heart-eyes:"
+
+msgid "notificationCoinsReadyDescription"
+msgstr "Visite a loja e aproveite os brindes."
+
+msgid "wantReceipt"
+msgstr "Quero um recibo (enviaremos por e-mail)"
+
+msgid "submit"
+msgstr "Submeter"
+
+msgid "receiptEmaitTitle"
+msgstr "Inserir E-mail"
+
+msgid "receiptEmailDescription"
+msgstr ""
+"Quer um recibo?\n"
+"Introduza o seu e-mail e nós enviá-lo-emos após a sua compra."
+
+msgid "buy"
+msgstr "Comprar"
+
+msgid "starterPackHeadline"
+msgstr "Agarra-o a tempo!"
+
+msgid "specialOfferHeadline"
+msgstr "Mais para sempre!"
+
+msgid "open"
+msgstr "Abrir"
+
+msgid "maximumResources"
+msgstr "Recursos máximos"
+
+msgid "exchangeCurrencyTitle"
+msgstr "Moedas de prata insuficientes."
+
+msgid "exchangeCurrencyDescription"
+msgstr "Um pouco menos."
+
+msgid "exchangeCurrencyQuestion"
+msgstr "Comprar o resto?"
+
+msgid "bankingAwaitingTitle"
+msgstr "Moedas a caminho"
+
+msgid "bankingAwaitingDescription"
+msgstr ""
+"Ouro está sendo carregado no vagão…\n"
+"A entrega pode levar alguns minutos."
+
+msgid "deleteItemConfirmationTitle"
+msgstr "Deitar fora o item?"
+
+msgid "deleteItemConfirmationDescription"
+msgstr ""
+"O item desaparecerá para sempre.\n"
+"Esta ação não pode ser desfeita."
+
+msgid "noKeepIt"
+msgstr "Não, mantenha-o"
+
+msgid "allRegionsAvailable"
+msgstr "Todas as regiões disponíveis"
+
+msgid "terrainProgressLabel"
+msgstr "Para a próxima localização"
+
+msgid "terrainClosedLabel"
+msgstr "Localização indisponível"
+
+msgid "terrainProgressInfoSlide1"
+msgstr ""
+"<color=#E3BA59>Seu objetivo final é o amor!</color>\n"
+"Venda suas criações aos habitantes locais para conquistá-los."
+
+msgid "terrainProgressInfoSlide2"
+msgstr ""
+"Não pare até que eles <color=#E3BA59>O ADOREM</color> — \n"
+"então você estará pronto para conquistar novas terras."
+
+msgid "cryolisUsedIn"
+msgstr ""
+"Pode ser <color=#E3BA59>vendido</color> na Loja de Trocas, usado no "
+"<color=#E3BA59>Espaço do Forno</color> ou colocado no <color=#E3BA59>Espaço "
+"Superior</color>."
+
+msgid "craftSelectBlockedMissingRecipe"
+msgstr "Este item não é adequado para a receita selecionada."
+
+msgid "craftSelectBlockedAnotherGroupSelected"
+msgstr "Outro item deste grupo já foi selecionado."
+
+msgid "failedPurchase"
+msgstr ""
+"A égua está triste. A compra falhou.\n"
+"Por favor, tente novamente."
+
+msgid "frozenUsedIn"
+msgstr ""
+"Pode ser aquecido na <color=#E3BA59>Incubadora</color> ou no <color=#E3BA59>"
+"Super Espaço</color>."
+
+msgid "frozen"
+msgstr "Congelado"
+
+msgid "frozens"
+msgstr "Congelado"
+
+msgid "language"
+msgstr "Idioma"
+
+msgid "termsOfUse"
+msgstr "Termos de Uso"
+
+msgid "privacyPolicy"
+msgstr "Política de Privacidade"
+
+msgid "deleteData"
+msgstr "Excluir dados"
+
+msgid "signInWithGoogle Play"
+msgstr "Entrar com o Google Play"
+
+msgid "notLinked"
+msgstr "Não vinculado"
+
+msgid "linked"
+msgstr "Vinculado"
+
+msgid "switchGooglePlay"
+msgstr "Mudar conta do Google Play"
+
+msgid "resetProgressDescription"
+msgstr ""
+"Tem certeza que deseja apagar seu progresso? Esta ação não pode ser desfeita!"
+
+msgid "resetProgressConfirm"
+msgstr "Sim, excluir"
+
+msgid "terrainInDevelopmentDescription"
+msgstr "Desculpe. Este local ainda está em desenvolvimento."
+
+msgid "terrain2Biome1Title"
+msgstr "Estaleiro Congelado"
+
+msgid "terrain2Biome2Title"
+msgstr "Farol"
+
+msgid "terrain2Biome3Title"
+msgstr "Bosque Perdido"
+
+msgid "collectAll"
+msgstr "Coletar Tudo"
+
+msgid "healthStatReward"
+msgstr "Saúde +{value}"
+
+msgid "storageStatReward"
+msgstr "Capacidade do Depósito +{value}"
+
+msgid "itemsLeft_x"
+msgstr "Itens restantes: {value}"
+
+msgid "storageStatRewardSummary"
+msgstr "Depósito eterno"
+
+msgid "healthStatRewardSummary"
+msgstr "Saúde eterna"
+
+msgid "prospectors"
+msgstr "Garimpeiros"
+
+msgid "storeStockFullDescription"
+msgstr "O depósito está lotado até a última lasca."
+
+msgid "terrain3Title"
+msgstr "Grimdal"
+
+msgid "switchGooglePlayDescription"
+msgstr ""
+"1. Abra as configurações do seu telefone\n"
+"2. Google - Todos os serviços - Play Games\n"
+"3. “Conta de login” - \"Alterar\" (ao lado do jogo)\n"
+"4. Reinicie o jogo"
+
+msgid "versionAlertMessage"
+msgstr "Uma nova versão do jogo foi lançada. Hora de atualizar!"
+
+msgid "treasureUsedIn"
+msgstr "Só pode ser <color=#E3BA59>vendido</color> na loja de Câmbio."
+
+msgid "noInternetConnectionBlocking"
+msgstr "Sem internet — sem aventura"
+
+msgid "noInternetConnectionReconnect"
+msgstr ""
+"Reconectando…\n"
+"{value}"
+
+msgid "newsAndCommunication"
+msgstr "Notícias e comunicação"
+
+msgid "statEffectAccumulationFreeze"
+msgstr "Congelamento"
+
+msgid "statEffectHeal"
+msgstr "Regeneração"
+
+msgid "statEffectMovementSpeedNegative"
+msgstr "Desaceleração"
+
+msgid "statEffectMovementSpeedPositive"
+msgstr "Impulso de Velocidade"
+
+msgid "statEffectDamageCurse"
+msgstr "Exaustão"
+
+msgid "statEffectDamageBleed"
+msgstr "Hemorragia"
+
+msgid "statEffectToolNoiseNegative"
+msgstr "Ferramenta Barulhenta"
+
+msgid "statEffectToolNoisePositive"
+msgstr "Ferramenta Silenciosa"
+
+msgid "statEffectToolSpeedNegative"
+msgstr "Fadiga"
+
+msgid "statEffectToolSpeedPositive"
+msgstr "Destreza"
+
+msgid "pause"
+msgstr "Pausa"
+
+msgid "pauseDescription"
+msgstr "Efeitos, ordens e configurações — tudo aqui."
+
+msgid "effects"
+msgstr "Estado da Personagem"
+
+msgid "settingsDialogTitle"
+msgstr "Configurações"
+
+msgid "russianPlaymentsBanner"
+msgstr "Pagamentos disponíveis para jogadores na Rússia."

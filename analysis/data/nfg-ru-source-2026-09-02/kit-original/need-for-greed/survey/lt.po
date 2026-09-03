@@ -1,0 +1,167 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Lithuanian <http://l10n.herocraft.com/projects/need-for-greed/"
+"survey/lt/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: lt\n"
+"Plural-Forms: nplurals=3; plural=(n % 10 == 1 && (n % 100 < 11 || n % 100 > "
+"19)) ? 0 : ((n % 10 >= 2 && n % 10 <= 9 && (n % 100 < 11 || n % 100 > 19)) ? "
+"1 : 2);\n"
+
+#: 294040899584
+msgid "survey1Intro"
+msgstr ""
+"Ei! Arklys nori kai ką išsiaiškinti.\n"
+"\n"
+"Tik pora greitų klausimų, kad išsiaiškintų, su kuo ji turi reikalą.\n"
+"Užtruks ne ilgiau nei minutę."
+
+#: 384566562816
+msgid "survey1Final"
+msgstr ""
+"Panašu, kad… tu išlaikei testą!\n"
+"\n"
+"Ji prisiminė tavo atsakymus.\n"
+"Ir, matyt, nusprendė tavęs nepalikti."
+
+#: 5159299321856
+msgid "survey1AcceptDescription"
+msgstr "Gausite atlygį."
+
+#: 5354862940160
+msgid "survey1DeclineDescription"
+msgstr ""
+"Ji išgyvens…\n"
+"tikriausiai."
+
+#: 5940509413376
+msgid "survey1Question1"
+msgstr ""
+"Kiek tau metų?\n"
+"Nemeluok. Ji gali pasakyti."
+
+#: 15613778202624
+msgid "survey1Question1Answer1"
+msgstr "Iki 15"
+
+#: 15721877999616
+msgid "survey1Question1Answer2"
+msgstr "15 - 20"
+
+#: 15806955261952
+msgid "survey1Question1Answer3"
+msgstr "21 - 29"
+
+#: 15875448246272
+msgid "survey1Question1Answer4"
+msgstr "30 - 40"
+
+#: 15939973419008
+msgid "survey1Question1Answer5"
+msgstr "40 +"
+
+#: 16047045611520
+msgid "survey1Question2"
+msgstr ""
+"Kas tu esi?\n"
+"Nereikia per daug detalių."
+
+#: 16356262285312
+msgid "survey1Question2Answer1"
+msgstr "V"
+
+#: 16421546627072
+msgid "survey1Question2Answer2"
+msgstr "M"
+
+#: 16480354963456
+msgid "survey1Question2Answer3"
+msgstr "Paslaptis"
+
+#: 16583924912128
+msgid "survey1Question3"
+msgstr "Ko čia atėjai?"
+
+#: 16952520347648
+msgid "survey1Question3Answer1"
+msgstr "Bėgioti ir rinkti Grobis"
+
+#: 17065502314496
+msgid "survey1Question3Answer2"
+msgstr "Gaminti ir parduoti"
+
+#: 17147127664640
+msgid "survey1Question3Answer3"
+msgstr "Atnaujinimai ir progresas"
+
+#: 17285803937792
+msgid "survey1Question3Answer4"
+msgstr "Tiesiog nuotaikos…"
+
+#: 17383480889344
+msgid "survey1Question4"
+msgstr "Ko trūksta, kad neišeitum?"
+
+#: 17980544258048
+msgid "survey1Question4Answer1"
+msgstr "Daugiau istorijos"
+
+#: 18049771245568
+msgid "survey1Question4Answer2"
+msgstr "Nauji pavojai, uolos ir lobiai"
+
+#: 18206881484800
+msgid "survey1Question4Answer3"
+msgstr "Nauji daiktai"
+
+#: 18275869396992
+msgid "survey1Question4Answer4"
+msgstr "Naujos vietos"
+
+#: 18730255126528
+msgid "survey1Question4Answer5"
+msgstr "Pasiekimai ir apdovanojimai"
+
+#: 19109206298624
+msgid "survey1Question5"
+msgstr "Kas turėtų būti pataisyta pirmiausia?"
+
+#: 19176772341760
+msgid "survey1Question5Answer1"
+msgstr "Dialogas"
+
+#: 19256145350656
+msgid "survey1Question5Answer2"
+msgstr "Apdovanojimai"
+
+#: 19311245922304
+msgid "survey1Question5Answer3"
+msgstr "Recepto sudėtingumas"
+
+#: 19403713548288
+msgid "survey1Question5Answer4"
+msgstr "Žemėlapio tankumas"
+
+#: 19475515838464
+msgid "survey1Question5Answer5"
+msgstr "Viskas puiku"
+
+#: 27306583396352
+msgid "surveyDialogTitle"
+msgstr "Greita apklausa"
+
+#: 28690401726464
+msgid "startSurvey"
+msgstr "Pradėti"
+
+#: 30707396382720
+msgid "claimReward"
+msgstr "Atsiimti atlygį"

@@ -1,0 +1,122 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:04+0000\n"
+"PO-Revision-Date: 2026-08-25 18:38+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: French <http://l10n.herocraft.com/projects/need-for-greed/"
+"characterdialogue/fr/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: fr\n"
+"Plural-Forms: nplurals=2; plural=n > 1;\n"
+
+#: 65661046784
+msgid "eggItemReceived"
+msgstr "Un œuf ! Il faut le faire éclore."
+
+#: 12383040049152
+msgid "cursedItemReceived"
+msgstr "Nooon, une malédiction !"
+
+#: 16277346455552
+msgid "geodeItemReceived"
+msgstr ""
+"Oh, une géode !\n"
+"Prête à être coupée."
+
+#: 16667567722496
+msgid "gemItemReceived"
+msgstr "Ouais, des trucs brillants !"
+
+#: 17079226077184
+msgid "goldItemReceived"
+msgstr "J'ADORE L'OR !"
+
+#: 17591476424704
+msgid "silverCoinItemReceived"
+msgstr "Mmmmmm, de l'argent…"
+
+#: 25552772927488
+msgid "wormSpawned"
+msgstr "Mince alors !"
+
+#: 26219063283712
+msgid "highNoise"
+msgstr "Allez…"
+
+#: 42988977000448
+msgid "pileLooted"
+msgstr "De la camelote, mais je peux la vendre."
+
+#: 44098089390080
+msgid "statsEffectAppliedOnDestroy"
+msgstr "Pourquoi ça arrive à chaque fois ?!"
+
+#: 50940257505280
+msgid "timeIsUp"
+msgstr "Quoi, personne d'autre à embêter ?!"
+
+#: 73606410539008
+msgid "noActions1"
+msgstr "Doo-doo-doo…"
+
+#: 73762149240832
+msgid "noActions2"
+msgstr "D'accord, nous allons attendre."
+
+#: 73828930949120
+msgid "noActions3"
+msgstr "D'accord, pause cigarette."
+
+#: 73889177931776
+msgid "noActions4"
+msgstr "Eh… peu importe."
+
+#: 73986347372544
+msgid "noActions5"
+msgstr "Patience, patience…"
+
+#: 91507905531904
+msgid "richZoneReached1"
+msgstr "Sinistre… ça veut dire plein de trésors !"
+
+#: 91695428669440
+msgid "richZoneReached2"
+msgstr "Plus on va loin, meilleur est le Butin !"
+
+#: 91772155072512
+msgid "richZoneReached3"
+msgstr "Ça sent les montagnes de trésors !"
+
+#: 42860303913062400
+msgid "coldNight"
+msgstr ""
+"F-f-f-fait\n"
+"f-f-froid…"
+
+#: 42861209547182080
+msgid "frostible"
+msgstr ""
+"I-i-il faut \n"
+"s-s-se réchauffer !"
+
+#: 42861912688693248
+msgid "warmedUp"
+msgstr "Hourra, il fait chaud !"
+
+#: 42862171338838016
+msgid "frozenRockHit"
+msgstr "Il faut faire fondre la glace !"
+
+#: 42862467540586496
+msgid "frozenItemReceived"
+msgstr "Trésor de glace !"
+
+#: 49631762726780928
+msgid "SuperRare"
+msgstr "Ouiiii, Jackpot !"

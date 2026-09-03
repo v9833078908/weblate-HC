@@ -1,0 +1,458 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-25 18:39+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Turkish <http://l10n.herocraft.com/projects/need-for-greed/"
+"tutorial/tr/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: tr\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 75765772134387712
+msgid "DialogueIntroCharacter1"
+msgstr ""
+"Peki, kısrak, kokusunu alıyor musun? Altın! Yakınlarda bir yerde… Ve aşk… şu "
+"kayanın içinde!"
+
+#: 75765971959418880
+msgid "DialogueIntroHorse1"
+msgstr "Frrr!"
+
+#: 75766215002558464
+msgid "DialogueIntroCharacter2"
+msgstr ""
+"'Orada bir daha kadın sesi duyarsam beni atarsın' derken ne demek "
+"istiyorsun? Orada kesinlikle yalnız biri vardı."
+
+#: 75766376147718144
+msgid "DialogueIntroHorse2"
+msgstr "Neeigh! Grr-ha!"
+
+#: 75766594431881216
+msgid "DialogueIntroCharacter3"
+msgstr "Tamam, tamam! Sadece bir yankıydı… benim yüceliğimin yankısı!"
+
+#: 75766733204623360
+msgid "DialogueMineFoundCharacter1"
+msgstr ""
+"Bir kaya! İlahi! Afrodit'in uyluğu gibi! İçinde kesinlikle parlayan bir "
+"şeyler var, ciğerim titredi!"
+
+#: 75766977115983872
+msgid "DialogueMineFoundHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 75767084016209920
+msgid "DialogueMineFoundCharacter2"
+msgstr "Pekala, vücudumun güzelliğe tepki vermesine üzgünüm!"
+
+#: 75768133359767552
+msgid "DialogueTimeIsUpHorse1"
+msgstr "Kişnemek!"
+
+#: 75768214897037312
+msgid "DialogueTimeIsUpCharacter1"
+msgstr "Ne? Şimdiden gün batımı mı?"
+
+#: 75768748328620032
+msgid "DialogueTimeIsUpHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 75769024796168192
+msgid "DialogueTimeIsUpCharacter2"
+msgstr ""
+"Sivrisinekler… Yine mi onlar! Evet-evet, yeşil küçük ev olduğunu "
+"hatırlıyorum, geliyorum! Sakın kaçma!"
+
+#: 75769959874301952
+msgid "DialoguePickLootIntroTrader1"
+msgstr "Hey! Çok fazla Ganimet. At'ın çantasına hepsi sığmaz."
+
+#: 75770225956753408
+msgid "DialoguePickLootIntroTrader2"
+msgstr "Depoya taşıyabileceğin en iyi eşyaları seç."
+
+#: 76060126094823424
+msgid "DialoguePrepareToOpenCraftCharacter1"
+msgstr ""
+"Şimdi… Şimdi bir başyapıt yaratacağım! Ona pişmanlık yaşatacak bir "
+"Mücevherat parçası!"
+
+#: 76060331171123200
+msgid "DialoguePrepareToOpenCraftHorse1"
+msgstr "Brrr-r-r."
+
+#: 76061423992836096
+msgid "DialoguerAfterCraftCharacter1"
+msgstr "BAK, At! Eski sevgilimle tanışmadan önceki gözlerim gibi parlıyor!"
+
+#: 76061521736896512
+msgid "DialoguerAfterCraftHorse1"
+msgstr "Frrr!"
+
+#: 76061738473361408
+msgid "DialoguerAfterCraftCharacter2"
+msgstr "Bu… bu benim intikamımın ilahi ışığı!"
+
+#: 76061830932598784
+msgid "DialoguerAfterCraftHorse2"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 76061898951626752
+msgid "DialoguerAfterCraftCharacter3"
+msgstr ""
+"Sadece kıskanıyorsun — böyle bir ihtişamı takacak parmakların yok. Geriye "
+"kalan tek şey parmakları olan bir Alıcı bulmak!"
+
+#: 76062368449433600
+msgid "DialoguerAfterTradeBuyer1"
+msgstr "Bunu sen mi yaptın? Güzel, alıyorum."
+
+#: 76062530391511040
+msgid "DialoguerAfterTradeCharacter1"
+msgstr ""
+"O… o anladı! Mücevheratın içinde — benim. Benim içimde — Altın. Altının "
+"içinde — bir tanrı."
+
+#: 76062825645346816
+msgid "DialoguerAfterTradeHorse1"
+msgstr "Frrr! Kişneme!"
+
+#: 76062978284457984
+msgid "DialoguerAfterTradeCharacter2"
+msgstr "Haklısın, At. Gerçeğe hazır değiller…"
+
+#: 76063254827503616
+msgid "DialogueBeforeUpgradeHorse1"
+msgstr "Frrr!"
+
+#: 76063498000666624
+msgid "DialogueBeforeUpgradeCharacter1"
+msgstr ""
+"Para mı? Ben mi? Eğer O zengin olduğumu öğrenirse ne olacağını biliyor musun?"
+
+#: 76063745632374784
+msgid "DialogueBeforeUpgradeHorse2"
+msgstr "Grrr-hrr!"
+
+#: 76063937093963776
+msgid "DialogueBeforeUpgradeCharacter2"
+msgstr ""
+"Pekala, kendime yatırım yapacağım — ama sadece beni dırdır etmeyi bırakman "
+"için!"
+
+#: 76064239725580288
+msgid "DialogueAfterUpgradeCharacter1"
+msgstr "Daha hızlı, daha güçlü ve üretimi daha ucuz oldum! O bunu beğenirdi."
+
+#: 76064347783434240
+msgid "DialogueAfterUpgradeHorse1"
+msgstr "Grrr-hrr!"
+
+#: 76064479283253248
+msgid "DialogueAfterUpgradeCharacter2"
+msgstr ""
+"Pekala, ısrar etmeye gerek yoktu! Kendi fetişlerin var — toynaklar ve yulaf."
+
+#: 76065879857827840
+msgid "DialogueLobbyLikesCharacter1"
+msgstr "Gördün mü, kısrak? Beni seviyorlar!"
+
+#: 76066013412855808
+msgid "DialogueLobbyLikesHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 76066107042304000
+msgid "DialogueLobbyLikesCharacter2"
+msgstr "Haklısın! Bu sadece başlangıç! Yakında hepsi benim hayranım olacak…"
+
+#: 76344321220284416
+msgid "character"
+msgstr "Karakter"
+
+#: 76344471367979008
+msgid "horse"
+msgstr "At"
+
+#: 76344680219152384
+msgid "trader"
+msgstr "Tüccar"
+
+#: 76344756748423168
+msgid "buyer"
+msgstr "Alıcı"
+
+#: 131220345145528320
+msgid "terrainDispenserFound"
+msgstr "Vay canına! Av!"
+
+#: 131220694531051520
+msgid "terrainDispenserCollecting"
+msgstr "Hadi! Kır şunu!"
+
+#: 131220939017031680
+msgid "exitDoorDescription"
+msgstr "Yeşil — bu bir At mı?"
+
+#: 131221107242176512
+msgid "exitDoorDescription2"
+msgstr "Yeşil mi? O… hasta mı hissediyor?"
+
+#: 137323318787444736
+msgid "DialoguePickLootSelectItemsTrader1"
+msgstr "Eşyaları At'ın çantasına koymak için dokunun."
+
+#: 137351439217594368
+msgid "DialoguePickLootSelectedItemsCharacter1"
+msgstr "Sadece bu kadar mı sığdı? Kısrağın daha büyük bir çantaya ihtiyacı var!"
+
+#: 137381643633823744
+msgid "DialoguePickLootClaimItemsTrader1"
+msgstr ""
+"Merak etmeyin! Geri kalanını ben alırım. Hatta biraz fazladan da veririm."
+
+#: 137616255752605696
+msgid "terrainWantMoreItems"
+msgstr "Daha fazla Altın istiyorum!"
+
+#: 137629488379072512
+msgid "terrainRoadIsClue"
+msgstr "Yol zenginliğe çıkar"
+
+#: 138087561421918208
+msgid "DialogueOrdersIntroBuyer1"
+msgstr ""
+"Ah, yeni bir yüz! Sana bir siparişim var. Koleksiyonumu yenilememe yardım "
+"eder misin?"
+
+#: 138088926181330944
+msgid "DialogueOrdersIntroCharacter1"
+msgstr "Bak kısrak, bensiz bir gün bile yapamazlar!"
+
+#: 138089230444531712
+msgid "DialogueOrdersIntroHorse1"
+msgstr "Frrrr!"
+
+#: 138089454202261504
+msgid "DialogueOrdersIntroCharacter2"
+msgstr "Evet, evet, seninki olmadan da olmaz."
+
+#: 138110517984366592
+msgid "DialogueOrdersThanksBuyer1"
+msgstr ""
+"Bana çok yardım ettin, ben de sana yardım edeceğim — kayaların her "
+"zamankinden daha yüksek sesle çaldığı bir yer işaretledim."
+
+#: 138111196928937984
+msgid "DialogueOrdersThanksCharacter1"
+msgstr "BENİ O KADAR ÇOK SEVİYORLAR Kİ DÜŞÜNCELERİNİ BİLE VERMEYE HAZIRLAR!"
+
+#: 138111354584436736
+msgid "DialogueOrdersThanksCharacter2"
+msgstr "Hayır, para cebine giremez ama bilgi — kesinlikle girebilir!"
+
+#: 138111433626095616
+msgid "DialogueOrdersThanksHorse1"
+msgstr "Kişniyor!"
+
+#: 139150891347611648
+msgid "DialogueBeforeBirdCharacter1"
+msgstr ""
+"O garip adam bu yeri Harita üzerinde işaretledi. Daha önce gittiğimiz hiçbir "
+"yere benzemiyor — ve şimdiden HAZİNE kokusunu alabiliyorum!"
+
+#: 139151218457186304
+msgid "DialogueBeforeBirdHorse1"
+msgstr "Frrr!"
+
+#: 139151464675414016
+msgid "DialogueBeforeBirdCharacter2"
+msgstr ""
+"Sırtımda bir kafes mi? Bu Hazine Avcısı Kanarya! Şimdi bakalım köpek nereye "
+"gömülmüş."
+
+#: 139160840467386368
+msgid "DialogueUseBirdCharacter1"
+msgstr "Şimdi tüy izini takip ediyoruz ve hazine benim!"
+
+#: 139178592703877120
+msgid "DialogueAfterChestCharacter1"
+msgstr "GÖRDÜN MÜ, AT!"
+
+#: 139178671472906240
+msgid "DialogueAfterChestCharacter2"
+msgstr "Sadece beni değil, bu sandığı da çekmek zorunda kalacaksın."
+
+#: 139178702909214720
+msgid "DialogueAfterChestHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 139180374293221376
+msgid "chestCollecting"
+msgstr "HAZİNE!"
+
+#: 139496544913330176
+msgid "DialogueClaimedChestHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139496773167353856
+msgid "DialogueClaimedChestCharacter1"
+msgstr ""
+"Evet, sandık burada ama anahtar yok — ama sihirli demirhaneyi unuttun, "
+"kısrak! Her şeyi her şeyle yapabilir."
+
+#: 139512809946091520
+msgid "DialogueAfterCraftChestCharacter1"
+msgstr "BU BİR PİYANGO! Çabucak satmalıyız!"
+
+#: 139537206085947392
+msgid "DialogueAfterTradeChestCharacter1"
+msgstr "EVET! Tanındım. BUGÜN BU BATAKLIK, YARIN TÜM DÜNYA! İLERİ, AT!"
+
+#: 139537401876058112
+msgid "DialogueAfterTradeChestBuyer1"
+msgstr ""
+"Ha-ha — görünüşe göre tüm yerliler senin parlak eşyalarını takıyor. Sonuçta, "
+"burada yaşayan tek kişi benim, Ha-ha-ha."
+
+#: 139766416519991296
+msgid "DialogueNewTerrainOpenedHorse1"
+msgstr "Brrr-r-r!"
+
+#: 139766737396830208
+msgid "DialogueNewTerrainOpenedCharacter1"
+msgstr "Kokusu… duman gibi mi?"
+
+#: 139767066540642304
+msgid "DialogueNewTerrainOpenedHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 139767291636355072
+msgid "DialogueNewTerrainOpenedCharacter2"
+msgstr "Deponun çatısına kömürleri ben mi düşürdüm demek istiyorsun?"
+
+#: 139767459110719488
+msgid "DialogueNewTerrainOpenedHorse3"
+msgstr "Grrr-hrr!"
+
+#: 139767686714626048
+msgid "DialogueNewTerrainOpenedCharacter3"
+msgstr "Ah… Belki de geri dönmemeliyiz."
+
+#: 139772805363535872
+msgid "DialogueNewTerrainStartedCharacter1"
+msgstr "Farklı bir arazi. Çamurlu zemin. Ah, hava anlam kokuyor!"
+
+#: 139772978911252480
+msgid "DialogueNewTerrainStartedHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139773239633383424
+msgid "DialogueNewTerrainStartedCharacter2"
+msgstr "Pekala, değerli eşyaları çabucak alıp kaçıyoruz."
+
+#: 140259502945734656
+msgid "NewTerrainDispenserCollectingCharacter1"
+msgstr "Ne çınlayan bir kaya! Sanki doğa beni alkışlıyor!"
+
+#: 140260138097577984
+msgid "DialoguePrepareToWormCharacter1"
+msgstr "O neydi?!"
+
+#: 140260175347191808
+msgid "DialoguePrepareToWormHorse1"
+msgstr "Grrr-hrr!"
+
+#: 140260548501835776
+msgid "DialoguePrepareToWormCharacter3"
+msgstr "Ah hayır… O… o muydu?"
+
+#: 140262190995476480
+msgid "DialogueWormAppearHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 140262312860979200
+msgid "DialogueWormAppearCharacter1"
+msgstr "Aman Tanrım. Ölümü uyandırdım. Yine."
+
+#: 140263122399399936
+msgid "DialoguePlayerDeathCharacter1"
+msgstr "ONA BUNDAN PİŞMAN OLDUĞUMU SÖYLEYİN!!!"
+
+#: 140263995359891456
+msgid "DialoguePlayerReviveCharacter1"
+msgstr "Burası cennet mi? O zaman neden bu kadar kötü kokuyor…"
+
+#: 140264148288409600
+msgid "DialoguePlayerReviveCharacter2"
+msgstr "Anladım. Ölü değilim. Daha da kötüsü – hayattayım!"
+
+#: 140264664699506688
+msgid "DialoguePlayerRevivedCharacter1"
+msgstr ""
+"Ucuz atlattım, ama şimdi her şeye hazırım! Kazmayı biraz daha sessiz "
+"sallamaya çalışacağım…"
+
+#: 142736080803991552
+msgid "tip1"
+msgstr "Bir vazoyu itebilirsiniz. Kırmak için iki kez itin."
+
+#: 142736223703928832
+msgid "tip2"
+msgstr "Solucan sizi suya veya Bataklık'a takip etmez."
+
+#: 142736293392289792
+msgid "tip3"
+msgstr "Böcekleri ezin — Madeni Paralar düşürürler."
+
+#: 142736344843816960
+msgid "tip4"
+msgstr "Bazı çalılıklar altın Yumurtalar bırakan kuşları saklar."
+
+#: 142736408026812416
+msgid "tip5"
+msgstr "Gürültü tehlikeli düşmanları çeker."
+
+#: 142736477400600576
+msgid "tip6"
+msgstr "Yollar ilgi çekici yerlere çıkar."
+
+#: 142736521784725504
+msgid "tip7"
+msgstr "Satıcı çantanızdaki fazla eşyaları satın alacaktır."
+
+#: 142736594941775872
+msgid "tip8"
+msgstr "Yeni konumların kilidini açmak için siparişleri tamamlayın."
+
+#: 142736659890573312
+msgid "tip9"
+msgstr "Yeni mücevher tariflerinin kilidini açmak için demirhaneyi yükseltin."
+
+#: 142736729293721600
+msgid "tip10"
+msgstr "Altar'da veya Süper yuva'da lanetleri kaldırın."
+
+#: 142736813704089600
+msgid "tip11"
+msgstr "“?” ile işaretlenmiş öğeler Tüccar tarafından değerlendirilebilir."
+
+#: 142736907266428928
+msgid "tip12"
+msgstr "Daha fazla Ganimet tutmak için Depolama alanınızı yükseltin."
+
+#: 201164984023257088
+msgid "tip13"
+msgstr ""
+"Duraklatıldığında, siparişleri ve etkileri her zaman kontrol edebilirsiniz."
+
+#: 201320091704627200
+msgid "tip14"
+msgstr "Elit yuva en iyi Alıcıyı garanti eder."

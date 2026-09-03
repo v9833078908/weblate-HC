@@ -1,0 +1,453 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-25 18:39+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Indonesian <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/id/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: id\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: 114226892800
+msgid "orderTerrain0.1Step1Title"
+msgstr "Kita Butuh Lebih Banyak Emas!"
+
+#: 432712978432
+msgid "orderTerrain0.1Step1Description"
+msgstr "Bawakan aku 3 Bongkahan Emas."
+
+#: 410868545490944
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Bagus sekali — bongkahan ini akan menambah koleksiku dengan indah."
+
+#: 4737438277963776
+msgid "orderTerrain1.1Step1Title"
+msgstr "Cahaya Fajar"
+
+#: 4737634734968832
+msgid "orderTerrain1.1Step1Description"
+msgstr "Bawakan aku Bongkahan Emas dari batu yang mengandung emas."
+
+#: 4737870236749824
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"Emas menyimpan kilau fajar di dalamnya — jika aku tidak bisa melihatnya, "
+"setidaknya aku bisa merasakannya..."
+
+#: 4740504523902976
+msgid "orderTerrain0.1Step2Title"
+msgstr "Kerja bagus!"
+
+#: 4740632143990784
+msgid "orderTerrain0.1Step2Description"
+msgstr ""
+"Terima kasih atas bantuannya! Aku akan berbagi tempat yang menarik denganmu."
+
+#: 16787486734028800
+msgid "orderTerrain1.1Step2Title"
+msgstr "Kacamata Baru"
+
+#: 16787574239793152
+msgid "orderTerrain1.1Step2Description"
+msgstr "Bawakan aku 2 Berlian. Mereka sering jatuh dari batu kristal."
+
+#: 16788049915809792
+msgid "orderTerrain1.1Step2Thank"
+msgstr ""
+"Mari kita lihat apakah saya siap untuk mulai terbiasa dengan tanah ini..."
+
+#: 16788621414895616
+msgid "orderTerrain1.1Step3Title"
+msgstr "Mulai Terbiasa dengan Tanah"
+
+#: 16788663253078016
+msgid "orderTerrain1.1Step3Description"
+msgstr "Bawakan saya Geode Kecil. Mereka dapat ditemukan di bebatuan biasa."
+
+#: 16788764000260096
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Mari kita lihat apakah saya siap untuk terbiasa dengan tanah ini..."
+
+#: 16789247150526464
+msgid "orderTerrain1.1Step4Title"
+msgstr "Peti Orang Mati"
+
+#: 16789336237543424
+msgid "orderTerrain1.1Step4Description"
+msgstr "Bawakan saya Peti. Kenari mungkin bisa membantu Anda menemukannya."
+
+#: 16789441711706112
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Jadi di situlah saya meninggalkan barang-barang saya..."
+
+#: 16789861523787776
+msgid "orderTerrain1.1Step5Title"
+msgstr "Perak untuk Penempaan"
+
+#: 16790058245033984
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Bawakan saya 3 Potongan Perak. Mereka dapat ditemukan di geode dan bebatuan "
+"biasa."
+
+#: 16790186938863616
+msgid "orderTerrain1.1Step6Title"
+msgstr "Kerja bagus!"
+
+#: 16790822405279744
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Perak ini dengan menyenangkan menyengat telapak tangan..."
+
+#: 16791339927867392
+msgid "orderTerrain1.1Step6Description"
+msgstr "Terima kasih! Mampirlah ke rumah saya kapan-kapan — ini alamatnya."
+
+#: 16792386012450816
+msgid "orderTerrain1.2Step1Title"
+msgstr "Uang Kuno"
+
+#: 16792448180424704
+msgid "orderTerrain1.2Step1Description"
+msgstr ""
+"Bawakan saya 4 Koin Kuno. Koin ini sering ditemukan di pot dan vas kuno."
+
+#: 16793192929431552
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Sekarang saya akhirnya bisa memberi kembalian kepada orang-orang kuno!"
+
+#: 16793381891215360
+msgid "orderTerrain1.2Step2Title"
+msgstr "Penggulung Bola"
+
+#: 16793474094600192
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Bawakan saya Scarab Emas. Mereka adalah kumbang besar yang dapat ditemukan "
+"merayap di semak-semak."
+
+#: 16793779863556096
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Kumbang ini adalah penggulung bola yang besar!"
+
+#: 16794392403906560
+msgid "orderTerrain1.2Step3Title"
+msgstr "Bowling Batu"
+
+#: 16794434028179456
+msgid "orderTerrain1.2Step3Description"
+msgstr "Bawakan saya Geode Sedang. Kadang-kadang muncul di bebatuan biasa."
+
+#: 16794517595492352
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Sekarang aku akhirnya bisa menggulirkan beberapa bola!"
+
+#: 16794991149191168
+msgid "orderTerrain1.2Step4Title"
+msgstr "Omelet Emas"
+
+#: 16795063073116160
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Bawakan aku Telur Emas. Cari di semak-semak untuk menemukan sarang yang "
+"berisi telur-telur tersebut."
+
+#: 16795116181393408
+msgid "orderTerrain1.2Step4Thank"
+msgstr "Nah, itu sarapan untuk bangsawan!"
+
+#: 16795705460133888
+msgid "orderTerrain1.2Step5Title"
+msgstr "Darah Singa"
+
+#: 16795757985402880
+msgid "orderTerrain1.2Step5Description"
+msgstr ""
+"Bawakan aku Ruby Singa. Itu bisa ditemukan di geode dengan kristal merah."
+
+#: 16795845432446976
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Sekarang aku akan berani seperti singa!"
+
+#: 16797388357505024
+msgid "orderTerrain1.2Step6Title"
+msgstr "Rahmat Surga"
+
+#: 16797558377811968
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Bawakan aku Safir Surgawi. Itu bisa ditemukan di geode dengan kristal biru."
+
+#: 16797646290423808
+msgid "orderTerrain1.2Step6Thank"
+msgstr "Langit sendiri ada di pihakku!"
+
+#: 16798157601247232
+msgid "orderTerrain1.2Step7Title"
+msgstr "Toilet emas"
+
+#: 16798193798090752
+msgid "orderTerrain1.2Step7Description"
+msgstr "Bawakan aku 9 Bongkahan Emas dari batu yang mengandung emas."
+
+#: 16798263801024512
+msgid "orderTerrain1.2Step7Thank"
+msgstr "Akhirnya, aku bisa memperbaiki toilet!"
+
+#: 16798933543292928
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"Jika kamu ingin membuat permintaan — aku tahu tempat di mana bintang-bintang "
+"jatuh setiap saat."
+
+#: 16799140129542144
+msgid "orderTerrain1.2Step8Title"
+msgstr "Kerja bagus!"
+
+#: 66701112705024000
+msgid "orderTerrain2.1Step5Title"
+msgstr "Kerja bagus!"
+
+#: 66701312781713408
+msgid "orderTerrain2.1Step5Description"
+msgstr "Es mengingatkanku pada Nenek... Mampirlah ke kabinnya juga!"
+
+#: 66701713186750464
+msgid "orderTerrain2.1Step1Description"
+msgstr "Bawakan aku 2 Item Beku dari bebatuan beku"
+
+#: 66702356693647360
+msgid "orderTerrain2.1Step1Title"
+msgstr "Es Batu"
+
+#: 66702611300483072
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Sempurna untuk koktailku!"
+
+#: 66705370212990976
+msgid "orderTerrain2.2Step7Title"
+msgstr "Kerja bagus!"
+
+#: 66705373262249984
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Sepertinya kepiting terhubung dengan Pemuja Matahari — aku tahu di mana "
+"reruntuhan kuil mereka!"
+
+#: 66705376152125440
+msgid "orderTerrain2.2Step2Description"
+msgstr "Tangkap kepiting es — cangkangnya terbuat dari Cryolis."
+
+#: 66705379809558528
+msgid "orderTerrain2.2Step2Title"
+msgstr "Logam Kepiting"
+
+#: 66705384804974592
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ah, eksologam! Aku suka misteri alam!"
+
+#: 66706577295933440
+msgid "orderTerrain2.3Step8Title"
+msgstr "Kerja bagus!"
+
+#: 66706580684931072
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"Harta paling berharga Pemuja Matahari tersembunyi jauh di dalam Labirin — "
+"aku akan menunjukkan tempatnya!"
+
+#: 66706585684541440
+msgid "orderTerrain2.3Step2Description"
+msgstr "Nyalakan 3 obor di Kuil dan curi Bola Matahari!"
+
+#: 66706589509746688
+msgid "orderTerrain2.3Step2Title"
+msgstr "Pemanas Terbaik"
+
+#: 66706594945564672
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Ya, sekarang itu pemanasan yang tepat!"
+
+#: 70714473507717120
+msgid "orderTerrain2.1Step2Description"
+msgstr "Temukan 2 Nugget Perak di dalam es batu, lalu hangatkan."
+
+#: 70714539375067136
+msgid "orderTerrain2.1Step2Title"
+msgstr "Perak Beku"
+
+#: 70714808414502912
+msgid "orderTerrain2.1Step2Thank"
+msgstr "Ini seperti es dalam foil... tapi terbalik..."
+
+#: 70714878748786688
+msgid "orderTerrain2.1Step3Title"
+msgstr "Emas Beku"
+
+#: 70714919110574080
+msgid "orderTerrain2.1Step3Thank"
+msgstr "Emas musim dingin mendapatkan kilau yang sangat istimewa..."
+
+#: 70714983467974656
+msgid "orderTerrain2.1Step3Description"
+msgstr "Temukan 2 Nugget Emas di dalam es batu, lalu hangatkan."
+
+#: 70715014472269824
+msgid "orderTerrain2.1Step4Title"
+msgstr "Permata Tak Terlihat"
+
+#: 70715038832787456
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Jernih di dalam jernih, ahahaha!"
+
+#: 70715070977933312
+msgid "orderTerrain2.1Step4Description"
+msgstr "Cairkan Berlian Sedang. Berlian Beku sering ditemukan di semua batuan."
+
+#: 70718769544560640
+msgid "orderTerrain2.2Step1Title"
+msgstr "Astrologi Berbasis Bumi"
+
+#: 70718775819239424
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Bawakan saya 2 Besi Bintang. Mereka dapat ditemukan di Rawa-rawa selama "
+"Jatuhnya Bintang."
+
+#: 70718777429852160
+msgid "orderTerrain2.2Step1Thank"
+msgstr "Astrometal adalah impian setiap ilmuwan!"
+
+#: 70721195022483456
+msgid "orderTerrain2.2Step3Title"
+msgstr "Penyusup Kosmik"
+
+#: 70721197308379136
+msgid "orderTerrain2.2Step3Description"
+msgstr ""
+"Temukan Inti Meteor Terkutuk selama Jatuhnya Bintang dan hilangkan "
+"kutukannya."
+
+#: 70721198948352000
+msgid "orderTerrain2.2Step3Thank"
+msgstr "Meteor adalah mesin, bukan hanya benda langit! Luar biasa!"
+
+#: 70723998965039104
+msgid "orderTerrain2.2Step4Title"
+msgstr "Kehangatan Kepiting"
+
+#: 70724001313849344
+msgid "orderTerrain2.2Step4Description"
+msgstr "Kumpulkan 5 pecahan Cryolis dari cangkang kepiting es."
+
+#: 70724003188703232
+msgid "orderTerrain2.2Step4Thank"
+msgstr "Apakah kamu juga ingin tahu bagaimana kepiting hidup di salju?"
+
+#: 70724154619854848
+msgid "orderTerrain2.2Step5Title"
+msgstr "Sensor Baru"
+
+#: 70724156297576448
+msgid "orderTerrain2.2Step5Description"
+msgstr ""
+"Bawakan saya 9 Potongan Perak. Mereka dapat ditemukan di geode dan batu "
+"sederhana."
+
+#: 70724162102493184
+msgid "orderTerrain2.2Step5Thank"
+msgstr "Instrumen penelitian saya akhirnya akan berhenti mengalami gangguan!"
+
+#: 70724346286964736
+msgid "orderTerrain2.2Step6Title"
+msgstr "Mantel Hangat Kepiting"
+
+#: 70724348468002816
+msgid "orderTerrain2.2Step6Description"
+msgstr "Kumpulkan 8 pecahan Cryolis dari cangkang kepiting es."
+
+#: 70724350279942144
+msgid "orderTerrain2.2Step6Thank"
+msgstr ""
+"Sekarang saya akhirnya akan mengerti bagaimana mereka bertahan hidup di "
+"musim dingin!"
+
+#: 70738013825007616
+msgid "orderTerrain2.3Step1Title"
+msgstr "Menjadi Besar"
+
+#: 70738018996584448
+msgid "orderTerrain2.3Step1Description"
+msgstr "Bawakan saya Berlian Besar. Itu dapat ditemukan di semua bebatuan beku."
+
+#: 70738021307645952
+msgid "orderTerrain2.3Step1Thank"
+msgstr "Ya Tuhan, ukurannya sebesar kepala! Tapi kepala siapa..."
+
+#: 70738580156710912
+msgid "orderTerrain2.3Step3Title"
+msgstr "Harta Karun Whitelands"
+
+#: 70738582908174336
+msgid "orderTerrain2.3Step3Description"
+msgstr ""
+"Berikan saya Peti Jarl. Kenari akan membantu Anda menemukannya di Whitelands."
+
+#: 70738585055657984
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Mengingatkan saya pada Kakek..."
+
+#: 70742364090007552
+msgid "orderTerrain2.3Step4Title"
+msgstr "Esensi Api"
+
+#: 70742368280117248
+msgid "orderTerrain2.3Step4Description"
+msgstr "Ekstrak Percikan Berhala dari Bola Matahari."
+
+#: 70742370125611008
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Batu yang panas sekali..."
+
+#: 70742532495507456
+msgid "orderTerrain2.3Step5Title"
+msgstr "Batu Berwarna-warni"
+
+#: 70742535381188608
+msgid "orderTerrain2.3Step5Description"
+msgstr "Bawakan aku Opal. Ini adalah temuan Langka di bebatuan Beku."
+
+#: 70742539273502720
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Lihat betapa indahnya berkilauan..."
+
+#: 70743768674336768
+msgid "orderTerrain2.3Step6Title"
+msgstr "Ia Meninggalkan Keturunan!"
+
+#: 70743771123810304
+msgid "orderTerrain2.3Step6Description"
+msgstr "Ekstrak Anak Burung Hantu dari Bola Matahari."
+
+#: 70743772839280640
+msgid "orderTerrain2.3Step6Thank"
+msgstr ""
+"Burung Hantu Besar membawa dingin... Mengapa anak burung hantu begitu panas?"
+
+#: 70744648739979264
+msgid "orderTerrain2.3Step7Title"
+msgstr "Kesepakatan Besar"
+
+#: 70744655853518848
+msgid "orderTerrain2.3Step7Description"
+msgstr "Bawakan saya 5 Potongan Emas. Mereka cukup Umum di bebatuan Beku."
+
+#: 70744658739200000
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Sekarang saya akan menjadi orang terbesar di kota."

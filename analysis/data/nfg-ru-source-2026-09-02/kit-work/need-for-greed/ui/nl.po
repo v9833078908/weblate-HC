@@ -1,0 +1,2080 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:02+0000\n"
+"PO-Revision-Date: 2026-08-28 09:39+0000\n"
+"Last-Translator: Hero Craft Localization user 14 "
+"<ivanbelov@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Dutch <http://l10n.herocraft.com/projects/need-for-greed/ui/"
+"nl/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: nl\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 142945292288
+msgid "vibration"
+msgstr "Trilling"
+
+#: 136857827676160
+msgid "loading"
+msgstr "Laden"
+
+#: 140450844643328
+msgid "adsNotReady"
+msgstr "De advertentie is niet klaar. Probeer het later opnieuw."
+
+#: 340188151943168
+msgid "amount"
+msgstr "{value}"
+
+#: 368875517775872
+msgid "reviewTitle"
+msgstr "Uw mening is belangrijk voor ons!"
+
+#: 368997953703936
+msgid "reviewDescription"
+msgstr "Vind je dit spel leuk?"
+
+#: 369514264137728
+msgid "reviewConfirm"
+msgstr "Ja, natuurlijk!"
+
+#: 369755633750016
+msgid "no"
+msgstr "Nee"
+
+#: 406497292193792
+msgid "amountFormatted"
+msgstr "{value:cond:>99999?{value:amount()}|}{value:cond:<=99999?{value:N0}|}"
+
+#: 483624632979456
+msgid "leaders"
+msgstr "Leiders"
+
+#: 483894125400064
+msgid "leaderboardAuth"
+msgstr ""
+"Het klassement is alleen beschikbaar voor geautoriseerde gebruikers.\n"
+"Meld u aan bij uw account in de instellingen."
+
+#: 693554757505024
+msgid "softCurrency"
+msgstr "Zilveren munten"
+
+#: 693648756051968
+msgid "gems"
+msgstr "Edelstenen"
+
+#: 2338581875265536
+msgid "day_N"
+msgstr "Dag {value}"
+
+#: 2340303519617024
+msgid "dailyRewards"
+msgstr "Dagelijkse beloningen"
+
+#: 2340513616498688
+msgid "dailyRewardsDescription"
+msgstr ""
+"Bezoek het spel elke dag\n"
+"en ontvang beloningen."
+
+#: 2524665741578240
+msgid "tapToStart"
+msgstr "Tik om te starten"
+
+#: 2534199759474688
+msgid "settings"
+msgstr "Instellingen"
+
+#: 2539217615065088
+msgid "sound"
+msgstr "SFX"
+
+#: 2539801025974272
+msgid "music"
+msgstr "Muziek"
+
+#: 2606360020914176
+msgid "humanTimer"
+msgstr ""
+"{hours:cond:>0?{hours}u. |}{minutes:cond:>0?{minutes}m. |}{seconds:cond:>=0?"
+"{seconds}s.|} "
+
+#: 31188945265680384
+msgid "sell"
+msgstr "Verkopen"
+
+#: 39267299644215296
+msgid "trading"
+msgstr "Handel"
+
+#: 39267930052300800
+msgid "selectAmount"
+msgstr ""
+"Selecteer aantal edelstenen <size=56><color=#fff>( {value} / {total} )</"
+"color></size>"
+
+#: 39432224572248064
+msgid "apply"
+msgstr "Toepassen"
+
+#: 88927433573797888
+msgid "exit"
+msgstr "Afsluiten"
+
+#: 89108083400511488
+msgid "loot"
+msgstr "Buit"
+
+#: 89232802619592704
+msgid "inventory"
+msgstr "Inventaris"
+
+#: 89233049219502080
+msgid "add_amount"
+msgstr "+ {value}"
+
+#: 101508439312961536
+msgid "upgradeCharacterHealthStat"
+msgstr "Gezondheid"
+
+#: 101509164025778176
+msgid "Pick"
+msgstr "Pikhouweel"
+
+#: 103762241726451712
+msgid "unload"
+msgstr "Uitladen"
+
+#: 105589950840573952
+msgid "continue"
+msgstr "doorgaan"
+
+#: 105600782735511552
+msgid "continueWithoutTheBird"
+msgstr "Doorgaan zonder de vogel"
+
+#: 128992315220168704
+msgid "x_of_y"
+msgstr "{value} / {total}"
+
+#: 129852820621103104
+msgid "make"
+msgstr "Maken"
+
+#: 130612002970406912
+msgid "in_progress"
+msgstr "Bezig..."
+
+#: 132250436289957888
+msgid "from_to_percent"
+msgstr "{from} -> {to}"
+
+#: 132393404065910784
+msgid "lvl_x"
+msgstr "niv. {value}"
+
+#: 133085114043469824
+msgid "take"
+msgstr "Nemen"
+
+#: 168978456979443712
+msgid "tradeDescription"
+msgstr "Sleep en zet items hier neer om te verkopen"
+
+#: 168979719083266048
+msgid "storage"
+msgstr "Opslag"
+
+#: 168993254521704448
+msgid "backpack"
+msgstr "Rugzak"
+
+#: 175428495763312640
+msgid "upgradeCharacterResistanceStat"
+msgstr "Weerstand"
+
+#: 175428883866456064
+msgid "completed"
+msgstr "Voltooid"
+
+#: 175429326734626816
+msgid "upgradeCharacterSpeedStat"
+msgstr "Snelheid"
+
+#: 175429624488267776
+msgid "detectionRadius"
+msgstr "Valdetectieradius"
+
+#: 175437389508120576
+msgid "upgrade"
+msgstr "Upgrade"
+
+#: 175444653988122624
+msgid "upgradeCharacterTitle"
+msgstr "Karakter niveau {value}"
+
+#: 175444893063450624
+msgid "upgradeToolTitle"
+msgstr "Gereedschap niveau {value}"
+
+#: 175445052228898816
+msgid "bird"
+msgstr "Vogel"
+
+#: 175445211058802688
+msgid "craft"
+msgstr "Maken"
+
+#: 175530141390475264
+msgid "upgradeBirdFlyAmountStat"
+msgstr "Extra vluchten"
+
+#: 175535881710735360
+msgid "upgradeToolSpeedStat"
+msgstr "Slagsnelheid van het gereedschap"
+
+#: 175536172950622208
+msgid "upgradeToolDamageStat"
+msgstr "Gereedschapsschade"
+
+#: 185307831437889536
+msgid "terrain1Title"
+msgstr "Fenmar Moeras"
+
+#: 185308054407090176
+msgid "terrain2Title"
+msgstr "Belomar"
+
+#: 185645691072417792
+msgid "start"
+msgstr "Start"
+
+#: 185658961254682624
+msgid "terrain1Description"
+msgstr ""
+"Gewoon een moeras dat een moeras is — behalve dan met goudklompjes en een "
+"gigantische worm die reageert op elke “rinkel.”\n"
+"De lokale bevolking zegt: als je goud wilt, rinkel dan niet als een "
+"porseleinkast."
+
+#: 185670435373060096
+msgid "howToOpenBiome"
+msgstr ""
+"Nieuwe plaatsen.\n"
+"Voltooi bestellingen en ontdek \n"
+"waar je verder kunt zoeken."
+
+#: 185944937449394176
+msgid "revivalTitle"
+msgstr "Het is een totale mislukking!"
+
+#: 185946490252038144
+msgid "itemsInTheBackpack_x_of_y"
+msgstr "Items in de Rugzak: {value} / {total}"
+
+#: 185949125390635008
+msgid "exitAndLoseItems"
+msgstr "Verlaten en items verliezen"
+
+#: 187764654040420352
+msgid "noBirdEnergy"
+msgstr "Geen vogels, geen ogen"
+
+#: 187765165577736192
+msgid "noDetectorEnergy"
+msgstr "Schatdetector"
+
+#: 190252961852821504
+msgid "yes_leave"
+msgstr "Ja, verlaten"
+
+#: 190253329051553792
+msgid "no_stay"
+msgstr "Nee, hier blijven"
+
+#: 190253804719181824
+msgid "leave_location_confirmation"
+msgstr "Wil je de locatie verlaten?"
+
+#: 190609920439357440
+msgid "percentAmount"
+msgstr "{value}%"
+
+#: 190613197834948608
+msgid "pointsAmount"
+msgstr "{value} <size=70%>pt.</size>"
+
+#: 190999934906142720
+msgid "close"
+msgstr "Sluiten"
+
+#: 191001304602251264
+msgid "selectTheShape"
+msgstr "Kies de vorm van de schat"
+
+#: 191001600908857344
+msgid "speedUp"
+msgstr "Versnellen"
+
+#: 191062612982894592
+msgid "tutorial"
+msgstr "Tutorial"
+
+#: 214456412639858688
+msgid "terrainPickLootTitle"
+msgstr "Pak alles wat in je tas en Opslag past"
+
+#: 214474517843808256
+msgid "highlighted_x_of_y"
+msgstr "<color=#{hasEnough:E3BA59|E01114}>{value}</color> / {total}"
+
+#: 215688832034803712
+msgid "takeToStorageXofY"
+msgstr "Neem {value}/{total}"
+
+#: 215688944811249664
+msgid "upgradeBag"
+msgstr "Upgrade tas"
+
+#: 216124892128743424
+msgid "dealerWillBuyTheRest"
+msgstr "De Handelaar koopt al het andere van je"
+
+#: 216274536972423168
+msgid "information"
+msgstr "Informatie"
+
+#: 216281997183815680
+msgid "weightInformation"
+msgstr ""
+"De Capaciteit van de Paardenbagagezak is een belangrijke indicator.\n"
+"Het gewicht van gevonden voorwerpen beïnvloedt hun transport.\n"
+"Upgrade je zak om de Capaciteit te vergroten en meer voorwerpen te dragen."
+
+#: 216292821260570624
+msgid "rank_x"
+msgstr "Rang {value}"
+
+#: 216295079784222720
+msgid "weight"
+msgstr "Gewicht:"
+
+#: 216455391749607424
+msgid "vehicleUpgradeDescription"
+msgstr ""
+"Verbeter de Capaciteit van de Paardenbagagezak voor het dragen van ladingen."
+
+#: 216456296213516288
+msgid "capacity"
+msgstr "Capaciteit"
+
+#: 216456449876037632
+msgid "horseCargoBag"
+msgstr "Paardenbagagezak"
+
+#: 216464394802171904
+msgid "hardCurrency"
+msgstr "Gouden munten"
+
+#: 216827767398076416
+msgid "confirmation"
+msgstr "Bevestiging"
+
+#: 216836939359457280
+msgid "attention!"
+msgstr "Let op!"
+
+#: 216837051221544960
+msgid "skipSelectionTreasuresDescription"
+msgstr ""
+"Als je nu vertrekt, <color=#E01114>worden alle gevonden voorwerpen aan de "
+"Handelaar verkocht</color> voor minder dan gebruikelijk."
+
+#: 216843048690388992
+msgid "bayerDescription"
+msgstr "Meer verdienen? Ik koop de restjes met een bonus."
+
+#: 217004942013239296
+msgid "bestProfit"
+msgstr "Beste winst"
+
+#: 217005085059977216
+msgid "goodProfit"
+msgstr "Goede winst"
+
+#: 217005221878173696
+msgid "badProfit"
+msgstr "Slechte winst"
+
+#: 217034757265166336
+msgid "profitPercent"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>{value:cond:>0?+|}{value}%</color>"
+
+#: 217067111195086848
+msgid "yourProfit"
+msgstr "Uw winst:"
+
+#: 219330229052903424
+msgid "eliteSlot"
+msgstr "Elite vak"
+
+#: 219330557043281920
+msgid "tradingShopLevel"
+msgstr "Handelswinkel niveau {value}"
+
+#: 219331227683131392
+msgid "rent"
+msgstr "Huur"
+
+#: 219333990236295168
+msgid "slot"
+msgstr "Vak"
+
+#: 219334107282542592
+msgid "selectItem"
+msgstr "Item selecteren"
+
+#: 219569917810446336
+msgid "checkOffer"
+msgstr "Aanbod"
+
+#: 221184956493467648
+msgid "shopLevel"
+msgstr "Winkel niveau {value}"
+
+#: 221731312916238336
+msgid "tradeOpenEliteSlotDialog"
+msgstr "Hier betalen kopers veel, zonder afdingen."
+
+#: 221732692687065088
+msgid "getASlot"
+msgstr "Krijg een Vak"
+
+#: 221745332360581120
+msgid "customerWillArriveIn"
+msgstr "De klant arriveert over:"
+
+#: 221747748288073728
+msgid "speedUpBy"
+msgstr "Versnellen met"
+
+#: 221752584698073088
+msgid "decline?"
+msgstr "Afwijzen?"
+
+#: 221752816395620352
+msgid "tradeDeclineClientInfo"
+msgstr "Tot de volgende klant arriveert:"
+
+#: 221785455785676800
+msgid "tradingShop"
+msgstr "Handelswinkel"
+
+#: 221785885429207040
+msgid "newSlot"
+msgstr "Nieuw vak"
+
+#: 221786327613706240
+msgid "tradeUpgradeDescription"
+msgstr ""
+"Upgrade de handelswinkel om meer vakken te ontgrendelen voor de verkoop."
+
+#: 221790732488544256
+msgid "tradingShopShort"
+msgstr "Winkel"
+
+#: 221791365350297600
+msgid "level_x"
+msgstr "Niveau {value}"
+
+#: 221901028389556224
+msgid "buyersOffer"
+msgstr "Aanbod koper:"
+
+#: 221902690122469376
+msgid "(profitPercent)"
+msgstr ""
+"<color=#{value:cond:>0?00DE00|E01114}>({value:cond:>0?+|}{value}%)</color>"
+
+#: 223520514767065088
+msgid "common"
+msgstr "Algemeen"
+
+#: 223520659910955008
+msgid "uncommon"
+msgstr "Ongewoon"
+
+#: 223520713283473408
+msgid "rare"
+msgstr "Zeldzaam"
+
+#: 223520767448715264
+msgid "epic"
+msgstr "Episch"
+
+#: 223520826210914304
+msgid "legendary"
+msgstr "Legendarisch"
+
+#: 223520860377714688
+msgid "mythic"
+msgstr "Mythisch"
+
+#: 224246507228106752
+msgid "tradeSelectItemTitle"
+msgstr "Selecteer een item voor verkoop"
+
+#: 224277347911864320
+msgid "basePrice"
+msgstr "Basisprijs:"
+
+#: 226508435681972224
+msgid "map"
+msgstr "Kaart"
+
+#: 226574491591118848
+msgid "wiseNotes"
+msgstr "Wijze notities"
+
+#: 226576404894191616
+msgid "emptyPickedItems"
+msgstr "Met lege handen vertrekken?"
+
+#: 226580081470083072
+msgid "settingsDescription"
+msgstr "Geef de wereld vorm op jouw manier!"
+
+#: 226582087576326144
+msgid "tradeClosedSlotDescription"
+msgstr ""
+"Upgrade je handelswinkel om meer verkoopslots te ontgrendelen — hoe meer "
+"schappen je toevoegt, hoe groter je winst!"
+
+#: 226633818465112064
+msgid "timer"
+msgstr "{hours:cond:>0?{hours:00}:|}{minutes:00}:{seconds:00}"
+
+#: 227954852267036672
+msgid "craftSlot"
+msgstr "Maakvak"
+
+#: 227959361919782912
+msgid "superSlot"
+msgstr "Super vak"
+
+#: 228232787804819456
+msgid "forge"
+msgstr "Smederij"
+
+#: 228312834624458752
+msgid "craftOpenEliteSlotDialog"
+msgstr ""
+"Smeed schatten, open kisten en magische eieren — wie weet welke zeldzame "
+"buit erin zit!"
+
+#: 228318026984067072
+msgid "chestSlot"
+msgstr "Kistvak"
+
+#: 228318447752450048
+msgid "incubator"
+msgstr "Incubator"
+
+#: 228321113740152832
+msgid "craftOpenEliteSlotLabel"
+msgstr "Ontketen de ultieme kracht!"
+
+#: 228357165007769600
+msgid "cancel"
+msgstr "Annuleren"
+
+#: 228360236127490048
+msgid "openChest"
+msgstr "Kist openen"
+
+#: 228385218756874240
+msgid "timeToOpen:"
+msgstr "Tijd om te openen:"
+
+#: 228792391647367168
+msgid "craftSelectChestNotEnoughTitle"
+msgstr "Geen Kisten op voorraad"
+
+#: 228794249094893568
+msgid "storageChestNotEnoughWarningText"
+msgstr ""
+"Eentje gevonden? Sleep hem naar Maken en open hem\n"
+"(maar niet met een bijl, oké?)"
+
+#: 228796285601452032
+msgid "select_x_of_y"
+msgstr ""
+"<color=#{hasEnough:00DE00|FFF}>{value} /</color> <color=#"
+"{hasEnough:00DE00|E01114}>{total}</color>"
+
+#: 229526591581196288
+msgid "craftSelectEggTitle"
+msgstr "Selecteer een Ei om te openen"
+
+#: 229526902270070784
+msgid "craftSelectEggNotEnoughTitle"
+msgstr "Geen Eieren op voorraad"
+
+#: 229528260377317376
+msgid "storageEggNotEnoughWarningTitle"
+msgstr "Naar het Ei gaan we — niet uit een kippenhok, maar geboren uit magie!"
+
+#: 229528854181711872
+msgid "storageEggNotEnoughWarningText"
+msgstr ""
+"Verken het rijk, ontdek het zeldzame Ei en lever het aan de Craft. Wat ligt "
+"erin — alleen dooier, of iets veel groters?"
+
+#: 229530481219342336
+msgid "openEgg"
+msgstr "Open Ei"
+
+#: 229879731472044032
+msgid "craftSelectRecipeTitle"
+msgstr "Kies componenten om te Maken"
+
+#: 229880209643671552
+msgid "craftSelectRecipeNotEnoughTitle"
+msgstr "Niets op voorraad!"
+
+#: 229881107660935168
+msgid "craftItem"
+msgstr "Item Maken"
+
+#: 229881635711225856
+msgid "crafting:"
+msgstr "Maken:"
+
+#: 229882264282206208
+msgid "storageRecipeNotEnoughWarningText"
+msgstr "Deze items zijn nog niet gevonden."
+
+#: 229887783071911936
+msgid "recipe"
+msgstr "Recept"
+
+#: 230098234464538624
+msgid "craftClosedRecipeTitle"
+msgstr "De Smederij is te zwak!"
+
+#: 230098538715156480
+msgid "craftClosedRecipeDescription"
+msgstr ""
+"Onvoldoende Smederij-niveau\n"
+"\n"
+"Met elke upgrade kun je steeds zeldzamere en waardevollere schatten Maken. "
+"Het is tijd om deze oven te veranderen in een Smederij van legendes!"
+
+#: 230596136282624000
+msgid "craftClosedSlotTitle"
+msgstr "Vak is vergrendeld!"
+
+#: 230596696704552960
+msgid "craftClosedSlotDescription"
+msgstr "Je Maken-vaardigheden zijn niet sterk genoeg. Je moet ze verbeteren."
+
+#: 230974103273869312
+msgid "or"
+msgstr "of"
+
+#: 231685619115626496
+msgid "craftSpeedUpTitle"
+msgstr "Schep de kolen erin!"
+
+#: 231686505602748416
+msgid "craftSpeedUpDescription"
+msgstr ""
+"Het zal zijn alsof de dwergen espresso hebben gedronken en de turbomodus "
+"hebben ingeschakeld!"
+
+#: 231700678231461888
+msgid "upgradeCraftCraftSlotsStatDescription"
+msgstr ""
+"Vak ontgrendeld.\n"
+"De oven smelt Metaal en verandert het in gloednieuwe Sieraden voor de "
+"verkoop."
+
+#: 231701488554217472
+msgid "upgradeCraftTimeStatDescription"
+msgstr "Tijd is geld, maar Sieraden worden nog sneller gemaakt"
+
+#: 231702447166590976
+msgid "upgradeCraftRarityStatDescription"
+msgstr "Verhoogt je kansen om een Legendarisch item te maken."
+
+#: 231703302095769600
+msgid "upgradeCraftRecipesStatDescription"
+msgstr ""
+"De wijsheid van de ouden stroomt door je heen — Smederij wonderen die de "
+"wereld nog nooit heeft gezien!"
+
+#: 232003352147529728
+msgid "craftStockFullTitle"
+msgstr "Geen ruimte voor schatten in de Opslag!"
+
+#: 232004264790331392
+msgid "craftStockFullDescription"
+msgstr ""
+"De Opslag zit tot de laatste splinter vol.\n"
+"Verkoop het overschot in de Handelswinkel of upgrade de Opslag — claim dan "
+"je glimmende trofee!"
+
+#: 232054830455328768
+msgid "allItems"
+msgstr "Alle items"
+
+#: 232055567298072576
+msgid "stockLevel"
+msgstr "Opslag niveau {value}"
+
+#: 232285845522223104
+msgid "storageUpgradeDescription"
+msgstr ""
+"Elke upgrade geeft <color=#E01114>meer ruimte</color> voor gevonden en "
+"gesmede schatten. Meer goud, minder lijden!"
+
+#: 238220511437656064
+msgid "revivalDescription"
+msgstr "Respawn — of neem afscheid van je Buit."
+
+#: 238225411982757888
+msgid "noBirdEnergyDescription"
+msgstr "Heeft je naar de schat gebracht en is weggevlogen om te rusten."
+
+#: 238226013823438848
+msgid "callTheBird"
+msgstr "Keer nu terug"
+
+#: 238228172388438016
+msgid "noDetectorEnergyDescription"
+msgstr "Denk je dat je er nog één aankan?"
+
+#: 238229156124692480
+msgid "oreSeeker"
+msgstr "Ertszoeker"
+
+#: 238230435035090944
+msgid "gemSeeker"
+msgstr "Edelsteenzoeker"
+
+#: 238805340126449664
+msgid "respawn"
+msgstr "Respawn"
+
+#: 238835918318080000
+msgid "deathExit"
+msgstr "Met lege handen vertrokken"
+
+#: 241685352961806336
+msgid "terrain0Title"
+msgstr "Stil Hout"
+
+#: 241686624016273408
+msgid "terrain2Description"
+msgstr ""
+"Een ruige noordelijke wildernis, gevangen in eeuwige kou. Tussen ijzige "
+"labyrinten is het gemakkelijk om te verdwalen – en na zonsondergang, om dood "
+"te vriezen. In die volgorde… of misschien andersom."
+
+#: 241686676700925952
+msgid "terrain0Description"
+msgstr ""
+"Elke held begint ergens!\r\n"
+"Hier liggen je eerste schatten begraven — en je eerste problemen. Hier leer "
+"je mijnen, smelten, pronken en overleven."
+
+#: 242168130602012672
+msgid "lockedTerrainTooltip"
+msgstr ""
+"Verdien de gunst van de dorpelingen,\n"
+"en een nieuwe stad zal haar poorten voor je openen!"
+
+#: 242225089728483328
+msgid "upgradeToolNoiseStat"
+msgstr "Geluidsreductie"
+
+#: 243276239902871552
+msgid "upgradeCharacterResistanceStatDescription"
+msgstr ""
+"Verhoog je weerstand — en je zult niet terugdeinzen als de wereld vijandig "
+"wordt!"
+
+#: 243276804422635520
+msgid "upgradeCharacterHealthStatDescription"
+msgstr "Meer levens — minder kansen om een legende te worden... postuum."
+
+#: 243277089148768256
+msgid "upgradeCharacterSpeedStatDescription"
+msgstr ""
+"Snellere voeten — minder kans om avondeten te worden voor de lokale fauna!"
+
+#: 243277490971480064
+msgid "upgradeBirdFlyAmountStatDescription"
+msgstr ""
+"Hoe meer gevederde verkenners je hebt, hoe groter de kans dat je begraven "
+"glimmertjes vindt!"
+
+#: 243277858065354752
+msgid "upgradeToolSpeedStatDescription"
+msgstr ""
+"Hoe sneller de slag, hoe kleiner de kans dat iemand anders het erts als "
+"eerste pakt!"
+
+#: 243278506789965824
+msgid "upgradeToolDamageStatDescription"
+msgstr ""
+"Hoe machtiger het gereedschap, hoe tammer de steen —\r\n"
+"en hoe voller je tas!"
+
+#: 243278882293420032
+msgid "upgradeToolNoiseStatDescription"
+msgstr ""
+"Minder lawaai betekent minder kans om gehoord te worden door degenen die de "
+"voorkeur geven aan het kraken van botten boven het klinken van goud."
+
+#: 243286615193292800
+msgid "resistanceStatLevel"
+msgstr "Weerstandsniveau {value}"
+
+#: 243287048297123840
+msgid "healthStatLevel"
+msgstr "Gezondheidsniveau {value}"
+
+#: 243287378833444864
+msgid "speedStatLevel"
+msgstr "Snelheidsniveau {value}"
+
+#: 243287648745295872
+msgid "upgradeBirdTitle"
+msgstr "Vogel niveau {value}"
+
+#: 243301960306135040
+msgid "amountPcs"
+msgstr "{value} st."
+
+#: 246550123938844672
+msgid "maxLevel"
+msgstr "Max. niveau"
+
+#: 246920055440543744
+msgid "treasureDetector"
+msgstr "Schatdetector"
+
+#: 246920748020797440
+msgid "amountSec"
+msgstr "{value} sec."
+
+#: 246921123041906688
+msgid "upgradeDetectorGoldAmountStat"
+msgstr "Ertszoeker"
+
+#: 246921489389195264
+msgid "upgradeDetectorGoldAmountStatDescription"
+msgstr ""
+"Dit magische snufje spoort goudaders beter op dan een dwerg een gratis lunch "
+"ruikt!"
+
+#: 246922080165302272
+msgid "upgradeDetectorGemsAmountStat"
+msgstr "Edelsteenzoeker"
+
+#: 246922249237696512
+msgid "upgradeDetectorGemsAmountStatDescription"
+msgstr ""
+"Een apparaat met een neus scherper dan de hebzucht van een koopman. Geen "
+"edelsteen blijft lang verborgen!"
+
+#: 246922743578365952
+msgid "upgradeDetectorGoldDurationStat"
+msgstr "Meer tijd voor Goud zoeken"
+
+#: 246922920854818816
+msgid "upgradeDetectorDurationStatDescription"
+msgstr ""
+"Loopt langer, zoekt beter, moppert minder. Meer tijd betekent meer Buit!"
+
+#: 247080041558839296
+msgid "addPercentAmount"
+msgstr "{value:cond:>0?+|}{value}%"
+
+#: 247080534393753600
+msgid "addAmountPcs"
+msgstr "{value:cond:>0?+|}{value} st."
+
+#: 247080751339933696
+msgid "addAmountSec"
+msgstr "{value:cond:>0?+|}{value} sec."
+
+#: 247452846670483456
+msgid "gold"
+msgstr "Goud"
+
+#: 247452991940202496
+msgid "chests"
+msgstr "Kisten"
+
+#: 247453392370405376
+msgid "eggs"
+msgstr "Eieren"
+
+#: 247453604342140928
+msgid "treasures"
+msgstr "Sieraden"
+
+#: 247453698634289152
+msgid "artifacts"
+msgstr "Artefacten"
+
+#: 249822854419582976
+msgid "deathTitle"
+msgstr "De dood is gul — hij neemt alles!"
+
+#: 249823090609229824
+msgid "deathDescription"
+msgstr "Je buit is nu legendarisch."
+
+#: 250055490891157504
+msgid "tradeEmptyStorageMessage"
+msgstr "Niets te verkopen op dit moment"
+
+#: 250066987813965824
+msgid "craftNoEggs"
+msgstr "Geen eieren voor de incubator"
+
+#: 250067227111591936
+msgid "craftNoChests"
+msgstr "Geen kisten om te openen"
+
+#: 250067363896233984
+msgid "craftNoItems"
+msgstr "Niets om mee te maken"
+
+#: 250187845660315648
+msgid "upgradeDetectorGemsDurationStat"
+msgstr "Meer tijd voor het jagen op edelstenen"
+
+#: 251259329547866112
+msgid "newLocationAvailableTitle"
+msgstr "Een nieuwe locatie is nu beschikbaar!"
+
+#: 251259543163768832
+msgid "newLocationAvailableDescription"
+msgstr "De dorpelingen zijn het erover eens: je verdient meer."
+
+#: 251632108633853952
+msgid "upgradeStock"
+msgstr "Opslag upgraden"
+
+#: 252146625037996032
+msgid "storageOverflowedDesctiption"
+msgstr "Je opslag kan al je rijkdommen niet bevatten. Tijd om te upgraden!"
+
+#: 252147840639569920
+msgid "throwAway"
+msgstr "Weggooien"
+
+#: 259586112407998464
+msgid "upgradeCraftCostStatDescription"
+msgstr "De basisprijs van items stijgt als brood op gist"
+
+#: 262490762970927104
+msgid "upgradeVehicleWeightStat"
+msgstr "Grote tas"
+
+#: 262491576103866368
+msgid "upgradeVehicleWeightStatDescription"
+msgstr "Het paard kan nu meer schatten dragen. Meer rommel, meer geluk!"
+
+#: 262491999908925440
+msgid "upgradeVehicleTitle"
+msgstr "Paard niveau {value}"
+
+#: 262492464646197248
+msgid "amountKg"
+msgstr "{value} kg."
+
+#: 262492710260445184
+msgid "addAmountKg"
+msgstr "{value:cond:>0?+|}{value} kg."
+
+#: 262493129695039488
+msgid "upgradeStorageWeightStat"
+msgstr "Capaciteit"
+
+#: 262493626518736896
+msgid "upgradeStorageWeightStatDescription"
+msgstr "Extra ruimte voor absoluut waardeloze schatten!"
+
+#: 262495569987244032
+msgid "upgradeTradeNewBuyersStat"
+msgstr "Royale kopers"
+
+#: 262495864679043072
+msgid "upgradeTradeNewBuyersStatDescription"
+msgstr "Klanten vechten om je rommel."
+
+#: 262496445971828736
+msgid "upgradeTradeTitle"
+msgstr "Handelswinkel niveau {value}"
+
+#: 262497898778071040
+msgid "upgradeTradeBestBuyersRateStat"
+msgstr "Je stinkt naar rijkdom"
+
+#: 262498326018265088
+msgid "upgradeTradeBestBuyersRateStatDescription"
+msgstr ""
+"Het woord van je vakmanschap heeft zich verspreid — echte wandelende "
+"portemonnees verschijnen vaker."
+
+#: 262499250967154688
+msgid "upgradeTradeSlotsStat"
+msgstr "Nieuw vak"
+
+#: 262499518630858752
+msgid "upgradeTradeSlotsStatDescription"
+msgstr "Er is een extra handelsvak geopend. Meer klanten — meer goud!"
+
+#: 262503656592773120
+msgid "upgradeCraftTimeStat"
+msgstr "Sieraden Sprint"
+
+#: 262504135200608256
+msgid "upgradeCraftTitle"
+msgstr "Maken niveau {value}"
+
+#: 262504539359547392
+msgid "upgradeCraftRarityStat"
+msgstr "Zeldzaamheid"
+
+#: 262505217075187712
+msgid "upgradeCraftRecipesStat"
+msgstr "Receptenboek"
+
+#: 262506098214572032
+msgid "upgradeCraftCostStat"
+msgstr "Goudmijn"
+
+#: 262506924148527104
+msgid "upgradeCraftCraftSlotsStat"
+msgstr "Maakvak"
+
+#: 262507722794340352
+msgid "upgradeCraftChestSlotsStat"
+msgstr "Kistvak"
+
+#: 262508574351298560
+msgid "upgradeCraftChestSlotsStatDescription"
+msgstr ""
+"Vak ontgrendeld.\n"
+"Opent kisten en vergrendelde objecten van elke herkomst — zelfs die "
+"duidelijk niet van deze planeet zijn."
+
+#: 262508742647746560
+msgid "upgradeCraftEggSlotsStat"
+msgstr "Incubator"
+
+#: 262508816316502016
+msgid "upgradeCraftEggSlotsStatDescription"
+msgstr ""
+"Vak ontgrendeld.\n"
+"Denk niet dat Coco alleen goed is voor eieren. Als je ijs moet smelten, iets "
+"moet opwarmen of moet helpen met andere taken — ze is altijd nuttig. En als "
+"het aankomt op het kraken van eieren, stelt ze zelfs geen vragen."
+
+#: 262509279946477568
+msgid "upgradeCraftSuperSlotsStatDescription"
+msgstr ""
+"Vak ontgrendeld.\n"
+"Het belangrijkste gereedschap van de meestervakman.\n"
+"Het kan het allemaal: verwerken, herstellen, polijsten, openbreken en "
+"herwerken."
+
+#: 262509359629864960
+msgid "upgradeCraftSuperSlotsStat"
+msgstr "Super vak"
+
+#: 262698318934839296
+msgid "tradeLockedState"
+msgstr "De Handelswinkel is te klein!"
+
+#: 262791601379872768
+msgid "upgradeDetectorTitle"
+msgstr "Schatdetector niveau {value}"
+
+#: 262792683350921216
+msgid "upgradeStorageTitle"
+msgstr "Opslag niveau {value}"
+
+#: 266500052736020480
+msgid "selectTrashTitle"
+msgstr "Bulk rommel"
+
+#: 267774055178047488
+msgid "upgradeTradeMoreLikesStat"
+msgstr "Alles draait om de likes!"
+
+#: 267774187718053888
+msgid "upgradeTradeMoreLikesDescription"
+msgstr "Het publiek schreeuwt van vreugde!"
+
+#: 286237360443887616
+msgid "metals"
+msgstr "Metalen"
+
+#: 289291316380307456
+msgid "craftSelectRoughTitle"
+msgstr "Kies een item om te polijsten"
+
+#: 289293923853275136
+msgid "craftNoRough"
+msgstr "Geen items om te polijsten"
+
+#: 302325393484156928
+msgid "curseRemovalSlot"
+msgstr "Altaar"
+
+#: 302327188075843584
+msgid "inlaySlot"
+msgstr "Invoegen"
+
+#: 302327678603890688
+msgid "polishingSlot"
+msgstr "Polijsten"
+
+#: 310688720811724800
+msgid "rough"
+msgstr "Ruw"
+
+#: 310688991746985984
+msgid "cursedItems"
+msgstr "Vervloekt"
+
+#: 310861865698988032
+msgid "storageDescription"
+msgstr ""
+"Alle gevonden voorwerpen worden hier opgeslagen.\n"
+"De ruimte is beperkt — het magazijn is niet van rubber.\n"
+"Upgrade je Opslag zodat je hebzucht niet tegen de muren botst."
+
+#: 311007630727581696
+msgid "traderName"
+msgstr "Zlatovich de Handelaar"
+
+#: 311064004203384832
+msgid "storageRecipeNotEnoughWarningTitleText"
+msgstr "Absoluut niets"
+
+#: 311066402032455680
+msgid "geodes"
+msgstr "Geodes"
+
+#: 311067011754233856
+msgid "unknownItems"
+msgstr "Onbekend"
+
+#: 311247067034161152
+msgid "selectItems"
+msgstr "Selecteer items"
+
+#: 311279184229175296
+msgid "proceed"
+msgstr "Doorgaan"
+
+#: 313943879775948800
+msgid "upgradeCraftPolishingSlotsStat"
+msgstr "Polijsten"
+
+#: 313944205258133504
+msgid "upgradeCraftPolishingSlotsStatDescription"
+msgstr ""
+"Vak ontgrendeld.\n"
+"Repareert, slijpt en laat het glanzen — zelfs de meest dubieuze vondsten "
+"zien er weer uit als schatten."
+
+#: 313944426742550528
+msgid "upgradeCraftInlaySlotsStat"
+msgstr "Invoegen"
+
+#: 313944595185799168
+msgid "upgradeCraftInlaySlotsStatDescription"
+msgstr ""
+"Vak ontgrendeld.\n"
+"Voeg edelstenen in sieraden en verander ruwe stukken in volwaardige "
+"glimmende objecten die klanten alle wilskracht doen verliezen."
+
+#: 313944710864703488
+msgid "upgradeCraftCurseRemovalSlotsStat"
+msgstr "Altaar"
+
+#: 313944844453285888
+msgid "upgradeCraftCurseRemovalSlotsStatDescription"
+msgstr ""
+"Vak ontgrendeld.\n"
+"Verwijdert vloeken en magische zegels van vervloekte items. Soms... met "
+"verrassingen."
+
+#: 313950130396205056
+msgid "craftInfoDescription"
+msgstr ""
+"Hier wordt het lot van wat je vindt beslist.\n"
+"Smelt het, zet er een edelsteen in, polijst het, kraak het open, of laat het "
+"groeien — elk vak doet iets verdacht nuttigs met je items.\n"
+"Gevonden voorwerpen veranderen in sieraden, schatten en vreemde "
+"meesterwerken die iemand vast en zeker zal kopen."
+
+#: 313951782213783552
+msgid "superSlotDescription"
+msgstr ""
+"Een speciaal vak voor alles wat vreemd en glimmend is.\n"
+"Het smelt metaal, snijdt edelstenen, heft vloeken op, herstelt schatten, "
+"kraakt geodes, opent kisten en behandelt zelfs buitenaardse artefacten (met "
+"wederzijdse instemming)."
+
+#: 313952177879257088
+msgid "chestSlotDescription"
+msgstr ""
+"Een Kist?\n"
+"Werp hem erin — het Vak zoekt het wel uit.\n"
+"\n"
+"Wat eruit komt, is alleen aan hem bekend.\n"
+"Soms is hij er verontrustend blij mee."
+
+#: 313952634336972800
+msgid "curseRemovalSlotDescription"
+msgstr ""
+"Een Vervloekt voorwerp? Werp het erin!\n"
+"Het Altaar zal elke druppel van zijn magie aftappen, piepen en kreunen — en "
+"het dan teruggeven zonder het gesis.\n"
+"\n"
+"Soms zegt het zelfs “dank u”… wat volkomen normaal is."
+
+#: 313953216909021184
+msgid "eggSlotDescription"
+msgstr ""
+"Kies een Ei — de kip zal erop zitten, het zachtjes aaien en zachtjes kakelen"
+"…\n"
+"dan iets interessants uitbroeden.\n"
+"\n"
+"Soms veel te interessant."
+
+#: 313953702185799680
+msgid "inlaySlotDescription"
+msgstr ""
+"Kies een stuk Sieraden en vul het met edelstenen — lege Vakken zijn niet "
+"genoeg!\n"
+"Wat je krijgt is een volledig gepolijst glimmend ding dat kopers doet gillen "
+"van genot."
+
+#: 313954530854440960
+msgid "craftSlotDescription"
+msgstr ""
+"Werp er iets van Metaal in — de oven zal het smelten, mengen en een "
+"gloednieuw stuk Sieraden smeden.\n"
+"Ze zeggen dat het werkt op inspiratie… die het niet heeft. Toch klaart het "
+"de klus!"
+
+#: 313954955250896896
+msgid "polishingSlotDescription"
+msgstr ""
+"Kies een Geode, Ruw gesteente, of zelfs een geruïneerde oude schat —\n"
+"de werkbank zal het polijsten, repareren en zijn glans naar voren brengen.\n"
+"\n"
+"Wat eruit komt, kan worden ingelegd, gemaakt of verkocht voor een mooie "
+"winst."
+
+#: 314195955441471488
+msgid "unknownSlot"
+msgstr "Taxatie"
+
+#: 314210445310562304
+msgid "unknownSlotTitle"
+msgstr "Selecteer een item voor Taxatie"
+
+#: 314211470289408000
+msgid "craftNoUnknown"
+msgstr "Geen items voor Taxatie"
+
+#: 314211918601785344
+msgid "craftNoCursed"
+msgstr "Geen vervloekte voorwerpen"
+
+#: 314214842253971456
+msgid "craftNoInlay"
+msgstr "Geen voorwerpen om in te voegen"
+
+#: 314260890229936128
+msgid "tradingShopInfoDescription"
+msgstr ""
+"Verkoop sieraden en andere vondsten, controleer hun waarde en sluit de "
+"deals.\n"
+"Upgrade de winkel — ontgrendel nieuwe slots en verkoop nog meer goederen."
+
+#: 314261126486691840
+msgid "tradingShopInfoTitle"
+msgstr "Zlatovich's Handelswinkel"
+
+#: 314274887167643648
+msgid "tradeSpeedUp"
+msgstr "Trek een klant aan"
+
+#: 314278745457561600
+msgid "nextCustomer"
+msgstr "Volgende klant"
+
+#: 314297063191089152
+msgid "upgradeTradeAppraisalSlotsStat"
+msgstr "Taxatie"
+
+#: 314297243575521280
+msgid "upgradeTradeAppraisalSlotsDescription"
+msgstr ""
+"Handelaar Zlatovich zal elk voorwerp bekijken, bedachtzaam grommen en een "
+"prijs noemen.\n"
+"Soms… een aangename."
+
+#: 314612693521928192
+msgid "timeToMoveOut"
+msgstr "Tijd om ervandoor te gaan!"
+
+#: 314914390584594432
+msgid "metal"
+msgstr "Metaal"
+
+#: 314914695741181952
+msgid "gem"
+msgstr "Edelsteen"
+
+#: 314915117155487744
+msgid "treasure"
+msgstr "Sieraden"
+
+#: 314915322823184384
+msgid "chest"
+msgstr "Kist"
+
+#: 314915636620038144
+msgid "trash"
+msgstr "Afval"
+
+#: 314915781340303360
+msgid "egg"
+msgstr "Ei"
+
+#: 314915913649623040
+msgid "artifact"
+msgstr "Artefact"
+
+#: 314916000182308864
+msgid "geode"
+msgstr "Geode"
+
+#: 314916165517578240
+msgid "unknown"
+msgstr "Onbekend"
+
+#: 314916328457900032
+msgid "cursed"
+msgstr "Vervloekt"
+
+#: 314925043173036032
+msgid "orders"
+msgstr "Bestellingen"
+
+#: 315250694291722240
+msgid "giveItem"
+msgstr "Item geven"
+
+#: 316337287538675712
+msgid "ordersInfoDescription"
+msgstr ""
+"Voltooi bestellingen — en klanten wijzen de weg.\n"
+"Nieuwe locaties, grondstoffen en sieraden wachten al."
+
+#: 316378780114620416
+msgid "hearthCurrency"
+msgstr "Likes"
+
+#: 316380499837980672
+msgid "reward"
+msgstr "Beloning"
+
+#: 316382146563674112
+msgid "claim"
+msgstr "Claimen"
+
+#: 316397921840140288
+msgid "terrain0Biome1Title"
+msgstr "Woestenij"
+
+#: 316402101459881984
+msgid "ordersClaimBiomeTitle"
+msgstr "Het pad naar een nieuwe locatie is open"
+
+#: 316402277297688576
+msgid "ordersClaimBiomeDescription"
+msgstr "Nieuwe vondsten zijn beschikbaar"
+
+#: 317048656315551744
+msgid "terrain1Biome1Title"
+msgstr "Graven"
+
+#: 317908391516442624
+msgid "toTrade"
+msgstr "Handel"
+
+#: 319566851823898624
+msgid "skipSelectionTreasuresConfirm"
+msgstr "Ja, verlaten"
+
+#: 319567663786627072
+msgid "skipSelectionTreasuresCancel"
+msgstr "Nee, terug naar selectie"
+
+#: 320015732638486528
+msgid "soldToDealer"
+msgstr "Verkocht!"
+
+#: 321539636750192640
+msgid "craftSelectBlockedWrongType"
+msgstr "Dit item is niet geschikt voor dit type vak"
+
+#: 321540352067768320
+msgid "craftSelectBlockedAlreadySelectedType"
+msgstr "Je hebt al genoeg items uit deze groep geselecteerd"
+
+#: 332999660336844800
+msgid "lockedTerrain0Tooltip"
+msgstr ""
+"Het pad is overwoekerd. Je hebt hier alles al onder de knie – tijd om aan de "
+"slag te gaan."
+
+#: 333367357155315712
+msgid "terrain0Biome0Title"
+msgstr "Woestenij"
+
+#: 333367909771644928
+msgid "terrain1Biome0Title"
+msgstr "Moeras"
+
+#: 333368362697756672
+msgid "terrain1Biome2Title"
+msgstr "Meteoorval"
+
+#: 333841248503992320
+msgid "goldUsedIn"
+msgstr ""
+"Kan worden <color=#E3BA59>verkocht</color> in de Handelswinkel, gebruikt in "
+"het <color=#E3BA59>Maakvak</color>, of geplaatst in het <color=#E3BA59>Super "
+"vak</color>."
+
+#: 333841848608231424
+msgid "meteoriteIronUsedIn"
+msgstr ""
+"Kan worden <color=#E3BA59>verkocht</color> in de Handelswinkel, gebruikt in "
+"het <color=#E3BA59>Maakvak</color>, of geplaatst in het <color=#E3BA59>Super "
+"vak</color>."
+
+#: 333841973128728576
+msgid "silverUsedIn"
+msgstr ""
+"Kan worden <color=#E3BA59>verkocht</color> in de Handelswinkel, gebruikt in "
+"het <color=#E3BA59>Maakvak</color>, of geplaatst in het <color=#E3BA59>Super "
+"vak</color>."
+
+#: 333842030875906048
+msgid "gemUsedIn"
+msgstr ""
+"Kan worden <color=#E3BA59>verkocht</color> in de Handelswinkel, gebruikt in "
+"het <color=#E3BA59>Maakvak</color> of <color=#E3BA59>Super vak</color>, of "
+"<color=#E3BA59>ingevoegd</color> in een Schat."
+
+#: 333842074681217024
+msgid "gemRoughUsedIn"
+msgstr ""
+"Kan worden verwerkt in <color=#E3BA59>Polijsten</color> of het "
+"<color=#E3BA59>Super vak</color> om de ware waarde te onthullen."
+
+#: 333842122626306048
+msgid "treasureEmptyUsedIn"
+msgstr ""
+"Kan worden <color=#E3BA59>verkocht</color> in de Handelswinkel of voorzien "
+"van edelstenen via <color=#E3BA59>Invoegen</color> of het <color=#E3BA59>"
+"Super vak</color> om de waarde te verhogen."
+
+#: 333842171624165376
+msgid "treasureRoughUsedIn"
+msgstr ""
+"Kan worden gerepareerd in <color=#E3BA59>Polijsten</color> of het "
+"<color=#E3BA59>Super vak</color>."
+
+#: 333842234089934848
+msgid "chestUsedIn"
+msgstr ""
+"Kan worden geopend in het <color=#E3BA59>Kistvak</color> of het "
+"<color=#E3BA59>Super vak</color>."
+
+#: 333842279115788288
+msgid "trashUsedIn"
+msgstr "Kan alleen worden <color=#E3BA59>verkocht</color> aan de Handelaar."
+
+#: 333842322942070784
+msgid "eggUsedIn"
+msgstr ""
+"Kan worden geopend in de <color=#E3BA59>Incubator</color> of het "
+"<color=#E3BA59>Super vak</color>."
+
+#: 333842403657256960
+msgid "artifactUsedIn"
+msgstr "Kan alleen worden <color=#E3BA59>verkocht</color> in de Handelswinkel."
+
+#: 333842449953984512
+msgid "geodeUsedIn"
+msgstr ""
+"Kan worden geopend in <color=#E3BA59>Polijsten</color> of het <color=#E3BA59>"
+"Super vak</color>."
+
+#: 333842496531730432
+msgid "unknownUsedIn"
+msgstr ""
+"Kan naar de Handelaar worden gebracht voor <color=#E3BA59>Taxatie</color> om "
+"de ware waarde te bepalen."
+
+#: 333842548465602560
+msgid "cursedUsedIn"
+msgstr ""
+"De vloek kan worden verwijderd bij het <color=#E3BA59>Altaar</color> of in "
+"het <color=#E3BA59>Super vak</color>."
+
+#: 334624695946317824
+msgid "terrain2Biome0Title"
+msgstr "Zagerij"
+
+#: 334752689742417920
+msgid "perfect"
+msgstr "Perfect"
+
+#: 334754742782922752
+msgid "decline"
+msgstr "Afwijzen"
+
+#: 334758932242501632
+msgid "putUpForSale"
+msgstr "Te koop aanbieden"
+
+#: 337073088274632704
+msgid "newLocationAvailable"
+msgstr "Er is een nieuwe plek verschenen!"
+
+#: 338548608547950592
+msgid "retargetingTitle1"
+msgstr ":monocle: Interessante vraag…"
+
+#: 338548710087856128
+msgid "retargetingDescription1"
+msgstr "Hoe ver kun je gaan?"
+
+#: 338548825884200960
+msgid "retargetingTitle2"
+msgstr ":sunglasses: Tijd om verder te gaan."
+
+#: 338548974257704960
+msgid "retargetingDescription2"
+msgstr "Je voortgang is er nog steeds."
+
+#: 338549087440998400
+msgid "retargetingTitle3"
+msgstr ":sunglasses: Klaar om er weer in te duiken?"
+
+#: 338549137776840704
+msgid "retargetingDescription3"
+msgstr "Ga verder waar je gebleven was."
+
+#: 338569990488985600
+msgid "notificationCraftCompletedTitle"
+msgstr ":eyes: Knutselen voltooid!"
+
+#: 338570100794986496
+msgid "notificationCraftCompletedDescription"
+msgstr "Kijk wat je hebt gekregen."
+
+#: 338570414583451648
+msgid "notificationTradeCompletedTitle"
+msgstr ":money-mouth: Je hebt een Koper!"
+
+#: 338570498368868352
+msgid "notificationTradeCompletedDescription"
+msgstr "Je goederen hebben een klant gevonden."
+
+#: 339457185953353728
+msgid "tradeSelectBlockedWrongType"
+msgstr "Dit item kan niet worden verkocht."
+
+#: 340628273341140992
+msgid "skip"
+msgstr "Overslaan"
+
+#: 354499398722654208
+msgid "daily"
+msgstr "Dagelijks"
+
+#: 354514538620784640
+msgid "available"
+msgstr "Beschikbaar"
+
+#: 354514769508831232
+msgid "availableIn"
+msgstr "Beschikbaar in"
+
+#: 355103206058233856
+msgid "dailyRewardClaimTitle"
+msgstr "Neem het voor winst"
+
+#: 355103597911085056
+msgid "dailyRewardClaimDescription"
+msgstr "Bekijk een video — ontvang 2x beloningen"
+
+#: 355120760352935936
+msgid "withoutBonus"
+msgstr "Geen bonus"
+
+#: 355145440342315008
+msgid "claimWithBonus"
+msgstr "Claim met bonus"
+
+#: 355146771715067904
+msgid "x2Reward"
+msgstr "2x beloning"
+
+#: 355255965734670336
+msgid "dailyRewardAlreadyReceived"
+msgstr "Beloning al geclaimd!"
+
+#: 355256265493188608
+msgid "missedDailyReward"
+msgstr "Beloning is al gemist!"
+
+#: 355256569236295680
+msgid "futureDailyReward"
+msgstr "Kom later terug voor deze beloning!"
+
+#: 355276036993454080
+msgid "rateUs"
+msgstr "Beoordeel ons"
+
+#: 355276149157531648
+msgid "rateUsTitle"
+msgstr "Beoordeel ons met sterren"
+
+#: 355276400991932416
+msgid "rateUsDescription"
+msgstr "Beoordeel het spel en help ons te verbeteren."
+
+#: 356305037681758208
+msgid "specialOffers"
+msgstr "Speciale aanbiedingen"
+
+#: 356313026543226880
+msgid "quickStart"
+msgstr "Snelle start!"
+
+#: 356313363102568448
+msgid "storePrice"
+msgstr "<color=#FEC60D>{currency}</color> {value}"
+
+#: 356342200381214720
+msgid "forever"
+msgstr "Voor altijd"
+
+#: 356345060842016768
+msgid "starterPack"
+msgstr "Starterspakket"
+
+#: 356346443771154432
+msgid "allInOneSupply"
+msgstr "Alles-in-één voorraad"
+
+#: 356350103481749504
+msgid "dealOfTheDay"
+msgstr "Aanbieding van de dag"
+
+#: 356354375627837440
+msgid "xAmount"
+msgstr "X{value}"
+
+#: 356354841824727040
+msgid "free!"
+msgstr "Gratis!"
+
+#: 356357806572703744
+msgid "watch"
+msgstr "Bekijken"
+
+#: 356360805877551104
+msgid "coins"
+msgstr "Munten"
+
+#: 356365108071632896
+msgid "mostPopular"
+msgstr "Meest populair"
+
+#: 356365403610681344
+msgid "bestPrice"
+msgstr "Beste prijs"
+
+#: 356519167105699840
+msgid "store"
+msgstr "Winkel"
+
+#: 357424739636219904
+msgid "dealOfTheDayDescription"
+msgstr "Nieuwe aanbiedingen zijn beschikbaar over"
+
+#: 357607511365521408
+msgid "health"
+msgstr "Gezondheid"
+
+#: 357784830910664704
+msgid "notificationDealOfTheDayTitle"
+msgstr "Mare wil winkelen :sunglasses:"
+
+#: 357784932224077824
+msgid "notificationDealOfTheDayDescription"
+msgstr "Het enige wat nog rest, is instappen en claimen wat van jou is."
+
+#: 357785735030640640
+msgid "notificationCoinsReadyTitle"
+msgstr "De winkel deelt goodies uit :heart-eyes:"
+
+#: 357785816504995840
+msgid "notificationCoinsReadyDescription"
+msgstr "Kom langs in de winkel en pak de gratis spullen."
+
+#: 358713136833105920
+msgid "wantReceipt"
+msgstr "Ik wil een bonnetje (we mailen het)"
+
+#: 358722499958280192
+msgid "submit"
+msgstr "Verzenden"
+
+#: 358723345383165952
+msgid "receiptEmaitTitle"
+msgstr "E-mailadres invoeren"
+
+#: 358723657267417088
+msgid "receiptEmailDescription"
+msgstr ""
+"Wilt u een bonnetje?\n"
+"Voer uw e-mailadres in en we sturen het na uw aankoop."
+
+#: 358900766250110976
+msgid "buy"
+msgstr "Kopen"
+
+#: 358901413183754240
+msgid "starterPackHeadline"
+msgstr "Grijp het op tijd!"
+
+#: 358901551423819776
+msgid "specialOfferHeadline"
+msgstr "Meer voor altijd!"
+
+#: 359524475709165568
+msgid "open"
+msgstr "Openen"
+
+#: 360153378165362688
+msgid "maximumResources"
+msgstr "Maximale grondstoffen"
+
+#: 360200917140901888
+msgid "exchangeCurrencyTitle"
+msgstr "Niet genoeg Zilveren munten."
+
+#: 360201095897944064
+msgid "exchangeCurrencyDescription"
+msgstr "Net iets te weinig."
+
+#: 360201375158898688
+msgid "exchangeCurrencyQuestion"
+msgstr "De rest kopen?"
+
+#: 360510317885919232
+msgid "bankingAwaitingTitle"
+msgstr "Munten onderweg"
+
+#: 360511732461080576
+msgid "bankingAwaitingDescription"
+msgstr ""
+"Goud wordt in de wagen geladen…\n"
+"Levering kan enkele minuten duren."
+
+#: 360689578840166400
+msgid "deleteItemConfirmationTitle"
+msgstr "Item weggooien?"
+
+#: 360689668438888448
+msgid "deleteItemConfirmationDescription"
+msgstr ""
+"Het item is voorgoed verdwenen.\n"
+"Deze actie kan niet ongedaan worden gemaakt."
+
+#: 360858085955473408
+msgid "noKeepIt"
+msgstr "Nee, behouden"
+
+#: 361772904917241856
+msgid "allRegionsAvailable"
+msgstr "Alle regio's beschikbaar"
+
+#: 361805221660463104
+msgid "terrainProgressLabel"
+msgstr "Naar de volgende locatie"
+
+#: 361805489286418432
+msgid "terrainClosedLabel"
+msgstr "Locatie niet beschikbaar"
+
+#: 362095342867714048
+msgid "terrainProgressInfoSlide1"
+msgstr ""
+"<color=#E3BA59>Je uiteindelijke doel is liefde!</color>\n"
+"Verkoop je creaties aan de lokale bevolking om ze voor je te winnen."
+
+#: 362097539907063808
+msgid "terrainProgressInfoSlide2"
+msgstr ""
+"Stop niet totdat ze je <color=#E3BA59>AANBIDDEN</color> — \n"
+"dan ben je klaar om nieuwe landen te veroveren."
+
+#: 362500096244584448
+msgid "cryolisUsedIn"
+msgstr ""
+"Kan worden <color=#E3BA59>verkocht</color> in de Handelswinkel, gebruikt in "
+"het <color=#E3BA59>Maakvak</color>, of geplaatst in het <color=#E3BA59>Super "
+"vak</color>."
+
+#: 362503199635279872
+msgid "craftSelectBlockedMissingRecipe"
+msgstr "Dit item is niet geschikt voor het geselecteerde recept."
+
+#: 362505392367079424
+msgid "craftSelectBlockedAnotherGroupSelected"
+msgstr "Een ander item uit deze groep is al geselecteerd."
+
+#: 362831462727421952
+msgid "failedPurchase"
+msgstr ""
+"De merrie is verdrietig. De aankoop is mislukt.\n"
+"Probeer het opnieuw."
+
+#: 363945774653116416
+msgid "frozenUsedIn"
+msgstr ""
+"Kan worden opgewarmd in de <color=#E3BA59>Incubator</color> of het "
+"<color=#E3BA59>Super vak</color>."
+
+#: 363945781498220544
+msgid "frozen"
+msgstr "Bevroren"
+
+#: 363947917120376832
+msgid "frozens"
+msgstr "Bevroren"
+
+#: 371768236233199616
+msgid "language"
+msgstr "Taal"
+
+#: 371825767475318784
+msgid "termsOfUse"
+msgstr "Gebruiksvoorwaarden"
+
+#: 371825915722993664
+msgid "privacyPolicy"
+msgstr "Privacybeleid"
+
+#: 371826077132394496
+msgid "deleteData"
+msgstr "Gegevens verwijderen"
+
+#: 371826289473228800
+msgid "signInWithGoogle Play"
+msgstr "Aanmelden met Google Play"
+
+#: 371936637333278720
+msgid "notLinked"
+msgstr "Niet gekoppeld"
+
+#: 371936898659389440
+msgid "linked"
+msgstr "Gekoppeld"
+
+#: 371937387937533952
+msgid "switchGooglePlay"
+msgstr "Google Play-account wisselen"
+
+#: 372201325233180672
+msgid "resetProgressDescription"
+msgstr ""
+"Weet je zeker dat je je voortgang wilt verwijderen? Deze actie kan niet "
+"ongedaan worden gemaakt!"
+
+#: 372201851437977600
+msgid "resetProgressConfirm"
+msgstr "Ja, verwijderen"
+
+#: 375231950777225216
+msgid "terrainInDevelopmentDescription"
+msgstr "Sorry. Deze locatie is nog in ontwikkeling."
+
+#: 375232378373935104
+msgid "terrain2Biome1Title"
+msgstr "Bevroren Scheepswerf"
+
+#: 375232425010401280
+msgid "terrain2Biome2Title"
+msgstr "Baken"
+
+#: 375232475627261952
+msgid "terrain2Biome3Title"
+msgstr "Lostwood"
+
+#: 376614903423963136
+msgid "collectAll"
+msgstr "Alles verzamelen"
+
+#: 376958824981204992
+msgid "healthStatReward"
+msgstr "Levenspunten +{value}"
+
+#: 376959365689905152
+msgid "storageStatReward"
+msgstr "Opslag Capaciteit +{value}"
+
+#: 376968663052587008
+msgid "itemsLeft_x"
+msgstr "Items over: {value}"
+
+#: 376983763331321856
+msgid "storageStatRewardSummary"
+msgstr "Opslag voor altijd"
+
+#: 376983951106117632
+msgid "healthStatRewardSummary"
+msgstr "Gezondheid voor altijd"
+
+#: 379459050652569600
+msgid "prospectors"
+msgstr "Goudzoekers"
+
+#: 384582485728825344
+msgid "storeStockFullDescription"
+msgstr "De opslag is tot de laatste splinter volgepakt."
+
+#: 384852464931966976
+msgid "terrain3Title"
+msgstr "Grimdal"
+
+#: 387215171681259520
+msgid "switchGooglePlayDescription"
+msgstr ""
+"1. Open de telefooninstellingen\n"
+"2. Google - Alle services - Play Games\n"
+"3. “Aanmeldingsaccount” - \"Wijzigen\" (naast het spel)\n"
+"4. Start het spel opnieuw"
+
+#: 388959282209755136
+msgid "versionAlertMessage"
+msgstr "Er is een nieuwe versie van het spel uitgebracht. Tijd om te updaten!"
+
+#: 390311463999508480
+msgid "treasureUsedIn"
+msgstr "Kan alleen worden <color=#E3BA59>verkocht</color> in de Handelswinkel."
+
+#: 390630593516539904
+msgid "noInternetConnectionBlocking"
+msgstr "Geen internet — geen avontuur"
+
+#: 390630963617730560
+msgid "noInternetConnectionReconnect"
+msgstr ""
+"Opnieuw verbinden…\n"
+"{value}"
+
+#: 391415174540824576
+msgid "newsAndCommunication"
+msgstr "Nieuws en communicatie"
+
+#: 392040460349345792
+msgid "statEffectAccumulationFreeze"
+msgstr "Bevriezing"
+
+#: 392040705481248768
+msgid "statEffectHeal"
+msgstr "Regeneratie"
+
+#: 392040844430151680
+msgid "statEffectMovementSpeedNegative"
+msgstr "Vertraging"
+
+#: 392041019248742400
+msgid "statEffectMovementSpeedPositive"
+msgstr "Snelheidsboost"
+
+#: 392041155999830016
+msgid "statEffectDamageCurse"
+msgstr "Uitputting"
+
+#: 392041334085783552
+msgid "statEffectDamageBleed"
+msgstr "Bloeden"
+
+#: 392041534623846400
+msgid "statEffectToolNoiseNegative"
+msgstr "Luidruchtig gereedschap"
+
+#: 392041656803921920
+msgid "statEffectToolNoisePositive"
+msgstr "Stil Gereedschap"
+
+#: 392041855974641664
+msgid "statEffectToolSpeedNegative"
+msgstr "Vermoeidheid"
+
+#: 392042070265827328
+msgid "statEffectToolSpeedPositive"
+msgstr "Behendigheid"
+
+#: 392090295794405376
+msgid "pause"
+msgstr "Pauze"
+
+#: 392090376618643456
+msgid "pauseDescription"
+msgstr "Effecten, bevelen en instellingen — alles hier."
+
+#: 392092595833278464
+msgid "effects"
+msgstr "Karakterstatus"
+
+#: 392119357174714368
+msgid "settingsDialogTitle"
+msgstr "Instellingen"
+
+#: 393910691879456768
+msgid "russianPlaymentsBanner"
+msgstr "Betalingen zijn beschikbaar voor spelers in Rusland."

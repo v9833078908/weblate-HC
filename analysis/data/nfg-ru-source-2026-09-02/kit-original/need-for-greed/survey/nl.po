@@ -1,0 +1,166 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 13:17+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Dutch <http://l10n.herocraft.com/projects/need-for-greed/"
+"survey/nl/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: nl\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 294040899584
+msgid "survey1Intro"
+msgstr ""
+"Hé! Het Paard wil iets ophelderen.\n"
+"\n"
+"Gewoon een paar snelle vragen om erachter te komen met wie ze te maken "
+"heeft.\n"
+"Duurt niet langer dan een minuut."
+
+#: 384566562816
+msgid "survey1Final"
+msgstr ""
+"Het lijkt erop dat… je de test hebt doorstaan!\n"
+"\n"
+"Ze herinnerde zich je antwoorden.\n"
+"En besloot je blijkbaar niet te dumpen."
+
+#: 5159299321856
+msgid "survey1AcceptDescription"
+msgstr "Je krijgt een beloning."
+
+#: 5354862940160
+msgid "survey1DeclineDescription"
+msgstr ""
+"Ze overleeft het…\n"
+"waarschijnlijk."
+
+#: 5940509413376
+msgid "survey1Question1"
+msgstr ""
+"Hoe oud ben je?\n"
+"Liegen heeft geen zin. Ze merkt het."
+
+#: 15613778202624
+msgid "survey1Question1Answer1"
+msgstr "Onder de 15"
+
+#: 15721877999616
+msgid "survey1Question1Answer2"
+msgstr "15 - 20"
+
+#: 15806955261952
+msgid "survey1Question1Answer3"
+msgstr "21 - 29"
+
+#: 15875448246272
+msgid "survey1Question1Answer4"
+msgstr "30 - 40"
+
+#: 15939973419008
+msgid "survey1Question1Answer5"
+msgstr "40 +"
+
+#: 16047045611520
+msgid "survey1Question2"
+msgstr ""
+"Wie ben je?\n"
+"Niet te veel details nodig."
+
+#: 16356262285312
+msgid "survey1Question2Answer1"
+msgstr "M"
+
+#: 16421546627072
+msgid "survey1Question2Answer2"
+msgstr "V"
+
+#: 16480354963456
+msgid "survey1Question2Answer3"
+msgstr "Geheim"
+
+#: 16583924912128
+msgid "survey1Question3"
+msgstr "Waarvoor ben je hier?"
+
+#: 16952520347648
+msgid "survey1Question3Answer1"
+msgstr "Rondrennen en Buit verzamelen"
+
+#: 17065502314496
+msgid "survey1Question3Answer2"
+msgstr "Maken en verkopen"
+
+#: 17147127664640
+msgid "survey1Question3Answer3"
+msgstr "Upgrades en progressie"
+
+#: 17285803937792
+msgid "survey1Question3Answer4"
+msgstr "Gewoon de sfeer…"
+
+#: 17383480889344
+msgid "survey1Question4"
+msgstr "Wat ontbreekt er om je hier te houden?"
+
+#: 17980544258048
+msgid "survey1Question4Answer1"
+msgstr "Meer verhaal"
+
+#: 18049771245568
+msgid "survey1Question4Answer2"
+msgstr "Nieuwe gevaren, rotsen en schatten"
+
+#: 18206881484800
+msgid "survey1Question4Answer3"
+msgstr "Nieuwe items"
+
+#: 18275869396992
+msgid "survey1Question4Answer4"
+msgstr "Nieuwe locaties"
+
+#: 18730255126528
+msgid "survey1Question4Answer5"
+msgstr "Prestaties en beloningen"
+
+#: 19109206298624
+msgid "survey1Question5"
+msgstr "Wat moet er eerst worden opgelost?"
+
+#: 19176772341760
+msgid "survey1Question5Answer1"
+msgstr "Dialoog"
+
+#: 19256145350656
+msgid "survey1Question5Answer2"
+msgstr "Beloningen"
+
+#: 19311245922304
+msgid "survey1Question5Answer3"
+msgstr "Recept moeilijkheidsgraad"
+
+#: 19403713548288
+msgid "survey1Question5Answer4"
+msgstr "Kaartdichtheid"
+
+#: 19475515838464
+msgid "survey1Question5Answer5"
+msgstr "Alles is geweldig"
+
+#: 27306583396352
+msgid "surveyDialogTitle"
+msgstr "Snelle enquête"
+
+#: 28690401726464
+msgid "startSurvey"
+msgstr "Starten"
+
+#: 30707396382720
+msgid "claimReward"
+msgstr "Beloning claimen"

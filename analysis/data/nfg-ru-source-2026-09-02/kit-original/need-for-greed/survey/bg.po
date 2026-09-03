@@ -1,0 +1,165 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Bulgarian <http://l10n.herocraft.com/projects/need-for-greed/"
+"survey/bg/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: bg\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 294040899584
+msgid "survey1Intro"
+msgstr ""
+"Хей! Кон иска да изясни нещо.\n"
+"\n"
+"Само няколко бързи въпроса, за да разбере с кого си има работа.\n"
+"Няма да отнеме повече от минута."
+
+#: 384566562816
+msgid "survey1Final"
+msgstr ""
+"Изглежда… издържа теста!\n"
+"\n"
+"Тя си спомни отговорите ти.\n"
+"И очевидно реши да не те изоставя."
+
+#: 5159299321856
+msgid "survey1AcceptDescription"
+msgstr "Ще получиш награда."
+
+#: 5354862940160
+msgid "survey1DeclineDescription"
+msgstr ""
+"Тя ще оцелее…\n"
+"вероятно."
+
+#: 5940509413376
+msgid "survey1Question1"
+msgstr ""
+"На колко години си?\n"
+"Не лъжи. Тя може да разбере."
+
+#: 15613778202624
+msgid "survey1Question1Answer1"
+msgstr "Под 15"
+
+#: 15721877999616
+msgid "survey1Question1Answer2"
+msgstr "15 - 20"
+
+#: 15806955261952
+msgid "survey1Question1Answer3"
+msgstr "21 - 29"
+
+#: 15875448246272
+msgid "survey1Question1Answer4"
+msgstr "30 -40"
+
+#: 15939973419008
+msgid "survey1Question1Answer5"
+msgstr "40 +"
+
+#: 16047045611520
+msgid "survey1Question2"
+msgstr ""
+"Кой си ти?\n"
+"Няма нужда от твърде много подробности."
+
+#: 16356262285312
+msgid "survey1Question2Answer1"
+msgstr "М"
+
+#: 16421546627072
+msgid "survey1Question2Answer2"
+msgstr "Ж"
+
+#: 16480354963456
+msgid "survey1Question2Answer3"
+msgstr "Тайна"
+
+#: 16583924912128
+msgid "survey1Question3"
+msgstr "Защо си тук?"
+
+#: 16952520347648
+msgid "survey1Question3Answer1"
+msgstr "Тичай наоколо и събирай Плячка"
+
+#: 17065502314496
+msgid "survey1Question3Answer2"
+msgstr "Изработка и продажба"
+
+#: 17147127664640
+msgid "survey1Question3Answer3"
+msgstr "Надстройки и прогресия"
+
+#: 17285803937792
+msgid "survey1Question3Answer4"
+msgstr "Просто настроение…"
+
+#: 17383480889344
+msgid "survey1Question4"
+msgstr "Какво липсва, за да не си тръгнеш?"
+
+#: 17980544258048
+msgid "survey1Question4Answer1"
+msgstr "Още история"
+
+#: 18049771245568
+msgid "survey1Question4Answer2"
+msgstr "Нови опасности, скали и съкровища"
+
+#: 18206881484800
+msgid "survey1Question4Answer3"
+msgstr "Нови предмети"
+
+#: 18275869396992
+msgid "survey1Question4Answer4"
+msgstr "Нови локации"
+
+#: 18730255126528
+msgid "survey1Question4Answer5"
+msgstr "Постижения и награди"
+
+#: 19109206298624
+msgid "survey1Question5"
+msgstr "Какво трябва да се поправи първо?"
+
+#: 19176772341760
+msgid "survey1Question5Answer1"
+msgstr "Диалог"
+
+#: 19256145350656
+msgid "survey1Question5Answer2"
+msgstr "Награди"
+
+#: 19311245922304
+msgid "survey1Question5Answer3"
+msgstr "Трудност на Рецепта"
+
+#: 19403713548288
+msgid "survey1Question5Answer4"
+msgstr "Плътност на Карта"
+
+#: 19475515838464
+msgid "survey1Question5Answer5"
+msgstr "Всичко е чудесно"
+
+#: 27306583396352
+msgid "surveyDialogTitle"
+msgstr "Кратко проучване"
+
+#: 28690401726464
+msgid "startSurvey"
+msgstr "Старт"
+
+#: 30707396382720
+msgid "claimReward"
+msgstr "Вземете награда"

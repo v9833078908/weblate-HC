@@ -1,0 +1,480 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 13:17+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Filipino <http://l10n.herocraft.com/projects/need-for-greed/"
+"tutorial/fil/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: fil\n"
+"Plural-Forms: nplurals=2; plural=n != 1 && n != 2 && n != 3 && (n % 10 == 4 "
+"|| n % 10 == 6 || n % 10 == 9);\n"
+
+#: 75765772134387712
+msgid "DialogueIntroCharacter1"
+msgstr ""
+"Kaya, mare, naaamoy mo ba? Ginto! Malapit lang… At pag-ibig… sa batong iyon "
+"doon!"
+
+#: 75765971959418880
+msgid "DialogueIntroHorse1"
+msgstr "Frrr!"
+
+#: 75766215002558464
+msgid "DialogueIntroCharacter2"
+msgstr ""
+"Anong ibig mong sabihin, 'kung marinig ko ulit ang isang babae doon, "
+"ihahagis mo ako'? Mayroong tiyak na nalulungkot doon."
+
+#: 75766376147718144
+msgid "DialogueIntroHorse2"
+msgstr "Neeigh! Grr-ha!"
+
+#: 75766594431881216
+msgid "DialogueIntroCharacter3"
+msgstr "Sige na, sige na! Echo lang iyon… ng aking kadakilaan!"
+
+#: 75766733204623360
+msgid "DialogueMineFoundCharacter1"
+msgstr ""
+"Isang bato! Banal! Tulad ng hita ni Aphrodite! Mayroong tiyak na kumikinang "
+"doon, nanginginig ang aking atay!"
+
+#: 75766977115983872
+msgid "DialogueMineFoundHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 75767084016209920
+msgid "DialogueMineFoundCharacter2"
+msgstr "Well, sorry kung ang aking katawan ay tumutugon sa kagandahan!"
+
+#: 75768133359767552
+msgid "DialogueTimeIsUpHorse1"
+msgstr "Neeigh!"
+
+#: 75768214897037312
+msgid "DialogueTimeIsUpCharacter1"
+msgstr "Ano? Paglubog ng araw na?"
+
+#: 75768748328620032
+msgid "DialogueTimeIsUpHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 75769024796168192
+msgid "DialogueTimeIsUpCharacter2"
+msgstr ""
+"Mga lamok… Sila na naman! Oo-oo, naaalala ko na ikaw ang berdeng maliit na "
+"bahay, paparating na ako! Huwag ka lang tumakbo!"
+
+#: 75769959874301952
+msgid "DialoguePickLootIntroTrader1"
+msgstr "Hoy! Sobrang daming Loot. Hindi kasya lahat sa bag ng Kabayo."
+
+#: 75770225956753408
+msgid "DialoguePickLootIntroTrader2"
+msgstr "Piliin ang pinakamahusay sa kung ano ang kaya mong dalhin sa Imbakan."
+
+#: 76060126094823424
+msgid "DialoguePrepareToOpenCraftCharacter1"
+msgstr ""
+"Ngayon… Ngayon ay gagawa ako ng obra maestra! Isang piraso ng Alahas na "
+"magpaparamdam sa Kanya ng pagsisisi!"
+
+#: 76060331171123200
+msgid "DialoguePrepareToOpenCraftHorse1"
+msgstr "Brrr-r-r."
+
+#: 76061423992836096
+msgid "DialoguerAfterCraftCharacter1"
+msgstr ""
+"TINGNAN MO, KABAYO! Kumikinang ito tulad ng aking mga mata bago ko nakilala "
+"ang aking ex!"
+
+#: 76061521736896512
+msgid "DialoguerAfterCraftHorse1"
+msgstr "Frrr!"
+
+#: 76061738473361408
+msgid "DialoguerAfterCraftCharacter2"
+msgstr "Ito… ito ang banal na liwanag ng aking paghihiganti!"
+
+#: 76061830932598784
+msgid "DialoguerAfterCraftHorse2"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 76061898951626752
+msgid "DialoguerAfterCraftCharacter3"
+msgstr ""
+"Naiinggit ka lang — wala kang mga daliri para isuot ang gayong karilagan. "
+"Ang natitira na lang ay makahanap ng Mamimili na may mga daliri!"
+
+#: 76062368449433600
+msgid "DialoguerAfterTradeBuyer1"
+msgstr "Ikaw mismo ang gumawa nito? Napakaganda, kukunin ko ito."
+
+#: 76062530391511040
+msgid "DialoguerAfterTradeCharacter1"
+msgstr ""
+"Naiintindihan niya! Sa loob ng Alahas — ako. Sa loob ko — Ginto. Sa loob ng "
+"Ginto — isang diyos."
+
+#: 76062825645346816
+msgid "DialoguerAfterTradeHorse1"
+msgstr "Frrr! Neeigh!"
+
+#: 76062978284457984
+msgid "DialoguerAfterTradeCharacter2"
+msgstr "Tama ka, Kabayo. Hindi pa sila handa sa katotohanan…"
+
+#: 76063254827503616
+msgid "DialogueBeforeUpgradeHorse1"
+msgstr "Frrr!"
+
+#: 76063498000666624
+msgid "DialogueBeforeUpgradeCharacter1"
+msgstr ""
+"Pera? Ako? Alam mo ba kung ano ang mangyayari kung malaman niyang mayaman "
+"ako?"
+
+#: 76063745632374784
+msgid "DialogueBeforeUpgradeHorse2"
+msgstr "Grrr-hrr!"
+
+#: 76063937093963776
+msgid "DialogueBeforeUpgradeCharacter2"
+msgstr ""
+"Sige, mamumuhunan ako sa sarili ko — pero para lang tumigil ka sa "
+"pangungulit sa akin!"
+
+#: 76064239725580288
+msgid "DialogueAfterUpgradeCharacter1"
+msgstr ""
+"Naging mas mabilis ako, mas malakas at mas mura gawin! Magugustuhan niya "
+"sana ito."
+
+#: 76064347783434240
+msgid "DialogueAfterUpgradeHorse1"
+msgstr "Grrr-hrr!"
+
+#: 76064479283253248
+msgid "DialogueAfterUpgradeCharacter2"
+msgstr ""
+"Well, there was no need to insist! You have your own fetishes — hooves and "
+"oats."
+
+#: 76065879857827840
+msgid "DialogueLobbyLikesCharacter1"
+msgstr "See, mare? They love me!"
+
+#: 76066013412855808
+msgid "DialogueLobbyLikesHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 76066107042304000
+msgid "DialogueLobbyLikesCharacter2"
+msgstr "You're right! This is just the beginning! Soon they'll all be my fans…"
+
+#: 76344321220284416
+msgid "character"
+msgstr "Karakter"
+
+#: 76344471367979008
+msgid "horse"
+msgstr "Kabayo"
+
+#: 76344680219152384
+msgid "trader"
+msgstr "Trader"
+
+#: 76344756748423168
+msgid "buyer"
+msgstr "Mamimili"
+
+#: 131220345145528320
+msgid "terrainDispenserFound"
+msgstr "Wow! Prey!"
+
+#: 131220694531051520
+msgid "terrainDispenserCollecting"
+msgstr "Sige na! Sirain mo!"
+
+#: 131220939017031680
+msgid "exitDoorDescription"
+msgstr "Berde — Kabayo ba 'yan?"
+
+#: 131221107242176512
+msgid "exitDoorDescription2"
+msgstr "Berde? Masama ba ang pakiramdam niya?"
+
+#: 137323318787444736
+msgid "DialoguePickLootSelectItemsTrader1"
+msgstr "I-tap ang mga item para ilagay sa bag ng Kabayo."
+
+#: 137351439217594368
+msgid "DialoguePickLootSelectedItemsCharacter1"
+msgstr "Iyan lang ang kasya? Kailangan ng mas malaking bag ng Kabayo!"
+
+#: 137381643633823744
+msgid "DialoguePickLootClaimItemsTrader1"
+msgstr ""
+"Huwag kang mag-alala! Bibilhin ko ang natitira. Bibigyan pa kita ng kaunting "
+"dagdag."
+
+#: 137616255752605696
+msgid "terrainWantMoreItems"
+msgstr "Gusto ko pa ng Ginto!"
+
+#: 137629488379072512
+msgid "terrainRoadIsClue"
+msgstr "Ang daan ay patungo sa kayamanan"
+
+#: 138087561421918208
+msgid "DialogueOrdersIntroBuyer1"
+msgstr ""
+"Oh, isang bagong mukha! May order ako para sa iyo. Tutulungan mo ba akong "
+"punan muli ang aking koleksyon?"
+
+#: 138088926181330944
+msgid "DialogueOrdersIntroCharacter1"
+msgstr ""
+"Tingnan mo, Kabayo, hindi sila makakaya ng isang araw nang walang tulong ko!"
+
+#: 138089230444531712
+msgid "DialogueOrdersIntroHorse1"
+msgstr "Frrrr!"
+
+#: 138089454202261504
+msgid "DialogueOrdersIntroCharacter2"
+msgstr "Oo, oo, wala rin sa iyo."
+
+#: 138110517984366592
+msgid "DialogueOrdersThanksBuyer1"
+msgstr ""
+"Malaki ang naitulong mo sa akin, at tutulungan din kita — minarkahan ko ang "
+"isang lugar kung saan mas malakas ang tunog ng mga bato kaysa karaniwan."
+
+#: 138111196928937984
+msgid "DialogueOrdersThanksCharacter1"
+msgstr ""
+"MAHAL NA MAHAL NILA AKO KAYA HANDA SILANG IBIGAY ANG KANILANG MGA SALOOBIN!"
+
+#: 138111354584436736
+msgid "DialogueOrdersThanksCharacter2"
+msgstr ""
+"Hindi, hindi ka maaaring magbulsa ng pera, ngunit ang kaalaman — tiyak na "
+"kaya mo!"
+
+#: 138111433626095616
+msgid "DialogueOrdersThanksHorse1"
+msgstr "Neigh!"
+
+#: 139150891347611648
+msgid "DialogueBeforeBirdCharacter1"
+msgstr ""
+"Minarkahan ng kakaibang taong iyon ang lugar na ito sa Mapa. Hindi ito tulad "
+"ng anumang lugar na napuntahan na namin — at naamoy ko na ang KAYAMANAN!"
+
+#: 139151218457186304
+msgid "DialogueBeforeBirdHorse1"
+msgstr "Frrr!"
+
+#: 139151464675414016
+msgid "DialogueBeforeBirdCharacter2"
+msgstr ""
+"Isang hawla sa aking likod? Ito ang Treasure-Hunting Kanaryo! Ngayon tingnan "
+"natin kung saan nakalibing ang aso."
+
+#: 139160840467386368
+msgid "DialogueUseBirdCharacter1"
+msgstr ""
+"Ngayon susundan natin ang bakas ng mga balahibo at ang kayamanan ay akin!"
+
+#: 139178592703877120
+msgid "DialogueAfterChestCharacter1"
+msgstr "NAKITA MO BA 'YAN, KABAYO!"
+
+#: 139178671472906240
+msgid "DialogueAfterChestCharacter2"
+msgstr ""
+"Kailangan mong hilahin hindi lang ako, kundi pati na rin ang kaban na ito."
+
+#: 139178702909214720
+msgid "DialogueAfterChestHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 139180374293221376
+msgid "chestCollecting"
+msgstr "YAMAN!"
+
+#: 139496544913330176
+msgid "DialogueClaimedChestHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139496773167353856
+msgid "DialogueClaimedChestCharacter1"
+msgstr ""
+"Oo, narito ang kaban ngunit walang susi — ngunit nakalimutan mo ang "
+"mahiwagang pandayan, mare! Kaya nitong gawin ang anumang bagay sa anumang "
+"bagay."
+
+#: 139512809946091520
+msgid "DialogueAfterCraftChestCharacter1"
+msgstr "ITO AY ISANG JACKPOT! Kailangan nating ibenta ito nang mabilis!"
+
+#: 139537206085947392
+msgid "DialogueAfterTradeChestCharacter1"
+msgstr ""
+"OO! Kinilala ako. NGAYON ANG SWAMP NA ITO, BUKAS ANG BUONG MUNDO! SULONG, "
+"KABAYO!"
+
+#: 139537401876058112
+msgid "DialogueAfterTradeChestBuyer1"
+msgstr ""
+"Ha-ha — tila lahat ng mga lokal ay suot ang iyong mga makinang na bagay. "
+"Pagkatapos ng lahat, ako lang ang nakatira dito, Ha-ha-ha."
+
+#: 139766416519991296
+msgid "DialogueNewTerrainOpenedHorse1"
+msgstr "Brrr-r-r!"
+
+#: 139766737396830208
+msgid "DialogueNewTerrainOpenedCharacter1"
+msgstr "Amoy… usok?"
+
+#: 139767066540642304
+msgid "DialogueNewTerrainOpenedHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 139767291636355072
+msgid "DialogueNewTerrainOpenedCharacter2"
+msgstr "Sinasabi mo bang nahulog ko ang mga uling sa bubong ng bodega?"
+
+#: 139767459110719488
+msgid "DialogueNewTerrainOpenedHorse3"
+msgstr "Grrr-hrr!"
+
+#: 139767686714626048
+msgid "DialogueNewTerrainOpenedCharacter3"
+msgstr "Oh… Siguro hindi na tayo dapat bumalik."
+
+#: 139772805363535872
+msgid "DialogueNewTerrainStartedCharacter1"
+msgstr ""
+"Ibang lupain. Putik na lupa. Ugh, ang hangin ay umaalingasaw sa kahulugan!"
+
+#: 139772978911252480
+msgid "DialogueNewTerrainStartedHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139773239633383424
+msgid "DialogueNewTerrainStartedCharacter2"
+msgstr "Sige, kukunin natin ang mga mahahalagang bagay nang mabilis at tatakbo."
+
+#: 140259502945734656
+msgid "NewTerrainDispenserCollectingCharacter1"
+msgstr ""
+"Anong batong umaalingawngaw! Para bang ang kalikasan mismo ang pumapalakpak "
+"sa akin!"
+
+#: 140260138097577984
+msgid "DialoguePrepareToWormCharacter1"
+msgstr "Ano 'yon?!"
+
+#: 140260175347191808
+msgid "DialoguePrepareToWormHorse1"
+msgstr "Grrr-hrr!"
+
+#: 140260548501835776
+msgid "DialoguePrepareToWormCharacter3"
+msgstr "Naku… Siya ba 'yon?"
+
+#: 140262190995476480
+msgid "DialogueWormAppearHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 140262312860979200
+msgid "DialogueWormAppearCharacter1"
+msgstr "Diyos ko. Ginising ko ang kamatayan. Muli."
+
+#: 140263122399399936
+msgid "DialoguePlayerDeathCharacter1"
+msgstr "SABIHIN MO SA KANYA NA PINAGSISISIHAN KO ITO!!!"
+
+#: 140263995359891456
+msgid "DialoguePlayerReviveCharacter1"
+msgstr "Ito ba ang langit? Bakit ang baho…"
+
+#: 140264148288409600
+msgid "DialoguePlayerReviveCharacter2"
+msgstr "Nakita ko. Hindi patay. Mas masahol pa — buhay!"
+
+#: 140264664699506688
+msgid "DialoguePlayerRevivedCharacter1"
+msgstr ""
+"Malapit na, pero handa na ako sa kahit ano! Susubukan kong iindayog ang piko "
+"nang mas tahimik…"
+
+#: 142736080803991552
+msgid "tip1"
+msgstr ""
+"Maaari kang magtulak ng plorera. Itulak ito nang dalawang beses upang "
+"basagin."
+
+#: 142736223703928832
+msgid "tip2"
+msgstr "Ang Uod ay hindi susunod sa iyo sa tubig o Swamp."
+
+#: 142736293392289792
+msgid "tip3"
+msgstr "Durugin ang mga insekto — naghuhulog sila ng Mga Barya."
+
+#: 142736344843816960
+msgid "tip4"
+msgstr ""
+"Ang ilang palumpong ay nagtatago ng mga ibon na nangingitlog ng gintong Mga "
+"Itlog."
+
+#: 142736408026812416
+msgid "tip5"
+msgstr "Ang ingay ay umaakit ng mapanganib na mga kaaway."
+
+#: 142736477400600576
+msgid "tip6"
+msgstr "Ang mga landas ay humahantong sa mga lugar ng interes."
+
+#: 142736521784725504
+msgid "tip7"
+msgstr "Bibili ang Dealer ng mga karagdagang item mula sa iyong bag."
+
+#: 142736594941775872
+msgid "tip8"
+msgstr "Kumpletuhin ang mga order upang i-unlock ang mga bagong lokasyon."
+
+#: 142736659890573312
+msgid "tip9"
+msgstr "I-upgrade ang Pandayan upang i-unlock ang mga bagong recipe ng Alahas."
+
+#: 142736729293721600
+msgid "tip10"
+msgstr "Alisin ang mga sumpa sa Altar o sa Super slot."
+
+#: 142736813704089600
+msgid "tip11"
+msgstr "Ang mga item na may markang “?” ay maaaring suriin ng Trader."
+
+#: 142736907266428928
+msgid "tip12"
+msgstr "I-upgrade ang iyong Imbakan upang maglaman ng mas maraming Loot."
+
+#: 201164984023257088
+msgid "tip13"
+msgstr "Sa pag-pause, maaari mong palaging suriin ang mga order at epekto."
+
+#: 201320091704627200
+msgid "tip14"
+msgstr "Ginagarantiya ng Elite slot ang pinakamahusay na Mamimili."

@@ -1,0 +1,448 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-28 10:39+0000\n"
+"Last-Translator: Hero Craft Localization user 14 "
+"<ivanbelov@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Dutch <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/nl/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: nl\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 114226892800
+msgid "orderTerrain0.1Step1Title"
+msgstr "We hebben meer goud nodig!"
+
+#: 432712978432
+msgid "orderTerrain0.1Step1Description"
+msgstr "Breng me 3 goudklompjes."
+
+#: 410868545490944
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Uitstekend — deze klompjes zullen mijn verzameling mooi aanvullen."
+
+#: 4737438277963776
+msgid "orderTerrain1.1Step1Title"
+msgstr "Glim van de Dageraad"
+
+#: 4737634734968832
+msgid "orderTerrain1.1Step1Description"
+msgstr "Breng me een goudklompje van een goudhoudende rots."
+
+#: 4737870236749824
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"Goud draagt de glinstering van de dageraad in zich — als ik het niet kan "
+"zien, kan ik het tenminste voelen..."
+
+#: 4740504523902976
+msgid "orderTerrain0.1Step2Title"
+msgstr "Uitstekend werk!"
+
+#: 4740632143990784
+msgid "orderTerrain0.1Step2Description"
+msgstr "Bedankt voor de hulp! Ik zal een bijzondere plek met je delen."
+
+#: 16787486734028800
+msgid "orderTerrain1.1Step2Title"
+msgstr "Een nieuwe bril"
+
+#: 16787574239793152
+msgid "orderTerrain1.1Step2Description"
+msgstr "Breng me 2 diamanten. Ze vallen vaak uit kristalrotsen."
+
+#: 16788049915809792
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Eens kijken of ik klaar ben om aan dit land te wennen..."
+
+#: 16788621414895616
+msgid "orderTerrain1.1Step3Title"
+msgstr "Wennen aan het land"
+
+#: 16788663253078016
+msgid "orderTerrain1.1Step3Description"
+msgstr "Breng me een kleine Geode. Ze zijn te vinden in gewone rotsen."
+
+#: 16788764000260096
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Eens kijken of ik klaar ben om aan dit land te wennen..."
+
+#: 16789247150526464
+msgid "orderTerrain1.1Step4Title"
+msgstr "Dodemanskist"
+
+#: 16789336237543424
+msgid "orderTerrain1.1Step4Description"
+msgstr "Breng me een Kist. Een Kanarie kan je helpen er een te vinden."
+
+#: 16789441711706112
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Dus daar had ik mijn spullen gelaten..."
+
+#: 16789861523787776
+msgid "orderTerrain1.1Step5Title"
+msgstr "Zilver om te temperen"
+
+#: 16790058245033984
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Breng me 3 stukken Zilver. Ze zijn te vinden in geodes en gewone rotsen."
+
+#: 16790186938863616
+msgid "orderTerrain1.1Step6Title"
+msgstr "Uitstekend werk!"
+
+#: 16790822405279744
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Dit zilver prikkelt aangenaam de handpalmen..."
+
+#: 16791339927867392
+msgid "orderTerrain1.1Step6Description"
+msgstr "Dank je! Kom eens langs bij mij thuis — hier is het adres."
+
+#: 16792386012450816
+msgid "orderTerrain1.2Step1Title"
+msgstr "Oud geld"
+
+#: 16792448180424704
+msgid "orderTerrain1.2Step1Description"
+msgstr ""
+"Breng me 4 Oude Munten. Ze worden vaak gevonden in oude potten en vazen."
+
+#: 16793192929431552
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Nu kan ik eindelijk wisselgeld geven aan de ouden!"
+
+#: 16793381891215360
+msgid "orderTerrain1.2Step2Title"
+msgstr "Balroller"
+
+#: 16793474094600192
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Breng me een Gouden Scarabee. Het zijn grote kevers die kruipend in de "
+"struiken te vinden zijn."
+
+#: 16793779863556096
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Deze kever is een grote balroller!"
+
+#: 16794392403906560
+msgid "orderTerrain1.2Step3Title"
+msgstr "Steenbowling"
+
+#: 16794434028179456
+msgid "orderTerrain1.2Step3Description"
+msgstr "Breng me een Medium Geode. Deze verschijnt soms in gewone rotsen."
+
+#: 16794517595492352
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Nu kan ik eindelijk wat ballen rollen!"
+
+#: 16794991149191168
+msgid "orderTerrain1.2Step4Title"
+msgstr "Gouden Omelet"
+
+#: 16795063073116160
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Breng me een Gouden Ei. Zoek door de struiken om een nest met zulke eieren "
+"te vinden."
+
+#: 16795116181393408
+msgid "orderTerrain1.2Step4Thank"
+msgstr "Dat is pas een ontbijt voor royalty!"
+
+#: 16795705460133888
+msgid "orderTerrain1.2Step5Title"
+msgstr "Leeuwenbloed"
+
+#: 16795757985402880
+msgid "orderTerrain1.2Step5Description"
+msgstr ""
+"Breng me een Leeuwenrobijn. Deze is te vinden in geodes met rode kristallen."
+
+#: 16795845432446976
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Nu zal ik moedig zijn als een leeuw!"
+
+#: 16797388357505024
+msgid "orderTerrain1.2Step6Title"
+msgstr "Hemelse Genade"
+
+#: 16797558377811968
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Breng me een Hemelse Saffier. Deze is te vinden in geodes met blauwe "
+"kristallen."
+
+#: 16797646290423808
+msgid "orderTerrain1.2Step6Thank"
+msgstr "De hemel zelf is aan mijn zijde!"
+
+#: 16798157601247232
+msgid "orderTerrain1.2Step7Title"
+msgstr "Gouden toilet"
+
+#: 16798193798090752
+msgid "orderTerrain1.2Step7Description"
+msgstr "Breng me een 9 Gouden Klomp uit een goudhoudende rots."
+
+#: 16798263801024512
+msgid "orderTerrain1.2Step7Thank"
+msgstr "Eindelijk kan ik het toilet laten repareren!"
+
+#: 16798933543292928
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"Als je wensen wilt doen — ik ken een plek waar de sterren de hele tijd "
+"vallen."
+
+#: 16799140129542144
+msgid "orderTerrain1.2Step8Title"
+msgstr "Uitstekend werk!"
+
+#: 66701112705024000
+msgid "orderTerrain2.1Step5Title"
+msgstr "Uitstekend werk!"
+
+#: 66701312781713408
+msgid "orderTerrain2.1Step5Description"
+msgstr "IJs doet me denken aan oma... Ga ook even langs haar hut!"
+
+#: 66701713186750464
+msgid "orderTerrain2.1Step1Description"
+msgstr "Breng me 2 Bevroren Items van de bevroren rotsen"
+
+#: 66702356693647360
+msgid "orderTerrain2.1Step1Title"
+msgstr "IJsblokjes"
+
+#: 66702611300483072
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Perfect voor mijn cocktails!"
+
+#: 66705370212990976
+msgid "orderTerrain2.2Step7Title"
+msgstr "Uitstekend werk!"
+
+#: 66705373262249984
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Het lijkt erop dat krabben verbonden zijn met de Zonnekultus — ik weet waar "
+"hun tempelruïnes zijn!"
+
+#: 66705376152125440
+msgid "orderTerrain2.2Step2Description"
+msgstr "Vang een ijskrab — zijn schild is gemaakt van Cryolis."
+
+#: 66705379809558528
+msgid "orderTerrain2.2Step2Title"
+msgstr "Krabmetaal"
+
+#: 66705384804974592
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ah, exometaal! Ik hou van de mysteries van de natuur!"
+
+#: 66706577295933440
+msgid "orderTerrain2.3Step8Title"
+msgstr "Uitstekend werk!"
+
+#: 66706580684931072
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"De meest waardevolle schatten van de Zonnekultus zijn diep verborgen in het "
+"Labyrint — ik zal je laten zien waar!"
+
+#: 66706585684541440
+msgid "orderTerrain2.3Step2Description"
+msgstr "Steek 3 fakkels aan bij het Heiligdom en steel de Zonnesfeer!"
+
+#: 66706589509746688
+msgid "orderTerrain2.3Step2Title"
+msgstr "Beste verwarming"
+
+#: 66706594945564672
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Ja, dat is pas een goede opwarming!"
+
+#: 70714473507717120
+msgid "orderTerrain2.1Step2Description"
+msgstr "Vind 2 Zilveren Klompjes in ijsblokjes en verwarm ze."
+
+#: 70714539375067136
+msgid "orderTerrain2.1Step2Title"
+msgstr "IJzig Zilver"
+
+#: 70714808414502912
+msgid "orderTerrain2.1Step2Thank"
+msgstr "Het is als ijs in folie... maar dan omgekeerd..."
+
+#: 70714878748786688
+msgid "orderTerrain2.1Step3Title"
+msgstr "IJzig goud"
+
+#: 70714919110574080
+msgid "orderTerrain2.1Step3Thank"
+msgstr "Wintergoud krijgt een heel speciale... glans..."
+
+#: 70714983467974656
+msgid "orderTerrain2.1Step3Description"
+msgstr "Vind 2 Gouden Klompjes in ijsblokjes en verwarm ze."
+
+#: 70715014472269824
+msgid "orderTerrain2.1Step4Title"
+msgstr "Onzichtbare Edelsteen"
+
+#: 70715038832787456
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Helder in helder, ahahaha!"
+
+#: 70715070977933312
+msgid "orderTerrain2.1Step4Description"
+msgstr ""
+"Ontdooi een Medium Diamant. Bevroren diamanten worden vaak in alle rotsen "
+"gevonden."
+
+#: 70718769544560640
+msgid "orderTerrain2.2Step1Title"
+msgstr "Aardse Astrologie"
+
+#: 70718775819239424
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Breng me 2 Sterrenijzers. Ze zijn te vinden in de Moerassen tijdens een "
+"Sterrenval."
+
+#: 70718777429852160
+msgid "orderTerrain2.2Step1Thank"
+msgstr "Astrometaal is de droom van elke wetenschapper!"
+
+#: 70721195022483456
+msgid "orderTerrain2.2Step3Title"
+msgstr "Kosmische indringer"
+
+#: 70721197308379136
+msgid "orderTerrain2.2Step3Description"
+msgstr "Vind een Vervloekte Meteoorkern tijdens een Sterrenval en ban de vloek."
+
+#: 70721198948352000
+msgid "orderTerrain2.2Step3Thank"
+msgstr "Een meteoriet is een machine, niet zomaar een hemellichaam! Geweldig!"
+
+#: 70723998965039104
+msgid "orderTerrain2.2Step4Title"
+msgstr "Krabwarmte"
+
+#: 70724001313849344
+msgid "orderTerrain2.2Step4Description"
+msgstr "Verzamel 5 Cryolis-scherven van de schelpen van ijskrabben."
+
+#: 70724003188703232
+msgid "orderTerrain2.2Step4Thank"
+msgstr "Ben je ook zo benieuwd hoe krabben in de sneeuw leven?"
+
+#: 70724154619854848
+msgid "orderTerrain2.2Step5Title"
+msgstr "Nieuwe sensoren"
+
+#: 70724156297576448
+msgid "orderTerrain2.2Step5Description"
+msgstr ""
+"Breng me 9 stukken zilver. Ze zijn te vinden in Geodes en eenvoudige rotsen."
+
+#: 70724162102493184
+msgid "orderTerrain2.2Step5Thank"
+msgstr "Mijn onderzoeksinstrumenten zullen eindelijk stoppen met haperen!"
+
+#: 70724346286964736
+msgid "orderTerrain2.2Step6Title"
+msgstr "Krab Warmjas"
+
+#: 70724348468002816
+msgid "orderTerrain2.2Step6Description"
+msgstr "Verzamel 8 Cryolis scherven van de schelpen van ijskrabben."
+
+#: 70724350279942144
+msgid "orderTerrain2.2Step6Thank"
+msgstr "Nu zal ik eindelijk begrijpen hoe ze de winter overleven!"
+
+#: 70738013825007616
+msgid "orderTerrain2.3Step1Title"
+msgstr "Groot worden"
+
+#: 70738018996584448
+msgid "orderTerrain2.3Step1Description"
+msgstr "Breng me een Grote Diamant. Deze is te vinden in alle bevroren rotsen."
+
+#: 70738021307645952
+msgid "orderTerrain2.3Step1Thank"
+msgstr "Oh mijn god, het is zo groot als een hoofd! Maar van wie..."
+
+#: 70738580156710912
+msgid "orderTerrain2.3Step3Title"
+msgstr "Schat van het Witte Land"
+
+#: 70738582908174336
+msgid "orderTerrain2.3Step3Description"
+msgstr ""
+"Geef me de Jarl Kist. De Kanarie zal je helpen hem te vinden in de "
+"Whitelands."
+
+#: 70738585055657984
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Doet me denken aan Grootvader..."
+
+#: 70742364090007552
+msgid "orderTerrain2.3Step4Title"
+msgstr "Essentie van Vlam"
+
+#: 70742368280117248
+msgid "orderTerrain2.3Step4Description"
+msgstr "Haal een Idoolvonk uit de Zonnesfeer."
+
+#: 70742370125611008
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Wat een hete steen..."
+
+#: 70742532495507456
+msgid "orderTerrain2.3Step5Title"
+msgstr "Iriserende Steen"
+
+#: 70742535381188608
+msgid "orderTerrain2.3Step5Description"
+msgstr "Breng me een Opaal. Het is een zeldzaamheid in de bevroren rotsen."
+
+#: 70742539273502720
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Kijk eens hoe mooi het glinstert..."
+
+#: 70743768674336768
+msgid "orderTerrain2.3Step6Title"
+msgstr "Nakomelingen!"
+
+#: 70743771123810304
+msgid "orderTerrain2.3Step6Description"
+msgstr "Haal een Uilenkuiken uit de Zonnesfeer."
+
+#: 70743772839280640
+msgid "orderTerrain2.3Step6Thank"
+msgstr "De Grote Uil brengt de kou... Waarom is het kuiken zo heet?"
+
+#: 70744648739979264
+msgid "orderTerrain2.3Step7Title"
+msgstr "Grote deal"
+
+#: 70744655853518848
+msgid "orderTerrain2.3Step7Description"
+msgstr "Breng me 5 Goudklomp. Ze zijn vrij Algemeen in de Bevroren rotsen."
+
+#: 70744658739200000
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Nu word ik de grootste man in de stad."

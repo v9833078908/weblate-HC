@@ -1,0 +1,506 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 13:17+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Filipino <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/fil/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: fil\n"
+"Plural-Forms: nplurals=2; plural=n != 1 && n != 2 && n != 3 && (n % 10 == 4 "
+"|| n % 10 == 6 || n % 10 == 9);\n"
+
+#: 114226892800
+msgid "orderTerrain0.1Step1Title"
+msgstr "Kailangan Natin ng Mas Maraming Ginto!"
+
+#: 432712978432
+msgid "orderTerrain0.1Step1Description"
+msgstr "Dalhan mo ako ng 3 Gold Nuggets."
+
+#: 410868545490944
+msgid "orderTerrain0.1Step1Thank"
+msgstr ""
+"Napakahusay — ang mga nugget na ito ay magandang idaragdag sa aking "
+"koleksyon."
+
+#: 4737438277963776
+msgid "orderTerrain1.1Step1Title"
+msgstr "Kislap ng Bukang-liwayway"
+
+#: 4737634734968832
+msgid "orderTerrain1.1Step1Description"
+msgstr "Dalhan mo ako ng Gold Nugget mula sa anumang batong may ginto."
+
+#: 4737870236749824
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"Ang ginto ay nagtataglay ng kislap ng bukang-liwayway sa loob nito — kung "
+"hindi ko ito makita, maramdaman ko man lang..."
+
+#: 4740504523902976
+msgid "orderTerrain0.1Step2Title"
+msgstr "Napakahusay na trabaho!"
+
+#: 4740632143990784
+msgid "orderTerrain0.1Step2Description"
+msgstr "Salamat sa tulong! Ibabahagi ko sa iyo ang isang kakaibang lugar."
+
+#: 16787486734028800
+msgid "orderTerrain1.1Step2Title"
+msgstr "Isang Bagong Salamin"
+
+#: 16787574239793152
+msgid "orderTerrain1.1Step2Description"
+msgstr ""
+"Dalhan mo ako ng 2 Diamante. Madalas itong mahulog mula sa mga batong "
+"kristal."
+
+#: 16788049915809792
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Tingnan natin kung handa na akong masanay sa lupaing ito..."
+
+#: 16788621414895616
+msgid "orderTerrain1.1Step3Title"
+msgstr "Pagkagawian sa Lupa"
+
+#: 16788663253078016
+msgid "orderTerrain1.1Step3Description"
+msgstr ""
+"Dalhan mo ako ng Maliit na Geode. Matatagpuan ang mga ito sa ordinaryong "
+"bato."
+
+#: 16788764000260096
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Tingnan natin kung handa na akong masanay sa lupaing ito..."
+
+#: 16789247150526464
+msgid "orderTerrain1.1Step4Title"
+msgstr "Kaban ng Patay na Tao"
+
+#: 16789336237543424
+msgid "orderTerrain1.1Step4Description"
+msgstr ""
+"Dalhan mo ako ng Kaban. Makakatulong ang isang Kanaryo para makahanap ka."
+
+#: 16789441711706112
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Kaya pala doon ko naiwan ang mga gamit ko..."
+
+#: 16789861523787776
+msgid "orderTerrain1.1Step5Title"
+msgstr "Pilak para sa Pagpapatigas"
+
+#: 16790058245033984
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Dalhan mo ako ng 3 Piraso ng Pilak. Matatagpuan ang mga ito sa mga Geode at "
+"ordinaryong bato."
+
+#: 16790186938863616
+msgid "orderTerrain1.1Step6Title"
+msgstr "Napakahusay na trabaho!"
+
+#: 16790822405279744
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Ang pilak na ito ay kaaya-ayang nanunuot sa mga palad..."
+
+#: 16791339927867392
+msgid "orderTerrain1.1Step6Description"
+msgstr "Salamat! Bisitahin mo ako minsan — narito ang address."
+
+#: 16792386012450816
+msgid "orderTerrain1.2Step1Title"
+msgstr "Sinaunang Pera"
+
+#: 16792448180424704
+msgid "orderTerrain1.2Step1Description"
+msgstr ""
+"Dalhan mo ako ng 4 na Sinaunang Barya. Madalas itong matagpuan sa mga "
+"sinaunang palayok at plorera."
+
+#: 16793192929431552
+msgid "orderTerrain1.2Step1Thank"
+msgstr ""
+"Ngayon ay sa wakas ay makapagbibigay na ako ng sukli sa mga sinaunang tao!"
+
+#: 16793381891215360
+msgid "orderTerrain1.2Step2Title"
+msgstr "Ball-Roller"
+
+#: 16793474094600192
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Dalhan mo ako ng isang Gintong Scarab. Ang mga ito ay malalaking salagubang "
+"na matatagpuan na gumagapang sa mga palumpong."
+
+#: 16793779863556096
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Ang salagubang na ito ay isang malaking ball-roller!"
+
+#: 16794392403906560
+msgid "orderTerrain1.2Step3Title"
+msgstr "Stone Bowling"
+
+#: 16794434028179456
+msgid "orderTerrain1.2Step3Description"
+msgstr ""
+"Dalhan mo ako ng isang Medium Geode. Minsan itong lumilitaw sa mga "
+"ordinaryong bato."
+
+#: 16794517595492352
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Ngayon, sa wakas ay makapagpapagulong na ako ng mga bola!"
+
+#: 16794991149191168
+msgid "orderTerrain1.2Step4Title"
+msgstr "Gintong Omelette"
+
+#: 16795063073116160
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Dalhan mo ako ng Gintong Itlog. Maghanap sa mga palumpong upang makahanap ng "
+"pugad na naglalaman ng gayong mga itlog."
+
+#: 16795116181393408
+msgid "orderTerrain1.2Step4Thank"
+msgstr "Ngayon, iyan ay almusal para sa maharlika!"
+
+#: 16795705460133888
+msgid "orderTerrain1.2Step5Title"
+msgstr "Dugo ng Leon"
+
+#: 16795757985402880
+msgid "orderTerrain1.2Step5Description"
+msgstr ""
+"Dalhan mo ako ng Lion Ruby. Ito ay matatagpuan sa mga geode na may pulang "
+"kristal."
+
+#: 16795845432446976
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Ngayon, magiging matapang ako tulad ng isang leon!"
+
+#: 16797388357505024
+msgid "orderTerrain1.2Step6Title"
+msgstr "Biyaya ng Langit"
+
+#: 16797558377811968
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Dalhan mo ako ng Heavenly Sapphire. Ito ay matatagpuan sa mga geode na may "
+"asul na kristal."
+
+#: 16797646290423808
+msgid "orderTerrain1.2Step6Thank"
+msgstr "Ang kalangitan mismo ay nasa panig ko!"
+
+#: 16798157601247232
+msgid "orderTerrain1.2Step7Title"
+msgstr "Gintong kubeta"
+
+#: 16798193798090752
+msgid "orderTerrain1.2Step7Description"
+msgstr "Dalhan mo ako ng 9 Gold Nugget mula sa anumang batong may ginto."
+
+#: 16798263801024512
+msgid "orderTerrain1.2Step7Thank"
+msgstr "Sa wakas, maaayos ko na ang banyo!"
+
+#: 16798933543292928
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"Kung gusto mong mag-wish — may alam akong lugar kung saan laging nahuhulog "
+"ang mga bituin."
+
+#: 16799140129542144
+msgid "orderTerrain1.2Step8Title"
+msgstr "Napakahusay na trabaho!"
+
+#: 66701112705024000
+msgid "orderTerrain2.1Step5Title"
+msgstr "Mahusay na trabaho!"
+
+#: 66701312781713408
+msgid "orderTerrain2.1Step5Description"
+msgstr ""
+"Ang yelo ay nagpapaalala sa akin kay Lola... Bisitahin mo rin ang kanyang "
+"kubo!"
+
+#: 66701713186750464
+msgid "orderTerrain2.1Step1Description"
+msgstr "Dalhan mo ako ng 2 Nagyelo na Item mula sa mga nagyelong bato"
+
+#: 66702356693647360
+msgid "orderTerrain2.1Step1Title"
+msgstr "Ice Cubes"
+
+#: 66702611300483072
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Perpekto para sa aking mga cocktail!"
+
+#: 66705370212990976
+msgid "orderTerrain2.2Step7Title"
+msgstr "Napakahusay na trabaho!"
+
+#: 66705373262249984
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Mukhang konektado ang mga alimango sa Kulto ng Araw — alam ko kung nasaan "
+"ang mga guho ng kanilang templo!"
+
+#: 66705376152125440
+msgid "orderTerrain2.2Step2Description"
+msgstr "Manghuli ng ice crab — ang shell nito ay gawa sa Cryolis."
+
+#: 66705379809558528
+msgid "orderTerrain2.2Step2Title"
+msgstr "Crab Metal"
+
+#: 66705384804974592
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ah, exometal! Gusto ko ang mga misteryo ng kalikasan!"
+
+#: 66706577295933440
+msgid "orderTerrain2.3Step8Title"
+msgstr "Mahusay na trabaho!"
+
+#: 66706580684931072
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"Ang pinakamahalagang kayamanan ng Kulto ng Araw ay nakatago sa loob ng "
+"Labyrinth — ipapakita ko sa iyo kung saan!"
+
+#: 66706585684541440
+msgid "orderTerrain2.3Step2Description"
+msgstr "Sindihan ang 3 sulo sa Shrine at nakawin ang Sun Sphere!"
+
+#: 66706589509746688
+msgid "orderTerrain2.3Step2Title"
+msgstr "Best Heater"
+
+msgid "orderTerrain2.3Step2HelpInfo"
+msgstr ""
+
+#: 66706594945564672
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Oo, ngayon, iyan ang tamang pagpapainit!"
+
+#: 70714473507717120
+msgid "orderTerrain2.1Step2Description"
+msgstr ""
+"Maghanap ng 2 Silver Nuggets sa loob ng Ice Cubes at painitin ang mga ito."
+
+#: 70714539375067136
+msgid "orderTerrain2.1Step2Title"
+msgstr "Frosty Silver"
+
+#: 70714808414502912
+msgid "orderTerrain2.1Step2Thank"
+msgstr "Para itong yelo sa foil... pero baliktad..."
+
+#: 70714878748786688
+msgid "orderTerrain2.1Step3Title"
+msgstr "Frosty Gold"
+
+#: 70714919110574080
+msgid "orderTerrain2.1Step3Thank"
+msgstr "Ang ginto sa taglamig ay nagkakaroon ng napakaespesyal na... kislap..."
+
+#: 70714983467974656
+msgid "orderTerrain2.1Step3Description"
+msgstr ""
+"Maghanap ng 2 Ginto Nuggets sa loob ng Ice Cubes at painitin ang mga ito."
+
+#: 70715014472269824
+msgid "orderTerrain2.1Step4Title"
+msgstr "Hindi Nakikitang Hiyas"
+
+#: 70715038832787456
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Malinaw sa loob ng malinaw, ahahaha!"
+
+#: 70715070977933312
+msgid "orderTerrain2.1Step4Description"
+msgstr ""
+"Tunawin ang isang Medium Diamond. Ang Nagyelo na mga diamante ay madalas na "
+"matatagpuan sa lahat ng bato."
+
+#: 70718769544560640
+msgid "orderTerrain2.2Step1Title"
+msgstr "Grounded Astrology"
+
+#: 70718775819239424
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Dalhin mo sa akin ang 2 Star Iron. Matatagpuan ang mga ito sa Swamps sa "
+"panahon ng Pagbagsak ng Bituin."
+
+#: 70718777429852160
+msgid "orderTerrain2.2Step1Thank"
+msgstr "Ang Astrometal ay pangarap ng bawat siyentipiko!"
+
+#: 70721195022483456
+msgid "orderTerrain2.2Step3Title"
+msgstr "Cosmic Intruder"
+
+#: 70721197308379136
+msgid "orderTerrain2.2Step3Description"
+msgstr ""
+"Maghanap ng Sinumpa na Meteor Core sa panahon ng Pagbagsak ng Bituin at "
+"alisin ang sumpa."
+
+#: 70721198948352000
+msgid "orderTerrain2.2Step3Thank"
+msgstr ""
+"Ang isang meteor ay isang makina, hindi lang isang celestial body! Kamangha-"
+"mangha!"
+
+#: 70723998965039104
+msgid "orderTerrain2.2Step4Title"
+msgstr "Crab Warmth"
+
+#: 70724001313849344
+msgid "orderTerrain2.2Step4Description"
+msgstr "Kolektahin ang 5 Cryolis shards mula sa mga shell ng ice crabs."
+
+#: 70724003188703232
+msgid "orderTerrain2.2Step4Thank"
+msgstr ""
+"Gusto mo rin bang malaman kung paano nabubuhay ang mga alimango sa niyebe?"
+
+#: 70724154619854848
+msgid "orderTerrain2.2Step5Title"
+msgstr "Mga Bagong Sensor"
+
+msgid "orderTerrain2.2Step5HelpInfo"
+msgstr ""
+
+#: 70724156297576448
+msgid "orderTerrain2.2Step5Description"
+msgstr ""
+"Dalhin mo sa akin ang 9 na Piraso ng Pilak. Matatagpuan ang mga ito sa Mga "
+"Geode at simpleng bato."
+
+#: 70724162102493184
+msgid "orderTerrain2.2Step5Thank"
+msgstr ""
+"Sa wakas ay titigil na sa pag-glitch ang aking mga instrumento sa "
+"pananaliksik!"
+
+#: 70724346286964736
+msgid "orderTerrain2.2Step6Title"
+msgstr "Crab Warmcoat"
+
+msgid "orderTerrain2.2Step6HelpInfo"
+msgstr ""
+
+#: 70724348468002816
+msgid "orderTerrain2.2Step6Description"
+msgstr "Kolektahin ang 8 Cryolis shards mula sa mga shell ng ice crabs."
+
+#: 70724350279942144
+msgid "orderTerrain2.2Step6Thank"
+msgstr ""
+"Ngayon ay sa wakas ay mauunawaan ko na kung paano sila nakaligtas sa "
+"taglamig!"
+
+#: 70738013825007616
+msgid "orderTerrain2.3Step1Title"
+msgstr "Paglaki"
+
+msgid "orderTerrain2.3Step1HelpInfo"
+msgstr ""
+
+#: 70738018996584448
+msgid "orderTerrain2.3Step1Description"
+msgstr ""
+"Dalhan mo ako ng isang Malaking Diamante. Ito ay matatagpuan sa lahat ng "
+"nagyelo na bato."
+
+#: 70738021307645952
+msgid "orderTerrain2.3Step1Thank"
+msgstr "Diyos ko, kasinglaki ito ng ulo! Ngunit kanino..."
+
+#: 70738580156710912
+msgid "orderTerrain2.3Step3Title"
+msgstr "Yaman ng Whitelands"
+
+msgid "orderTerrain2.3Step3HelpInfo"
+msgstr ""
+
+#: 70738582908174336
+msgid "orderTerrain2.3Step3Description"
+msgstr ""
+"Ibigay mo sa akin ang Kaban ng Jarl. Tutulungan ka ng Kanaryo na hanapin ito "
+"sa Whitelands."
+
+#: 70738585055657984
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Naaalala ko ang Lolo..."
+
+#: 70742364090007552
+msgid "orderTerrain2.3Step4Title"
+msgstr "Esensya ng Apoy"
+
+msgid "orderTerrain2.3Step4HelpInfo"
+msgstr ""
+
+#: 70742368280117248
+msgid "orderTerrain2.3Step4Description"
+msgstr "Kumuha ng Idol Spark mula sa Sun Sphere."
+
+#: 70742370125611008
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Ang init ng batong ito..."
+
+#: 70742532495507456
+msgid "orderTerrain2.3Step5Title"
+msgstr "Bato ng Bahaghari"
+
+msgid "orderTerrain2.3Step5HelpInfo"
+msgstr ""
+
+#: 70742535381188608
+msgid "orderTerrain2.3Step5Description"
+msgstr "Dalhan mo ako ng Opal. Bihira itong makita sa mga nagyelong bato."
+
+#: 70742539273502720
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Tingnan mo kung gaano kaganda ang kislap nito..."
+
+#: 70743768674336768
+msgid "orderTerrain2.3Step6Title"
+msgstr "Nag-iwan Ito ng Anak!"
+
+msgid "orderTerrain2.3Step6HelpInfo"
+msgstr ""
+
+#: 70743771123810304
+msgid "orderTerrain2.3Step6Description"
+msgstr "Kumuha ng Sisiw ng Kuwago mula sa Sun Sphere."
+
+#: 70743772839280640
+msgid "orderTerrain2.3Step6Thank"
+msgstr "Ang Malaking Kuwago ay nagdadala ng lamig... Bakit napakainit ng sisiw?"
+
+#: 70744648739979264
+msgid "orderTerrain2.3Step7Title"
+msgstr "Malaking Deal"
+
+msgid "orderTerrain2.3Step7HelpInfo"
+msgstr ""
+
+#: 70744655853518848
+msgid "orderTerrain2.3Step7Description"
+msgstr ""
+"Dalhin mo sa akin ang 5 Ginto na Tipak. Karaniwan ang mga ito sa nagyelo na "
+"mga bato."
+
+#: 70744658739200000
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Ngayon, ako na ang pinakamalaking tao sa bayan."

@@ -1,0 +1,456 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Lithuanian <http://l10n.herocraft.com/projects/need-for-greed/"
+"tutorial/lt/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: lt\n"
+"Plural-Forms: nplurals=3; plural=(n % 10 == 1 && (n % 100 < 11 || n % 100 > "
+"19)) ? 0 : ((n % 10 >= 2 && n % 10 <= 9 && (n % 100 < 11 || n % 100 > 19)) ? "
+"1 : 2);\n"
+
+#: 75765772134387712
+msgid "DialogueIntroCharacter1"
+msgstr ""
+"Taigi, kumele, ar jauti? Auksas! Jis kažkur netoliese… Ir meilė… toje uoloje "
+"ten!"
+
+#: 75765971959418880
+msgid "DialogueIntroHorse1"
+msgstr "Frrr!"
+
+#: 75766215002558464
+msgid "DialogueIntroCharacter2"
+msgstr ""
+"Ką reiškia „jei dar kartą išgirsiu ten moterį, numesi mane“? Kažkas ten "
+"tikrai buvo vienišas."
+
+#: 75766376147718144
+msgid "DialogueIntroHorse2"
+msgstr "Neeigh! Grr-ha!"
+
+#: 75766594431881216
+msgid "DialogueIntroCharacter3"
+msgstr "Gerai, gerai! Tai buvo tik aidas… mano didybės!"
+
+#: 75766733204623360
+msgid "DialogueMineFoundCharacter1"
+msgstr ""
+"Uola! Dieviška! Kaip Afroditės šlaunis! Kažkas ten tikrai spindi, mano "
+"kepenys ką tik sudrebėjo!"
+
+#: 75766977115983872
+msgid "DialogueMineFoundHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 75767084016209920
+msgid "DialogueMineFoundCharacter2"
+msgstr "Na, atsiprašau, kad mano kūnas reaguoja į grožį!"
+
+#: 75768133359767552
+msgid "DialogueTimeIsUpHorse1"
+msgstr "Žvengia!"
+
+#: 75768214897037312
+msgid "DialogueTimeIsUpCharacter1"
+msgstr "Ką? Jau saulėlydis?"
+
+#: 75768748328620032
+msgid "DialogueTimeIsUpHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 75769024796168192
+msgid "DialogueTimeIsUpCharacter2"
+msgstr ""
+"Uodai… Vėl jie! Taip, taip, prisimenu, tu esi mažas žalias namelis, aš "
+"ateinu! Tik nepabėk!"
+
+#: 75769959874301952
+msgid "DialoguePickLootIntroTrader1"
+msgstr "Ei! Per daug Grobis. Arklys krepšys negali visko sutalpinti."
+
+#: 75770225956753408
+msgid "DialoguePickLootIntroTrader2"
+msgstr "Kirtiklis geriausią, ką gali nunešti į Saugykla."
+
+#: 76060126094823424
+msgid "DialoguePrepareToOpenCraftCharacter1"
+msgstr "Dabar… Dabar aš sukursiu šedevrą! Papuošalai, dėl kurio Ji gailėsis!"
+
+#: 76060331171123200
+msgid "DialoguePrepareToOpenCraftHorse1"
+msgstr "Brrr-r-r."
+
+#: 76061423992836096
+msgid "DialoguerAfterCraftCharacter1"
+msgstr "ŽIŪRĖK, ARKLYS! Jis spindi kaip mano akys, kol sutikau savo buvusiąją!"
+
+#: 76061521736896512
+msgid "DialoguerAfterCraftHorse1"
+msgstr "Frrr!"
+
+#: 76061738473361408
+msgid "DialoguerAfterCraftCharacter2"
+msgstr "Tai… tai dieviška mano keršto šviesa!"
+
+#: 76061830932598784
+msgid "DialoguerAfterCraftHorse2"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 76061898951626752
+msgid "DialoguerAfterCraftCharacter3"
+msgstr ""
+"Tu tiesiog pavydi – neturi pirštų, kad galėtum nešioti tokią didybę. Belieka "
+"tik rasti Pirkėją su pirštais!"
+
+#: 76062368449433600
+msgid "DialoguerAfterTradeBuyer1"
+msgstr "Pats tai padarei? Gražu, paimsiu."
+
+#: 76062530391511040
+msgid "DialoguerAfterTradeCharacter1"
+msgstr ""
+"Jis… jis suprato! Papuošalų viduje – aš. Manyje – Auksas. Aukso viduje – "
+"dievas."
+
+#: 76062825645346816
+msgid "DialoguerAfterTradeHorse1"
+msgstr "Frrr! Žvengimas!"
+
+#: 76062978284457984
+msgid "DialoguerAfterTradeCharacter2"
+msgstr "Tu teisus, Arkly. Jie dar nepasiruošę tiesai…"
+
+#: 76063254827503616
+msgid "DialogueBeforeUpgradeHorse1"
+msgstr "Frrr!"
+
+#: 76063498000666624
+msgid "DialogueBeforeUpgradeCharacter1"
+msgstr "Pinigai? Aš? Ar žinai, kas nutiks, jei Ji sužinos, kad esu turtingas?"
+
+#: 76063745632374784
+msgid "DialogueBeforeUpgradeHorse2"
+msgstr "Grrr-hrr!"
+
+#: 76063937093963776
+msgid "DialogueBeforeUpgradeCharacter2"
+msgstr "Gerai, investuosiu į save – bet tik tam, kad nustotum mane varginti!"
+
+#: 76064239725580288
+msgid "DialogueAfterUpgradeCharacter1"
+msgstr "Tapau greitesnis, stipresnis ir pigesnis gamyboje! Jai tai būtų patikę."
+
+#: 76064347783434240
+msgid "DialogueAfterUpgradeHorse1"
+msgstr "Grrr-hrr!"
+
+#: 76064479283253248
+msgid "DialogueAfterUpgradeCharacter2"
+msgstr ""
+"Na, nereikėjo primygtinai reikalauti! Turite savo fetišus – kanopas ir "
+"avižas."
+
+#: 76065879857827840
+msgid "DialogueLobbyLikesCharacter1"
+msgstr "Matai, kumele? Jie mane myli!"
+
+#: 76066013412855808
+msgid "DialogueLobbyLikesHorse1"
+msgstr "Frrr! Pffuuu.."
+
+#: 76066107042304000
+msgid "DialogueLobbyLikesCharacter2"
+msgstr "Jūs teisus! Tai tik pradžia! Netrukus jie visi bus mano gerbėjai…"
+
+#: 76344321220284416
+msgid "character"
+msgstr "Personažas"
+
+#: 76344471367979008
+msgid "horse"
+msgstr "Arklys"
+
+#: 76344680219152384
+msgid "trader"
+msgstr "Prekybininkas"
+
+#: 76344756748423168
+msgid "buyer"
+msgstr "Pirkėjas"
+
+#: 131220345145528320
+msgid "terrainDispenserFound"
+msgstr "Oho! Grobis!"
+
+#: 131220694531051520
+msgid "terrainDispenserCollecting"
+msgstr "Nagi! Sulaužyk!"
+
+#: 131220939017031680
+msgid "exitDoorDescription"
+msgstr "Žalia – ar tai Arklys?"
+
+#: 131221107242176512
+msgid "exitDoorDescription2"
+msgstr "Žalia? Ar ji… serga?"
+
+#: 137323318787444736
+msgid "DialoguePickLootSelectItemsTrader1"
+msgstr "Bakstelėkite daiktus, kad įdėtumėte juos į Arklio krepšį."
+
+#: 137351439217594368
+msgid "DialoguePickLootSelectedItemsCharacter1"
+msgstr "Tik tiek tilpo? Kumelaitei reikia didesnio krepšio!"
+
+#: 137381643633823744
+msgid "DialoguePickLootClaimItemsTrader1"
+msgstr ""
+"Nesijaudinkite! Aš nupirksiu likusius. Netgi pridėsiu šiek tiek papildomai."
+
+#: 137616255752605696
+msgid "terrainWantMoreItems"
+msgstr "Noriu daugiau Aukso!"
+
+#: 137629488379072512
+msgid "terrainRoadIsClue"
+msgstr "Takas veda į turtus"
+
+#: 138087561421918208
+msgid "DialogueOrdersIntroBuyer1"
+msgstr ""
+"O, naujas veidas! Turiu jums užsakymą. Ar padėsite papildyti mano kolekciją?"
+
+#: 138088926181330944
+msgid "DialogueOrdersIntroCharacter1"
+msgstr "Žiūrėk, kumelaite, jie negali nė dienos be mano pagalbos!"
+
+#: 138089230444531712
+msgid "DialogueOrdersIntroHorse1"
+msgstr "Frrrr!"
+
+#: 138089454202261504
+msgid "DialogueOrdersIntroCharacter2"
+msgstr "Taip, taip, be tavojo taip pat."
+
+#: 138110517984366592
+msgid "DialogueOrdersThanksBuyer1"
+msgstr ""
+"Tu man labai padėjai, ir aš tau padėsiu – pažymėjau vietą, kur uolos skamba "
+"garsiau nei įprastai."
+
+#: 138111196928937984
+msgid "DialogueOrdersThanksCharacter1"
+msgstr "JIE MANE TAIP MYLI, KAD NORI ATSISKLEISTI SAVO MINTIS!"
+
+#: 138111354584436736
+msgid "DialogueOrdersThanksCharacter2"
+msgstr "Ne, pinigų į kišenę neįsidėsi, bet žinių – tikrai taip!"
+
+#: 138111433626095616
+msgid "DialogueOrdersThanksHorse1"
+msgstr "Žvengia!"
+
+#: 139150891347611648
+msgid "DialogueBeforeBirdCharacter1"
+msgstr ""
+"Tas keistas tipas pažymėjo šią vietą Žemėlapis. Tai nepanašu į jokią vietą, "
+"kurioje esame buvę – ir aš jau užuodžiu LOBĮ!"
+
+#: 139151218457186304
+msgid "DialogueBeforeBirdHorse1"
+msgstr "Frrr!"
+
+#: 139151464675414016
+msgid "DialogueBeforeBirdCharacter2"
+msgstr ""
+"Narvas ant nugaros? Tai lobių ieškotoja Kanarėlė! Dabar pažiūrėkime, kur šuo "
+"palaidotas."
+
+#: 139160840467386368
+msgid "DialogueUseBirdCharacter1"
+msgstr "Dabar sekame plunksnų pėdsakais ir lobis mano!"
+
+#: 139178592703877120
+msgid "DialogueAfterChestCharacter1"
+msgstr "ARKLIAU, AR MATEI TAI!"
+
+#: 139178671472906240
+msgid "DialogueAfterChestCharacter2"
+msgstr "Turėsi tempti ne tik mane, bet ir šią Skrynia."
+
+#: 139178702909214720
+msgid "DialogueAfterChestHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 139180374293221376
+msgid "chestCollecting"
+msgstr "LOBIS!"
+
+#: 139496544913330176
+msgid "DialogueClaimedChestHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139496773167353856
+msgid "DialogueClaimedChestCharacter1"
+msgstr ""
+"Taip, Skrynia čia, bet rakto nėra – bet tu pamiršai apie stebuklingą "
+"Kalykla, kumelaite! Ji gali padaryti bet ką su bet kuo."
+
+#: 139512809946091520
+msgid "DialogueAfterCraftChestCharacter1"
+msgstr "TAI YRA LOŠIMAS! Turime greitai parduoti!"
+
+#: 139537206085947392
+msgid "DialogueAfterTradeChestCharacter1"
+msgstr ""
+"TAIP! Mane atpažino. ŠIANDIEN ŠI PELKĖ, RYTOJ VISAS PASAULIS! PIRMĖN, "
+"ARKLIAU!"
+
+#: 139537401876058112
+msgid "DialogueAfterTradeChestBuyer1"
+msgstr ""
+"Cha-cha – atrodo, kad visi vietiniai nešioja tavo blizgančius daiktus. Juk "
+"aš vienintelis čia gyvenu, Cha-cha-cha."
+
+#: 139766416519991296
+msgid "DialogueNewTerrainOpenedHorse1"
+msgstr "Brrr-r-r!"
+
+#: 139766737396830208
+msgid "DialogueNewTerrainOpenedCharacter1"
+msgstr "Kvepia… dūmais?"
+
+#: 139767066540642304
+msgid "DialogueNewTerrainOpenedHorse2"
+msgstr "Hh-hh! Eeee-ih!"
+
+#: 139767291636355072
+msgid "DialogueNewTerrainOpenedCharacter2"
+msgstr "Ar sakai, kad aš numečiau anglis ant sandėlio stogo?"
+
+#: 139767459110719488
+msgid "DialogueNewTerrainOpenedHorse3"
+msgstr "Grrr-hrr!"
+
+#: 139767686714626048
+msgid "DialogueNewTerrainOpenedCharacter3"
+msgstr "O… Galbūt neturėtume grįžti."
+
+#: 139772805363535872
+msgid "DialogueNewTerrainStartedCharacter1"
+msgstr "Kitokia vietovė. Šlapia žemė. Ugh, oras dvokia prasme!"
+
+#: 139772978911252480
+msgid "DialogueNewTerrainStartedHorse1"
+msgstr "Grrr-hrr!"
+
+#: 139773239633383424
+msgid "DialogueNewTerrainStartedCharacter2"
+msgstr "Gerai, greitai paimame vertybes ir bėgame."
+
+#: 140259502945734656
+msgid "NewTerrainDispenserCollectingCharacter1"
+msgstr "Kokia skambanti uola! Tarsi pati gamta man ploja!"
+
+#: 140260138097577984
+msgid "DialoguePrepareToWormCharacter1"
+msgstr "Kas tai buvo?!"
+
+#: 140260175347191808
+msgid "DialoguePrepareToWormHorse1"
+msgstr "Grrr-hrr!"
+
+#: 140260548501835776
+msgid "DialoguePrepareToWormCharacter3"
+msgstr "O, ne… Ar tai buvo… ji?"
+
+#: 140262190995476480
+msgid "DialogueWormAppearHorse1"
+msgstr "Grrr-hrr! Brrr..."
+
+#: 140262312860979200
+msgid "DialogueWormAppearCharacter1"
+msgstr "Gerasis Dieve. Vėl pažadinau mirtį."
+
+#: 140263122399399936
+msgid "DialoguePlayerDeathCharacter1"
+msgstr "PASAKYKITE JAI, KAD GAILEJAUS DĖL TO!!!"
+
+#: 140263995359891456
+msgid "DialoguePlayerReviveCharacter1"
+msgstr "Ar tai rojus? Kodėl tada taip blogai kvepia…"
+
+#: 140264148288409600
+msgid "DialoguePlayerReviveCharacter2"
+msgstr "Supratau. Ne miręs. Dar blogiau – gyvas!"
+
+#: 140264664699506688
+msgid "DialoguePlayerRevivedCharacter1"
+msgstr ""
+"Buvo arti, bet dabar esu pasiruošęs viskam! Bandysiu kirsti kirtikliu šiek "
+"tiek tyliau…"
+
+#: 142736080803991552
+msgid "tip1"
+msgstr "Galite stumti vazą. Stumkite ją du kartus, kad sudaužytumėte."
+
+#: 142736223703928832
+msgid "tip2"
+msgstr "Kirminas neseks jūsų į vandenį ar Pelkę."
+
+#: 142736293392289792
+msgid "tip3"
+msgstr "Sunaikinkite klaidas – iš jų iškrenta Monetos."
+
+#: 142736344843816960
+msgid "tip4"
+msgstr ""
+"Kai kuriuose krūmuose slepiasi paukščiai, kurie deda auksinius Kiaušiniai."
+
+#: 142736408026812416
+msgid "tip5"
+msgstr "Triukšmas pritraukia pavojingus priešus."
+
+#: 142736477400600576
+msgid "tip6"
+msgstr "Takai veda į lankytinas vietas."
+
+#: 142736521784725504
+msgid "tip7"
+msgstr "Prekybininkas nupirks papildomus daiktus iš jūsų krepšio."
+
+#: 142736594941775872
+msgid "tip8"
+msgstr "Užbaikite užsakymus, kad atrakintumėte naujas vietas."
+
+#: 142736659890573312
+msgid "tip9"
+msgstr "Atnaujinkite Kalykla, kad atrakintumėte naujus Papuošalai receptus."
+
+#: 142736729293721600
+msgid "tip10"
+msgstr "Pašalinkite prakeikimus prie Altorius arba Super lizdas."
+
+#: 142736813704089600
+msgid "tip11"
+msgstr "Prekybininkas gali įvertinti daiktus, pažymėtus „?“."
+
+#: 142736907266428928
+msgid "tip12"
+msgstr "Atnaujinkite savo Saugykla, kad tilptų daugiau Grobis."
+
+#: 201164984023257088
+msgid "tip13"
+msgstr "Pauzės metu visada galite patikrinti užsakymus ir efektus."
+
+#: 201320091704627200
+msgid "tip14"
+msgstr "Elito lizdas garantuoja geriausią Pirkėją."

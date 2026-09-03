@@ -1,0 +1,94 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:04+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: es\n"
+
+msgid "eggItemReceived"
+msgstr "¡Un huevo! Hay que incubarlo."
+
+msgid "cursedItemReceived"
+msgstr "¡Nooo, una maldición!"
+
+msgid "geodeItemReceived"
+msgstr ""
+"¡Oh, una geoda!\n"
+"Lista para cortar."
+
+msgid "gemItemReceived"
+msgstr "¡Sí, brillos!"
+
+msgid "goldItemReceived"
+msgstr "¡ADORO EL ORO!"
+
+msgid "silverCoinItemReceived"
+msgstr "Mmmmmm, dinero…"
+
+msgid "wormSpawned"
+msgstr "¡Maldita sea!"
+
+msgid "highNoise"
+msgstr "Venga ya…"
+
+msgid "pileLooted"
+msgstr "Chatarra, pero puedo venderla."
+
+msgid "statsEffectAppliedOnDestroy"
+msgstr "¡¿Por qué pasa esto siempre?!"
+
+msgid "timeIsUp"
+msgstr "¡¿Qué, no hay nadie más a quien molestar?!"
+
+msgid "noActions1"
+msgstr "Du-du-du…"
+
+msgid "noActions2"
+msgstr "De acuerdo, esperaremos."
+
+msgid "noActions3"
+msgstr "Bien, un descanso para fumar."
+
+msgid "noActions4"
+msgstr "Eh… lo que sea."
+
+msgid "noActions5"
+msgstr "Paciencia, paciencia…"
+
+msgid "richZoneReached1"
+msgstr "Siniestro… ¡significa un montón de tesoros!"
+
+msgid "richZoneReached2"
+msgstr "¡Cuanto más profundo vayamos, mejor será el botín!"
+
+msgid "richZoneReached3"
+msgstr "¡Huele a montañas de tesoros!"
+
+msgid "coldNight"
+msgstr ""
+"H-h-hace\n"
+"f-frío…"
+
+msgid "frostible"
+msgstr ""
+"¡N-n-necesito \n"
+"c-c-calentarme!"
+
+msgid "warmedUp"
+msgstr "¡Qué bien, hace calor!"
+
+msgid "frozenRockHit"
+msgstr "¡Hay que derretir el hielo!"
+
+msgid "frozenItemReceived"
+msgstr "¡Tesoro de hielo!"
+
+msgid "SuperRare"
+msgstr "¡Sí, premio gordo!"

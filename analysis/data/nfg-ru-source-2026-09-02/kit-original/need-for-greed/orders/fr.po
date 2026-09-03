@@ -1,0 +1,467 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-25 18:39+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: French <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/fr/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: fr\n"
+"Plural-Forms: nplurals=2; plural=n > 1;\n"
+
+#: 114226892800
+msgid "orderTerrain0.1Step1Title"
+msgstr "Nous avons besoin de plus d'or !"
+
+#: 432712978432
+msgid "orderTerrain0.1Step1Description"
+msgstr "Apportez-moi 3 pépites d'Or."
+
+#: 410868545490944
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Excellent — ces pépites s'ajouteront joliment à ma collection."
+
+#: 4737438277963776
+msgid "orderTerrain1.1Step1Title"
+msgstr "Lueur de l'aube"
+
+#: 4737634734968832
+msgid "orderTerrain1.1Step1Description"
+msgstr "Apportez-moi une pépite d'Or de n'importe quelle roche aurifère."
+
+#: 4737870236749824
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"L'Or contient la lueur de l'aube — si je ne peux pas la voir, au moins je "
+"peux la sentir..."
+
+#: 4740504523902976
+msgid "orderTerrain0.1Step2Title"
+msgstr "Excellent travail !"
+
+#: 4740632143990784
+msgid "orderTerrain0.1Step2Description"
+msgstr "Merci pour l'aide ! Je partagerai un endroit curieux avec vous."
+
+#: 16787486734028800
+msgid "orderTerrain1.1Step2Title"
+msgstr "De nouvelles lunettes"
+
+#: 16787574239793152
+msgid "orderTerrain1.1Step2Description"
+msgstr ""
+"Apportez-moi 2 Diamants. Ils tombent fréquemment des roches cristallines."
+
+#: 16788049915809792
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Voyons si je suis prêt à m'habituer à cette terre..."
+
+#: 16788621414895616
+msgid "orderTerrain1.1Step3Title"
+msgstr "S'habituer à la terre"
+
+#: 16788663253078016
+msgid "orderTerrain1.1Step3Description"
+msgstr ""
+"Apportez-moi une petite Géode. On les trouve dans les roches ordinaires."
+
+#: 16788764000260096
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Voyons si je suis prêt à m'habituer à cette terre..."
+
+#: 16789247150526464
+msgid "orderTerrain1.1Step4Title"
+msgstr "Coffre du mort"
+
+#: 16789336237543424
+msgid "orderTerrain1.1Step4Description"
+msgstr "Apportez-moi un Coffre. Un Canari pourrait vous aider à en trouver un."
+
+#: 16789441711706112
+msgid "orderTerrain1.1Step4Thank"
+msgstr "C'est donc là que j'ai laissé mes affaires..."
+
+#: 16789861523787776
+msgid "orderTerrain1.1Step5Title"
+msgstr "Argent pour le trempage"
+
+#: 16790058245033984
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Apportez-moi 3 morceaux d'argent. On les trouve dans les Géodes et les "
+"roches ordinaires."
+
+#: 16790186938863616
+msgid "orderTerrain1.1Step6Title"
+msgstr "Excellent travail !"
+
+#: 16790822405279744
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Cet argent picote agréablement les paumes..."
+
+#: 16791339927867392
+msgid "orderTerrain1.1Step6Description"
+msgstr "Merci ! Passez chez moi un de ces jours — voici l'adresse."
+
+#: 16792386012450816
+msgid "orderTerrain1.2Step1Title"
+msgstr "Argent ancien"
+
+#: 16792448180424704
+msgid "orderTerrain1.2Step1Description"
+msgstr ""
+"Apportez-moi 4 Pièces anciennes. On les trouve souvent dans les pots et "
+"vases anciens."
+
+#: 16793192929431552
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Maintenant, je peux enfin rendre la monnaie aux anciens !"
+
+#: 16793381891215360
+msgid "orderTerrain1.2Step2Title"
+msgstr "Rouleur de boules"
+
+#: 16793474094600192
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Apportez-moi un Scarabée doré. Ce sont de gros coléoptères que l'on peut "
+"trouver rampant dans les buissons."
+
+#: 16793779863556096
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Ce scarabée est un sacré rouleur de boules !"
+
+#: 16794392403906560
+msgid "orderTerrain1.2Step3Title"
+msgstr "Bowling de pierres"
+
+#: 16794434028179456
+msgid "orderTerrain1.2Step3Description"
+msgstr ""
+"Apportez-moi une Géode moyenne. Elle apparaît parfois dans les roches "
+"ordinaires."
+
+#: 16794517595492352
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Maintenant, je vais enfin pouvoir lancer des boules !"
+
+#: 16794991149191168
+msgid "orderTerrain1.2Step4Title"
+msgstr "Omelette dorée"
+
+#: 16795063073116160
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Apportez-moi un Œuf doré. Cherchez dans les buissons pour trouver un nid "
+"contenant de tels œufs."
+
+#: 16795116181393408
+msgid "orderTerrain1.2Step4Thank"
+msgstr "Voilà un petit-déjeuner digne d'un roi !"
+
+#: 16795705460133888
+msgid "orderTerrain1.2Step5Title"
+msgstr "Sang de lion"
+
+#: 16795757985402880
+msgid "orderTerrain1.2Step5Description"
+msgstr ""
+"Apportez-moi un Rubis de lion. On le trouve dans les Géodes avec des "
+"cristaux rouges."
+
+#: 16795845432446976
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Maintenant, je serai courageux comme un lion !"
+
+#: 16797388357505024
+msgid "orderTerrain1.2Step6Title"
+msgstr "Grâce du Ciel"
+
+#: 16797558377811968
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Apportez-moi un Saphir céleste. On le trouve dans les Géodes avec des "
+"cristaux bleus."
+
+#: 16797646290423808
+msgid "orderTerrain1.2Step6Thank"
+msgstr "Les cieux eux-mêmes sont de mon côté !"
+
+#: 16798157601247232
+msgid "orderTerrain1.2Step7Title"
+msgstr "Toilettes dorées"
+
+#: 16798193798090752
+msgid "orderTerrain1.2Step7Description"
+msgstr ""
+"Apportez-moi une pépite d'Or de 9 grammes provenant de n'importe quelle "
+"roche aurifère."
+
+#: 16798263801024512
+msgid "orderTerrain1.2Step7Thank"
+msgstr "Enfin, je peux faire réparer les toilettes !"
+
+#: 16798933543292928
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"Si vous voulez faire des vœux, je connais un endroit où les étoiles tombent "
+"tout le temps."
+
+#: 16799140129542144
+msgid "orderTerrain1.2Step8Title"
+msgstr "Excellent travail !"
+
+#: 66701112705024000
+msgid "orderTerrain2.1Step5Title"
+msgstr "Excellent travail !"
+
+#: 66701312781713408
+msgid "orderTerrain2.1Step5Description"
+msgstr "La glace me rappelle Mamie... Passez aussi par sa cabane !"
+
+#: 66701713186750464
+msgid "orderTerrain2.1Step1Description"
+msgstr "Apportez-moi 2 objets Gelés des roches gelées"
+
+#: 66702356693647360
+msgid "orderTerrain2.1Step1Title"
+msgstr "Glaçons"
+
+#: 66702611300483072
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Parfait pour mes cocktails !"
+
+#: 66705370212990976
+msgid "orderTerrain2.2Step7Title"
+msgstr "Excellent travail !"
+
+#: 66705373262249984
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Il semble que les crabes soient liés au Culte du Soleil — je sais où se "
+"trouvent les ruines de leur temple !"
+
+#: 66705376152125440
+msgid "orderTerrain2.2Step2Description"
+msgstr "Attrapez un Crabe de glace — sa carapace est faite de Cryolis."
+
+#: 66705379809558528
+msgid "orderTerrain2.2Step2Title"
+msgstr "Métal de crabe"
+
+#: 66705384804974592
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ah, l'exométal ! J'adore les mystères de la nature !"
+
+#: 66706577295933440
+msgid "orderTerrain2.3Step8Title"
+msgstr "Excellent travail !"
+
+#: 66706580684931072
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"Les trésors les plus précieux du Culte du Soleil sont cachés au plus profond "
+"du Labyrinthe — je vais vous montrer où !"
+
+#: 66706585684541440
+msgid "orderTerrain2.3Step2Description"
+msgstr "Allumez 3 torches au Sanctuaire et volez la Sphère solaire !"
+
+#: 66706589509746688
+msgid "orderTerrain2.3Step2Title"
+msgstr "Meilleur chauffage"
+
+#: 66706594945564672
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Ouais, ça c'est un bon échauffement !"
+
+#: 70714473507717120
+msgid "orderTerrain2.1Step2Description"
+msgstr "Trouvez 2 pépites d'argent à l'intérieur de glaçons et réchauffez-les."
+
+#: 70714539375067136
+msgid "orderTerrain2.1Step2Title"
+msgstr "Argent givré"
+
+#: 70714808414502912
+msgid "orderTerrain2.1Step2Thank"
+msgstr ""
+"C'est comme de la glace dans du papier d'aluminium... mais à l'envers..."
+
+#: 70714878748786688
+msgid "orderTerrain2.1Step3Title"
+msgstr "Or givré"
+
+#: 70714919110574080
+msgid "orderTerrain2.1Step3Thank"
+msgstr "L'or d'hiver a un éclat très spécial..."
+
+#: 70714983467974656
+msgid "orderTerrain2.1Step3Description"
+msgstr "Trouvez 2 pépites d'Or à l'intérieur de glaçons et réchauffez-les."
+
+#: 70715014472269824
+msgid "orderTerrain2.1Step4Title"
+msgstr "Gemme invisible"
+
+#: 70715038832787456
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Clair dans le clair, ahahaha !"
+
+#: 70715070977933312
+msgid "orderTerrain2.1Step4Description"
+msgstr ""
+"Faites dégeler un diamant moyen. Les diamants gelés se trouvent souvent dans "
+"toutes les roches."
+
+#: 70718769544560640
+msgid "orderTerrain2.2Step1Title"
+msgstr "Astrologie terrestre"
+
+#: 70718775819239424
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Apportez-moi 2 fers stellaires. On les trouve dans les marais lors d'une "
+"Chute d'étoiles."
+
+#: 70718777429852160
+msgid "orderTerrain2.2Step1Thank"
+msgstr "L'astrométal est le rêve de tout scientifique !"
+
+#: 70721195022483456
+msgid "orderTerrain2.2Step3Title"
+msgstr "Intrus cosmique"
+
+#: 70721197308379136
+msgid "orderTerrain2.2Step3Description"
+msgstr ""
+"Trouvez un Noyau de météore Maudit lors d'une Chute d'étoiles et bannissez "
+"la malédiction."
+
+#: 70721198948352000
+msgid "orderTerrain2.2Step3Thank"
+msgstr ""
+"Un météore est une machine, pas seulement un corps céleste ! Incroyable !"
+
+#: 70723998965039104
+msgid "orderTerrain2.2Step4Title"
+msgstr "Chaleur de crabe"
+
+#: 70724001313849344
+msgid "orderTerrain2.2Step4Description"
+msgstr "Collectez 5 éclats de Cryolis sur les carapaces de crabes de glace."
+
+#: 70724003188703232
+msgid "orderTerrain2.2Step4Thank"
+msgstr ""
+"Mourrez-vous aussi d'envie de savoir comment les crabes vivent dans la "
+"neige ?"
+
+#: 70724154619854848
+msgid "orderTerrain2.2Step5Title"
+msgstr "Nouveaux capteurs"
+
+#: 70724156297576448
+msgid "orderTerrain2.2Step5Description"
+msgstr ""
+"Apportez-moi 9 pièces d'argent. On les trouve dans les Géodes et les roches "
+"simples."
+
+#: 70724162102493184
+msgid "orderTerrain2.2Step5Thank"
+msgstr "Mes instruments de recherche vont enfin arrêter de bugger !"
+
+#: 70724346286964736
+msgid "orderTerrain2.2Step6Title"
+msgstr "Manteau chaud de crabe"
+
+#: 70724348468002816
+msgid "orderTerrain2.2Step6Description"
+msgstr "Collectez 8 éclats de Cryolis sur les carapaces des crabes de glace."
+
+#: 70724350279942144
+msgid "orderTerrain2.2Step6Thank"
+msgstr "Maintenant, je vais enfin comprendre comment ils survivent à l'hiver !"
+
+#: 70738013825007616
+msgid "orderTerrain2.3Step1Title"
+msgstr "Voir grand"
+
+#: 70738018996584448
+msgid "orderTerrain2.3Step1Description"
+msgstr ""
+"Apportez-moi un grand diamant. On le trouve dans toutes les roches gelées."
+
+#: 70738021307645952
+msgid "orderTerrain2.3Step1Thank"
+msgstr "Oh mon dieu, c'est la taille d'une tête ! Mais de qui..."
+
+#: 70738580156710912
+msgid "orderTerrain2.3Step3Title"
+msgstr "Trésor des Terres Blanches"
+
+#: 70738582908174336
+msgid "orderTerrain2.3Step3Description"
+msgstr ""
+"Donnez-moi le Coffre du Jarl. Le canari vous aidera à le trouver dans les "
+"Terres blanches."
+
+#: 70738585055657984
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Ça me rappelle Grand-père..."
+
+#: 70742364090007552
+msgid "orderTerrain2.3Step4Title"
+msgstr "Essence de Flamme"
+
+#: 70742368280117248
+msgid "orderTerrain2.3Step4Description"
+msgstr "Extrayez une Étincelle d'Idole de la Sphère solaire."
+
+#: 70742370125611008
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Quelle pierre chaude..."
+
+#: 70742532495507456
+msgid "orderTerrain2.3Step5Title"
+msgstr "Pierre irisée"
+
+#: 70742535381188608
+msgid "orderTerrain2.3Step5Description"
+msgstr ""
+"Apportez-moi une Opale. C'est une trouvaille rare dans les roches Gelées."
+
+#: 70742539273502720
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Regardez comme elle scintille magnifiquement..."
+
+#: 70743768674336768
+msgid "orderTerrain2.3Step6Title"
+msgstr "Il a laissé une progéniture !"
+
+#: 70743771123810304
+msgid "orderTerrain2.3Step6Description"
+msgstr "Extrayez un Petit hibou de la Sphère solaire."
+
+#: 70743772839280640
+msgid "orderTerrain2.3Step6Thank"
+msgstr "Le Grand hibou apporte le froid... Pourquoi le petit est-il si chaud ?"
+
+#: 70744648739979264
+msgid "orderTerrain2.3Step7Title"
+msgstr "Grosse affaire"
+
+#: 70744655853518848
+msgid "orderTerrain2.3Step7Description"
+msgstr ""
+"Apportez-moi 5 morceaux d'Or. Ils sont assez Communs dans les roches Gelées."
+
+#: 70744658739200000
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Maintenant, je serai l'homme le plus important de la ville."

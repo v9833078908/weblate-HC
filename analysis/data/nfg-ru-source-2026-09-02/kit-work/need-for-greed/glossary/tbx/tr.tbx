@@ -1,0 +1,1527 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE martif PUBLIC "ISO 12200:1999A//DTD MARTIF core (DXFcdV04)//EN" "TBXcdv04.dtd">
+<martif type="TBX" xml:lang="ru">
+    <martifHeader>
+        <fileDesc>
+            <sourceDesc>
+                <p>Translate Toolkit</p>
+            </sourceDesc>
+        </fileDesc>
+    </martifHeader>
+    <text>
+        <body>
+            <termEntry id="[&quot;&quot;, &quot;Новые очки&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Новые очки</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yeni Bir Gözlük</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.1Step2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Щедрые на лайки!&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Щедрые на лайки!</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Her şey beğenilerle ilgili!</term></tig></langSet>
+                <descrip>[UI] upgradeTradeMoreLikesStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Алтарь&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Алтарь</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altar</term></tig></langSet>
+                <descrip>[UI] upgradeCraftCurseRemovalSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Аметист (Большой)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Аметист (Большой)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Ametist (Büyük)</term></tig></langSet>
+                <descrip>[Loot] amethystBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Аметист (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Аметист (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Ametist (Orta)</term></tig></langSet>
+                <descrip>[Loot] amethystMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Аметист (Необработанный)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Аметист (Необработанный)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Ametist (Ham)</term></tig></langSet>
+                <descrip>[Loot] amethystRough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Аметист (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Аметист (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Ametist (Küçük)</term></tig></langSet>
+                <descrip>[Loot] amethystSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Монета Судьбы&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Монета Судьбы</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Antik Para (Altın)</term></tig></langSet>
+                <descrip>[Loot] goldSmallCoin</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Древняя монета (серебро)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Древняя монета (серебро)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Antik Para (Gümüş)</term></tig></langSet>
+                <descrip>[Loot] silverSmallCoin</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Древние деньги&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Древние деньги</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Antik Para</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Древняя книга&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Древняя книга</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kadim Kitap</term></tig></langSet>
+                <descrip>[Loot] artifactBook
+
+A substantial book or volume; not a scroll.</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Оценка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Оценка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Değerleme</term></tig></langSet>
+                <descrip>[UI] unknownSlot</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Артефакт&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Артефакт</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Eser</term></tig></langSet>
+                <descrip>[Loot] artifact; [UI] artifact</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Артефакты&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Артефакты</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Eserler</term></tig></langSet>
+                <descrip>[UI] artifacts</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Птичий Самоцвет&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Птичий Самоцвет</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kuş Mücevheri</term></tig></langSet>
+                <descrip>[Loot] gemBirdSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Рюкзак&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Рюкзак</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Sırt Çantası</term></tig></langSet>
+                <descrip>[UI] backpack</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Плохая прибыль&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Плохая прибыль</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kötü kâr</term></tig></langSet>
+                <descrip>[UI] badProfit</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Шарокат&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Шарокат</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Top Yuvarlayıcı</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Светоч&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Светоч</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Fener</term></tig></langSet>
+                <descrip>[UI] terrain2Biome2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;Belomar&quot;, &quot;Белоземье&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Белоземье</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Belomar</term></tig></langSet>
+                <descrip>[UI] terrain2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Лучшая Грелка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Лучшая Грелка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>En İyi Isıtıcı</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Лучшая прибыль&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Лучшая прибыль</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>En iyi kar</term></tig></langSet>
+                <descrip>[UI] bestProfit</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Большая сумка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Большая сумка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Büyük çanta</term></tig></langSet>
+                <descrip>[UI] upgradeVehicleWeightStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Большой Куш&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Большой Куш</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Büyük Anlaşma</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step7Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Взрослая Сова&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Взрослая Сова</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Büyük Baykuş</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step6Thank</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Птица&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Птица</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kuş</term></tig></langSet>
+                <descrip>[UI] bird</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Кровотечение&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Кровотечение</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kanama</term></tig></langSet>
+                <descrip>[UI] statEffectDamageBleed</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Брошь Расцветшего Сада (золото)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Брошь Расцветшего Сада (золото)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Çiçek Açan Bahçe Broşu (Altın)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldNecklace1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Синий Сапфир (Большой)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Синий Сапфир (Большой)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Mavi Safir (Büyük)</term></tig></langSet>
+                <descrip>[Loot] sapphireBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Синий Сапфир (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Синий Сапфир (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Mavi Safir (Orta)</term></tig></langSet>
+                <descrip>[Loot] sapphireMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Синий Сапфир (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Синий Сапфир (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Mavi Safir (Küçük)</term></tig></langSet>
+                <descrip>[Loot] sapphireSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Пояс Уз (серебро)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Пояс Уз (серебро)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bağlı Kemer (Gümüş)</term></tig></langSet>
+                <descrip>[Loot] treasureSilverNecklace1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Камень Привязанности (Большой)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Камень Привязанности (Большой)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bağ Taşı (Büyük)</term></tig></langSet>
+                <descrip>[Loot] loveBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Камень Привязанности (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Камень Привязанности (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bağ Taşı (Orta)</term></tig></langSet>
+                <descrip>[Loot] loveMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Камень Привязанности (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Камень Привязанности (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bağ Taşı (Küçük)</term></tig></langSet>
+                <descrip>[Loot] gemLoveSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Браслет&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Браслет</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bilezik</term></tig></langSet>
+                <descrip>[Loot] bracelet</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Сломанная Маска Лика&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сломанная Маска Лика</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kırık Görünüm Maskesi</term></tig></langSet>
+                <descrip>[Loot] roughMaskT1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Брошь&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Брошь</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Broş</term></tig></langSet>
+                <descrip>[Loot] brooch</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Бурый Рубин&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Бурый Рубин</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kahverengi Yakut</term></tig></langSet>
+                <descrip>[Loot] gem.ruby.small.t1.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;Buried Chest&quot;, &quot;Сундук&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сундук</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Gömülü Sandık</term></tig></langSet>
+                <descrip>[Loot] chest</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Покупатель&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Покупатель</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Alıcı</term></tig></langSet>
+                <descrip>[Tutorial] buyer</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Канарейка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Канарейка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kanarya</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step3Description; [Tutorial] DialogueBeforeBirdCharacter2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Вместимость&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Вместимость</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kapasite</term></tig></langSet>
+                <descrip>[UI] upgradeStorageWeightStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Шкатулка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Шкатулка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Mücevher Kutusu</term></tig></langSet>
+                <descrip>[Loot] casket</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Небесное кольцо&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Небесное кольцо</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Göksel Yüzük</term></tig></langSet>
+                <descrip>[Loot] treasureMeteoriteIron1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Искатель&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Искатель</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Karakter</term></tig></langSet>
+                <descrip>[Tutorial] character</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Состояние персонажа&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Состояние персонажа</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Karakter Durumu</term></tig></langSet>
+                <descrip>[UI] effects</descrip>
+            </termEntry>
+            <termEntry id="[&quot;Chest&quot;, &quot;Сундук&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сундук</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Sandık</term></tig></langSet>
+                <descrip>[UI] chest</descrip>
+            </termEntry>
+            <termEntry id="[&quot;Chest of the Jarl&quot;, &quot;Сундук Конунга&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сундук Конунга</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Jarl'ın Sandığı</term></tig></langSet>
+                <descrip>[Loot] winter.chest</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Взлом&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Взлом</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Sandık yuvası</term></tig></langSet>
+                <descrip>[UI] upgradeCraftChestSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Сундуки&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сундуки</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Sandıklar</term></tig></langSet>
+                <descrip>[UI] chests</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Сколотый Алмаз (Большой)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сколотый Алмаз (Большой)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yontulmuş Büyük Elmas</term></tig></langSet>
+                <descrip>[Loot] gem.diamond.big.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;КоКо&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>КоКо</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Coco</term></tig></langSet>
+                <descrip>[UI] upgradeCraftEggSlotsStatDescription</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Монета древнего величия&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Монета древнего величия</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Antik Zafer Parası</term></tig></langSet>
+                <descrip>[Loot] artifactGoldCoinBest</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Монеты&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Монеты</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Madeni Paralar</term></tig></langSet>
+                <descrip>[UI] coins</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Получено&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Получено</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Toplandı</term></tig></langSet>
+                <descrip>[Loot] collected</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Комар в канифоли&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Комар в канифоли</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kolofon Sivrisinek</term></tig></langSet>
+                <descrip>[Loot] Jur.Cheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Колоссальный Алмаз&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Колоссальный Алмаз</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Dev Elmas</term></tig></langSet>
+                <descrip>[Loot] gem.diamond.big.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Обычный&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Обычный</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yaygın</term></tig></langSet>
+                <descrip>[UI] common</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Космический засланец&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Космический засланец</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kozmik Davetsiz Misafir</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Граф Блингула&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Граф Блингула</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kont Blingula</term></tig></langSet>
+                <descrip>[Buyers] Buyer10</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Камень Завета&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Камень Завета</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Antlaşma Taşı</term></tig></langSet>
+                <descrip>[Loot] artifactTablet</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Крабовое Железо&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Крабовое Железо</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yengeç Metali</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Крабовая Шуба&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Крабовая Шуба</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yengeç Sıcaklığı</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step6Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Крабовое Тепло&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Крабовое Тепло</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yengeç Sıcaklığı</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step4Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Треснувшая Длань&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Треснувшая Длань</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Çatlak Zırh Eldiveni</term></tig></langSet>
+                <descrip>[Loot] roughGloveT1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Крафт&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Крафт</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Zanaat</term></tig></langSet>
+                <descrip>[UI] craft</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Плавильня&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Плавильня</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Zanaat yuvası</term></tig></langSet>
+                <descrip>[UI] craftSlot; [UI] upgradeCraftCraftSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Алый Рубин (Большой)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Алый Рубин (Большой)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kızıl Yakut (Büyük)</term></tig></langSet>
+                <descrip>[Loot] rubyBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Алый Рубин (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Алый Рубин (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kızıl Yakut (Orta)</term></tig></langSet>
+                <descrip>[Loot] rubyMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Алый Рубин (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Алый Рубин (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kızıl Yakut (Küçük)</term></tig></langSet>
+                <descrip>[Loot] rubySmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Кроваво-красный Рубин&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Кроваво-красный Рубин</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kızıl Kan Yakutu</term></tig></langSet>
+                <descrip>[Loot] gem.ruby.small.t1.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Раскрошенное золото&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Раскрошенное золото</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Ufalanmış Altın</term></tig></langSet>
+                <descrip>[Loot] gold.small.t1.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Криолис&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Криолис</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Cryolis</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step2Description; [Orders] orderTerrain2.2Step4Description; [Loot] cryolisSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Криолис (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Криолис (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Cryolis Külçesi (Küçük)</term></tig></langSet>
+                <descrip>[Loot] cryolisSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Проклято&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Проклято</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Lanetli</term></tig></langSet>
+                <descrip>[UI] cursed</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Проклятый предмет&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Проклятый предмет</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Lanetli Kalıntı</term></tig></langSet>
+                <descrip>[Loot] cursedItem</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Кинжал&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Кинжал</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Hançer</term></tig></langSet>
+                <descrip>[Loot] dagger</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Сундук мертвеца&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сундук мертвеца</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Ölü Adamın Sandığı</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.1Step4Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Скупщик&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Скупщик</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Satıcı</term></tig></langSet>
+                <descrip>[Tutorial] tip7; [UI] dealerWillBuyTheRest</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Сноровка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сноровка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Çeviklik</term></tig></langSet>
+                <descrip>[UI] statEffectToolSpeedPositive</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Диадема&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Диадема</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Diadem</term></tig></langSet>
+                <descrip>[Loot] diadem</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Алмаз (Необработанный)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Алмаз (Необработанный)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Elmas (Ham)</term></tig></langSet>
+                <descrip>[Loot] diamondRough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Потускневшее серебро&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Потускневшее серебро</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donuk Gümüş</term></tig></langSet>
+                <descrip>[Loot] silver.small.t1.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Дискета с ярлыками игр&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Дискета с ярлыками игр</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Sahte sürücü</term></tig></langSet>
+                <descrip>[Loot] Flop.Cheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Навозный пирог&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Навозный пирог</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Gübre Pastası</term></tig></langSet>
+                <descrip>[Loot] Shit.Cheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Серьга&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Серьга</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Küpe</term></tig></langSet>
+                <descrip>[Loot] earring</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Яйцо&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Яйцо</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yumurta</term></tig></langSet>
+                <descrip>[UI] egg</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Яйца&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Яйца</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yumurtalar</term></tig></langSet>
+                <descrip>[UI] eggs</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Эльф Лустро&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Эльф Лустро</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Elf Lustro</term></tig></langSet>
+                <descrip>[Buyers] Buyer6</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Элитная ячейка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Элитная ячейка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Elit yuva</term></tig></langSet>
+                <descrip>[UI] eliteSlot</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Элиза Блескфорд&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Элиза Блескфорд</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Eliza Glitterford</term></tig></langSet>
+                <descrip>[Buyers] Buyer4</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Изумруд (Большой)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Изумруд (Большой)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Zümrüt (Büyük)</term></tig></langSet>
+                <descrip>[Loot] emeraldBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Изумруд (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Изумруд (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Zümrüt (Orta)</term></tig></langSet>
+                <descrip>[Loot] emeraldMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Изумруд (Необработанный)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Изумруд (Необработанный)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Zümrüt (Ham)</term></tig></langSet>
+                <descrip>[Loot] emeraldRough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Изумруд (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Изумруд (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Zümrüt (Küçük)</term></tig></langSet>
+                <descrip>[Loot] emeraldSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Эпический&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Эпический</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Epik</term></tig></langSet>
+                <descrip>[UI] epic</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Эссенция пламени&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Эссенция пламени</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Alev Özü</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step4Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Истощение&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Истощение</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Tükenmişlik</term></tig></langSet>
+                <descrip>[UI] statEffectDamageCurse</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Усталость&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Усталость</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yorgunluk</term></tig></langSet>
+                <descrip>[UI] statEffectToolSpeedNegative</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Фенмарская топь&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Фенмарская топь</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Fenmar Bataklığı</term></tig></langSet>
+                <descrip>[UI] terrain1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Несовершенный Алмаз (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Несовершенный Алмаз (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kusurlu Elmas (Orta)</term></tig></langSet>
+                <descrip>[Loot] gem.diamond.medium.t1.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Идеальный Алмаз (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Идеальный Алмаз (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kusursuz Elmas (Orta)</term></tig></langSet>
+                <descrip>[Loot] gem.diamond.medium.t1.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Дискета со Скуфкоинами&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Дискета со Скуфкоинами</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Flopcoin'li Disket</term></tig></langSet>
+                <descrip>[Loot] Flop</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Кузница&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Кузница</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Dövme</term></tig></langSet>
+                <descrip>[UI] forge</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Надломленный Венец&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Надломленный Венец</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kırık Taç</term></tig></langSet>
+                <descrip>[Loot] roughCrownT1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Надломленной Кинжал Воли&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Надломленной Кинжал Воли</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kırık İrade Hançeri</term></tig></langSet>
+                <descrip>[Loot] roughDaggerT1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Маска для пятницы&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Маска для пятницы</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Cuma Gecesi Maskesi</term></tig></langSet>
+                <descrip>[Loot] Frid</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Обморожение&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Обморожение</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donma</term></tig></langSet>
+                <descrip>[UI] statEffectAccumulationFreeze</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Мороженное Золото&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Мороженное Золото</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Buzlu Altın</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.1Step3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Мороженное Серебро&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Мороженное Серебро</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Buzlu Gümüş</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.1Step2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замороженный&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замороженный</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş</term></tig></langSet>
+                <descrip>[UI] frozen</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замороженная древняя книга&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замороженная древняя книга</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş Antik Tomar</term></tig></langSet>
+                <descrip>[Loot] frozen.artifact.book.t4.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замороженный Алмаз (Большой)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замороженный Алмаз (Большой)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş Elmas (Büyük)</term></tig></langSet>
+                <descrip>[Loot] frozen.daimond.big.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замороженный Алмаз (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замороженный Алмаз (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş Elmas (Orta)</term></tig></langSet>
+                <descrip>[Loot] frozen.daimond.medium.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замороженный Золотой самородок (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замороженный Золотой самородок (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş Altın Külçesi (Küçük)</term></tig></langSet>
+                <descrip>[Loot] frozen.gold.small.t1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замороженный Идол&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замороженный Идол</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş İdol</term></tig></langSet>
+                <descrip>[Loot] frozen.treasure.1g.idol</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замороженный предмет&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замороженный предмет</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş eşya</term></tig></langSet>
+                <descrip>[Loot] frozenItem</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замороженный Крупный Кусок Золота&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замороженный Крупный Кусок Золота</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş Büyük Altın Parçası</term></tig></langSet>
+                <descrip>[Loot] frozen.gold.medium.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замороженный Опал (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замороженный Опал (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş Opal (Küçük)</term></tig></langSet>
+                <descrip>[Loot] frozen.opal.small.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замороженный Рубин (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замороженный Рубин (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş Yakut (Küçük)</term></tig></langSet>
+                <descrip>[Loot] frozen.ruby.small.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замороженный Сапфир (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замороженный Сапфир (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş Safir (Küçük)</term></tig></langSet>
+                <descrip>[Loot] frozen.sapphire.small.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Мёрзлая Верфь&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Мёрзлая Верфь</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş Tersane</term></tig></langSet>
+                <descrip>[UI] terrain2Biome1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замороженный Серебряный самородок (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замороженный Серебряный самородок (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Donmuş Gümüş Külçesi (Küçük)</term></tig></langSet>
+                <descrip>[Loot] frozen.silver.small.t1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Камень&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Камень</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Mücevher</term></tig></langSet>
+                <descrip>[UI] gem</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Искатель самоцветов&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Искатель самоцветов</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Mücevher Arayıcısı</term></tig></langSet>
+                <descrip>[UI] upgradeDetectorGemsAmountStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Камни&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Камни</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Mücevherler</term></tig></langSet>
+                <descrip>[UI] gems</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Щедрые покупатели&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Щедрые покупатели</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Cömert alıcılar</term></tig></langSet>
+                <descrip>[UI] upgradeTradeNewBuyersStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Зуб Чингисхана&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Зуб Чингисхана</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Cengiz Han Dişi</term></tig></langSet>
+                <descrip>[Loot] Tooth</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Геод&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Геод</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Jeot</term></tig></langSet>
+                <descrip>[UI] geode</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Геод (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Геод (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Jeot (Orta)</term></tig></langSet>
+                <descrip>[Loot] geodeMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Геод (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Геод (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Jeot (Küçük)</term></tig></langSet>
+                <descrip>[Loot] geodeSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Геоды&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Геоды</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Jeotlar</term></tig></langSet>
+                <descrip>[UI] geodes</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Привыкание к земле&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Привыкание к земле</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Toprağa Alışmak</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.1Step3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Очки&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Очки</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Gözlük</term></tig></langSet>
+                <descrip>[Loot] glasses</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Отблеск рассвета&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Отблеск рассвета</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Şafağın Parıltısı</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.1Step1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Сияющий Серебряный Самородок&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сияющий Серебряный Самородок</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Parlak Gümüş Külçe</term></tig></langSet>
+                <descrip>[Loot] silver.small.t1.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Ходим по-большому&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Ходим по-большому</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Büyümek</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золото&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золото</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın</term></tig></langSet>
+                <descrip>[UI] gold</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотой самородок (Большой)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотой самородок (Большой)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın Külçesi (Büyük)</term></tig></langSet>
+                <descrip>[Loot] goldBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотой самородок (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотой самородок (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın Külçesi (Küçük)</term></tig></langSet>
+                <descrip>[Loot] goldSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотые монеты&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотые монеты</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın paralar</term></tig></langSet>
+                <descrip>[UI] hardCurrency</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотой Венец&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотой Венец</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın Taç</term></tig></langSet>
+                <descrip>[Loot] treasureGoldCrownT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотой Кинжал Воли&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотой Кинжал Воли</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın İrade Hançeri</term></tig></langSet>
+                <descrip>[Loot] treasureGoldDagger2GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотая Длань&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотая Длань</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın Zırh Eldiveni</term></tig></langSet>
+                <descrip>[Loot] treasureGoldGlove5GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотой омлет&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотой омлет</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın Omlet</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step4Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотой жук-скарабей&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотой жук-скарабей</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın Böcek</term></tig></langSet>
+                <descrip>[Loot] goldSmallScarab</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотой Скипетр&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотой Скипетр</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın Asa</term></tig></langSet>
+                <descrip>[Loot] treasureGoldScepter3GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотой унитаз&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотой унитаз</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın tuvalet</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step7Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотая Маска Лика&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотая Маска Лика</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın Görünüm Maskesi</term></tig></langSet>
+                <descrip>[Loot] treasureGoldMask2GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотая жила&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотая жила</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Altın madeni</term></tig></langSet>
+                <descrip>[UI] upgradeCraftCostStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Хорошая прибыль&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Хорошая прибыль</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>İyi kâr</term></tig></langSet>
+                <descrip>[UI] goodProfit</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Могилы&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Могилы</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Mezarlar</term></tig></langSet>
+                <descrip>[UI] terrain1Biome1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Гримдаль&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Гримдаль</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Grimdal</term></tig></langSet>
+                <descrip>[UI] terrain3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Подножная Астрология&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Подножная Астрология</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Temelli Astroloji</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Небесная благодать&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Небесная благодать</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Cennetin Lütfu</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step6Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Заговорённая монета&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Заговорённая монета</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Lanetli Madeni Para</term></tig></langSet>
+                <descrip>[Loot] artifactGoldCoin</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Булавка Тайного Самоцвета (Золото)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Булавка Тайного Самоцвета (Золото)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Gizli Mücevher İğnesi (Altın)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldPin1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Мощи Святого Говарда&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Мощи Святого Говарда</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kutsal Dubai Çikolatası</term></tig></langSet>
+                <descrip>[Loot] Shit</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Лошадь&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Лошадь</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>At</term></tig></langSet>
+                <descrip>[Tutorial] horse</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Сумка для лошади&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сумка для лошади</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>At kargo çantası</term></tig></langSet>
+                <descrip>[UI] horseCargoBag</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;ледяной краб&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>ледяной краб</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>buz yengeci</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step2Description; [Orders] orderTerrain2.2Step4Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Колотый Лед&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Колотый Лед</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Buz Küpleri</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.1Step1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Идол&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Идол</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>İdol</term></tig></langSet>
+                <descrip>[Loot] idol</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Искра идола&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Искра идола</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>İdol Ocağı</term></tig></langSet>
+                <descrip>[Loot] gemIdolHearthSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Идол Пылающего Черепа&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Идол Пылающего Черепа</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Alevli Kafatası İdolü</term></tig></langSet>
+                <descrip>[Loot] treasure2GIdolT1.2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Идол Великого Хряка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Идол Великого Хряка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Büyük Yaban Domuzu İdolü</term></tig></langSet>
+                <descrip>[Loot] treasure2GIdolT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Идол Усатости&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Идол Усатости</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bıyıklılık İdolü</term></tig></langSet>
+                <descrip>[Loot] treasure.3g.idol.cheap.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Идол Обгоревшей Макушки&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Идол Обгоревшей Макушки</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yanık Kafa İdolü</term></tig></langSet>
+                <descrip>[Loot] treasure2GIdolCheapT1.2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Идол Мудрости&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Идол Мудрости</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bilgelik İdolü</term></tig></langSet>
+                <descrip>[Loot] treasure.3g.idol.t1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Искра Идола&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Искра Идола</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>İdol Kıvılcımı</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step4Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Инкубатор&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Инкубатор</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kuluçka Makinesi</term></tig></langSet>
+                <descrip>[UI] upgradeCraftEggSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Вставка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Вставка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Ekle</term></tig></langSet>
+                <descrip>[UI] upgradeCraftInlaySlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Инвентарь&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Инвентарь</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Envanter</term></tig></langSet>
+                <descrip>[UI] inventory</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Невидимый Камень&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Невидимый Камень</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Görünmez Mücevher</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.1Step4Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Переливчатый камень&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Переливчатый камень</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yanardöner Taş</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step5Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Оно оставило потомство!&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Оно оставило потомство!</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yavrular Bıraktı!</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step6Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;Jarl Chest&quot;, &quot;Сундук Конунга&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сундук Конунга</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Jarl Sandığı</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step3Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Украшение&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Украшение</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Mücevherat</term></tig></langSet>
+                <descrip>[UI] treasure</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Ювелирный спринт&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Ювелирный спринт</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Mücevher Sprinti</term></tig></langSet>
+                <descrip>[UI] upgradeCraftTimeStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Шкатулка Прошлого&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Шкатулка Прошлого</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Hatıra Kutusu</term></tig></langSet>
+                <descrip>[Loot] Lem</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Перстень короля (золото)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Перстень короля (золото)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kraliyet Mührü (Altın)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldRing1GT1.3</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Лабиринт&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Лабиринт</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Labirent</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step8Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Леди Аметиста&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Леди Аметиста</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Leydi Amethysta</term></tig></langSet>
+                <descrip>[Buyers] Buyer2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Крупный Кусок Золота&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Крупный Кусок Золота</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Büyük Altın Parçası</term></tig></langSet>
+                <descrip>[Loot] goldMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Лидеры&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Лидеры</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Liderler</term></tig></langSet>
+                <descrip>[UI] leaders</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Легендарный&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Легендарный</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Efsanevi</term></tig></langSet>
+                <descrip>[UI] legendary</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Леонард Голдстейн&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Леонард Голдстейн</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Leonard Goldstein</term></tig></langSet>
+                <descrip>[Buyers] Buyer3</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Лайки&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Лайки</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Beğeniler</term></tig></langSet>
+                <descrip>[UI] hearthCurrency</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Кровь льва&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Кровь льва</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Aslan Kanı</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step5Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Добыча&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Добыча</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Ganimet</term></tig></langSet>
+                <descrip>[UI] loot</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Перекошенный Сапфир&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Перекошенный Сапфир</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yamuk Safir</term></tig></langSet>
+                <descrip>[Loot] gem.sapphire.medium.t1.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Лорд Глимо&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Лорд Глимо</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Lord Glimo</term></tig></langSet>
+                <descrip>[Buyers] Buyer5</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Заблудье&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Заблудье</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Lostwood</term></tig></langSet>
+                <descrip>[UI] terrain2Biome3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Лучистый Опал&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Лучистый Опал</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Parlak Opal</term></tig></langSet>
+                <descrip>[Loot] gem.opal.small.t1.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Промерзший кусок золота&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Промерзший кусок золота</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bükülmüş Altın Parçası</term></tig></langSet>
+                <descrip>[Loot] gold.medium.t1.2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Карта&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Карта</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Harita</term></tig></langSet>
+                <descrip>[UI] map</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Маска&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Маска</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Maske</term></tig></langSet>
+                <descrip>[Loot] mask</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Металл&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Металл</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Metal</term></tig></langSet>
+                <descrip>[UI] metal</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Металлы&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Металлы</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Metaller</term></tig></langSet>
+                <descrip>[UI] metals</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Ядро Метеора&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Ядро Метеора</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Meteor Çekirdeği</term></tig></langSet>
+                <descrip>[Loot] artifactGalaxyMechanism</descrip>
+            </termEntry>
+            <termEntry id="[&quot;Meteorfall&quot;, &quot;Звездопад&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Звездопад</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Meteor Düşüşü</term></tig></langSet>
+                <descrip>[UI] terrain1Biome2Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Маска Четных Чисел&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Маска Четных Чисел</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>12. Pazartesi Maskesi</term></tig></langSet>
+                <descrip>[Loot] Frid.Cheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Лунное Кольцо (серебро)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Лунное Кольцо (серебро)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Ay Işığı Yüzüğü (Gümüş)</term></tig></langSet>
+                <descrip>[Loot] treasureSilverRing1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замшелая монета&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замшелая монета</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yosunlu Madeni Para</term></tig></langSet>
+                <descrip>[Loot] artifactGoldCoinCheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Мутный Опал&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Мутный Опал</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bulanık Opal</term></tig></langSet>
+                <descrip>[Loot] gem.opal.small.t1.bad</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Камень Чего-то?&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Камень Чего-то?</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Gizemli-Çöp Taş</term></tig></langSet>
+                <descrip>[Loot] Tablet.Cheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Мифический&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Мифический</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Efsanevi</term></tig></langSet>
+                <descrip>[UI] mythic</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Браслет Узкого Камня (золото)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Браслет Узкого Камня (золото)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Dar Taş Bilezik (Altın)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldRing1GT1.2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Ожерелье&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Ожерелье</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kolye</term></tig></langSet>
+                <descrip>[Loot] necklace</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Игла Чести (серебро)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Игла Чести (серебро)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Onur İğnesi (Gümüş)</term></tig></langSet>
+                <descrip>[Loot] treasureSilverPin1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Новые датчики&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Новые датчики</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yeni Sensörler</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step5Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Новый прилавок&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Новый прилавок</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yeni yuva</term></tig></langSet>
+                <descrip>[UI] upgradeTradeSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Шумный инструмент&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Шумный инструмент</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Gürültülü Alet</term></tig></langSet>
+                <descrip>[UI] statEffectToolNoiseNegative</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Опал (Большой)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Опал (Большой)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Opal (Büyük)</term></tig></langSet>
+                <descrip>[Loot] opalBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Опал (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Опал (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Opal (Orta)</term></tig></langSet>
+                <descrip>[Loot] opalMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Опал (Необработанный)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Опал (Необработанный)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Opal (Ham)</term></tig></langSet>
+                <descrip>[Loot] opalRough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Опал (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Опал (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Opal (Küçük)</term></tig></langSet>
+                <descrip>[Loot] opalSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Искатель руды&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Искатель руды</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Cevher Arayıcısı</term></tig></langSet>
+                <descrip>[UI] upgradeDetectorGoldAmountStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Птенец Совы&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Птенец Совы</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Baykuş Yavrusu</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step6Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Золотое Яйцо&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Золотое Яйцо</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Cennet Kuşu Yumurtası</term></tig></langSet>
+                <descrip>[Loot] eggBird</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Кулон Скрытого Света (Золото)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Кулон Скрытого Света (Золото)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Gizli Işık Kolyesi (Altın)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldNecklace1GT1.2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Кирка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Кирка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kazma</term></tig></langSet>
+                <descrip>[UI] Pick</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Булавка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Булавка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>İğne</term></tig></langSet>
+                <descrip>[Loot] pin</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Полировка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Полировка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Parlatma</term></tig></langSet>
+                <descrip>[UI] upgradeCraftPolishingSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Идол Хряка для бедных&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Идол Хряка для бедных</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Fakir Adamın Yaban Domuzu İdolü</term></tig></langSet>
+                <descrip>[Loot] treasure2GIdolCheapT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Чистейший золотой самородок&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Чистейший золотой самородок</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Tertemiz Altın Külçesi</term></tig></langSet>
+                <descrip>[Loot] gold.small.t1.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Старатели&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Старатели</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Prospektörler</term></tig></langSet>
+                <descrip>[UI] prospectors</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Чистый Алмаз (Большой)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Чистый Алмаз (Большой)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Saf Elmas (Büyük)</term></tig></langSet>
+                <descrip>[Loot] diamondBig</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Чистый Алмаз (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Чистый Алмаз (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Saf Elmas (Orta)</term></tig></langSet>
+                <descrip>[Loot] diamondMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Чистый Алмаз (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Чистый Алмаз (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Saf Elmas (Küçük)</term></tig></langSet>
+                <descrip>[Loot] diamondSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Тихолесье&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Тихолесье</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Sakin Orman</term></tig></langSet>
+                <descrip>[UI] terrain0Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Медальон Блеска (Золото)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Медальон Блеска (Золото)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Parlak Madalyon (Altın)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldEarring1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Редкий&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Редкий</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Nadir</term></tig></langSet>
+                <descrip>[UI] rare</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Редкость&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Редкость</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Nadirlik</term></tig></langSet>
+                <descrip>[UI] upgradeCraftRarityStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Рецепт&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Рецепт</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Tarif</term></tig></langSet>
+                <descrip>[UI] recipe</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Книга рецептов&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Книга рецептов</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Tarif kitabı</term></tig></langSet>
+                <descrip>[UI] upgradeCraftRecipesStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Регенерация&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Регенерация</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yenilenme</term></tig></langSet>
+                <descrip>[UI] statEffectHeal</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Звонкие Серьги (золото)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Звонкие Серьги (золото)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Rezonant Küpeler (Altın)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldEarring2GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Кольцо&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Кольцо</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yüzük</term></tig></langSet>
+                <descrip>[Loot] ring</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Кольцо (золото)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Кольцо (золото)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yüzük (Altın)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldRing1GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Роман фон Вэлиант&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Роман фон Вэлиант</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Roman von Valiant</term></tig></langSet>
+                <descrip>[Buyers] Buyer1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Необработанные&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Необработанные</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Ham</term></tig></langSet>
+                <descrip>[UI] rough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Рубин (Необработанный)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Рубин (Необработанный)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yakut (Ham)</term></tig></langSet>
+                <descrip>[Loot] rubyRough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Руби Рэй&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Руби Рэй</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yakut Işını</term></tig></langSet>
+                <descrip>[Buyers] Buyer8</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Рубинобород&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Рубинобород</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yakut Sakal</term></tig></langSet>
+                <descrip>[Buyers] Buyer9</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Сапфир (Необработанный)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сапфир (Необработанный)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Safir (Ham)</term></tig></langSet>
+                <descrip>[Loot] sapphireRough</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Лесопилка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Лесопилка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kereste Fabrikası</term></tig></langSet>
+                <descrip>[UI] terrain2Biome0Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;змеиное кольцо (серебро)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>змеиное кольцо (серебро)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yılan Yüzüğü (Gümüş)</term></tig></langSet>
+                <descrip>[Loot] treasureSilverRing1GT1.2</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Расколотый Скипетр&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Расколотый Скипетр</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Parçalanmış Asa</term></tig></langSet>
+                <descrip>[Loot] roughtScepterT1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Капище&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Капище</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Tapınak</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step2Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Тихий инструмент&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Тихий инструмент</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Sessiz Alet</term></tig></langSet>
+                <descrip>[UI] statEffectToolNoisePositive</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Серебряные монеты&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Серебряные монеты</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Gümüş paralar</term></tig></langSet>
+                <descrip>[UI] softCurrency</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Серебро для закалки&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Серебро для закалки</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Sertleştirme için Gümüş</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.1Step5Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Серебряный самородок (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Серебряный самородок (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Gümüş Külçesi (Küçük)</term></tig></langSet>
+                <descrip>[Loot] silverSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Сэр Максиллион&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сэр Максиллион</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Sör Maxillion</term></tig></langSet>
+                <descrip>[Buyers] Buyer7</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Небесный Сапфир&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Небесный Сапфир</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Göksel Safir</term></tig></langSet>
+                <descrip>[Loot] gem.sapphire.medium.t1.good</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Ячейка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Ячейка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yuva</term></tig></langSet>
+                <descrip>[UI] slot</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Замедление&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Замедление</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yavaşlama</term></tig></langSet>
+                <descrip>[UI] statEffectMovementSpeedNegative</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Источник Древней Крови&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Источник Древней Крови</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Eski Kanın Kaynağı</term></tig></langSet>
+                <descrip>[Loot] Jur</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Перстень Владыки (золото)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Перстень Владыки (золото)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Hükümdar Mührü (Altın)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldRing1GT1.4</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Искрокрыл&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Искрокрыл</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Kıvılcım Kanat</term></tig></langSet>
+                <descrip>[Loot] sparkwing</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Ускорение&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Ускорение</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Hız Takviyesi</term></tig></langSet>
+                <descrip>[UI] statEffectMovementSpeedPositive</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Великолепный Кусок Золота&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Великолепный Кусок Золота</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Muhteşem Altın Parçası</term></tig></langSet>
+                <descrip>[Loot] gold.medium.t1.3</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Звёздное железо (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Звёздное железо (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yıldız Demiri (Küçük)</term></tig></langSet>
+                <descrip>[Loot] meteoriteIronSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;Starfall&quot;, &quot;Звездопад&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Звездопад</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Yıldız Düşüşü</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step1Description; [Orders] orderTerrain2.2Step3Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Каменный боулинг&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Каменный боулинг</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Taş Bowling</term></tig></langSet>
+                <descrip>[Orders] orderTerrain1.2Step3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Склад&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Склад</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Depolama</term></tig></langSet>
+                <descrip>[UI] storage</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Культ Солнца&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Культ Солнца</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Güneş Kültü</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.2Step7Description; [Orders] orderTerrain2.3Step8Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Солнечная Сфера&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Солнечная Сфера</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Güneş Küresi</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step2Description; [Orders] orderTerrain2.3Step4Description; [Orders] orderTerrain2.3Step6Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Солнечная Брошь (золото)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Солнечная Брошь (золото)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Güneş Patlaması Broşu (Altın)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldBrooch2GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Супер слот&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Супер слот</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Süper yuva</term></tig></langSet>
+                <descrip>[UI] upgradeCraftSuperSlotsStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Топь&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Топь</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bataklık</term></tig></langSet>
+                <descrip>[UI] terrain1Biome0Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Болотная Личинка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Болотная Личинка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bataklık Larvası</term></tig></langSet>
+                <descrip>[Loot] artifactWormEntity</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Щупальцевый Перстень (серебро)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Щупальцевый Перстень (серебро)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Dokunaç Mührü (Gümüş)</term></tig></langSet>
+                <descrip>[Loot] treasureSilverRing1GT1.3</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Торговец&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Торговец</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Tüccar</term></tig></langSet>
+                <descrip>[Tutorial] trader</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Торги&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Торги</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Ticaret</term></tig></langSet>
+                <descrip>[UI] trading</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Торговая лавка&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Торговая лавка</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Ticaret dükkanı</term></tig></langSet>
+                <descrip>[UI] tradingShop</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Мусор&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Мусор</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Çöp</term></tig></langSet>
+                <descrip>[Loot] trash; [UI] trash</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Детектор сокровищ&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Детектор сокровищ</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Hazine dedektörü</term></tig></langSet>
+                <descrip>[UI] treasureDetector</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Перстень Двух Судеб (золото)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Перстень Двух Судеб (золото)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>İkiz Kader Yüzüğü (Altın)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldRing2GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Необычный&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Необычный</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Sıradışı</term></tig></langSet>
+                <descrip>[UI] uncommon</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Неизвестный&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Неизвестный</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bilinmeyen</term></tig></langSet>
+                <descrip>[UI] unknown</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Неизвестный предмет&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Неизвестный предмет</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bilinmeyen eşya</term></tig></langSet>
+                <descrip>[Loot] unknownItem</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Ценный Геод (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Ценный Геод (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Değerli Jeot (Orta)</term></tig></langSet>
+                <descrip>[Loot] geodeGemMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Ценный Геод (Малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Ценный Геод (Малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Değerli Jeot (Küçük)</term></tig></langSet>
+                <descrip>[Loot] geodeGemSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Очки Тщеславия (золото)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Очки Тщеславия (золото)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Gösteriş Gözlüğü (Altın)</term></tig></langSet>
+                <descrip>[Loot] treasureGoldGlasses2GT1.1</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Пустошь&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Пустошь</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Çorak Toprak</term></tig></langSet>
+                <descrip>[UI] terrain0Biome0Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Нужно больше золота!&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Нужно больше золота!</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Daha Fazla Altına İhtiyacımız Var!</term></tig></langSet>
+                <descrip>[Orders] orderTerrain0.1Step1Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;Whitelands&quot;, &quot;Белоземье&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Белоземье</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Beyaz Topraklar</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step3Title; [Orders] orderTerrain2.3Step3Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Сокровище Белоземья&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Сокровище Белоземья</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Whitelands Hazinesi</term></tig></langSet>
+                <descrip>[Orders] orderTerrain2.3Step3Title</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Дикий Самоцвет (Средний)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Дикий Самоцвет (Средний)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Vahşi Mücevher (Orta)</term></tig></langSet>
+                <descrip>[Loot] gemRoughMedium</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Дикий Самоцвет (малый)&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Дикий Самоцвет (малый)</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Vahşi Mücevher (küçük)</term></tig></langSet>
+                <descrip>[Loot] gemRoughSmall</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Мудрые записи&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Мудрые записи</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Bilge notlar</term></tig></langSet>
+                <descrip>[UI] wiseNotes</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Червь&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Червь</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Solucan</term></tig></langSet>
+                <descrip>[Tutorial] tip2; [UI] terrain1Description</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Червиное Яйцо&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Червиное Яйцо</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Solucan Yumurtası</term></tig></langSet>
+                <descrip>[Loot] eggWorm</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Потёртый Свиток&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Потёртый Свиток</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Eskimiş Tomar</term></tig></langSet>
+                <descrip>[Loot] artifactManuscript</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Желток Фортуны&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Желток Фортуны</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Servet Yumurtası</term></tig></langSet>
+                <descrip>[Loot] artifactBirdEntity</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Ты пахнешь богатством&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Ты пахнешь богатством</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Zenginlik kokuyorsun</term></tig></langSet>
+                <descrip>[UI] upgradeTradeBestBuyersRateStat</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Твой зуб?!?&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Твой зуб?!?</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Dişin mi?!?</term></tig></langSet>
+                <descrip>[Loot] Tooth.Cheap</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Скупщик Златович&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Скупщик Златович</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Tüccar Zlatovich</term></tig></langSet>
+                <descrip>[UI] traderName</descrip>
+            </termEntry>
+            <termEntry id="[&quot;&quot;, &quot;Торговая лавка Златовича&quot;]" weblate-flags="terminology">
+                <langSet xml:lang="ru"><tig><term>Торговая лавка Златовича</term></tig></langSet>
+                <langSet xml:lang="tr"><tig><term>Zlatovich'in Ticaret Dükkanı</term></tig></langSet>
+                <descrip>[UI] tradingShopInfoTitle</descrip>
+            </termEntry>
+        </body>
+    </text>
+</martif>

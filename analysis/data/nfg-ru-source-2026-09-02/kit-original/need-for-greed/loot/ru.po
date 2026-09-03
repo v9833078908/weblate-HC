@@ -1,0 +1,475 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: ru\n"
+
+msgid "ring"
+msgstr "Кольцо"
+
+msgid "dagger"
+msgstr "Кинжал"
+
+msgid "necklace"
+msgstr "Ожерелье"
+
+msgid "treasureGoldScepter3GT1.1"
+msgstr "Золотой Скипетр"
+
+msgid "bracelet"
+msgstr "Браслет"
+
+msgid "brooch"
+msgstr "Брошь"
+
+msgid "diadem"
+msgstr "Диадема"
+
+msgid "casket"
+msgstr "Шкатулка"
+
+msgid "treasureGoldCrownT1.1"
+msgstr "Золотой Венец"
+
+msgid "diamondBig"
+msgstr "Чистый Алмаз (Большой)"
+
+msgid "diamondMedium"
+msgstr "Чистый Алмаз (Средний)"
+
+msgid "diamondSmall"
+msgstr "Чистый Алмаз (Малый)"
+
+msgid "rubyBig"
+msgstr "Алый Рубин (Большой)"
+
+msgid "rubyMedium"
+msgstr "Алый Рубин (Средний)"
+
+msgid "rubySmall"
+msgstr "Алый Рубин (Малый)"
+
+msgid "sapphireBig"
+msgstr "Синий Сапфир (Большой)"
+
+msgid "sapphireMedium"
+msgstr "Синий Сапфир (Средний)"
+
+msgid "sapphireSmall"
+msgstr "Синий Сапфир (Малый)"
+
+msgid "emeraldBig"
+msgstr "Изумруд (Большой)"
+
+msgid "emeraldMedium"
+msgstr "Изумруд (Средний)"
+
+msgid "emeraldSmall"
+msgstr "Изумруд (Малый)"
+
+msgid "amethystBig"
+msgstr "Аметист (Большой)"
+
+msgid "amethystMedium"
+msgstr "Аметист (Средний)"
+
+msgid "amethystSmall"
+msgstr "Аметист (Малый)"
+
+msgid "opalBig"
+msgstr "Опал (Большой)"
+
+msgid "opalMedium"
+msgstr "Опал (Средний)"
+
+msgid "opalSmall"
+msgstr "Опал (Малый)"
+
+msgid "diamondRough"
+msgstr "Алмаз (Необработанный)"
+
+msgid "amethystRough"
+msgstr "Аметист (Необработанный)"
+
+msgid "emeraldRough"
+msgstr "Изумруд (Необработанный)"
+
+msgid "opalRough"
+msgstr "Опал (Необработанный)"
+
+msgid "rubyRough"
+msgstr "Рубин (Необработанный)"
+
+msgid "sapphireRough"
+msgstr "Сапфир (Необработанный)"
+
+msgid "goldSmall"
+msgstr "Золотой самородок (Малый)"
+
+msgid "eggBird"
+msgstr "Золотое Яйцо"
+
+msgid "goldMedium"
+msgstr "Крупный Кусок Золота"
+
+msgid "goldBig"
+msgstr "Золотой самородок (Большой)"
+
+msgid "trash"
+msgstr "Мусор"
+
+msgid "pin"
+msgstr "Булавка"
+
+msgid "earring"
+msgstr "Серьга"
+
+msgid "glasses"
+msgstr "Очки"
+
+msgid "loveBig"
+msgstr "Камень Привязанности (Большой)"
+
+msgid "loveMedium"
+msgstr "Камень Привязанности (Средний)"
+
+msgid "gemBirdSmall"
+msgstr "Птичий Самоцвет"
+
+msgid "geodeMedium"
+msgstr "Геод (Средний)"
+
+msgid "gemRoughMedium"
+msgstr "Дикий Самоцвет (Средний)"
+
+msgid "artifact"
+msgstr "Артефакт"
+
+msgid "meteoriteIronSmall"
+msgstr "Звёздное железо (Малый)"
+
+msgid "mask"
+msgstr "Маска"
+
+msgid "treasureGoldGlove5GT1.1"
+msgstr "Золотая Длань"
+
+msgid "silverSmall"
+msgstr "Серебряный самородок (Малый)"
+
+msgid "idol"
+msgstr "Идол"
+
+msgid "goldSmallCoin"
+msgstr "Монета Судьбы"
+
+msgid "silverSmallCoin"
+msgstr "Древняя монета (серебро)"
+
+msgid "gemLoveSmall"
+msgstr "Камень Привязанности (Малый)"
+
+msgid "artifactBirdEntity"
+msgstr "Желток Фортуны"
+
+msgid "artifactWormEntity"
+msgstr "Болотная Личинка"
+
+msgid "artifactGalaxyMechanism"
+msgstr "Ядро Метеора"
+
+msgid "artifactBook"
+msgstr "Древняя книга"
+
+msgid "artifactManuscript"
+msgstr "Потёртый Свиток"
+
+msgid "artifactTablet"
+msgstr "Камень Завета"
+
+msgid "cursedItem"
+msgstr "Проклятый предмет"
+
+msgid "chest"
+msgstr "Сундук"
+
+msgid "eggWorm"
+msgstr "Червиное Яйцо"
+
+msgid "geodeSmall"
+msgstr "Геод (Малый)"
+
+msgid "geodeGemSmall"
+msgstr "Ценный Геод (Малый)"
+
+msgid "geodeGemMedium"
+msgstr "Ценный Геод (Средний)"
+
+msgid "goldSmallScarab"
+msgstr "Золотой жук-скарабей"
+
+msgid "gemRoughSmall"
+msgstr "Дикий Самоцвет (малый)"
+
+msgid "roughDaggerT1"
+msgstr "Надломленной Кинжал Воли"
+
+msgid "roughMaskT1"
+msgstr "Сломанная Маска Лика"
+
+msgid "roughtScepterT1"
+msgstr "Расколотый Скипетр"
+
+msgid "roughCrownT1"
+msgstr "Надломленный Венец"
+
+msgid "roughGloveT1"
+msgstr "Треснувшая Длань"
+
+msgid "unknownItem"
+msgstr "Неизвестный предмет"
+
+msgid "treasureGoldEarring1GT1.1"
+msgstr "Медальон Блеска (Золото)"
+
+msgid "treasureGoldNecklace1GT1.1"
+msgstr "Брошь Расцветшего Сада (золото)"
+
+msgid "treasureGoldNecklace1GT1.2"
+msgstr "Кулон Скрытого Света (Золото)"
+
+msgid "treasureGoldPin1GT1.1"
+msgstr "Булавка Тайного Самоцвета (Золото)"
+
+msgid "treasureGoldRing1GT1.1"
+msgstr "Кольцо (золото)"
+
+msgid "treasureGoldRing1GT1.2"
+msgstr "Браслет Узкого Камня (золото)"
+
+msgid "treasureGoldRing1GT1.3"
+msgstr "Перстень короля (золото)"
+
+msgid "treasureGoldRing1GT1.4"
+msgstr "Перстень Владыки (золото)"
+
+msgid "treasureGoldBrooch2GT1.1"
+msgstr "Солнечная Брошь (золото)"
+
+msgid "treasureGoldDagger2GT1.1"
+msgstr "Золотой Кинжал Воли"
+
+msgid "treasureGoldEarring2GT1.1"
+msgstr "Звонкие Серьги (золото)"
+
+msgid "treasureGoldGlasses2GT1.1"
+msgstr "Очки Тщеславия (золото)"
+
+msgid "treasureGoldMask2GT1.1"
+msgstr "Золотая Маска Лика"
+
+msgid "treasureGoldRing2GT1.1"
+msgstr "Перстень Двух Судеб (золото)"
+
+msgid "treasureMeteoriteIron1GT1.1"
+msgstr "Небесное кольцо"
+
+msgid "treasureMeteoriteIron2GT1.1"
+msgstr "Небесное кольцо"
+
+msgid "treasureSilverNecklace1GT1.1"
+msgstr "Пояс Уз (серебро)"
+
+msgid "treasureSilverRing1GT1.1"
+msgstr "Лунное Кольцо (серебро)"
+
+msgid "treasureSilverRing1GT1.2"
+msgstr "змеиное кольцо (серебро)"
+
+msgid "treasureSilverRing1GT1.3"
+msgstr "Щупальцевый Перстень (серебро)"
+
+msgid "treasureSilverPin1GT1.1"
+msgstr "Игла Чести (серебро)"
+
+msgid "artifactGoldCoinCheap"
+msgstr "Замшелая монета"
+
+msgid "artifactGoldCoin"
+msgstr "Заговорённая монета"
+
+msgid "artifactGoldCoinBest"
+msgstr "Монета древнего величия"
+
+msgid "treasure2GIdolCheapT1.1"
+msgstr "Идол Хряка для бедных"
+
+msgid "treasure2GIdolT1.1"
+msgstr "Идол Великого Хряка"
+
+msgid "treasure2GIdolCheapT1.2"
+msgstr "Идол Обгоревшей Макушки"
+
+msgid "treasure2GIdolT1.2"
+msgstr "Идол Пылающего Черепа"
+
+msgid "Lem"
+msgstr "Шкатулка Прошлого"
+
+msgid "Tablet.Cheap"
+msgstr "Камень Чего-то?"
+
+msgid "Flop"
+msgstr "Дискета со Скуфкоинами"
+
+msgid "Flop.Cheap"
+msgstr "Дискета с ярлыками игр"
+
+msgid "Shit"
+msgstr "Мощи Святого Говарда"
+
+msgid "Shit.Cheap"
+msgstr "Навозный пирог"
+
+msgid "Frid"
+msgstr "Маска для пятницы"
+
+msgid "Frid.Cheap"
+msgstr "Маска Четных Чисел"
+
+msgid "Jur"
+msgstr "Источник Древней Крови"
+
+msgid "Jur.Cheap"
+msgstr "Комар в канифоли"
+
+msgid "Tooth"
+msgstr "Зуб Чингисхана"
+
+msgid "Tooth.Cheap"
+msgstr "Твой зуб?!?"
+
+msgid "cryolisSmall"
+msgstr "Криолис (Малый)"
+
+msgid "frozenItem"
+msgstr "Замороженный предмет"
+
+msgid "emberSphere"
+msgstr "Солнечная Сфера"
+
+msgid "gemIdolHearthSmall"
+msgstr "Искра идола"
+
+msgid "sparkwing"
+msgstr "Искрокрыл"
+
+msgid "collected"
+msgstr "Получено"
+
+msgid "treasure.3g.idol.cheap.t1.1"
+msgstr "Идол Усатости"
+
+msgid "treasure.3g.idol.t1.1"
+msgstr "Идол Мудрости"
+
+msgid "winter.chest"
+msgstr "Сундук Конунга"
+
+msgid "gold.medium.t1.2"
+msgstr "Промерзший кусок золота"
+
+msgid "gold.medium.t1.3"
+msgstr "Великолепный Кусок Золота"
+
+msgid "gold.small.t1.bad"
+msgstr "Раскрошенное золото"
+
+msgid "gold.small.t1.good"
+msgstr "Чистейший золотой самородок"
+
+msgid "silver.small.t1.bad"
+msgstr "Потускневшее серебро"
+
+msgid "silver.small.t1.good"
+msgstr "Сияющий Серебряный Самородок"
+
+msgid "gem.diamond.big.bad"
+msgstr "Сколотый Алмаз (Большой)"
+
+msgid "gem.diamond.big.good"
+msgstr "Колоссальный Алмаз"
+
+msgid "gem.diamond.medium.t1.bad"
+msgstr "Несовершенный Алмаз (Средний)"
+
+msgid "gem.diamond.medium.t1.good"
+msgstr "Идеальный Алмаз (Средний)"
+
+msgid "gem.opal.small.t1.bad"
+msgstr "Мутный Опал"
+
+msgid "gem.opal.small.t1.good"
+msgstr "Лучистый Опал"
+
+msgid "gem.ruby.small.t1.bad"
+msgstr "Бурый Рубин"
+
+msgid "gem.ruby.small.t1.good"
+msgstr "Кроваво-красный Рубин"
+
+msgid "gem.sapphire.medium.t1.bad"
+msgstr "Перекошенный Сапфир"
+
+msgid "gem.sapphire.medium.t1.good"
+msgstr "Небесный Сапфир"
+
+msgid "frozen.artifact.book.t4.1"
+msgstr "Замороженная древняя книга"
+
+msgid "frozen.daimond.big.t1.1"
+msgstr "Замороженный Алмаз (Большой)"
+
+msgid "frozen.daimond.medium.t1.1"
+msgstr "Замороженный Алмаз (Средний)"
+
+msgid "frozen.gold.medium.t1.1"
+msgstr "Замороженный Крупный Кусок Золота"
+
+msgid "frozen.gold.small.t1"
+msgstr "Замороженный Золотой самородок (Малый)"
+
+msgid "frozen.silver.small.t1"
+msgstr "Замороженный Серебряный самородок (Малый)"
+
+msgid "frozen.opal.small.t1.1"
+msgstr "Замороженный Опал (Малый)"
+
+msgid "frozen.ruby.small.t1.1"
+msgstr "Замороженный Рубин (Малый)"
+
+msgid "frozen.sapphire.small.t1.1"
+msgstr "Замороженный Сапфир (Малый)"
+
+msgid "frozen.treasure.1g.idol"
+msgstr "Замороженный Идол"
+
+msgid "treasureCryolisEarring2GT1.1"
+msgstr "Сверкающие Серьги"
+
+msgid "treasureCryolisEarring2GT1.2"
+msgstr "Лунные Серьги"
+
+msgid "treasureCryolisEarring2GT1.3"
+msgstr "Ледяной Взгляд"
+
+msgid "treasureCryolisEarring2GT1.4"
+msgstr "Лунное Озеро"

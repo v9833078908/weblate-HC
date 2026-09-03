@@ -1,0 +1,449 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-25 18:39+0000\n"
+"Last-Translator: Hero Craft Localization user 2 <user-"
+"2@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Polish <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/pl/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: pl\n"
+"Plural-Forms: nplurals=3; plural=n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 "
+"|| n%100>=20) ? 1 : 2;\n"
+
+#: 114226892800
+msgid "orderTerrain0.1Step1Title"
+msgstr "Potrzebujemy więcej złota!"
+
+#: 432712978432
+msgid "orderTerrain0.1Step1Description"
+msgstr "Przynieś mi 3 bryłki złota."
+
+#: 410868545490944
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Doskonale — te bryłki ładnie uzupełnią moją kolekcję."
+
+#: 4737438277963776
+msgid "orderTerrain1.1Step1Title"
+msgstr "Blask świtu"
+
+#: 4737634734968832
+msgid "orderTerrain1.1Step1Description"
+msgstr "Przynieś mi bryłkę złota z dowolnej skały zawierającej złoto."
+
+#: 4737870236749824
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"Złoto kryje w sobie blask świtu — jeśli nie mogę go zobaczyć, przynajmniej "
+"mogę je poczuć..."
+
+#: 4740504523902976
+msgid "orderTerrain0.1Step2Title"
+msgstr "Doskonała robota!"
+
+#: 4740632143990784
+msgid "orderTerrain0.1Step2Description"
+msgstr "Dzięki za pomoc! Podzielę się z tobą ciekawym miejscem."
+
+#: 16787486734028800
+msgid "orderTerrain1.1Step2Title"
+msgstr "Nowe okulary"
+
+#: 16787574239793152
+msgid "orderTerrain1.1Step2Description"
+msgstr "Przynieś mi 2 diamenty. Często wypadają z kryształowych skał."
+
+#: 16788049915809792
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Zobaczmy, czy jestem gotów, by przyzwyczaić się do tej ziemi..."
+
+#: 16788621414895616
+msgid "orderTerrain1.1Step3Title"
+msgstr "Przyzwyczajanie się do ziemi"
+
+#: 16788663253078016
+msgid "orderTerrain1.1Step3Description"
+msgstr "Przynieś mi małą Geodę. Można je znaleźć w zwykłych skałach."
+
+#: 16788764000260096
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Zobaczmy, czy jestem gotów przyzwyczaić się do tej ziemi..."
+
+#: 16789247150526464
+msgid "orderTerrain1.1Step4Title"
+msgstr "Skrzynia umarlaka"
+
+#: 16789336237543424
+msgid "orderTerrain1.1Step4Description"
+msgstr "Przynieś mi Skrzynię. Kanarek może pomóc ci ją znaleźć."
+
+#: 16789441711706112
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Więc to tam zostawiłem swoje rzeczy..."
+
+#: 16789861523787776
+msgid "orderTerrain1.1Step5Title"
+msgstr "Srebro do hartowania"
+
+#: 16790058245033984
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Przynieś mi 3 kawałki srebra. Można je znaleźć w geodach i zwykłych skałach."
+
+#: 16790186938863616
+msgid "orderTerrain1.1Step6Title"
+msgstr "Doskonała robota!"
+
+#: 16790822405279744
+msgid "orderTerrain1.1Step5Thank"
+msgstr "To srebro przyjemnie szczypie w dłonie..."
+
+#: 16791339927867392
+msgid "orderTerrain1.1Step6Description"
+msgstr "Dziękuję! Wpadnij kiedyś do mnie — oto adres."
+
+#: 16792386012450816
+msgid "orderTerrain1.2Step1Title"
+msgstr "Starożytne pieniądze"
+
+#: 16792448180424704
+msgid "orderTerrain1.2Step1Description"
+msgstr ""
+"Przynieś mi 4 Starożytne Monety. Często znajdują się w starożytnych garnkach "
+"i wazach."
+
+#: 16793192929431552
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Teraz wreszcie mogę wydać resztę starożytnym!"
+
+#: 16793381891215360
+msgid "orderTerrain1.2Step2Title"
+msgstr "Toczyciel kul"
+
+#: 16793474094600192
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Przynieś mi Złotego Skarabeusza. To duże chrząszcze, które można znaleźć "
+"pełzające w krzakach."
+
+#: 16793779863556096
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Ten chrząszcz to wielki toczyciel kul!"
+
+#: 16794392403906560
+msgid "orderTerrain1.2Step3Title"
+msgstr "Kamienne Kręgle"
+
+#: 16794434028179456
+msgid "orderTerrain1.2Step3Description"
+msgstr "Przynieś mi Średnią Geodę. Czasami pojawia się w zwykłych skałach."
+
+#: 16794517595492352
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Teraz w końcu będę mógł toczyć kulki!"
+
+#: 16794991149191168
+msgid "orderTerrain1.2Step4Title"
+msgstr "Złoty Omlet"
+
+#: 16795063073116160
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Przynieś mi Złote Jajko. Przeszukaj krzaki, aby znaleźć gniazdo zawierające "
+"takie jajka."
+
+#: 16795116181393408
+msgid "orderTerrain1.2Step4Thank"
+msgstr "To śniadanie godne króla!"
+
+#: 16795705460133888
+msgid "orderTerrain1.2Step5Title"
+msgstr "Krew Lwa"
+
+#: 16795757985402880
+msgid "orderTerrain1.2Step5Description"
+msgstr ""
+"Przynieś mi Lwi Rubin. Można go znaleźć w geodach z czerwonymi kryształami."
+
+#: 16795845432446976
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Teraz będę odważny jak lew!"
+
+#: 16797388357505024
+msgid "orderTerrain1.2Step6Title"
+msgstr "Łaska Niebios"
+
+#: 16797558377811968
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Przynieś mi Niebiański Szafir. Można go znaleźć w geodach z niebieskimi "
+"kryształami."
+
+#: 16797646290423808
+msgid "orderTerrain1.2Step6Thank"
+msgstr "Same niebiosa są po mojej stronie!"
+
+#: 16798157601247232
+msgid "orderTerrain1.2Step7Title"
+msgstr "Złota toaleta"
+
+#: 16798193798090752
+msgid "orderTerrain1.2Step7Description"
+msgstr "Przynieś mi 9 samorodków złota z dowolnej skały zawierającej złoto."
+
+#: 16798263801024512
+msgid "orderTerrain1.2Step7Thank"
+msgstr "Wreszcie mogę naprawić toaletę!"
+
+#: 16798933543292928
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"Jeśli chcesz coś sobie życzyć — znam miejsce, gdzie gwiazdy spadają cały "
+"czas."
+
+#: 16799140129542144
+msgid "orderTerrain1.2Step8Title"
+msgstr "Doskonała robota!"
+
+#: 66701112705024000
+msgid "orderTerrain2.1Step5Title"
+msgstr "Doskonała robota!"
+
+#: 66701312781713408
+msgid "orderTerrain2.1Step5Description"
+msgstr "Lód przypomina mi babcię... Wpadnij też do jej chaty!"
+
+#: 66701713186750464
+msgid "orderTerrain2.1Step1Description"
+msgstr "Przynieś mi 2 Zamrożone Przedmioty z zamarzniętych skał"
+
+#: 66702356693647360
+msgid "orderTerrain2.1Step1Title"
+msgstr "Kostki lodu"
+
+#: 66702611300483072
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Idealne do moich koktajli!"
+
+#: 66705370212990976
+msgid "orderTerrain2.2Step7Title"
+msgstr "Doskonała robota!"
+
+#: 66705373262249984
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Wygląda na to, że kraby są powiązane z Kultem Słońca — wiem, gdzie znajdują "
+"się ruiny ich świątyni!"
+
+#: 66705376152125440
+msgid "orderTerrain2.2Step2Description"
+msgstr "Złap kraba lodowego — jego skorupa jest z Cryolis."
+
+#: 66705379809558528
+msgid "orderTerrain2.2Step2Title"
+msgstr "Metal kraba"
+
+#: 66705384804974592
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ach, egzometal! Uwielbiam tajemnice natury!"
+
+#: 66706577295933440
+msgid "orderTerrain2.3Step8Title"
+msgstr "Doskonała robota!"
+
+#: 66706580684931072
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"Najcenniejsze skarby Kultu Słońca są ukryte głęboko w Labiryncie — pokażę "
+"ci, gdzie!"
+
+#: 66706585684541440
+msgid "orderTerrain2.3Step2Description"
+msgstr "Zapal 3 pochodnie w Świątyni i ukradnij Słoneczną Kulę!"
+
+#: 66706589509746688
+msgid "orderTerrain2.3Step2Title"
+msgstr "Najlepszy grzejnik"
+
+#: 66706594945564672
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Tak, to jest porządna rozgrzewka!"
+
+#: 70714473507717120
+msgid "orderTerrain2.1Step2Description"
+msgstr "Znajdź 2 samorodki srebra w kostkach lodu i rozgrzej je."
+
+#: 70714539375067136
+msgid "orderTerrain2.1Step2Title"
+msgstr "Mroźne srebro"
+
+#: 70714808414502912
+msgid "orderTerrain2.1Step2Thank"
+msgstr "To jak lód w folii... ale na odwrót..."
+
+#: 70714878748786688
+msgid "orderTerrain2.1Step3Title"
+msgstr "Mroźne złoto"
+
+#: 70714919110574080
+msgid "orderTerrain2.1Step3Thank"
+msgstr "Zimowe złoto zyskuje bardzo specjalny... blask..."
+
+#: 70714983467974656
+msgid "orderTerrain2.1Step3Description"
+msgstr "Znajdź 2 samorodki złota w kostkach lodu i rozgrzej je."
+
+#: 70715014472269824
+msgid "orderTerrain2.1Step4Title"
+msgstr "Niewidzialny klejnot"
+
+#: 70715038832787456
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Przejrzyste w przejrzystym, ahahaha!"
+
+#: 70715070977933312
+msgid "orderTerrain2.1Step4Description"
+msgstr ""
+"Rozmroź średni diament. Zamrożone diamenty często znajdują się we wszystkich "
+"skałach."
+
+#: 70718769544560640
+msgid "orderTerrain2.2Step1Title"
+msgstr "Ugruntowana astrologia"
+
+#: 70718775819239424
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Przynieś mi 2 Gwiezdne Żelaza. Można je znaleźć na Bagnach podczas Deszczu "
+"Gwiazd."
+
+#: 70718777429852160
+msgid "orderTerrain2.2Step1Thank"
+msgstr "Astrometal to marzenie każdego naukowca!"
+
+#: 70721195022483456
+msgid "orderTerrain2.2Step3Title"
+msgstr "Kosmiczny intruz"
+
+#: 70721197308379136
+msgid "orderTerrain2.2Step3Description"
+msgstr "Znajdź Przeklęty Rdzeń meteoru podczas Deszczu Gwiazd i zdejmij klątwę."
+
+#: 70721198948352000
+msgid "orderTerrain2.2Step3Thank"
+msgstr "Meteor to maszyna, a nie tylko ciało niebieskie! Niesamowite!"
+
+#: 70723998965039104
+msgid "orderTerrain2.2Step4Title"
+msgstr "Ciepło kraba"
+
+#: 70724001313849344
+msgid "orderTerrain2.2Step4Description"
+msgstr "Zbierz 5 odłamków Cryolis z pancerzy lodowych krabów."
+
+#: 70724003188703232
+msgid "orderTerrain2.2Step4Thank"
+msgstr "Czy ty też umierasz z ciekawości, jak kraby żyją w śniegu?"
+
+#: 70724154619854848
+msgid "orderTerrain2.2Step5Title"
+msgstr "Nowe Czujniki"
+
+#: 70724156297576448
+msgid "orderTerrain2.2Step5Description"
+msgstr ""
+"Przynieś mi 9 kawałków srebra. Można je znaleźć w Geodach i prostych skałach."
+
+#: 70724162102493184
+msgid "orderTerrain2.2Step5Thank"
+msgstr "Moje instrumenty badawcze w końcu przestaną się psuć!"
+
+#: 70724346286964736
+msgid "orderTerrain2.2Step6Title"
+msgstr "Ciepły płaszcz kraba"
+
+#: 70724348468002816
+msgid "orderTerrain2.2Step6Description"
+msgstr "Zbierz 8 odłamków Cryolis z muszli lodowych krabów."
+
+#: 70724350279942144
+msgid "orderTerrain2.2Step6Thank"
+msgstr "Teraz w końcu zrozumiem, jak przetrwają zimę!"
+
+#: 70738013825007616
+msgid "orderTerrain2.3Step1Title"
+msgstr "Idąc na całość"
+
+#: 70738018996584448
+msgid "orderTerrain2.3Step1Description"
+msgstr ""
+"Przynieś mi duży diament. Można go znaleźć we wszystkich zamrożonych skałach."
+
+#: 70738021307645952
+msgid "orderTerrain2.3Step1Thank"
+msgstr "O mój Boże, jest wielkości głowy! Ale czyjej..."
+
+#: 70738580156710912
+msgid "orderTerrain2.3Step3Title"
+msgstr "Skarb Białych Ziem"
+
+#: 70738582908174336
+msgid "orderTerrain2.3Step3Description"
+msgstr "Daj mi Skrzynię Jarla. Kanarek pomoże ci ją znaleźć w Białych Ziemiach."
+
+#: 70738585055657984
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Przypomina mi dziadka..."
+
+#: 70742364090007552
+msgid "orderTerrain2.3Step4Title"
+msgstr "Esencja Płomienia"
+
+#: 70742368280117248
+msgid "orderTerrain2.3Step4Description"
+msgstr "Wyodrębnij Iskrę Idola ze Słonecznej Kuli."
+
+#: 70742370125611008
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Cóż za gorący kamień..."
+
+#: 70742532495507456
+msgid "orderTerrain2.3Step5Title"
+msgstr "Mieniący się kamień"
+
+#: 70742535381188608
+msgid "orderTerrain2.3Step5Description"
+msgstr "Przynieś mi Opal. To rzadkie znalezisko w Zamrożonych skałach."
+
+#: 70742539273502720
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Spójrz, jak pięknie się mieni..."
+
+#: 70743768674336768
+msgid "orderTerrain2.3Step6Title"
+msgstr "Zostawił potomstwo!"
+
+#: 70743771123810304
+msgid "orderTerrain2.3Step6Description"
+msgstr "Wyodrębnij Pisklę sowy ze Słonecznej Kuli."
+
+#: 70743772839280640
+msgid "orderTerrain2.3Step6Thank"
+msgstr "Duża Sowa przynosi zimno... Dlaczego pisklę jest takie gorące?"
+
+#: 70744648739979264
+msgid "orderTerrain2.3Step7Title"
+msgstr "Duża sprawa"
+
+#: 70744655853518848
+msgid "orderTerrain2.3Step7Description"
+msgstr "Przynieś mi 5 bryłek Złota. Są dość Zwykłe w Zamrożonych skałach."
+
+#: 70744658739200000
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Teraz będę największym człowiekiem w mieście."

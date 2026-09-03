@@ -1,0 +1,451 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Bulgarian <http://l10n.herocraft.com/projects/need-for-greed/"
+"tutorial/bg/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: bg\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 75765772134387712
+msgid "DialogueIntroCharacter1"
+msgstr ""
+"Е, кобилке, усещаш ли го? Злато! Някъде наблизо е… А любов… в онази скала "
+"там!"
+
+#: 75765971959418880
+msgid "DialogueIntroHorse1"
+msgstr "Фррр!"
+
+#: 75766215002558464
+msgid "DialogueIntroCharacter2"
+msgstr ""
+"Какво значи „ако чуя пак жена там, ще ме хвърлиш“? Някой определено е бил "
+"самотен там."
+
+#: 75766376147718144
+msgid "DialogueIntroHorse2"
+msgstr "Иииха! Грр-ха!"
+
+#: 75766594431881216
+msgid "DialogueIntroCharacter3"
+msgstr "Добре, добре! Беше просто ехо… на моето величие!"
+
+#: 75766733204623360
+msgid "DialogueMineFoundCharacter1"
+msgstr ""
+"Скала! Божествено! Като бедрото на Афродита! Определено нещо блести там, "
+"черният ми дроб просто потрепери!"
+
+#: 75766977115983872
+msgid "DialogueMineFoundHorse1"
+msgstr "Фррр! Пфууу.."
+
+#: 75767084016209920
+msgid "DialogueMineFoundCharacter2"
+msgstr "Е, съжалявам, че тялото ми реагира на красотата!"
+
+#: 75768133359767552
+msgid "DialogueTimeIsUpHorse1"
+msgstr "Иииха!"
+
+#: 75768214897037312
+msgid "DialogueTimeIsUpCharacter1"
+msgstr "Какво? Вече залез?"
+
+#: 75768748328620032
+msgid "DialogueTimeIsUpHorse2"
+msgstr "Хх-хх! Иии-их!"
+
+#: 75769024796168192
+msgid "DialogueTimeIsUpCharacter2"
+msgstr ""
+"Комари… Пак ли те! Да-да, помня, че си зелената къщичка, идвам! Само не "
+"бягай!"
+
+#: 75769959874301952
+msgid "DialoguePickLootIntroTrader1"
+msgstr "Хей! Твърде много Плячка. Чантата на Коня не може да побере всичко."
+
+#: 75770225956753408
+msgid "DialoguePickLootIntroTrader2"
+msgstr "Избери най-доброто, което можеш да занесеш до Съхранението."
+
+#: 76060126094823424
+msgid "DialoguePrepareToOpenCraftCharacter1"
+msgstr ""
+"Сега… Сега ще създам шедьовър! Едно Бижу, което ще я накара да съжалява!"
+
+#: 76060331171123200
+msgid "DialoguePrepareToOpenCraftHorse1"
+msgstr "Бррр-р-р."
+
+#: 76061423992836096
+msgid "DialoguerAfterCraftCharacter1"
+msgstr "ВИЖ, КОН! Блести като очите ми, преди да срещна бившия си!"
+
+#: 76061521736896512
+msgid "DialoguerAfterCraftHorse1"
+msgstr "Фррр!"
+
+#: 76061738473361408
+msgid "DialoguerAfterCraftCharacter2"
+msgstr "Това… това е божествената светлина на моето отмъщение!"
+
+#: 76061830932598784
+msgid "DialoguerAfterCraftHorse2"
+msgstr "Гррр-хрр! Бррр..."
+
+#: 76061898951626752
+msgid "DialoguerAfterCraftCharacter3"
+msgstr ""
+"Просто завиждаш — нямаш пръсти, за да носиш такова великолепие. Остава само "
+"да намериш Купувач с пръсти!"
+
+#: 76062368449433600
+msgid "DialoguerAfterTradeBuyer1"
+msgstr "Сам ли го направи? Красиво е, ще го взема."
+
+#: 76062530391511040
+msgid "DialoguerAfterTradeCharacter1"
+msgstr ""
+"Той… той разбра! Вътре в Бижутата — съм аз. Вътре в мен — Злато. Вътре в "
+"Златото — бог."
+
+#: 76062825645346816
+msgid "DialoguerAfterTradeHorse1"
+msgstr "Фррр! Иииха!"
+
+#: 76062978284457984
+msgid "DialoguerAfterTradeCharacter2"
+msgstr "Прав си, Кон. Те не са готови за истината…"
+
+#: 76063254827503616
+msgid "DialogueBeforeUpgradeHorse1"
+msgstr "Фррр!"
+
+#: 76063498000666624
+msgid "DialogueBeforeUpgradeCharacter1"
+msgstr "Пари? Аз? Знаеш ли какво ще стане, ако Тя разбере, че съм богат?"
+
+#: 76063745632374784
+msgid "DialogueBeforeUpgradeHorse2"
+msgstr "Гррр-хрр!"
+
+#: 76063937093963776
+msgid "DialogueBeforeUpgradeCharacter2"
+msgstr "Добре, ще инвестирам в себе си — но само за да спреш да ми досаждаш!"
+
+#: 76064239725580288
+msgid "DialogueAfterUpgradeCharacter1"
+msgstr ""
+"Станах по-бърз, по-силен и по-евтин за производство! Тя би харесала това."
+
+#: 76064347783434240
+msgid "DialogueAfterUpgradeHorse1"
+msgstr "Гррр-хрр!"
+
+#: 76064479283253248
+msgid "DialogueAfterUpgradeCharacter2"
+msgstr "Е, нямаше нужда да настояваш! Имаш си своите фетиши — копита и овес."
+
+#: 76065879857827840
+msgid "DialogueLobbyLikesCharacter1"
+msgstr "Виждаш ли, кобилко? Обичат ме!"
+
+#: 76066013412855808
+msgid "DialogueLobbyLikesHorse1"
+msgstr "Фррр! Пфууу.."
+
+#: 76066107042304000
+msgid "DialogueLobbyLikesCharacter2"
+msgstr "Прав си! Това е само началото! Скоро всички ще ми станат фенове…"
+
+#: 76344321220284416
+msgid "character"
+msgstr "Герой"
+
+#: 76344471367979008
+msgid "horse"
+msgstr "Кон"
+
+#: 76344680219152384
+msgid "trader"
+msgstr "Търговец"
+
+#: 76344756748423168
+msgid "buyer"
+msgstr "Купувач"
+
+#: 131220345145528320
+msgid "terrainDispenserFound"
+msgstr "Уау! Плячка!"
+
+#: 131220694531051520
+msgid "terrainDispenserCollecting"
+msgstr "Хайде! Счупи го!"
+
+#: 131220939017031680
+msgid "exitDoorDescription"
+msgstr "Зелено — това Кон ли е?"
+
+#: 131221107242176512
+msgid "exitDoorDescription2"
+msgstr "Зелена? Дали ѝ е… лошо?"
+
+#: 137323318787444736
+msgid "DialoguePickLootSelectItemsTrader1"
+msgstr "Докоснете предметите, за да ги сложите в чантата на Коня."
+
+#: 137351439217594368
+msgid "DialoguePickLootSelectedItemsCharacter1"
+msgstr "Само това ли се побра? Кобилата има нужда от по-голяма чанта!"
+
+#: 137381643633823744
+msgid "DialoguePickLootClaimItemsTrader1"
+msgstr "Не се тревожи! Ще купя останалото. Дори ще добавя малко допълнително."
+
+#: 137616255752605696
+msgid "terrainWantMoreItems"
+msgstr "Искам още Злато!"
+
+#: 137629488379072512
+msgid "terrainRoadIsClue"
+msgstr "Пътеката води към богатства"
+
+#: 138087561421918208
+msgid "DialogueOrdersIntroBuyer1"
+msgstr ""
+"О, ново лице! Имам поръчка за теб. Ще ми помогнеш ли да попълня колекцията "
+"си?"
+
+#: 138088926181330944
+msgid "DialogueOrdersIntroCharacter1"
+msgstr "Виж, кобило, те не могат да изкарат и ден без моята помощ!"
+
+#: 138089230444531712
+msgid "DialogueOrdersIntroHorse1"
+msgstr "Фррр!"
+
+#: 138089454202261504
+msgid "DialogueOrdersIntroCharacter2"
+msgstr "Да, да, и без твоята също."
+
+#: 138110517984366592
+msgid "DialogueOrdersThanksBuyer1"
+msgstr ""
+"Много ми помогна и аз ще ти помогна — отбелязах място, където скалите звънят "
+"по-силно от обикновено."
+
+#: 138111196928937984
+msgid "DialogueOrdersThanksCharacter1"
+msgstr "ТОЛКОВА МНОГО МЕ ОБИЧАТ, ЧЕ СА ГОТОВИ ДА РАЗДАВАТ МИСЛИТЕ СИ!"
+
+#: 138111354584436736
+msgid "DialogueOrdersThanksCharacter2"
+msgstr "Не, не можеш да прибереш пари, но знание — абсолютно можеш!"
+
+#: 138111433626095616
+msgid "DialogueOrdersThanksHorse1"
+msgstr "Игого!"
+
+#: 139150891347611648
+msgid "DialogueBeforeBirdCharacter1"
+msgstr ""
+"Този странен тип отбеляза това място на Картата. Не прилича на никое друго "
+"място, където сме били — и вече усещам миризмата на СЪКРОВИЩЕ!"
+
+#: 139151218457186304
+msgid "DialogueBeforeBirdHorse1"
+msgstr "Фррр!"
+
+#: 139151464675414016
+msgid "DialogueBeforeBirdCharacter2"
+msgstr ""
+"Клетка на гърба ми? Това е Канарчето за търсене на съкровища! Сега да видим "
+"къде е заровено кучето."
+
+#: 139160840467386368
+msgid "DialogueUseBirdCharacter1"
+msgstr "Сега следваме дирята от пера и съкровището е мое!"
+
+#: 139178592703877120
+msgid "DialogueAfterChestCharacter1"
+msgstr "ВИДЯ ЛИ ТОВА, КОНЮ!"
+
+#: 139178671472906240
+msgid "DialogueAfterChestCharacter2"
+msgstr "Ще трябва да влачиш не само мен, но и тази ракла."
+
+#: 139178702909214720
+msgid "DialogueAfterChestHorse1"
+msgstr "Гррр-хрр! Бррр..."
+
+#: 139180374293221376
+msgid "chestCollecting"
+msgstr "СЪКРОВИЩЕ!"
+
+#: 139496544913330176
+msgid "DialogueClaimedChestHorse1"
+msgstr "Гррр-хрр!"
+
+#: 139496773167353856
+msgid "DialogueClaimedChestCharacter1"
+msgstr ""
+"Да, раклата е тук, но няма ключ — но ти забрави за магическата ковачница, "
+"кобило! Тя може да направи всичко с всичко."
+
+#: 139512809946091520
+msgid "DialogueAfterCraftChestCharacter1"
+msgstr "ТОВА Е ДЖАКПОТ! Трябва да го продадем бързо!"
+
+#: 139537206085947392
+msgid "DialogueAfterTradeChestCharacter1"
+msgstr "ДА! Признаха ме. ДНЕС ТОВА БЛАТО, УТРЕ ЦЕЛИЯ СВЯТ! НАПРЕД, КОНЮ!"
+
+#: 139537401876058112
+msgid "DialogueAfterTradeChestBuyer1"
+msgstr ""
+"Ха-ха — изглежда, че всички местни носят твоите лъскави неща. В крайна "
+"сметка, аз съм единственият, който живее тук, Ха-ха-ха."
+
+#: 139766416519991296
+msgid "DialogueNewTerrainOpenedHorse1"
+msgstr "Бррр-р-р!"
+
+#: 139766737396830208
+msgid "DialogueNewTerrainOpenedCharacter1"
+msgstr "Мирише… на дим?"
+
+#: 139767066540642304
+msgid "DialogueNewTerrainOpenedHorse2"
+msgstr "Хх-хх! Иии-их!"
+
+#: 139767291636355072
+msgid "DialogueNewTerrainOpenedCharacter2"
+msgstr "Искаш да кажеш, че съм изпуснал въглищата на покрива на склада?"
+
+#: 139767459110719488
+msgid "DialogueNewTerrainOpenedHorse3"
+msgstr "Гррр-хрр!"
+
+#: 139767686714626048
+msgid "DialogueNewTerrainOpenedCharacter3"
+msgstr "О… Може би не трябва да се връщаме."
+
+#: 139772805363535872
+msgid "DialogueNewTerrainStartedCharacter1"
+msgstr "Различен терен. Мокра земя. Уф, въздухът вони на смисъл!"
+
+#: 139772978911252480
+msgid "DialogueNewTerrainStartedHorse1"
+msgstr "Гррр-хррр!"
+
+#: 139773239633383424
+msgid "DialogueNewTerrainStartedCharacter2"
+msgstr "Добре, взимаме ценностите бързо и бягаме."
+
+#: 140259502945734656
+msgid "NewTerrainDispenserCollectingCharacter1"
+msgstr "Каква звънтяща скала! Сякаш самата природа ми ръкопляска!"
+
+#: 140260138097577984
+msgid "DialoguePrepareToWormCharacter1"
+msgstr "Какво беше това?!"
+
+#: 140260175347191808
+msgid "DialoguePrepareToWormHorse1"
+msgstr "Гррр-хрр!"
+
+#: 140260548501835776
+msgid "DialoguePrepareToWormCharacter3"
+msgstr "О, не… Тя ли беше…?"
+
+#: 140262190995476480
+msgid "DialogueWormAppearHorse1"
+msgstr "Гррр-хрр! Бррр..."
+
+#: 140262312860979200
+msgid "DialogueWormAppearCharacter1"
+msgstr "Боже мой. Събудих смъртта. Отново."
+
+#: 140263122399399936
+msgid "DialoguePlayerDeathCharacter1"
+msgstr "КАЖЕТЕ Ѝ, ЧЕ СЪЖАЛЯВАХ ЗА ТОВА!!!"
+
+#: 140263995359891456
+msgid "DialoguePlayerReviveCharacter1"
+msgstr "Това ли е раят? Тогава защо мирише толкова лошо…"
+
+#: 140264148288409600
+msgid "DialoguePlayerReviveCharacter2"
+msgstr "Разбирам. Не е мъртъв. Дори по-лошо — жив!"
+
+#: 140264664699506688
+msgid "DialoguePlayerRevivedCharacter1"
+msgstr ""
+"Беше на косъм, но сега съм готов за всичко! Ще се опитам да замахвам с "
+"кирката малко по-тихо…"
+
+#: 142736080803991552
+msgid "tip1"
+msgstr "Можете да бутнете ваза. Бутнете я два пъти, за да я счупите."
+
+#: 142736223703928832
+msgid "tip2"
+msgstr "Червеят няма да ви последва във вода или блато."
+
+#: 142736293392289792
+msgid "tip3"
+msgstr "Мачкайте буболечки — те пускат Монети."
+
+#: 142736344843816960
+msgid "tip4"
+msgstr "Някои храсти крият птици, които снасят златни Яйца."
+
+#: 142736408026812416
+msgid "tip5"
+msgstr "Шумът привлича опасни врагове."
+
+#: 142736477400600576
+msgid "tip6"
+msgstr "Пътеките водят до интересни места."
+
+#: 142736521784725504
+msgid "tip7"
+msgstr "Търговецът ще купи допълнителни предмети от чантата ви."
+
+#: 142736594941775872
+msgid "tip8"
+msgstr "Изпълнявайте поръчки, за да отключите нови локации."
+
+#: 142736659890573312
+msgid "tip9"
+msgstr "Надстройте Ковачницата, за да отключите нови рецепти за Бижута."
+
+#: 142736729293721600
+msgid "tip10"
+msgstr "Премахвайте проклятия на Олтара или в Супер слота."
+
+#: 142736813704089600
+msgid "tip11"
+msgstr "Предмети, маркирани с „?“, могат да бъдат оценени от Търговеца."
+
+#: 142736907266428928
+msgid "tip12"
+msgstr "Надстройте Съхранението си, за да побира повече Плячка."
+
+#: 201164984023257088
+msgid "tip13"
+msgstr "На пауза винаги можете да проверявате поръчки и ефекти."
+
+#: 201320091704627200
+msgid "tip14"
+msgstr "Елитен слот гарантира най-добрия Купувач."

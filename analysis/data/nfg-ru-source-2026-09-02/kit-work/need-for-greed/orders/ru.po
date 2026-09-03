@@ -1,0 +1,396 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-09-01 19:56+0000\n"
+"Last-Translator: Hero Craft Localization user 23 "
+"<matios_free@users.noreply.l10n.herocraft.com>\n"
+"Language-Team: Russian <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/ru/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: ru\n"
+"Plural-Forms: nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;\n"
+
+msgid "orderTerrain0.1Step1Title"
+msgstr "Нужно больше золота!"
+
+msgid "orderTerrain0.1Step1Description"
+msgstr "Принеси мне 3 золотых самородка"
+
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Отлично - эти самородки пополнят мою коллекцию."
+
+msgid "orderTerrain1.1Step1Title"
+msgstr "Отблеск рассвета"
+
+msgid "orderTerrain1.1Step1Description"
+msgstr "Принеси мне Золотой самородок из любой золотоносной скалы."
+
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"Золото хранит в себе отблески рассвета - не могу увидеть, так хоть пощупаю..."
+
+msgid "orderTerrain0.1Step2Title"
+msgstr "Отличная работа!"
+
+msgid "orderTerrain0.1Step2Description"
+msgstr "Спасибо за помощь! Я поделюсь с тобой одним любопытным местечком."
+
+msgid "orderTerrain1.1Step2Title"
+msgstr "Новые очки"
+
+msgid "orderTerrain1.1Step2Description"
+msgstr "Принеси мне 2 Алмаза. Они часто попадаются в кристальных скалах."
+
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Сейчас узнаем, хочу ли я привыкать к местной земле..."
+
+msgid "orderTerrain1.1Step3Title"
+msgstr "Привыкание к земле"
+
+msgid "orderTerrain1.1Step3Description"
+msgstr "Принеси мне маленький Геод. Они встречаются в обычных скалах."
+
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Сейчас узнаем, хочу ли я привыкать к местной земле..."
+
+msgid "orderTerrain1.1Step4Title"
+msgstr "Сундук мертвеца"
+
+msgid "orderTerrain1.1Step4Description"
+msgstr "Принеси мне Сундук. Его можно найти с помощью канарейки."
+
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Так вот куда я положил свои вещи..."
+
+msgid "orderTerrain1.1Step5Title"
+msgstr "Серебро для закалки"
+
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Принеси мне 3 Кусочка Серебра. Они попадаются в Геодах и обычных скалах."
+
+msgid "orderTerrain1.1Step6Title"
+msgstr "Отличная работа!"
+
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Это серебро приятно щиплет ладони..."
+
+msgid "orderTerrain1.1Step6Description"
+msgstr "Благодарю! Заглядывай ко мне домой - вот адрес."
+
+msgid "orderTerrain1.2Step1Title"
+msgstr "Древние деньги"
+
+msgid "orderTerrain1.2Step1Description"
+msgstr ""
+"Принеси мне 4 Древних Монеты. Их часто можно найти в древних горшках и вазах."
+
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Теперь я смогу дать сдачи древним!"
+
+msgid "orderTerrain1.2Step2Title"
+msgstr "Шарокат"
+
+msgid "orderTerrain1.2Step2Description"
+msgstr "Принеси мне Золотого Скарабея. Это большие жуки, ползающие в кустах."
+
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Этот жук любит катать шары!"
+
+msgid "orderTerrain1.2Step3Title"
+msgstr "Каменный боулинг"
+
+msgid "orderTerrain1.2Step3Description"
+msgstr "Принеси мне Средний Геод. Он иногда попадается в простых скалах."
+
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Наконец я смогу покатать шары!"
+
+msgid "orderTerrain1.2Step4Title"
+msgstr "Золотой омлет"
+
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Принеси мне Золотое Яйцо. Ходи через кусты и найдешь гнездо с такими яйцами."
+
+msgid "orderTerrain1.2Step4Thank"
+msgstr "Это будет завтрак аристократа!"
+
+msgid "orderTerrain1.2Step5Title"
+msgstr "Кровь льва"
+
+msgid "orderTerrain1.2Step5Description"
+msgstr "Принеси мне Рубин. Он попадается в геодах с красными кристаллами."
+
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Теперь я буду отважен как лев!"
+
+msgid "orderTerrain1.2Step6Title"
+msgstr "Небесная благодать"
+
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Принеси мне небесный Сапфир. Он попадается в геодах с синими кристаллами."
+
+msgid "orderTerrain1.2Step6Thank"
+msgstr "Сами небеса на моей стороне!"
+
+msgid "orderTerrain1.2Step7Title"
+msgstr "Золотой унитаз"
+
+msgid "orderTerrain1.2Step7Description"
+msgstr "Принеси мне 9 золотых самородков из любой золотоносной скалы."
+
+msgid "orderTerrain1.2Step7Thank"
+msgstr "Наконец я смогу отремонтировать уборную!"
+
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"Если хочешь позагадывать желания - я знаю место, где все время падают звезды."
+
+msgid "orderTerrain1.2Step8Title"
+msgstr "Отличная работа!"
+
+msgid "orderTerrain2.1Step5Title"
+msgstr "Отличная работа!"
+
+msgid "orderTerrain2.1Step5Description"
+msgstr "Лед напоминает мне о Бабуле... Заглядывай в ее избушку тоже!"
+
+msgid "orderTerrain2.1Step1Description"
+msgstr "Принеси мне 2 замороженных предмета из заледеневших скал."
+
+msgid "orderTerrain2.1Step1Title"
+msgstr "Колотый Лед"
+
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Эти ледышки отлично разбавят мои коктейли!"
+
+msgid "orderTerrain2.2Step7Title"
+msgstr "Отличная работа!"
+
+msgid "orderTerrain2.2Step7Description"
+msgstr "Похоже, крабы связаны с Культом Солнца - я знаю, где руины их храма!"
+
+msgid "orderTerrain2.2Step2Description"
+msgstr "Поймай ледяного краба - его панцирь сделан из Криолиса."
+
+msgid "orderTerrain2.2Step2Title"
+msgstr "Крабовое Железо"
+
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ах, экзометалл! Обожаю загадки природы!"
+
+msgid "orderTerrain2.3Step8Title"
+msgstr "Отличная работа!"
+
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"Самые ценные сокровища Культа Солнца спрятаны в глубинах Лабиринта - я "
+"покажу где это!"
+
+msgid "orderTerrain2.3Step2Description"
+msgstr "Потуши 3 факела на Капище в локации Светоч и укради Солнечную Сферу!"
+
+msgid "orderTerrain2.3Step2Title"
+msgstr "Лучшая Грелка"
+
+msgid "orderTerrain2.3Step2HelpInfo"
+msgstr ""
+"Потуши 3 факела на Капище в локации Светоч или Заблудье и стащи Солнечную "
+"Сферу. Принеси мне её. Вытащи ту, что во рту у идола. Да, именно изо рта. Не "
+"спрашивай зачем - просто забери.\n"
+"Только аккуратно, штука вроде ценная. Если вдруг начнёт светиться или руки "
+"жечь - не геройствуй, тащи сюда как есть."
+
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Ох-х-х, вот это прогрев!"
+
+msgid "orderTerrain2.1Step2Description"
+msgstr "Найди 2 Серебрянных Самородка в кубах льда и растопи их."
+
+msgid "orderTerrain2.1Step2Title"
+msgstr "Мороженное Серебро"
+
+msgid "orderTerrain2.1Step2Thank"
+msgstr "Это как лед в фольге - только наоборот..."
+
+msgid "orderTerrain2.1Step3Title"
+msgstr "Мороженное Золото"
+
+msgid "orderTerrain2.1Step3Thank"
+msgstr "Зимнее золото приобретает особенный... блеск..."
+
+msgid "orderTerrain2.1Step3Description"
+msgstr "Найди 3 Золотых Самородка в кубах льда и растопи их."
+
+msgid "orderTerrain2.1Step4Title"
+msgstr "Невидимый Камень"
+
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Прозрачное из прозрачного, ахахах!"
+
+msgid "orderTerrain2.1Step4Description"
+msgstr ""
+"Разморозь Средний Алмаз. Замороженные Алмазы часто встречаются в скалах."
+
+msgid "orderTerrain2.2Step1Title"
+msgstr "Подножная Астрология"
+
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Принеси мне 2 Звездных железа. Их можно найти в Топях, когда идет Звездопад."
+
+msgid "orderTerrain2.2Step1Thank"
+msgstr "Астрометалл - мечта любого ученого!"
+
+msgid "orderTerrain2.2Step3Title"
+msgstr "Космический засланец"
+
+msgid "orderTerrain2.2Step3Description"
+msgstr "Найди Проклятое Ядро Метеора во время Звездопада и сними проклятье."
+
+msgid "orderTerrain2.2Step3Thank"
+msgstr "Метеор - это механизм, а не камень! Удивительно!"
+
+msgid "orderTerrain2.2Step4Title"
+msgstr "Крабовое Тепло"
+
+msgid "orderTerrain2.2Step4Description"
+msgstr "Собери 5 осколков Криолиса с панцирей ледяных крабов."
+
+msgid "orderTerrain2.2Step4Thank"
+msgstr "Тебе тоже не терпится узнать, как крабы живут в снегах?"
+
+msgid "orderTerrain2.2Step5Title"
+msgstr "Новые датчики"
+
+msgid "orderTerrain2.2Step5HelpInfo"
+msgstr ""
+"Принеси мне 9 Кусочков Серебра. Ищи их в Геодах и обычных скалах без "
+"прожилок. Разбивай всё подозрительно каменное - серебро любит прятаться там, "
+"где его меньше всего ждёшь."
+
+msgid "orderTerrain2.2Step5Description"
+msgstr ""
+"Принеси мне 9 Кусочков Серебра. Они попадаются в Геодах и обычных скалах."
+
+msgid "orderTerrain2.2Step5Thank"
+msgstr "Мои исследовательские приборы теперь перестанут барахлить!"
+
+msgid "orderTerrain2.2Step6Title"
+msgstr "Крабовая Шуба"
+
+msgid "orderTerrain2.2Step6HelpInfo"
+msgstr ""
+"Собери 8 осколков Криолиса. Ищи ледяных крабов и собирай осколки с их "
+"панцирей. Только будь осторожен - эти ребята не любят, когда у них что-то "
+"отрывают.\n"
+"\n"
+"Поймал краба, забрал Криолис - и можно уходить. Пока он не передумал."
+
+msgid "orderTerrain2.2Step6Description"
+msgstr "Собери 8 осколков Криолиса с панцирей ледяных крабов."
+
+msgid "orderTerrain2.2Step6Thank"
+msgstr "Теперь я наконец пойму, как они выживают зимой!"
+
+msgid "orderTerrain2.3Step1Title"
+msgstr "Ходим по-большому"
+
+msgid "orderTerrain2.3Step1HelpInfo"
+msgstr ""
+"Принеси мне Большой Алмаз. Ищи его в скалах Белоземья - иногда среди "
+"обычного камня попадается кое-что действительно ценное. Хорошенько осмотрись "
+"и не разбей его раньше времени. Большой алмаз - штука хрупкая. Особенно "
+"когда по нему бьёшь киркой."
+
+msgid "orderTerrain2.3Step1Description"
+msgstr "Принеси мне Большой Алмаз. Он попадается в скалах Белоземья."
+
+msgid "orderTerrain2.3Step1Thank"
+msgstr "О боже, он размером с голову! Только чью..."
+
+msgid "orderTerrain2.3Step3Title"
+msgstr "Сокровище Белоземья"
+
+msgid "orderTerrain2.3Step3HelpInfo"
+msgstr "Дай мне Сундук Конунга. Канарейка поможет найти его в Белоземье."
+
+msgid "orderTerrain2.3Step3Description"
+msgstr "Дай мне Сундук Конунга. Канарейка поможет найти его в Белоземье."
+
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Вспоминаю Дедушку..."
+
+msgid "orderTerrain2.3Step4Title"
+msgstr "Эссенция пламени"
+
+msgid "orderTerrain2.3Step4HelpInfo"
+msgstr ""
+"Извлеки Искру Идола из Солнечной Сферы. Когда найдёшь Солнечную Сферу, "
+"отнеси её в Кузницу. Положи Сферу в специальный слот Взлома и запусти "
+"процесс. Внутри неё спрятана Искра Идола - именно её нам и нужно достать."
+
+msgid "orderTerrain2.3Step4Description"
+msgstr "Извлеки Искру Идола из Солнечной Сферы."
+
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Какой жаркий камень..."
+
+msgid "orderTerrain2.3Step5Title"
+msgstr "Переливчатый камень"
+
+msgid "orderTerrain2.3Step5HelpInfo"
+msgstr ""
+"Принеси мне Опал. Ищи его в ледяных скалах - встречается он там редко, так "
+"что придётся немного поискать.\n"
+"\n"
+"Если увидишь что-то красиво переливающееся, не проходи мимо. Возможно, это "
+"именно то, что нам нужно."
+
+msgid "orderTerrain2.3Step5Description"
+msgstr "Принеси мне Опал. Он редко попадается в ледяных скалах."
+
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Как прекрасно он переливается..."
+
+msgid "orderTerrain2.3Step6Title"
+msgstr "Оно оставило потомство!"
+
+msgid "orderTerrain2.3Step6HelpInfo"
+msgstr ""
+"Извлеки Птенца Совы из Солнечной Сферы. Найдёшь ту самую Сферу во рту "
+"идола - неси её в Кузницу и помести в слот Взлома. Что именно произойдёт, "
+"лучше не спрашивай. Главное, чтобы Птенец вышел целым. И желательно, чтобы "
+"вместе с ним ничего лишнего не вылезло."
+
+msgid "orderTerrain2.3Step6Description"
+msgstr "Извлеки Птенца Совы из Солнечной Сферы."
+
+msgid "orderTerrain2.3Step6Thank"
+msgstr "Взрослая Сова приносит холод... Почему птенец такой горячий?"
+
+msgid "orderTerrain2.3Step7Title"
+msgstr "Большой Куш"
+
+msgid "orderTerrain2.3Step7HelpInfo"
+msgstr ""
+"Принеси мне 5 Крупных Кусков Золота. Ищи их в ледяных скалах - золото там "
+"встречается довольно часто. Да, звучит странно: лёд и золото. Но не нам с "
+"тобой это объяснять.\n"
+"\n"
+"Так что бери кирку и ищи хорошенько. Золотые куски сами изо льда не вылезут."
+
+msgid "orderTerrain2.3Step7Description"
+msgstr ""
+"Принеси мне 5 Крупных Кусков Золота. Они нередко попадются в ледяных скалах."
+
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Теперь я буду самым большим парнем на деревне."

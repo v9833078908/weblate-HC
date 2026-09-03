@@ -1,0 +1,163 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Translate Toolkit 3.19.17\n"
+"Language: en\n"
+
+#: 294040899584
+msgid "survey1Intro"
+msgstr ""
+"Hey! The horse wants to clear something up.\n"
+"\n"
+"Just a couple of quick questions to figure out who she’s dealing with.\n"
+"Won’t take more than a minute."
+
+#: 384566562816
+msgid "survey1Final"
+msgstr ""
+"Looks like… you passed the test!\n"
+"\n"
+"She remembered your answers.\n"
+"And apparently decided not to ditch you."
+
+#: 5159299321856
+msgid "survey1AcceptDescription"
+msgstr "You’ll get a reward."
+
+#: 5354862940160
+msgid "survey1DeclineDescription"
+msgstr ""
+"She’ll survive…\n"
+"probably."
+
+#: 5940509413376
+msgid "survey1Question1"
+msgstr ""
+"How old are you?\n"
+"Don’t lie. She can tell."
+
+#: 15613778202624
+msgid "survey1Question1Answer1"
+msgstr "Under 15"
+
+#: 15721877999616
+msgid "survey1Question1Answer2"
+msgstr "15 - 20"
+
+#: 15806955261952
+msgid "survey1Question1Answer3"
+msgstr "21 - 29"
+
+#: 15875448246272
+msgid "survey1Question1Answer4"
+msgstr "30 -40"
+
+#: 15939973419008
+msgid "survey1Question1Answer5"
+msgstr "40 +"
+
+#: 16047045611520
+msgid "survey1Question2"
+msgstr ""
+"Who are you?\n"
+"No need for too many details."
+
+#: 16356262285312
+msgid "survey1Question2Answer1"
+msgstr "M"
+
+#: 16421546627072
+msgid "survey1Question2Answer2"
+msgstr "F"
+
+#: 16480354963456
+msgid "survey1Question2Answer3"
+msgstr "Secret"
+
+#: 16583924912128
+msgid "survey1Question3"
+msgstr "What are you here for?"
+
+#: 16952520347648
+msgid "survey1Question3Answer1"
+msgstr "Run around and loot"
+
+#: 17065502314496
+msgid "survey1Question3Answer2"
+msgstr "Craft and sell"
+
+#: 17147127664640
+msgid "survey1Question3Answer3"
+msgstr "Upgrades and progression"
+
+#: 17285803937792
+msgid "survey1Question3Answer4"
+msgstr "Just vibes…"
+
+#: 17383480889344
+msgid "survey1Question4"
+msgstr "What’s missing to keep you from leaving?"
+
+#: 17980544258048
+msgid "survey1Question4Answer1"
+msgstr "More story"
+
+#: 18049771245568
+msgid "survey1Question4Answer2"
+msgstr "New dangers, rocks, and treasures"
+
+#: 18206881484800
+msgid "survey1Question4Answer3"
+msgstr "New items"
+
+#: 18275869396992
+msgid "survey1Question4Answer4"
+msgstr "New locations"
+
+#: 18730255126528
+msgid "survey1Question4Answer5"
+msgstr "Achievements and rewards"
+
+#: 19109206298624
+msgid "survey1Question5"
+msgstr "What should be fixed first?"
+
+#: 19176772341760
+msgid "survey1Question5Answer1"
+msgstr "Dialogue"
+
+#: 19256145350656
+msgid "survey1Question5Answer2"
+msgstr "Rewards"
+
+#: 19311245922304
+msgid "survey1Question5Answer3"
+msgstr "Recipe difficulty"
+
+#: 19403713548288
+msgid "survey1Question5Answer4"
+msgstr "Map density"
+
+#: 19475515838464
+msgid "survey1Question5Answer5"
+msgstr "Everything's great"
+
+#: 27306583396352
+msgid "surveyDialogTitle"
+msgstr "Quick Survey"
+
+#: 28690401726464
+msgid "startSurvey"
+msgstr "Start"
+
+#: 30707396382720
+msgid "claimReward"
+msgstr "Claim reward"

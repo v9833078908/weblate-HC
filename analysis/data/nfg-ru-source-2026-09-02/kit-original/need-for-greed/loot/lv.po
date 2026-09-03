@@ -1,0 +1,632 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Latvian <http://l10n.herocraft.com/projects/need-for-greed/"
+"loot/lv/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: lv\n"
+"Plural-Forms: nplurals=3; plural=(n % 10 == 0 || n % 100 >= 11 && n % 100 <= "
+"19) ? 0 : ((n % 10 == 1 && n % 100 != 11) ? 1 : 2);\n"
+
+#: 145034502144
+msgid "ring"
+msgstr "Gredzens"
+
+#: 180082106368
+msgid "dagger"
+msgstr "Duncis"
+
+#: 269412392960
+msgid "necklace"
+msgstr "Kaklarota"
+
+#: 317432979456
+msgid "treasureGoldScepter3GT1.1"
+msgstr "Zelta scepteris"
+
+#: 391995121664
+msgid "bracelet"
+msgstr "Aproce"
+
+#: 430343643136
+msgid "brooch"
+msgstr "Broša"
+
+#: 479966453760
+msgid "diadem"
+msgstr "Diadēma"
+
+#: 549466071040
+msgid "casket"
+msgstr "Lādīte"
+
+#: 610409308160
+msgid "treasureGoldCrownT1.1"
+msgstr "Zelta kronis"
+
+#: 877821353984
+msgid "diamondBig"
+msgstr "Tīrs dimants (liels)"
+
+#: 918229278720
+msgid "diamondMedium"
+msgstr "Tīrs dimants (vidējs)"
+
+#: 966572826624
+msgid "diamondSmall"
+msgstr "Tīrs dimants (mazs)"
+
+#: 1109162385408
+msgid "rubyBig"
+msgstr "Sarkanais rubīns (liels)"
+
+#: 1112484274176
+msgid "rubyMedium"
+msgstr "Sarkanais rubīns (vidējs)"
+
+#: 1118599569408
+msgid "rubySmall"
+msgstr "Sarkanais rubīns (mazs)"
+
+#: 1382245130240
+msgid "sapphireBig"
+msgstr "Zilais safīrs (liels)"
+
+#: 1385105645568
+msgid "sapphireMedium"
+msgstr "Zilais safīrs (vidējs)"
+
+#: 1387160854528
+msgid "sapphireSmall"
+msgstr "Zilais safīrs (mazs)"
+
+#: 1624038367232
+msgid "emeraldBig"
+msgstr "Smaragds (liels)"
+
+#: 1626538172416
+msgid "emeraldMedium"
+msgstr "Smaragds (vidējs)"
+
+#: 1628039733248
+msgid "emeraldSmall"
+msgstr "Smaragds (mazs)"
+
+#: 1775394021376
+msgid "amethystBig"
+msgstr "Ametists (liels)"
+
+#: 1778531360768
+msgid "amethystMedium"
+msgstr "Ametists (vidējs)"
+
+#: 1781240881152
+msgid "amethystSmall"
+msgstr "Ametists (mazs)"
+
+#: 1975328104448
+msgid "opalBig"
+msgstr "Opāls (liels)"
+
+#: 1977366536192
+msgid "opalMedium"
+msgstr "Opāls (vidējs)"
+
+#: 1978461249536
+msgid "opalSmall"
+msgstr "Opāls (mazs)"
+
+#: 90993176100474880
+msgid "diamondRough"
+msgstr "Dimants (neapstrādāts)"
+
+#: 90994685357854720
+msgid "amethystRough"
+msgstr "Ametists (neapstrādāts)"
+
+#: 90995679407902720
+msgid "emeraldRough"
+msgstr "Smaragds (neapstrādāts)"
+
+#: 90995991497674752
+msgid "opalRough"
+msgstr "Opāls (neapstrādāts)"
+
+#: 90996287313547264
+msgid "rubyRough"
+msgstr "Rubīns (neapstrādāts)"
+
+#: 90996648090800128
+msgid "sapphireRough"
+msgstr "Safīrs (neapstrādāts)"
+
+#: 91104301592875008
+msgid "goldSmall"
+msgstr "Zelta tīrradnis (mazs)"
+
+#: 170368899466137600
+msgid "eggBird"
+msgstr "Paradīzes putna ola"
+
+#: 184508261447503872
+msgid "goldMedium"
+msgstr "Liels zelta gabals"
+
+#: 184510784782733312
+msgid "goldBig"
+msgstr "Zelta tīrradnis (liels)"
+
+#: 223644980889260032
+msgid "trash"
+msgstr "Atkritumi"
+
+#: 226530276224012288
+msgid "pin"
+msgstr "Spraudīte"
+
+#: 226809520472723456
+msgid "earring"
+msgstr "Auskaru"
+
+#: 231192180821331968
+msgid "glasses"
+msgstr "Brilles"
+
+#: 236643067328991232
+msgid "loveBig"
+msgstr "Saistakmens (liels)"
+
+#: 236643187822956544
+msgid "loveMedium"
+msgstr "Saistakmens (vidējs)"
+
+#: 236643238079107072
+msgid "gemBirdSmall"
+msgstr "Putnu dārgakmens"
+
+#: 253417221730340864
+msgid "geodeMedium"
+msgstr "Ģeode (vidēja)"
+
+#: 254185922679279616
+msgid "gemRoughMedium"
+msgstr "Savvaļas dārgakmens (vidējs)"
+
+#: 254905974785314816
+msgid "artifact"
+msgstr "Artefakts"
+
+#: 255083397128654848
+msgid "meteoriteIronSmall"
+msgstr "Zvaigžņu dzelzs (mazs)"
+
+#: 256721089700564992
+msgid "mask"
+msgstr "Maska"
+
+#: 256721248970870784
+msgid "treasureGoldGlove5GT1.1"
+msgstr "Zelta dūraiņi"
+
+#: 257443856536309760
+msgid "silverSmall"
+msgstr "Sudraba tīrradnis (mazs)"
+
+#: 258521155209793536
+msgid "idol"
+msgstr "Elks"
+
+#: 300784345364566016
+msgid "goldSmallCoin"
+msgstr "Sena monēta (zelts)"
+
+#: 300784550382145536
+msgid "silverSmallCoin"
+msgstr "Sena monēta (sudrabs)"
+
+#: 300785063425216512
+msgid "gemLoveSmall"
+msgstr "Saistakmens (mazs)"
+
+#: 301130818094632960
+msgid "artifactBirdEntity"
+msgstr "Laimes dzeltenums"
+
+#: 301131059615240192
+msgid "artifactWormEntity"
+msgstr "Purva kāpurs"
+
+#: 301131351488466944
+msgid "artifactGalaxyMechanism"
+msgstr "Meteora kodols"
+
+#: 301131515259260928
+msgid "artifactBook"
+msgstr "Sens sējums"
+
+#: 301131609035509760
+msgid "artifactManuscript"
+msgstr "Nolietots rullis"
+
+#: 301131692661542912
+msgid "artifactTablet"
+msgstr "Derības akmens"
+
+#: 301131928431759360
+msgid "cursedItem"
+msgstr "Nolādēta relikvija"
+
+#: 301134437837705216
+msgid "chest"
+msgstr "Aprakta lāde"
+
+#: 301134754209861632
+msgid "eggWorm"
+msgstr "Tārpu ola"
+
+#: 301134952529137664
+msgid "geodeSmall"
+msgstr "Ģeode (maza)"
+
+#: 301135305941192704
+msgid "geodeGemSmall"
+msgstr "Vērtīga ģeode (maza)"
+
+#: 301135432625950720
+msgid "geodeGemMedium"
+msgstr "Vērtīga ģeode (vidēja)"
+
+#: 301136788187254784
+msgid "goldSmallScarab"
+msgstr "Zelta skarabejs"
+
+#: 301138401769558016
+msgid "gemRoughSmall"
+msgstr "Savvaļas dārgakmens (mazs)"
+
+#: 301138758054711296
+msgid "roughDaggerT1"
+msgstr "Salauzts gribas duncis"
+
+#: 301138888757612544
+msgid "roughMaskT1"
+msgstr "Salauzta sejas maska"
+
+#: 301139046975148032
+msgid "roughtScepterT1"
+msgstr "Saplēsts scepteris"
+
+#: 301139166772858880
+msgid "roughCrownT1"
+msgstr "Salauzta kronis"
+
+#: 301139272288964608
+msgid "roughGloveT1"
+msgstr "Plaisa dūraiņi"
+
+#: 301139595988570112
+msgid "unknownItem"
+msgstr "Nezināms priekšmets"
+
+#: 301139858380034048
+msgid "treasureGoldEarring1GT1.1"
+msgstr "Starojošs medaljons (zelts)"
+
+#: 301140049422192640
+msgid "treasureGoldNecklace1GT1.1"
+msgstr "Ziedoša dārza piespraude (zelts)"
+
+#: 301140236874027008
+msgid "treasureGoldNecklace1GT1.2"
+msgstr "Apslēptās gaismas kulons (zelts)"
+
+#: 301140518961942528
+msgid "treasureGoldPin1GT1.1"
+msgstr "Slēptā dārgakmens piespraude (zelts)"
+
+#: 301140708619980800
+msgid "treasureGoldRing1GT1.1"
+msgstr "Gredzens (zelts)"
+
+#: 301157185821609984
+msgid "treasureGoldRing1GT1.2"
+msgstr "Šaura akmens aproce (zelts)"
+
+#: 301157418504818688
+msgid "treasureGoldRing1GT1.3"
+msgstr "Karaļa zīmogs (zelts)"
+
+#: 301157807581040640
+msgid "treasureGoldRing1GT1.4"
+msgstr "Suverēna zīmogs (zelts)"
+
+#: 301157950980100096
+msgid "treasureGoldBrooch2GT1.1"
+msgstr "Saules staru broša (zelts)"
+
+#: 301159108893216768
+msgid "treasureGoldDagger2GT1.1"
+msgstr "Zelta gribas duncis"
+
+#: 301159380533121024
+msgid "treasureGoldEarring2GT1.1"
+msgstr "Rezonējoši auskari (zelts)"
+
+#: 301159536917745664
+msgid "treasureGoldGlasses2GT1.1"
+msgstr "Veltīgās brilles (zelts)"
+
+#: 301159731252432896
+msgid "treasureGoldMask2GT1.1"
+msgstr "Zelta sejas maska"
+
+#: 301159892582141952
+msgid "treasureGoldRing2GT1.1"
+msgstr "Dvīņu likteņu gredzens (zelts)"
+
+#: 301160906458664960
+msgid "treasureMeteoriteIron1GT1.1"
+msgstr "Debesu gredzens"
+
+#: 301161084104216576
+msgid "treasureMeteoriteIron2GT1.1"
+msgstr "Debesu gredzens"
+
+#: 301161408911118336
+msgid "treasureSilverNecklace1GT1.1"
+msgstr "Savienota josta (sudrabs)"
+
+#: 301161581187960832
+msgid "treasureSilverRing1GT1.1"
+msgstr "Mēness gredzens (sudrabs)"
+
+#: 301161692269907968
+msgid "treasureSilverRing1GT1.2"
+msgstr "Čūskas gredzens (sudrabs)"
+
+#: 301161856397217792
+msgid "treasureSilverRing1GT1.3"
+msgstr "Taustas zīmogs (sudrabs)"
+
+#: 301162192604237824
+msgid "treasureSilverPin1GT1.1"
+msgstr "Goda adata (sudrabs)"
+
+#: 304825262794870784
+msgid "artifactGoldCoinCheap"
+msgstr "Sūnaina monēta"
+
+#: 304825379492990976
+msgid "artifactGoldCoin"
+msgstr "Nolādēta monēta"
+
+#: 304825491313135616
+msgid "artifactGoldCoinBest"
+msgstr "Senās godības monēta"
+
+#: 304826479935754240
+msgid "treasure2GIdolCheapT1.1"
+msgstr "Nabaga vīra kuiļa elks"
+
+#: 304826631895388160
+msgid "treasure2GIdolT1.1"
+msgstr "Lielā kuiļa elks"
+
+#: 304826724413345792
+msgid "treasure2GIdolCheapT1.2"
+msgstr "Apdegušās galvas elks"
+
+#: 304827057936011264
+msgid "treasure2GIdolT1.2"
+msgstr "Kvīlošā galvaskausa elks"
+
+#: 308071776790249472
+msgid "Lem"
+msgstr "Piemiņas kaste"
+
+#: 308087884024905728
+msgid "Tablet.Cheap"
+msgstr "Noslēpumains akmens"
+
+#: 308103528141291520
+msgid "Flop"
+msgstr "Disketes ar Flopcoins"
+
+#: 308105688279154688
+msgid "Flop.Cheap"
+msgstr "Tukšs disks"
+
+#: 308108977548820480
+msgid "Shit"
+msgstr "Svētais Dubai Choco"
+
+#: 308109676152094720
+msgid "Shit.Cheap"
+msgstr "Mēslu pīrāgs"
+
+#: 308112391376732160
+msgid "Frid"
+msgstr "Piektdienas nakts maska"
+
+#: 308113442167324672
+msgid "Frid.Cheap"
+msgstr "Pirmdienas 12. maska"
+
+#: 308116274564038656
+msgid "Jur"
+msgstr "Veco asiņu avots"
+
+#: 308116311943675904
+msgid "Jur.Cheap"
+msgstr "Kolofonija ods"
+
+#: 308118123144806400
+msgid "Tooth"
+msgstr "Čingishana zobs"
+
+#: 308118125929824256
+msgid "Tooth.Cheap"
+msgstr "Jūsu zobs?!?"
+
+#: 331272749512396800
+msgid "cryolisSmall"
+msgstr "Kriolis (mazs)"
+
+#: 332799018326560768
+msgid "frozenItem"
+msgstr "Saldēts priekšmets"
+
+#: 344256652787322880
+msgid "emberSphere"
+msgstr "Saules sfēra"
+
+#: 344256998452498432
+msgid "gemIdolHearthSmall"
+msgstr "Elka pavards"
+
+#: 344257252614737920
+msgid "sparkwing"
+msgstr "Dzirksteļspārnis"
+
+#: 345838386553294848
+msgid "collected"
+msgstr "Savākts"
+
+#: 352860554265776128
+msgid "treasure.3g.idol.cheap.t1.1"
+msgstr "Ūsainības elks"
+
+#: 352861521468084224
+msgid "treasure.3g.idol.t1.1"
+msgstr "Gudrības elks"
+
+#: 355564928933298176
+msgid "winter.chest"
+msgstr "Jarla lāde"
+
+#: 355819897745833984
+msgid "gold.medium.t1.2"
+msgstr "Saplēsts zelta gabals"
+
+#: 355820315255242752
+msgid "gold.medium.t1.3"
+msgstr "Lielisks zelta gabals"
+
+#: 355820677206900736
+msgid "gold.small.t1.bad"
+msgstr "Sadalīts zelts"
+
+#: 355820843536220160
+msgid "gold.small.t1.good"
+msgstr "Nevainojams zelta tīrradnis"
+
+#: 355821218943205376
+msgid "silver.small.t1.bad"
+msgstr "Blāvs sudrabs"
+
+#: 355821334773104640
+msgid "silver.small.t1.good"
+msgstr "Spīdīgs sudraba tīrradnis"
+
+#: 355823949699350528
+msgid "gem.diamond.big.bad"
+msgstr "Sasists liels dimants"
+
+#: 355824022109814784
+msgid "gem.diamond.big.good"
+msgstr "Kolosāls dimants"
+
+#: 355825018307346432
+msgid "gem.diamond.medium.t1.bad"
+msgstr "Dimants ar defektu (vidējs)"
+
+#: 355825051593342976
+msgid "gem.diamond.medium.t1.good"
+msgstr "Nevainojams dimants (vidējs)"
+
+#: 355825892232527872
+msgid "gem.opal.small.t1.bad"
+msgstr "Duļķains opāls"
+
+#: 355825926491602944
+msgid "gem.opal.small.t1.good"
+msgstr "Spīdošs opāls"
+
+#: 355831675162722304
+msgid "gem.ruby.small.t1.bad"
+msgstr "Brūns rubīns"
+
+#: 355831712475250688
+msgid "gem.ruby.small.t1.good"
+msgstr "Asins sarkanais rubīns"
+
+#: 355835925297102848
+msgid "gem.sapphire.medium.t1.bad"
+msgstr "Greizs safīrs"
+
+#: 355835927612358656
+msgid "gem.sapphire.medium.t1.good"
+msgstr "Debesu safīrs"
+
+#: 360176275164499968
+msgid "frozen.artifact.book.t4.1"
+msgstr "Saldēts Sens sējums"
+
+#: 360177589508378624
+msgid "frozen.daimond.big.t1.1"
+msgstr "Saldēts Dimants (liels)"
+
+#: 360177807297613824
+msgid "frozen.daimond.medium.t1.1"
+msgstr "Saldēts Dimants (vidējs)"
+
+#: 360177937186820096
+msgid "frozen.gold.medium.t1.1"
+msgstr "Saldēts liels zelta gabals"
+
+#: 360178211246837760
+msgid "frozen.gold.small.t1"
+msgstr "Saldēts Zelta tīrradnis (mazs)"
+
+#: 360178467921465344
+msgid "frozen.silver.small.t1"
+msgstr "Saldēts Sudraba tīrradnis (mazs)"
+
+#: 360179617257230336
+msgid "frozen.opal.small.t1.1"
+msgstr "Saldēts opāls (mazs)"
+
+#: 360179817572995072
+msgid "frozen.ruby.small.t1.1"
+msgstr "Saldēts rubīns (mazs)"
+
+#: 360180105012842496
+msgid "frozen.sapphire.small.t1.1"
+msgstr "Saldēts safīrs (mazs)"
+
+#: 360180385796329472
+msgid "frozen.treasure.1g.idol"
+msgstr "Saldēts Elks"
+
+#: 366715237467164672
+msgid "treasureCryolisEarring2GT1.1"
+msgstr "Mirdzoši auskari"
+
+#: 366715787273310208
+msgid "treasureCryolisEarring2GT1.2"
+msgstr "Mēnessgaismas auskari"
+
+#: 366715935038640128
+msgid "treasureCryolisEarring2GT1.3"
+msgstr "Ledains skatiens"
+
+#: 366716149346603008
+msgid "treasureCryolisEarring2GT1.4"
+msgstr "Mēnessgaismas ezers"

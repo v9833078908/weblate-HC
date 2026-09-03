@@ -1,0 +1,478 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-22 09:03+0000\n"
+"PO-Revision-Date: 2026-08-24 14:37+0000\n"
+"Last-Translator: OpenRouter <noreply-mt-openrouter@weblate.org>\n"
+"Language-Team: Bulgarian <http://l10n.herocraft.com/projects/need-for-greed/"
+"orders/bg/>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Weblate 2026.8.1.dev0\n"
+"Language: bg\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: 114226892800
+msgid "orderTerrain0.1Step1Title"
+msgstr "Имаме нужда от още злато!"
+
+#: 432712978432
+msgid "orderTerrain0.1Step1Description"
+msgstr "Донеси ми 3 златни къса."
+
+#: 410868545490944
+msgid "orderTerrain0.1Step1Thank"
+msgstr "Отлично — тези късове ще се добавят чудесно към колекцията ми."
+
+#: 4737438277963776
+msgid "orderTerrain1.1Step1Title"
+msgstr "Блясък на зората"
+
+#: 4737634734968832
+msgid "orderTerrain1.1Step1Description"
+msgstr "Донеси ми златен къс от всяка златоносна скала."
+
+#: 4737870236749824
+msgid "orderTerrain1.1Step1Thank"
+msgstr ""
+"Златото съдържа блясъка на зората – ако не мога да го видя, поне мога да го "
+"почувствам..."
+
+#: 4740504523902976
+msgid "orderTerrain0.1Step2Title"
+msgstr "Отлична работа!"
+
+#: 4740632143990784
+msgid "orderTerrain0.1Step2Description"
+msgstr "Благодаря за помощта! Ще споделя с теб едно любопитно място."
+
+#: 16787486734028800
+msgid "orderTerrain1.1Step2Title"
+msgstr "Нови очила"
+
+#: 16787574239793152
+msgid "orderTerrain1.1Step2Description"
+msgstr "Донеси ми 2 диаманта. Те често падат от кристални скали."
+
+#: 16788049915809792
+msgid "orderTerrain1.1Step2Thank"
+msgstr "Да видим дали съм готов да свикна с тази земя..."
+
+#: 16788621414895616
+msgid "orderTerrain1.1Step3Title"
+msgstr "Свиквам със земята"
+
+#: 16788663253078016
+msgid "orderTerrain1.1Step3Description"
+msgstr "Донеси ми малка Геода. Те могат да бъдат намерени в обикновени скали."
+
+#: 16788764000260096
+msgid "orderTerrain1.1Step3Thank"
+msgstr "Да видим дали съм готов да свикна с тази земя..."
+
+#: 16789247150526464
+msgid "orderTerrain1.1Step4Title"
+msgstr "Раклата на мъртвеца"
+
+#: 16789336237543424
+msgid "orderTerrain1.1Step4Description"
+msgstr "Донеси ми Ракла. Канарче може да ти помогне да намериш такава."
+
+#: 16789441711706112
+msgid "orderTerrain1.1Step4Thank"
+msgstr "Значи там съм си оставил нещата..."
+
+#: 16789861523787776
+msgid "orderTerrain1.1Step5Title"
+msgstr "Сребро за закаляване"
+
+#: 16790058245033984
+msgid "orderTerrain1.1Step5Description"
+msgstr ""
+"Донеси ми 3 парчета сребро. Те могат да бъдат намерени в геоди и обикновени "
+"скали."
+
+#: 16790186938863616
+msgid "orderTerrain1.1Step6Title"
+msgstr "Отлична работа!"
+
+#: 16790822405279744
+msgid "orderTerrain1.1Step5Thank"
+msgstr "Това сребро приятно щипе дланите..."
+
+#: 16791339927867392
+msgid "orderTerrain1.1Step6Description"
+msgstr "Благодаря! Отбийте се в къщата ми някой път — ето адреса."
+
+#: 16792386012450816
+msgid "orderTerrain1.2Step1Title"
+msgstr "Древни пари"
+
+#: 16792448180424704
+msgid "orderTerrain1.2Step1Description"
+msgstr ""
+"Донесете ми 4 древни монети. Те често се намират в древни гърнета и вази."
+
+#: 16793192929431552
+msgid "orderTerrain1.2Step1Thank"
+msgstr "Сега най-накрая мога да върна ресто на древните!"
+
+#: 16793381891215360
+msgid "orderTerrain1.2Step2Title"
+msgstr "Топка-валяк"
+
+#: 16793474094600192
+msgid "orderTerrain1.2Step2Description"
+msgstr ""
+"Донесете ми Златен скарабей. Те са големи бръмбари, които могат да бъдат "
+"намерени да пълзят в храстите."
+
+#: 16793779863556096
+msgid "orderTerrain1.2Step2Thank"
+msgstr "Този бръмбар е голям топка-валяк!"
+
+#: 16794392403906560
+msgid "orderTerrain1.2Step3Title"
+msgstr "Каменно боулинг"
+
+#: 16794434028179456
+msgid "orderTerrain1.2Step3Description"
+msgstr "Донесете ми Средна геода. Понякога се появява в обикновени скали."
+
+#: 16794517595492352
+msgid "orderTerrain1.2Step3Thank"
+msgstr "Сега най-накрая ще мога да търкалям топки!"
+
+#: 16794991149191168
+msgid "orderTerrain1.2Step4Title"
+msgstr "Златен омлет"
+
+#: 16795063073116160
+msgid "orderTerrain1.2Step4Description"
+msgstr ""
+"Донеси ми Златно яйце. Претърси храстите, за да намериш гнездо, съдържащо "
+"такива яйца."
+
+#: 16795116181393408
+msgid "orderTerrain1.2Step4Thank"
+msgstr "Ето това е закуска за кралски особи!"
+
+#: 16795705460133888
+msgid "orderTerrain1.2Step5Title"
+msgstr "Лъвска кръв"
+
+#: 16795757985402880
+msgid "orderTerrain1.2Step5Description"
+msgstr ""
+"Донеси ми Лъвски рубин. Може да бъде намерен в геоди с червени кристали."
+
+#: 16795845432446976
+msgid "orderTerrain1.2Step5Thank"
+msgstr "Сега ще бъда смел като лъв!"
+
+#: 16797388357505024
+msgid "orderTerrain1.2Step6Title"
+msgstr "Небесна благодат"
+
+#: 16797558377811968
+msgid "orderTerrain1.2Step6Description"
+msgstr ""
+"Донеси ми Небесен сапфир. Може да бъде намерен в геоди със сини кристали."
+
+#: 16797646290423808
+msgid "orderTerrain1.2Step6Thank"
+msgstr "Самите небеса са на моя страна!"
+
+#: 16798157601247232
+msgid "orderTerrain1.2Step7Title"
+msgstr "Златна тоалетна"
+
+#: 16798193798090752
+msgid "orderTerrain1.2Step7Description"
+msgstr "Донеси ми 9 златни къса от всяка златоносна скала."
+
+#: 16798263801024512
+msgid "orderTerrain1.2Step7Thank"
+msgstr "Най-накрая мога да оправя тоалетната!"
+
+#: 16798933543292928
+msgid "orderTerrain1.2Step8Description"
+msgstr ""
+"Ако искаш да си пожелаеш нещо — знам едно място, където звездите падат "
+"постоянно."
+
+#: 16799140129542144
+msgid "orderTerrain1.2Step8Title"
+msgstr "Отлична работа!"
+
+#: 66701112705024000
+msgid "orderTerrain2.1Step5Title"
+msgstr "Отлична работа!"
+
+#: 66701312781713408
+msgid "orderTerrain2.1Step5Description"
+msgstr "Ледът ми напомня за баба... Отбий се и до нейната колиба!"
+
+#: 66701713186750464
+msgid "orderTerrain2.1Step1Description"
+msgstr "Донеси ми 2 Замръзнали предмета от замръзналите скали"
+
+#: 66702356693647360
+msgid "orderTerrain2.1Step1Title"
+msgstr "Ледени кубчета"
+
+#: 66702611300483072
+msgid "orderTerrain2.1Step1Thank"
+msgstr "Идеални за моите коктейли!"
+
+#: 66705370212990976
+msgid "orderTerrain2.2Step7Title"
+msgstr "Отлична работа!"
+
+#: 66705373262249984
+msgid "orderTerrain2.2Step7Description"
+msgstr ""
+"Изглежда, че раците са свързани със Слънчев култ — знам къде са руините на "
+"техния храм!"
+
+#: 66705376152125440
+msgid "orderTerrain2.2Step2Description"
+msgstr "Хванете леден рак — черупката му е направена от Криолис."
+
+#: 66705379809558528
+msgid "orderTerrain2.2Step2Title"
+msgstr "Рачешки метал"
+
+#: 66705384804974592
+msgid "orderTerrain2.2Step2Thank"
+msgstr "Ах, екзометал! Обичам мистериите на природата!"
+
+#: 66706577295933440
+msgid "orderTerrain2.3Step8Title"
+msgstr "Отлична работа!"
+
+#: 66706580684931072
+msgid "orderTerrain2.3Step8Description"
+msgstr ""
+"Най-ценните съкровища на Слънчев култ са скрити дълбоко в Лабиринт — ще ви "
+"покажа къде!"
+
+#: 66706585684541440
+msgid "orderTerrain2.3Step2Description"
+msgstr "Запалете 3 факли в Светилище и откраднете Слънчева сфера!"
+
+#: 66706589509746688
+msgid "orderTerrain2.3Step2Title"
+msgstr "Най-добър нагревател"
+
+msgid "orderTerrain2.3Step2HelpInfo"
+msgstr ""
+
+#: 66706594945564672
+msgid "orderTerrain2.3Step2Thank"
+msgstr "Да, това вече е добро загряване!"
+
+#: 70714473507717120
+msgid "orderTerrain2.1Step2Description"
+msgstr "Намерете 2 сребърни къса в ледени кубчета и ги затоплете."
+
+#: 70714539375067136
+msgid "orderTerrain2.1Step2Title"
+msgstr "Мразовито сребро"
+
+#: 70714808414502912
+msgid "orderTerrain2.1Step2Thank"
+msgstr "Като лед във фолио е... но наобратно..."
+
+#: 70714878748786688
+msgid "orderTerrain2.1Step3Title"
+msgstr "Мразовито злато"
+
+#: 70714919110574080
+msgid "orderTerrain2.1Step3Thank"
+msgstr "Зимното злато получава много специален... блясък..."
+
+#: 70714983467974656
+msgid "orderTerrain2.1Step3Description"
+msgstr "Намерете 2 златни къса в ледени кубчета и ги затоплете."
+
+#: 70715014472269824
+msgid "orderTerrain2.1Step4Title"
+msgstr "Невидим скъпоценен камък"
+
+#: 70715038832787456
+msgid "orderTerrain2.1Step4Thank"
+msgstr "Ясно в ясното, ахахаха!"
+
+#: 70715070977933312
+msgid "orderTerrain2.1Step4Description"
+msgstr ""
+"Размразете среден диамант. Замръзналите диаманти често се намират във всички "
+"скали."
+
+#: 70718769544560640
+msgid "orderTerrain2.2Step1Title"
+msgstr "Наземна астрология"
+
+#: 70718775819239424
+msgid "orderTerrain2.2Step1Description"
+msgstr ""
+"Донеси ми 2 Звездни желяза. Те могат да бъдат намерени в блатата по време на "
+"Звездопад."
+
+#: 70718777429852160
+msgid "orderTerrain2.2Step1Thank"
+msgstr "Астрометалът е мечтата на всеки учен!"
+
+#: 70721195022483456
+msgid "orderTerrain2.2Step3Title"
+msgstr "Космически натрапник"
+
+#: 70721197308379136
+msgid "orderTerrain2.2Step3Description"
+msgstr ""
+"Намерете Прокълнат Ядро на метеор по време на Звездопад и премахнете "
+"проклятието."
+
+#: 70721198948352000
+msgid "orderTerrain2.2Step3Thank"
+msgstr "Метеорът е машина, не просто небесно тяло! Удивително!"
+
+#: 70723998965039104
+msgid "orderTerrain2.2Step4Title"
+msgstr "Рачешка топлина"
+
+#: 70724001313849344
+msgid "orderTerrain2.2Step4Description"
+msgstr "Съберете 5 Криолис парчета от черупките на ледени раци."
+
+#: 70724003188703232
+msgid "orderTerrain2.2Step4Thank"
+msgstr "И вие ли умирате от желание да разберете как раците живеят в снега?"
+
+#: 70724154619854848
+msgid "orderTerrain2.2Step5Title"
+msgstr "Нови сензори"
+
+msgid "orderTerrain2.2Step5HelpInfo"
+msgstr ""
+
+#: 70724156297576448
+msgid "orderTerrain2.2Step5Description"
+msgstr ""
+"Донеси ми 9 парчета сребро. Те могат да бъдат намерени в Геоди и обикновени "
+"скали."
+
+#: 70724162102493184
+msgid "orderTerrain2.2Step5Thank"
+msgstr "Моите изследователски инструменти най-накрая ще спрат да се бъгват!"
+
+#: 70724346286964736
+msgid "orderTerrain2.2Step6Title"
+msgstr "Рачешка топла дреха"
+
+msgid "orderTerrain2.2Step6HelpInfo"
+msgstr ""
+
+#: 70724348468002816
+msgid "orderTerrain2.2Step6Description"
+msgstr "Съберете 8 Криолис парчета от черупките на ледените раци."
+
+#: 70724350279942144
+msgid "orderTerrain2.2Step6Thank"
+msgstr "Сега най-накрая ще разбера как оцеляват през зимата!"
+
+#: 70738013825007616
+msgid "orderTerrain2.3Step1Title"
+msgstr "На едро"
+
+msgid "orderTerrain2.3Step1HelpInfo"
+msgstr ""
+
+#: 70738018996584448
+msgid "orderTerrain2.3Step1Description"
+msgstr ""
+"Донесете ми голям диамант. Може да бъде намерен във всички замръзнали скали."
+
+#: 70738021307645952
+msgid "orderTerrain2.3Step1Thank"
+msgstr "О, Боже мой, голям е колкото глава! Но чия ли..."
+
+#: 70738580156710912
+msgid "orderTerrain2.3Step3Title"
+msgstr "Съкровище от Белите земи"
+
+msgid "orderTerrain2.3Step3HelpInfo"
+msgstr ""
+
+#: 70738582908174336
+msgid "orderTerrain2.3Step3Description"
+msgstr ""
+"Дайте ми Раклата на ярла. Канарчето ще ви помогне да я намерите в Белите "
+"земи."
+
+#: 70738585055657984
+msgid "orderTerrain2.3Step3Thank"
+msgstr "Напомня ми на дядо..."
+
+#: 70742364090007552
+msgid "orderTerrain2.3Step4Title"
+msgstr "Есенция на пламъка"
+
+msgid "orderTerrain2.3Step4HelpInfo"
+msgstr ""
+
+#: 70742368280117248
+msgid "orderTerrain2.3Step4Description"
+msgstr "Извлечете Идолна искра от Слънчева сфера."
+
+#: 70742370125611008
+msgid "orderTerrain2.3Step4Thank"
+msgstr "Какъв горещ камък..."
+
+#: 70742532495507456
+msgid "orderTerrain2.3Step5Title"
+msgstr "Преливащ камък"
+
+msgid "orderTerrain2.3Step5HelpInfo"
+msgstr ""
+
+#: 70742535381188608
+msgid "orderTerrain2.3Step5Description"
+msgstr "Донесете ми опал. Той е рядък в Замръзналте скали."
+
+#: 70742539273502720
+msgid "orderTerrain2.3Step5Thank"
+msgstr "Вижте колко красиво блести..."
+
+#: 70743768674336768
+msgid "orderTerrain2.3Step6Title"
+msgstr "Остави потомство!"
+
+msgid "orderTerrain2.3Step6HelpInfo"
+msgstr ""
+
+#: 70743771123810304
+msgid "orderTerrain2.3Step6Description"
+msgstr "Извлечете Малка сова от Слънчева сфера."
+
+#: 70743772839280640
+msgid "orderTerrain2.3Step6Thank"
+msgstr "Голяма сова носи студ... Защо пилето е толкова горещо?"
+
+#: 70744648739979264
+msgid "orderTerrain2.3Step7Title"
+msgstr "Голяма работа"
+
+msgid "orderTerrain2.3Step7HelpInfo"
+msgstr ""
+
+#: 70744655853518848
+msgid "orderTerrain2.3Step7Description"
+msgstr "Донеси ми 5 парчета Злато. Те са доста Обикновен в Замръзнал скали."
+
+#: 70744658739200000
+msgid "orderTerrain2.3Step7Thank"
+msgstr "Сега ще бъда най-големият човек в града."
