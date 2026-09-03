@@ -1831,8 +1831,15 @@ class JudgeQueueStripViewTest(ViewTestCase):
         response = self.client.get(self.component.get_absolute_url())
         runs = response.context["judge_queue"]["runs"]
         self.assertEqual(len(runs), 10)
+        # Count parsed rows, not occurrences of an exact class attribute:
+        # the row carries spacing utilities beside dropdown-item.
         self.assertEqual(
-            len(self.run_menu_markup(response).split('class="dropdown-item"')) - 1, 9
+            len(
+                html.fromstring(self.run_menu_markup(response)).xpath(
+                    '//a[contains(@class, "dropdown-item")]'
+                )
+            ),
+            9,
         )
 
     def test_breakdown_button_only_with_zero_runs(self) -> None:

@@ -7,11 +7,20 @@
 producer opens the string, and make its absence explain itself instead of
 looking like a page that does nothing.
 
-**Status:** implemented on 2026-09-03 in worktree
-`feat/candidate-readiness-and-repair-visibility`, all four tasks done and
-verified. The acceptance semantics of Task 4 were decided on 2026-09-03
-(decision 1); its label, its gating and its third JS collision come from that
-review (decisions 6-7). The implementation is not merged or deployed yet.
+**Status:** completed on 2026-09-03. All four tasks were implemented,
+verified, merged to `main` (`81b5f3a`) and deployed to the dev instance
+(migrations `0119`/`0120` applied, `compilemessages`, `collectstatic`, and
+the `weblate_customization` copy). The acceptance semantics of Task 4 were
+decided on 2026-09-03 (decision 1); its label, its gating and its third JS
+collision come from that review (decisions 6-7). Two later changes were made
+on top of the plan at the producer's request: the on-demand paid
+:guilabel:`Сгенерировать исправление` button and every "Paid model request"
+hint were removed from the verdict card (superseding decision 6, which had
+kept the button as the only way to ask for a fix on a `no-candidate`
+string), and the run report's row action now says :guilabel:`Fix by hand`
+for a `no-engine-for-language` row instead of relying on the per-row status
+column that the report's Pareto redesign had removed. Production has not
+been touched and needs its own approval.
 
 **Origin:** a producer pressed :guilabel:`Сгенерировать исправление` on
 `need-for-greed/orders/ru`, navigated away, came back, and found the card
