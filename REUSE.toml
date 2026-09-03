@@ -31,6 +31,7 @@ path = [
   ".claude/skills/**.md",
   ".omp/skills/**.md",
   ".omp/skills/**/*.json",
+  "analysis/**.baseline",
   "analysis/**.csv",
   "analysis/**.json",
   "analysis/**.jsonl",
