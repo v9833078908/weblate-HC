@@ -41,6 +41,19 @@ approval-gated per run. The browser pass and the DOM action count of Task 9
 are still outstanding. Items outside the approved list are kept in "Deferred"
 at the end and need their own approval.
 
+**Carried on the same branch, outside this plan:** commit `fefdd64`
+(`fix(api): commit explanation and flag changes to the translation file`)
+routes the REST API through `Unit.update_explanation` /
+`update_extra_flags`. It is tested and changelogged but belongs to no task
+here; it rides this branch and needs its own approval before the branch
+lands.
+
+**Decision on the backfill cap (2026-09-03):** `--write` stays usable
+without `--limit`. The command already refuses `--all`/`--file-format`, so
+the scope is always one project or component; forcing `--limit` would only
+move the operator's judgement into a guessed number. The unbounded case is
+documented in `docs/admin/management.rst` instead.
+
 **Out of scope:** Zen mode (the 2026-09-01 research decision "leave Zen
 untouched" stands), a persistent Producer/Advanced mode toggle, judge prompt or
 schema changes (the rationale stays in the judge's own language; the

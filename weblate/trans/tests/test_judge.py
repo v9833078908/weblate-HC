@@ -330,6 +330,23 @@ class JudgeResolutionTest(ViewTestCase):
         self.assertIsNotNone(change)
         self.assertEqual(change.details["reason"], "")
 
+    def test_whitespace_reason_is_stored_as_blank(self) -> None:
+        """A reason of spaces is the same decision as no reason at all."""
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_FUZZY)
+        unit = self.get_unit()
+        verdict = self.make_verdict(unit, "critical")
+        resolve_verdict(
+            unit=unit,
+            expected_verdict_id=verdict.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ESCALATED,
+            reason="   \n ",
+        )
+        verdict.refresh_from_db()
+        self.assertEqual(verdict.resolution_reason, "")
+
     def test_unsupported_resolution_value_rejected(self) -> None:
         self.enable_review()
         unit = self.get_unit()

@@ -25559,6 +25559,7 @@ msgstr "Изменённый текст судья перепроверит ав
 msgid "The changed text has been queued for a judge re-check."
 msgstr "Изменённый текст поставлен в очередь на перепроверку судьёй."
 
+#: weblate/trans/views/edit.py:890
 msgid "The changed text awaits a judge re-check by a user who may run it."
 msgstr ""
 "Изменённый текст ждёт перепроверки судьёй: её запустит пользователь с "

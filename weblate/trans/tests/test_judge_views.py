@@ -3452,8 +3452,15 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         card = html.fromstring(response.content).get_element_by_id("id_judge_card")
         self.assertIsNone(card.get("data-judge-pending"))
 
-    def test_unparsed_card_marks_pending_recheck(self) -> None:
-        """The unparsed-round card self-refreshes while a re-check is running."""
+    def test_unparsed_round_marks_pending_recheck(self) -> None:
+        """
+        An unparsed round still self-refreshes while a re-check is running.
+
+        This covers the unparsed state of the main card. The separate
+        ``{% elif judge_round %}`` card needs a round with neither a verdict
+        nor an unparsed row nor a historical fallback; it carries the same
+        attribute, unexercised here.
+        """
         unit = self.get_unit()
         self.make_verdict(unit, "none", unparsed=True)
         self._completed_recheck(unit)
