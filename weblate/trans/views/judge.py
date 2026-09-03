@@ -287,6 +287,11 @@ def _annotate_row(row: JudgeRunUnit) -> None:
         row.action = gettext_lazy("Review the suggested fix")  # type: ignore[attr-defined]
     elif row.repair_status == _REPAIR.APPLIED:
         row.action = gettext_lazy("See the applied fix")  # type: ignore[attr-defined]
+    elif row.repair_status == _REPAIR.NO_ENGINE_FOR_LANGUAGE:
+        # No candidate was ever attempted for this row: the run-level
+        # warning explains why once, and the row must not promise a fix
+        # that cannot arrive.
+        row.action = gettext_lazy("Fix by hand")  # type: ignore[attr-defined]
     else:
         row.action = _ACTION_BY_OUTCOME.get(  # type: ignore[attr-defined]
             row.outcome, gettext_lazy("View")

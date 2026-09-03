@@ -25763,6 +25763,10 @@ msgstr "Просмотреть предложенное исправление"
 msgid "See the applied fix"
 msgstr "Посмотреть применённое исправление"
 
+#: weblate/trans/views/judge.py:294
+msgid "Fix by hand"
+msgstr "Исправить вручную"
+
 #: weblate/trans/views/judge.py:74
 msgid "Suggested fixes"
 msgstr "Предложенные исправления"

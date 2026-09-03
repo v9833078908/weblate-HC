@@ -2329,18 +2329,26 @@ class JudgeRunReportViewTest(ViewTestCase):
             )
         ]
         run.save(update_fields=["warnings"])
-        for index in range(3):
+        # Real units: the "Action" cell is rendered only for a row whose
+        # unit still exists, since a deleted one has nothing to act on.
+        units = list(self.translation.unit_set.all()[:3])
+        self.assertEqual(len(units), 3)
+        for unit in units:
             self.add_row(
                 run,
-                unit_id_snapshot=900010 + index,
+                unit,
                 outcome=JudgeRunUnit.Outcome.CRITICAL,
                 repair_status=JudgeRunUnit.RepairStatus.NO_ENGINE_FOR_LANGUAGE,
             )
 
         response = self.client.get(self.report_url(run))
 
+        # The configuration problem is stated once for the whole run, not
+        # repeated per string. Each affected row still refuses to promise a
+        # fix that no engine can produce.
         self.assertContains(response, "No repair engine is configured for ru", count=1)
-        self.assertContains(response, "No Engine For Language", count=3)
+        self.assertContains(response, "Fix by hand", count=3)
+        self.assertNotContains(response, "Review the suggested fix")
 
     def test_refused_run_shows_the_refusal_and_no_unparsed_row(self) -> None:
         self.enable_review()
