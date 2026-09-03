@@ -1,6 +1,8 @@
 # Judge run navigation: reaching a finished report
 
-Status: proposed, not approved, nothing implemented. Reviewed in
+Status: implemented 2026-09-03 (tasks 1-9; the /plan-design-review step ran as a
+manual pass over the changed templates because no such instrument exists as a
+tool, and the browser pass ran against the live dev instance). Reviewed in
 `docs/llm-first/reviews/2026-09-03-judge-run-navigation-review.md`; its
 amendments F1-F6 are folded into the design and tasks below.
 

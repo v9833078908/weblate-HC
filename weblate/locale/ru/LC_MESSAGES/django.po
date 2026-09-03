@@ -846,6 +846,10 @@ msgstr "Выводить вспомогательные переводы в ре
 msgid "Hide source if a secondary translation exists"
 msgstr "Скрывать источник, если есть вспомогательный перевод"
 
+#: weblate/templates/snippets/judge-runs-menu.html:19
+msgid "Earlier runs"
+msgstr "Предыдущие запуски"
+
 #: weblate/accounts/models.py:803
 msgid "Editor link"
 msgstr "Ссылка на редактор"
@@ -4842,6 +4846,10 @@ msgstr "В пределах"
 #: weblate/billing/models.py:280
 msgid "Inactive recurring payment notification"
 msgstr "Уведомление о неактивных повторяющихся платежах"
+
+#: weblate/templates/snippets/judge-runs-menu.html:8
+msgid "Latest report"
+msgstr "Последний отчёт"
 
 #: weblate/billing/models.py:285
 msgid "Latest upstream commit"
@@ -9474,6 +9482,10 @@ msgstr "Переключить видимость ключа API"
 #: weblate/templates/trans/project-access.html:447
 msgid "API key copied to clipboard."
 msgstr "API ключ скопирован в буфер обмена."
+
+#: weblate/templates/snippets/judge-runs-menu.html:15
+msgid "Toggle earlier runs"
+msgstr "Показать предыдущие запуски"
 
 #: weblate/templates/accounts/profile.html:574
 msgid "API root URL:"

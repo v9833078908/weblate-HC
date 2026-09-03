@@ -242,8 +242,9 @@ reported as a style error less often than a wrongly assumed one.
 
 The component page shows an :guilabel:`AI judge` summary with the same
 ``needs a human``, ``not reviewed``, and ``unparsed`` counts described
-above, plus links to the checks breakdown and to the launch's own run
-history. A :guilabel:`Download for hand-off` action appears only once
+above, plus a link to the checks breakdown while no run exists yet and a
+menu of recent runs once one does. A :guilabel:`Download for hand-off`
+action appears only once
 those cached counts read zero *and* an authoritative, uncached recheck
 agrees: no current critical, no stale target, no glossary or explanation
 drift the cache never tracked, and no unparsed attempt anywhere in the
@@ -264,7 +265,9 @@ result that started it. The run report lists checked, matched, cached, and
 skipped counts, and repaired, rolled back, minor, major, critical, unparsed,
 stale-conflict, accepted-as-is, and escalated outcomes; each count opens the
 matching paginated list of strings. A finished component, project, or
-translation page shows a link to its own last run. Access to a run report
+translation page shows its recent runs: a :guilabel:`Latest report` button
+opening the newest one, with earlier runs listed in a menu beside it.
+Access to a run report
 requires the same
 automatic translation and review permissions as launching one, re-checked
 for the current user rather than trusted from who launched it; it never

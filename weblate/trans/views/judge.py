@@ -23,7 +23,8 @@ from urllib.parse import urlencode
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Case, Value, When
+from django.db.models import Case, CharField, Q, Value, When
+from django.db.models.functions import Cast
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -37,7 +38,7 @@ from weblate.workspaces.models import Workspace
 if TYPE_CHECKING:
     from django.db.models import Model, QuerySet
 
-    from weblate.auth.models import AuthenticatedHttpRequest, User
+    from weblate.auth.models import AuthenticatedHttpRequest
 
 _SCOPE_MODELS: dict[str, type[Model]] = {
     JudgeRun.ScopeType.TRANSLATION: Translation,
@@ -310,42 +311,94 @@ def user_can_view_judge_run(user, scope) -> bool:
     )
 
 
-def last_judge_run(
-    scope: Translation | Component | Project | Workspace,
-    *,
-    actor: User,
-) -> JudgeRun | None:
+def _scope_run_query(scope: Translation | Component | Project | Workspace) -> Q:
     """
-    Return the requesting user's own most recent run for this exact scope.
+    Match the runs launched for this scope and for everything nested in it.
 
-    Filtered by actor, not just scope: get_user_tasks() forgets a settled
-    task immediately (a shared, tested contract - see
-    test_finished_task_is_forgotten), so a reload after completion has no
-    surviving task id to look up. Scope alone would then show whichever
-    run is newest regardless of who launched it, including a concurrent
-    launch by someone else on a shared component; actor narrows this back
-    to an exact identity match for the common case (at most one launcher
-    reviewing their own reload), and "the latest of my own launches" for a
-    user who launched more than once is the expected result, not an
-    ambiguity.
+    A translation matches itself alone; a component also matches its
+    translations; a project also matches its components and their
+    translations; a workspace also matches its projects, their components
+    and their translations. ``scope_id`` stores ``str(pk)``, so each nested
+    level's membership is matched through a ``Cast("pk", CharField())``
+    subquery over that level's own queryset: one SQL subquery per branch,
+    evaluated inside the single run lookup, never a materialized id list
+    per nesting level (which a project page would pay one query for).
+    An unknown scope matches nothing.
     """
     match scope:
         case Translation():
-            scope_type = JudgeRun.ScopeType.TRANSLATION
+            return Q(scope_type=JudgeRun.ScopeType.TRANSLATION, scope_id=str(scope.pk))
         case Component():
-            scope_type = JudgeRun.ScopeType.COMPONENT
+            return Q(
+                scope_type=JudgeRun.ScopeType.COMPONENT, scope_id=str(scope.pk)
+            ) | Q(
+                scope_type=JudgeRun.ScopeType.TRANSLATION,
+                scope_id__in=Translation.objects.filter(component=scope)
+                .annotate(_scope_id=Cast("pk", CharField()))
+                .values("_scope_id"),
+            )
         case Project():
-            scope_type = JudgeRun.ScopeType.PROJECT
+            return (
+                Q(scope_type=JudgeRun.ScopeType.PROJECT, scope_id=str(scope.pk))
+                | Q(
+                    scope_type=JudgeRun.ScopeType.COMPONENT,
+                    scope_id__in=Component.objects.filter(project=scope)
+                    .annotate(_scope_id=Cast("pk", CharField()))
+                    .values("_scope_id"),
+                )
+                | Q(
+                    scope_type=JudgeRun.ScopeType.TRANSLATION,
+                    scope_id__in=Translation.objects.filter(component__project=scope)
+                    .annotate(_scope_id=Cast("pk", CharField()))
+                    .values("_scope_id"),
+                )
+            )
         case Workspace():
-            scope_type = JudgeRun.ScopeType.WORKSPACE
+            return (
+                Q(scope_type=JudgeRun.ScopeType.WORKSPACE, scope_id=str(scope.pk))
+                | Q(
+                    scope_type=JudgeRun.ScopeType.PROJECT,
+                    scope_id__in=Project.objects.filter(workspace=scope)
+                    .annotate(_scope_id=Cast("pk", CharField()))
+                    .values("_scope_id"),
+                )
+                | Q(
+                    scope_type=JudgeRun.ScopeType.COMPONENT,
+                    scope_id__in=Component.objects.filter(project__workspace=scope)
+                    .annotate(_scope_id=Cast("pk", CharField()))
+                    .values("_scope_id"),
+                )
+                | Q(
+                    scope_type=JudgeRun.ScopeType.TRANSLATION,
+                    scope_id__in=Translation.objects.filter(
+                        component__project__workspace=scope
+                    )
+                    .annotate(_scope_id=Cast("pk", CharField()))
+                    .values("_scope_id"),
+                )
+            )
         case _:
-            return None
-    return (
-        JudgeRun.objects.filter(
-            scope_type=scope_type, scope_id=str(scope.pk), actor=actor
-        )
+            return Q(pk=None)
+
+
+def recent_judge_runs(
+    scope: Translation | Component | Project | Workspace,
+    *,
+    limit: int = 10,
+) -> list[JudgeRun]:
+    """
+    Return the scope's most recent runs, newest first, as a materialized list.
+
+    Callers take ``runs[0]`` as the newest run and iterate the remainder for
+    the menu, so the list is evaluated exactly once - never ``.first()`` or
+    ``[0]`` on the queryset itself, either of which would issue a second
+    ``LIMIT 1`` query ahead of the menu's ``LIMIT 10`` and silently double
+    the page's query budget.
+    """
+    return list(
+        JudgeRun.objects.filter(_scope_run_query(scope))
         .order_by("-created")
-        .first()
+        .select_related("actor")[:limit]
     )
 
 
