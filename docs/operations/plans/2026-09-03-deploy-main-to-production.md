@@ -1,8 +1,8 @@
-# Deploy runbook 2026-09-03: main (4ed812c) -> production
+# Deploy runbook 2026-09-03: main -> production
 
 Подготовлено 2026-09-03. Сам деплой - по отдельной команде; каждая прод-фаза
-требует отдельного одобрения по AGENTS.md. Документ - подготовка и чек-лист,
-никакие прод-изменения здесь не выполнены и не одобрены.
+требует отдельного одобрения по AGENTS.md. Одноразовый чек-лист: после
+выполнения деплоя файл удаляется (не переносится в archive).
 
 ## Состояние
 
@@ -10,8 +10,8 @@
 |---|---|---|
 | Прод checkout | `931de81` | `git rev-parse HEAD` на VPS |
 | Прод образ | `53f2ac1` (label revision) | `docker inspect hcgameloc:latest` |
-| К выкатке | `4ed812c` (= origin/main) | ветка чистая, запушена |
-| Коммитов впереди | 68 | `git log 931de81..origin/main` |
+| К выкатке | HEAD main на момент деплоя | ветка чистая, запушена |
+| Коммитов впереди | ~70 и растёт с документацией | `git log 931de81..origin/main` |
 | Миграций к применению | 6: `0113`..`0118` (trans) | прод на `0112` |
 | Контейнер прода | `hcgameloc-weblate-1` Up, healthy | `docker ps` |
 
@@ -22,7 +22,7 @@
 Все шесть аддитивные (AddField/AlterField с дефолтом/blank) - схема впереди
 безопасна для отката кода на предыдущий образ.
 
-## Что едет (68 коммитов, три линии)
+## Что едет (три линии)
 
 1. **Judge zero-unparsed** (Tasks 1-6, merge `c12e8c7`): fail-fast на refused
    HTTP (400/401/422 и др. -> `http-request-invalid`, без вердикта, без
@@ -84,8 +84,9 @@
 ```
 
 `--build` обязателен: менялись `weblate/`, шаблоны, статика, локаль.
-Приёмка: `DEPLOY-OK`; image revision == `4ed812c`;
-`weblate showmigrations trans` - `[X]` на `0113`..`0118`; логин 200.
+Приёмка: `DEPLOY-OK`; image revision == выкаченному HEAD (показан в выводе
+деплоя как `checkout:`); `weblate showmigrations trans` - `[X]` на
+`0113`..`0118`; логин 200.
 
 ### Фаза 2. Smoke атрибуции (гейт варианта A)
 
@@ -112,10 +113,13 @@ MT). Приёмка: fallback не настроен по `judge_configuration_sn
 
 ### Фаза 4. Историческая чистка refused-вердиктов (деструктивная, guarded)
 
+`--expected-count` обязателен при любом вызове (в dry-run не сверяется,
+поэтому ведём его от замера 2026-09-03 и сверяем глазами с напечатанным
+`total:`; при `--confirm` расхождение = автоматический abort):
+
 ```sh
-weblate judge_close_refused_verdicts --expected-count 0            # dry-run: снять реальный total
-weblate judge_close_refused_verdicts --expected-count <N>          # повторный dry-run: сверка
-weblate judge_close_refused_verdicts --expected-count <N> --confirm
+weblate judge_close_refused_verdicts --expected-count 100            # dry-run: сверить total
+weblate judge_close_refused_verdicts --expected-count <total> --confirm
 ```
 
 Ожидаемый кандидат на 2026-09-03: 100 (замер выше). Приёмка: ровно N вердиктов

@@ -30,13 +30,18 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 path = [
   ".claude/skills/**.md",
   ".omp/skills/**.md",
+  ".omp/skills/**/*.json",
   "analysis/**.csv",
   "analysis/**.json",
   "analysis/**.jsonl",
   "analysis/**.log",
+  "analysis/**.md",
+  "analysis/**.po",
   "analysis/**.py",
   "analysis/**.sh",
+  "analysis/**.tbx",
   "analysis/**.tsv",
+  "analysis/**.zip",
   "docs/**.md",
   "hcgameloc.egg-info/**",
   "loc_kit_ingest/.gitignore",
@@ -45,7 +50,8 @@ path = [
   "prototypes/**.html",
   "weblate/trans/judge_prompts/**.txt",
   "weblate/trans/prompts/**.txt",
-  "weblate_customization/pyproject.toml"
+  "weblate_customization/pyproject.toml",
+  "weblate_customization/uv.lock"
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "HCGameLoc"
