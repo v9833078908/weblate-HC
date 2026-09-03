@@ -90,7 +90,7 @@ hub-1 этот класс дали только ручной аудит и пр�
 
 | Механизм | Почему не закрывает | Где проверено |
 |---|---|---|
-| стоковый `inconsistent` | группирует по `id_hash = hash(source, context)`; `context` в монолингвальных форматах — ключ строки, различный у каждого юнита | `weblate/checks/consistency.py:112-160`, `weblate/trans/models/unit.py:377-392` |
+| стоковый `inconsistent` | скоуп у него уже проектный (`batch_project_wide = True`, `component__project=component.project`), дыра не в радиусе, а в ключе: группирует по `id_hash = hash(source, context)`; `context` в монолингвальных форматах — ключ строки, различный у каждого юнита, поэтому одинаковый текст под разными ключами в одну группу не попадает | `weblate/checks/consistency.py:84,86,112-160`, `weblate/trans/models/unit.py:377-392` |
 | распространение перевода | тот же фильтр `source` **и** `context` | `weblate/trans/models/unit.py:2577-2586` |
 | `reused` | обратное направление: разные источники, один перевод | `weblate/checks/consistency.py:172-207` |
 | сессионный канон | предотвращение внутри одного прогона автоперевода, не детекция накопленного корпуса; сам план это оговаривает | `docs/llm-first/plans/2026-08-17-session-canon.md:27-31,174-175` |
