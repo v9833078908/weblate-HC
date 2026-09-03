@@ -2915,6 +2915,40 @@ class JudgeLiteLLMPayloadTest(TestCase):
 
     @override_settings(
         JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+        JUDGE_REASONING_EFFORT_SEAT_1="",
+        JUDGE_REASONING_EFFORT_SEAT_2="extra_body.enable_thinking=false",
+    )
+    def test_extra_body_reasoning_reaches_the_upstream_passthrough(self) -> None:
+        """The only shape the proxy forwards is nested under ``extra_body``."""
+        second = resolve_judge_seat_profile(2)
+        body = _payload([REQ], second, "")
+
+        self.assertEqual(body["extra_body"], {"enable_thinking": False})
+        # A top-level key is either rejected with HTTP 500 (`enable_thinking`)
+        # or accepted and silently dropped (`thinking`), so neither may appear.
+        self.assertNotIn("enable_thinking", body)
+        self.assertNotIn("thinking", body)
+
+        first = resolve_judge_seat_profile(1)
+        untouched = _payload([REQ], first, "")
+        self.assertNotIn("extra_body", untouched)
+        self.assertNotIn("thinking", untouched)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
+        JUDGE_MODEL_SEAT_1="deepseek-v4-pro",
+        JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
+        JUDGE_REASONING_EFFORT_SEAT_2="extra_body.enable_thinking=true",
+    )
+    def test_reasoning_value_outside_the_litellm_allowlist_raises(self) -> None:
+        """A near-miss of an allowlisted value is an operator mistake."""
+        with self.assertRaises(JudgeError):
+            resolve_judge_seat_profile(2)
+
+    @override_settings(
+        JUDGE_BASE_URL="https://hcbifrost.herocraft.com/litellm/v1",
         JUDGE_MODEL_SEAT_1="weblate-judge-deepseek-v4-pro",
         JUDGE_MODEL_SEAT_2="atlas/qwen3.8-max",
         JUDGE_REASONING_EFFORT="enable_thinking=false",
