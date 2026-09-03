@@ -109,6 +109,27 @@ itself, so this is acceptable as designed - but if it bothers anyone, the
 one-run degradation is the place to add the status word, not the split
 button.
 
+### F7 (post-implementation) - Scope-led rows collapse into one repeated label
+
+Found on the development instance after Tasks 1-9 shipped, on the very page
+the plan measures. The **Hierarchy** bullet leads a row with its scope label
+wherever that scope differs from the page, on the reasoning that "which
+component and language" distinguishes one run from another. In the measured
+data it does not: `/projects/col4/` lists five earlier runs carrying two
+distinct scopes, so four of five rows read `CoL4/data - Французский` and the
+timestamp - the only differentiator between them - sits muted underneath.
+
+Replace it with one uniform rule: the timestamp leads every row, and a row
+whose scope is not the page adds that scope as the muted second line. This
+keeps both facts on the row, keeps the conditional that spares a
+translation page from repeating its own scope, and removes the conditional
+lead. It costs the two hierarchy pins their names and assertions, not their
+coverage.
+
+Unlike F1-F6 this changes a design contract rather than a task text, so it
+is folded into the plan's **Hierarchy** bullet and Task 7 acceptance, and
+the plan's status line records the amendment.
+
 ## What the plan gets right, briefly
 
 - The problem is measured, not asserted, and the measurement is the decisive
@@ -133,3 +154,8 @@ button.
 Fold F1-F5 into the task texts (each is a one-line amendment), consider F6,
 then approve. The amendments do not interact and do not change the design,
 so no second review round is needed.
+
+F7 arrived after the implementation, from live data rather than from
+reading, and is folded into the plan the same way: the design bullet and the
+matching acceptance line change, and no second review round is needed
+because the row still carries the same two facts.

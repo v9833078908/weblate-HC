@@ -4,7 +4,12 @@ Status: implemented 2026-09-03 (tasks 1-9; the /plan-design-review step ran as a
 manual pass over the changed templates because no such instrument exists as a
 tool, and the browser pass ran against the live dev instance). Reviewed in
 `docs/llm-first/reviews/2026-09-03-judge-run-navigation-review.md`; its
-amendments F1-F6 are folded into the design and tasks below.
+amendments F1-F6 are folded into the design and tasks below. Amended
+2026-09-03 by F7 (row hierarchy) after the shipped control was seen on live
+data, together with a layout fix for the control's own presentation: the
+theme makes `.btn-group` a block-level flex container
+(`weblate/static/styles/main.css`), which stretched the split button across
+the whole card.
 
 Follow-up to `docs/llm-first/plans/2026-09-03-judge-run-report-pareto.md`, which
 rebuilt the report page itself. That plan assumed the producer arrives at the
@@ -75,12 +80,13 @@ familiarity rather than expression, and brand lives in precision.
   line; no icons, badges, or counts. The status word is
   `run.get_status_display`, the same rendering the report page's metadata
   line uses, so even it introduces no new msgid.
-- **Hierarchy.** Where the scope differs from the page (project and workspace
-  pages), the scope label leads the row and the rest is muted beneath it -
-  on a project page "which component and language" is what distinguishes one
-  run from another. Where the scope is the page (translation, component with
-  one language), the timestamp leads, because it is then the only
-  differentiator.
+- **Hierarchy.** The timestamp leads every row, and a row whose scope is not
+  the page being viewed carries that scope as the muted second line. One
+  uniform rule: on a project page most runs share a scope, so leading with
+  the scope label repeats one string down the menu and buries the only
+  differentiator (measured: five earlier runs, two distinct scopes, four
+  identical leads). See F7 in the review, which replaced the original
+  scope-led rule.
 - **States.**
   - No runs: the card renders exactly as today, :guilabel:`Breakdown by check`
     plus :guilabel:`Run the judge`.
@@ -221,9 +227,9 @@ exists in this file); ordering is newest-first across components, with
 sequential creation would be non-deterministic (the Task 6 tests show the
 pattern); a run in another project does not leak; one run renders no dropdown
 and, when it is not `completed`, carries its status word; a non-`completed`
-row in the menu carries its status word; on the project page a child-scope
-row leads with the scope label while an own-scope row leads with the
-timestamp; the ten-row ceiling holds; the breakdown button appears only with
+row in the menu carries its status word; every row leads with its timestamp
+while a child-scope row adds the muted scope line and an own-scope row does
+not (F7); the ten-row ceiling holds; the breakdown button appears only with
 zero runs; a project page with N runs issues the same number of queries as
 with zero runs, captured in the existing relative `CaptureQueriesContext`
 style on a page that renders the menu.

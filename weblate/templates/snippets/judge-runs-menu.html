@@ -12,32 +12,34 @@
       {# an 18px pill (main.css) that btn-sm cannot scale down. #}
       <a class="btn btn-sm btn-outline-primary"
          href="{% url 'judge-run' pk=runs.0.pk %}">{% translate "Latest report" %}</a>
+      {# data-bs-reference="parent": without it the menu hangs off the 22px #}
+      {# caret instead of lining up with the group it belongs to. #}
       <button type="button"
               class="btn btn-sm btn-outline-primary dropdown-toggle dropdown-toggle-split"
               data-bs-toggle="dropdown"
+              data-bs-reference="parent"
               aria-haspopup="true"
               aria-expanded="false">
         <span class="visually-hidden">{% translate "Toggle earlier runs" %}</span>
       </button>
-      <ul class="dropdown-menu dropdown-menu-end shadow">
+      <ul class="dropdown-menu shadow">
         <li class="dropdown-header">{% translate "Earlier runs" %}</li>
         {% for run in runs|slice:"1:" %}
           <li>
-            <a class="dropdown-item py-2 lh-sm"
-               href="{% url 'judge-run' pk=run.pk %}">
-              {% if run.scope_path != current_path %}
-                <span class="d-block">{{ run.scope_label }}</span>
-                <span class="d-block text-muted">{{ run.created|date:"DATETIME_FORMAT" }}{% if run.actor and run.actor != user %} · {{ run.actor.profile.get_user_name }}{% endif %}{% if run.status != "completed" %} · {{ run.get_status_display }}{% endif %}</span>
-              {% else %}
-                {{ run.created|date:"DATETIME_FORMAT" }}{% if run.actor and run.actor != user %} · {{ run.actor.profile.get_user_name }}{% endif %}{% if run.status != "completed" %} · {{ run.get_status_display }}{% endif %}
-              {% endif %}
+            <a class="dropdown-item py-2 lh-sm" href="{% url 'judge-run' pk=run.pk %}">
+              {# The timestamp leads every row: on a project page most runs #}
+              {# share one scope, so a scope-led row repeats the same label #}
+              {# and buries the only differentiator. #}
+              <span class="d-block">{{ run.created|date:"DATETIME_FORMAT" }}{% if run.actor and run.actor != user %} · {{ run.actor.profile.get_user_name }}{% endif %}{% if run.status != "completed" %} · {{ run.get_status_display }}{% endif %}</span>
+              {% if run.scope_path != current_path %}<span class="d-block text-muted">{{ run.scope_label }}</span>{% endif %}
             </a>
           </li>
         {% endfor %}
       </ul>
     </div>
   {% else %}
-    <a class="btn btn-sm btn-outline-primary" href="{% url 'judge-run' pk=runs.0.pk %}">
+    <a class="btn btn-sm btn-outline-primary"
+       href="{% url 'judge-run' pk=runs.0.pk %}">
       {% translate "Latest report" %}
       {% if runs.0.status != "completed" %}<span class="opacity-75">{{ runs.0.get_status_display }}</span>{% endif %}
     </a>

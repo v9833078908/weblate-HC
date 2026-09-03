@@ -1627,6 +1627,21 @@ class JudgeQueueStripViewTest(ViewTestCase):
         )
         return html.tostring(menu, encoding="unicode")
 
+    def run_menu_rows(self, response) -> dict[str, list[tuple[str, str]]]:
+        # Row structure by target URL: each entry is the row's own spans in
+        # document order, as (class, text). The lead span is the row's
+        # hierarchy, so the tests read it instead of matching substrings.
+        (menu,) = html.fromstring(response.content.decode("utf-8")).xpath(
+            self.RUN_MENU_XPATH
+        )
+        return {
+            row.get("href"): [
+                (span.get("class"), span.text_content().strip())
+                for span in row.xpath("./span")
+            ]
+            for row in menu.xpath('.//a[contains(@class, "dropdown-item")]')
+        }
+
     def test_translation_scoped_run_surfaces_on_every_ancestor_page(self) -> None:
         # A run's scope is matched against the page's subtree, so a
         # translation-scoped launch is reachable from its component, its
@@ -1751,11 +1766,11 @@ class JudgeQueueStripViewTest(ViewTestCase):
         self.assertIn(reverse("judge-run", kwargs={"pk": deleted_run.pk}), menu_markup)
         self.assertNotIn("·", menu_markup)
 
-    def test_project_page_leads_a_child_scope_row_with_its_scope_label(self) -> None:
-        # On a project page "which component and language" is what
-        # distinguishes one run from another: the child scope's label leads
-        # its row and the rest is muted beneath it, while the project's own
-        # run leads with the timestamp, the only differentiator there. The
+    def test_project_page_rows_lead_with_the_timestamp(self) -> None:
+        # Amendment F7: every row leads with its timestamp, and a row whose
+        # scope is not the page adds that scope as a muted second line. A
+        # scope-led row repeated one label four times out of five on the
+        # measured project page and buried the only differentiator. The
         # newest run is the button alone, so both hierarchy rows need a
         # third run behind them.
         self.enable_review()
@@ -1776,22 +1791,19 @@ class JudgeQueueStripViewTest(ViewTestCase):
             [run.pk for run in response.context["judge_queue"]["runs"]],
             [newest.pk, project_run.pk, child_run.pk],
         )
-        menu_markup = self.run_menu_markup(response)
-        label = f'<span class="d-block">{translation}</span>'
-        self.assertIn(label, menu_markup)
-        self.assertIn('class="d-block text-muted"', menu_markup)
-        self.assertLess(
-            menu_markup.find(label), menu_markup.find('class="d-block text-muted"')
-        )
-        # The project's own row leads with the timestamp: its scope is the
-        # page, so it carries no scope label.
-        self.assertEqual(menu_markup.count('class="d-block"'), 1)
+        rows = self.run_menu_rows(response)
+        child_row = rows[reverse("judge-run", kwargs={"pk": child_run.pk})]
+        own_row = rows[reverse("judge-run", kwargs={"pk": project_run.pk})]
+        self.assertEqual(child_row[0][0], "d-block")
+        self.assertNotIn(str(translation), child_row[0][1])
+        self.assertEqual(child_row[1], ("d-block text-muted", str(translation)))
+        # The project's own row carries no scope line: its scope is the page.
+        self.assertEqual([css for css, _ in own_row], ["d-block"])
 
-    def test_component_page_leads_an_own_scope_row_with_its_timestamp(self) -> None:
-        # Where the scope is the page, the timestamp leads, because it is
-        # then the only differentiator: the component's own row carries no
-        # scope label, while a child scope's label leads its row and the
-        # rest is muted beneath it.
+    def test_component_page_own_scope_row_carries_no_scope_line(self) -> None:
+        # The component's own run carries a timestamp line only, while a
+        # child scope's row adds the muted scope line beneath its own
+        # timestamp.
         self.enable_review()
         translation = self.get_unit().translation
         child_run = self.make_judge_run(self.user, scope=translation)
@@ -1810,13 +1822,11 @@ class JudgeQueueStripViewTest(ViewTestCase):
             [run.pk for run in response.context["judge_queue"]["runs"]],
             [newest.pk, own_run.pk, child_run.pk],
         )
-        menu_markup = self.run_menu_markup(response)
-        label = f'<span class="d-block">{translation}</span>'
-        self.assertIn(label, menu_markup)
-        self.assertIn('class="d-block text-muted"', menu_markup)
-        self.assertLess(
-            menu_markup.find(label), menu_markup.find('class="d-block text-muted"')
-        )
+        rows = self.run_menu_rows(response)
+        child_row = rows[reverse("judge-run", kwargs={"pk": child_run.pk})]
+        own_row = rows[reverse("judge-run", kwargs={"pk": own_run.pk})]
+        self.assertEqual(child_row[1], ("d-block text-muted", str(translation)))
+        self.assertEqual([css for css, _ in own_row], ["d-block"])
 
     def test_run_menu_ceiling_is_ten_rows(self) -> None:
         # Older runs stay unreachable, which is the honest limit of a menu
@@ -1945,58 +1955,38 @@ class JudgeQueueStripViewTest(ViewTestCase):
         response = self.client.get(self.translation.get_absolute_url())
         self.assertIsNone(response.context["judge_last_run"])
 
-    def test_translation_last_run_does_not_leak_from_another_actor(self) -> None:
+    def test_translation_last_run_includes_another_actors_launch(self) -> None:
+        # The translation page carries the same contract as the card
+        # (confirmed decision 2): every actor's runs are listed, so a run
+        # launched by someone else is the latest report here too. The
+        # superseded rule hid it from the page entirely.
         self.enable_review()
-        other_user = self.anotheruser
-        JudgeRun.objects.create(
-            actor=other_user,
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
-            scope_id=str(self.translation.pk),
-            scope_label=str(self.translation),
-            scope_path=self.translation.get_absolute_url(),
-            requested_mode="judge",
-            cap=10,
-            status=JudgeRun.Status.COMPLETED,
-        )
+        other_run = self.make_judge_run(self.anotheruser, scope=self.translation)
         response = self.client.get(self.translation.get_absolute_url())
-        self.assertIsNone(response.context["judge_last_run"])
+        self.assertEqual(response.context["judge_last_run"].pk, other_run.pk)
+        self.assertEqual(
+            [run.pk for run in response.context["judge_runs"]], [other_run.pk]
+        )
 
-    def test_translation_last_run_shows_own_launch_over_a_newer_other_actor(
-        self,
-    ) -> None:
+    def test_translation_last_run_is_the_newest_launch_whoever_made_it(self) -> None:
         # Same ordering discipline as the component-scope equivalent above:
-        # own_run's ``created`` is forced strictly earlier than the other
-        # actor's run via a queryset update (bypassing auto_now_add), since
-        # order_by("-created") has no tie-breaker for equal timestamps.
+        # every ``created`` is forced via a queryset update (bypassing
+        # auto_now_add), since order_by("-created") has no tie-breaker for
+        # equal timestamps.
         self.enable_review()
-        other_user = self.anotheruser
         now = timezone.now()
-        own_run = JudgeRun.objects.create(
-            actor=self.user,
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
-            scope_id=str(self.translation.pk),
-            scope_label=str(self.translation),
-            scope_path=self.translation.get_absolute_url(),
-            requested_mode="judge",
-            cap=10,
-            status=JudgeRun.Status.COMPLETED,
-        )
-        other_run = JudgeRun.objects.create(
-            actor=other_user,
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
-            scope_id=str(self.translation.pk),
-            scope_label=str(self.translation),
-            scope_path=self.translation.get_absolute_url(),
-            requested_mode="judge",
-            cap=10,
-            status=JudgeRun.Status.COMPLETED,
-        )
+        own_run = self.make_judge_run(self.user, scope=self.translation)
+        other_run = self.make_judge_run(self.anotheruser, scope=self.translation)
         JudgeRun.objects.filter(pk=own_run.pk).update(
             created=now - timedelta(minutes=1)
         )
         JudgeRun.objects.filter(pk=other_run.pk).update(created=now)
         response = self.client.get(self.translation.get_absolute_url())
-        self.assertEqual(response.context["judge_last_run"].pk, own_run.pk)
+        self.assertEqual(response.context["judge_last_run"].pk, other_run.pk)
+        self.assertEqual(
+            [run.pk for run in response.context["judge_runs"]],
+            [other_run.pk, own_run.pk],
+        )
 
     # -- Task 9: conservative hand-off readiness ---------------------------
 
