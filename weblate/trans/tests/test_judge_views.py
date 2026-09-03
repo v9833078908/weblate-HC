@@ -38,6 +38,7 @@ from weblate.trans.models.judge import (
     resolve_verdict,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog
+from weblate.trans.models.project import CommitPolicyChoices
 from weblate.trans.models.suggestion import Suggestion
 from weblate.trans.models.unit import Unit
 from weblate.trans.tests.test_views import ViewTestCase
@@ -1864,11 +1865,17 @@ class JudgeRunReportViewTest(ViewTestCase):
         self.component.project.translation_review = True
         self.component.project.save(update_fields=["translation_review"])
 
-    def create_run(self, scope=None, *, status=JudgeRun.Status.COMPLETED) -> JudgeRun:
+    def create_run(
+        self,
+        scope=None,
+        *,
+        status=JudgeRun.Status.COMPLETED,
+        scope_type=JudgeRun.ScopeType.COMPONENT,
+    ) -> JudgeRun:
         scope = scope or self.component
         return JudgeRun.objects.create(
             actor=self.user,
-            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_type=scope_type,
             scope_id=str(scope.pk),
             scope_label=str(scope),
             scope_path=scope.get_absolute_url(),
@@ -1934,6 +1941,31 @@ class JudgeRunReportViewTest(ViewTestCase):
             target_hash=compute_target_hash(unit.get_target_plurals()),
             context_hash=judge_context_hash(unit),
             resolution=resolution,
+        )
+
+    def make_verdict_with_error(
+        self, unit, *, severity: str, category: str, seat: int = 1
+    ) -> JudgeVerdict:
+        return JudgeVerdict.objects.create(
+            unit=unit,
+            max_severity=severity,
+            model_verdict=(
+                JudgeVerdict.Verdict.REJECT
+                if severity == "critical"
+                else JudgeVerdict.Verdict.FLAG
+            ),
+            judge_model="vendor/model-a",
+            seat=seat,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash=judge_context_hash(unit),
+            errors=[
+                {
+                    "span": "x",
+                    "category": category,
+                    "severity": severity,
+                    "description": f"{category} problem",
+                }
+            ],
         )
 
     # -- Counts --------------------------------------------------------
@@ -2029,7 +2061,9 @@ class JudgeRunReportViewTest(ViewTestCase):
         [older_row] = list(older_response.context["page_obj"])
         self.assertEqual(older_row.outcome, JudgeRunUnit.Outcome.MAJOR)
 
-        newer_response = self.client.get(self.report_url(newer))
+        # The default bucket is "actionable"; PASSED rows need an explicit
+        # filter to prove the newer run's own report still finds them.
+        newer_response = self.client.get(self.report_url(newer), {"outcome": "matched"})
         [newer_row] = list(newer_response.context["page_obj"])
         self.assertEqual(newer_row.outcome, JudgeRunUnit.Outcome.PASSED)
 
@@ -2050,7 +2084,9 @@ class JudgeRunReportViewTest(ViewTestCase):
         gone = self.add_row(
             run, unit_id_snapshot=900010, outcome=JudgeRunUnit.Outcome.MAJOR
         )
-        response = self.client.get(self.report_url(run))
+        # "matched" (every row) so the drifted PASSED rows are visible too:
+        # the default "actionable" bucket would hide them.
+        response = self.client.get(self.report_url(run), {"outcome": "matched"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "900010")
         self.assertContains(response, "current text changed since this run")
@@ -2175,6 +2211,198 @@ class JudgeRunReportViewTest(ViewTestCase):
             self.client.get(self.report_url(run2))
 
         self.assertEqual(len(small), len(large))
+
+    # -- Task 9: triage, categories, review URLs, actions --------------
+
+    def test_actionable_is_the_default_bucket_and_matches_its_own_count(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL)
+        self.add_row(run, unit_id_snapshot=900200, outcome=JudgeRunUnit.Outcome.MAJOR)
+        self.add_row(run, unit_id_snapshot=900201, outcome=JudgeRunUnit.Outcome.MINOR)
+        self.add_row(
+            run, unit_id_snapshot=900202, outcome=JudgeRunUnit.Outcome.UNPARSED
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900203,
+            outcome=JudgeRunUnit.Outcome.STALE_CONFLICT,
+        )
+        self.add_row(run, unit_id_snapshot=900204, outcome=JudgeRunUnit.Outcome.PASSED)
+
+        default_response = self.client.get(self.report_url(run))
+        self.assertEqual(default_response.context["outcome"], "")
+        self.assertEqual(default_response.context["bucket"], "actionable")
+        self.assertEqual(default_response.context["page_obj"].paginator.count, 5)
+
+        explicit_response = self.client.get(
+            self.report_url(run), {"outcome": "actionable"}
+        )
+        self.assertEqual(
+            explicit_response.context["page_obj"].paginator.count,
+            default_response.context["page_obj"].paginator.count,
+        )
+
+    def test_zero_count_buckets_render_no_button_and_technical_trio_is_text(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(
+            run, unit_id_snapshot=900210, outcome=JudgeRunUnit.Outcome.CRITICAL
+        )
+        response = self.client.get(self.report_url(run))
+        # "Repaired" has zero rows in this run: no filter button for it.
+        self.assertNotContains(response, "outcome=repaired")
+        # matched/checked/cached never render as buttons, even though their
+        # counts are non-zero: they move to the plain-text technical line.
+        self.assertNotContains(response, "outcome=matched")
+        self.assertNotContains(response, "outcome=checked")
+        self.assertNotContains(response, "outcome=cached")
+        self.assertContains(response, "Matched 1")
+
+    def test_blocks_release_reflects_the_scope_project_commit_policy(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(
+            run, unit_id_snapshot=900220, outcome=JudgeRunUnit.Outcome.CRITICAL
+        )
+
+        self.project.commit_policy = CommitPolicyChoices.WITHOUT_NEEDS_EDITING
+        self.project.save(update_fields=["commit_policy"])
+        blocking_response = self.client.get(self.report_url(run))
+        self.assertTrue(blocking_response.context["triage"]["blocks_release"])
+
+        self.project.commit_policy = CommitPolicyChoices.ALL
+        self.project.save(update_fields=["commit_policy"])
+        shipping_response = self.client.get(self.report_url(run))
+        self.assertFalse(shipping_response.context["triage"]["blocks_release"])
+
+    def test_blocking_excludes_critical_rows_accepted_as_is(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        accepted_verdict = self.make_verdict(
+            unit, resolution=JudgeVerdict.Resolution.ACCEPTED_AS_IS
+        )
+        self.add_row(
+            run,
+            unit,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+            verdict=accepted_verdict,
+        )
+        self.add_row(
+            run, unit_id_snapshot=900230, outcome=JudgeRunUnit.Outcome.CRITICAL
+        )
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.context["triage"]["blocking"], 1)
+        self.assertEqual(response.context["counts"]["critical"], 2)
+
+    def test_category_list_is_ordered_by_count_with_worst_severity(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict_a = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900240,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+            verdict=verdict_a,
+        )
+        verdict_b = self.make_verdict_with_error(
+            unit, severity="major", category="mistranslation"
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900241,
+            outcome=JudgeRunUnit.Outcome.MAJOR,
+            verdict=verdict_b,
+        )
+        verdict_c = self.make_verdict_with_error(
+            unit, severity="minor", category="omission"
+        )
+        self.add_row(
+            run,
+            unit_id_snapshot=900242,
+            outcome=JudgeRunUnit.Outcome.MINOR,
+            verdict=verdict_c,
+        )
+
+        response = self.client.get(self.report_url(run))
+        categories = response.context["categories"]
+        self.assertEqual(
+            [entry["category"] for entry in categories],
+            ["mistranslation", "omission"],
+        )
+        self.assertEqual(categories[0]["count"], 2)
+        self.assertEqual(categories[0]["worst"], "critical")
+        self.assertTrue(categories[0]["review_url"])
+        self.assertEqual(categories[1]["count"], 1)
+        self.assertEqual(categories[1]["worst"], "minor")
+
+    def test_review_urls_are_scope_correct_for_translation_and_component(
+        self,
+    ) -> None:
+        self.enable_review()
+        component_run = self.create_run()
+        self.add_row(
+            component_run,
+            unit_id_snapshot=900250,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+        )
+        component_response = self.client.get(self.report_url(component_run))
+        self.assertIn("/search/", component_response.context["blocking_review_url"])
+
+        translation_run = self.create_run(
+            self.translation, scope_type=JudgeRun.ScopeType.TRANSLATION
+        )
+        self.add_row(
+            translation_run,
+            unit_id_snapshot=900251,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+        )
+        translation_response = self.client.get(self.report_url(translation_run))
+        blocking_url = translation_response.context["blocking_review_url"]
+        self.assertIn("/translate/", blocking_url)
+        self.assertNotIn("/search/", blocking_url)
+        # The translate view canonicalizes to an explicit offset (302).
+        resolved = self.client.get(blocking_url, follow=True)
+        self.assertEqual(resolved.status_code, 200)
+
+    def test_candidate_stored_row_shows_review_the_suggested_fix_action(
+        self,
+    ) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        self.add_row(
+            run,
+            unit,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+            repair_status=JudgeRunUnit.RepairStatus.CANDIDATE_STORED,
+        )
+        response = self.client.get(self.report_url(run), {"outcome": "candidates"})
+        self.assertContains(response, "Review the suggested fix")
+
+    def test_row_without_verdict_renders_an_explicit_sentence(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(
+            run, unit_id_snapshot=900260, outcome=JudgeRunUnit.Outcome.UNPARSED
+        )
+        response = self.client.get(self.report_url(run), {"outcome": "unparsed"})
+        self.assertContains(
+            response, "The judge reply for this string could not be used."
+        )
 
 
 @override_settings(
