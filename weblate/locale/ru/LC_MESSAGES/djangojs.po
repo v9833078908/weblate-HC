@@ -85,7 +85,7 @@ msgstr "Нажмите Ctrl+I, затем %s, чтобы отклонить эт
 
 #: weblate/static/editor/full.js:817
 msgid "Clone to translation"
-msgstr "Дублировать в перевод"
+msgstr "Вставить"
 
 #: weblate/static/editor/full.js:819
 msgid "Accept"

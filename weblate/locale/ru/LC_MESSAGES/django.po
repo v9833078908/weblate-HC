@@ -14848,7 +14848,7 @@ msgstr ""
 #: weblate/templates/snippets/suggestions.html:42
 #: weblate/templates/snippets/suggestions.html:43
 msgid "Clone to translation"
-msgstr "Дублировать в перевод"
+msgstr "Вставить"
 
 #: weblate/templates/snippets/embed-units.html:13
 msgid "Select"
