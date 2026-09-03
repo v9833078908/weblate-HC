@@ -7,15 +7,18 @@
 producer opens the string, and make its absence explain itself instead of
 looking like a page that does nothing.
 
-**Status:** proposed on 2026-09-03, not approved, not started.
+**Status:** proposed on 2026-09-03. Four tasks, none started. The acceptance
+semantics of Task 4 were decided on 2026-09-03 (decision 1); the plan itself
+is not approved for implementation yet.
 
 **Origin:** a producer pressed :guilabel:`Сгенерировать исправление` on
 `need-for-greed/orders/ru`, navigated away, came back, and found the card
 unchanged. Investigation on the dev instance found three separate causes,
-one per task below. Nothing about the observed symptom was a queue or a
+one each for Tasks 1-3. Nothing about the observed symptom was a queue or a
 timing problem: generation is already asynchronous
 (`weblate/trans/views/edit.py:2054-2070`), and the run-time candidate path
-already exists (`weblate/trans/judge_loop.py:1425-1507`).
+already exists (`weblate/trans/judge_loop.py:1425-1507`). Task 4 comes from
+the follow-up question of where the producer expects to find the fix.
 
 ## What the investigation established
 
@@ -38,7 +41,7 @@ never broken; it was starved by configuration and silent about it.
 
 | # | Decision | Consequence |
 | --- | --- | --- |
-| 1 | The stored candidate stays out of the :guilabel:`Автоматические предложения` tab by default | Not for speed - a stored candidate would render from the database with no call at all. The load-bearing reason is acceptance semantics: that tab's :guilabel:`Принять` is copy + `markTranslated` + submit (`full.js:79-82`), while a candidate must be accepted through `accept_judge_candidate`, which re-verifies target and context hashes, refuses a forged run id, writes `STATE_FUZZY`, deletes the candidate and queues the fresh re-check (`judge_loop.py:2114-2148`). A machinery row also cannot carry the diff, the round or the judge's repair instruction. See "Optional Task 4" for the version that keeps those guarantees |
+| 1 | The stored candidate is rendered in the :guilabel:`Автоматические предложения` tab, and accepting it there stores `STATE_TRANSLATED` (decided 2026-09-03) | Task 4 is in scope. The row is server-rendered, so it costs no call. Its action still posts to `accept_judge_candidate`, which re-verifies target and context hashes, refuses a forged run id, deletes the candidate and records the audited Change (`judge_loop.py:2114-2148`); only the written state changes from `STATE_FUZZY` to `STATE_TRANSLATED`. The diff, the round and the judge's repair instruction stay in the card, which the row cannot carry |
 | 2 | Generation outcome becomes durable, not a message | A redirect message cannot survive navigating away, which is exactly what the producer did; the outcome is stored on the verdict and rendered by the card |
 | 3 | The reply schema must be provider-portable | An OpenAI-family model in any routing entry currently breaks all machine translation and all repair for that language, silently |
 | 4 | A language with no usable routing entry is a configuration error, reported once | Not a per-string failure the producer has to interpret |
@@ -46,8 +49,8 @@ never broken; it was starved by configuration and silent about it.
 
 ## Invariants that stay
 
-1. Generation never mutates the target; acceptance writes `STATE_FUZZY`; only a
-   fresh re-check makes accepted text shippable.
+1. Generation never mutates the target. Acceptance is audited and hash-checked,
+   and it queues the fresh re-check.
 2. Generate, accept and re-check keep requiring `unit.review` and
    `translation.auto`.
 3. No secret, prompt or response body reaches a template or a log.
@@ -56,6 +59,32 @@ never broken; it was starved by configuration and silent about it.
    happened, Task 2 makes an already-paid call succeed instead of fail, Task 3
    refuses before spending.
 
+## The one invariant this plan changes
+
+`docs/llm-first/plans/2026-09-01-judge-producer-triage-embed.md` invariant 1
+said that accepting a candidate writes `STATE_FUZZY`, so that only a fresh
+re-check can make the repaired text shippable. Decision 1 replaces that
+clause: acceptance writes `STATE_TRANSLATED`, and the queued re-check
+decides afterwards.
+
+What the producer gains: a string they accepted looks finished immediately,
+in the editor and in every count, instead of sitting in
+:guilabel:`Требует правки` until a background call returns.
+
+What the studio takes on: between acceptance and the re-check's verdict the
+string is shippable. If a commit or a hand-off downloads the file in that
+window, an unverified LLM repair of a string the judge had rejected can
+reach the game. A failing re-check then holds the string again, but it holds
+text that already left.
+
+The window is the re-check's own latency (two judge calls). No task here
+widens it, and the "Download for hand-off" indicator still refuses while any
+judged string is not current and clean, so the documented hand-off path is
+not affected - only an ad-hoc commit or export in that window is.
+
+Recorded as accepted on 2026-09-03. Reverting it is a one-line change in
+`accept_judge_candidate` plus its tests.
+
 ## Cost contract
 
 | Path | Paid calls | Change |
@@ -63,6 +92,7 @@ never broken; it was starved by configuration and silent about it.
 | Judge run over a reject/flag string | 1 repair MT | unchanged (already spent today, currently wasted when the model rejects the schema) |
 | Producer presses Generate | 1 repair MT | unchanged |
 | Producer opens a string with a stored candidate | 0 | unchanged |
+| Producer accepts the candidate, in the card or in the tab | 2 judge (re-check) | unchanged; only the written state changes |
 | Language with no routing entry | 0 | Task 3 refuses at run start instead of failing per string |
 
 ---
@@ -189,37 +219,77 @@ result being indistinguishable from a model that answered badly.
 
 ---
 
-## Optional Task 4 (proposed 2026-09-03, needs its own approval)
+## Task 4: Show the candidate in the automatic suggestions tab and accept it as translated
 
-Show the stored candidate as the first row of the
-:guilabel:`Автоматические предложения` table, for producers who look for a
-suggestion there rather than in the card.
+Producers look for a suggestion in :guilabel:`Автоматические предложения`.
+Put the stored candidate there as the first row, and make accepting it leave
+the string translated rather than held.
 
 **Files:**
 
-- Modify: `weblate/templates/translate.html` (the `#machinery` pane)
+- Modify: `weblate/templates/translate.html` (the `#machinery` pane,
+  `tbody#machinery-translations` at line 543)
 - Modify: `weblate/trans/views/edit.py` (`_judge_view_context` already
-  resolves `judge_candidate`; the pane needs it)
-- Tests: `weblate/trans/tests/test_judge_views.py`
+  resolves `judge_candidate`; the pane needs it in the template context)
+- Modify: `weblate/trans/judge_loop.py` (`accept_judge_candidate`:
+  `STATE_FUZZY` at line 2138 becomes `STATE_TRANSLATED`)
+- Modify: `weblate/static/editor/full.js` (`Machinery.render` merge loop and
+  the memory-search handler)
+- Modify: `weblate/locale/ru/LC_MESSAGES/django.po`
+- Modify: `docs/guides/producer-guide-weblate.md`, `docs/changes.rst`
+- Tests: `weblate/trans/tests/test_judge_views.py`,
+  `weblate/trans/tests/test_judge.py`, `weblate/trans/tests/test_edit.py`
 
-The row is rendered server-side, so it is present the moment the tab opens
-and costs no call: the text is already in the database. Its service column
-names the judge, and its action is a form posting to
-`judge-accept-candidate`, never the JS `js-copy-save-machinery` handler -
-otherwise acceptance would write `STATE_TRANSLATED` and skip the hash
-re-verification, the candidate deletion and the audited Change that
-`accept_judge_candidate` performs.
+**The row.** Server-rendered inside `tbody#machinery-translations`, so it is
+present the moment the tab opens and costs no call - the text is already in
+the database. Columns reuse the existing table: target text, the diff against
+the current text (the card's own rendering, which the row can carry after all
+because it is server-side), an empty source column, the judge as origin, and
+no similarity. Marked `data-judge-candidate="1"`.
 
-What it cannot reproduce: the diff against the current text, the round and
-seat provenance, and the judge's repair instruction. Those stay in the card.
+**The action.** A form posting to `judge-accept-candidate`, the same endpoint
+the card uses - never the `js-copy-save-machinery` handler. `markTranslated`
+plus a plain form submit would reach `STATE_TRANSLATED` too (`views/edit.py:914-926`
+lifts changed text on a judged string and `_queue_manual_save_recheck`
+queues the re-check), but it would skip the target/context hash
+re-verification, the run-id check, the candidate deletion and the Change
+carrying `judge_verdict_id`/`judge_run_id` (`judge_loop.py:2114-2148`). The
+leftover candidate row is not hypothetical: it is deleted only when a newer
+candidate replaces it (`models/suggestion.py:139`), so a plain-form
+acceptance would leave a suggestion in the :guilabel:`Предложения` tab that
+matches the current text.
+
+**The state.** `accept_judge_candidate` writes `STATE_TRANSLATED` instead of
+`STATE_FUZZY`; everything else in it stays. See "The one invariant this plan
+changes". The card's :guilabel:`Принять исправление` gets the same behaviour -
+two acceptance paths with different states would be worse than either
+choice.
+
+**Two JS collisions to handle, both in `full.js`:**
+
+1. `Machinery.render` (line 904) walks every existing row through
+   `getRawData(row)` and reads `base.quality`/`base.plural_forms` to merge
+   and insert-sort. A server-rendered row without that payload throws.
+   Skip rows carrying `data-judge-candidate` in the merge loop, and keep them
+   first regardless of quality.
+2. The memory-search handler calls
+   `document.getElementById("machinery-translations").replaceChildren()`
+   (line 344), which would wipe the candidate row. Preserve it.
 
 **Acceptance:**
 
-- The pane contains the candidate row before any machinery request is made
-  (assert on the server-rendered HTML, with no JS involved).
-- The row's only action posts to `judge-accept-candidate` and the accepted
-  string ends in `STATE_FUZZY` with a queued re-check.
-- A string with no stored candidate renders no such row.
+- The pane contains the candidate row in the server-rendered HTML, before any
+  machinery request is made (assert without JS).
+- The row's only action posts to `judge-accept-candidate`; the accepted string
+  ends in `STATE_TRANSLATED`, the candidate row is gone, one re-check is
+  queued, and the Change carries the verdict and run ids.
+- A string with no stored candidate, and a string whose candidate is stale,
+  render no such row.
+- A JS test or a browser pass shows machinery results loading around the
+  candidate row without throwing and without displacing it, and a memory
+  search leaving it in place.
+- `docs/changes.rst` records the state change as a behaviour change, not as a
+  UI tweak.
 
 ---
 
@@ -230,14 +300,18 @@ CI_DB_NAME=weblate_candidate_readiness \
   DJANGO_SETTINGS_MODULE=weblate.settings_test uv run pytest \
   weblate/trans/tests/test_judge.py \
   weblate/trans/tests/test_judge_views.py \
+  weblate/trans/tests/test_edit.py \
   weblate/trans/tests/test_tasks.py -q -p no:randomly
-cd weblate_customization && uv run pytest
+uv run pytest weblate_customization/tests/test_machinery.py -q -p no:randomly
 uv run prek run --files <touched files>
 ```
 
 ## Out of scope
 
-- Optional Task 4 unless it is separately approved.
+- Rendering a live machine-translation result anywhere but that tab, and any
+  change to how the tab's own engine rows are fetched or sorted.
+- A second acceptance path with different semantics: the card and the row
+  write the same state.
 - Any change to the judge prompt, the seat configuration or the verdict
   schema.
 - Re-judging anything. Filling a historical candidate gap is
@@ -252,7 +326,7 @@ uv run prek run --files <touched files>
   `./rundev.sh` migrate; production needs the usual approval.
 - Task 2 reaches the dev container only through
   `cp -r weblate_customization/src/weblate_customization dev-docker/data/python/`.
-- Russian strings from Task 1 need `./rundev.sh compilemessages`.
+- Russian strings from Tasks 1 and 4 need `./rundev.sh compilemessages`.
 - Production routing currently must be verified: this plan assumes
   `google/gemini-3.7-flash` there and `google/gemini-2.5-flash` on dev. Dev
   was set to `{'fr': 'google/gemini-2.5-flash', 'ru':
