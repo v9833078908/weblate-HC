@@ -431,12 +431,13 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
             check_flags="repeat-drift"
         )
         translation = Translation.objects.get(pk=self.translation_1.pk)
-        self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        first = self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
         second = self.add_unit(translation, "greet_outro", "Hello", "Nazdar")
 
         second.run_checks()
 
         self.assertIn("repeat-drift", second.all_checks_names)
+        self.assertIn("repeat-drift", Unit.objects.get(pk=first.pk).all_checks_names)
 
     def test_check_component_finds_cross_component_drift(self) -> None:
         check = RepeatDriftCheck()
@@ -522,3 +523,35 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
 
         self.assertIn("hit the 1 group cap", "\n".join(logs.output))
         self.assertEqual(len(units), 2)
+
+    def test_fixing_one_member_clears_the_sibling(self) -> None:
+        self.enable_repeat_drift()
+        translation = Translation.objects.get(pk=self.translation_1.pk)
+        first = self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(translation, "greet_outro", "Hello", "Nazdar")
+        second.run_checks()
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 2)
+
+        second = Unit.objects.get(pk=second.pk)
+        second.translate(self.user, "Ahoj", STATE_TRANSLATED)
+
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 0)
+        self.assertNotIn(
+            "repeat-drift", Unit.objects.get(pk=first.pk).all_checks_names
+        )
+
+    def test_breaking_one_member_flags_the_sibling(self) -> None:
+        self.enable_repeat_drift()
+        translation = Translation.objects.get(pk=self.translation_1.pk)
+        first = self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(translation, "greet_outro", "Hello", "Ahoj")
+        second.run_checks()
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 0)
+
+        second = Unit.objects.get(pk=second.pk)
+        second.translate(self.user, "Nazdar", STATE_TRANSLATED)
+
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 2)
+        self.assertIn(
+            "repeat-drift", Unit.objects.get(pk=first.pk).all_checks_names
+        )

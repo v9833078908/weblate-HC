@@ -2196,7 +2196,7 @@ class Unit(models.Model, LoggerMixin):
             target_checks = True
 
         # Initial propagation setup
-        propagation: set[Literal["source", "target"]] = set()
+        propagation: set[Literal["source", "target", "repeat"]] = set()
         if force_propagate:
             propagation.add("source")
 
@@ -2262,6 +2262,11 @@ class Unit(models.Model, LoggerMixin):
                             values = set(
                                 propagated_units.values_list("source", flat=True)
                             )
+                        elif check_obj.propagates == "repeat":
+                            propagated_units = self.repeat_units
+                            values = set(
+                                propagated_units.values_list("target", flat=True)
+                            )
                         else:
                             message = f"Unsupported propagation: {check_obj.propagates}"
                             raise ValueError(message)
@@ -2279,9 +2284,10 @@ class Unit(models.Model, LoggerMixin):
         # Propagate checks which need it (for example consistency)
         if propagation:
             self.translation.require_full_stats_rebuild()
-            querymap: dict[Literal["source", "target"], UnitQuerySet] = {
+            querymap: dict[Literal["source", "target", "repeat"], UnitQuerySet] = {
                 "source": self.propagated_units,
                 "target": Unit.objects.same_target(self),
+                "repeat": self.repeat_units,
             }
             propagated_units: UnitQuerySet = reduce(
                 operator.or_, (querymap[item] for item in propagation)

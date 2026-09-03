@@ -304,6 +304,7 @@ class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
         "The same source string is translated differently under a different key."
     )
     default_disabled = True
+    propagates = "repeat"
     batch_project_wide = True
     skip_suggestions = True
     batch_limit = 200
