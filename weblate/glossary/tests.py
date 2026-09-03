@@ -1223,6 +1223,33 @@ class GlossaryCoverageCommandTest(ViewTestCase):
         self.assertEqual(Unit.objects.count(), before)
 
 
+class AuditGlossaryCommandTest(GlossaryTest):
+    def run_command(self, **kwargs) -> str:
+        output = StringIO()
+        call_command("audit_glossary", stdout=output, **kwargs)
+        return output.getvalue()
+
+    def run_command_expecting_findings(self, **kwargs) -> str:
+        output = StringIO()
+        with self.assertRaises(CommandError):
+            call_command("audit_glossary", stdout=output, **kwargs)
+        return output.getvalue()
+
+    def test_duplicate_term_with_diverging_targets(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "Yashchik", context="ui")
+
+        output = self.run_command_expecting_findings()
+
+        self.assertIn("duplicate-term", output)
+
+    def test_duplicate_term_with_one_target_is_clean(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "Sunduk", context="ui")
+
+        self.assertIn("no findings", self.run_command())
+
+
 class GlossaryStemMatcherTest(ViewTestCase):
     """
     Задача 2: source-side stem matcher, fetch_glossary_terms.
