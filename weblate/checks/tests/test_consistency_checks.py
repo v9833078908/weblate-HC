@@ -27,7 +27,12 @@ from weblate.trans.tests.test_views import (
     ComponentTestCase,
     FixtureTestCase,
 )
-from weblate.utils.state import STATE_EMPTY, STATE_FUZZY, STATE_TRANSLATED
+from weblate.utils.state import (
+    STATE_EMPTY,
+    STATE_FUZZY,
+    STATE_READONLY,
+    STATE_TRANSLATED,
+)
 
 
 class PluralsCheckTest(TestCase):
@@ -494,7 +499,7 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
         check.perform_batch(self.enable_repeat_drift())
         self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 0)
 
-    def test_ignore_flag_keeps_the_unit_clean(self) -> None:
+    def test_ignore_flag_excludes_the_unit_from_the_group(self) -> None:
         check = RepeatDriftCheck()
         self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
         second = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
@@ -502,14 +507,43 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
 
         check.perform_batch(self.enable_repeat_drift())
 
-        self.assertEqual(
-            list(
-                Check.objects.filter(name="repeat-drift").values_list(
-                    "unit_id", flat=True
-                )
-            ),
-            [self.translation_1.unit_set.get(context="greet_intro").pk],
+        self.assertFalse(Check.objects.filter(name="repeat-drift").exists())
+
+    def test_ignore_flag_excludes_the_unit_from_live_comparison(self) -> None:
+        check = RepeatDriftCheck()
+        first = self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+        Unit.objects.filter(pk=first.pk).update(extra_flags="ignore-repeat-drift")
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_disabled_peer_still_participates_in_comparison(self) -> None:
+        check = RepeatDriftCheck()
+        Component.objects.filter(project=self.project).update(
+            allow_translation_propagation=True, check_flags=""
         )
+        Component.objects.filter(pk=self.component.pk).update(
+            check_flags="repeat-drift"
+        )
+        translation = Translation.objects.get(pk=self.translation_1.pk)
+        unit = self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        peer = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+        unit = Unit.objects.get(pk=unit.pk)
+
+        self.assertEqual(
+            list(unit.repeat_units.values_list("pk", flat=True)), [peer.pk]
+        )
+        self.assertTrue(check.check_target_unit([], [], unit))
+
+    def test_readonly_unit_is_excluded_from_the_group(self) -> None:
+        check = RepeatDriftCheck()
+        readonly = self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        Unit.objects.filter(pk=readonly.pk).update(state=STATE_READONLY)
+        unit = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+        check.perform_batch(self.enable_repeat_drift())
+        self.assertFalse(Check.objects.filter(name="repeat-drift").exists())
 
     def test_group_cap_is_reported(self) -> None:
         check = RepeatDriftCheck()
@@ -552,6 +586,33 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
 
         self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 2)
         self.assertIn("repeat-drift", Unit.objects.get(pk=first.pk).all_checks_names)
+
+    def test_post_commit_recheck_restores_concurrent_drift(self) -> None:
+        self.enable_repeat_drift()
+        translation = Translation.objects.get(pk=self.translation_1.pk)
+        first = self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(translation, "greet_outro", "Hello", "Nazdar")
+        second.run_checks()
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 2)
+
+        second = Unit.objects.get(pk=second.pk)
+        with self.captureOnCommitCallbacks(execute=True):
+            second.translate(self.user, "Ahoj", STATE_TRANSLATED)
+            Unit.objects.filter(pk=first.pk).update(target="Nazdar")
+
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 2)
+
+    def test_batch_update_skips_post_commit_recheck(self) -> None:
+        self.enable_repeat_drift()
+        translation = Translation.objects.get(pk=self.translation_1.pk)
+        self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(translation, "greet_outro", "Hello", "Nazdar")
+        unit.is_batch_update = True
+
+        with patch.object(unit, "schedule_repeat_drift_recheck") as schedule_recheck:
+            unit.translate(self.user, "Ahoj", STATE_TRANSLATED)
+
+        schedule_recheck.assert_not_called()
 
     def test_description_lists_the_other_renderings(self) -> None:
         check = RepeatDriftCheck()

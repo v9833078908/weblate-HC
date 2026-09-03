@@ -1291,6 +1291,15 @@ class AuditGlossaryCommandTest(GlossaryTest):
         with self.assertRaises(CommandError):
             self.run_command(project="no-such-project")
 
+    def test_project_without_glossary_is_clean(self) -> None:
+        project = Project.objects.create(
+            name="No glossary",
+            slug="no-glossary",
+            web="https://nonexisting.weblate.org/",
+        )
+
+        self.assertIn("no findings", self.run_command(project=project.slug))
+
     def test_project_limits_the_audit(self) -> None:
         self.add_term("Chest", "Sunduk", context="loot")
         self.add_term("Chest", "Yashchik", context="ui")
@@ -1308,6 +1317,25 @@ class AuditGlossaryCommandTest(GlossaryTest):
         )
 
         self.assertIn("no findings", self.run_command(project=other.slug))
+
+    def test_invalid_baseline_encoding_fails_cleanly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline = Path(tmp) / "invalid.baseline"
+            baseline.write_bytes(b"\xff")
+
+            with self.assertRaisesMessage(CommandError, "Cannot read baseline"):
+                self.run_command(baseline=baseline)
+
+    def test_the_audit_does_not_recreate_a_source_translation(self) -> None:
+        source_translation = self.glossary_component.get_source_translation()
+        self.assertIsNotNone(source_translation)
+        source_translation.delete()
+        self.glossary_component.__dict__.pop("source_translation", None)
+        before = self.glossary_component.translation_set.count()
+
+        self.run_command()
+
+        self.assertEqual(self.glossary_component.translation_set.count(), before)
 
     def test_the_audit_writes_nothing(self) -> None:
         self.add_term("Chest", "Sunduk", context="loot")

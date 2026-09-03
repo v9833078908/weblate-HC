@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from functools import reduce
+from itertools import batched
 from typing import TYPE_CHECKING, ClassVar, Literal
 
 from django.db.models import Count, F, Max, Min, Prefetch, Q, Value
@@ -18,7 +19,7 @@ from weblate.logger import LOGGER
 from weblate.trans.actions import ACTIONS_REVERTABLE, ActionEvents
 from weblate.trans.util import split_plural
 from weblate.utils.html import format_html_join_comma
-from weblate.utils.state import STATE_TRANSLATED
+from weblate.utils.state import STATE_READONLY, STATE_TRANSLATED
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -309,6 +310,10 @@ class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
     skip_suggestions = True
     batch_limit = 200
 
+    def get_repeat_members(self, units: Iterable[Unit]) -> list[Unit]:
+        """Exclude only members which explicitly ignore the check."""
+        return [unit for unit in units if not self.is_ignored(unit.all_flags)]
+
     def check_target_unit(
         self, sources: list[str], targets: list[str], unit: Unit
     ) -> bool:
@@ -323,7 +328,10 @@ class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
         if component.batch_checks:
             return self.handle_batch(unit, component)
 
-        return unit.repeat_units.exclude(target=unit.target).exists()
+        return any(
+            other.target != unit.target
+            for other in self.get_repeat_members(unit.repeat_units)
+        )
 
     def check_single(self, source: str, target: str, unit: Unit) -> bool:
         """Target strings are checked in check_target_unit."""
@@ -331,10 +339,12 @@ class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
 
     def get_description(self, check_obj):
         unit = check_obj.unit
-        others = (
-            unit.repeat_units.exclude(target=unit.target)
-            .values_list("target", flat=True)
-            .distinct()
+        others = sorted(
+            {
+                other.target
+                for other in self.get_repeat_members(unit.repeat_units)
+                if other.target != unit.target
+            }
         )
         if not others:
             return super().get_description(check_obj)
@@ -363,45 +373,58 @@ class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
             translation_ids_by_plural[plural_id].append(translation_id)
 
         for plural_id, translation_ids in sorted(translation_ids_by_plural.items()):
-            candidates = (
+            hashes = (
                 Unit.objects.filter(
-                    translation_id__in=translation_ids, state__gte=STATE_TRANSLATED
+                    translation_id__in=translation_ids,
+                    state__gte=STATE_TRANSLATED,
+                    state__lt=STATE_READONLY,
                 )
                 .annotate(source_md5=MD5(Lower("source")))
                 .values("source_md5")
                 .annotate(min_target=Min("target"), max_target=Max("target"))
                 .filter(min_target__lt=F("max_target"))
-                .order_by("source_md5")[: self.batch_limit]
+                .order_by("source_md5")
             )
-            hashes = [row["source_md5"] for row in candidates]
-            if not hashes:
-                continue
-            if len(hashes) == self.batch_limit:
-                LOGGER.warning(
-                    "repeat-drift: hit the %d group cap on %s (plural %d)",
-                    self.batch_limit,
-                    component.project.slug,
-                    plural_id,
+            found_groups = 0
+            for candidate_hashes in batched(
+                hashes.values_list("source_md5", flat=True).iterator(
+                    chunk_size=self.batch_limit
+                ),
+                self.batch_limit,
+            ):
+                units = (
+                    Unit.objects.filter(
+                        translation_id__in=translation_ids,
+                        state__gte=STATE_TRANSLATED,
+                        state__lt=STATE_READONLY,
+                    )
+                    .annotate(source_md5=MD5(Lower("source")))
+                    .filter(source_md5__in=candidate_hashes)
+                    .prefetch()
+                    .prefetch_bulk()
                 )
 
-            units = (
-                Unit.objects.filter(
-                    translation_id__in=translation_ids, state__gte=STATE_TRANSLATED
-                )
-                .annotate(source_md5=MD5(Lower("source")))
-                .filter(source_md5__in=hashes)
-                .prefetch()
-                .prefetch_bulk()
-            )
-
-            # The aggregate narrows case-insensitively because that is the
-            # indexed expression; the decision is made on the exact source.
-            groups: dict[str, list[Unit]] = defaultdict(list)
-            for unit in units:
-                groups[unit.source].append(unit)
-            for members in groups.values():
-                if len({member.target for member in members}) > 1:
+                # The aggregate narrows case-insensitively because that is the
+                # indexed expression; the decision is made on the exact source.
+                groups: dict[str, list[Unit]] = defaultdict(list)
+                for unit in units:
+                    groups[unit.source].append(unit)
+                for source in sorted(groups):
+                    members = self.get_repeat_members(groups[source])
+                    if len({member.target for member in members}) <= 1:
+                        continue
                     yield from members
+                    found_groups += 1
+                    if found_groups == self.batch_limit:
+                        LOGGER.warning(
+                            "repeat-drift: hit the %d group cap on %s (plural %d)",
+                            self.batch_limit,
+                            component.project.slug,
+                            plural_id,
+                        )
+                        break
+                if found_groups == self.batch_limit:
+                    break
 
 
 class TranslatedCheck(TargetCheck, BatchCheckMixin):
