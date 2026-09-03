@@ -67,6 +67,9 @@
 - Замечание: `WEBLATE_REMOVE_CHECK` в продовом `.env` не содержит
   `weblate.checks.consistency.TranslatedCheck` (environment.example обновлён
   коммитом `411fc54`). Отдельная правка `.env`, только по одобрению.
+- Локальное дерево чистое (`git status --porcelain` пуст): nfg-артефакты
+  миграции закоммичены, typos/reuse приведены в порядок - `deploy_stack`
+  больше не блокируется.
 
 ## Тесты (хост, изолированная БД `weblate_deployready`, порт 5434)
 
