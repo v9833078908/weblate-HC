@@ -329,6 +329,23 @@ class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
         """Target strings are checked in check_target_unit."""
         return False
 
+    def get_description(self, check_obj):
+        unit = check_obj.unit
+        others = (
+            unit.repeat_units.exclude(target=unit.target)
+            .values_list("target", flat=True)
+            .distinct()
+        )
+        if not others:
+            return super().get_description(check_obj)
+        return format_html(
+            "{} {}",
+            gettext("The same source string is translated differently elsewhere:"),
+            format_html_join_comma(
+                "{}", ((self.format_value(other),) for other in others)
+            ),
+        )
+
     def check_component(self, component: Component) -> Iterable[Unit]:
         # ruff: ignore[import-outside-top-level]
         from weblate.trans.models import Translation, Unit

@@ -555,3 +555,13 @@ class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
         self.assertIn(
             "repeat-drift", Unit.objects.get(pk=first.pk).all_checks_names
         )
+
+    def test_description_lists_the_other_renderings(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+
+        description = check.get_description(Check(unit=unit, name="repeat-drift"))
+
+        self.assertIn("Ahoj", description)
+        self.assertNotIn("Nazdar", description)
