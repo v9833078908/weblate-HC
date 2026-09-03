@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import json
+import tempfile
 from copy import deepcopy
 from io import StringIO
 from pathlib import Path
@@ -1256,6 +1257,48 @@ class AuditGlossaryCommandTest(GlossaryTest):
         output = self.run_command_expecting_findings()
 
         self.assertIn("collapsed-terms", output)
+
+    def test_baseline_accepts_a_known_finding(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "Yashchik", context="ui")
+        output = self.run_command_expecting_findings()
+        key = next(
+            line[2:].rsplit("\t", 1)[0]
+            for line in output.splitlines()
+            if line.startswith("! duplicate-term")
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline = Path(tmp) / "accepted.baseline"
+            baseline.write_text(f"# deliberate homonym\n{key}\n", encoding="utf-8")
+
+            self.assertIn("duplicate-term", self.run_command(baseline=baseline))
+
+    def test_case_only_difference_is_not_a_finding(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "sunduk", context="ui")
+
+        self.assertIn("no findings", self.run_command())
+
+    def test_untranslated_term_is_not_a_finding(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "Yashchik", context="ui")
+        self.glossary.unit_set.filter(context="ui").update(state=STATE_EMPTY)
+
+        self.assertIn("no findings", self.run_command())
+
+    def test_unknown_project_fails_loudly(self) -> None:
+        with self.assertRaises(CommandError):
+            self.run_command(project="no-such-project")
+
+    def test_the_audit_writes_nothing(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "Sunduk", context="ui")
+        before = Unit.objects.count()
+
+        self.run_command()
+
+        self.assertEqual(Unit.objects.count(), before)
 
 
 class GlossaryStemMatcherTest(ViewTestCase):
