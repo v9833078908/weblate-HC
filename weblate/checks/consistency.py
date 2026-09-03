@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from functools import reduce
+from itertools import batched
 from typing import TYPE_CHECKING, ClassVar, Literal
 
 from django.db.models import Count, F, Max, Min, Prefetch, Q, Value
@@ -14,10 +15,11 @@ from django.utils.html import format_html
 from django.utils.translation import gettext, gettext_lazy, ngettext
 
 from weblate.checks.base import BatchCheckMixin, TargetCheck
+from weblate.logger import LOGGER
 from weblate.trans.actions import ACTIONS_REVERTABLE, ActionEvents
 from weblate.trans.util import split_plural
 from weblate.utils.html import format_html_join_comma
-from weblate.utils.state import STATE_TRANSLATED
+from weblate.utils.state import STATE_READONLY, STATE_TRANSLATED
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -289,6 +291,140 @@ class ReusedCheck(TargetCheck, BatchCheckMixin):
         for key, unit in remaining:
             if len(found[key]) > 1:
                 yield unit
+
+
+REPEAT_DRIFT_CHECK_ID = "repeat-drift"
+
+
+class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
+    """Check whether a repeated source string has different translations."""
+
+    check_id = REPEAT_DRIFT_CHECK_ID
+    name = gettext_lazy("Inconsistent repeat")
+    description = gettext_lazy(
+        "The same source string is translated differently under a different key."
+    )
+    default_disabled = True
+    propagates = "repeat"
+    batch_project_wide = True
+    skip_suggestions = True
+    batch_limit = 200
+
+    def get_repeat_members(self, units: Iterable[Unit]) -> list[Unit]:
+        """Exclude only members which explicitly ignore the check."""
+        return [unit for unit in units if not self.is_ignored(unit.all_flags)]
+
+    def check_target_unit(
+        self, sources: list[str], targets: list[str], unit: Unit
+    ) -> bool:
+        component = unit.translation.component
+        if component.is_glossary or not component.allow_translation_propagation:
+            return False
+        if unit.state < STATE_TRANSLATED:
+            # The batch pass compares translated units only; flagging a
+            # needs-editing unit here would flap on the next batch.
+            return False
+
+        if component.batch_checks:
+            return self.handle_batch(unit, component)
+
+        return any(
+            other.target != unit.target
+            for other in self.get_repeat_members(unit.repeat_units)
+        )
+
+    def check_single(self, source: str, target: str, unit: Unit) -> bool:
+        """Target strings are checked in check_target_unit."""
+        return False
+
+    def get_description(self, check_obj):
+        unit = check_obj.unit
+        others = sorted(
+            {
+                other.target
+                for other in self.get_repeat_members(unit.repeat_units)
+                if other.target != unit.target
+            }
+        )
+        if not others:
+            return super().get_description(check_obj)
+        return format_html(
+            "{} {}",
+            gettext("The same source string is translated differently elsewhere:"),
+            format_html_join_comma(
+                "{}", ((self.format_value(other),) for other in others)
+            ),
+        )
+
+    def check_component(self, component: Component) -> Iterable[Unit]:
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models import Translation, Unit
+
+        translation_ids_by_plural: dict[int, list[int]] = defaultdict(list)
+        for translation_id, plural_id in (
+            Translation.objects.filter(
+                component__project=component.project,
+                component__allow_translation_propagation=True,
+                component__is_glossary=False,
+            )
+            .exclude_source()
+            .values_list("id", "plural_id")
+        ):
+            translation_ids_by_plural[plural_id].append(translation_id)
+
+        for plural_id, translation_ids in sorted(translation_ids_by_plural.items()):
+            hashes = (
+                Unit.objects.filter(
+                    translation_id__in=translation_ids,
+                    state__gte=STATE_TRANSLATED,
+                    state__lt=STATE_READONLY,
+                )
+                .annotate(source_md5=MD5(Lower("source")))
+                .values("source_md5")
+                .annotate(min_target=Min("target"), max_target=Max("target"))
+                .filter(min_target__lt=F("max_target"))
+                .order_by("source_md5")
+            )
+            found_groups = 0
+            for candidate_hashes in batched(
+                hashes.values_list("source_md5", flat=True).iterator(
+                    chunk_size=self.batch_limit
+                ),
+                self.batch_limit,
+            ):
+                units = (
+                    Unit.objects.filter(
+                        translation_id__in=translation_ids,
+                        state__gte=STATE_TRANSLATED,
+                        state__lt=STATE_READONLY,
+                    )
+                    .annotate(source_md5=MD5(Lower("source")))
+                    .filter(source_md5__in=candidate_hashes)
+                    .prefetch()
+                    .prefetch_bulk()
+                )
+
+                # The aggregate narrows case-insensitively because that is the
+                # indexed expression; the decision is made on the exact source.
+                groups: dict[str, list[Unit]] = defaultdict(list)
+                for unit in units:
+                    groups[unit.source].append(unit)
+                for source in sorted(groups):
+                    members = self.get_repeat_members(groups[source])
+                    if len({member.target for member in members}) <= 1:
+                        continue
+                    yield from members
+                    found_groups += 1
+                    if found_groups == self.batch_limit:
+                        LOGGER.warning(
+                            "repeat-drift: hit the %d group cap on %s (plural %d)",
+                            self.batch_limit,
+                            component.project.slug,
+                            plural_id,
+                        )
+                        break
+                if found_groups == self.batch_limit:
+                    break
 
 
 class TranslatedCheck(TargetCheck, BatchCheckMixin):

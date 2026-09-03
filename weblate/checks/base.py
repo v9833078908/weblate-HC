@@ -71,7 +71,7 @@ class BaseCheck(ClassLoaderProtocol, DocVersionsMixin):
     ignore_untranslated = True
     ignore_readonly = True
     default_disabled = False
-    propagates: Literal["source", "target"] | None = None
+    propagates: Literal["source", "target", "repeat"] | None = None
     param_type: Callable[[tuple[str, ...]], Any] | None = None
     always_display = False
     batch_project_wide = False

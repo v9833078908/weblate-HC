@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import json
+import tempfile
 from copy import deepcopy
 from io import StringIO
 from pathlib import Path
@@ -33,7 +34,7 @@ from weblate.glossary.tasks import (
 )
 from weblate.lang.models import Language
 from weblate.trans.alerts.registry import update_alerts
-from weblate.trans.models import PendingUnitChange, Unit, Variant
+from weblate.trans.models import PendingUnitChange, Project, Unit, Variant
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.tests.utils import get_test_file
 from weblate.utils.hash import calculate_hash
@@ -1216,6 +1217,129 @@ class GlossaryCoverageCommandTest(ViewTestCase):
 
     def test_the_report_writes_nothing(self) -> None:
         self.add_source_term("world")
+        before = Unit.objects.count()
+
+        self.run_command()
+
+        self.assertEqual(Unit.objects.count(), before)
+
+
+class AuditGlossaryCommandTest(GlossaryTest):
+    def run_command(self, **kwargs) -> str:
+        output = StringIO()
+        call_command("audit_glossary", stdout=output, **kwargs)
+        return output.getvalue()
+
+    def run_command_expecting_findings(self, **kwargs) -> str:
+        output = StringIO()
+        with self.assertRaises(CommandError):
+            call_command("audit_glossary", stdout=output, **kwargs)
+        return output.getvalue()
+
+    def test_duplicate_term_with_diverging_targets(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "Yashchik", context="ui")
+
+        output = self.run_command_expecting_findings()
+
+        self.assertIn("duplicate-term", output)
+
+    def test_duplicate_term_with_one_target_is_clean(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "Sunduk", context="ui")
+
+        self.assertIn("no findings", self.run_command())
+
+    def test_one_target_for_two_terms(self) -> None:
+        self.add_term("Dealer", "Trader", context="buyer")
+        self.add_term("Merchant", "Trader", context="ui")
+
+        output = self.run_command_expecting_findings()
+
+        self.assertIn("collapsed-terms", output)
+
+    def test_baseline_accepts_a_known_finding(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "Yashchik", context="ui")
+        output = self.run_command_expecting_findings()
+        key = next(
+            line[2:].rsplit("\t", 1)[0]
+            for line in output.splitlines()
+            if line.startswith("! duplicate-term")
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline = Path(tmp) / "accepted.baseline"
+            baseline.write_text(f"# deliberate homonym\n{key}\n", encoding="utf-8")
+
+            self.assertIn("duplicate-term", self.run_command(baseline=baseline))
+
+    def test_case_only_difference_is_not_a_finding(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "sunduk", context="ui")
+
+        self.assertIn("no findings", self.run_command())
+
+    def test_untranslated_term_is_not_a_finding(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "Yashchik", context="ui")
+        self.glossary.unit_set.filter(context="ui").update(state=STATE_EMPTY)
+
+        self.assertIn("no findings", self.run_command())
+
+    def test_unknown_project_fails_loudly(self) -> None:
+        with self.assertRaises(CommandError):
+            self.run_command(project="no-such-project")
+
+    def test_project_without_glossary_is_clean(self) -> None:
+        project = Project.objects.create(
+            name="No glossary",
+            slug="no-glossary",
+            web="https://nonexisting.weblate.org/",
+        )
+
+        self.assertIn("no findings", self.run_command(project=project.slug))
+
+    def test_project_limits_the_audit(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "Yashchik", context="ui")
+        other = Project.objects.create(
+            name="Other",
+            slug="other",
+            web="https://nonexisting.weblate.org/",
+        )
+        other.scratch_create_component(
+            name="Other glossary",
+            slug="other-glossary",
+            source_language=self.component.source_language,
+            file_format="po",
+            is_glossary=True,
+        )
+
+        self.assertIn("no findings", self.run_command(project=other.slug))
+
+    def test_invalid_baseline_encoding_fails_cleanly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            baseline = Path(tmp) / "invalid.baseline"
+            baseline.write_bytes(b"\xff")
+
+            with self.assertRaisesMessage(CommandError, "Cannot read baseline"):
+                self.run_command(baseline=baseline)
+
+    def test_the_audit_does_not_recreate_a_source_translation(self) -> None:
+        source_translation = self.glossary_component.get_source_translation()
+        self.assertIsNotNone(source_translation)
+        source_translation.delete()
+        self.glossary_component.__dict__.pop("source_translation", None)
+        before = self.glossary_component.translation_set.count()
+
+        self.run_command()
+
+        self.assertEqual(self.glossary_component.translation_set.count(), before)
+
+    def test_the_audit_writes_nothing(self) -> None:
+        self.add_term("Chest", "Sunduk", context="loot")
+        self.add_term("Chest", "Sunduk", context="ui")
         before = Unit.objects.count()
 
         self.run_command()

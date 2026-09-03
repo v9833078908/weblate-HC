@@ -17,6 +17,8 @@ Weblate 2026.8.1
 * A repaired LLM-judge major or critical verdict now also sends the judge's own short repair instruction to the machine translation engine, kept out of every human-facing check description.
 * Components can now exchange all language targets through one multilingual CSV or XLSX spreadsheet, with previewed imports that protect keys and placeholders.
 * Added an optional **LiteLLM** :ref:`automatic suggestion <machine-translation-setup>` service for the corporate LiteLLM proxy, alongside the existing OpenRouter service, and made the LLM judge endpoint configurable via :setting:`JUDGE_BASE_URL` (default OpenRouter).
+* Added an optional ``repeat-drift`` :ref:`check <checks>` that flags the same source string translated differently under another key, which the stock consistency check cannot see because it groups by the string key as well as the source text.
+* Added a read-only ``audit_glossary`` management command reporting glossary terms that contradict each other.
 
 .. rubric:: Improvements
 

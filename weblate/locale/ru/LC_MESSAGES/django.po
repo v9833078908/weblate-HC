@@ -5261,6 +5261,18 @@ msgstr[2] "Другие исходные строки:"
 msgid "“%s”"
 msgstr "«%s»"
 
+#: weblate/checks/consistency.py:302
+msgid "Inconsistent repeat"
+msgstr "Непоследовательный повтор"
+
+#: weblate/checks/consistency.py:304
+msgid "The same source string is translated differently under a different key."
+msgstr "Одна и та же исходная строка по-разному переведена под другим ключом."
+
+#: weblate/checks/consistency.py:343
+msgid "The same source string is translated differently elsewhere:"
+msgstr "Та же исходная строка по-разному переведена в другом месте:"
+
 #: weblate/checks/consistency.py:298
 msgid "Has been translated"
 msgstr "Уже переведено"

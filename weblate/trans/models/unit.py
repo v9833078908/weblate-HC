@@ -14,7 +14,7 @@ from django.contrib.postgres import indexes as postgres_indexes
 from django.core.cache import cache
 from django.db import Error as DjangoDatabaseError
 from django.db import models, transaction
-from django.db.models import Count, ManyToManyField, Max, Q, Sum, Value
+from django.db.models import Count, F, ManyToManyField, Max, Q, Sum, Value
 from django.db.models.functions import MD5, Length, Lower
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -27,6 +27,7 @@ from weblate.auth.data import (
     SELECTION_ALL_PUBLIC,
 )
 from weblate.auth.results import PermissionResult
+from weblate.checks.consistency import REPEAT_DRIFT_CHECK_ID
 from weblate.checks.flags import Flags
 from weblate.checks.judge import JUDGE_CHECKS
 from weblate.checks.models import CHECKS, Check
@@ -60,6 +61,7 @@ from weblate.utils import messages
 from weblate.utils.db import verify_in_transaction
 from weblate.utils.errors import report_error
 from weblate.utils.hash import calculate_hash, hash_to_checksum
+from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.regex import regex_findall
 from weblate.utils.state import (
     FUZZY_STATES,
@@ -2196,7 +2198,7 @@ class Unit(models.Model, LoggerMixin):
             target_checks = True
 
         # Initial propagation setup
-        propagation: set[Literal["source", "target"]] = set()
+        propagation: set[Literal["source", "target", "repeat"]] = set()
         if force_propagate:
             propagation.add("source")
 
@@ -2262,6 +2264,11 @@ class Unit(models.Model, LoggerMixin):
                             values = set(
                                 propagated_units.values_list("source", flat=True)
                             )
+                        elif check_obj.propagates == "repeat":
+                            propagated_units = self.repeat_units
+                            values = set(
+                                propagated_units.values_list("target", flat=True)
+                            )
                         else:
                             message = f"Unsupported propagation: {check_obj.propagates}"
                             raise ValueError(message)
@@ -2279,9 +2286,10 @@ class Unit(models.Model, LoggerMixin):
         # Propagate checks which need it (for example consistency)
         if propagation:
             self.translation.require_full_stats_rebuild()
-            querymap: dict[Literal["source", "target"], UnitQuerySet] = {
+            querymap: dict[Literal["source", "target", "repeat"], UnitQuerySet] = {
                 "source": self.propagated_units,
                 "target": Unit.objects.same_target(self),
+                "repeat": self.repeat_units,
             }
             propagated_units: UnitQuerySet = reduce(
                 operator.or_, (querymap[item] for item in propagation)
@@ -2484,7 +2492,32 @@ class Unit(models.Model, LoggerMixin):
 
         self.update_translation_memory(user)
 
+        if saved and not self.is_batch_update:
+            self.schedule_repeat_drift_recheck()
+
         return saved
+
+    def schedule_repeat_drift_recheck(self) -> None:
+        """Re-evaluate a repeat group after its target edit commits."""
+        check = CHECKS.get(REPEAT_DRIFT_CHECK_ID)
+        previously_failed = (
+            self.updated_old_checks_names is not None
+            and check is not None
+            and check.check_id in self.updated_old_checks_names
+        )
+        if (
+            check is None
+            or check.propagates != "repeat"
+            or self.is_source
+            or self.translation.component.is_glossary
+            or not self.translation.component.allow_translation_propagation
+        ):
+            return
+        if not previously_failed and (
+            check.should_skip(self) or not self.repeat_units.exists()
+        ):
+            return
+        transaction.on_commit(partial(_recheck_repeat_drift_group, self.pk))
 
     def get_all_flags(self, override: Flags | str | None = None) -> Flags:
         """Return union of own and component flags."""
@@ -2583,6 +2616,29 @@ class Unit(models.Model, LoggerMixin):
                 translation__component__allow_translation_propagation=True,
                 translation__plural_id=self.translation.plural_id,
             )
+        )
+
+    @cached_property
+    def repeat_units(self) -> UnitQuerySet:
+        """Units with the same source text under another key, project-wide."""
+        translation = self.translation
+        component = translation.component
+        return (
+            Unit.objects.filter(
+                translation__component__project_id=component.project_id,
+                translation__component__allow_translation_propagation=True,
+                translation__component__is_glossary=False,
+                translation__plural_id=translation.plural_id,
+                source__lower__md5=MD5(Lower(Value(self.source))),
+                source=self.source,
+                state__gte=STATE_TRANSLATED,
+                state__lt=STATE_READONLY,
+            )
+            .exclude(
+                translation__language_id=F("translation__component__source_language_id")
+            )
+            .exclude(pk=self.pk)
+            .prefetch()
         )
 
     def get_max_length(self):
@@ -2888,3 +2944,30 @@ class Unit(models.Model, LoggerMixin):
                 commit_policy == CommitPolicyChoices.APPROVED_ONLY and not self.approved
             )
         )
+
+
+def _recheck_repeat_drift_group(unit_id: int) -> None:
+    """Reconcile repeat-drift checks after the editing transaction commits."""
+    try:
+        unit = Unit.objects.filter(pk=unit_id).prefetch().prefetch_all_checks().get()
+    except Unit.DoesNotExist:
+        return
+
+    component = unit.translation.component
+    if component.is_glossary or not component.allow_translation_propagation:
+        return
+
+    try:
+        with component.project.checks_lock:
+            try:
+                unit = (
+                    Unit.objects.filter(pk=unit_id)
+                    .prefetch()
+                    .prefetch_all_checks()
+                    .get()
+                )
+            except Unit.DoesNotExist:
+                return
+            unit.run_checks()
+    except WeblateLockTimeoutError:
+        component.schedule_update_checks()

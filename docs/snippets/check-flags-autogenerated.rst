@@ -121,6 +121,8 @@
     Enables the :ref:`check-scheme-format` quality check.
 ``vue-format``
     Enables the :ref:`check-vue-format` quality check.
+``repeat-drift``
+    Enables the :ref:`check-repeat-drift` quality check.
 ``rst-text``
     Treat a text as an reStructuredText document, affects :ref:`check-same`.
     Enables the :ref:`check-rst-references` and :ref:`check-rst-syntax` quality checks.
@@ -236,6 +238,8 @@
     Skip the :ref:`check-translated` quality check.
 ``ignore-inconsistent``
     Skip the :ref:`check-inconsistent` quality check.
+``ignore-repeat-drift``
+    Skip the :ref:`check-repeat-drift` quality check.
 ``ignore-rst-references``
     Skip the :ref:`check-rst-references` quality check.
 ``ignore-kashida``

@@ -21,6 +21,7 @@ from django.db.models import OuterRef, Subquery
 from django.utils.html import strip_tags
 from django.utils.translation import override, pgettext
 
+from weblate.checks.consistency import REPEAT_DRIFT_CHECK_ID
 from weblate.checks.glossary import GLOSSARY_CHECK_ID, evaluate_glossary_terms
 from weblate.checks.utils import highlight_string
 from weblate.glossary.models import (
@@ -608,6 +609,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
         for check in checks:
             check_id = cls._normalize_context_text(check.name)
             if not check_id:
+                continue
+            if check_id == REPEAT_DRIFT_CHECK_ID:
+                # Every member of a repeat group is flagged, including the
+                # correct one. A mandatory repair would chase a sibling.
                 continue
             if check_id == GLOSSARY_CHECK_ID:
                 target_text = unit.get_target_plurals()[0] if unit.translated else ""

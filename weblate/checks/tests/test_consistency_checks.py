@@ -13,20 +13,26 @@ from django.test.utils import CaptureQueriesContext
 from weblate.checks.consistency import (
     ConsistencyCheck,
     PluralsCheck,
+    RepeatDriftCheck,
     ReusedCheck,
     SamePluralsCheck,
     TranslatedCheck,
 )
-from weblate.checks.models import Check
+from weblate.checks.models import CHECKS, Check
 from weblate.lang.models import Language
 from weblate.trans.actions import ActionEvents
-from weblate.trans.models import Unit
+from weblate.trans.models import Component, Translation, Unit
 from weblate.trans.tests.factories import make_unit
 from weblate.trans.tests.test_views import (
     ComponentTestCase,
     FixtureTestCase,
 )
-from weblate.utils.state import STATE_EMPTY, STATE_TRANSLATED
+from weblate.utils.state import (
+    STATE_EMPTY,
+    STATE_FUZZY,
+    STATE_READONLY,
+    STATE_TRANSLATED,
+)
 
 
 class PluralsCheckTest(TestCase):
@@ -149,7 +155,9 @@ class ReusedCheckGuardTest(SimpleTestCase):
         handle_batch.assert_not_called()
 
 
-class ConsistencyCheckTest(ComponentTestCase):
+class SameSourceUnitsMixin:
+    """Create units with an explicit context, source and target."""
+
     def setUp(self) -> None:
         super().setUp()
         self.other = self.create_link_existing()
@@ -185,6 +193,8 @@ class ConsistencyCheckTest(ComponentTestCase):
             state=STATE_TRANSLATED,
         )
 
+
+class ConsistencyCheckTest(SameSourceUnitsMixin, ComponentTestCase):
     def test_reuse(self) -> None:
         check = ReusedCheck()
         self.assertEqual(list(check.check_component(self.component)), [])
@@ -342,3 +352,274 @@ class ConsistencyCheckTest(ComponentTestCase):
 
         sql = "\n".join(query["sql"].upper() for query in queries)
         self.assertNotIn("MIN(", sql)
+
+
+class RepeatDriftCheckTest(SameSourceUnitsMixin, ComponentTestCase):
+    def enable_repeat_drift(self):
+        Component.objects.filter(project=self.project).update(
+            check_flags="repeat-drift"
+        )
+        return Component.objects.get(pk=self.component.pk)
+
+    def test_same_source_different_key_drifts(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Nazdar")
+
+        self.assertTrue(check.check_target_unit([], [], unit))
+
+    def test_same_source_same_translation_is_clean(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Ahoj")
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_case_distinct_sources_are_not_one_group(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_1, "greet_outro", "hello", "Nazdar")
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_glossary_component_is_ignored(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Nazdar")
+        unit.translation.component.is_glossary = True
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_propagation_disabled_is_ignored(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Nazdar")
+        unit.translation.component.allow_translation_propagation = False
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_needs_editing_unit_is_ignored(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Nazdar")
+        unit.state = STATE_FUZZY
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_other_language_is_not_a_repeat(self) -> None:
+        check = RepeatDriftCheck()
+        german = self.component.translation_set.get(language__code="de")
+        self.add_unit(german, "greet_intro", "Hello", "Hallo")
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Ahoj")
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_source_language_translation_is_excluded(self) -> None:
+        check = RepeatDriftCheck()
+        czech = Language.objects.get(code="cs")
+        self.other.source_language = czech
+        self.other.save(update_fields=["source_language"])
+        self.translation_2.unit_set.create(
+            id_hash=9001,
+            position=9001,
+            context="greet_source",
+            source="Hello",
+            target="Nazdar",
+            state=STATE_TRANSLATED,
+        )
+        unit = self.add_unit(self.translation_1, "greet_outro", "Hello", "Ahoj")
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_registered_and_reachable_through_run_checks(self) -> None:
+        self.assertIn("repeat-drift", CHECKS)
+        Component.objects.filter(project=self.project).update(
+            check_flags="repeat-drift"
+        )
+        translation = Translation.objects.get(pk=self.translation_1.pk)
+        first = self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(translation, "greet_outro", "Hello", "Nazdar")
+
+        second.run_checks()
+
+        self.assertIn("repeat-drift", second.all_checks_names)
+        self.assertIn("repeat-drift", Unit.objects.get(pk=first.pk).all_checks_names)
+
+    def test_check_component_finds_cross_component_drift(self) -> None:
+        check = RepeatDriftCheck()
+        self.assertEqual(list(check.check_component(self.component)), [])
+
+        first = self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+
+        self.assertEqual(
+            {unit.pk for unit in check.check_component(self.component)},
+            {first.pk, second.pk},
+        )
+
+    def test_check_component_ignores_agreeing_repeats(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        self.add_unit(self.translation_2, "greet_outro", "Hello", "Ahoj")
+
+        self.assertEqual(list(check.check_component(self.component)), [])
+
+    def test_aggregate_groups_by_source_not_context(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+
+        with CaptureQueriesContext(connection) as queries:
+            list(check.check_component(self.component))
+
+        aggregate_sql = next(
+            query["sql"].upper() for query in queries if "MIN(" in query["sql"].upper()
+        )
+        self.assertIn("MD5(LOWER", aggregate_sql)
+        self.assertNotIn('"TRANS_UNIT"."CONTEXT"', aggregate_sql)
+        self.assertNotIn('"TRANS_UNIT"."ID_HASH"', aggregate_sql)
+        self.assertNotIn('"TRANS_COMPONENT"', aggregate_sql)
+
+    def test_batch_pass_creates_and_clears_rows(self) -> None:
+        check = RepeatDriftCheck()
+        first = self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+
+        check.perform_batch(self.enable_repeat_drift())
+        self.assertEqual(
+            set(
+                Check.objects.filter(name="repeat-drift").values_list(
+                    "unit_id", flat=True
+                )
+            ),
+            {first.pk, second.pk},
+        )
+
+        Unit.objects.filter(pk=second.pk).update(target="Ahoj")
+        check.perform_batch(self.enable_repeat_drift())
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 0)
+
+    def test_ignore_flag_excludes_the_unit_from_the_group(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+        Unit.objects.filter(pk=second.pk).update(extra_flags="ignore-repeat-drift")
+
+        check.perform_batch(self.enable_repeat_drift())
+
+        self.assertFalse(Check.objects.filter(name="repeat-drift").exists())
+
+    def test_ignore_flag_excludes_the_unit_from_live_comparison(self) -> None:
+        check = RepeatDriftCheck()
+        first = self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+        Unit.objects.filter(pk=first.pk).update(extra_flags="ignore-repeat-drift")
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+
+    def test_disabled_peer_still_participates_in_comparison(self) -> None:
+        check = RepeatDriftCheck()
+        Component.objects.filter(project=self.project).update(
+            allow_translation_propagation=True, check_flags=""
+        )
+        Component.objects.filter(pk=self.component.pk).update(
+            check_flags="repeat-drift"
+        )
+        translation = Translation.objects.get(pk=self.translation_1.pk)
+        unit = self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        peer = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+        unit = Unit.objects.get(pk=unit.pk)
+
+        self.assertEqual(
+            list(unit.repeat_units.values_list("pk", flat=True)), [peer.pk]
+        )
+        self.assertTrue(check.check_target_unit([], [], unit))
+
+    def test_readonly_unit_is_excluded_from_the_group(self) -> None:
+        check = RepeatDriftCheck()
+        readonly = self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        Unit.objects.filter(pk=readonly.pk).update(state=STATE_READONLY)
+        unit = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+
+        self.assertFalse(check.check_target_unit([], [], unit))
+        check.perform_batch(self.enable_repeat_drift())
+        self.assertFalse(Check.objects.filter(name="repeat-drift").exists())
+
+    def test_group_cap_is_reported(self) -> None:
+        check = RepeatDriftCheck()
+        check.batch_limit = 1
+        self.add_unit(self.translation_1, "one_a", "One", "Jeden")
+        self.add_unit(self.translation_1, "one_b", "One", "Jedna")
+        self.add_unit(self.translation_1, "two_a", "Two", "Dva")
+        self.add_unit(self.translation_1, "two_b", "Two", "Dvě")
+
+        with self.assertLogs("weblate", level="WARNING") as logs:
+            units = list(check.check_component(self.component))
+
+        self.assertIn("hit the 1 group cap", "\n".join(logs.output))
+        self.assertEqual(len(units), 2)
+
+    def test_fixing_one_member_clears_the_sibling(self) -> None:
+        self.enable_repeat_drift()
+        translation = Translation.objects.get(pk=self.translation_1.pk)
+        first = self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(translation, "greet_outro", "Hello", "Nazdar")
+        second.run_checks()
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 2)
+
+        second = Unit.objects.get(pk=second.pk)
+        second.translate(self.user, "Ahoj", STATE_TRANSLATED)
+
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 0)
+        self.assertNotIn("repeat-drift", Unit.objects.get(pk=first.pk).all_checks_names)
+
+    def test_breaking_one_member_flags_the_sibling(self) -> None:
+        self.enable_repeat_drift()
+        translation = Translation.objects.get(pk=self.translation_1.pk)
+        first = self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(translation, "greet_outro", "Hello", "Ahoj")
+        second.run_checks()
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 0)
+
+        second = Unit.objects.get(pk=second.pk)
+        second.translate(self.user, "Nazdar", STATE_TRANSLATED)
+
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 2)
+        self.assertIn("repeat-drift", Unit.objects.get(pk=first.pk).all_checks_names)
+
+    def test_post_commit_recheck_restores_concurrent_drift(self) -> None:
+        self.enable_repeat_drift()
+        translation = Translation.objects.get(pk=self.translation_1.pk)
+        first = self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        second = self.add_unit(translation, "greet_outro", "Hello", "Nazdar")
+        second.run_checks()
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 2)
+
+        second = Unit.objects.get(pk=second.pk)
+        with self.captureOnCommitCallbacks(execute=True):
+            second.translate(self.user, "Ahoj", STATE_TRANSLATED)
+            Unit.objects.filter(pk=first.pk).update(target="Nazdar")
+
+        self.assertEqual(Check.objects.filter(name="repeat-drift").count(), 2)
+
+    def test_batch_update_skips_post_commit_recheck(self) -> None:
+        self.enable_repeat_drift()
+        translation = Translation.objects.get(pk=self.translation_1.pk)
+        self.add_unit(translation, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(translation, "greet_outro", "Hello", "Nazdar")
+        unit.is_batch_update = True
+
+        with patch.object(unit, "schedule_repeat_drift_recheck") as schedule_recheck:
+            unit.translate(self.user, "Ahoj", STATE_TRANSLATED)
+
+        schedule_recheck.assert_not_called()
+
+    def test_description_lists_the_other_renderings(self) -> None:
+        check = RepeatDriftCheck()
+        self.add_unit(self.translation_1, "greet_intro", "Hello", "Ahoj")
+        unit = self.add_unit(self.translation_2, "greet_outro", "Hello", "Nazdar")
+
+        description = check.get_description(Check(unit=unit, name="repeat-drift"))
+
+        self.assertIn("Ahoj", description)
+        self.assertNotIn("Nazdar", description)
