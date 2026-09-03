@@ -152,11 +152,13 @@ WEBLATE_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2=json_schema
 ```
 
 Историческая пара проверена живьём 2026-09-02: оба эндпоинта ответили 200 и
-распарсились. Ключ нужен OpenRouter-аккаунтовый (в продовом `.env` и бэкапах
-его нет - в бэкапе канарейки лежит только loc-kit-ключ; валидатор требует
-непустой `JUDGE_FALLBACK_API_KEY`, иначе `JudgeError` до первого запроса).
-Контейнер **пересоздаётся** (`docker compose up -d weblate` из `deploy/`):
-environment запекается при создании.
+распарсились. Ключ уже есть на проде: site-wide настройка сервиса
+`openrouter` (`Setting category=2 name=openrouter`, добавлена владельцем
+через UI; проверена 2026-09-03 - `GET /models` с VPS отвечает 200). Взять
+его оттуда (`weblate shell`, поле `value['key']`) и подставить в
+`WEBLATE_JUDGE_FALLBACK_API_KEY`; в продовом `.env` и его бэкапах судейского
+ключа нет. Контейнер **пересоздаётся** (`docker compose up -d weblate` из
+`deploy/`): environment запекается при создании.
 
 Приёмка: `judge_configuration_snapshot()` показывает оба эндпоинта; повтор
 канарейки фазы 2 даёт ноль строк `judge_provider="openrouter"` - fallback
