@@ -1731,6 +1731,25 @@ class JudgeQueueStripViewTest(ViewTestCase):
         # carries no status word, the rows own the statuses.
         self.assertNotIn(reverse("judge-run", kwargs={"pk": completed.pk}), menu_markup)
 
+    def test_a_run_whose_actor_was_deleted_renders_without_an_author(self) -> None:
+        # JudgeRun.actor is SET_NULL and the menu lists every actor's runs,
+        # so a run whose launcher has since been deleted reaches the menu
+        # with actor=None. The row must then drop the whole author segment:
+        # rendering the separator against a silently empty
+        # run.actor.profile would leave a dangling "·" at the row's end.
+        self.enable_review()
+        own_run = self.make_judge_run(self.user)
+        deleted_run = self.make_judge_run(None)
+        now = timezone.now()
+        JudgeRun.objects.filter(pk=own_run.pk).update(created=now)
+        JudgeRun.objects.filter(pk=deleted_run.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        response = self.client.get(self.component.get_absolute_url())
+        menu_markup = self.run_menu_markup(response)
+        self.assertIn(reverse("judge-run", kwargs={"pk": deleted_run.pk}), menu_markup)
+        self.assertNotIn("·", menu_markup)
+
     def test_project_page_leads_a_child_scope_row_with_its_scope_label(self) -> None:
         # On a project page "which component and language" is what
         # distinguishes one run from another: the child scope's label leads

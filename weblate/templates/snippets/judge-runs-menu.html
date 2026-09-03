@@ -23,9 +23,9 @@
             <a class="dropdown-item" href="{% url 'judge-run' pk=run.pk %}">
               {% if run.scope_path != current_path %}
                 <span class="d-block">{{ run.scope_label }}</span>
-                <span class="d-block text-muted">{{ run.created|date:"DATETIME_FORMAT" }}{% if run.actor != user %} · {{ run.actor.profile.get_user_name }}{% endif %}{% if run.status != "completed" %} · {{ run.get_status_display }}{% endif %}</span>
+                <span class="d-block text-muted">{{ run.created|date:"DATETIME_FORMAT" }}{% if run.actor and run.actor != user %} · {{ run.actor.profile.get_user_name }}{% endif %}{% if run.status != "completed" %} · {{ run.get_status_display }}{% endif %}</span>
               {% else %}
-                {{ run.created|date:"DATETIME_FORMAT" }}{% if run.actor != user %} · {{ run.actor.profile.get_user_name }}{% endif %}{% if run.status != "completed" %} · {{ run.get_status_display }}{% endif %}
+                {{ run.created|date:"DATETIME_FORMAT" }}{% if run.actor and run.actor != user %} · {{ run.actor.profile.get_user_name }}{% endif %}{% if run.status != "completed" %} · {{ run.get_status_display }}{% endif %}
               {% endif %}
             </a>
           </li>
