@@ -311,7 +311,29 @@
                href="#"
                title="{% translate "List of recent changes done in Weblate" %}">{% translate "History" %}</a>
           </li>
-          {% if nearby_keys or variants|length > 1 or others.total or unit.all_comments or user_can_add_comment or other_languages_count or user_can_use_machinery %}
+          {% if other_languages_count %}
+            <li class="nav-item">
+              <a class="nav-link"
+                 data-bs-target="#translations"
+                 data-bs-toggle="tab"
+                 id="toggle-translations"
+                 data-href="{% url 'js-unit-translations' unit_id=unit.id %}"
+                 href="#"
+                 title="{% translate "Translations of this string in the other languages" %}">{% translate "Other languages" %} <span class="badge text-bg-secondary">{{ other_languages_count }}</span></a>
+            </li>
+          {% endif %}
+          {% if user_can_use_machinery %}
+            <li class="nav-item">
+              <a class="nav-link"
+                 data-bs-target="#machinery"
+                 data-bs-toggle="tab"
+                 id="toggle-machinery"
+                 data-load="machinery"
+                 href="#"
+                 title="{% translate "Computer-aided translation suggestions" %}">{% translate "Automatic suggestions" %}</a>
+            </li>
+          {% endif %}
+          {% if nearby_keys or variants|length > 1 or others.total or unit.all_comments or user_can_add_comment %}
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle"
                  data-bs-toggle="dropdown"
@@ -357,28 +379,6 @@
                        href="#">{% translate "Comments" %}
                       {% if unit.all_comments %}<span class="badge text-bg-secondary">{{ unit.all_comments|length }}</span>{% endif %}
                     </a>
-                  </li>
-                {% endif %}
-                {% if other_languages_count %}
-                  <li>
-                    <a class="dropdown-item"
-                       data-bs-target="#translations"
-                       data-bs-toggle="tab"
-                       id="toggle-translations"
-                       data-href="{% url 'js-unit-translations' unit_id=unit.id %}"
-                       href="#"
-                       title="{% translate "Translations of this string in the other languages" %}">{% translate "Other languages" %} <span class="badge text-bg-secondary">{{ other_languages_count }}</span> </a>
-                  </li>
-                {% endif %}
-                {% if user_can_use_machinery %}
-                  <li>
-                    <a class="dropdown-item"
-                       data-bs-target="#machinery"
-                       data-bs-toggle="tab"
-                       id="toggle-machinery"
-                       data-load="machinery"
-                       href="#"
-                       title="{% translate "Computer-aided translation suggestions" %}">{% translate "Automatic suggestions" %}</a>
                   </li>
                 {% endif %}
               </ul>
@@ -762,15 +762,14 @@
                 {% documentation_icon 'user/glossary' right=True %}
                 {% loading_icon "glossary-add" %}
                 <button type="button"
-                        class="accordion-button {% if not glossary %}collapsed{% endif %}"
+                        class="accordion-button"
                         data-bs-toggle="collapse"
                         data-bs-target="#glossary-card-body-{{ unit.id }}"
-                        aria-expanded="{% if glossary %}true{% else %}false{% endif %}"
+                        aria-expanded="true"
                         aria-controls="glossary-card-body-{{ unit.id }}">{% translate "Glossary" %}</button>
               </h4>
             </div>
-            <div class="list-group collapse {% if glossary %}show{% endif %}"
-                 id="glossary-card-body-{{ unit.id }}">
+            <div class="list-group collapse show" id="glossary-card-body-{{ unit.id }}">
               <div class="list-group-item">
                 <table class="table table-sm table-simple">
                   <thead>
@@ -849,15 +848,14 @@
             <h4 class="card-title">
               {% documentation_icon 'user/translating' 'source-context' right=True %}
               <button type="button"
-                      class="accordion-button {% if not unit.source_unit.explanation and not unit.all_labels and not unit.all_flags %}collapsed{% endif %}"
+                      class="accordion-button"
                       data-bs-toggle="collapse"
                       data-bs-target="#string-info-card-body-{{ unit.id }}"
-                      aria-expanded="{% if unit.source_unit.explanation or unit.all_labels or unit.all_flags %}true{% else %}false{% endif %}"
+                      aria-expanded="true"
                       aria-controls="string-info-card-body-{{ unit.id }}">{% translate "String information" %}</button>
             </h4>
           </div>
-          <div class="list-group collapse {% if unit.source_unit.explanation or unit.all_labels or unit.all_flags %}show{% endif %}"
-               id="string-info-card-body-{{ unit.id }}">
+          <div class="list-group collapse show" id="string-info-card-body-{{ unit.id }}">
             {% if path_object != unit.translation %}
               <div class="list-group-item">
                 <h5>{% translate "Component" %}</h5>

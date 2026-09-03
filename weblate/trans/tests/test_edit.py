@@ -498,8 +498,8 @@ class EditTest(ViewTestCase):
         with pytest.raises(NoReverseMatch):
             reverse("js-dismiss-automatically-translated", kwargs={"unit_id": unit.id})
 
-    def test_machinery_tab_in_more_dropdown(self) -> None:
-        """The automatic suggestions tab lives in the More dropdown."""
+    def test_machinery_tab_is_a_direct_tab(self) -> None:
+        """The automatic suggestions tab is one click away, not in More."""
         self.assertTrue(self.user.has_perm("machinery.view", self.translation))
         response = self.client.get(self.get_unit(self.source).get_absolute_url())
         self.assertContains(response, 'id="toggle-machinery"')
@@ -509,9 +509,9 @@ class EditTest(ViewTestCase):
             len(
                 tree.xpath(
                     '//a[@id="toggle-machinery"][contains('
-                    'concat(" ", @class, " "), " dropdown-item ")]'
-                    "/ancestor::li[contains(concat(' ', @class, ' '), ' dropdown ')]"
-                    '/ancestor::ul[contains(concat(" ", @class, " "), " translation-tabs ")]'
+                    'concat(" ", @class, " "), " nav-link ")]'
+                    "/parent::li[not(contains(concat(' ', @class, ' '), ' dropdown '))]"
+                    '/parent::ul[contains(concat(" ", @class, " "), " translation-tabs ")]'
                 )
             ),
             1,
@@ -523,7 +523,7 @@ class EditTest(ViewTestCase):
         self.assertNotContains(response, 'id="machinery"')
 
     def test_bottom_tabs_reduced(self) -> None:
-        """Nearby and History stay direct; the rest fold into More."""
+        """Nearby, History, other languages and machinery stay direct."""
         unit = self.get_unit(self.source)
         response = self.client.get(unit.get_absolute_url())
         tree = html.fromstring(response.content)
@@ -532,16 +532,15 @@ class EditTest(ViewTestCase):
             f'{tabs_xpath}/li[not(contains(concat(" ", @class, " "), " dropdown "))]'
             "/a/@id"
         )
-        self.assertIn("toggle-nearby", direct_ids)
-        self.assertIn("toggle-history", direct_ids)
-        self.assertNotIn("toggle-translations", direct_ids)
         dropdown_ids = tree.xpath(
             f'{tabs_xpath}//li[contains(concat(" ", @class, " "), " dropdown ")]'
             '//a[contains(concat(" ", @class, " "), " dropdown-item ")]/@id'
         )
-        for tab_id in ("toggle-translations", "toggle-machinery", "toggle-comments"):
-            self.assertIn(tab_id, dropdown_ids)
-            self.assertNotIn(tab_id, direct_ids)
+        for tab_id in ("toggle-nearby", "toggle-history", "toggle-machinery"):
+            self.assertIn(tab_id, direct_ids)
+            self.assertNotIn(tab_id, dropdown_ids)
+        self.assertIn("toggle-comments", dropdown_ids)
+        self.assertNotIn("toggle-comments", direct_ids)
 
     def test_suggestions_tab_direct_only_when_present(self) -> None:
         """Suggestions stays a direct item, but only when non-empty."""
@@ -632,43 +631,8 @@ class EditTest(ViewTestCase):
         next_button = tree.xpath('//a[@id="button-next"]')[0]
         self.assertIn("disabled", next_button.get("class", "").split())
 
-    def test_glossary_card_collapsed_when_no_terms(self) -> None:
-        """The Glossary header is a collapse toggle, closed with no matches."""
-        unit = self.get_unit(self.source)
-        response = self.client.get(unit.get_absolute_url())
-        tree = html.fromstring(response.content)
-        toggle = tree.xpath(f'//button[@aria-controls="glossary-card-body-{unit.id}"]')[
-            0
-        ]
-        self.assertEqual(toggle.get("aria-expanded"), "false")
-        self.assertIn("collapsed", toggle.get("class", "").split())
-        body = tree.xpath(f'//div[@id="glossary-card-body-{unit.id}"]')[0]
-        body_classes = body.get("class", "").split()
-        self.assertIn("collapse", body_classes)
-        self.assertNotIn("show", body_classes)
-
-    def test_glossary_card_expanded_with_matching_term(self) -> None:
-        """A matching term opens the Glossary card by default."""
-        if type(self) is not EditTest:
-            # A template-structural claim about the collapse wiring, not a
-            # per-format regression; some subclasses override self.source
-            # to text that would never match a "Hello" glossary term.
-            self.skipTest("Verified once against the base po fixture")
-        glossary = self.create_po(
-            name="Glossary",
-            project=self.project,
-            is_glossary=True,
-            manage_units=True,
-        )
-        glossary.source_translation.unit_set.create(
-            source="Hello",
-            target="Hello",
-            context="",
-            id_hash=calculate_hash("Hello", ""),
-            position=glossary.source_translation.unit_set.count() + 1,
-            state=STATE_TRANSLATED,
-        )
-        glossary.invalidate_glossary_cache()
+    def test_glossary_card_open_without_terms(self) -> None:
+        """The Glossary card is open even when nothing matches."""
         unit = self.get_unit(self.source)
         response = self.client.get(unit.get_absolute_url())
         tree = html.fromstring(response.content)
@@ -682,8 +646,8 @@ class EditTest(ViewTestCase):
         self.assertIn("collapse", body_classes)
         self.assertIn("show", body_classes)
 
-    def test_string_info_card_collapsed_when_empty(self) -> None:
-        """No explanation, labels or flags: the card body stays collapsed."""
+    def test_string_info_card_open_when_empty(self) -> None:
+        """The string information card is open with no explanation or flags."""
         if type(self) is not EditTest:
             # A template-structural claim; the base po fixture bakes
             # "#, c-format, max-length:100" onto self.source specifically
@@ -691,31 +655,16 @@ class EditTest(ViewTestCase):
             # fixture string instead of assuming self.source is clean.
             self.skipTest("Verified once against the base po fixture")
         unit = self.get_unit("Thank you for using Weblate.")
-        response = self.client.get(unit.get_absolute_url())
-        tree = html.fromstring(response.content)
-        toggle = tree.xpath(
-            f'//button[@aria-controls="string-info-card-body-{unit.id}"]'
-        )[0]
-        self.assertEqual(toggle.get("aria-expanded"), "false")
-        body = tree.xpath(f'//div[@id="string-info-card-body-{unit.id}"]')[0]
-        self.assertNotIn("show", body.get("class", "").split())
-
-    def test_string_info_card_shown_with_explanation(self) -> None:
-        """The explanation alone opens the card, without labels or flags."""
-        if type(self) is not EditTest:
-            # Same reason as the collapsed case: self.source carries baked
-            # flags in the po fixture, which would open the card anyway.
-            self.skipTest("Verified once against the base po fixture")
-        unit = self.get_unit("Thank you for using Weblate.")
         self.assertFalse(unit.all_flags)
         self.assertFalse(unit.all_labels)
-        unit.source_unit.update_explanation("Some explanation.", self.user)
+        self.assertFalse(unit.source_unit.explanation)
         response = self.client.get(unit.get_absolute_url())
         tree = html.fromstring(response.content)
         toggle = tree.xpath(
             f'//button[@aria-controls="string-info-card-body-{unit.id}"]'
         )[0]
         self.assertEqual(toggle.get("aria-expanded"), "true")
+        self.assertNotIn("collapsed", toggle.get("class", "").split())
         body = tree.xpath(f'//div[@id="string-info-card-body-{unit.id}"]')[0]
         self.assertIn("show", body.get("class", "").split())
 
