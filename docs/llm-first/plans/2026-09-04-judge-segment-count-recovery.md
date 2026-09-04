@@ -1,6 +1,6 @@
 # Judge segment-count recovery
 
-**Status:** implemented locally; awaiting production canary and deployment approval.
+**Status:** implemented; compatibility canary passed; awaiting deployment approval.
 
 ## Goal
 
