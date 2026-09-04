@@ -27,10 +27,11 @@ checks at once**. Drift can never demand a target the glossary refuses, unless
 pre-existing glossary defect on both variants, not a conflict.
 
 Measured on `col4`: a conflict-free canonical candidate exists in
-**73 of 76** French diverging groups and **57 of 57** Indonesian ones. The
-three French exceptions are one term, `Хриплый` -> `Râpeux`, which no
-translation of the group uses (`rauque`, `enroué`); picking either variant
-leaves the same advisory. Drift is neutral there.
+**73 of 76** French diverging groups, **57 of 61** Turkish and **57 of 57**
+Indonesian ones. The seven exceptions (3 fr, 4 tr) are groups where every
+variant already fails the glossary - `Хриплый` -> `Râpeux` rendered `rauque`
+and `enroué`, `Ячейка` -> `Hücre` rendered `daire`/`ev` - so picking either
+variant leaves the same advisory. Drift is neutral there.
 
 The same argument covers the caps question below: a rule keyed on the source
 form is constant inside a repeat group.
@@ -43,38 +44,42 @@ project at all (0 rows), and `repeat-drift` only on `need-for-greed`
 (253 rows). The numbers below are therefore what enabling them *would*
 produce.
 
-| | fr | en_US | tr_TR | id |
+| | fr | tr | id | en_US |
 |---|---|---|---|---|
-| diverging groups (`repeat-drift` fires) | 76 | 51 | 61 | 57 |
-| units flagged | 181 | 140 | 167 | 133 |
-| source carries a glossary term | 28 | 12 | - | 20 |
-| glossary green on every member | 71 | 51 | - | 56 |
-| glossary advisory on some member | 5 | 0 | - | 1 |
-| conflict-free canonical candidate | 73 | 51 | - | 57 |
-| divergence is case-only | 1 | 1 | 0 | 2 |
+| diverging groups (`repeat-drift` fires) | 76 | 61 | 57 | 51 |
+| units flagged | 181 | 167 | 133 | 140 |
+| source carries a glossary term | 28 | 13 | 20 | 12 |
+| glossary green on every member | 71 | 56 | 56 | 51 |
+| glossary advisory on some member | 5 | 5 | 1 | 0 |
+| conflict-free canonical candidate | 73 | 57 | 57 | 51 |
+| divergence is case-only | 1 | 0 | 2 | 1 |
 | source carries an all-caps term | 3 | 3 | 3 | 3 |
 
 The two detectors are near-disjoint: of 245 diverging groups, 172 have no
 glossary term in the source at all (counted against the Russian term list,
-independent of target-language coverage), and only 6 carry a glossary advisory
+independent of target-language coverage), and only 11 carry a glossary advisory
 anywhere. Where they do overlap they agree - the group that renders
 `Чествование Знамён Хозяйств` three ways (`Drapeaux Ménagers`,
 `Drapeaux des Ménages`, `Drapeaux des Exploitations Agricoles`) is both a
 drift and a terminology finding, and the candidate with the fewest advisories
 is the one to canonicalise on.
 
-`tr_TR` shows no glossary column because it **has no glossary at all**: the
-glossary component `all-glossary` carries translations for `en`, `fr`, `tr`,
-`id`, `en_US`, while the content components use `en_US` and `tr_TR`.
-`get_glossary_units()` filters `translation__language=<exact language>`
-(`weblate/glossary/models.py:311-316`), so `tr_TR` units match zero terms.
-`en_US` is worse than it looks: its 95 term rows exist but are **untranslated**
-(`translated_terms: 0`), and an empty `term.target` compiles to the
-zero-width pattern `\b\b`, which `re.search` finds in any target
-(`weblate/checks/glossary.py:69-72`). So all 12 `en_US` groups whose source
-carries a term are reported green **only because the term is untranslated**.
-For two of four `col4` languages, `repeat-drift` and the judge are the only
-term-consistency signals that exist.
+`en_US` is the one blind language, and blind in a way that reads as green: its
+95 term rows exist but are **untranslated** (`translated_terms: 0`), and an
+empty `term.target` compiles to the zero-width pattern `\b\b`, which
+`re.search` finds in any target (`weblate/checks/glossary.py:69-72`). So all
+12 `en_US` groups whose source carries a term are reported green **only
+because the term is untranslated**. For that language `repeat-drift` and the
+judge are the only term-consistency signals that exist.
+
+Turkish nearly landed in this bucket by a reporting trap worth recording: the
+content components' Turkish translation reports `language_code: "tr_TR"`
+(derived from `tr_TR.po`), while its `Language` object is `tr` - the same one
+the glossary's `tbx/tr.tbx` translation uses. The product matches glossary
+units on `translation__language` (`weblate/glossary/models.py:311-316`), i.e.
+on the `Language` row, so Turkish is fully covered and Turkish Snowball is
+active. Any probe or query that groups by `translation["language_code"]`
+instead of `translation["language"]["code"]` will invent a coverage hole here.
 
 ## `ГИГАХРУЩ`: where morphology carries the weight
 
@@ -89,7 +94,7 @@ it, in 13 source forms:
 ГИГАХРУЩЁВКЕ 1  Гигахрущестроения 1  ГИГАХРУЩУ 1  ГИГАХРУЩЕМ 1
 ```
 
-(per language; the probe reports the sum over the three glossary-covered
+(per language; the probe reports the sum over the four glossary-covered
 languages.)
 
 Source-side match path, per language: **26 units exact, 52 stem-only, 7 not
@@ -143,11 +148,13 @@ sees it. Nothing downstream can know that a unit shouted `ГИГАХРУЩЕВК
 |---|---|---|
 | en_US | CAPS 16, Title 5 | Title 68, CAPS 4 |
 | fr | Title 20 | Title 73 |
+| tr | Title 20, CAPS 1 | Title 72 |
 | id | CAPS 20 | CAPS 68, Title 5 |
 
 English mirrors the source caps 16 times out of 21 and shouts 4 times when
-the source did not; French never mirrors (0 of 20 - a normalising MT run);
-Indonesian shouts 68 times where the source did not, because its own glossary
+the source did not; French never mirrors (0 of 20 - a normalising MT run) and
+Turkish mirrors once out of 21; Indonesian shouts 68 times where the source
+did not, because its own glossary
 target `GIGAKHRUSHCH` is itself all-caps. The golden set already treats the
 non-mirrored caps case as a defect (`analysis/data/col4-judge-golden.json`,
 `expected_rendering: GIGASTRUCTURE` for a caps source), i.e. today the judge
@@ -205,10 +212,12 @@ that flag currently has no repair path.
    5-7 characters, so nothing breaks; the class is real and the escape hatch
    is `ignore-repeat-drift` on the tighter unit. Nothing in the code detects
    the case.
-3. **Glossary language coverage holes make drift the only detector.**
-   `tr_TR` and `en_US` on `col4` (previous section) have no usable glossary,
-   yet carry 112 of the 245 diverging groups. Fixing the glossary language
-   codes is worth more than either check.
+3. **One glossary language is blind while reading green.** `en_US` on `col4`
+   carries 51 of the 245 diverging groups and 95 untranslated term rows that
+   satisfy the check vacuously (previous section). Translating that glossary
+   language - or removing it - is worth more than either check. Turkish is
+   covered; the `tr_TR`/`tr` code split is a reporting trap for queries, not a
+   product hole.
 
 ## Reproduction
 
@@ -221,7 +230,10 @@ PROD_WEBLATE_API_TOKEN=... uv run python \
 Snowball 3.1.1; source stemming on (`ru` in `SOURCE_STEM_LANGUAGES`); target
 algorithms `fr` -> french, `tr` -> turkish, `en`/`en_US`/`id` -> none, so
 Indonesian and English targets have no morphological tolerance at all and
-`id`'s 0 morphology lifts are expected, not a measurement gap.
+their 0 morphology lifts are expected, not a measurement gap. Corpus-wide term
+evaluations: French 2 013 exact, 274 lifted by morphology, 121 advisory;
+Turkish 1 456 exact, 354 lifted, 599 advisory; Indonesian 2 331 exact, 0
+lifted, 78 advisory.
 
 ## Limits
 
@@ -236,3 +248,7 @@ Indonesian and English targets have no morphological tolerance at all and
 * The judge suppression risk in finding 1 is a mechanism traced through code
   and prompt, not a measured verdict delta. Measuring it needs a paired judge
   run with and without the flag in `checks`.
+* Corrected after the first run of this probe, which grouped by
+  `translation["language_code"]` and therefore reported Turkish as having no
+  glossary. Coverage follows the `Language` row, not the filename code; the
+  probe now reads `translation["language"]["code"]`.

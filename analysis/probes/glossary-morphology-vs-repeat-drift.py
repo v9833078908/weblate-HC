@@ -204,7 +204,11 @@ def load_glossary(api: str, project: str) -> tuple[Glossary, dict]:
             continue
         source_code = component["source_language"]["code"]
         for translation in paginate(component["translations_url"] + "?page_size=100"):
-            language = translation["language_code"]
+            # Language.code, not translation["language_code"]: the latter is
+            # the filename-derived code (`tr_TR.po` -> `tr_TR`), while the
+            # product matches glossary units on translation__language
+            # (weblate/glossary/models.py:311-316).
+            language = translation["language"]["code"]
             if language == source_code:
                 continue
             units = paginate(translation["units_list_url"] + "?page_size=1000")
@@ -237,7 +241,7 @@ def load_units(api: str, project: str) -> tuple[list[dict], dict]:
             # (weblate/trans/models/unit.py:2626-2642).
             continue
         for translation in paginate(component["translations_url"] + "?page_size=100"):
-            language = translation["language_code"]
+            language = translation["language"]["code"]
             if language == component["source_language"]["code"]:
                 continue
             for unit in paginate(translation["units_list_url"] + "?page_size=1000"):

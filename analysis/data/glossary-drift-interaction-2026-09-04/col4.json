@@ -96,11 +96,15 @@
       "case_only_divergence": 2,
       "glossary_advisory_on_some_member": 1
     },
-    "tr_TR": {
+    "tr": {
       "diverging_groups": 61,
       "flagged_units": 167,
       "source_carries_an_all_caps_term": 3,
-      "no_glossary_for_this_language": 61
+      "source_carries_a_term": 13,
+      "glossary_green_on_every_member": 56,
+      "conflict_free_canonical_candidate_exists": 57,
+      "glossary_advisory_on_some_member": 5,
+      "every_candidate_fails_the_glossary": 4
     }
   },
   "source_match_paths": {
@@ -115,67 +119,71 @@
     "id": {
       "exact": 1160,
       "stem_only": 1249
+    },
+    "tr": {
+      "exact": 1160,
+      "stem_only": 1249
     }
   },
   "terms_most_dependent_on_snowball_all_languages": {
     "Ликвидатор": {
-      "stem_only": 465,
-      "exact": 105
+      "stem_only": 620,
+      "exact": 140
     },
     "Настя": {
-      "exact": 390,
-      "stem_only": 303
+      "exact": 520,
+      "stem_only": 404
     },
     "Партия": {
-      "exact": 162,
-      "stem_only": 249
+      "exact": 216,
+      "stem_only": 332
     },
     "Чистые": {
-      "stem_only": 219,
-      "exact": 105
+      "stem_only": 292,
+      "exact": 140
     },
     "Ячейка": {
-      "stem_only": 213,
-      "exact": 6
+      "stem_only": 284,
+      "exact": 8
     },
     "Блок": {
-      "stem_only": 177,
-      "exact": 96
+      "stem_only": 236,
+      "exact": 128
     },
     "ГИГАХРУЩ": {
-      "stem_only": 156,
-      "exact": 78
+      "stem_only": 208,
+      "exact": 104
     },
     "Смена": {
-      "stem_only": 135,
-      "exact": 9
+      "stem_only": 180,
+      "exact": 12
     },
     "Игорь": {
-      "stem_only": 135
+      "stem_only": 180
     },
     "Община": {
-      "stem_only": 99,
-      "exact": 24
+      "stem_only": 132,
+      "exact": 32
     },
     "Юля": {
-      "stem_only": 90,
-      "exact": 213
+      "stem_only": 120,
+      "exact": 284
     },
     "Цикл": {
-      "stem_only": 81,
-      "exact": 18
+      "stem_only": 108,
+      "exact": 24
     },
     "Плесень": {
-      "exact": 155,
-      "stem_only": 75
+      "exact": 207,
+      "stem_only": 100
     },
     "Вера": {
-      "stem_only": 75,
-      "exact": 3
+      "stem_only": 100,
+      "exact": 4
     },
     "Старейшина": {
-      "stem_only": 66,
-      "exact": 93
+      "stem_only": 88,
+      "exact": 124
     }
   },
   "term_focus": {
@@ -188,24 +196,28 @@
       "en_US": ""
     },
     "source_forms": {
-      "Гигахруща": 96,
-      "Гигахрущ": 75,
-      "ГИГАХРУЩА": 33,
-      "Гигахрущу": 18,
-      "Гигахруще": 12,
-      "ГИГАХРУЩ": 12,
-      "Гигахрущёвке": 9,
-      "Гигахрущём": 6,
-      "ГИГАХРУЩЕВКИ": 6,
-      "ГИГАХРУЩЁВКЕ": 3,
-      "Гигахрущестроения": 3,
-      "ГИГАХРУЩУ": 3,
-      "ГИГАХРУЩЕМ": 3
+      "Гигахруща": 128,
+      "Гигахрущ": 100,
+      "ГИГАХРУЩА": 44,
+      "Гигахрущу": 24,
+      "Гигахруще": 16,
+      "ГИГАХРУЩ": 16,
+      "Гигахрущёвке": 12,
+      "Гигахрущём": 8,
+      "ГИГАХРУЩЕВКИ": 8,
+      "ГИГАХРУЩЁВКЕ": 4,
+      "Гигахрущестроения": 4,
+      "ГИГАХРУЩУ": 4,
+      "ГИГАХРУЩЕМ": 4
     },
     "outcome_per_language": {
       "en_US": {
         "term-not-matched": 7,
         "vacuous-untranslated-term": 78
+      },
+      "tr": {
+        "term-not-matched": 7,
+        "exact-ignorecase": 78
       },
       "fr": {
         "term-not-matched": 7,
@@ -238,6 +250,13 @@
       "id/other-source": {
         "title": 5,
         "caps": 68
+      },
+      "tr/caps-source": {
+        "caps": 1,
+        "title": 20
+      },
+      "tr/other-source": {
+        "title": 72
       }
     }
   },
@@ -335,6 +354,64 @@
           "Ликвидатор": "exact-ignorecase",
           "Хриплый": "advisory",
           "Койка": "exact-ignorecase"
+        }
+      }
+    },
+    {
+      "language": "tr",
+      "source": "Весь ликвидаторский блок поднят по тревоге. Все разыскивают Настю",
+      "candidates": {
+        "Tüm likidatör birliği alarm durumunda. Herkes Nastya'yı arıyor": {
+          "Блок": "advisory",
+          "Настя": "exact-ignorecase"
+        },
+        "Tüm likidatörler alarma geçti. Herkes Nastya'yı arıyor": {
+          "Блок": "advisory",
+          "Настя": "exact-ignorecase"
+        }
+      }
+    },
+    {
+      "language": "tr",
+      "source": "Мясной Поезд не даёт вам покоя, вы пытаетесь найти информацию о нём в своей ячейке",
+      "candidates": {
+        "Et Treni ile ilgili düşünceler peşini bırakmıyor. Evde bu konuda bilgi bulmaya çalışıyorsun": {
+          "Ячейка": "advisory",
+          "Мясной Поезд": "exact-ignorecase",
+          "Поезд": "advisory"
+        },
+        "Et Treni ile ilgili hayaller peşini bırakmıyor. Dairenden bu konuda bilgi bulmaya çalışıyorsun": {
+          "Ячейка": "advisory",
+          "Мясной Поезд": "exact-ignorecase",
+          "Поезд": "advisory"
+        }
+      }
+    },
+    {
+      "language": "tr",
+      "source": "Начинается Чествование Знамён Хозяйств",
+      "candidates": {
+        "AMK başlıyor": {
+          "Знамя": "advisory",
+          "Чествование Знамён Хозяйств": "advisory",
+          "Хозяйство": "advisory"
+        },
+        "Bayrak Töreni başlıyor": {
+          "Знамя": "exact-ignorecase",
+          "Чествование Знамён Хозяйств": "advisory",
+          "Хозяйство": "advisory"
+        }
+      }
+    },
+    {
+      "language": "tr",
+      "source": "Плесенка",
+      "candidates": {
+        "Yeşilimsi Nasta": {
+          "Плесенка": "advisory"
+        },
+        "Yeşilimsi Nastya": {
+          "Плесенка": "advisory"
         }
       }
     }
