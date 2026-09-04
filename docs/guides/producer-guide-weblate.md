@@ -863,7 +863,6 @@ especially to choice lines such as "Промолчать" -> "Se taire".
 
 ## Ссылки
 
-- Длинные тексты (2000+ знаков): `docs/guides/long-texts-playbook.md`
 - Создание проектов и компонентов, загрузка таблиц: `docs/admin/projects.rst`
 - Глоссарий: `docs/user/glossary.rst`
 - Проверки качества: `docs/user/checks.rst`
