@@ -108,7 +108,7 @@ def build_payload(model: str) -> dict:
             "json_schema": {
                 "name": "judge_verdicts",
                 "strict": True,
-                "schema": judge._response_schema(),
+                "schema": judge._response_schema(len(REQUESTS)),
             },
         },
         "messages": [

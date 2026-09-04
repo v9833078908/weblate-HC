@@ -115,7 +115,7 @@ def payload_for(model: str, *, stream: bool) -> dict:
             "json_schema": {
                 "name": "judge_verdicts",
                 "strict": True,
-                "schema": judge._response_schema(),
+                "schema": judge._response_schema(len(BATCH)),
             },
         },
         "messages": [

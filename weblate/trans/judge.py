@@ -44,7 +44,7 @@ _OPENROUTER_HOST = "openrouter.ai"
 _LITELLM_HOST = "hcbifrost.herocraft.com"
 JUDGE_SEATS = (1, 2)
 MAX_BATCH_RESPONSE_BYTES = 8 * 1024 * 1024
-PROMPT_SCHEMA_REVISION = "judge-verdict-v2"
+PROMPT_SCHEMA_REVISION = "judge-verdict-v3"
 
 # LiteLLM aliases declare the exact reasoning control they support, so the
 # accepted values are a closed set rather than a free-form effort level.
@@ -91,9 +91,19 @@ FAILURE_KINDS = frozenset(
 # configuration defect), so failing it over would double every batch's
 # calls while hiding the defect; `http-auth` is here because a different
 # key presented to a different provider is exactly one warranted fallback
-# call, even though it raises before reaching the retry branch below.
+# call, even though it raises before reaching the retry branch below;
+# `segment-count` is here because a completed primary reply with the wrong
+# cardinality already exhausted its protocol-recovery opportunity, while it
+# must not open the shared availability circuit.
 _FAILOVER_FAILURE_KINDS = frozenset(
-    {"transport", "deadline", "http-rate-limit", "http-server", "http-auth"}
+    {
+        "transport",
+        "deadline",
+        "http-rate-limit",
+        "http-server",
+        "http-auth",
+        "segment-count",
+    }
 )
 CATEGORIES = (
     "terminology",
@@ -850,7 +860,7 @@ def _load_prompt(source_language: str, target_language: str, context: str = "") 
     )
 
 
-def _response_schema() -> dict:
+def _response_schema(size: int) -> dict:
     error = {
         "type": "object",
         "properties": {
@@ -875,7 +885,14 @@ def _response_schema() -> dict:
     }
     return {
         "type": "object",
-        "properties": {"segments": {"type": "array", "items": segment}},
+        "properties": {
+            "segments": {
+                "type": "array",
+                "minItems": size,
+                "maxItems": size,
+                "items": segment,
+            }
+        },
         "required": ["segments"],
         "additionalProperties": False,
     }
@@ -1629,7 +1646,7 @@ def _payload(
         response_format["json_schema"] = {
             "name": "judge_verdicts",
             "strict": True,
-            "schema": _response_schema(),
+            "schema": _response_schema(len(batch)),
         }
     payload: dict = {
         "model": profile.model,
@@ -1941,7 +1958,12 @@ def _run_batch(  # ruff: ignore[complex-structure]
     # way it goes) must never corrupt what the primary itself observed.
     primary_failure = last_failure
     _update_adaptive(profile, adaptive, primary_failure)
-    if primary_failure in _FAILOVER_FAILURE_KINDS:
+    # A parser-failed multi-item batch gets one fallback at the original batch
+    # boundary. If that fallback also fails, width-one isolation below may
+    # retry the primary per item, but must not multiply paid fallback calls.
+    if primary_failure in _FAILOVER_FAILURE_KINDS and (
+        primary_failure != "segment-count" or isolate
+    ):
         fb_results, fb_failure, fb_attempt, fb_attempted = try_fallback(ordinal + 1)
         if fb_results is not None:
             return fb_results

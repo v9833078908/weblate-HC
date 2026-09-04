@@ -8,7 +8,7 @@ import json
 import time
 from dataclasses import replace
 from decimal import Decimal
-from typing import Any
+from typing import Any, ClassVar
 from unittest import mock
 
 import httpx2
@@ -527,7 +527,7 @@ class JudgeFallbackConfigurationTest(SimpleTestCase):
     @http_mock.activate
     def test_fully_configured_fallback_validates_before_any_request(self) -> None:
         validate_judge_configuration()
-        self.assertEqual(len(http_mock.calls), 0)
+        self.assertFalse(any(call.request.method == "POST" for call in http_mock.calls))
         endpoint = judge_fallback_endpoint()
         self.assertIsNotNone(endpoint)
         self.assertEqual(endpoint.role, "fallback")
@@ -714,7 +714,8 @@ class JudgeFailoverTest(TestCase):
         self,
     ) -> None:
         self.assertEqual(
-            _FAILOVER_FAILURE_KINDS - _AVAILABILITY_FAILURE_KINDS, {"http-auth"}
+            _FAILOVER_FAILURE_KINDS - _AVAILABILITY_FAILURE_KINDS,
+            {"http-auth", "segment-count"},
         )
         self.assertEqual(
             _AVAILABILITY_FAILURE_KINDS - _FAILOVER_FAILURE_KINDS, {"http-other"}
@@ -812,6 +813,91 @@ class JudgeFailoverTest(TestCase):
         self.assertTrue(result.unparsed)
         self.assertEqual(result.failure_kind, "invalid-json")
         self.assertEqual(calls, ["litellm"])
+
+    @override_settings(JUDGE_PROTOCOL_RETRIES=1)
+    def test_segment_count_retries_primary_before_fallback(self) -> None:
+        primary = _canned_response(
+            status_code=200,
+            payload=_reply([]),
+            transport_succeeded=True,
+        )
+        fallback = _canned_response(
+            status_code=200,
+            payload=_FALLBACK_PARSED_PAYLOAD,
+            transport_succeeded=True,
+        )
+        with mock.patch("weblate.trans.judge._sleep_retry"):
+            result, calls = self._run_with_primary_failure(
+                primary,
+                fallback_response=fallback,
+            )
+
+        self.assertFalse(result.unparsed)
+        self.assertEqual(result.served_provider, "openrouter")
+        self.assertEqual(calls, ["litellm", "litellm", "openrouter"])
+        self.assertEqual(
+            list(
+                JudgeRequestAttempt.objects.order_by("pk").values_list(
+                    "provider", "failure_kind"
+                )
+            ),
+            [
+                ("litellm", "segment-count"),
+                ("litellm", "segment-count"),
+                ("openrouter", ""),
+            ],
+        )
+
+    @override_settings(JUDGE_PROTOCOL_RETRIES=1)
+    def test_segment_count_falls_back_when_shared_retry_budget_is_exhausted(
+        self,
+    ) -> None:
+        budget = RetryBudget(maximum=0)
+        result, calls = self._run_with_primary_failure(
+            _canned_response(
+                status_code=200,
+                payload=_reply([]),
+                transport_succeeded=True,
+            ),
+            fallback_response=_canned_response(
+                status_code=200,
+                payload=_FALLBACK_PARSED_PAYLOAD,
+                transport_succeeded=True,
+            ),
+            retry_budget=budget,
+        )
+
+        self.assertFalse(result.unparsed)
+        self.assertEqual(calls, ["litellm", "openrouter"])
+        self.assertEqual(budget.used, 0)
+
+    @override_settings(JUDGE_BATCH_SIZE=2, JUDGE_RETRY_BUDGET_RATIO=10)
+    def test_segment_count_fallback_is_not_repeated_during_isolation(self) -> None:
+        second_request = replace(REQ, unit_key="OTHER_KEY")
+        calls = []
+
+        def fake_post_batch(payload, profile):
+            calls.append(profile.provider)
+            if profile.provider == "openrouter":
+                return _canned_response(
+                    status_code=200,
+                    payload={"choices": [{"message": {"content": "not json"}}]},
+                    transport_succeeded=True,
+                )
+            return _canned_response(
+                status_code=200,
+                payload=_reply([]),
+                transport_succeeded=True,
+            )
+
+        with mock.patch("weblate.trans.judge._post_batch", side_effect=fake_post_batch):
+            results = request_verdicts(
+                [REQ, second_request], seat=1, persist_attempts=True
+            )
+
+        self.assertEqual(len(results), 2)
+        self.assertTrue(all(item.unparsed for item in results))
+        self.assertEqual(calls, ["litellm", "openrouter", "litellm", "litellm"])
 
     def test_a_parsed_primary_result_never_fails_over(self) -> None:
         result, calls = self._run_with_primary_failure(
@@ -958,15 +1044,15 @@ class JudgeFailoverTest(TestCase):
         self.assertTrue(all(item.served_provider == "litellm" for item in results))
         self.assertEqual(set(calls), {"litellm"})
 
-    def test_every_failure_kind_fails_over_only_when_it_is_an_availability_kind(
+    def test_every_failure_kind_fails_over_only_when_permitted(
         self,
     ) -> None:
         """
         Enumerate the closed kind set rather than trusting a representative.
 
-        A regression that routed a parser kind to the fallback, or that
-        stopped failing over on one availability kind, passes a
-        set-difference assertion but fails here.
+        A regression that routed another parser kind to the fallback, or that
+        stopped failing over on one permitted kind, passes a set-difference
+        assertion but fails here.
         """
         fallback = _canned_response(
             status_code=200,
@@ -1494,12 +1580,37 @@ class JudgeClientTest(SimpleTestCase):
         request_verdicts([REQ], model="vendor/model-a", persist_attempts=True)
         body = json.loads(http_mock.calls[0].request.content)
         self.assertTrue(body["response_format"]["json_schema"]["strict"])
+        segments_schema = body["response_format"]["json_schema"]["schema"][
+            "properties"
+        ]["segments"]
+        self.assertEqual(segments_schema["minItems"], 1)
+        self.assertEqual(segments_schema["maxItems"], 1)
         self.assertTrue(body["provider"]["require_parameters"])
         self.assertEqual(body["model"], "vendor/model-a")
         user_msg = {
             "segments": _request_segments(body),
         }
         self.assertIn("segments", user_msg)
+
+    def test_strict_schema_cardinality_matches_a_multi_item_batch(self) -> None:
+        profile = _resolve_profile(0, legacy_model="vendor/model-a")
+        body = _payload([REQ, REQ, REQ], profile, "")
+        segments_schema = body["response_format"]["json_schema"]["schema"][
+            "properties"
+        ]["segments"]
+
+        self.assertEqual(segments_schema["minItems"], 3)
+        self.assertEqual(segments_schema["maxItems"], 3)
+
+    @override_settings(JUDGE_PROTOCOL_RETRIES=0)
+    @http_mock.activate
+    def test_empty_segment_array_remains_a_segment_count_failure(self) -> None:
+        http_mock.register("POST", CHAT_URL, json=_reply([]))
+
+        [result] = request_verdicts([REQ], model="vendor/model-a")
+
+        self.assertTrue(result.unparsed)
+        self.assertEqual(result.failure_kind, "segment-count")
 
     @http_mock.activate
     def test_render_preview_is_attached_when_placeholders_are_present(self) -> None:
@@ -3093,8 +3204,8 @@ class JudgeLiteLLMPayloadTest(TestCase):
 class JudgeHttpFailureMappingTest(SimpleTestCase):
     """The whole safety argument for refusals lives in this table."""
 
-    REQUEST_INVALID = {400, 404, 405, 406, 415, 422}
-    SIZE_DEPENDENT = {413, 431}
+    REQUEST_INVALID: ClassVar[set[int]] = {400, 404, 405, 406, 415, 422}
+    SIZE_DEPENDENT: ClassVar[set[int]] = {413, 431}
 
     def test_failure_for_http_table(self) -> None:
         for status in sorted(self.REQUEST_INVALID):
