@@ -1,0 +1,342 @@
+{
+  "project": "col4",
+  "api": "https://l10n.herocraft.com/api",
+  "captured_at": "2026-09-04",
+  "snowball_version": "3.1.1",
+  "source_language": "ru",
+  "source_stemming_enabled": true,
+  "target_algorithms": {
+    "en": null,
+    "en_US": null,
+    "fr": "french",
+    "id": null,
+    "tr": "turkish"
+  },
+  "components": {
+    "localizecommon": {
+      "is_glossary": false,
+      "source_language": "ru",
+      "propagation": true,
+      "check_flags": ""
+    },
+    "data": {
+      "is_glossary": false,
+      "source_language": "ru",
+      "propagation": true,
+      "check_flags": ""
+    },
+    "all-glossary": {
+      "is_glossary": true,
+      "source_language": "ru",
+      "propagation": true,
+      "check_flags": ""
+    }
+  },
+  "glossary_language_coverage": {
+    "en": {
+      "component": "all-glossary",
+      "terms": 95,
+      "translated_terms": 95
+    },
+    "fr": {
+      "component": "all-glossary",
+      "terms": 95,
+      "translated_terms": 95
+    },
+    "tr": {
+      "component": "all-glossary",
+      "terms": 95,
+      "translated_terms": 95
+    },
+    "id": {
+      "component": "all-glossary",
+      "terms": 95,
+      "translated_terms": 95
+    },
+    "en_US": {
+      "component": "all-glossary",
+      "terms": 95,
+      "translated_terms": 0
+    }
+  },
+  "glossary_terms": 95,
+  "units_compared": 16090,
+  "repeated_source_groups": 620,
+  "diverging_groups": 245,
+  "flagged_units": 621,
+  "interaction": {
+    "en_US": {
+      "diverging_groups": 51,
+      "flagged_units": 140,
+      "source_carries_an_all_caps_term": 3,
+      "source_carries_a_term": 12,
+      "term_passes_only_because_it_is_untranslated": 12,
+      "glossary_green_on_every_member": 51,
+      "conflict_free_canonical_candidate_exists": 51,
+      "case_only_divergence": 1
+    },
+    "fr": {
+      "diverging_groups": 76,
+      "flagged_units": 181,
+      "source_carries_an_all_caps_term": 3,
+      "source_carries_a_term": 28,
+      "glossary_green_on_every_member": 71,
+      "conflict_free_canonical_candidate_exists": 73,
+      "glossary_advisory_on_some_member": 5,
+      "every_candidate_fails_the_glossary": 3,
+      "case_only_divergence": 1
+    },
+    "id": {
+      "diverging_groups": 57,
+      "flagged_units": 133,
+      "glossary_green_on_every_member": 56,
+      "conflict_free_canonical_candidate_exists": 57,
+      "source_carries_an_all_caps_term": 3,
+      "source_carries_a_term": 20,
+      "case_only_divergence": 2,
+      "glossary_advisory_on_some_member": 1
+    },
+    "tr_TR": {
+      "diverging_groups": 61,
+      "flagged_units": 167,
+      "source_carries_an_all_caps_term": 3,
+      "no_glossary_for_this_language": 61
+    }
+  },
+  "source_match_paths": {
+    "en_US": {
+      "exact": 1160,
+      "stem_only": 1249
+    },
+    "fr": {
+      "exact": 1159,
+      "stem_only": 1249
+    },
+    "id": {
+      "exact": 1160,
+      "stem_only": 1249
+    }
+  },
+  "terms_most_dependent_on_snowball_all_languages": {
+    "Ликвидатор": {
+      "stem_only": 465,
+      "exact": 105
+    },
+    "Настя": {
+      "exact": 390,
+      "stem_only": 303
+    },
+    "Партия": {
+      "exact": 162,
+      "stem_only": 249
+    },
+    "Чистые": {
+      "stem_only": 219,
+      "exact": 105
+    },
+    "Ячейка": {
+      "stem_only": 213,
+      "exact": 6
+    },
+    "Блок": {
+      "stem_only": 177,
+      "exact": 96
+    },
+    "ГИГАХРУЩ": {
+      "stem_only": 156,
+      "exact": 78
+    },
+    "Смена": {
+      "stem_only": 135,
+      "exact": 9
+    },
+    "Игорь": {
+      "stem_only": 135
+    },
+    "Община": {
+      "stem_only": 99,
+      "exact": 24
+    },
+    "Юля": {
+      "stem_only": 90,
+      "exact": 213
+    },
+    "Цикл": {
+      "stem_only": 81,
+      "exact": 18
+    },
+    "Плесень": {
+      "exact": 155,
+      "stem_only": 75
+    },
+    "Вера": {
+      "stem_only": 75,
+      "exact": 3
+    },
+    "Старейшина": {
+      "stem_only": 66,
+      "exact": 93
+    }
+  },
+  "term_focus": {
+    "term": "ГИГАХРУЩ",
+    "glossary_target": {
+      "en": "Gigastructure",
+      "fr": "Gigastructure",
+      "tr": "Gigastructure",
+      "id": "GIGAKHRUSHCH",
+      "en_US": ""
+    },
+    "source_forms": {
+      "Гигахруща": 96,
+      "Гигахрущ": 75,
+      "ГИГАХРУЩА": 33,
+      "Гигахрущу": 18,
+      "Гигахруще": 12,
+      "ГИГАХРУЩ": 12,
+      "Гигахрущёвке": 9,
+      "Гигахрущём": 6,
+      "ГИГАХРУЩЕВКИ": 6,
+      "ГИГАХРУЩЁВКЕ": 3,
+      "Гигахрущестроения": 3,
+      "ГИГАХРУЩУ": 3,
+      "ГИГАХРУЩЕМ": 3
+    },
+    "outcome_per_language": {
+      "en_US": {
+        "term-not-matched": 7,
+        "vacuous-untranslated-term": 78
+      },
+      "fr": {
+        "term-not-matched": 7,
+        "exact-ignorecase": 78
+      },
+      "id": {
+        "term-not-matched": 7,
+        "exact-ignorecase": 78
+      }
+    },
+    "case_fallback_language": "en",
+    "target_case_by_source_case": {
+      "en_US/caps-source": {
+        "caps": 16,
+        "title": 5
+      },
+      "en_US/other-source": {
+        "title": 68,
+        "caps": 4
+      },
+      "fr/caps-source": {
+        "title": 20
+      },
+      "fr/other-source": {
+        "title": 73
+      },
+      "id/caps-source": {
+        "caps": 20
+      },
+      "id/other-source": {
+        "title": 5,
+        "caps": 68
+      }
+    }
+  },
+  "case_only_divergence_groups": [
+    {
+      "language": "en_US",
+      "source": "Старейшина странно качает головой",
+      "targets": [
+        "The Elder shakes his head weirdly",
+        "The elder shakes his head weirdly"
+      ],
+      "terms": {
+        "Старейшина": "vacuous-untranslated-term"
+      }
+    },
+    {
+      "language": "fr",
+      "source": "Партия гордится тобой, Пионер!",
+      "targets": [
+        "Le Parti est fier de toi, Pionnier !",
+        "Le Parti est fier de toi, pionnier !"
+      ],
+      "terms": {
+        "Партия": "exact-ignorecase",
+        "Пионер": "exact-ignorecase"
+      }
+    },
+    {
+      "language": "id",
+      "source": "Извиниться",
+      "targets": [
+        "Minta Maaf",
+        "Minta maaf"
+      ],
+      "terms": {}
+    },
+    {
+      "language": "id",
+      "source": "Мясной Поезд не даёт вам покоя, вы пытаетесь найти информацию о нём в своей ячейке",
+      "targets": [
+        "Kereta Daging tidak memberi Anda kedamaian, Anda mencoba mencari informasi tentangnya di Sel Anda",
+        "Kereta Daging tidak memberi Anda kedamaian, Anda mencoba mencari informasi tentangnya di sel Anda"
+      ],
+      "terms": {
+        "Ячейка": "exact-ignorecase",
+        "Мясной Поезд": "exact-ignorecase",
+        "Поезд": "exact-ignorecase"
+      }
+    }
+  ],
+  "groups_no_candidate_satisfies": [
+    {
+      "language": "fr",
+      "source": "Вы различаете два голоса - взволнованный Пашин и еще какой-то, холодный и хриплый. Однако вы не можете различить, о чем они говорят",
+      "candidates": {
+        "Vous distinguez deux voix – celle de Pasha, excitée, et une autre, froide et rauque. Cependant, vous ne pouvez pas distinguer ce qu'ils disent": {
+          "Хриплый": "advisory"
+        },
+        "Vous distinguez deux voix – celle, excitée, de Pasha, et une autre, froide et rauque. Cependant, vous ne pouvez pas comprendre de quoi ils parlent": {
+          "Хриплый": "advisory"
+        }
+      }
+    },
+    {
+      "language": "fr",
+      "source": "Начинается Чествование Знамён Хозяйств",
+      "candidates": {
+        "La Célébration des Drapeaux Ménagers commence": {
+          "Знамя": "advisory",
+          "Чествование Знамён Хозяйств": "advisory",
+          "Хозяйство": "advisory"
+        },
+        "La Célébration des Drapeaux des Exploitations Agricoles commence": {
+          "Знамя": "advisory",
+          "Чествование Знамён Хозяйств": "advisory",
+          "Хозяйство": "morphology"
+        },
+        "La Célébration des Drapeaux des Ménages commence": {
+          "Знамя": "advisory",
+          "Чествование Знамён Хозяйств": "advisory",
+          "Хозяйство": "advisory"
+        }
+      }
+    },
+    {
+      "language": "fr",
+      "source": "Хриплый ликвидатор кивает и отходит от вашей койки. Он смотрит на стену, словно собираясь с мыслями, после чего поворачивается к вам",
+      "candidates": {
+        "Le Liquidateur enroué hoche la tête et s'éloigne de votre couchette. Il regarde le mur, comme pour rassembler ses pensées, après quoi il se tourne vers vous": {
+          "Ликвидатор": "exact-ignorecase",
+          "Хриплый": "advisory",
+          "Койка": "exact-ignorecase"
+        },
+        "Le Liquidateur enroué hoche la tête et s'éloigne de votre couchette. Il regarde le mur, comme pour rassembler ses pensées, puis se tourne vers vous": {
+          "Ликвидатор": "exact-ignorecase",
+          "Хриплый": "advisory",
+          "Койка": "exact-ignorecase"
+        }
+      }
+    }
+  ]
+}
