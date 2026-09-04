@@ -1,0 +1,11 @@
+109 units from scenes ('hub1_first_1', 'hub1_ramen_1', 'hub1_teahouse_1'); arms ['H', 'H2']; seats [1]
+seat 1 H2 r0 b0/8 10s
+seat 1 H r0 b0/8 26s
+seat 1 H2 r0 b6: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 7671, 'seconds': 31.0}
+seat 1 H2 r1 b0/8 314s
+seat 1 H r1 b0/8 377s
+seat 1 H2 r1 b3: FAILED {'attempts': 3, 'status': None, 'note': 'transport failure (transport)', 'input_chars': 7712, 'seconds': 30.9}
+seat 1 H r2 b0/8 735s
+seat 1 H2 r2 b0/8 775s
+seat 1 H: wrote /Users/eli/Documents/PythonProjects/gamedev tools/weblate/analysis/data/judge-dialog-context-2026-09-04/seat1-H-rerun.json (48 rows)
+seat 1 H2: wrote /Users/eli/Documents/PythonProjects/gamedev tools/weblate/analysis/data/judge-dialog-context-2026-09-04/seat1-H2-rerun.json (46 rows)

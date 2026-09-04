@@ -1,0 +1,1391 @@
+{
+ "seat": 1,
+ "model": "deepseek-v4-pro",
+ "arm": "H",
+ "repeats": 3,
+ "batch_size": 2,
+ "context_rule": "",
+ "seconds": 963.0,
+ "rows": [
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 0,
+   "unit": "hub1_first_1_1",
+   "source": "Леон, вставай. Мы уже приехали.",
+   "target": "Leon, lève-toi. Nous sommes arrivés.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Leon, lève-toi. Nous sommes arrivés.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6840,
+    "seconds": 26.3,
+    "usage": {
+     "prompt_tokens": 1935,
+     "completion_tokens": 1465,
+     "reasoning_tokens": 1365
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 0,
+   "unit": "hub1_first_1_2",
+   "source": "Хорошо… Давно мы приехали?",
+   "target": "Bien… Nous sommes arrivés il y a longtemps ?",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Bien… Nous sommes arrivés il y a longtemps ?",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6840,
+    "seconds": 26.3,
+    "usage": {
+     "prompt_tokens": 1935,
+     "completion_tokens": 1465,
+     "reasoning_tokens": 1365
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 1,
+   "unit": "hub1_first_1_3",
+   "source": "Недавно. Ты проспал всю дорогу.",
+   "target": "Non. Tu as dormi tout le long du trajet.",
+   "context": {},
+   "verdict": "reject",
+   "max_severity": "critical",
+   "errors": [
+    {
+     "category": "mistranslation",
+     "description": "The target says 'Non' (No), whereas the source says 'Недавно' (Recently). The meaning is replaced with a negation.",
+     "severity": "critical",
+     "span": "Non"
+    }
+   ],
+   "back_translation": "Нет. Ты спал всю дорогу.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6844,
+    "seconds": 24.3,
+    "usage": {
+     "prompt_tokens": 1586,
+     "completion_tokens": 1627,
+     "reasoning_tokens": 1373
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 1,
+   "unit": "hub1_first_1_4",
+   "source": "Проспал очередные виды на ебеня?",
+   "target": "J'ai raté d'autres paysages de merde ?",
+   "context": {},
+   "verdict": "reject",
+   "max_severity": "critical",
+   "errors": [
+    {
+     "category": "mistranslation",
+     "description": "The target says 'J'ai raté' (I missed), whereas the source uses an implied second-person subject 'Проспал' (you missed). The subject is changed from 'you' to 'I', altering who is being asked about.",
+     "severity": "critical",
+     "span": "J'ai raté"
+    }
+   ],
+   "back_translation": "Я пропустил другие дерьмовые пейзажи?",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6844,
+    "seconds": 24.3,
+    "usage": {
+     "prompt_tokens": 1586,
+     "completion_tokens": 1627,
+     "reasoning_tokens": 1373
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 2,
+   "unit": "hub1_first_1_5",
+   "source": "Даже не знаю, как я это переживу.",
+   "target": "Je ne sais même pas comment je vais m'en remettre.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Я даже не знаю, как я от этого оправлюсь.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6841,
+    "seconds": 19.7,
+    "usage": {
+     "prompt_tokens": 1932,
+     "completion_tokens": 1127,
+     "reasoning_tokens": 1045
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 2,
+   "unit": "hub1_first_1_6",
+   "source": "Добро пожаловать в Столицу.",
+   "target": "Bienvenue dans la Capitale",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Добро пожаловать в Столицу.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6841,
+    "seconds": 19.7,
+    "usage": {
+     "prompt_tokens": 1932,
+     "completion_tokens": 1127,
+     "reasoning_tokens": 1045
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 3,
+   "unit": "hub1_first_1_7",
+   "source": "Ну, или в самую её «лучшую» часть — Рыбный тупик.",
+   "target": "Enfin, dans sa « meilleure » partie — le Cul-de-sac des Poissons.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Наконец, в её «лучшей» части — Рыбный тупик.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6926,
+    "seconds": 18.0,
+    "usage": {
+     "prompt_tokens": 1616,
+     "completion_tokens": 1238,
+     "reasoning_tokens": 1125
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 3,
+   "unit": "hub1_first_1_8",
+   "source": "Построили недавно, ещё при третьем императоре Акито.",
+   "target": "Construit récemment, sous le troisième empereur Akito.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Построен недавно, при третьем императоре Акито.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6926,
+    "seconds": 18.0,
+    "usage": {
+     "prompt_tokens": 1616,
+     "completion_tokens": 1238,
+     "reasoning_tokens": 1125
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 4,
+   "unit": "hub1_first_1_13",
+   "source": "Скукота.",
+   "target": "Ennuyeux",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Скучный.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6816,
+    "seconds": 20.3,
+    "usage": {
+     "prompt_tokens": 1920,
+     "completion_tokens": 1019,
+     "reasoning_tokens": 943
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 4,
+   "unit": "hub1_first_1_14",
+   "source": "Очень интересно. И спасибо, что подкинули нас.",
+   "target": "Très intéressant. Et merci de nous avoir déposés.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Очень интересно. И спасибо, что нас подвезли.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6816,
+    "seconds": 20.3,
+    "usage": {
+     "prompt_tokens": 1920,
+     "completion_tokens": 1019,
+     "reasoning_tokens": 943
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 5,
+   "unit": "hub1_first_1_17",
+   "source": "Только… с чешуей и шерстью.",
+   "target": "Seulement… avec des écailles et de la fourrure.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Только… с чешуей и мехом.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6868,
+    "seconds": 23.0,
+    "usage": {
+     "prompt_tokens": 1600,
+     "completion_tokens": 1301,
+     "reasoning_tokens": 1196
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 5,
+   "unit": "hub1_first_1_18",
+   "source": "Заглядывайте ко мне в «Тысячу мелочей»!",
+   "target": "Passez me voir à la « Mille et une babioles » !",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Заходите ко мне в «Тысяча и одна безделушка»!",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6868,
+    "seconds": 23.0,
+    "usage": {
+     "prompt_tokens": 1600,
+     "completion_tokens": 1301,
+     "reasoning_tokens": 1196
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 6,
+   "unit": "hub1_ramen_1_31",
+   "source": "Мы тут совсем не ориентируемся…",
+   "target": "Nous ne nous y retrouvons pas du tout…",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Мы совсем не ориентируемся здесь.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6882,
+    "seconds": 27.2,
+    "usage": {
+     "prompt_tokens": 1592,
+     "completion_tokens": 1416,
+     "reasoning_tokens": 1320
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 6,
+   "unit": "hub1_ramen_1_32",
+   "source": "Никто из наших отсюда носа не высунет в Столицу…",
+   "target": "Aucun des nôtres ne mettra le nez dehors dans la Capitale…",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Никто из наших не высунет нос наружу в Столице.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6882,
+    "seconds": 27.2,
+    "usage": {
+     "prompt_tokens": 1592,
+     "completion_tokens": 1416,
+     "reasoning_tokens": 1320
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 7,
+   "unit": "hub1_teahouse_1_11",
+   "source": "Чем ты дойдёшь до соседней улицы.",
+   "target": "Que tu n’atteignes la rue d’à côté.",
+   "context": {},
+   "verdict": "reject",
+   "max_severity": "critical",
+   "errors": [
+    {
+     "category": "mistranslation",
+     "description": "The target says 'Que tu n’atteignes la rue d’à côté', which means 'May you not reach the next street' (a negative wish), whereas the source is a rhetorical question 'Чем ты дойдёшь до соседней улицы' meaning 'What will you get to the next street with?' or 'How will you ever get there?'. The meaning is entirely changed, and the player is misled.",
+     "severity": "critical",
+     "span": "Que tu n’atteignes la rue d’à côté."
+    }
+   ],
+   "back_translation": "That you may not reach the next street.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6844,
+    "seconds": 19.3,
+    "usage": {
+     "prompt_tokens": 1593,
+     "completion_tokens": 1133,
+     "reasoning_tokens": 902
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 0,
+   "batch": 7,
+   "unit": "hub1_teahouse_1_12",
+   "source": "Да понял я уже, хватит ржать.",
+   "target": "J'ai compris, arrête de te marrer.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "I understood, stop laughing.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6844,
+    "seconds": 19.3,
+    "usage": {
+     "prompt_tokens": 1593,
+     "completion_tokens": 1133,
+     "reasoning_tokens": 902
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 0,
+   "unit": "hub1_first_1_1",
+   "source": "Леон, вставай. Мы уже приехали.",
+   "target": "Leon, lève-toi. Nous sommes arrivés.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Леон, вставай. Мы прибыли.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6840,
+    "seconds": 23.8,
+    "usage": {
+     "prompt_tokens": 1943,
+     "completion_tokens": 1337,
+     "reasoning_tokens": 1241
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 0,
+   "unit": "hub1_first_1_2",
+   "source": "Хорошо… Давно мы приехали?",
+   "target": "Bien… Nous sommes arrivés il y a longtemps ?",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Хорошо… Мы прибыли давно?",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6840,
+    "seconds": 23.8,
+    "usage": {
+     "prompt_tokens": 1943,
+     "completion_tokens": 1337,
+     "reasoning_tokens": 1241
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 1,
+   "unit": "hub1_first_1_3",
+   "source": "Недавно. Ты проспал всю дорогу.",
+   "target": "Non. Tu as dormi tout le long du trajet.",
+   "context": {},
+   "verdict": "reject",
+   "max_severity": "critical",
+   "errors": [
+    {
+     "span": "Non",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says 'Non' which means 'No', but the source says 'Недавно' meaning 'Recently'. This changes the meaning entirely, misleading the player about the time reference."
+    }
+   ],
+   "back_translation": "Нет. Ты спал всё время пути.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 3,
+    "status": 200,
+    "note": "",
+    "input_chars": 6844,
+    "seconds": 21.2,
+    "usage": {
+     "prompt_tokens": 1934,
+     "completion_tokens": 1317,
+     "reasoning_tokens": 1043
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 1,
+   "unit": "hub1_first_1_4",
+   "source": "Проспал очередные виды на ебеня?",
+   "target": "J'ai raté d'autres paysages de merde ?",
+   "context": {},
+   "verdict": "reject",
+   "max_severity": "critical",
+   "errors": [
+    {
+     "span": "J'ai raté",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says 'J'ai raté' which means 'I missed', but the source says 'Проспал' which is an elided second-person 'you slept through'. The change in person from 'you' to 'I' misattributes the action in the dialogue, misleading the player."
+    }
+   ],
+   "back_translation": "Я пропустил другие дерьмовые пейзажи?",
+   "unparsed": false,
+   "diag": {
+    "attempts": 3,
+    "status": 200,
+    "note": "",
+    "input_chars": 6844,
+    "seconds": 21.2,
+    "usage": {
+     "prompt_tokens": 1934,
+     "completion_tokens": 1317,
+     "reasoning_tokens": 1043
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 2,
+   "unit": "hub1_first_1_5",
+   "source": "Даже не знаю, как я это переживу.",
+   "target": "Je ne sais même pas comment je vais m'en remettre.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Я даже не знаю, как я от этого оправлюсь.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6841,
+    "seconds": 15.4,
+    "usage": {
+     "prompt_tokens": 1944,
+     "completion_tokens": 831,
+     "reasoning_tokens": 749
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 2,
+   "unit": "hub1_first_1_6",
+   "source": "Добро пожаловать в Столицу.",
+   "target": "Bienvenue dans la Capitale",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Добро пожаловать в Столицу.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6841,
+    "seconds": 15.4,
+    "usage": {
+     "prompt_tokens": 1944,
+     "completion_tokens": 831,
+     "reasoning_tokens": 749
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 3,
+   "unit": "hub1_first_1_7",
+   "source": "Ну, или в самую её «лучшую» часть — Рыбный тупик.",
+   "target": "Enfin, dans sa « meilleure » partie — le Cul-de-sac des Poissons.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Ну, в её самую «лучшую» часть — Рыбный тупик.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 3,
+    "status": 200,
+    "note": "",
+    "input_chars": 6926,
+    "seconds": 27.4,
+    "usage": {
+     "prompt_tokens": 1962,
+     "completion_tokens": 1597,
+     "reasoning_tokens": 1485
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 3,
+   "unit": "hub1_first_1_8",
+   "source": "Построили недавно, ещё при третьем императоре Акито.",
+   "target": "Construit récemment, sous le troisième empereur Akito.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Построен недавно, под третьим императором Акито.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 3,
+    "status": 200,
+    "note": "",
+    "input_chars": 6926,
+    "seconds": 27.4,
+    "usage": {
+     "prompt_tokens": 1962,
+     "completion_tokens": 1597,
+     "reasoning_tokens": 1485
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 4,
+   "unit": "hub1_first_1_13",
+   "source": "Скукота.",
+   "target": "Ennuyeux",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Скучно.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6816,
+    "seconds": 23.4,
+    "usage": {
+     "prompt_tokens": 1930,
+     "completion_tokens": 1196,
+     "reasoning_tokens": 1101
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 4,
+   "unit": "hub1_first_1_14",
+   "source": "Очень интересно. И спасибо, что подкинули нас.",
+   "target": "Très intéressant. Et merci de nous avoir déposés.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Очень интересно. И спасибо, что высадили нас.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6816,
+    "seconds": 23.4,
+    "usage": {
+     "prompt_tokens": 1930,
+     "completion_tokens": 1196,
+     "reasoning_tokens": 1101
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 5,
+   "unit": "hub1_first_1_17",
+   "source": "Только… с чешуей и шерстью.",
+   "target": "Seulement… avec des écailles et de la fourrure.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Только… с чешуей и шерстью.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6868,
+    "seconds": 16.3,
+    "usage": {
+     "prompt_tokens": 1950,
+     "completion_tokens": 910,
+     "reasoning_tokens": 806
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 5,
+   "unit": "hub1_first_1_18",
+   "source": "Заглядывайте ко мне в «Тысячу мелочей»!",
+   "target": "Passez me voir à la « Mille et une babioles » !",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Заглядывайте ко мне в «Тысячу мелочей»!",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6868,
+    "seconds": 16.3,
+    "usage": {
+     "prompt_tokens": 1950,
+     "completion_tokens": 910,
+     "reasoning_tokens": 806
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 6,
+   "unit": "hub1_ramen_1_31",
+   "source": "Мы тут совсем не ориентируемся…",
+   "target": "Nous ne nous y retrouvons pas du tout…",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "We do not find ourselves there at all...",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6882,
+    "seconds": 25.9,
+    "usage": {
+     "prompt_tokens": 1598,
+     "completion_tokens": 1785,
+     "reasoning_tokens": 1519
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 6,
+   "unit": "hub1_ramen_1_32",
+   "source": "Никто из наших отсюда носа не высунет в Столицу…",
+   "target": "Aucun des nôtres ne mettra le nez dehors dans la Capitale…",
+   "context": {},
+   "verdict": "reject",
+   "max_severity": "critical",
+   "errors": [
+    {
+     "category": "mistranslation",
+     "description": "The target says 'Aucun des nôtres ne mettra le nez dehors dans la Capitale', which means 'None of our people will go outside in the Capital', implying they are already in the Capital and won't go outside. The source says they will not venture out of here into the Capital, i.e., they are not in the Capital and won't go there. The omission of 'отсюда' (from here) and the static 'dans la Capitale' instead of a directional phrase changes the location and action, misleading the player.",
+     "severity": "critical",
+     "span": "Aucun des nôtres ne mettra le nez dehors dans la Capitale"
+    }
+   ],
+   "back_translation": "None of ours will put the nose outside in the Capital...",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6882,
+    "seconds": 25.9,
+    "usage": {
+     "prompt_tokens": 1598,
+     "completion_tokens": 1785,
+     "reasoning_tokens": 1519
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 7,
+   "unit": "hub1_teahouse_1_11",
+   "source": "Чем ты дойдёшь до соседней улицы.",
+   "target": "Que tu n’atteignes la rue d’à côté.",
+   "context": {},
+   "verdict": "reject",
+   "max_severity": "critical",
+   "errors": [
+    {
+     "category": "mistranslation",
+     "description": "The target says \"Que tu n’atteignes la rue d’à côté\", which means \"May you not reach the next street\", a subjunctive wish with negation, whereas the source means \"What will you use to reach the next street.\" The meaning is completely different, and the player would be misled about what is being said.",
+     "severity": "critical",
+     "span": "Que tu n’atteignes la rue d’à côté."
+    }
+   ],
+   "back_translation": "Чтоб ты не дошел до соседней улицы.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6844,
+    "seconds": 28.3,
+    "usage": {
+     "prompt_tokens": 1587,
+     "completion_tokens": 1341,
+     "reasoning_tokens": 1124
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 1,
+   "batch": 7,
+   "unit": "hub1_teahouse_1_12",
+   "source": "Да понял я уже, хватит ржать.",
+   "target": "J'ai compris, arrête de te marrer.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Я понял, хватит ржать.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6844,
+    "seconds": 28.3,
+    "usage": {
+     "prompt_tokens": 1587,
+     "completion_tokens": 1341,
+     "reasoning_tokens": 1124
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 0,
+   "unit": "hub1_first_1_1",
+   "source": "Леон, вставай. Мы уже приехали.",
+   "target": "Leon, lève-toi. Nous sommes arrivés.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Леон, встань. Мы приехали.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6840,
+    "seconds": 17.7,
+    "usage": {
+     "prompt_tokens": 1939,
+     "completion_tokens": 1044,
+     "reasoning_tokens": 944
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 0,
+   "unit": "hub1_first_1_2",
+   "source": "Хорошо… Давно мы приехали?",
+   "target": "Bien… Nous sommes arrivés il y a longtemps ?",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Хорошо… Мы приехали давно?",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6840,
+    "seconds": 17.7,
+    "usage": {
+     "prompt_tokens": 1939,
+     "completion_tokens": 1044,
+     "reasoning_tokens": 944
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 1,
+   "unit": "hub1_first_1_3",
+   "source": "Недавно. Ты проспал всю дорогу.",
+   "target": "Non. Tu as dormi tout le long du trajet.",
+   "context": {},
+   "verdict": "reject",
+   "max_severity": "critical",
+   "errors": [
+    {
+     "span": "Non",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says 'Non' which means 'No', but the source says 'Недавно' which means 'Recently'. This completely changes the meaning from a time reference to a negation."
+    }
+   ],
+   "back_translation": "Нет. Ты проспал всю дорогу.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6844,
+    "seconds": 27.2,
+    "usage": {
+     "prompt_tokens": 1936,
+     "completion_tokens": 1596,
+     "reasoning_tokens": 1387
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 1,
+   "unit": "hub1_first_1_4",
+   "source": "Проспал очередные виды на ебеня?",
+   "target": "J'ai raté d'autres paysages de merde ?",
+   "context": {},
+   "verdict": "reject",
+   "max_severity": "critical",
+   "errors": [
+    {
+     "span": "J'ai raté",
+     "category": "mistranslation",
+     "severity": "critical",
+     "description": "The target says 'J'ai raté' which means 'I missed', but the source says 'Проспал' with an implied 'ты' subject, making it 'you slept through'. This changes the subject from the addressee to the speaker, altering who performed the action."
+    }
+   ],
+   "back_translation": "Я пропустил другие дерьмовые пейзажи?",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6844,
+    "seconds": 27.2,
+    "usage": {
+     "prompt_tokens": 1936,
+     "completion_tokens": 1596,
+     "reasoning_tokens": 1387
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 2,
+   "unit": "hub1_first_1_5",
+   "source": "Даже не знаю, как я это переживу.",
+   "target": "Je ne sais même pas comment je vais m'en remettre.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Я даже не знаю, как я от этого оправлюсь.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6841,
+    "seconds": 15.4,
+    "usage": {
+     "prompt_tokens": 1586,
+     "completion_tokens": 1010,
+     "reasoning_tokens": 910
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 2,
+   "unit": "hub1_first_1_6",
+   "source": "Добро пожаловать в Столицу.",
+   "target": "Bienvenue dans la Capitale",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Добро пожаловать в Столицу.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6841,
+    "seconds": 15.4,
+    "usage": {
+     "prompt_tokens": 1586,
+     "completion_tokens": 1010,
+     "reasoning_tokens": 910
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 3,
+   "unit": "hub1_first_1_7",
+   "source": "Ну, или в самую её «лучшую» часть — Рыбный тупик.",
+   "target": "Enfin, dans sa « meilleure » partie — le Cul-de-sac des Poissons.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Наконец, в её «лучшую» часть — Рыбный тупик.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6926,
+    "seconds": 25.1,
+    "usage": {
+     "prompt_tokens": 1968,
+     "completion_tokens": 1514,
+     "reasoning_tokens": 1401
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 3,
+   "unit": "hub1_first_1_8",
+   "source": "Построили недавно, ещё при третьем императоре Акито.",
+   "target": "Construit récemment, sous le troisième empereur Akito.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Построен недавно, при третьем императоре Акито.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6926,
+    "seconds": 25.1,
+    "usage": {
+     "prompt_tokens": 1968,
+     "completion_tokens": 1514,
+     "reasoning_tokens": 1401
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 4,
+   "unit": "hub1_first_1_13",
+   "source": "Скукота.",
+   "target": "Ennuyeux",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "minor",
+   "errors": [
+    {
+     "category": "fluency",
+     "description": "The target says 'Ennuyeux' (boring, adjective) instead of a noun like 'Ennui' (boredom). The source 'Скукота.' is a colloquial noun meaning boredom. The adjective is a grammatical mismatch, though the meaning is preserved.",
+     "severity": "minor",
+     "span": "Ennuyeux"
+    }
+   ],
+   "back_translation": "Скучный.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6816,
+    "seconds": 22.6,
+    "usage": {
+     "prompt_tokens": 1570,
+     "completion_tokens": 1493,
+     "reasoning_tokens": 1297
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 4,
+   "unit": "hub1_first_1_14",
+   "source": "Очень интересно. И спасибо, что подкинули нас.",
+   "target": "Très intéressant. Et merci de nous avoir déposés.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Очень интересно. И спасибо, что вы нас высадили.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6816,
+    "seconds": 22.6,
+    "usage": {
+     "prompt_tokens": 1570,
+     "completion_tokens": 1493,
+     "reasoning_tokens": 1297
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 5,
+   "unit": "hub1_first_1_17",
+   "source": "Только… с чешуей и шерстью.",
+   "target": "Seulement… avec des écailles et de la fourrure.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Только... с чешуей и шерстью.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6868,
+    "seconds": 14.9,
+    "usage": {
+     "prompt_tokens": 1962,
+     "completion_tokens": 812,
+     "reasoning_tokens": 706
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 5,
+   "unit": "hub1_first_1_18",
+   "source": "Заглядывайте ко мне в «Тысячу мелочей»!",
+   "target": "Passez me voir à la « Mille et une babioles » !",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Заходите ко мне в «Тысячу и одну безделушку»!",
+   "unparsed": false,
+   "diag": {
+    "attempts": 1,
+    "status": 200,
+    "note": "",
+    "input_chars": 6868,
+    "seconds": 14.9,
+    "usage": {
+     "prompt_tokens": 1962,
+     "completion_tokens": 812,
+     "reasoning_tokens": 706
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 6,
+   "unit": "hub1_ramen_1_31",
+   "source": "Мы тут совсем не ориентируемся…",
+   "target": "Nous ne nous y retrouvons pas du tout…",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Мы совсем не ориентируемся здесь.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6882,
+    "seconds": 27.3,
+    "usage": {
+     "prompt_tokens": 1946,
+     "completion_tokens": 1611,
+     "reasoning_tokens": 1450
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 6,
+   "unit": "hub1_ramen_1_32",
+   "source": "Никто из наших отсюда носа не высунет в Столицу…",
+   "target": "Aucun des nôtres ne mettra le nez dehors dans la Capitale…",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "minor",
+   "errors": [
+    {
+     "span": "dans la Capitale",
+     "category": "fluency",
+     "severity": "minor",
+     "description": "The phrase 'dans la Capitale' combined with 'dehors' creates a slight contradiction (outside inside the Capital). The source says 'в Столицу' (to the Capital), and a more natural French phrasing would avoid the clash, e.g., 'pour aller dans la Capitale'. The meaning remains understandable."
+    }
+   ],
+   "back_translation": "Никто из наших не высунет носа наружу в Столице…",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6882,
+    "seconds": 27.3,
+    "usage": {
+     "prompt_tokens": 1946,
+     "completion_tokens": 1611,
+     "reasoning_tokens": 1450
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 7,
+   "unit": "hub1_teahouse_1_11",
+   "source": "Чем ты дойдёшь до соседней улицы.",
+   "target": "Que tu n’atteignes la rue d’à côté.",
+   "context": {},
+   "verdict": "reject",
+   "max_severity": "critical",
+   "errors": [
+    {
+     "category": "mistranslation",
+     "description": "The target says 'Que tu n’atteignes la rue d’à côté' meaning 'May you not reach the street next door', which is a wish with negation, while the source asks 'How will you get to the next street?' The meaning is inverted and the question is lost.",
+     "severity": "critical",
+     "span": "Que tu n’atteignes la rue d’à côté."
+    }
+   ],
+   "back_translation": "Пусть ты не доберешься до соседней улицы.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6844,
+    "seconds": 25.9,
+    "usage": {
+     "prompt_tokens": 1587,
+     "completion_tokens": 1152,
+     "reasoning_tokens": 945
+    }
+   }
+  },
+  {
+   "seat": 1,
+   "arm": "H",
+   "repeat": 2,
+   "batch": 7,
+   "unit": "hub1_teahouse_1_12",
+   "source": "Да понял я уже, хватит ржать.",
+   "target": "J'ai compris, arrête de te marrer.",
+   "context": {},
+   "verdict": "pass",
+   "max_severity": "none",
+   "errors": [],
+   "back_translation": "Я понял, прекрати смеяться.",
+   "unparsed": false,
+   "diag": {
+    "attempts": 2,
+    "status": 200,
+    "note": "",
+    "input_chars": 6844,
+    "seconds": 25.9,
+    "usage": {
+     "prompt_tokens": 1587,
+     "completion_tokens": 1152,
+     "reasoning_tokens": 945
+    }
+   }
+  }
+ ]
+}
