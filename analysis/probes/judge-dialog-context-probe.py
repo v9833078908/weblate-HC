@@ -100,7 +100,9 @@ settings.JUDGE_BATCH_SIZE_SEAT_2 = 1
 settings.JUDGE_REQUEST_DEADLINE = 150.0
 settings.JUDGE_REQUEST_DEADLINE_SEAT_1 = 150.0
 settings.JUDGE_REQUEST_DEADLINE_SEAT_2 = 150.0
-settings.JUDGE_REQUEST_IDLE_TIMEOUT = 30.0
+# Without streaming the idle timeout caps the whole reply; the first run lost
+# 12 batches at exactly 30 s, so it now equals the deadline.
+settings.JUDGE_REQUEST_IDLE_TIMEOUT = 150.0
 settings.JUDGE_TEMPERATURE = 0
 settings.JUDGE_MAX_TOKENS = 0
 
