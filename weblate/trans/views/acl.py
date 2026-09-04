@@ -380,20 +380,31 @@ def revert_blocked_user_edits(request: AuthenticatedHttpRequest, project):
     return redirect("manage-access", project=obj.slug)
 
 
-def can_invite_users(request: AuthenticatedHttpRequest) -> bool:
-    return settings.REGISTRATION_OPEN or bool(request.user.has_perm("user.edit"))
+def can_invite_users(
+    request: AuthenticatedHttpRequest, project: Project | None = None
+) -> bool:
+    return bool(
+        settings.REGISTRATION_OPEN
+        or request.user.has_perm("user.edit")
+        or (
+            project is not None
+            and request.user.has_perm("project.permissions", project)
+        )
+    )
 
 
 @require_POST
 @login_required
 def invite_user(request: AuthenticatedHttpRequest, project):
     """Invite user to a project."""
-    if not can_invite_users(request):
-        raise PermissionDenied
-    form_class = BulkInviteForm if "emails" in request.POST else InviteEmailForm
+    form_class = (
+        BulkInviteForm if "emails" in request.POST else InviteEmailForm
+    )
     obj, form = check_user_form(
         request, project, form_class=form_class, pass_project=True
     )
+    if not can_invite_users(request, obj):
+        raise PermissionDenied
 
     if form is not None:
         form.save(request)
@@ -527,12 +538,12 @@ def manage_access(request: AuthenticatedHttpRequest, project):
             "invite_email_form": InviteEmailForm(
                 project=obj, auto_id="id_project_invite_%s"
             )
-            if can_invite_users(request)
+            if can_invite_users(request, obj)
             else None,
             "bulk_invite_form": BulkInviteForm(
                 project=obj, auto_id="id_project_bulk_invite_%s"
             )
-            if can_invite_users(request)
+            if can_invite_users(request, obj)
             else None,
             "public_ssh_keys": get_all_key_data(),
         },

@@ -38,7 +38,7 @@ WEBLATE_ADMIN_NAME=Hero Craft Admin
 WEBLATE_ADMIN_EMAIL=loc@herocraft.example
 # Used only when the admin account is created on the first start.
 WEBLATE_ADMIN_PASSWORD=CHANGE-ME
-WEBLATE_REGISTRATION_OPEN=0
+WEBLATE_REGISTRATION_OPEN=1
 WEBLATE_REQUIRE_LOGIN=1
 # Community/sharing menu (share to social networks, Hosted Weblate promotion)
 # has no purpose on a private single-tenant instance.

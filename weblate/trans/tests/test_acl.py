@@ -604,17 +604,21 @@ class ACLTest(FixtureTestCase, RegistrationTestMixin):
             {"email": "user@example.com", "group": self.admin_group.pk},
             follow=True,
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "user@example.com")
 
-        # It should work for the superuser
-        self.user.is_superuser = True
-        self.user.save()
-        response = self.client.post(
+        other_user = User.objects.create_user(
+            "outside", "outside@example.org", "testpassword"
+        )
+        self.project.add_user(other_user, "Translate")
+        other_client = self.client_class()
+        other_client.force_login(other_user)
+        response = other_client.post(
             reverse("invite-user", kwargs=self.kw_project),
-            {"email": "user@example.com", "group": self.admin_group.pk},
+            {"email": "no-access@example.com", "group": self.admin_group.pk},
             follow=True,
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 403)
 
     @override_settings(REGISTRATION_OPEN=True, REGISTRATION_CAPTCHA=False)
     def test_invite_user_open(self) -> None:

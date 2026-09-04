@@ -1049,6 +1049,11 @@ surface, when a documented security property is removed or narrowed, or when
 maintainers accept a vulnerability report that cannot be routed to a triage
 disposition below. *(maintainer)*
 
+A project administrator with project-management permissions can now invite users
+through the project access flow even when ``REGISTRATION_OPEN`` is false. This
+adds a project-scoped account-creation path to the modeled authorization
+boundary and is now part of the access-management assumptions.
+
 The loc-kit glossary table intake (see :ref:`uploading-glossary-tables`) is the
 reviewed instance of a new import format plus a fixed-host outbound integration
 class: its owner-and-session-bound temporary draft, bounded sample, per-session
