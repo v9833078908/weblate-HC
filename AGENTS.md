@@ -14,7 +14,7 @@ inherited from the original codebase.
   modules or introducing a new subsystem. For such work, propose a plan - what
   will change, in which files, how it will be verified, what is out of scope -
   and wait for approval before editing. Multi-step plans go in the matching
-  `docs/<area>/plans/` directory (see "Documentation layout" below) following
+  `docs/product/plans/` directory (see "Documentation layout" below) following
   the existing files there.
 - Everything else needs no plan: answering questions, reading code, research,
   bug fixes, small or local changes, documentation edits, test additions, and
@@ -223,9 +223,11 @@ Repository-specific parts:
 - `weblate-mcp/` (gitignored, its own git repo) - vendored `@mmntm/weblate-mcp`,
   a NestJS MCP server that talks to the local Weblate REST API. Its `.env` points
   at `http://localhost:3001/api/`.
-- `docs/llm-first/`, `docs/product/`, `docs/operations/`, `docs/guides/` -
-  fork documentation (mostly in Russian) for game-localization workflows; see
-  "Documentation layout" below for the rule that decides where a file goes.
+- `docs/product/` - all new fork documentation (mostly in Russian) for
+  game-localization workflows. Plans, designs, measurements, research, reviews,
+  audits, reports, meetings, archive, vision, and guides all go here; see
+  "Documentation layout" below. Existing legacy files elsewhere are not
+  destinations for new fork documentation.
 - `analysis/probes/`, `analysis/data/` - one-off measurement scripts and the
   corpora, golden sets and run outputs they read and write. Not documentation:
   nothing here is part of the product, and both directories are excluded from
@@ -296,17 +298,12 @@ with `file` so local git repos can be used as translation sources.
 
 ## Documentation layout
 
-Every fork document lives at `docs/<area>/<genre>/<YYYY-MM-DD>-<slug>.md`. The
-area answers "whose document is this", the genre answers "what kind". Both
-vocabularies are closed; if a document does not fit, discuss it rather than
-inventing a directory.
-
-| Area | What belongs there |
-| --- | --- |
-| `docs/llm-first/` | the LLM-first TMS: anything that changes or executes a phase of the roadmap in `docs/llm-first/vision/llm-first-product-architecture.md` - judge, MT machinery, autofix layer, quality gates |
-| `docs/product/` | features of the Weblate fork itself that the roadmap does not own - loc-kit intake, glossary UI, checks, exports, dev-environment work |
-| `docs/operations/` | work bound to a live instance or one game - production tasks, LQA audits, reports, team meetings |
-| `docs/guides/` | evergreen contracts and instructions read from outside; updated in place, never dated |
+All new fork documentation lives under `docs/product/`. Use
+`docs/product/<genre>/<YYYY-MM-DD>-<slug>.md`; do not create new fork
+documents under `docs/llm-first/`, `docs/operations/`, or `docs/guides/`.
+Those locations are legacy locations for existing files. `docs/product/` is
+the sole destination for new fork documents, whether they describe the
+LLM-first roadmap, product behavior, operations, or evergreen guidance.
 
 | Genre | What belongs there |
 | --- | --- |
@@ -319,7 +316,8 @@ inventing a directory.
 | `reports/` | a status or summary written for a human |
 | `meetings/` | material from a meeting with a game team |
 | `archive/` | superseded, kept for history |
-| `vision/` | vision and roadmap (only under `docs/llm-first/`) |
+| `vision/` | vision and roadmap |
+| `guides/` | evergreen contracts and instructions, updated in place |
 
 Naming: directories are lowercase and hyphenated; a dated snapshot always
 carries its date first (`2026-08-24-slug.md`), a living document carries none;
