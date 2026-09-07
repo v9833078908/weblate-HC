@@ -47,7 +47,7 @@
     <div class="card mb-3">
       <div class="card-header"><h4 class="card-title">{% translate "What was written" %}</h4></div>
       <div class="card-body">
-        <p>{% blocktranslate count counter=run.summary.written|default:0 %}{{ counter }} string was written.{% plural %}{{ counter }} strings were written.{% endblocktranslate %}</p>
+        <p>{% blocktranslate count counter=written %}{{ counter }} string was written.{% plural %}{{ counter }} strings were written.{% endblocktranslate %}</p>
         {% if translation_spend.requests %}
           <p class="text-muted mb-0">{% blocktranslate with sent=translation_spend.strings_sent %}{{ sent }} strings were sent to the model.{% endblocktranslate %}</p>
         {% else %}

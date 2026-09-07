@@ -265,10 +265,14 @@ def _blocks_release(scope) -> bool:
         CommitPolicyChoices.WITHOUT_NEEDS_EDITING,
         CommitPolicyChoices.APPROVED_ONLY,
     }
-    if isinstance(scope, Project):
-        return scope.commit_policy in blocking_policies
+    if isinstance(scope, Translation):
+        return scope.component.project.commit_policy in blocking_policies
+    if isinstance(scope, Component):
+        return scope.project.commit_policy in blocking_policies
     if isinstance(scope, Category):
         return scope.project.commit_policy in blocking_policies
+    if isinstance(scope, Project):
+        return scope.commit_policy in blocking_policies
     if isinstance(scope, ProjectLanguage):
         return scope.project.commit_policy in blocking_policies
     if isinstance(scope, Workspace):
@@ -631,6 +635,7 @@ def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
             "page_obj": page,
             "is_judge_run": is_judge_run,
             "run_spend": spend,
+            "written": run.summary.get("written", 0),
             "language_spend": language_spend,
             "translation_spend": run_spend(
                 run.pk, LLMUsageLog.Operation.TRANSLATION

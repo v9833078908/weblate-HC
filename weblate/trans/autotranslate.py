@@ -1436,6 +1436,8 @@ class BatchAutoTranslate(BaseAutoTranslate):
         judge_preview = self.preview_judge_scope() if self.mode == "judge" else None
         if judge_preview is not None:
             producer_run = self._adopt_producer_run()
+        elif auto_source == "mt":
+            producer_run = self._create_producer_run()
         else:
             producer_run = None
         self.active_producer_run = producer_run
