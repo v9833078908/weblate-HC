@@ -25942,6 +25942,10 @@ msgstr "Изменено после этого прогона"
 msgid "Check the current verdict"
 msgstr "Проверить текущий вердикт"
 
+#: weblate/templates/judge-run.html
+msgid "current text changed since this run"
+msgstr "текущий текст изменился после этого прогона"
+
 #~ msgid "Could not open a ticket, please try again later."
 #~ msgstr "Не удалось открыть заявку, попробуйте позже."
 
