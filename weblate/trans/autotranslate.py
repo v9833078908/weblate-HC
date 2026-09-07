@@ -1334,7 +1334,9 @@ class BatchAutoTranslate(BaseAutoTranslate):
         run.status = status
         run.finished = timezone.now()
         run.failure = failure
-        run.summary = asdict(self.judge_summary or JudgeSummary())
+        summary = asdict(self.judge_summary or JudgeSummary())
+        summary["written"] = self.updated
+        run.summary = summary
         run.warnings = self.get_warnings()
         run.save(update_fields=["status", "finished", "failure", "summary", "warnings"])
 

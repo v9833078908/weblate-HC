@@ -43,7 +43,35 @@
       {% endif %}
     </div>
   </div>
+  {% if not is_judge_run %}
+    <div class="card mb-3">
+      <div class="card-header"><h4 class="card-title">{% translate "What was written" %}</h4></div>
+      <div class="card-body">
+        <p>{% blocktranslate count counter=run.summary.written|default:0 %}{{ counter }} string was written.{% plural %}{{ counter }} strings were written.{% endblocktranslate %}</p>
+        {% if translation_spend.requests %}
+          <p class="text-muted mb-0">{% blocktranslate with sent=translation_spend.strings_sent %}{{ sent }} strings were sent to the model.{% endblocktranslate %}</p>
+        {% else %}
+          <p class="text-muted mb-0">{% translate "No large language model was used by this run." %}</p>
+        {% endif %}
+        <p class="mt-2 mb-0"><a href="{{ scope_query_url }}">{% translate "Open current strings matching this run's filter" %}</a></p>
+      </div>
+    </div>
+    {% if language_spend %}
+      <div class="card mb-3">
+        <div class="card-header"><h4 class="card-title">{% translate "Cost by language, provider, and model" %}</h4></div>
+        <table class="table mb-0">
+          <thead><tr><th>{% translate "Language" %}</th><th>{% translate "Provider" %}</th><th>{% translate "Model" %}</th><th>{% translate "Requests" %}</th><th>{% translate "Strings sent" %}</th><th>{% translate "USD" %}</th></tr></thead>
+          <tbody>
+            {% for row in language_spend %}
+              <tr><td>{{ row.language|default:"-" }}</td><td>{{ row.service|default:"-" }}</td><td>{{ row.model }}</td><td>{{ row.requests }}</td><td>{{ row.strings_sent }}</td><td>{{ row.cost_usd|floatformat:6 }}{% if row.unpriced_requests %} <span class="text-muted small">({% translate "price unknown" %})</span>{% endif %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  {% endif %}
 
+  {% if is_judge_run %}
   <div class="card mb-3">
     <div class="card-header">
       <h4 class="card-title">{% translate "What to do" %}</h4>
@@ -83,6 +111,7 @@
       {% endif %}
     </div>
   </div>
+  {% endif %}
 
   {% if categories %}
     <div class="card mb-3">
@@ -119,6 +148,7 @@
     </div>
   {% endif %}
 
+  {% if is_judge_run %}
   <div class="card">
     <div class="card-header">
       <h4 class="card-title">{% translate "Strings" %}</h4>
@@ -191,4 +221,5 @@
     </div>
     <div class="card-footer">{% include "paginator.html" %}</div>
   </div>
+  {% endif %}
 {% endblock content %}

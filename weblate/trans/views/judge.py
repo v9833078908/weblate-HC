@@ -17,6 +17,7 @@ links to (task 2's own test contract). No count on this page is a cost figure.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
@@ -24,7 +25,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Case, CharField, Q, Value, When
+from django.db.models import Case, CharField, Count, Q, Sum, Value, When
 from django.db.models.functions import Cast
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
@@ -489,6 +490,33 @@ def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
         else LLMUsageLog.Operation.TRANSLATION
     )
     spend = run_spend(run.pk, operation)
+    language_spend = [
+        {
+            "language": row["target_language_code"],
+            "service": row["service"],
+            "model": row["model"],
+            "requests": row["requests"],
+            "strings_sent": row["strings_sent"] or 0,
+            "cost_usd": row["cost_usd"] or Decimal(0),
+            "unpriced_requests": row["unpriced_requests"],
+        }
+        for row in LLMUsageLog.objects.filter(
+            run_id=run.pk, operation=LLMUsageLog.Operation.TRANSLATION
+        )
+        .values("target_language_code", "service", "model")
+        .annotate(
+            requests=Count("id"),
+            strings_sent=Sum("batch_size"),
+            cost_usd=Sum("cost_usd"),
+            unpriced_requests=Count("id", filter=Q(cost_usd__isnull=True)),
+        )
+        .order_by("-cost_usd", "target_language_code", "service", "model")
+    ]
+    scope_query_url = (
+        _review_url(scope, run.requested_query)
+        if run.requested_query
+        else scope.get_absolute_url()
+    )
     if outcome and outcome not in _OUTCOME_LABELS:
         raise Http404
     # No explicit filter: the producer default. The actionable buckets are
@@ -596,5 +624,10 @@ def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
             "page_obj": page,
             "is_judge_run": is_judge_run,
             "run_spend": spend,
+            "language_spend": language_spend,
+            "translation_spend": run_spend(
+                run.pk, LLMUsageLog.Operation.TRANSLATION
+            ),
+            "scope_query_url": scope_query_url,
         },
     )
