@@ -1077,7 +1077,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         self.assertEqual(run.scope_label, str(self.project))
         self.assertEqual(run.scope_path, self.project.get_absolute_url())
 
-    def test_finish_judge_run_does_not_overwrite_a_terminal_run(self) -> None:
+    def test_finish_producer_run_does_not_overwrite_a_terminal_run(self) -> None:
         unit = self.get_unit()
         batch = BatchAutoTranslate(
             self.component,
@@ -1100,7 +1100,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
 
         # A second finalize call (a redundant exception handler, a stray
         # retry) must never overwrite an already-terminal run.
-        batch._finish_judge_run(  # ruff: ignore[private-member-access]
+        batch._finish_producer_run(  # ruff: ignore[private-member-access]
             run, ProducerRun.Status.FAILED, "should not apply"
         )
         run.refresh_from_db()
@@ -1118,7 +1118,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             unit_ids=[unit.id],
             enforce_permissions=False,
         )
-        run = batch._create_judge_run()  # ruff: ignore[private-member-access]
+        run = batch._create_producer_run()  # ruff: ignore[private-member-access]
         # Simulate a retried step recording the same skip twice: this must
         # update the one (run, unit) row, never insert a second one.
         batch._record_skipped_judge_units(  # ruff: ignore[private-member-access]
@@ -1141,7 +1141,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             unit_ids=[unit.id],
             enforce_permissions=False,
         )
-        run = batch._create_judge_run()  # ruff: ignore[private-member-access]
+        run = batch._create_producer_run()  # ruff: ignore[private-member-access]
         JudgeRunUnit.objects.create(
             run=run,
             unit=unit,
@@ -1463,7 +1463,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             mode="judge",
             unit_ids=[unit.pk],
             enforce_permissions=False,
-            judge_run_id=str(run.pk),
+            producer_run_id=str(run.pk),
             judge_pretranslate=False,
             judge_mutating_repairs=False,
             judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
@@ -1494,7 +1494,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             mode="judge",
             unit_ids=[unit.pk],
             enforce_permissions=False,
-            judge_run_id=str(run.pk),
+            producer_run_id=str(run.pk),
             judge_pretranslate=False,
         )
         with self.assertRaises(ValueError):
@@ -1518,7 +1518,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             mode="judge",
             unit_ids=[unit.pk],
             enforce_permissions=False,
-            judge_run_id=str(run.pk),
+            producer_run_id=str(run.pk),
             judge_pretranslate=False,
         )
         with self.assertRaises(ValueError):

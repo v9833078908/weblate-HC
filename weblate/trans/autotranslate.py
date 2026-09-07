@@ -1037,7 +1037,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         allow_non_shared_tm_source_components: bool = False,
         enforce_permissions: bool = True,
         overwrite_existing: bool = False,
-        judge_run_id: str | None = None,
+        producer_run_id: str | None = None,
         judge_pretranslate: bool = True,
         judge_mutating_repairs: bool = True,
         judge_candidate_severities: tuple[str, ...] = DEFAULT_CANDIDATE_SEVERITIES,
@@ -1056,7 +1056,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         self.workspace_source_component_ids: dict[int, list[int]] | None = None
         self.enforce_permissions = enforce_permissions
         self.overwrite_existing = overwrite_existing
-        self.producer_run_id = judge_run_id
+        self.producer_run_id = producer_run_id
         self.judge_pretranslate = judge_pretranslate
         self.judge_mutating_repairs = judge_mutating_repairs
         self.judge_candidate_severities = judge_candidate_severities
@@ -1222,7 +1222,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 translation.component.project_id
             ][translation.language_id].workflow_settings
 
-    def _adopt_judge_run(self) -> ProducerRun:
+    def _adopt_producer_run(self) -> ProducerRun:
         """
         Move the queued re-check run created by the view to RUNNING.
 
@@ -1435,9 +1435,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
     ) -> str:
         judge_preview = self.preview_judge_scope() if self.mode == "judge" else None
         if judge_preview is not None:
-            producer_run = self._adopt_judge_run()
-        elif auto_source == "mt":
-            producer_run = self._create_producer_run()
+            producer_run = self._adopt_producer_run()
         else:
             producer_run = None
         self.active_producer_run = producer_run

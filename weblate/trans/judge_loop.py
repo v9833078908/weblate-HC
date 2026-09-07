@@ -2079,7 +2079,7 @@ def queue_judge_recheck(unit: Unit, actor: User) -> tuple[ProducerRun, bool]:
                 threshold=MACHINERY_DEFAULT_THRESHOLD,
                 translation_id=translation.pk,
                 unit_ids=[unit.pk],
-                judge_run_id=str(run.pk),
+                producer_run_id=str(run.pk),
                 judge_pretranslate=False,
                 judge_mutating_repairs=False,
                 judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),

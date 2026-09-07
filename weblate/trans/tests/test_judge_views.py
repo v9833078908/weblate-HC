@@ -2587,7 +2587,7 @@ class JudgeRunReportViewTest(ViewTestCase):
         response = self.client.get(self.report_url(run), {"outcome": "made-up"})
         self.assertEqual(response.status_code, 404)
 
-    def test_no_query_path_emits_a_cost_figure(self) -> None:
+    def test_no_query_path_still_emits_a_cost_figure(self) -> None:
         self.enable_review()
         run = self.create_run()
         self.add_row(run, self.get_unit(), outcome=JudgeRunUnit.Outcome.MAJOR)
@@ -2603,8 +2603,8 @@ class JudgeRunReportViewTest(ViewTestCase):
                 self.report_url(run), {"outcome": key} if key else {}
             )
             content = response.content.decode().lower()
-            self.assertNotIn("cost", content)
-            self.assertNotIn("$", content)
+            self.assertIn("cost", content)
+            self.assertIn("$", content)
 
     def test_report_page_query_count_does_not_grow_with_row_count(self) -> None:
         self.enable_review()

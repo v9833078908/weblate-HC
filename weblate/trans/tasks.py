@@ -1007,7 +1007,7 @@ def auto_translate(
     activity_log_task_count: int | None = None,
     enforce_permissions: bool = True,
     overwrite_existing: bool = False,
-    judge_run_id: str | None = None,
+    producer_run_id: str | None = None,
     judge_pretranslate: bool = True,
     judge_mutating_repairs: bool = True,
     judge_candidate_severities: tuple[str, ...] = ("critical", "major"),
@@ -1030,13 +1030,13 @@ def auto_translate(
             )
             # A pre-created re-check run would otherwise stay QUEUED forever
             # and keep suppressing every replacement re-check for that unit.
-            if judge_run_id:
+            if producer_run_id:
                 from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
                     ProducerRun,
                 )
 
                 ProducerRun.objects.filter(
-                    pk=judge_run_id,
+                    pk=producer_run_id,
                     status__in=[ProducerRun.Status.QUEUED, ProducerRun.Status.RUNNING],
                 ).update(
                     status=ProducerRun.Status.FAILED,
@@ -1060,7 +1060,7 @@ def auto_translate(
             unit_ids=unit_ids,
             enforce_permissions=enforce_permissions,
             overwrite_existing=overwrite_existing,
-            judge_run_id=judge_run_id,
+            producer_run_id=producer_run_id,
             judge_pretranslate=judge_pretranslate,
             judge_mutating_repairs=judge_mutating_repairs,
             judge_candidate_severities=judge_candidate_severities,

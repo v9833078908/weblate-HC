@@ -267,14 +267,20 @@ def _blocks_release(scope) -> bool:
     }
     if isinstance(scope, Project):
         return scope.commit_policy in blocking_policies
-    if isinstance(scope, Component):
+    if isinstance(scope, Category):
         return scope.project.commit_policy in blocking_policies
-    if isinstance(scope, Translation):
-        return scope.component.project.commit_policy in blocking_policies
-    policies = list(
-        Project.objects.filter(workspace=scope).values_list("commit_policy", flat=True)
-    )
-    return bool(policies) and all(policy in blocking_policies for policy in policies)
+    if isinstance(scope, ProjectLanguage):
+        return scope.project.commit_policy in blocking_policies
+    if isinstance(scope, Workspace):
+        policies = list(
+            Project.objects.filter(workspace=scope).values_list(
+                "commit_policy", flat=True
+            )
+        )
+        return bool(policies) and all(
+            policy in blocking_policies for policy in policies
+        )
+    return False
 
 
 def _annotate_row(row: JudgeRunUnit) -> None:
@@ -523,6 +529,7 @@ def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
     # the whole point of the page; everything else stays one URL away.
     effective = outcome or "actionable"
     base_rows = JudgeRunUnit.objects.filter(run=run)
+    counts = {key: _filter_outcome(base_rows, key).count() for key in _OUTCOME_LABELS}
     rows = base_rows.select_related(
         "verdict",
         "unit__translation__language",
