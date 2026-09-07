@@ -938,7 +938,7 @@ class AutoTranslationTest(ViewTestCase):
             result["report_url"], reverse("judge-run", kwargs={"pk": run.pk})
         )
 
-    def test_non_judge_task_result_has_no_report_url(self) -> None:
+    def test_non_judge_task_result_links_to_its_report(self) -> None:
         result = auto_translate(
             user_id=self.user.id,
             mode="translate",
@@ -950,8 +950,10 @@ class AutoTranslationTest(ViewTestCase):
             component_id=self.component.id,
             enforce_permissions=False,
         )
-        self.assertNotIn("report_url", result)
-        self.assertFalse(ProducerRun.objects.exists())
+        run = ProducerRun.objects.get()
+        self.assertEqual(
+            result["report_url"], reverse("judge-run", kwargs={"pk": run.pk})
+        )
 
     @override_settings(
         JUDGE_ENABLED=True,
