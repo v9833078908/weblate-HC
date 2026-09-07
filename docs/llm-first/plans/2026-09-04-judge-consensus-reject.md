@@ -1,35 +1,40 @@
-# Judge consensus REJECT implementation plan
+# Judge consensus REJECT with a global rollback flag implementation plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Status:** proposed, awaiting approval. Nothing below is deployed.
 
-**Goal:** A string is held (`REJECT` -> `STATE_FUZZY`, excluded from the
+**Goal:** With the site-wide `JUDGE_CONSENSUS_REJECT` setting enabled (the
+default), a string is held (`REJECT` -> `STATE_FUZZY`, excluded from the
 release export) only when every parsed seat of the collegium grades it
 `critical`; a `critical` from one seat that the other parsed seat grades lower
 reads as `FLAG` (major): the string ships with both opinions attached and
-appears under "Major not fixed", never under "Critical held".
+appears under "Major not fixed", never under "Critical held". An operator can
+set `WEBLATE_JUDGE_CONSENSUS_REJECT=0` and recreate the application processes
+to restore the old site-wide rule: any parsed `critical` makes the round
+`REJECT`.
 
-**Architecture:** The rule lives in one pure function,
-`collegium_severity(rows)` in `weblate/trans/models/judge.py`, next to the
-existing `collegium_verdict(rows)`. `collegium_verdict` keeps returning the
-strictest seat's row (its errors are the evidence the card, the repair prompt
-and the candidate generator already use) and stamps the round severity on it as
-a transient attribute; `JudgeVerdict.verdict` and a new
+**Architecture:** The policy is the site-wide Boolean setting
+`JUDGE_CONSENSUS_REJECT`, exposed to Docker as
+`WEBLATE_JUDGE_CONSENSUS_REJECT` and defaulting to `True`. The reduction
+kernel is the pure function
+`collegium_severity(rows, *, consensus_reject: bool)` in
+`weblate/trans/models/judge.py`. `collegium_verdict` supplies the global
+setting, keeps returning the strictest seat's row and stamps the mode-dependent
+round severity on it as a transient attribute. `JudgeVerdict.verdict` and a new
 `JudgeVerdict.effective_severity` read that attribute, falling back to the
-row's own `max_severity`. Consequence of the transient: any consumer that
-**re-fetches the row from the database** loses the round severity and silently
-falls back to the seat's own. Exactly one such consumer exists -
-`resolve_verdict`, which re-reads the representative under
-`select_for_update()` - and Task 3 carries the stamp across that re-read. The
-SQL twin, `judge_status_annotations()`, gets the same rule so the
-`judge:reject` / `judge:flag` search filters, the `check:judge-*` projections
-and the judge statistics agree with the Python read. No migration: the
-`verdict` property was written to be reopened by measurement R3 without one
-(`JudgeVerdict` docstring, models/judge.py:649-656).
+row's own `max_severity`. Task 3 carries the stamp across the one locked
+re-fetch in `resolve_verdict`.
 
-**Tech stack:** Python 3.14, Django ORM (`Case`/`When`/`Exists` subqueries),
-pytest via `./rundev.sh test`, prek for lint.
+The SQL twin, `judge_status_annotations()`, branches when constructing the
+queryset. With the setting enabled it applies consensus to search, check
+projections and statistics. With it disabled, it uses the representative's
+`max_severity` directly and does not construct the new `disputed_critical`
+`Exists`, reproducing the old verdict and query cost. No migration is needed.
+
+**Tech stack:** Python 3.14, Django settings and ORM
+(`Case`/`When`/`Exists` subqueries), Docker environment variables, pytest via
+`./rundev.sh test`, prek for lint.
 
 **Evidence and rationale:**
 `docs/operations/audits/2026-09-04-need-for-greed-ui-es-judge-calibration.md`
@@ -45,14 +50,17 @@ below cuts false criticals from a median 14/122 to 0-2 and demotes the one
 revised true critical to `FLAG` in 1-2 of 5 runs.
 
 **Out of scope:** any prompt edit (R3: it would invalidate every measurement),
-seat model or reasoning changes, a per-project severity mapping, a span or
-glossary validator in the reply parser, the run-report layout.
+seat model or reasoning changes, a per-project or per-component severity
+mapping, a runtime UI switch, automatic re-projection of stored unit states and
+check rows when the setting changes, a span or glossary validator in the reply
+parser, the run-report layout.
 
 ---
 
-## The rule, stated once
+## The rule and rollback switch, stated once
 
-For the parsed rows of one round:
+`JUDGE_CONSENSUS_REJECT=True` is the new default. For the parsed rows of one
+round:
 
 | parsed seats' severities | round severity | verdict |
 |---|---|---|
@@ -60,6 +68,11 @@ For the parsed rows of one round:
 | strictest is `critical`, another parsed seat is lower | `major` | `flag` |
 | strictest is `major` / `minor` / `none` | unchanged (strictest) | as today |
 | no parsed row | none | `unparsed` |
+
+`JUDGE_CONSENSUS_REJECT=False` is rollback mode. The strictest parsed seat
+always determines the round: any parsed `critical`, disputed or not, remains
+`critical` / `reject`. Below `critical`, lone parsed seats and all-unparsed
+rounds behave identically in both modes.
 
 An unparsed row is still not an opinion: it neither raises nor lowers the round
 (`test_a_parsed_seat_outvotes_an_unparsed_one` keeps passing). Below
@@ -72,22 +85,29 @@ landing in its own run - does dispute an earlier critical from the other seat.
 That is deliberate: it is a real opinion about the current text, and two
 existing fixtures encode exactly this shape (Task 2 and Task 3 update them).
 
+The switch changes interpretation, not stored evidence. Both modes retain each
+seat's `max_severity`, errors and representative row. Docker processes load
+the setting at startup, so all web, Celery and command processes must use the
+same value. Changing it requires recreating those processes and is a deployment
+action under `AGENTS.md`.
+
 ## What follows from the rule, and where it is pinned
 
 These are consequences, not extra scope; each has an owning task and a test:
 
-1. **The state gate** - `state_for_verdict()` reads the derived verdict, so a
-   disputed critical projects `STATE_TRANSLATED`. It is written in
+1. **The state gate** - `state_for_verdict()` reads the derived verdict. A
+   disputed critical projects `STATE_TRANSLATED` in consensus mode and
+   `STATE_FUZZY` in rollback mode. It is written in
    `AutoTranslate.process_judge` (autotranslate.py:858-873) and
    `_finalize_drain_run` (judge_loop.py:1695-1710) - **never** in
    `run_judge_batch`, so no loop-level test can assert it (Task 3).
-2. **Resolution** - a disputed critical offers and applies the *major*
-   transitions: escalation sends it to the needs-checking queue instead of
-   forcing a fuzzy hold (Task 3's `resolve_verdict` fix, Task 5's doc line).
-3. **Candidates** - `FLAG` is in the default candidate severities, so a
-   disputed critical still gets a repair candidate in a normal run. A producer
-   one-unit re-check narrows candidates to critical only and therefore stops
-   auto-storing one; see "What this plan does not settle".
+2. **Resolution** - consensus mode gives a disputed critical the *major*
+   transitions; rollback mode preserves the old critical transitions (Task 3).
+3. **Candidates** - a disputed critical is a normal `FLAG` candidate in
+   consensus mode and remains a critical candidate in rollback mode. A
+   producer one-unit re-check narrows candidates to critical only and therefore
+   stops auto-storing one only in consensus mode; see "What this plan does not
+   settle".
 
 ## Environment
 
@@ -112,10 +132,16 @@ with the session attribution footer configured for this repository.
 
 ---
 
-### Task 1: `collegium_severity` and `effective_severity` (Python read)
+### Task 1: global policy setting and the Python read
 
 **Files:**
 
+- Modify: `weblate/trans/defaults.py`
+- Modify: `weblate/trans/models/_conf.py`
+- Modify: `weblate/settings_example.py`
+- Modify: `weblate/settings_docker.py`
+- Modify: `deploy/environment.example`
+- Modify: `dev-docker/docker-compose.yml`
 - Modify: `weblate/trans/models/judge.py:803-813` (the `verdict` property)
 - Modify: `weblate/trans/models/judge.py:984-997` (`collegium_verdict`)
 - Modify: `weblate/trans/models/judge.py:714` (comment on `seat`)
@@ -126,10 +152,11 @@ with the session attribution footer configured for this repository.
 Add to `weblate/trans/tests/test_judge_round.py`, right after
 `test_no_seat_may_lower_the_other` (line 213-223), and add
 `collegium_severity` to the `weblate.trans.models.judge` import block at the top
-of the file (after `active_verdict`):
+of the file (after `active_verdict`) and `override_settings` from
+`django.test`:
 
 ```python
-    def test_a_lone_critical_seat_is_only_a_flag(self) -> None:
+    def test_a_disputed_critical_is_only_a_flag(self) -> None:
         # Consensus REJECT: one seat's critical against the other seat's
         # lower grade holds nothing. The row is still the critical seat's
         # (its errors are the evidence), but the round reads as major.
@@ -170,10 +197,19 @@ of the file (after `active_verdict`):
             self.make(unit, "major", seat=1, run_id=run),
             self.make(unit, "critical", seat=2, run_id=run),
         ]
-        self.assertEqual(collegium_severity(rows), "major")
-        self.assertEqual(collegium_severity([rows[1]]), "critical")
-        self.assertEqual(collegium_severity([rows[0]]), "major")
-        self.assertIsNone(collegium_severity([]))
+        self.assertEqual(
+            collegium_severity(rows, consensus_reject=True), "major"
+        )
+        self.assertEqual(
+            collegium_severity(rows, consensus_reject=False), "critical"
+        )
+        self.assertEqual(
+            collegium_severity([rows[1]], consensus_reject=True), "critical"
+        )
+        self.assertEqual(
+            collegium_severity([rows[0]], consensus_reject=True), "major"
+        )
+        self.assertIsNone(collegium_severity([], consensus_reject=True))
 
     def test_a_row_read_outside_the_collegium_keeps_its_own_severity(self) -> None:
         # The transient stamp is the whole footgun of this design: a row
@@ -190,6 +226,22 @@ of the file (after `active_verdict`):
         row = JudgeVerdict.objects.get(pk=strict.pk)
         self.assertEqual(row.effective_severity, "critical")
         self.assertEqual(row.verdict, JudgeVerdict.Verdict.REJECT)
+```
+
+Add one paired rollback test for the first case:
+
+```text
+    @override_settings(JUDGE_CONSENSUS_REJECT=False)
+    def test_a_disputed_critical_rejects_in_rollback_mode(self) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "none", seat=1, run_id=run)
+        strict = self.make(unit, "critical", seat=2, run_id=run)
+        verdict = active_verdict(unit)
+        assert verdict is not None
+        self.assertEqual(verdict.pk, strict.pk)
+        self.assertEqual(verdict.effective_severity, "critical")
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
 ```
 
 Then change the existing `test_collegium_takes_the_strictest_seat` (line 204)
@@ -210,10 +262,33 @@ so it no longer asserts the old rule:
 
 **Step 2: Run the tests to verify they fail**
 
-Run: `./rundev.sh test weblate/trans/tests/test_judge_round.py -k "lone_critical or two_critical or lone_parsed or collegium_severity or outside_the_collegium"`
+Run: `./rundev.sh test weblate/trans/tests/test_judge_round.py -k "disputed_critical or rollback_mode or two_critical or lone_parsed or collegium_severity or outside_the_collegium"`
 Expected: FAIL - `ImportError: cannot import name 'collegium_severity'`.
 
-**Step 3: Implement**
+**Step 3: Implement the setting and Python reduction**
+
+Add `DEFAULT_JUDGE_CONSENSUS_REJECT = True` beside the judge defaults in
+`weblate/trans/defaults.py`. Expose it as:
+
+```python
+# weblate/trans/models/_conf.py
+JUDGE_CONSENSUS_REJECT = defaults.DEFAULT_JUDGE_CONSENSUS_REJECT
+
+# weblate/settings_example.py
+JUDGE_CONSENSUS_REJECT = True
+
+# weblate/settings_docker.py
+JUDGE_CONSENSUS_REJECT = get_env_bool(
+    "WEBLATE_JUDGE_CONSENSUS_REJECT",
+    trans_defaults.DEFAULT_JUDGE_CONSENSUS_REJECT,
+)
+```
+
+Add `WEBLATE_JUDGE_CONSENSUS_REJECT=1` after `WEBLATE_JUDGE_ENABLED` in
+`deploy/environment.example`, with a comment that `0` restores "any parsed
+critical rejects" after all application processes are recreated. Pin
+`WEBLATE_JUDGE_CONSENSUS_REJECT: 1` in the judge block of
+`dev-docker/docker-compose.yml`, but do not recreate the stack.
 
 In `weblate/trans/models/judge.py`, replace the `verdict` property
 (lines 803-813) with:
@@ -248,18 +323,18 @@ In `weblate/trans/models/judge.py`, replace the `verdict` property
 Replace `collegium_verdict` (lines 984-997) with:
 
 ```python
-def collegium_severity(rows: Sequence[JudgeVerdict]) -> str | None:
+def collegium_severity(
+    rows: Sequence[JudgeVerdict], *, consensus_reject: bool
+) -> str | None:
     """
     Reduce a round's parsed seats to one severity.
 
-    Below ``critical`` the strictest seat is the round: no seat may
-    lower another's finding. ``critical`` alone is different: it holds
-    the string out of the release, and one seat's word is not enough for
-    that. A ``critical`` that the other parsed seat grades lower reads
-    as ``major`` (a flag, shipped with both opinions attached); only a
-    round whose every parsed seat says ``critical`` rejects. A lone
-    parsed seat is unanimous by itself. An unparsed row is not an
-    opinion and takes no part. ``None`` when nothing parsed.
+    Below ``critical`` the strictest seat is the round in either mode.
+    With ``consensus_reject``, a ``critical`` that another parsed seat
+    grades lower reads as ``major``; only unanimous critical rejects.
+    Without it, the strictest parsed seat always wins, preserving the
+    original rule where any ``critical`` rejects. A lone parsed seat is
+    unanimous by itself. An unparsed row is not an opinion.
 
     Measured: docs/operations/audits/2026-09-04-need-for-greed-ui-es-judge-calibration.md.
     """
@@ -268,7 +343,7 @@ def collegium_severity(rows: Sequence[JudgeVerdict]) -> str | None:
         return None
     strictest = max(SEVERITY_RANK[row.max_severity] for row in parsed)
     severity = JudgeVerdict.Severity.values[strictest]
-    if severity == JudgeVerdict.Severity.CRITICAL and any(
+    if consensus_reject and severity == JudgeVerdict.Severity.CRITICAL and any(
         row.max_severity != JudgeVerdict.Severity.CRITICAL for row in parsed
     ):
         return JudgeVerdict.Severity.MAJOR
@@ -295,7 +370,9 @@ def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
     representative = max(
         parsed, key=lambda row: (SEVERITY_RANK[row.max_severity], -row.seat)
     )
-    representative._round_severity = collegium_severity(parsed)  # ruff: ignore[private-member-access]
+    representative._round_severity = collegium_severity(  # ruff: ignore[private-member-access]
+        parsed, consensus_reject=settings.JUDGE_CONSENSUS_REJECT
+    )
     return representative
 ```
 
@@ -303,8 +380,12 @@ Change the comment on the `seat` field (line 714) to:
 
 ```python
     # Place in the collegium, not seniority: below critical, seat 2 may not
-    # lower seat 1; a critical needs both seats (collegium_severity).
+    # lower seat 1; policy decides whether a critical needs both seats.
 ```
+
+The Boolean is an explicit keyword argument so `collegium_severity` remains
+pure. Only `collegium_verdict`, the application boundary, reads Django
+settings.
 
 **Step 4: Run the round tests**
 
@@ -321,14 +402,14 @@ consumer that reads `max_severity` where it should read `effective_severity`
 
 **Step 5: Lint and commit**
 
-Run: `uv run prek run --files weblate/trans/models/judge.py weblate/trans/tests/test_judge_round.py`
+Run: `uv run prek run --files weblate/trans/defaults.py weblate/trans/models/_conf.py weblate/settings_example.py weblate/settings_docker.py deploy/environment.example dev-docker/docker-compose.yml weblate/trans/models/judge.py weblate/trans/tests/test_judge_round.py`
 If ruff rejects the `# ruff: ignore[...]` pragma spelling, use the rule name it
 prints for the private-attribute access on `_round_severity`; do not switch to
 a bare `# noqa` code.
 
 ```sh
-git add weblate/trans/models/judge.py weblate/trans/tests/test_judge_round.py
-git commit -m "feat(judge): reject only on a unanimous critical"
+git add weblate/trans/defaults.py weblate/trans/models/_conf.py weblate/settings_example.py weblate/settings_docker.py deploy/environment.example dev-docker/docker-compose.yml weblate/trans/models/judge.py weblate/trans/tests/test_judge_round.py
+git commit -m "feat(judge): add a consensus reject policy switch"
 ```
 
 ---
@@ -344,6 +425,7 @@ over `judge_active_severity`). They must agree with Task 1.
 
 - Modify: `weblate/trans/models/judge.py:1086-1145` (`judge_status_annotations`)
 - Test: `weblate/trans/tests/test_judge_round.py`
+- Test: `weblate/utils/tests/test_stats.py`
 
 **Step 1: Write the failing tests**
 
@@ -390,6 +472,21 @@ Replace `test_status_annotations_reduce_the_fresh_round` (line 75-80) with:
         self.assertEqual(list(translation.unit_set.search("judge:flag")), [unit])
 ```
 
+Add
+`test_search_filters_follow_any_critical_policy_in_rollback_mode` under
+`@override_settings(JUDGE_CONSENSUS_REJECT=False)` for the same
+`none`/`critical` round. It must assert
+`judge_active_severity == "critical"`, inclusion in `judge:reject`, and
+exclusion from `judge:flag`.
+
+In `weblate/utils/tests/test_stats.py`, let `JudgeStatsTest.add_verdict`
+accept optional `seat` and `run_id` arguments. Add paired tests for a
+`none`/`critical` round:
+`test_judge_stats_follow_the_consensus_policy` contributes one `judge_flag`
+and zero `judge_reject`; the
+`test_judge_stats_follow_any_critical_policy_in_rollback_mode` sibling
+contributes zero `judge_flag` and one `judge_reject`.
+
 Then fix the fixture that encodes the old rule for the annotation. In
 `test_one_seat_retry_in_a_new_run_cannot_hide_the_other_seats_critical`
 (line 375-405) the round is seat 1 `critical` plus seat 2's later recovered
@@ -411,10 +508,12 @@ annotation changes. Replace its last four lines (402-405) with:
 
 **Step 2: Run to verify they fail**
 
-Run: `./rundev.sh test weblate/trans/tests/test_judge_round.py -k "status_annotations or search_filters or one_seat_retry"`
-Expected: three FAIL - `demote_a_disputed_critical` and
+Run: `./rundev.sh test weblate/trans/tests/test_judge_round.py weblate/utils/tests/test_stats.py -k "status_annotations or search_filters or one_seat_retry or consensus_policy or any_critical_policy"`
+Expected: four FAIL - `demote_a_disputed_critical` and
 `one_seat_retry_in_a_new_run_cannot_hide_the_other_seats_critical` with
 `'critical' != 'major'`, `search_filters_follow` with `[] != [<Unit ...>]`.
+The fourth failure is the default-mode statistics assertion. Rollback-mode
+tests pass already because they pin the old SQL behavior.
 `keep_a_unanimous_critical`, `keep_a_lone_parsed_critical` and the rewritten
 `reduce_the_fresh_round` PASS already (the old SQL agrees on those).
 
@@ -422,30 +521,33 @@ Expected: three FAIL - `demote_a_disputed_critical` and
 
 In `judge_status_annotations()` (`weblate/trans/models/judge.py`), after
 `severity_rank = Case(...)` (lines 1112-1118) and before
-`seat_fresh_unparsed`, add:
+`seat_fresh_unparsed`, branch while constructing the expression:
 
 ```python
-    # The SQL twin of collegium_severity: the strictest parsed seat, except
-    # that a critical some other parsed seat of the same text grades lower
-    # reads as major. Same rows as current_parsed_round, minus the critical
-    # ones, so Exists() answers "is the critical disputed".
-    disputed_critical = Exists(
-        JudgeVerdict.objects.filter(
-            unit_id=OuterRef(OuterRef("pk")),
-            target_storage_hash=MD5(OuterRef(OuterRef("target"))),
-            unparsed=False,
+    if settings.JUDGE_CONSENSUS_REJECT:
+        # SQL twin of collegium_severity: a critical disputed by another
+        # current parsed seat reads as major.
+        disputed_critical = Exists(
+            JudgeVerdict.objects.filter(
+                unit_id=OuterRef(OuterRef("pk")),
+                target_storage_hash=MD5(OuterRef(OuterRef("target"))),
+                unparsed=False,
+            )
+            .exclude(_has_newer_sibling(newer_parsed=True))
+            .exclude(max_severity=JudgeVerdict.Severity.CRITICAL)
         )
-        .exclude(_has_newer_sibling(newer_parsed=True))
-        .exclude(max_severity=JudgeVerdict.Severity.CRITICAL)
-    )
-    round_severity = Case(
-        When(
-            Q(max_severity=JudgeVerdict.Severity.CRITICAL) & disputed_critical,
-            then=Value(JudgeVerdict.Severity.MAJOR.value),
-        ),
-        default=F("max_severity"),
-        output_field=CharField(),
-    )
+        round_severity = Case(
+            When(
+                Q(max_severity=JudgeVerdict.Severity.CRITICAL)
+                & disputed_critical,
+                then=Value(JudgeVerdict.Severity.MAJOR.value),
+            ),
+            default=F("max_severity"),
+            output_field=CharField(),
+        )
+    else:
+        # Old policy and old query cost: any critical remains critical.
+        round_severity = F("max_severity")
 ```
 
 and change the `judge_active_severity` subquery from
@@ -472,13 +574,13 @@ one subquery level below `current_parsed_round`, whose own `OuterRef("pk")`
 already points at `Unit`. `judge_active_resolution` keeps its existing
 annotation: it orders by the row's own `severity_rank`, so it still returns the
 representative's resolution. Add `F` to the `django.db.models` import at the
-top of the module if it is not already there.
+top of the module if it is not already there. The false branch deliberately
+constructs no `disputed_critical` `Exists`.
 
 **Step 4: Run the tests**
 
-Run: `./rundev.sh test weblate/trans/tests/test_judge_round.py weblate/utils/tests/test_search.py -k "judge or preset"`
-Expected: all PASS. The single-seat search fixtures are unaffected (a lone
-parsed critical still rejects).
+Run: `./rundev.sh test weblate/trans/tests/test_judge_round.py weblate/utils/tests/test_search.py weblate/utils/tests/test_stats.py -k "judge or preset"`
+Expected: all PASS in both modes. Single-seat fixtures are unaffected.
 
 If `OuterRef(OuterRef(...))` raises `ValueError: This queryset contains a
 reference to an outer query and may only be used in a subquery`, the
@@ -488,11 +590,11 @@ do not assign `disputed_critical` to a variable used elsewhere.
 
 **Step 5: Lint and commit**
 
-Run: `uv run prek run --files weblate/trans/models/judge.py weblate/trans/tests/test_judge_round.py`
+Run: `uv run prek run --files weblate/trans/models/judge.py weblate/trans/tests/test_judge_round.py weblate/utils/tests/test_stats.py`
 
 ```sh
-git add weblate/trans/models/judge.py weblate/trans/tests/test_judge_round.py
-git commit -m "feat(judge): apply the consensus rule in the search annotations"
+git add weblate/trans/models/judge.py weblate/trans/tests/test_judge_round.py weblate/utils/tests/test_stats.py
+git commit -m "feat(judge): apply the policy switch in status annotations"
 ```
 
 ---
@@ -503,6 +605,10 @@ Every place that turns a collegium read into a state, a check row, a run-report
 outcome, a producer summary or a resolution must use the round severity. Rows
 written by `_write_verdict` (`judge_loop.py:332`) keep the seat's own
 `max_severity`; that line does not change.
+
+Consumers must not inspect `settings.JUDGE_CONSENSUS_REJECT` themselves. The
+policy is reduced once into `effective_severity`, so the same consumer path
+serves both modes.
 
 Note which layer does what, because it decides where each test can live:
 `run_judge_batch` projects **check rows** (`_prepare_round_unit` calls
@@ -550,6 +656,12 @@ Note which layer does what, because it decides where each test can live:
         self.assertEqual(verdict.effective_severity, "critical")
         self.assertIn("judge-reject", self.get_unit().all_checks_names)
 ```
+
+Add
+`test_run_batch_projects_any_critical_policy_in_rollback_mode` under
+`@override_settings(JUDGE_CONSENSUS_REJECT=False)` for `[MAJOR, CRITICAL]`.
+It must assert `REJECT`, effective severity `critical`, `judge-reject` present
+and `judge-flag` absent.
 
 *(b) The check projection.* In `weblate/checks/tests/test_judge.py`, add to
 `JudgeCheckTest` next to `test_reject_verdict_makes_run_checks_create_the_row`
@@ -625,6 +737,13 @@ the `weblate.trans.models.judge` imports:
         self.assertEqual(round_read.max_severity, "critical")
         self.assertEqual(round_read.verdict, JudgeVerdict.Verdict.FLAG)
 ```
+
+Add
+`test_process_judge_holds_any_critical_policy_in_rollback_mode` under
+`@override_settings(JUDGE_CONSENSUS_REJECT=False)` using the same producer
+path. It must assert `STATE_FUZZY`, `critical_held == 1`,
+`major_not_fixed == 0`, and a round verdict of `REJECT`. This is the
+end-to-end rollback guard.
 
 The unanimous counterpart is already covered by
 `test_reject_lands_on_a_state_that_does_not_ship` (line 106): a lone parsed
@@ -735,8 +854,9 @@ Expected: FAIL, each on the old rule -
 - resolution: state is `STATE_FUZZY` (10), not needs-checking (12).
 
 `test_a_unanimous_critical_still_rejects` and the repaired recovered-hold
-fixture pass before and after: they are the guards that the rule did not
-overreach.
+fixture pass before and after. The rollback-mode tests also pass before and
+after the consumer edits; they guard the old behavior while the default-mode
+tests drive the new one.
 
 **Step 3: Implement**
 
@@ -815,7 +935,8 @@ re-fetches and branches on the value; it is fixed above.
 **Step 4: Run the tests**
 
 Run: `./rundev.sh test weblate/trans/tests/test_judge_loop.py weblate/checks/tests/test_judge.py weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_views.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_judge_deferrals.py`
-Expected: PASS. `test_resolution_applies_to_the_collegium_representative`
+Expected: PASS in both modes.
+`test_resolution_applies_to_the_collegium_representative`
 (`test_judge.py:674`) still passes: minor + critical keeps the critical row as
 representative, only its verdict changed, and `resolve_verdict` matches on pk.
 If a `test_judge_views.py` test asserts the "Critical held" count or the
@@ -852,9 +973,15 @@ Expected: PASS - `judge_backfill_candidates` and
 `judge_release_advisory_holds` follow the round through `.verdict` with no
 edit, and their fixtures are single-seat.
 
+Run the rollback-focused subset explicitly:
+
+`./rundev.sh test weblate/trans/tests/test_judge_round.py weblate/trans/tests/test_judge_loop.py weblate/trans/tests/test_judge_autotranslate.py weblate/utils/tests/test_stats.py -k "rollback_mode or any_critical_policy"`
+
+Expected: PASS, with a disputed critical held and counted as reject.
+
 **Step 2: Type check and lint**
 
-Run: `uv run mypy --show-column-numbers weblate/trans/models/judge.py weblate/checks/judge.py weblate/trans/judge_loop.py weblate/trans/autotranslate.py | ./scripts/filter-mypy.sh`
+Run: `uv run mypy --show-column-numbers weblate/trans/models/judge.py weblate/trans/models/_conf.py weblate/trans/defaults.py weblate/checks/judge.py weblate/trans/judge_loop.py weblate/trans/autotranslate.py | ./scripts/filter-mypy.sh`
 Expected: no new findings. `_round_severity` is set on a model instance
 outside `__init__` (in `collegium_verdict` and in `resolve_verdict`); if mypy
 reports it, declare it on the class:
@@ -872,10 +999,16 @@ collegium.
 Run: `uv run pylint weblate/trans/models/judge.py weblate/checks/judge.py`
 Expected: no new messages.
 
+Run the full changed-file hook set:
+
+`uv run prek run --files deploy/environment.example dev-docker/docker-compose.yml weblate/settings_docker.py weblate/settings_example.py weblate/trans/defaults.py weblate/trans/models/_conf.py weblate/trans/models/judge.py weblate/trans/judge_loop.py weblate/trans/autotranslate.py weblate/checks/judge.py weblate/trans/tests/test_judge_round.py weblate/trans/tests/test_judge_loop.py weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_judge_deferrals.py weblate/checks/tests/test_judge.py weblate/utils/tests/test_stats.py`
+
+Then run `git diff --check`.
+
 **Step 3: Commit if anything changed**
 
 ```sh
-git add -u
+git add weblate/trans/models/judge.py
 git commit -m "chore(judge): satisfy mypy on the round severity attribute"
 ```
 
@@ -887,6 +1020,7 @@ git commit -m "chore(judge): satisfy mypy on the round severity attribute"
 
 - Modify: `docs/admin/checks.rst:165-169`
 - Modify: `docs/admin/config.rst:1811-1813`
+- Modify: `docs/admin/install/docker.rst:2366-2401`
 - Modify: `docs/changes.rst` (top unreleased section, "Improvements")
 - Modify: `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md:69`
 - Modify: `docs/llm-first/plans/2026-09-04-judge-consensus-reject.md` (this file: status)
@@ -900,14 +1034,15 @@ of the two" with:
 ```rst
 Both configured models (called seats) judge every selected string
 independently. Below critical the string's verdict is the strictest of the
-two: a seat can never lower what the other seat found. A critical is held
+two: a seat can never lower what the other seat found. With
+:setting:`JUDGE_CONSENSUS_REJECT` enabled (the default), a critical is held
 only when both seats grade the string critical; a critical from one seat
 that the other seat grades lower is shown as a major, so the string ships
-with both opinions attached instead of being held on one seat's word. Such
-a disputed critical is also reviewed like a major: sending it back puts it
-in the needs-checking queue rather than holding it. Each seat's opinion,
-and any disagreement between them, is shown on the ``judge`` checks card of
-the string.
+with both opinions attached instead of being held on one seat's word. An
+administrator can disable :setting:`JUDGE_CONSENSUS_REJECT` site-wide to
+restore the original rule where either seat's critical holds the string.
+Each seat's opinion and any disagreement are shown on the ``judge`` checks
+card of the string.
 ```
 
 **Step 2: `docs/admin/config.rst`**
@@ -916,23 +1051,36 @@ Replace "the string's verdict is the strictest of the two, so a seat can never
 lower what the other seat found." with:
 
 ```rst
-below critical the string's verdict is the strictest of the two, and a
-critical hold requires both seats to agree (see :ref:`llm-judge`).
+below critical the string's verdict is the strictest of the two. With
+:setting:`JUDGE_CONSENSUS_REJECT` enabled, a critical hold requires both
+seats to agree (see :ref:`llm-judge`); disabling it restores the original
+strictest-seat policy where either seat's critical holds the string.
 ```
+
+Add a `JUDGE_CONSENSUS_REJECT` setting section after `JUDGE_ENABLED`. Document
+it as added in 2026.8.1, the `True` default, the `False` old-policy rollback,
+the requirement that all application processes use the same value, and that
+changing it affects read-time verdicts and future projections but does not
+rewrite stored unit states or check rows.
+
+Also add `WEBLATE_JUDGE_CONSENSUS_REJECT` to the LLM judge environment group
+in `docs/admin/install/docker.rst` and
+link it to `JUDGE_CONSENSUS_REJECT`. Document `1` as consensus and `0` as the
+site-wide rollback; changing it requires recreating all application processes.
 
 **Step 3: `docs/changes.rst`**
 
 Add under `.. rubric:: Improvements` of the unreleased section:
 
 ```rst
-* An LLM-judge critical now holds a string only when both seats grade it critical; a critical from one seat that the other grades lower ships as a major with both opinions attached, see :ref:`llm-judge`.
+* An LLM-judge critical now holds a string only when both seats grade it critical; a critical from one seat that the other grades lower ships as a major with both opinions attached. Administrators can restore the original site-wide policy where either critical holds through :setting:`JUDGE_CONSENSUS_REJECT`, see :ref:`llm-judge`.
 ```
 
 **Step 4: design diagram**
 
 In `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md:69` change
 `M{{Вердикт = max severity}}` to
-`M{{Вердикт = max severity; critical только при согласии обоих мест}}`.
+`M{{Вердикт = max severity; critical по политике инстанса, consensus по умолчанию}}`.
 
 **Step 5: this plan's status line**
 
@@ -942,8 +1090,8 @@ Change `**Status:** proposed, awaiting approval.` to
 **Step 6: Commit**
 
 ```sh
-git add docs/admin/checks.rst docs/admin/config.rst docs/changes.rst docs/llm-first/designs/2026-08-13-judge-native-ui-design.md docs/llm-first/plans/2026-09-04-judge-consensus-reject.md
-git commit -m "docs(judge): document the consensus critical hold"
+git add docs/admin/checks.rst docs/admin/config.rst docs/admin/install/docker.rst docs/changes.rst docs/llm-first/designs/2026-08-13-judge-native-ui-design.md docs/llm-first/plans/2026-09-04-judge-consensus-reject.md
+git commit -m "docs(judge): document the critical aggregation policy"
 git push
 ```
 
@@ -960,33 +1108,45 @@ would need a full `./rundev.sh`, which recreates the shared `dev-docker`
 stack - a deployment-class action under `AGENTS.md`. Do not run it as part of
 this task; if a live run is wanted, request that approval separately.
 
-**Step 2: check an existing dev disagreement**
+**Step 2: check an existing dev disagreement in both modes**
 
 In `./rundev.sh shell` (dev only, never production):
 
 ```python
+from django.test import override_settings
 from weblate.trans.models import Unit
 from weblate.trans.models.judge import active_round, active_verdict
 seen = 0
 for unit in Unit.objects.filter(judge_verdicts__isnull=False).distinct()[:500]:
-    rows = active_round(unit)
+    rows = [row for row in active_round(unit) if not row.unparsed]
     sev = {row.seat: row.max_severity for row in rows}
     if "critical" in sev.values() and len(set(sev.values())) > 1:
-        v = active_verdict(unit)
-        print(unit.pk, sev, v.max_severity, v.effective_severity, v.verdict)
+        with override_settings(JUDGE_CONSENSUS_REJECT=True):
+            consensus = active_verdict(unit)
+        with override_settings(JUDGE_CONSENSUS_REJECT=False):
+            rollback = active_verdict(unit)
+        print(
+            unit.pk,
+            sev,
+            (consensus.max_severity, consensus.effective_severity, consensus.verdict),
+            (rollback.max_severity, rollback.effective_severity, rollback.verdict),
+        )
         seen += 1
     if seen >= 10:
         break
 ```
 
-Expected: every printed line ends with `critical major flag`.
+Expected: every printed line ends with
+`('critical', 'major', 'flag') ('critical', 'critical', 'reject')`.
 
 **Step 3: run `judge:reject` and `judge:flag` searches on that translation in the UI**
 
 Open the translation, filter `judge:reject`: the units printed above must not
-be listed. Filter `judge:flag`: they must be.
+be listed. Filter `judge:flag`: they must be. This checks the default mode.
+Do not recreate the shared stack only to check rollback mode; Tasks 2-4 cover
+that path.
 
-**Step 4: record the annotation's cost**
+**Step 4: record the annotation's cost in both modes**
 
 `disputed_critical` adds a correlated subquery level under every `judge:*`
 filter and under `Stats.calculate_judge` (`weblate/utils/stats.py:929-977`,
@@ -995,46 +1155,55 @@ largest dev translation:
 
 ```python
 import time
+from django.test import override_settings
 from weblate.trans.models import Translation
 from weblate.trans.models.judge import judge_status_annotations
 t = Translation.objects.order_by("-stats__all")[0]
-start = time.monotonic()
-list(t.unit_set.annotate(**judge_status_annotations()).values_list("judge_active_severity", flat=True))
-print(t, t.unit_set.count(), round(time.monotonic() - start, 3))
+for consensus_reject in (True, False):
+    with override_settings(JUDGE_CONSENSUS_REJECT=consensus_reject):
+        start = time.monotonic()
+        list(t.unit_set.annotate(**judge_status_annotations()).values_list("judge_active_severity", flat=True))
+        elapsed = round(time.monotonic() - start, 3)
+    print(consensus_reject, t, t.unit_set.count(), elapsed)
 ```
 
-Record the number in the commit message of Task 5 (or in a dated
-`docs/llm-first/measurements/` note if it looks bad). A regression worth
-acting on is a judge-filtered listing that stops answering in interactive
-time; the fix would be an index on `(unit, target_storage_hash, seat)`, not a
-stored severity column (see below).
+Record both numbers in the implementation report. If the result needs a dated
+`docs/llm-first/measurements/` note, add and commit that note after this
+verification. A regression worth acting on is a judge-filtered listing that
+stops answering in interactive time. The false branch should stay near the
+old-query baseline because it does not build `disputed_critical`.
 
 ---
 
 ## What this plan does not settle
 
+- **Rollback does not rewrite materialized projections.** Setting
+  `WEBLATE_JUDGE_CONSENSUS_REJECT=0` and recreating all web, Celery, beat and
+  one-shot command processes restores the old Python verdict, `judge:*`
+  filters, statistics, and future state/check projections. A disputed critical
+  already projected as `STATE_TRANSLATED` or `judge-flag` stays that way until
+  the unit is judged or checked again. Conversely, enabling consensus does not
+  automatically release an existing fuzzy hold. The rollout or rollback
+  request must name the manual re-projection step.
 - **Production rollout.** Deploying changes which strings are held. It is an
   approval of its own (`deploy/vps.sh`). Existing production rows need no
-  migration: the rule is applied at read time, so the 20 seat-2-only holds on
-  `need-for-greed/ui/es` read as `flag` the moment the code is live; their
-  `STATE_FUZZY` from the earlier projection stays until the next run projects
-  them again or a producer resolves them. The stored `judge-reject` check rows
-  likewise survive until something re-runs checks for those units, so the
-  filter and the check row disagree for exactly that window - worth naming in
-  the rollout request.
-- **Recall on a true critical one seat under-grades.** Measured on the sealed
-  zh corpus: the one revised true critical lands on `flag` in 1-2 of 5 runs.
-  It is still visible with evidence; it is not held. If the product wants that
-  case held, the answer is a second-opinion re-check on disputed criticals,
-  not a return to one seat's word.
+  migration. With the default setting, the 20 seat-2-only holds on
+  `need-for-greed/ui/es` read as `flag` once every process runs the new code
+  and setting; stored `STATE_FUZZY` and `judge-reject` projections survive
+  until rerun.
+- **Recall on a true critical one seat under-grades.** In consensus mode, the
+  one revised true critical lands on `flag` in 1-2 of 5 measured runs. If that
+  case must be held without the site-wide rollback, use a second-opinion
+  re-check.
 - **Candidates on a producer re-check of a disputed critical.** A one-unit
   re-check dispatches `candidate_severities=(CRITICAL,)`
-  (`queue_judge_recheck`, judge_loop.py:2076). A disputed critical now reads
-  as `flag`, so that run projects the verdict and stores no candidate
+  (`queue_judge_recheck`, judge_loop.py:2076). In consensus mode a disputed
+  critical reads as `flag`, so that run projects the verdict and stores no candidate
   (`no-candidate`), exactly as it already does for an ordinary major
   (`test_recheck_major_projects_directly_without_a_candidate`). The card's
-  manual generate button still accepts it. Whether the re-check should widen
-  its candidate set is a paid-call policy decision, not a reader bug.
+  manual generate button still accepts it. In rollback mode it remains a
+  critical candidate. Whether the re-check should widen its candidate set is a
+  paid-call policy decision, not a reader bug.
 - **A stored round severity.** Everything here is read-time on purpose (no
   migration, R3 stays reopenable). If the SQL twin's cost ever forces
   materialization, that is a separate design with a backfill and a writer
