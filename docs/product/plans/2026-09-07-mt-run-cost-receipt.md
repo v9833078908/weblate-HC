@@ -1,5 +1,6 @@
 # MT Run Cost Receipt Implementation Plan
-**Status:** implemented 2026-09-07
+
+**Status (2026-09-07):** implemented, reviewed and verified; merged into `main` and deployed to `l10n.herocraft.com` (image `8d5e7ec`, migrations `0121_producer_run` and `0122_llm_usage_run` applied).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
