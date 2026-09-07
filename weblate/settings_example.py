@@ -1018,6 +1018,7 @@ LOC_KIT_IMPORT_DRAFT_EXPIRY = 3600
 # LLM judge (off by default). Sends component strings to the configured
 # endpoint (JUDGE_BASE_URL); see docs/security/threat-model.rst.
 JUDGE_ENABLED = False
+JUDGE_CONSENSUS_REJECT = True
 JUDGE_API_KEY = ""
 JUDGE_BASE_URL = "https://openrouter.ai/api/v1"
 JUDGE_MODEL_SEAT_1 = ""

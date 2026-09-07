@@ -8,6 +8,7 @@ import uuid
 from types import SimpleNamespace
 
 from django.db import IntegrityError, transaction
+from django.test import override_settings
 
 from weblate.glossary.models import (
     get_glossary_terms,
@@ -19,6 +20,7 @@ from weblate.trans.models.judge import (
     JudgeVerdict,
     active_round,
     active_verdict,
+    collegium_severity,
     compute_context_hash,
     compute_target_hash,
     compute_target_storage_hash,
@@ -202,13 +204,15 @@ class JudgeRoundTest(ViewTestCase):
         self.assertEqual(self.judge_status(unit)["judge_active_severity"], "major")
 
     def test_collegium_takes_the_strictest_seat(self) -> None:
+        # Below critical the strictest seat is the round: major beats minor.
         unit = self.get_unit()
         run = uuid.uuid4()
-        self.make(unit, "major", seat=1, run_id=run)
-        self.make(unit, "critical", seat=2, run_id=run)
+        self.make(unit, "minor", seat=1, run_id=run)
+        self.make(unit, "major", seat=2, run_id=run)
         verdict = active_verdict(unit)
         assert verdict is not None
-        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+        self.assertEqual(verdict.seat, 2)
 
     def test_no_seat_may_lower_the_other(self) -> None:
         # Seat 2 passing must not clear seat 1's flag: the cascade B2'
@@ -221,6 +225,83 @@ class JudgeRoundTest(ViewTestCase):
         assert v is not None
         self.assertEqual(v.verdict, JudgeVerdict.Verdict.FLAG)
         self.assertEqual(v.seat, 1)
+
+    def test_a_disputed_critical_is_only_a_flag(self) -> None:
+        # Consensus REJECT: one seat's critical against the other seat's
+        # lower grade holds nothing. The row is still the critical seat's
+        # (its errors are the evidence), but the round reads as major.
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "none", seat=1, run_id=run)
+        strict = self.make(unit, "critical", seat=2, run_id=run)
+        verdict = active_verdict(unit)
+        assert verdict is not None
+        self.assertEqual(verdict.pk, strict.pk)
+        self.assertEqual(verdict.max_severity, "critical")
+        self.assertEqual(verdict.effective_severity, "major")
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+
+    @override_settings(JUDGE_CONSENSUS_REJECT=False)
+    def test_a_disputed_critical_rejects_in_rollback_mode(self) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "none", seat=1, run_id=run)
+        strict = self.make(unit, "critical", seat=2, run_id=run)
+        verdict = active_verdict(unit)
+        assert verdict is not None
+        self.assertEqual(verdict.pk, strict.pk)
+        self.assertEqual(verdict.effective_severity, "critical")
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+
+    def test_two_critical_seats_still_reject(self) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "critical", seat=1, run_id=run)
+        self.make(unit, "critical", seat=2, run_id=run)
+        verdict = active_verdict(unit)
+        assert verdict is not None
+        self.assertEqual(verdict.effective_severity, "critical")
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+
+    def test_a_lone_parsed_critical_seat_rejects(self) -> None:
+        # One voice and nobody disagreeing: not a disputed critical.
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "critical", seat=1, run_id=run)
+        verdict = active_verdict(unit)
+        assert verdict is not None
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+
+    def test_collegium_severity_is_pure(self) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        rows = [
+            self.make(unit, "major", seat=1, run_id=run),
+            self.make(unit, "critical", seat=2, run_id=run),
+        ]
+        self.assertEqual(collegium_severity(rows, consensus_reject=True), "major")
+        self.assertEqual(collegium_severity(rows, consensus_reject=False), "critical")
+        self.assertEqual(
+            collegium_severity([rows[1]], consensus_reject=True), "critical"
+        )
+        self.assertEqual(collegium_severity([rows[0]], consensus_reject=True), "major")
+        self.assertIsNone(collegium_severity([], consensus_reject=True))
+
+    def test_a_row_read_outside_the_collegium_keeps_its_own_severity(self) -> None:
+        # The transient stamp is the whole footgun of this design: a row
+        # re-fetched from the database stands only for itself. Pin both
+        # halves on the same disputed round, so a regression in either
+        # direction fails here (resolve_verdict depends on this, Task 3).
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "minor", seat=1, run_id=run)
+        strict = self.make(unit, "critical", seat=2, run_id=run)
+        round_read = active_verdict(unit)
+        assert round_read is not None
+        self.assertEqual(round_read.verdict, JudgeVerdict.Verdict.FLAG)
+        row = JudgeVerdict.objects.get(pk=strict.pk)
+        self.assertEqual(row.effective_severity, "critical")
+        self.assertEqual(row.verdict, JudgeVerdict.Verdict.REJECT)
 
     def test_a_parsed_seat_outvotes_an_unparsed_one(self) -> None:
         unit = self.get_unit()

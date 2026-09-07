@@ -711,7 +711,8 @@ class JudgeVerdict(models.Model):
     # The endpoint that actually served this verdict. Blank on every row
     # written before the availability fallback existed; no data migration.
     judge_provider = models.CharField(max_length=32, blank=True)
-    # Place in the collegium, not seniority: seat 2 may not lower seat 1.
+    # Place in the collegium, not seniority: below critical, seat 2 may not
+    # lower seat 1; policy decides whether a critical needs both seats.
     seat = models.SmallIntegerField()
     attempt = models.SmallIntegerField(default=0)
     request_round = models.PositiveSmallIntegerField(default=0)
@@ -801,6 +802,19 @@ class JudgeVerdict(models.Model):
         return f"{self.unit_id}: {self.verdict} (seat {self.seat})"
 
     @property
+    def effective_severity(self) -> str:
+        """
+        The severity this row stands for where it was read.
+
+        A row returned by ``collegium_verdict`` carries the round's
+        severity (consensus rule, ``collegium_severity``), which may be
+        lower than the row's own ``max_severity`` when this seat's
+        ``critical`` is disputed by the other parsed seat. A row read
+        directly from the database stands only for itself.
+        """
+        return getattr(self, "_round_severity", None) or self.max_severity
+
+    @property
     def verdict(self) -> str:
         """
         Derive the verdict, never stored.
@@ -810,7 +824,7 @@ class JudgeVerdict(models.Model):
         """
         if self.unparsed:
             return self.Verdict.UNPARSED
-        return verdict_for_severity(self.max_severity)
+        return verdict_for_severity(self.effective_severity)
 
     @property
     def primary_error(self) -> dict | None:
@@ -981,20 +995,59 @@ def active_round(unit: Unit) -> list[JudgeVerdict]:
     return _seat_round_rows(unit, target_hash, None, prefer_parsed=True)
 
 
+def collegium_severity(
+    rows: Sequence[JudgeVerdict], *, consensus_reject: bool
+) -> str | None:
+    """
+    Reduce a round's parsed seats to one severity.
+
+    Below ``critical`` the strictest seat is the round in either mode.
+    With ``consensus_reject``, a ``critical`` that another parsed seat
+    grades lower reads as ``major``; only unanimous critical rejects.
+    Without it, the strictest parsed seat always wins, preserving the
+    original rule where any ``critical`` rejects. A lone parsed seat is
+    unanimous by itself. An unparsed row is not an opinion.
+
+    Measured: docs/operations/audits/2026-09-04-need-for-greed-ui-es-judge-calibration.md.
+    """
+    parsed = [row for row in rows if not row.unparsed]
+    if not parsed:
+        return None
+    strictest = max(SEVERITY_RANK[row.max_severity] for row in parsed)
+    severity = JudgeVerdict.Severity.values[strictest]
+    if (
+        consensus_reject
+        and severity == JudgeVerdict.Severity.CRITICAL
+        and any(row.max_severity != JudgeVerdict.Severity.CRITICAL for row in parsed)
+    ):
+        return JudgeVerdict.Severity.MAJOR
+    return severity
+
+
 def collegium_verdict(rows: Sequence[JudgeVerdict]) -> JudgeVerdict | None:
     """
-    Return the strictest opinion of a round. No seat may lower another.
+    Return the round's representative row, carrying the round severity.
 
-    A transport failure is not an opinion, so an unparsed row neither
-    raises nor lowers the round; only when every seat failed does the
-    round read as unparsed.
+    The representative is the strictest parsed seat (lowest seat number
+    on a tie): its errors are the evidence the card, the repair prompt
+    and the candidate generator read. Its ``effective_severity`` and
+    ``verdict`` are the round's, from ``collegium_severity``; its own
+    ``max_severity`` is untouched. A transport failure is not an
+    opinion, so an unparsed row neither raises nor lowers the round;
+    only when every seat failed does the round read as unparsed.
     """
     if not rows:
         return None
     parsed = [row for row in rows if not row.unparsed]
     if not parsed:
         return rows[0]
-    return max(parsed, key=lambda row: (SEVERITY_RANK[row.max_severity], -row.seat))
+    representative = max(
+        parsed, key=lambda row: (SEVERITY_RANK[row.max_severity], -row.seat)
+    )
+    representative._round_severity = collegium_severity(  # ruff: ignore[private-member-access]
+        parsed, consensus_reject=settings.JUDGE_CONSENSUS_REJECT
+    )
+    return representative
 
 
 def active_verdict(unit: Unit) -> JudgeVerdict | None:

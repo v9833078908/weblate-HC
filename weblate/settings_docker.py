@@ -1689,6 +1689,10 @@ JUDGE_ENABLED = get_env_bool(
     "WEBLATE_JUDGE_ENABLED",
     trans_defaults.DEFAULT_JUDGE_ENABLED,
 )
+JUDGE_CONSENSUS_REJECT = get_env_bool(
+    "WEBLATE_JUDGE_CONSENSUS_REJECT",
+    trans_defaults.DEFAULT_JUDGE_CONSENSUS_REJECT,
+)
 JUDGE_API_KEY = get_env_str(
     "WEBLATE_JUDGE_API_KEY",
     trans_defaults.DEFAULT_JUDGE_API_KEY,

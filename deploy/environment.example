@@ -124,6 +124,11 @@ WEBLATE_LOC_KIT_PROFILE_OPENROUTER_MODEL=google/gemini-2.5-flash
 # independently; the same model on both seats is a valid configuration.
 # Fill the key and both models, then switch the feature on.
 WEBLATE_JUDGE_ENABLED=0
+# By default, a critical holds a string only when every parsed seat agrees
+# (consensus REJECT); one seat's critical against another's lower grade reads
+# as major. Setting 0 restores "any parsed critical rejects" after all
+# application processes are recreated.
+WEBLATE_JUDGE_CONSENSUS_REJECT=1
 WEBLATE_JUDGE_API_KEY=
 WEBLATE_JUDGE_BASE_URL=https://hcbifrost.herocraft.com/litellm/v1
 WEBLATE_JUDGE_MODEL_SEAT_1=deepseek-v4-pro
