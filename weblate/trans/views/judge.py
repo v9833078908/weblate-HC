@@ -48,6 +48,8 @@ from weblate.utils.stats import ProjectLanguage
 from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from django.db.models import Model, QuerySet
 
     from weblate.auth.models import AuthenticatedHttpRequest
@@ -375,70 +377,135 @@ def user_can_view_producer_run(user, scope, run) -> bool:
     return False
 
 
-def _scope_run_query(scope: Translation | Component | Project | Workspace) -> Q:
+def _cast_ids(queryset) -> QuerySet:
+    """Return the scope ids of a nesting level, as ``scope_id`` stores them."""
+    return queryset.annotate(_scope_id=Cast("pk", CharField())).values("_scope_id")
+
+
+def _project_language_runs(project_ids: Iterable[int]) -> Q:
+    """
+    Match the project-language runs of the given projects.
+
+    ``ProjectLanguage.pk`` is ``"<project>-<language>"``
+    (``weblate/utils/stats.py``), so membership is a prefix test rather than
+    a subquery, and the trailing dash keeps project 1 from matching project
+    11. The ids are passed in already known: a project knows its own, and a
+    workspace holds few projects.
+    """
+    query = Q(pk=None)
+    for project_id in project_ids:
+        query |= Q(
+            scope_type=ProducerRun.ScopeType.PROJECT_LANGUAGE,
+            scope_id__startswith=f"{project_id}-",
+        )
+    return query
+
+
+def _scope_run_query(
+    scope: Translation | Component | Category | Project | ProjectLanguage | Workspace,
+) -> Q:
     """
     Match the runs launched for this scope and for everything nested in it.
 
-    A translation matches itself alone; a component also matches its
-    translations; a project also matches its components and their
-    translations; a workspace also matches its projects, their components
-    and their translations. ``scope_id`` stores ``str(pk)``, so each nested
-    level's membership is matched through a ``Cast("pk", CharField())``
-    subquery over that level's own queryset: one SQL subquery per branch,
-    evaluated inside the single run lookup, never a materialized id list
-    per nesting level (which a project page would pay one query for).
-    An unknown scope matches nothing.
+    A translation and a project language match themselves alone; a category
+    also matches its nested categories, their components and translations; a
+    component also matches its translations; a project also matches its
+    categories, project languages, components and their translations; a
+    workspace also matches everything of its projects. ``scope_id`` stores
+    ``str(pk)``, so each nested level's membership is matched through a
+    ``Cast("pk", CharField())`` subquery over that level's own queryset: one
+    SQL subquery per branch, evaluated inside the single run lookup, never a
+    materialized id list per nesting level (which a project page would pay
+    one query for). An unknown scope matches nothing.
     """
     match scope:
         case Translation():
-            return Q(scope_type=ProducerRun.ScopeType.TRANSLATION, scope_id=str(scope.pk))
+            return Q(
+                scope_type=ProducerRun.ScopeType.TRANSLATION, scope_id=str(scope.pk)
+            )
+        case ProjectLanguage():
+            return Q(
+                scope_type=ProducerRun.ScopeType.PROJECT_LANGUAGE,
+                scope_id=str(scope.pk),
+            )
+        case Category():
+            # A component may sit up to three category levels deep
+            # (``Category.objects`` prefetches exactly that depth), and every
+            # level carries its own runs.
+            categories = Category.objects.filter(
+                Q(pk=scope.pk) | Q(category=scope) | Q(category__category=scope)
+            )
+            return (
+                Q(
+                    scope_type=ProducerRun.ScopeType.CATEGORY,
+                    scope_id__in=_cast_ids(categories),
+                )
+                | Q(
+                    scope_type=ProducerRun.ScopeType.COMPONENT,
+                    scope_id__in=_cast_ids(
+                        Component.objects.filter(category__in=categories)
+                    ),
+                )
+                | Q(
+                    scope_type=ProducerRun.ScopeType.TRANSLATION,
+                    scope_id__in=_cast_ids(
+                        Translation.objects.filter(component__category__in=categories)
+                    ),
+                )
+            )
         case Component():
             return Q(
                 scope_type=ProducerRun.ScopeType.COMPONENT, scope_id=str(scope.pk)
             ) | Q(
                 scope_type=ProducerRun.ScopeType.TRANSLATION,
-                scope_id__in=Translation.objects.filter(component=scope)
-                .annotate(_scope_id=Cast("pk", CharField()))
-                .values("_scope_id"),
+                scope_id__in=_cast_ids(Translation.objects.filter(component=scope)),
             )
         case Project():
             return (
                 Q(scope_type=ProducerRun.ScopeType.PROJECT, scope_id=str(scope.pk))
+                | _project_language_runs([scope.pk])
+                | Q(
+                    scope_type=ProducerRun.ScopeType.CATEGORY,
+                    scope_id__in=_cast_ids(Category.objects.filter(project=scope)),
+                )
                 | Q(
                     scope_type=ProducerRun.ScopeType.COMPONENT,
-                    scope_id__in=Component.objects.filter(project=scope)
-                    .annotate(_scope_id=Cast("pk", CharField()))
-                    .values("_scope_id"),
+                    scope_id__in=_cast_ids(Component.objects.filter(project=scope)),
                 )
                 | Q(
                     scope_type=ProducerRun.ScopeType.TRANSLATION,
-                    scope_id__in=Translation.objects.filter(component__project=scope)
-                    .annotate(_scope_id=Cast("pk", CharField()))
-                    .values("_scope_id"),
+                    scope_id__in=_cast_ids(
+                        Translation.objects.filter(component__project=scope)
+                    ),
                 )
             )
         case Workspace():
             return (
                 Q(scope_type=ProducerRun.ScopeType.WORKSPACE, scope_id=str(scope.pk))
+                | _project_language_runs(
+                    Project.objects.filter(workspace=scope).values_list("pk", flat=True)
+                )
                 | Q(
                     scope_type=ProducerRun.ScopeType.PROJECT,
-                    scope_id__in=Project.objects.filter(workspace=scope)
-                    .annotate(_scope_id=Cast("pk", CharField()))
-                    .values("_scope_id"),
+                    scope_id__in=_cast_ids(Project.objects.filter(workspace=scope)),
+                )
+                | Q(
+                    scope_type=ProducerRun.ScopeType.CATEGORY,
+                    scope_id__in=_cast_ids(
+                        Category.objects.filter(project__workspace=scope)
+                    ),
                 )
                 | Q(
                     scope_type=ProducerRun.ScopeType.COMPONENT,
-                    scope_id__in=Component.objects.filter(project__workspace=scope)
-                    .annotate(_scope_id=Cast("pk", CharField()))
-                    .values("_scope_id"),
+                    scope_id__in=_cast_ids(
+                        Component.objects.filter(project__workspace=scope)
+                    ),
                 )
                 | Q(
                     scope_type=ProducerRun.ScopeType.TRANSLATION,
-                    scope_id__in=Translation.objects.filter(
-                        component__project__workspace=scope
-                    )
-                    .annotate(_scope_id=Cast("pk", CharField()))
-                    .values("_scope_id"),
+                    scope_id__in=_cast_ids(
+                        Translation.objects.filter(component__project__workspace=scope)
+                    ),
                 )
             )
         case _:
@@ -446,7 +513,7 @@ def _scope_run_query(scope: Translation | Component | Project | Workspace) -> Q:
 
 
 def recent_producer_runs(
-    scope: Translation | Component | Project | Workspace,
+    scope: Translation | Component | Category | Project | ProjectLanguage | Workspace,
     *,
     user,
     limit: int = 10,
@@ -475,9 +542,7 @@ def recent_producer_runs(
     if not modes:
         return []
     return list(
-        ProducerRun.objects.filter(
-            _scope_run_query(scope), requested_mode__in=modes
-        )
+        ProducerRun.objects.filter(_scope_run_query(scope), requested_mode__in=modes)
         .order_by("-created")
         .select_related("actor")[:limit]
     )
@@ -637,9 +702,7 @@ def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
             "run_spend": spend,
             "written": run.summary.get("written", 0),
             "language_spend": language_spend,
-            "translation_spend": run_spend(
-                run.pk, LLMUsageLog.Operation.TRANSLATION
-            ),
+            "translation_spend": run_spend(run.pk, LLMUsageLog.Operation.TRANSLATION),
             "scope_query_url": scope_query_url,
         },
     )

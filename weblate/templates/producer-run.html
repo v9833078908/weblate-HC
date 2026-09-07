@@ -31,13 +31,21 @@
     <div class="alert alert-warning">{{ warning }}</div>
   {% endfor %}
   <div class="card mb-3">
-    <div class="card-header"><h4 class="card-title">{% translate "Cost" %}</h4></div>
+    <div class="card-header">
+      <h4 class="card-title">{% translate "Cost" %}</h4>
+    </div>
     <div class="card-body">
       <p>{% translate "Requests sent" %}: {{ run_spend.requests }}</p>
       <p>{% translate "Strings sent" %}: {{ run_spend.strings_sent }}</p>
       <p>{% translate "Prompt tokens" %}: {{ run_spend.prompt_tokens }}</p>
       <p>{% translate "Completion tokens" %}: {{ run_spend.completion_tokens }}</p>
-      <p>{% translate "Cost" %}: ${{ run_spend.cost_usd }}</p>
+      {% if run_spend.cost_usd or not run_spend.unpriced_requests %}
+        <p>{% translate "Cost" %}: ${{ run_spend.cost_usd }}</p>
+      {% else %}
+        {# Every request of this run came back without a price: "$0" would #}
+        {# report a paid run as free. #}
+        <p>{% translate "Cost" %}: {% translate "not reported by the provider" %}</p>
+      {% endif %}
       {% if run_spend.unpriced_requests %}
         <p class="text-warning">{% translate "Price unknown for some requests; total is incomplete." %}</p>
       {% endif %}
@@ -45,7 +53,9 @@
   </div>
   {% if not is_judge_run %}
     <div class="card mb-3">
-      <div class="card-header"><h4 class="card-title">{% translate "What was written" %}</h4></div>
+      <div class="card-header">
+        <h4 class="card-title">{% translate "What was written" %}</h4>
+      </div>
       <div class="card-body">
         <p>{% blocktranslate count counter=written %}{{ counter }} string was written.{% plural %}{{ counter }} strings were written.{% endblocktranslate %}</p>
         {% if translation_spend.requests %}
@@ -58,9 +68,20 @@
     </div>
     {% if language_spend %}
       <div class="card mb-3">
-        <div class="card-header"><h4 class="card-title">{% translate "Cost by language, provider, and model" %}</h4></div>
+        <div class="card-header">
+          <h4 class="card-title">{% translate "Cost by language, provider, and model" %}</h4>
+        </div>
         <table class="table mb-0">
-          <thead><tr><th>{% translate "Language" %}</th><th>{% translate "Provider" %}</th><th>{% translate "Model" %}</th><th>{% translate "Requests" %}</th><th>{% translate "Strings sent" %}</th><th>{% translate "USD" %}</th></tr></thead>
+          <thead>
+            <tr>
+              <th>{% translate "Language" %}</th>
+              <th>{% translate "Provider" context "machine translation service" %}</th>
+              <th>{% translate "Model" %}</th>
+              <th>{% translate "Requests" %}</th>
+              <th>{% translate "Strings sent" %}</th>
+              <th>{% translate "USD" %}</th>
+            </tr>
+          </thead>
           <tbody>
             {% for row in language_spend %}
               <tr><td>{{ row.language|default:"-" }}</td><td>{{ row.service|default:"-" }}</td><td>{{ row.model }}</td><td>{{ row.requests }}</td><td>{{ row.strings_sent }}</td><td>{{ row.cost_usd|floatformat:6 }}{% if row.unpriced_requests %} <span class="text-muted small">({% translate "price unknown" %})</span>{% endif %}</td></tr>
@@ -72,45 +93,45 @@
   {% endif %}
 
   {% if is_judge_run %}
-  <div class="card mb-3">
-    <div class="card-header">
-      <h4 class="card-title">{% translate "What to do" %}</h4>
-    </div>
-    <div class="card-body">
-      {% if triage.blocking %}
-        {% if triage.blocks_release %}
-          <p>
-            {% blocktranslate count counter=triage.blocking %}{{ counter }} string will not ship until you fix it.{% plural %}{{ counter }} strings will not ship until you fix them.{% endblocktranslate %}
-          </p>
+    <div class="card mb-3">
+      <div class="card-header">
+        <h4 class="card-title">{% translate "What to do" %}</h4>
+      </div>
+      <div class="card-body">
+        {% if triage.blocking %}
+          {% if triage.blocks_release %}
+            <p>
+              {% blocktranslate count counter=triage.blocking %}{{ counter }} string will not ship until you fix it.{% plural %}{{ counter }} strings will not ship until you fix them.{% endblocktranslate %}
+            </p>
+          {% else %}
+            <p>
+              {% blocktranslate count counter=triage.blocking %}{{ counter }} string is rejected and needs a fix before release.{% plural %}{{ counter }} strings are rejected and need a fix before release.{% endblocktranslate %}
+            </p>
+          {% endif %}
+          {% if triage.top_category %}
+            <p class="text-muted">
+              {% blocktranslate with category=triage.top_category.label count counter=triage.top_category.count %}Biggest problem: {{ category }} ({{ counter }} string).{% plural %}Biggest problem: {{ category }} ({{ counter }} strings).{% endblocktranslate %}
+            </p>
+          {% endif %}
+          <a class="btn btn-primary" href="{{ blocking_review_url }}">{% translate "Open the blocking strings" %}</a>
+        {% elif triage.major or triage.minor %}
+          <p>{% translate "Nothing is blocked from shipping." %}</p>
+          <a class="btn btn-primary" href="{{ needs_review_url }}">{% translate "Open the flagged strings" %}</a>
+        {% elif triage.needs_recheck %}
+          <p>{% translate "The judge left no usable verdict for some strings." %}</p>
+          <a class="btn btn-primary" href="{{ recheck_review_url }}">{% translate "Re-check them" %}</a>
         {% else %}
           <p>
-            {% blocktranslate count counter=triage.blocking %}{{ counter }} string is rejected and needs a fix before release.{% plural %}{{ counter }} strings are rejected and need a fix before release.{% endblocktranslate %}
+            {% blocktranslate count counter=triage.passed %}Nothing needs action. {{ counter }} string passed.{% plural %}Nothing needs action. {{ counter }} strings passed.{% endblocktranslate %}
           </p>
         {% endif %}
-        {% if triage.top_category %}
-          <p class="text-muted">
-            {% blocktranslate with category=triage.top_category.label count counter=triage.top_category.count %}Biggest problem: {{ category }} ({{ counter }} string).{% plural %}Biggest problem: {{ category }} ({{ counter }} strings).{% endblocktranslate %}
-          </p>
+        {% if triage.candidates %}
+          <a class="btn btn-outline-primary" href="?outcome=candidates">
+            {% blocktranslate count counter=triage.candidates %}Review {{ counter }} suggested fix{% plural %}Review {{ counter }} suggested fixes{% endblocktranslate %}
+          </a>
         {% endif %}
-        <a class="btn btn-primary" href="{{ blocking_review_url }}">{% translate "Open the blocking strings" %}</a>
-      {% elif triage.major or triage.minor %}
-        <p>{% translate "Nothing is blocked from shipping." %}</p>
-        <a class="btn btn-primary" href="{{ needs_review_url }}">{% translate "Open the flagged strings" %}</a>
-      {% elif triage.needs_recheck %}
-        <p>{% translate "The judge left no usable verdict for some strings." %}</p>
-        <a class="btn btn-primary" href="{{ recheck_review_url }}">{% translate "Re-check them" %}</a>
-      {% else %}
-        <p>
-          {% blocktranslate count counter=triage.passed %}Nothing needs action. {{ counter }} string passed.{% plural %}Nothing needs action. {{ counter }} strings passed.{% endblocktranslate %}
-        </p>
-      {% endif %}
-      {% if triage.candidates %}
-        <a class="btn btn-outline-primary" href="?outcome=candidates">
-          {% blocktranslate count counter=triage.candidates %}Review {{ counter }} suggested fix{% plural %}Review {{ counter }} suggested fixes{% endblocktranslate %}
-        </a>
-      {% endif %}
+      </div>
     </div>
-  </div>
   {% endif %}
 
   {% if categories %}
@@ -149,77 +170,77 @@
   {% endif %}
 
   {% if is_judge_run %}
-  <div class="card">
-    <div class="card-header">
-      <h4 class="card-title">{% translate "Strings" %}</h4>
-    </div>
-    <div class="card-body">
-      {% for key, label, count in stats %}
-        {% if count and key != "matched" and key != "checked" and key != "cached" %}
-          <a class="btn btn-sm {% if key == bucket %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-             href="?outcome={{ key }}">{{ label }}: {{ count }}</a>
+    <div class="card">
+      <div class="card-header">
+        <h4 class="card-title">{% translate "Strings" %}</h4>
+      </div>
+      <div class="card-body">
+        {% for key, label, count in stats %}
+          {% if count and key != "matched" and key != "checked" and key != "cached" %}
+            <a class="btn btn-sm {% if key == bucket %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+               href="?outcome={{ key }}">{{ label }}: {{ count }}</a>
+          {% endif %}
+        {% endfor %}
+        {% if outcome %}
+          <a class="btn btn-sm btn-outline-secondary" href="?">{% translate "Clear filter" %}</a>
         {% endif %}
-      {% endfor %}
-      {% if outcome %}
-        <a class="btn btn-sm btn-outline-secondary" href="?">{% translate "Clear filter" %}</a>
-      {% endif %}
-      <p class="text-muted small mt-2 mb-0">
-        {% blocktranslate with matched=counts.matched checked=counts.checked cached=counts.cached %}Matched {{ matched }} &middot; checked {{ checked }} &middot; cached {{ cached }}.{% endblocktranslate %}
-      </p>
-    </div>
-    <div class="table-responsive">
-      <table class="table table-striped" id="judge-run-units">
-        <thead>
-          <tr>
-            <th>{% translate "Source" %}</th>
-            <th>{% translate "Translation" %}</th>
-            <th>{% translate "Problem" %}</th>
-            <th>{% translate "Action" %}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in page_obj %}
+        <p class="text-muted small mt-2 mb-0">
+          {% blocktranslate with matched=counts.matched checked=counts.checked cached=counts.cached %}Matched {{ matched }} &middot; checked {{ checked }} &middot; cached {{ cached }}.{% endblocktranslate %}
+        </p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-striped" id="judge-run-units">
+          <thead>
             <tr>
-              <td>
-                {% if row.editor_url %}
-                  <a href="{{ row.editor_url }}">{{ row.source_text|truncatechars:90 }}</a>
-                {% else %}
-                  {% blocktranslate with id=row.unit_id_snapshot %}{{ id }} (deleted){% endblocktranslate %}
-                {% endif %}
-              </td>
-              <td>
-                {{ row.target_text|truncatechars:90 }}
-                {% if row.unit and not row.current_target_matches %}
-                  <br>
-                  <span class="text-muted small">({% translate "current text changed since this run" %})</span>
-                {% endif %}
-              </td>
-              <td>
-                {{ row.problem }}
-                {% if row.cached %}
-                  <span class="text-muted small">({% translate "cached" %})</span>
-                {% endif %}
-                {% if row.verdict.resolution %}
-                  <span class="text-muted small">({{ row.verdict.get_resolution_display }})</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if row.editor_url %}
-                  <a href="{{ row.editor_url }}">{{ row.action }}</a>
-                {% else %}
-                  {% translate "nothing to do" %}
-                {% endif %}
-              </td>
+              <th>{% translate "Source" %}</th>
+              <th>{% translate "Translation" %}</th>
+              <th>{% translate "Problem" %}</th>
+              <th>{% translate "Action" %}</th>
             </tr>
-          {% empty %}
-            <tr>
-              <td colspan="4">{% translate "No strings in this outcome." %}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {% for row in page_obj %}
+              <tr>
+                <td>
+                  {% if row.editor_url %}
+                    <a href="{{ row.editor_url }}">{{ row.source_text|truncatechars:90 }}</a>
+                  {% else %}
+                    {% blocktranslate with id=row.unit_id_snapshot %}{{ id }} (deleted){% endblocktranslate %}
+                  {% endif %}
+                </td>
+                <td>
+                  {{ row.target_text|truncatechars:90 }}
+                  {% if row.unit and not row.current_target_matches %}
+                    <br>
+                    <span class="text-muted small">({% translate "current text changed since this run" %})</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {{ row.problem }}
+                  {% if row.cached %}
+                    <span class="text-muted small">({% translate "cached" %})</span>
+                  {% endif %}
+                  {% if row.verdict.resolution %}
+                    <span class="text-muted small">({{ row.verdict.get_resolution_display }})</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if row.editor_url %}
+                    <a href="{{ row.editor_url }}">{{ row.action }}</a>
+                  {% else %}
+                    {% translate "nothing to do" %}
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="4">{% translate "No strings in this outcome." %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer">{% include "paginator.html" %}</div>
     </div>
-    <div class="card-footer">{% include "paginator.html" %}</div>
-  </div>
   {% endif %}
 {% endblock content %}

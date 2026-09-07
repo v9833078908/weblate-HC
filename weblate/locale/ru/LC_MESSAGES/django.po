@@ -31084,12 +31084,6 @@ msgstr "Совпало %(matched)s &middot; проверено %(checked)s &midd
 #~ msgid "%(delta)s from now"
 #~ msgstr "через %(delta)s"
 
-msgid "View run report"
-msgstr "Открыть отчёт прогона"
-
-msgid "Cost"
-msgstr "Стоимость"
-
 msgid "Requests sent"
 msgstr "Отправлено запросов"
 
@@ -31114,9 +31108,7 @@ msgstr "В этом запуске большая языковая модель 
 msgid "Cost by language, provider, and model"
 msgstr "Стоимость по языку, провайдеру и модели"
 
-msgid "Language"
-msgstr "Язык"
-
+msgctxt "machine translation service"
 msgid "Provider"
 msgstr "Провайдер"
 
@@ -31129,8 +31121,20 @@ msgstr "USD"
 msgid "price unknown"
 msgstr "цена неизвестна"
 
-msgid "Estimated machine translation cost is unavailable."
-msgstr "Оценка стоимости машинного перевода недоступна."
+msgid "not reported by the provider"
+msgstr "не сообщена провайдером"
 
-msgid "Automatic translation preview is unavailable. You can still apply this run."
-msgstr "Предпросмотр автоматического перевода недоступен. Запуск всё равно можно применить."
+msgid "Judge run"
+msgstr "Прогон судьи"
+
+msgid "Judge re-check"
+msgstr "Перепроверка судьёй"
+
+msgid "Deferred judge retry"
+msgstr "Отложенная повторная проверка"
+
+msgid "Automatic translation run"
+msgstr "Автоматический перевод"
+
+msgid "Automatic suggestion run"
+msgstr "Автоматические предложения"

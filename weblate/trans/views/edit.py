@@ -1671,7 +1671,10 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
     pretranslation_cost: dict[str, str | bool] = {"available": False}
     engine_ids = autoform.cleaned_data["engines"]
     if mode != "judge" and autoform.cleaned_data["auto_source"] == "mt" and engine_ids:
-        configurations_by_translation = []
+        # Every selected engine is asked for every unit, so one string in one
+        # language costs the sum over the engines; the interval bounds are the
+        # cheapest and the dearest such sum across the languages of the scope.
+        bounds_by_language: list[tuple[Decimal, Decimal]] = []
         complete = bool(mt_preview and mt_preview.per_translation)
         for translation, _writable in mt_preview.per_translation if mt_preview else []:
             configurations = translation.component.project.get_machinery_settings()
@@ -1702,17 +1705,16 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
                 high += cost_range[1]
             if not complete:
                 break
-            configurations_by_translation.extend((low, high))
-        if complete and configurations_by_translation and mt_preview:
+            bounds_by_language.append((low, high))
+        if complete and bounds_by_language and mt_preview:
             pretranslation_cost = {
                 "available": True,
                 "min": format(
-                    min(item[0] for item in configurations_by_translation)
-                    * mt_preview.writable,
+                    min(low for low, _high in bounds_by_language) * mt_preview.writable,
                     "f",
                 ),
                 "max": format(
-                    max(item[1] for item in configurations_by_translation)
+                    max(high for _low, high in bounds_by_language)
                     * mt_preview.writable,
                     "f",
                 ),
@@ -1724,7 +1726,9 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
             "remaining": judge_preview.remaining if judge_preview else 0,
             "writable": preview.writable,
             "judge_calls_initial": judge_preview.initial_calls if judge_preview else 0,
-            "judge_calls_worst_case": judge_preview.worst_case_calls if judge_preview else 0,
+            "judge_calls_worst_case": judge_preview.worst_case_calls
+            if judge_preview
+            else 0,
             "judge_cost": judge_cost,
             "pretranslation_cost": pretranslation_cost,
         }

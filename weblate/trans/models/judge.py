@@ -286,6 +286,7 @@ RUN_KIND_LABELS: dict[str, StrOrPromise] = {
     "approved": gettext_lazy("Automatic translation run"),
 }
 
+
 class ProducerRun(models.Model):
     """
     One permission-checked producer launch across one closed scope.
@@ -364,6 +365,10 @@ class ProducerRun(models.Model):
             self.configuration_snapshot
         )
         super().save(*args, **kwargs)
+
+    def get_requested_mode_label(self) -> str:
+        """Return a short human label for the launch mode, for history rows."""
+        return str(RUN_KIND_LABELS.get(self.requested_mode, self.requested_mode))
 
 
 class JudgeRequestAttempt(models.Model):
