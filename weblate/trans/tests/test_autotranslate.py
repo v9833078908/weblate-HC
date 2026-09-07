@@ -1501,6 +1501,9 @@ class ProducerRunCreationTest(ViewTestCase):
         )
         with (
             mock.patch.object(
+                BatchAutoTranslate, "_can_process_translation", return_value=True
+            ),
+            mock.patch.object(
                 BatchAutoTranslate, "_finish_translation", side_effect=ValueError("boom")
             ),
             self.assertRaises(ValueError),
@@ -1524,8 +1527,13 @@ class ProducerRunCreationTest(ViewTestCase):
             auto_translate.failure_message = "provider unavailable"
             return auto_translate.failure_message
 
-        with mock.patch.object(
-            AutoTranslate, "perform", autospec=True, side_effect=fail
+        with (
+            mock.patch.object(
+                BatchAutoTranslate, "_can_process_translation", return_value=True
+            ),
+            mock.patch.object(
+                AutoTranslate, "perform", autospec=True, side_effect=fail
+            ),
         ):
             auto = self._perform("translate")
         run = auto.active_producer_run
