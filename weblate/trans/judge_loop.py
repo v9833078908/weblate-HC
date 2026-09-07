@@ -93,7 +93,7 @@ _CANDIDATE_VERDICTS = frozenset(
 )
 # A run purpose names candidate severities, not verdicts: critical selects
 # REJECT and major selects FLAG (models/judge.py severity vocabulary).
-_CANDIDATE_VERDICT_BY_SEVERITY = {
+_CANDIDATE_VERDICT_BY_SEVERITY: dict[str, str] = {
     JudgeVerdict.Severity.CRITICAL: JudgeVerdict.Verdict.REJECT,
     JudgeVerdict.Severity.MAJOR: JudgeVerdict.Verdict.FLAG,
 }
@@ -1619,7 +1619,7 @@ def _release_judge_deferrals(token: str) -> None:
     ).update(claim_token="", claimed_at=None, claim_expires_at=None)
 
 
-_DRAIN_SEVERITY_OUTCOMES = {
+_DRAIN_SEVERITY_OUTCOMES: dict[str, JudgeRunUnit.Outcome] = {
     JudgeVerdict.Severity.NONE: JudgeRunUnit.Outcome.PASSED,
     JudgeVerdict.Severity.MINOR: JudgeRunUnit.Outcome.MINOR,
     JudgeVerdict.Severity.MAJOR: JudgeRunUnit.Outcome.MAJOR,

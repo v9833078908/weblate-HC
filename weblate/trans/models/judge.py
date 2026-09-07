@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -41,12 +42,8 @@ from weblate.utils.state import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
-
     from weblate.auth.models import User
     from weblate.glossary.models import GlossaryPromptEntry
-else:
-    from collections.abc import Mapping
 
 JUDGE_ERROR_SEPARATOR = " | "
 JUDGE_REPAIR_REQUIREMENT = (
@@ -765,6 +762,8 @@ class JudgeVerdict(models.Model):
     )
     generation_outcome_at = models.DateTimeField(null=True, blank=True)
 
+    _round_severity: str | None = None
+
     class Meta:
         verbose_name = gettext_lazy("Judge verdict")
         verbose_name_plural = gettext_lazy("Judge verdicts")
@@ -1170,6 +1169,7 @@ def judge_status_annotations() -> dict[str, models.Expression]:
         ),
         output_field=IntegerField(),
     )
+    round_severity: Case | F
     if settings.JUDGE_CONSENSUS_REJECT:
         # SQL twin of collegium_severity: a critical disputed by another
         # current parsed seat reads as major.
