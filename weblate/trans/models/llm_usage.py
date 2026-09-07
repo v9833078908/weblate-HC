@@ -163,7 +163,7 @@ def run_spend(run_id, operation: str) -> RunSpend:
         completion_tokens=Sum("completion_tokens"),
         reasoning_tokens=Sum("reasoning_tokens"),
         cached_tokens=Sum("cached_tokens"),
-        cost_usd=Sum("cost_usd"),
+        known_cost_usd=Sum("cost_usd"),
         unpriced_requests=Count("id", filter=Q(cost_usd__isnull=True)),
     )
     return RunSpend(
@@ -174,7 +174,7 @@ def run_spend(run_id, operation: str) -> RunSpend:
         completion_tokens=totals["completion_tokens"] or 0,
         reasoning_tokens=totals["reasoning_tokens"] or 0,
         cached_tokens=totals["cached_tokens"] or 0,
-        cost_usd=totals["cost_usd"] or Decimal(0),
+        cost_usd=totals["known_cost_usd"] or Decimal(0),
         unpriced_requests=totals["unpriced_requests"] or 0,
     )
 
