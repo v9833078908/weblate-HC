@@ -109,7 +109,7 @@ from weblate.machinery.yandex import YandexTranslation
 from weblate.machinery.yandexv2 import YandexV2Translation
 from weblate.machinery.youdao import YoudaoTranslation
 from weblate.memory.machine import WeblateMemory
-from weblate.trans.models import Category, Component, Project, Unit
+from weblate.trans.models import Category, Component, ProducerRun, Project, Unit
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.trans.tests.factories import make_language, make_unit
 from weblate.trans.tests.test_views import (
@@ -4346,7 +4346,26 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(log.cached_tokens, 4)
         self.assertEqual(log.project_slug, "mock")
         self.assertEqual(log.operation, LLMUsageLog.Operation.TRANSLATION)
+
         self.assertEqual(log.unit_count, 1)
+
+    @http_mock.activate
+    def test_usage_is_billed_to_the_run(self) -> None:
+        run = ProducerRun.objects.create(
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id="1",
+            scope_label="Test",
+            scope_path="/projects/test/test/",
+            requested_mode="translate",
+            cap=100,
+        )
+        self.mock_response_priced()
+        machine = self.get_machine()
+        machine.usage_run_id = str(run.pk)
+        self.assert_translate(
+            self.SUPPORTED, self.SOURCE_TRANSLATED, self.EXPECTED_LEN, machine=machine
+        )
+        self.assertEqual(LLMUsageLog.objects.get().run_id, run.pk)
 
     @http_mock.activate
     def test_usage_unit_count_reflects_split_recovery(self) -> None:

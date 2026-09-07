@@ -59,7 +59,7 @@ from weblate.trans.models.judge import (
     JudgeCandidateMetadata,
     JudgeDeferral,
     JudgeRequestAttempt,
-    JudgeRun,
+    ProducerRun,
     JudgeRunUnit,
     JudgeVerdict,
     collegium_verdict,
@@ -167,7 +167,9 @@ def _machinery_candidates(
     ]
 
 
-def repair_targets(units: list[Unit], user: User | None) -> dict[int, list[str]]:
+def repair_targets(
+    units: list[Unit], user: User | None, *, run_id: str | None = None
+) -> dict[int, list[str]]:
     """
     Return usable repair targets keyed by unit id, writing nothing.
 
@@ -185,6 +187,7 @@ def repair_targets(units: list[Unit], user: User | None) -> dict[int, list[str]]
         return {}
     setting = settings_map[engine_id]
     engine = MACHINERY[engine_id](setting)
+    engine.usage_run_id = run_id
     if engine.batch_size == 1:
         return _repair_targets_per_unit(engine, units, user)
     try:
@@ -456,7 +459,7 @@ class _SeatJob:
     model: str
     requests: list[JudgeRequest]
     persist: OnBatch
-    run: JudgeRun | None
+    run: ProducerRun | None
     retry_budget: RetryBudget
     attempt: int
     retry_deadline: float | None
@@ -1006,11 +1009,11 @@ def _sync_deferral(
     )
 
 
-def _allocate_request_round(run_id: uuid.UUID, run: JudgeRun | None) -> int:
+def _allocate_request_round(run_id: uuid.UUID, run: ProducerRun | None) -> int:
     """Reserve one monotonic request-round coordinate for a JudgeRun."""
     if run is not None:
         with transaction.atomic():
-            locked_run = JudgeRun.objects.select_for_update().get(pk=run.pk)
+            locked_run = ProducerRun.objects.select_for_update().get(pk=run.pk)
             request_round = locked_run.next_request_round
             locked_run.next_request_round += 1
             locked_run.save(update_fields=["next_request_round"])
@@ -1259,7 +1262,7 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
     writable_ids: set[int],
     user: User | None,
     on_batch: OnBatch | None = None,
-    run: JudgeRun | None = None,
+    run: ProducerRun | None = None,
     seats: tuple[int, ...] | None = None,
     use_cache: bool = True,
     retry_deadline: float | None = None,
@@ -1465,7 +1468,11 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                 or (item.needs_candidate and item.unit.id not in reused_candidate_ids)
             )
         ]
-        repairs = repair_targets(repairable_units, user) if repairable_units else {}
+        repairs = (
+            repair_targets(repairable_units, user, run_id=run_id)
+            if repairable_units
+            else {}
+        )
         unsupported_language = (
             unsupported_repair_language(repairable_units) if repairable_units else None
         )
@@ -1650,7 +1657,7 @@ def _close_deferrals_for_disabled_judge() -> None:
 
 
 def _finalize_drain_run(
-    run: JudgeRun,
+    run: ProducerRun,
     units: Sequence[Unit],
     before_snapshots: dict[int, tuple[list[str], int]],
 ) -> None:
@@ -1802,7 +1809,7 @@ def _select_drain_requests(
 
 
 def _drain_seat(
-    run: JudgeRun,
+    run: ProducerRun,
     profiles: dict[int, object],
     claimed: list[JudgeDeferral],
     started: float,
@@ -1869,11 +1876,11 @@ def _run_drain_translation(
     touched_unit_ids = {
         unit.id for seat_units in requested_by_seat.values() for unit in seat_units
     }
-    run = JudgeRun.objects.create(
+    run = ProducerRun.objects.create(
         actor=None,
         started=timezone.now(),
-        status=JudgeRun.Status.RUNNING,
-        scope_type=JudgeRun.ScopeType.TRANSLATION,
+        status=ProducerRun.Status.RUNNING,
+        scope_type=ProducerRun.ScopeType.TRANSLATION,
         scope_id=str(translation.pk),
         scope_label=str(translation),
         scope_path=translation.get_absolute_url(),
@@ -1889,15 +1896,15 @@ def _run_drain_translation(
         touched_units = [unit for unit in units if unit.id in touched_unit_ids]
         _finalize_drain_run(run, touched_units, before_snapshots)
     except Exception:
-        JudgeRun.objects.filter(pk=run.pk).update(
-            status=JudgeRun.Status.FAILED,
+        ProducerRun.objects.filter(pk=run.pk).update(
+            status=ProducerRun.Status.FAILED,
             failure="Deferred retry drain pass failed.",
             finished=timezone.now(),
         )
         raise
     else:
-        JudgeRun.objects.filter(pk=run.pk).update(
-            status=JudgeRun.Status.COMPLETED, finished=timezone.now()
+        ProducerRun.objects.filter(pk=run.pk).update(
+            status=ProducerRun.Status.COMPLETED, finished=timezone.now()
         )
     return processed
 
@@ -1962,15 +1969,15 @@ def recheck_query(unit_id: int) -> str:
     return f"id:{unit_id}"
 
 
-def active_recheck_run(unit: Unit) -> JudgeRun | None:
+def active_recheck_run(unit: Unit) -> ProducerRun | None:
     """Return the queued or running re-check for this unit, if in flight."""
     return (
-        JudgeRun.objects.filter(
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
+        ProducerRun.objects.filter(
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(unit.translation_id),
             requested_mode="recheck",
             requested_query=recheck_query(unit.pk),
-            status__in=[JudgeRun.Status.QUEUED, JudgeRun.Status.RUNNING],
+            status__in=[ProducerRun.Status.QUEUED, ProducerRun.Status.RUNNING],
         )
         .order_by("-created")
         .first()
@@ -2024,7 +2031,7 @@ def active_judge_candidate(unit: Unit, verdict: JudgeVerdict | None):
     return None
 
 
-def queue_judge_recheck(unit: Unit, actor: User) -> tuple[JudgeRun, bool]:
+def queue_judge_recheck(unit: Unit, actor: User) -> tuple[ProducerRun, bool]:
     """
     Reuse or create the one queued/running re-check run for this unit.
 
@@ -2047,16 +2054,16 @@ def queue_judge_recheck(unit: Unit, actor: User) -> tuple[JudgeRun, bool]:
         existing = active_recheck_run(unit)
         if existing is not None:
             return existing, False
-        run = JudgeRun.objects.create(
+        run = ProducerRun.objects.create(
             actor=actor,
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(translation.pk),
             scope_label=str(translation),
             scope_path=translation.get_absolute_url(),
             requested_query=query,
             requested_mode="recheck",
             cap=1,
-            status=JudgeRun.Status.QUEUED,
+            status=ProducerRun.Status.QUEUED,
             configuration_snapshot=judge_configuration_snapshot(),
         )
 
@@ -2072,20 +2079,20 @@ def queue_judge_recheck(unit: Unit, actor: User) -> tuple[JudgeRun, bool]:
                 threshold=MACHINERY_DEFAULT_THRESHOLD,
                 translation_id=translation.pk,
                 unit_ids=[unit.pk],
-                judge_run_id=str(run.pk),
+                producer_run_id=str(run.pk),
                 judge_pretranslate=False,
                 judge_mutating_repairs=False,
                 judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
             )
         except Exception:
             LOGGER.exception("Failed to dispatch a judge re-check run")
-            JudgeRun.objects.filter(pk=run.pk).update(
-                status=JudgeRun.Status.FAILED,
+            ProducerRun.objects.filter(pk=run.pk).update(
+                status=ProducerRun.Status.FAILED,
                 finished=timezone.now(),
                 failure="The re-check could not be queued for execution.",
             )
             return
-        JudgeRun.objects.filter(pk=run.pk).update(task_id=task.id)
+        ProducerRun.objects.filter(pk=run.pk).update(task_id=task.id)
 
     transaction.on_commit(dispatch)
     return run, True

@@ -193,6 +193,7 @@ class BaseOpenAITranslation(BaseLLMTranslation):
             operation=LLMUsageLog.Operation.TRANSLATION,
             unit_count=llm_batch_unit_count.get() or None,
             batch_size=batch_size,
+            run_id=self.usage_run_id,
         )
         llm_usage_record.set(record.pk)
 

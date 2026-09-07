@@ -1007,7 +1007,7 @@ def auto_translate(
     activity_log_task_count: int | None = None,
     enforce_permissions: bool = True,
     overwrite_existing: bool = False,
-    judge_run_id: str | None = None,
+    producer_run_id: str | None = None,
     judge_pretranslate: bool = True,
     judge_mutating_repairs: bool = True,
     judge_candidate_severities: tuple[str, ...] = ("critical", "major"),
@@ -1030,16 +1030,16 @@ def auto_translate(
             )
             # A pre-created re-check run would otherwise stay QUEUED forever
             # and keep suppressing every replacement re-check for that unit.
-            if judge_run_id:
+            if producer_run_id:
                 from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
-                    JudgeRun,
+                    ProducerRun,
                 )
 
-                JudgeRun.objects.filter(
-                    pk=judge_run_id,
-                    status__in=[JudgeRun.Status.QUEUED, JudgeRun.Status.RUNNING],
+                ProducerRun.objects.filter(
+                    pk=producer_run_id,
+                    status__in=[ProducerRun.Status.QUEUED, ProducerRun.Status.RUNNING],
                 ).update(
-                    status=JudgeRun.Status.FAILED,
+                    status=ProducerRun.Status.FAILED,
                     finished=timezone.now(),
                     failure=result["message"],
                 )
@@ -1060,7 +1060,7 @@ def auto_translate(
             unit_ids=unit_ids,
             enforce_permissions=enforce_permissions,
             overwrite_existing=overwrite_existing,
-            judge_run_id=judge_run_id,
+            producer_run_id=producer_run_id,
             judge_pretranslate=judge_pretranslate,
             judge_mutating_repairs=judge_mutating_repairs,
             judge_candidate_severities=judge_candidate_severities,
@@ -1075,9 +1075,9 @@ def auto_translate(
                 ),
             )
         except PermissionDenied as error:
-            if auto.active_judge_run is not None:
+            if auto.active_producer_run is not None:
                 result["report_url"] = reverse(
-                    "judge-run", kwargs={"pk": auto.active_judge_run.id}
+                    "judge-run", kwargs={"pk": auto.active_producer_run.id}
                 )
             result.update({"message": str(error), "warnings": auto.get_warnings()})
             return store_auto_translate_activity_log(
@@ -1087,9 +1087,9 @@ def auto_translate(
                 task_count=activity_log_task_count,
             )
         except JudgeError as error:
-            if auto.active_judge_run is not None:
+            if auto.active_producer_run is not None:
                 result["report_url"] = reverse(
-                    "judge-run", kwargs={"pk": auto.active_judge_run.id}
+                    "judge-run", kwargs={"pk": auto.active_producer_run.id}
                 )
             result.update(
                 {
@@ -1104,9 +1104,9 @@ def auto_translate(
                 task_count=activity_log_task_count,
             )
         result.update({"message": message, "warnings": auto.get_warnings()})
-        if auto.active_judge_run is not None:
+        if auto.active_producer_run is not None:
             result["report_url"] = reverse(
-                "judge-run", kwargs={"pk": auto.active_judge_run.id}
+                "judge-run", kwargs={"pk": auto.active_producer_run.id}
             )
         return store_auto_translate_activity_log(
             activity_log_id,
@@ -1165,9 +1165,9 @@ def auto_translate_component(
             "message": message,
             "warnings": auto.get_warnings(),
         }
-        if auto.active_judge_run is not None:
+        if auto.active_producer_run is not None:
             result["report_url"] = reverse(
-                "judge-run", kwargs={"pk": auto.active_judge_run.id}
+                "judge-run", kwargs={"pk": auto.active_producer_run.id}
             )
         return store_auto_translate_activity_log(
             activity_log_id,
@@ -1180,9 +1180,9 @@ def auto_translate_component(
         "message": message,
         "warnings": auto.get_warnings(),
     }
-    if auto.active_judge_run is not None:
+    if auto.active_producer_run is not None:
         result["report_url"] = reverse(
-            "judge-run", kwargs={"pk": auto.active_judge_run.id}
+            "judge-run", kwargs={"pk": auto.active_producer_run.id}
         )
     return store_auto_translate_activity_log(activity_log_id, result)
 

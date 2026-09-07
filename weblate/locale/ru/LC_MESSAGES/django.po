@@ -31147,3 +31147,58 @@ msgstr "текущий текст изменился после этого пр�
 #~ msgctxt "naturaltime"
 #~ msgid "%(delta)s from now"
 #~ msgstr "через %(delta)s"
+
+msgid "Requests sent"
+msgstr "Отправлено запросов"
+
+msgid "Strings sent"
+msgstr "Отправлено строк"
+
+msgid "Prompt tokens"
+msgstr "Токены запроса"
+
+msgid "Completion tokens"
+msgstr "Токены ответа"
+
+msgid "Price unknown for some requests; total is incomplete."
+msgstr "Цена некоторых запросов неизвестна; сумма неполная."
+
+msgid "What was written"
+msgstr "Что записано"
+
+msgid "No large language model was used by this run."
+msgstr "В этом запуске большая языковая модель не использовалась."
+
+msgid "Cost by language, provider, and model"
+msgstr "Стоимость по языку, провайдеру и модели"
+
+msgctxt "machine translation service"
+msgid "Provider"
+msgstr "Провайдер"
+
+msgid "Model"
+msgstr "Модель"
+
+msgid "USD"
+msgstr "USD"
+
+msgid "price unknown"
+msgstr "цена неизвестна"
+
+msgid "not reported by the provider"
+msgstr "не сообщена провайдером"
+
+msgid "Judge run"
+msgstr "Прогон судьи"
+
+msgid "Judge re-check"
+msgstr "Перепроверка судьёй"
+
+msgid "Deferred judge retry"
+msgstr "Отложенная повторная проверка"
+
+msgid "Automatic translation run"
+msgstr "Автоматический перевод"
+
+msgid "Automatic suggestion run"
+msgstr "Автоматические предложения"

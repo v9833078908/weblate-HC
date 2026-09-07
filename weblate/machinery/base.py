@@ -122,6 +122,7 @@ class BatchMachineTranslation(DocVersionsMixin):
     # requests are dominated by remote latency gain from more than one.
     batch_concurrency = 1
     accounting_key = "external"
+    usage_run_id: str | None = None
     force_uncleanup = False
     highlight_syntax = False
     glossary_support = False

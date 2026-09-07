@@ -17,7 +17,7 @@ from weblate.trans.judge_loop import (
     recheck_query,
 )
 from weblate.trans.models.judge import (
-    JudgeRun,
+    ProducerRun,
     JudgeRunUnit,
     JudgeVerdict,
     compute_context_hash,
@@ -739,8 +739,8 @@ class JudgeAutoTranslateTest(ViewTestCase):
                 source_component_ids=None,
             )
         self.assertIn("refused the request (HTTP 400)", message)
-        run = JudgeRun.objects.get()
-        self.assertEqual(run.status, JudgeRun.Status.FAILED)
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
         self.assertIn("refused the request (HTTP 400)", run.failure)
         # The refusal itself contributes no unparsed verdict.
         self.assertEqual(
@@ -864,7 +864,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
         units = [translation.unit_set.first() for translation in translations]
         self.assertTrue(all(units))
 
-        seen_runs: list[JudgeRun | None] = []
+        seen_runs: list[ProducerRun | None] = []
 
         def fake_batch(units, *, writable_ids, user, on_batch=None, run=None, **kwargs):
             seen_runs.append(run)
@@ -905,7 +905,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
                 source_component_ids=None,
             )
 
-        run = JudgeRun.objects.get()
+        run = ProducerRun.objects.get()
         self.assertTrue(all(seen_run == run for seen_run in seen_runs))
         self.assertEqual(
             set(JudgeRunUnit.objects.filter(run=run).values_list("unit_id", flat=True)),
@@ -990,8 +990,8 @@ class JudgeAutoTranslateTest(ViewTestCase):
                 source_component_ids=None,
             )
 
-        run = JudgeRun.objects.get()
-        self.assertEqual(run.status, JudgeRun.Status.FAILED)
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
         self.assertIsNotNone(run.finished)
         self.assertEqual(run.failure, "boom")
 
@@ -1070,14 +1070,14 @@ class JudgeAutoTranslateTest(ViewTestCase):
                 threshold=80,
                 source_component_ids=None,
             )
-        run = JudgeRun.objects.get()
+        run = ProducerRun.objects.get()
         self.assertEqual(run.actor_id, self.user.pk)
-        self.assertEqual(run.scope_type, JudgeRun.ScopeType.PROJECT)
+        self.assertEqual(run.scope_type, ProducerRun.ScopeType.PROJECT)
         self.assertEqual(run.scope_id, str(self.project.pk))
         self.assertEqual(run.scope_label, str(self.project))
         self.assertEqual(run.scope_path, self.project.get_absolute_url())
 
-    def test_finish_judge_run_does_not_overwrite_a_terminal_run(self) -> None:
+    def test_finish_producer_run_does_not_overwrite_a_terminal_run(self) -> None:
         unit = self.get_unit()
         batch = BatchAutoTranslate(
             self.component,
@@ -1094,17 +1094,17 @@ class JudgeAutoTranslateTest(ViewTestCase):
                 threshold=80,
                 source_component_ids=None,
             )
-        run = JudgeRun.objects.get()
-        self.assertEqual(run.status, JudgeRun.Status.COMPLETED)
+        run = ProducerRun.objects.get()
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
         first_finished = run.finished
 
         # A second finalize call (a redundant exception handler, a stray
         # retry) must never overwrite an already-terminal run.
-        batch._finish_judge_run(  # ruff: ignore[private-member-access]
-            run, JudgeRun.Status.FAILED, "should not apply"
+        batch._finish_producer_run(  # ruff: ignore[private-member-access]
+            run, ProducerRun.Status.FAILED, "should not apply"
         )
         run.refresh_from_db()
-        self.assertEqual(run.status, JudgeRun.Status.COMPLETED)
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
         self.assertEqual(run.finished, first_finished)
         self.assertEqual(run.failure, "")
 
@@ -1118,7 +1118,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             unit_ids=[unit.id],
             enforce_permissions=False,
         )
-        run = batch._create_judge_run()  # ruff: ignore[private-member-access]
+        run = batch._create_producer_run()  # ruff: ignore[private-member-access]
         # Simulate a retried step recording the same skip twice: this must
         # update the one (run, unit) row, never insert a second one.
         batch._record_skipped_judge_units(  # ruff: ignore[private-member-access]
@@ -1141,7 +1141,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             unit_ids=[unit.id],
             enforce_permissions=False,
         )
-        run = batch._create_judge_run()  # ruff: ignore[private-member-access]
+        run = batch._create_producer_run()  # ruff: ignore[private-member-access]
         JudgeRunUnit.objects.create(
             run=run,
             unit=unit,
@@ -1224,16 +1224,16 @@ class JudgeAutoTranslateTest(ViewTestCase):
 
     def _make_queued_recheck_run(self, unit, *, query=None, status=None):
         translation = unit.translation
-        return JudgeRun.objects.create(
+        return ProducerRun.objects.create(
             actor=self.user,
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(translation.pk),
             scope_label=str(translation),
             scope_path=translation.get_absolute_url(),
             requested_query=query or recheck_query(unit.pk),
             requested_mode="recheck",
             cap=1,
-            status=status or JudgeRun.Status.QUEUED,
+            status=status or ProducerRun.Status.QUEUED,
             configuration_snapshot={},
         )
 
@@ -1463,7 +1463,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             mode="judge",
             unit_ids=[unit.pk],
             enforce_permissions=False,
-            judge_run_id=str(run.pk),
+            producer_run_id=str(run.pk),
             judge_pretranslate=False,
             judge_mutating_repairs=False,
             judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
@@ -1478,15 +1478,15 @@ class JudgeAutoTranslateTest(ViewTestCase):
                 source_component_ids=None,
             )
         run.refresh_from_db()
-        self.assertEqual(run.status, JudgeRun.Status.COMPLETED)
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
         self.assertIsNotNone(run.finished)
         # The batch received the adopted run, not a newly created one.
         self.assertEqual(run_batch.call_args.kwargs["run"].pk, run.pk)
-        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 1)
+        self.assertEqual(ProducerRun.objects.filter(requested_mode="recheck").count(), 1)
 
     def test_worker_refuses_a_run_that_is_not_queued(self) -> None:
         unit = self.get_unit()
-        run = self._make_queued_recheck_run(unit, status=JudgeRun.Status.RUNNING)
+        run = self._make_queued_recheck_run(unit, status=ProducerRun.Status.RUNNING)
         batch = BatchAutoTranslate(
             self.component,
             user=self.user,
@@ -1494,7 +1494,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             mode="judge",
             unit_ids=[unit.pk],
             enforce_permissions=False,
-            judge_run_id=str(run.pk),
+            producer_run_id=str(run.pk),
             judge_pretranslate=False,
         )
         with self.assertRaises(ValueError):
@@ -1506,7 +1506,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             )
         run.refresh_from_db()
         # Someone else's RUNNING run must not be failed by this worker.
-        self.assertEqual(run.status, JudgeRun.Status.RUNNING)
+        self.assertEqual(run.status, ProducerRun.Status.RUNNING)
 
     def test_worker_fails_a_run_whose_query_mismatches(self) -> None:
         unit = self.get_unit()
@@ -1518,7 +1518,7 @@ class JudgeAutoTranslateTest(ViewTestCase):
             mode="judge",
             unit_ids=[unit.pk],
             enforce_permissions=False,
-            judge_run_id=str(run.pk),
+            producer_run_id=str(run.pk),
             judge_pretranslate=False,
         )
         with self.assertRaises(ValueError):
@@ -1529,5 +1529,5 @@ class JudgeAutoTranslateTest(ViewTestCase):
                 source_component_ids=None,
             )
         run.refresh_from_db()
-        self.assertEqual(run.status, JudgeRun.Status.FAILED)
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
         self.assertTrue(run.failure)

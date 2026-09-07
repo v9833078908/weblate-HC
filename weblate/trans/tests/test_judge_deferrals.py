@@ -26,7 +26,7 @@ from weblate.trans.models.judge import (
     JudgeAdaptiveState,
     JudgeDeferral,
     JudgeRequestAttempt,
-    JudgeRun,
+    ProducerRun,
     JudgeRunUnit,
     JudgeVerdict,
 )
@@ -483,12 +483,12 @@ class JudgeDeferralTest(ViewTestCase):
         self.assertEqual(
             unit.judge_deferrals.get(seat=1).state, JudgeDeferral.State.CLOSED
         )
-        run = JudgeRun.objects.get()
+        run = ProducerRun.objects.get()
         self.assertIsNone(run.actor)
-        self.assertEqual(run.scope_type, JudgeRun.ScopeType.TRANSLATION)
+        self.assertEqual(run.scope_type, ProducerRun.ScopeType.TRANSLATION)
         self.assertEqual(run.scope_id, str(unit.translation_id))
         self.assertEqual(run.requested_mode, "drain")
-        self.assertEqual(run.status, JudgeRun.Status.COMPLETED)
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
         run_unit = JudgeRunUnit.objects.get(run=run, unit_id_snapshot=unit.pk)
         self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.CRITICAL)
         self.assertEqual(run_unit.initial_severity, "critical")
@@ -530,7 +530,7 @@ class JudgeDeferralTest(ViewTestCase):
             processed = drain_judge_deferrals()
 
         self.assertEqual(processed, 1)
-        run = JudgeRun.objects.get()
+        run = ProducerRun.objects.get()
         run_unit = JudgeRunUnit.objects.get(run=run, unit_id_snapshot=unit.pk)
         self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.MAJOR)
         self.assertEqual(run_unit.initial_severity, "major")
@@ -573,7 +573,7 @@ class JudgeDeferralTest(ViewTestCase):
             processed = drain_judge_deferrals()
 
         self.assertEqual(processed, 1)
-        run = JudgeRun.objects.get()
+        run = ProducerRun.objects.get()
         run_unit = JudgeRunUnit.objects.get(run=run, unit_id_snapshot=unit.pk)
         self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.CRITICAL)
         self.assertEqual(run_unit.initial_severity, "critical")
@@ -602,7 +602,7 @@ class JudgeDeferralTest(ViewTestCase):
             unit.judge_deferrals.get(seat=1).state,
             (JudgeDeferral.State.QUEUED, JudgeDeferral.State.SLOW),
         )
-        run = JudgeRun.objects.get()
+        run = ProducerRun.objects.get()
         run_unit = JudgeRunUnit.objects.get(run=run, unit_id_snapshot=unit.pk)
         self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.DEFERRED)
 
@@ -621,7 +621,7 @@ class JudgeDeferralTest(ViewTestCase):
         deferral = unit.judge_deferrals.get(seat=1)
         self.assertEqual(deferral.state, JudgeDeferral.State.CLOSED)
         self.assertIsNotNone(deferral.closed_at)
-        self.assertFalse(JudgeRun.objects.exists())
+        self.assertFalse(ProducerRun.objects.exists())
 
     def test_drain_retains_deferrals_on_a_recoverable_configuration_failure(
         self,

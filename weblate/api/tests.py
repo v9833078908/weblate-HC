@@ -88,7 +88,7 @@ from weblate.trans.models import (
 )
 from weblate.trans.models.component import ComponentQuerySet
 from weblate.trans.models.judge import (
-    JudgeRun,
+    ProducerRun,
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
@@ -13447,7 +13447,7 @@ class SuggestionAPITest(APIBaseTest):
         unit.refresh_from_db()
         self.assertEqual(unit.state, STATE_FUZZY)
         self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
-        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 1)
+        self.assertEqual(ProducerRun.objects.filter(requested_mode="recheck").count(), 1)
 
     @override_settings(
         JUDGE_ENABLED=True,

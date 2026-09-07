@@ -14,6 +14,7 @@ import sys
 import threading
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
+from unittest import mock
 from unittest.mock import Mock, patch
 
 from django.conf import settings
@@ -46,7 +47,7 @@ from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models import (
     Change,
     Component,
-    JudgeRun,
+    ProducerRun,
     PendingUnitChange,
     Project,
     Translation,
@@ -931,13 +932,13 @@ class AutoTranslationTest(ViewTestCase):
                 component_id=self.component.id,
                 enforce_permissions=False,
             )
-        run = JudgeRun.objects.get()
+        run = ProducerRun.objects.get()
         self.assertIn("report_url", result)
         self.assertEqual(
             result["report_url"], reverse("judge-run", kwargs={"pk": run.pk})
         )
 
-    def test_non_judge_task_result_has_no_report_url(self) -> None:
+    def test_non_judge_task_result_links_to_its_report(self) -> None:
         result = auto_translate(
             user_id=self.user.id,
             mode="translate",
@@ -949,8 +950,10 @@ class AutoTranslationTest(ViewTestCase):
             component_id=self.component.id,
             enforce_permissions=False,
         )
-        self.assertNotIn("report_url", result)
-        self.assertFalse(JudgeRun.objects.exists())
+        run = ProducerRun.objects.get()
+        self.assertEqual(
+            result["report_url"], reverse("judge-run", kwargs={"pk": run.pk})
+        )
 
     @override_settings(
         JUDGE_ENABLED=True,
@@ -970,7 +973,7 @@ class AutoTranslationTest(ViewTestCase):
                 user_id=self.user.id,
                 enforce_permissions=False,
             )
-        run = JudgeRun.objects.get()
+        run = ProducerRun.objects.get()
         self.assertEqual(
             result["report_url"], reverse("judge-run", kwargs={"pk": run.pk})
         )
@@ -1422,6 +1425,124 @@ class AutoTranslationMtTest(ViewTestCase):
         translation = self.component3.translation_set.get(language_code="cs")
         translation.invalidate_cache()
         self.assertEqual(translation.stats.translated, 0)
+
+
+
+class ProducerRunCreationTest(ViewTestCase):
+    def _perform(
+        self,
+        mode: str,
+        *,
+        scope=None,
+        auto_source: str = "mt",
+    ) -> BatchAutoTranslate:
+        auto = BatchAutoTranslate(
+            self.component if scope is None else scope,
+            user=self.user,
+            q="",
+            mode=mode,
+            component_wide=True,
+            # The base component fixture may have no eligible strings when the
+            # built-in ``weblate`` machinery is disabled.  Pin the lifecycle
+            # probe to a real unit so the child AutoTranslate is dispatched.
+            unit_ids=[self.get_unit().pk],
+        )
+        auto.perform(
+            auto_source=auto_source,
+            engines=["weblate"],
+            threshold=80,
+            source_component_ids=None,
+        )
+        return auto
+
+    def test_machine_translation_launch_records_a_run(self) -> None:
+        auto = self._perform("translate")
+        run = auto.active_producer_run
+        self.assertIsNotNone(run)
+        run.refresh_from_db()
+        self.assertEqual(run.requested_mode, "translate")
+        self.assertEqual(run.actor, self.user)
+        self.assertEqual(run.status, ProducerRun.Status.COMPLETED)
+        self.assertIsNotNone(run.finished)
+
+    def test_suggest_launch_records_its_own_mode(self) -> None:
+        auto = self._perform("suggest")
+        self.assertEqual(auto.active_producer_run.requested_mode, "suggest")
+
+    def test_category_and_project_language_launches_record_their_own_scopes(
+        self,
+    ) -> None:
+        category = self.create_category(project=self.component.project)
+        project_language = ProjectLanguage(
+            self.component.project, self.get_translation().language
+        )
+        for scope, scope_type in (
+            (category, ProducerRun.ScopeType.CATEGORY),
+            (project_language, ProducerRun.ScopeType.PROJECT_LANGUAGE),
+        ):
+            with self.subTest(scope=scope):
+                run = self._perform("translate", scope=scope).active_producer_run
+                self.assertIsNotNone(run)
+                self.assertEqual(run.scope_type, scope_type)
+                self.assertEqual(run.scope_id, str(scope.pk))
+
+    def test_translation_memory_launch_records_no_run(self) -> None:
+        """A launch that asks no model has no cost, so it gets no receipt."""
+        auto = self._perform("translate", auto_source="others")
+        self.assertIsNone(auto.active_producer_run)
+        self.assertFalse(ProducerRun.objects.exists())
+
+    def test_exception_marks_the_launch_failed(self) -> None:
+        auto = BatchAutoTranslate(
+            self.component,
+            user=self.user,
+            q="",
+            mode="translate",
+            component_wide=True,
+            unit_ids=[self.get_unit().pk],
+        )
+        with (
+            mock.patch.object(
+                BatchAutoTranslate, "_can_process_translation", return_value=True
+            ),
+            mock.patch.object(
+                BatchAutoTranslate, "_finish_translation", side_effect=ValueError("boom")
+            ),
+            self.assertRaises(ValueError),
+        ):
+            auto.perform(
+                auto_source="mt",
+                engines=["weblate"],
+                threshold=80,
+                source_component_ids=None,
+            )
+        run = auto.active_producer_run
+        self.assertIsNotNone(run)
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertEqual(run.failure, "boom")
+
+    def test_swallowed_mt_failure_finalizes_the_run_as_failed(self) -> None:
+        """AutoTranslate records expected provider errors instead of raising."""
+
+        def fail(auto_translate, **_kwargs) -> str:
+            auto_translate.failure_message = "provider unavailable"
+            return auto_translate.failure_message
+
+        with (
+            mock.patch.object(
+                BatchAutoTranslate, "_can_process_translation", return_value=True
+            ),
+            mock.patch.object(
+                AutoTranslate, "perform", autospec=True, side_effect=fail
+            ),
+        ):
+            auto = self._perform("translate")
+        run = auto.active_producer_run
+        self.assertIsNotNone(run)
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertEqual(run.failure, "provider unavailable")
 
 
 class RecordingTranslation(DummyTranslation):

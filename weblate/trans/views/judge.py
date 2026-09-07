@@ -17,37 +17,53 @@ links to (task 2's own test contract). No count on this page is a cost figure.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Case, CharField, F, Q, Value, When
+from django.db.models import Case, CharField, Count, F, Q, Sum, Value, When
 from django.db.models.functions import MD5, Cast
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
-from django.utils.translation import gettext_lazy, pgettext_lazy
+from django.utils.translation import gettext, gettext_lazy, pgettext_lazy
 
-from weblate.trans.models import Component, JudgeRun, JudgeRunUnit, Project, Translation
+from weblate.lang.models import Language
+from weblate.trans.models import (
+    Category,
+    Component,
+    JudgeRunUnit,
+    ProducerRun,
+    Project,
+    Translation,
+)
 from weblate.trans.models.judge import (
+    RUN_KIND_LABELS,
     SEVERITY_RANK,
     JudgeVerdict,
     compute_target_storage_hash,
 )
+from weblate.trans.models.llm_usage import LLMUsageLog, run_spend
+from weblate.utils.stats import ProjectLanguage
 from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from django.db.models import Model, QuerySet
 
     from weblate.auth.models import AuthenticatedHttpRequest
 
 _SCOPE_MODELS: dict[str, type[Model]] = {
-    JudgeRun.ScopeType.TRANSLATION: Translation,
-    JudgeRun.ScopeType.COMPONENT: Component,
-    JudgeRun.ScopeType.PROJECT: Project,
-    JudgeRun.ScopeType.WORKSPACE: Workspace,
+    ProducerRun.ScopeType.TRANSLATION: Translation,
+    ProducerRun.ScopeType.COMPONENT: Component,
+    ProducerRun.ScopeType.CATEGORY: Category,
+    ProducerRun.ScopeType.PROJECT: Project,
+    ProducerRun.ScopeType.WORKSPACE: Workspace,
 }
 
 _OUTCOME = JudgeRunUnit.Outcome
@@ -59,8 +75,12 @@ _RESOLUTION = JudgeVerdict.Resolution
 # "recheck" and the deferral drain pass writes "drain". An allowlist rather
 # than an exclusion list: a mode added later must opt into the menu
 # explicitly instead of silently competing with real launches for its rows.
-HISTORY_MODES = ("judge",)
+HISTORY_MODES = ("judge", "translate", "suggest", "fuzzy", "approved")
 
+# Modes that contain verdict data and must retain the review gate.
+JUDGE_MODES = ("judge", "recheck", "drain")
+# Modes produced by AutoForm that contain only the launcher-visible receipt.
+MT_LAUNCH_MODES = ("translate", "suggest", "fuzzy", "approved")
 # Buckets that make up the producer's "what to do" list. Ordered by what
 # costs the producer most to leave alone: critical, major, minor, then the
 # two transport/evidence buckets that need a re-check.
@@ -304,8 +324,17 @@ def _annotate_row(row: JudgeRunUnit) -> None:
         )
 
 
-def _get_scope(run: JudgeRun):
+def _get_scope(run: ProducerRun):
     """Resolve the run's closed scope, or 404 when it no longer exists."""
+    if run.scope_type == ProducerRun.ScopeType.PROJECT_LANGUAGE:
+        try:
+            project_id, language_id = map(int, run.scope_id.split("-", 1))
+            return ProjectLanguage(
+                Project.objects.get(pk=project_id),
+                Language.objects.get(pk=language_id),
+            )
+        except (Project.DoesNotExist, Language.DoesNotExist, ValueError) as error:
+            raise Http404 from error
     model = _SCOPE_MODELS.get(run.scope_type)
     if model is None:
         raise Http404
@@ -315,88 +344,170 @@ def _get_scope(run: JudgeRun):
         raise Http404 from error
 
 
-def user_can_view_judge_run(user, scope) -> bool:
-    """Whether ``user`` currently (not at launch time) may view a run's scope."""
-    return user.has_perm("translation.auto", scope) and user.has_perm(
-        "unit.review", scope
+def producer_run_modes(user, scope) -> tuple[str, ...]:
+    """Which of ``HISTORY_MODES`` this user may currently see for this scope."""
+    if not user.has_perm("translation.auto", scope):
+        return ()
+    may_review = settings.JUDGE_ENABLED and user.has_perm("unit.review", scope)
+    return tuple(
+        mode
+        for mode in HISTORY_MODES
+        if mode in MT_LAUNCH_MODES or (may_review and mode in JUDGE_MODES)
     )
 
 
-def _scope_run_query(scope: Translation | Component | Project | Workspace) -> Q:
+def user_can_view_producer_run(user, scope, run) -> bool:
+    """Whether ``user`` currently may view this run."""
+    if not user.has_perm("translation.auto", scope):
+        return False
+    if run.requested_mode in MT_LAUNCH_MODES:
+        return True
+    if run.requested_mode in JUDGE_MODES:
+        return settings.JUDGE_ENABLED and user.has_perm("unit.review", scope)
+    return False
+
+
+def _cast_ids(queryset) -> QuerySet:
+    """Return the scope ids of a nesting level, as ``scope_id`` stores them."""
+    return queryset.annotate(_scope_id=Cast("pk", CharField())).values("_scope_id")
+
+
+def _project_language_runs(project_ids: Iterable[int]) -> Q:
+    """
+    Match the project-language runs of the given projects.
+
+    ``ProjectLanguage.pk`` is ``"<project>-<language>"``
+    (``weblate/utils/stats.py``), so membership is a prefix test rather than
+    a subquery, and the trailing dash keeps project 1 from matching project
+    11. The ids are passed in already known: a project knows its own, and a
+    workspace holds few projects.
+    """
+    query = Q(pk=None)
+    for project_id in project_ids:
+        query |= Q(
+            scope_type=ProducerRun.ScopeType.PROJECT_LANGUAGE,
+            scope_id__startswith=f"{project_id}-",
+        )
+    return query
+
+
+def _scope_run_query(
+    scope: Translation | Component | Category | Project | ProjectLanguage | Workspace,
+) -> Q:
     """
     Match the runs launched for this scope and for everything nested in it.
 
-    A translation matches itself alone; a component also matches its
-    translations; a project also matches its components and their
-    translations; a workspace also matches its projects, their components
-    and their translations. ``scope_id`` stores ``str(pk)``, so each nested
-    level's membership is matched through a ``Cast("pk", CharField())``
-    subquery over that level's own queryset: one SQL subquery per branch,
-    evaluated inside the single run lookup, never a materialized id list
-    per nesting level (which a project page would pay one query for).
-    An unknown scope matches nothing.
+    A translation and a project language match themselves alone; a category
+    also matches its nested categories, their components and translations; a
+    component also matches its translations; a project also matches its
+    categories, project languages, components and their translations; a
+    workspace also matches everything of its projects. ``scope_id`` stores
+    ``str(pk)``, so each nested level's membership is matched through a
+    ``Cast("pk", CharField())`` subquery over that level's own queryset: one
+    SQL subquery per branch, evaluated inside the single run lookup, never a
+    materialized id list per nesting level (which a project page would pay
+    one query for). An unknown scope matches nothing.
     """
     match scope:
         case Translation():
-            return Q(scope_type=JudgeRun.ScopeType.TRANSLATION, scope_id=str(scope.pk))
+            return Q(
+                scope_type=ProducerRun.ScopeType.TRANSLATION, scope_id=str(scope.pk)
+            )
+        case ProjectLanguage():
+            return Q(
+                scope_type=ProducerRun.ScopeType.PROJECT_LANGUAGE,
+                scope_id=str(scope.pk),
+            )
+        case Category():
+            # A component may sit up to three category levels deep
+            # (``Category.objects`` prefetches exactly that depth), and every
+            # level carries its own runs.
+            categories = Category.objects.filter(
+                Q(pk=scope.pk) | Q(category=scope) | Q(category__category=scope)
+            )
+            return (
+                Q(
+                    scope_type=ProducerRun.ScopeType.CATEGORY,
+                    scope_id__in=_cast_ids(categories),
+                )
+                | Q(
+                    scope_type=ProducerRun.ScopeType.COMPONENT,
+                    scope_id__in=_cast_ids(
+                        Component.objects.filter(category__in=categories)
+                    ),
+                )
+                | Q(
+                    scope_type=ProducerRun.ScopeType.TRANSLATION,
+                    scope_id__in=_cast_ids(
+                        Translation.objects.filter(component__category__in=categories)
+                    ),
+                )
+            )
         case Component():
             return Q(
-                scope_type=JudgeRun.ScopeType.COMPONENT, scope_id=str(scope.pk)
+                scope_type=ProducerRun.ScopeType.COMPONENT, scope_id=str(scope.pk)
             ) | Q(
-                scope_type=JudgeRun.ScopeType.TRANSLATION,
-                scope_id__in=Translation.objects.filter(component=scope)
-                .annotate(_scope_id=Cast("pk", CharField()))
-                .values("_scope_id"),
+                scope_type=ProducerRun.ScopeType.TRANSLATION,
+                scope_id__in=_cast_ids(Translation.objects.filter(component=scope)),
             )
         case Project():
             return (
-                Q(scope_type=JudgeRun.ScopeType.PROJECT, scope_id=str(scope.pk))
+                Q(scope_type=ProducerRun.ScopeType.PROJECT, scope_id=str(scope.pk))
+                | _project_language_runs([scope.pk])
                 | Q(
-                    scope_type=JudgeRun.ScopeType.COMPONENT,
-                    scope_id__in=Component.objects.filter(project=scope)
-                    .annotate(_scope_id=Cast("pk", CharField()))
-                    .values("_scope_id"),
+                    scope_type=ProducerRun.ScopeType.CATEGORY,
+                    scope_id__in=_cast_ids(Category.objects.filter(project=scope)),
                 )
                 | Q(
-                    scope_type=JudgeRun.ScopeType.TRANSLATION,
-                    scope_id__in=Translation.objects.filter(component__project=scope)
-                    .annotate(_scope_id=Cast("pk", CharField()))
-                    .values("_scope_id"),
+                    scope_type=ProducerRun.ScopeType.COMPONENT,
+                    scope_id__in=_cast_ids(Component.objects.filter(project=scope)),
+                )
+                | Q(
+                    scope_type=ProducerRun.ScopeType.TRANSLATION,
+                    scope_id__in=_cast_ids(
+                        Translation.objects.filter(component__project=scope)
+                    ),
                 )
             )
         case Workspace():
             return (
-                Q(scope_type=JudgeRun.ScopeType.WORKSPACE, scope_id=str(scope.pk))
-                | Q(
-                    scope_type=JudgeRun.ScopeType.PROJECT,
-                    scope_id__in=Project.objects.filter(workspace=scope)
-                    .annotate(_scope_id=Cast("pk", CharField()))
-                    .values("_scope_id"),
+                Q(scope_type=ProducerRun.ScopeType.WORKSPACE, scope_id=str(scope.pk))
+                | _project_language_runs(
+                    Project.objects.filter(workspace=scope).values_list("pk", flat=True)
                 )
                 | Q(
-                    scope_type=JudgeRun.ScopeType.COMPONENT,
-                    scope_id__in=Component.objects.filter(project__workspace=scope)
-                    .annotate(_scope_id=Cast("pk", CharField()))
-                    .values("_scope_id"),
+                    scope_type=ProducerRun.ScopeType.PROJECT,
+                    scope_id__in=_cast_ids(Project.objects.filter(workspace=scope)),
                 )
                 | Q(
-                    scope_type=JudgeRun.ScopeType.TRANSLATION,
-                    scope_id__in=Translation.objects.filter(
-                        component__project__workspace=scope
-                    )
-                    .annotate(_scope_id=Cast("pk", CharField()))
-                    .values("_scope_id"),
+                    scope_type=ProducerRun.ScopeType.CATEGORY,
+                    scope_id__in=_cast_ids(
+                        Category.objects.filter(project__workspace=scope)
+                    ),
+                )
+                | Q(
+                    scope_type=ProducerRun.ScopeType.COMPONENT,
+                    scope_id__in=_cast_ids(
+                        Component.objects.filter(project__workspace=scope)
+                    ),
+                )
+                | Q(
+                    scope_type=ProducerRun.ScopeType.TRANSLATION,
+                    scope_id__in=_cast_ids(
+                        Translation.objects.filter(component__project__workspace=scope)
+                    ),
                 )
             )
         case _:
             return Q(pk=None)
 
 
-def recent_judge_runs(
-    scope: Translation | Component | Project | Workspace,
+def recent_producer_runs(
+    scope: Translation | Component | Category | Project | ProjectLanguage | Workspace,
     *,
+    user,
     limit: int = 10,
-) -> list[JudgeRun]:
+) -> list[ProducerRun]:
     """
     Return the scope's most recent producer launches, newest first, materialized.
 
@@ -417,25 +528,60 @@ def recent_judge_runs(
     which is exactly how a 462-string component launch became unreachable on
     production.
     """
+    modes = producer_run_modes(user, scope)
+    if not modes:
+        return []
     return list(
-        JudgeRun.objects.filter(
-            _scope_run_query(scope), requested_mode__in=HISTORY_MODES
-        )
+        ProducerRun.objects.filter(_scope_run_query(scope), requested_mode__in=modes)
         .order_by("-created")
         .select_related("actor")[:limit]
     )
 
 
 @login_required
-def judge_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
-    run = get_object_or_404(JudgeRun.objects.select_related("actor"), pk=pk)
+def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
+    run = get_object_or_404(ProducerRun.objects.select_related("actor"), pk=pk)
     scope = _get_scope(run)
     # Permission is re-checked against the current user, never inferred from
     # the stored actor: a launcher can lose access after the run completes.
-    if not user_can_view_judge_run(request.user, scope):
+    if not user_can_view_producer_run(request.user, scope, run):
         raise Http404
 
     outcome = request.GET.get("outcome", "")
+    is_judge_run = run.requested_mode in JUDGE_MODES
+    operation = (
+        LLMUsageLog.Operation.JUDGE
+        if is_judge_run
+        else LLMUsageLog.Operation.TRANSLATION
+    )
+    spend = run_spend(run.pk, operation)
+    language_spend = [
+        {
+            "language": row["target_language_code"],
+            "service": row["service"],
+            "model": row["model"],
+            "requests": row["requests"],
+            "strings_sent": row["strings_sent"] or 0,
+            "cost_usd": row["known_cost_usd"] or Decimal(0),
+            "unpriced_requests": row["unpriced_requests"],
+        }
+        for row in LLMUsageLog.objects.filter(
+            run_id=run.pk, operation=LLMUsageLog.Operation.TRANSLATION
+        )
+        .values("target_language_code", "service", "model")
+        .annotate(
+            requests=Count("id"),
+            strings_sent=Sum("batch_size"),
+            known_cost_usd=Sum("cost_usd"),
+            unpriced_requests=Count("id", filter=Q(cost_usd__isnull=True)),
+        )
+        .order_by("-known_cost_usd", "target_language_code", "service", "model")
+    ]
+    scope_query_url = (
+        _review_url(scope, run.requested_query)
+        if run.requested_query
+        else scope.get_absolute_url()
+    )
     if outcome and outcome not in _OUTCOME_LABELS:
         raise Http404
     # No explicit filter: the producer default. The actionable buckets are
@@ -513,10 +659,13 @@ def judge_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
 
     return render(
         request,
-        "judge-run.html",
+        "producer-run.html",
         {
             "run": run,
             "scope": scope,
+            "run_kind_label": RUN_KIND_LABELS.get(
+                run.requested_mode, gettext("Producer run")
+            ),
             "stats": [
                 (key, label, counts[key]) for key, label in _OUTCOME_LABELS.items()
             ],
@@ -535,5 +684,11 @@ def judge_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
             "bucket": effective,
             "query_string": f"outcome={outcome}" if outcome else "",
             "page_obj": page,
+            "is_judge_run": is_judge_run,
+            "run_spend": spend,
+            "written": run.summary.get("written", 0),
+            "language_spend": language_spend,
+            "translation_spend": run_spend(run.pk, LLMUsageLog.Operation.TRANSLATION),
+            "scope_query_url": scope_query_url,
         },
     )

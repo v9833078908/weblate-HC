@@ -12,24 +12,23 @@ from unittest.mock import patch
 
 from django.core.exceptions import PermissionDenied
 from django.db import connection
-from django.test import SimpleTestCase, TransactionTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 from django.utils import translation
 from django.utils.translation import gettext
 
-from weblate.auth.models import Group, Permission, Role, setup_project_groups
+from weblate.auth.models import Group, Permission, Role, User, setup_project_groups
 from weblate.trans.actions import ActionEvents
 from weblate.trans.change_display import RenderJudgeResolution
 from weblate.trans.forms import JudgeResolutionForm
 from weblate.trans.judge import judge_request_upper_bound
 from weblate.trans.judge_loop import accept_judge_candidate, build_request
-from weblate.trans.models import Suggestion
+from weblate.trans.models import ProducerRun, Suggestion
 from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
     SEVERITY_RANK,
     JudgeCandidateError,
     JudgeCandidateMetadata,
     JudgeResolutionError,
-    JudgeRun,
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
@@ -1085,7 +1084,7 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
         self.assertEqual(refreshed.state, STATE_TRANSLATED)
         self.assertEqual(refreshed.target, "Better translation\n")
         self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
-        runs = JudgeRun.objects.filter(
+        runs = ProducerRun.objects.filter(
             requested_mode="recheck", scope_id=str(unit.translation_id)
         )
         self.assertEqual(runs.count(), 1)
@@ -1110,7 +1109,7 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
 
         self.assertEqual(self.get_unit().target, before_target)
         self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
-        self.assertFalse(JudgeRun.objects.filter(requested_mode="recheck").exists())
+        self.assertFalse(ProducerRun.objects.filter(requested_mode="recheck").exists())
 
     def test_accept_denied_without_translation_auto(self) -> None:
         self.grant(["unit.review"])
@@ -1138,7 +1137,7 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
         refreshed = self.get_unit()
         self.assertEqual(refreshed.target, "Manually edited\n")
         self.assertTrue(Suggestion.objects.filter(pk=candidate.pk).exists())
-        self.assertFalse(JudgeRun.objects.filter(requested_mode="recheck").exists())
+        self.assertFalse(ProducerRun.objects.filter(requested_mode="recheck").exists())
 
     def test_accept_fails_on_context_drift(self) -> None:
         self.enable_review()
@@ -1216,3 +1215,38 @@ class JudgeCandidateAcceptanceTest(ViewTestCase):
 
         with self.assertRaises(JudgeCandidateError):
             self.accept_as(candidate)
+
+
+class ProducerRunModelTest(TestCase):
+    def test_model_keeps_the_original_table(self) -> None:
+        """The rename is state-only: renaming the table would move judge history."""
+        self.assertEqual(
+            ProducerRun._meta.db_table,  # ruff: ignore[private-member-access]
+            "trans_judgerun",
+        )
+
+    def test_actor_reverse_accessor_is_producer_runs(self) -> None:
+        user = User.objects.create(username="producer-run-actor")
+        run = ProducerRun.objects.create(
+            actor=user,
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id="1",
+            scope_label="Test",
+            scope_path="/projects/test/test/",
+            requested_mode="translate",
+            cap=100,
+        )
+        self.assertEqual([item.pk for item in user.producer_runs.all()], [run.pk])
+
+    def test_scope_types_cover_every_automatic_translation_target(self) -> None:
+        self.assertEqual(
+            {value for value, _label in ProducerRun.ScopeType.choices},
+            {
+                "translation",
+                "component",
+                "category",
+                "project",
+                "project-language",
+                "workspace",
+            },
+        )

@@ -42,9 +42,10 @@ from weblate.utils.state import (
 )
 
 if TYPE_CHECKING:
+    from django_stubs_ext import StrOrPromise
+
     from weblate.auth.models import User
     from weblate.glossary.models import GlossaryPromptEntry
-
 JUDGE_ERROR_SEPARATOR = " | "
 JUDGE_REPAIR_REQUIREMENT = (
     "Fix all listed errors while preserving the remaining meaning, placeholders, and "
@@ -273,13 +274,37 @@ def compute_judge_request_identity(
     )
 
 
-class JudgeRun(models.Model):
-    """One permission-checked producer launch across one closed scope."""
+#: Human label for a run's launch mode, shown as the report's breadcrumb and
+#: in the run-history menu. Mirrors AutoForm's own mode labels.
+RUN_KIND_LABELS: dict[str, StrOrPromise] = {
+    "judge": gettext_lazy("Judge run"),
+    "recheck": gettext_lazy("Judge re-check"),
+    "drain": gettext_lazy("Deferred judge retry"),
+    "translate": gettext_lazy("Automatic translation run"),
+    "suggest": gettext_lazy("Automatic suggestion run"),
+    "fuzzy": gettext_lazy("Automatic translation run"),
+    "approved": gettext_lazy("Automatic translation run"),
+}
+
+
+class ProducerRun(models.Model):
+    """
+    One permission-checked producer launch across one closed scope.
+
+    Both an LLM judge launch and a plain automatic-translation launch are
+    the same object: a producer asked for work over a closed scope, and
+    the run is what they return to for its outcome and its cost.
+    ``requested_mode`` carries which one it was, using the mode values of
+    ``AutoForm`` ("translate", "suggest", "fuzzy", "approved", "judge")
+    plus the two non-launch passes "recheck" and "drain".
+    """
 
     class ScopeType(models.TextChoices):
         TRANSLATION = "translation"
         COMPONENT = "component"
+        CATEGORY = "category"
         PROJECT = "project"
+        PROJECT_LANGUAGE = "project-language"
         WORKSPACE = "workspace"
 
     class Status(models.TextChoices):
@@ -294,7 +319,7 @@ class JudgeRun(models.Model):
         on_delete=models.deletion.SET_NULL,
         null=True,
         blank=True,
-        related_name="judge_runs",
+        related_name="producer_runs",
     )
     task_id = models.CharField(max_length=255, blank=True)
     created = models.DateTimeField(auto_now_add=True)
@@ -317,8 +342,11 @@ class JudgeRun(models.Model):
     configuration_snapshot = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        verbose_name = gettext_lazy("Judge run")
-        verbose_name_plural = gettext_lazy("Judge runs")
+        # State-only rename: the table still holds every judge run written
+        # before this change, so it must not be renamed with the model.
+        db_table = "trans_judgerun"
+        verbose_name = gettext_lazy("Producer run")
+        verbose_name_plural = gettext_lazy("Producer runs")
         # ruff: ignore[mutable-class-default]
         indexes = [
             models.Index(fields=["actor", "-created"], name="judge_run_actor_idx"),
@@ -337,6 +365,10 @@ class JudgeRun(models.Model):
             self.configuration_snapshot
         )
         super().save(*args, **kwargs)
+
+    def get_requested_mode_label(self) -> str:
+        """Return a short human label for the launch mode, for history rows."""
+        return str(RUN_KIND_LABELS.get(self.requested_mode, self.requested_mode))
 
 
 class JudgeRequestAttempt(models.Model):
@@ -366,7 +398,7 @@ class JudgeRequestAttempt(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     run = models.ForeignKey(
-        JudgeRun,
+        ProducerRun,
         on_delete=models.deletion.SET_NULL,
         null=True,
         blank=True,
@@ -569,7 +601,7 @@ class JudgeRunUnit(models.Model):
         APPLIED = "applied"
         ROLLED_BACK = "rolled-back"
 
-    run = models.ForeignKey(JudgeRun, on_delete=models.deletion.CASCADE)
+    run = models.ForeignKey(ProducerRun, on_delete=models.deletion.CASCADE)
     unit = models.ForeignKey(
         "trans.Unit",
         on_delete=models.deletion.SET_NULL,

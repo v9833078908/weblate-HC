@@ -12,6 +12,11 @@ set -euo pipefail
 # --mssfix is required: without it a full-size TCP segment inside the tunnel
 # (any HTTP POST, git push or file upload) is silently dropped and the request
 # hangs, while small GET requests keep working.
+# --tun-mtu with --pull-filter ignore "tun-mtu": the office server pushes MTU
+# 1500 and re-applies it on every re-key, so setting the MTU only once after
+# the first connect (below) silently reverts hours later and SSH stalls in the
+# key exchange again. Refusing the pushed value keeps every reconnect at the
+# MTU the path can actually carry.
 # --ping/--ping-exit make a dead peer terminate openvpn, so the container
 # exits and Docker's restart policy reconnects cleanly instead of leaving a
 # healthy-looking container with a dead tunnel.
@@ -22,6 +27,8 @@ openvpn \
     --auth-nocache \
     --data-ciphers AES-256-GCM:AES-128-GCM:AES-256-CBC \
     --mssfix "${OPENVPN_MSSFIX:-1300}" \
+    --pull-filter ignore "tun-mtu" \
+    --tun-mtu "${TUN_MTU:-1100}" \
     --ping 10 \
     --ping-exit 120 \
     --verb "${OPENVPN_VERB:-3}" &

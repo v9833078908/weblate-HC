@@ -34,7 +34,7 @@ from weblate.trans.models.judge import (
     JudgeAdaptiveState,
     JudgeDeferral,
     JudgeRequestAttempt,
-    JudgeRun,
+    ProducerRun,
     JudgeRunUnit,
     JudgeVerdict,
 )
@@ -76,7 +76,7 @@ __all__ = [
     "JudgeAdaptiveState",
     "JudgeDeferral",
     "JudgeRequestAttempt",
-    "JudgeRun",
+    "ProducerRun",
     "JudgeRunUnit",
     "JudgeVerdict",
     "LLMUsageLog",

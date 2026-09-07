@@ -469,7 +469,7 @@ real_patterns = [
     # Judge verdicts
     path(
         "judge-runs/<uuid:pk>/",
-        weblate.trans.views.judge.judge_run,
+        weblate.trans.views.judge.producer_run,
         name="judge-run",
     ),
     path(

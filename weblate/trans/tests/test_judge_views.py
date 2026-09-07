@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest import mock
 
@@ -19,6 +20,7 @@ from lxml import html
 
 from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Permission, Role
+from weblate.machinery.base import MachineTranslation
 from weblate.trans.actions import ActionEvents
 from weblate.trans.judge import JudgeError
 from weblate.trans.judge_loop import (
@@ -27,12 +29,12 @@ from weblate.trans.judge_loop import (
     queue_judge_recheck,
     recheck_query,
 )
-from weblate.trans.models import Component, Project, Translation
+from weblate.trans.models import Category, Component, Project, Translation
 from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
-    JudgeRun,
     JudgeRunUnit,
     JudgeVerdict,
+    ProducerRun,
     compute_context_hash,
     compute_target_hash,
     compute_target_storage_hash,
@@ -44,6 +46,7 @@ from weblate.trans.models.unit import Unit
 from weblate.trans.tasks import generate_judge_candidate
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.views.basic import _judge_hand_off_blocked
+from weblate.trans.views.judge import recent_producer_runs
 from weblate.utils.state import (
     STATE_APPROVED,
     STATE_FUZZY,
@@ -51,6 +54,7 @@ from weblate.utils.state import (
     STATE_READONLY,
     STATE_TRANSLATED,
 )
+from weblate.utils.stats import ProjectLanguage
 from weblate.workspaces.models import Workspace
 
 
@@ -1513,15 +1517,15 @@ class JudgeQueueStripViewTest(ViewTestCase):
 
     def test_last_run_link_shown_for_the_exact_component_scope(self) -> None:
         self.enable_review()
-        run = JudgeRun.objects.create(
+        run = ProducerRun.objects.create(
             actor=self.user,
-            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_type=ProducerRun.ScopeType.COMPONENT,
             scope_id=str(self.component.pk),
             scope_label=str(self.component),
             scope_path=self.component.get_absolute_url(),
             requested_mode="judge",
             cap=10,
-            status=JudgeRun.Status.COMPLETED,
+            status=ProducerRun.Status.COMPLETED,
         )
         response = self.client.get(self.component.get_absolute_url())
         self.assertEqual(response.context["judge_queue"]["last_run"].pk, run.pk)
@@ -1544,11 +1548,11 @@ class JudgeQueueStripViewTest(ViewTestCase):
         own_run = self.make_judge_run(self.user)
         other_run = self.make_judge_run(other_user)
         earlier_other_run = self.make_judge_run(other_user)
-        JudgeRun.objects.filter(pk=own_run.pk).update(
+        ProducerRun.objects.filter(pk=own_run.pk).update(
             created=now - timedelta(minutes=2)
         )
-        JudgeRun.objects.filter(pk=other_run.pk).update(created=now)
-        JudgeRun.objects.filter(pk=earlier_other_run.pk).update(
+        ProducerRun.objects.filter(pk=other_run.pk).update(created=now)
+        ProducerRun.objects.filter(pk=earlier_other_run.pk).update(
             created=now - timedelta(minutes=1)
         )
         response = self.client.get(self.component.get_absolute_url())
@@ -1571,18 +1575,20 @@ class JudgeQueueStripViewTest(ViewTestCase):
         self,
         actor,
         scope=None,
-        status=JudgeRun.Status.COMPLETED,
+        status=ProducerRun.Status.COMPLETED,
         mode: str = "judge",
-    ) -> JudgeRun:
+    ) -> ProducerRun:
         if scope is None:
             scope = self.component
         scope_types = {
-            Translation: JudgeRun.ScopeType.TRANSLATION,
-            Component: JudgeRun.ScopeType.COMPONENT,
-            Project: JudgeRun.ScopeType.PROJECT,
-            Workspace: JudgeRun.ScopeType.WORKSPACE,
+            Translation: ProducerRun.ScopeType.TRANSLATION,
+            Component: ProducerRun.ScopeType.COMPONENT,
+            Category: ProducerRun.ScopeType.CATEGORY,
+            Project: ProducerRun.ScopeType.PROJECT,
+            ProjectLanguage: ProducerRun.ScopeType.PROJECT_LANGUAGE,
+            Workspace: ProducerRun.ScopeType.WORKSPACE,
         }
-        return JudgeRun.objects.create(
+        return ProducerRun.objects.create(
             actor=actor,
             scope_type=scope_types[type(scope)],
             scope_id=str(scope.pk),
@@ -1603,8 +1609,8 @@ class JudgeQueueStripViewTest(ViewTestCase):
         other_run = self.make_judge_run(other_user)
         own_run = self.make_judge_run(self.user)
         now = timezone.now()
-        JudgeRun.objects.filter(pk=other_run.pk).update(created=now)
-        JudgeRun.objects.filter(pk=own_run.pk).update(
+        ProducerRun.objects.filter(pk=other_run.pk).update(created=now)
+        ProducerRun.objects.filter(pk=own_run.pk).update(
             created=now - timedelta(minutes=1)
         )
         response = self.client.get(self.component.get_absolute_url())
@@ -1657,17 +1663,17 @@ class JudgeQueueStripViewTest(ViewTestCase):
         run = self.make_judge_run(self.user, scope=translation)
         run_url = reverse("judge-run", kwargs={"pk": run.pk})
         # The translation page carries the runs in its own context key
-        # (judge_runs, the list itself); component and project pages reach
+        # (producer_runs, the list itself); component and project pages reach
         # them through the strip's judge_queue.
         for page_url, runs_key in (
-            (translation.get_absolute_url(), "judge_runs"),
+            (translation.get_absolute_url(), "producer_runs"),
             (self.component.get_absolute_url(), "judge_queue"),
             (self.project.get_absolute_url(), "judge_queue"),
         ):
             response = self.client.get(page_url)
             runs = (
                 response.context[runs_key]
-                if runs_key == "judge_runs"
+                if runs_key == "producer_runs"
                 else response.context[runs_key]["runs"]
             )
             self.assertEqual(runs[0].pk, run.pk)
@@ -1695,8 +1701,10 @@ class JudgeQueueStripViewTest(ViewTestCase):
         older = self.make_judge_run(self.user, scope=sibling_translation)
         newer = self.make_judge_run(self.user)
         now = timezone.now()
-        JudgeRun.objects.filter(pk=older.pk).update(created=now - timedelta(minutes=1))
-        JudgeRun.objects.filter(pk=newer.pk).update(created=now)
+        ProducerRun.objects.filter(pk=older.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        ProducerRun.objects.filter(pk=newer.pk).update(created=now)
         response = self.client.get(self.project.get_absolute_url())
         self.assertEqual(
             [run.pk for run in response.context["judge_queue"]["runs"]],
@@ -1728,7 +1736,7 @@ class JudgeQueueStripViewTest(ViewTestCase):
         # menu: with one run the button is the newest run regardless of
         # status, and its status word follows the label, muted.
         self.enable_review()
-        run = self.make_judge_run(self.user, status=JudgeRun.Status.QUEUED)
+        run = self.make_judge_run(self.user, status=ProducerRun.Status.QUEUED)
         response = self.client.get(self.component.get_absolute_url())
         self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
         self.assertContains(response, "Queued")
@@ -1738,9 +1746,9 @@ class JudgeQueueStripViewTest(ViewTestCase):
         completed = self.make_judge_run(self.user)
         failed = self.make_judge_run(self.user)
         now = timezone.now()
-        JudgeRun.objects.filter(pk=completed.pk).update(created=now)
-        JudgeRun.objects.filter(pk=failed.pk).update(
-            status=JudgeRun.Status.FAILED, created=now - timedelta(minutes=1)
+        ProducerRun.objects.filter(pk=completed.pk).update(created=now)
+        ProducerRun.objects.filter(pk=failed.pk).update(
+            status=ProducerRun.Status.FAILED, created=now - timedelta(minutes=1)
         )
         response = self.client.get(self.component.get_absolute_url())
         menu_markup = self.run_menu_markup(response)
@@ -1756,18 +1764,88 @@ class JudgeQueueStripViewTest(ViewTestCase):
         # with actor=None. The row must then drop the whole author segment:
         # rendering the separator against a silently empty
         # run.actor.profile would leave a dangling "·" at the row's end.
+        # One separator remains by design, the one before the launch mode.
         self.enable_review()
         own_run = self.make_judge_run(self.user)
         deleted_run = self.make_judge_run(None)
         now = timezone.now()
-        JudgeRun.objects.filter(pk=own_run.pk).update(created=now)
-        JudgeRun.objects.filter(pk=deleted_run.pk).update(
+        ProducerRun.objects.filter(pk=own_run.pk).update(created=now)
+        ProducerRun.objects.filter(pk=deleted_run.pk).update(
             created=now - timedelta(minutes=1)
         )
         response = self.client.get(self.component.get_absolute_url())
-        menu_markup = self.run_menu_markup(response)
-        self.assertIn(reverse("judge-run", kwargs={"pk": deleted_run.pk}), menu_markup)
-        self.assertNotIn("·", menu_markup)
+        rows = self.run_menu_rows(response)
+        lead = rows[reverse("judge-run", kwargs={"pk": deleted_run.pk})][0][1]
+        self.assertTrue(lead.endswith("Judge run"), lead)
+        self.assertEqual(lead.count("·"), 1)
+        self.assertNotIn(self.anotheruser.username, lead)
+
+    def test_menu_rows_name_the_launch_mode(self) -> None:
+        # A judge launch and an automatic translation of the same scope are
+        # otherwise indistinguishable: same timestamp shape, same actor,
+        # same scope label.
+        self.enable_review()
+        judge_run = self.make_judge_run(self.user)
+        mt_run = self.make_judge_run(self.user, mode="translate")
+        newest = self.make_judge_run(self.user, mode="suggest")
+        now = timezone.now()
+        for offset, run in enumerate((newest, judge_run, mt_run)):
+            ProducerRun.objects.filter(pk=run.pk).update(
+                created=now - timedelta(minutes=offset)
+            )
+        rows = self.run_menu_rows(self.client.get(self.component.get_absolute_url()))
+        self.assertIn(
+            "Judge run", rows[reverse("judge-run", kwargs={"pk": judge_run.pk})][0][1]
+        )
+        self.assertIn(
+            "Automatic translation run",
+            rows[reverse("judge-run", kwargs={"pk": mt_run.pk})][0][1],
+        )
+
+    def test_category_scoped_run_surfaces_on_the_project(self) -> None:
+        # A category launch is one of the six supported scopes, so its
+        # receipt must be reachable from the pages above it.
+        self.enable_review()
+        category = Category.objects.create(
+            name="Judge run category", slug="judge-run-category", project=self.project
+        )
+        run = self.make_judge_run(self.user, scope=category, mode="translate")
+        self.assertEqual(
+            [found.pk for found in recent_producer_runs(self.project, user=self.user)],
+            [run.pk],
+        )
+        self.assertEqual(
+            [found.pk for found in recent_producer_runs(category, user=self.user)],
+            [run.pk],
+        )
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_project_language_scoped_run_surfaces_on_the_project(self) -> None:
+        self.enable_review()
+        scope = ProjectLanguage(self.project, self.get_translation().language)
+        run = self.make_judge_run(self.user, scope=scope, mode="translate")
+        self.assertEqual(
+            [found.pk for found in recent_producer_runs(self.project, user=self.user)],
+            [run.pk],
+        )
+        self.assertEqual(
+            [found.pk for found in recent_producer_runs(scope, user=self.user)],
+            [run.pk],
+        )
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
+
+    def test_another_projects_language_run_does_not_leak(self) -> None:
+        # ProjectLanguage ids are "<project>-<language>", matched by prefix:
+        # project 1 must not swallow project 11's runs.
+        self.enable_review()
+        other_project = Project.objects.create(
+            name="Judge run prefix project", slug="judge-run-prefix-project"
+        )
+        scope = ProjectLanguage(other_project, self.get_translation().language)
+        self.make_judge_run(self.user, scope=scope, mode="translate")
+        self.assertEqual(recent_producer_runs(self.project, user=self.user), [])
 
     def test_project_page_rows_lead_with_the_timestamp(self) -> None:
         # Amendment F7: every row leads with its timestamp, and a row whose
@@ -1782,11 +1860,11 @@ class JudgeQueueStripViewTest(ViewTestCase):
         project_run = self.make_judge_run(self.user, scope=self.project)
         child_run = self.make_judge_run(self.user, scope=translation)
         now = timezone.now()
-        JudgeRun.objects.filter(pk=newest.pk).update(created=now)
-        JudgeRun.objects.filter(pk=project_run.pk).update(
+        ProducerRun.objects.filter(pk=newest.pk).update(created=now)
+        ProducerRun.objects.filter(pk=project_run.pk).update(
             created=now - timedelta(minutes=1)
         )
-        JudgeRun.objects.filter(pk=child_run.pk).update(
+        ProducerRun.objects.filter(pk=child_run.pk).update(
             created=now - timedelta(minutes=2)
         )
         response = self.client.get(self.project.get_absolute_url())
@@ -1813,11 +1891,11 @@ class JudgeQueueStripViewTest(ViewTestCase):
         own_run = self.make_judge_run(self.user)
         newest = self.make_judge_run(self.user, scope=translation)
         now = timezone.now()
-        JudgeRun.objects.filter(pk=newest.pk).update(created=now)
-        JudgeRun.objects.filter(pk=own_run.pk).update(
+        ProducerRun.objects.filter(pk=newest.pk).update(created=now)
+        ProducerRun.objects.filter(pk=own_run.pk).update(
             created=now - timedelta(minutes=1)
         )
-        JudgeRun.objects.filter(pk=child_run.pk).update(
+        ProducerRun.objects.filter(pk=child_run.pk).update(
             created=now - timedelta(minutes=2)
         )
         response = self.client.get(self.component.get_absolute_url())
@@ -1838,7 +1916,7 @@ class JudgeQueueStripViewTest(ViewTestCase):
         self.enable_review()
         for index in range(12):
             run = self.make_judge_run(self.user)
-            JudgeRun.objects.filter(pk=run.pk).update(
+            ProducerRun.objects.filter(pk=run.pk).update(
                 created=timezone.now() - timedelta(minutes=12 - index)
             )
         response = self.client.get(self.component.get_absolute_url())
@@ -1866,14 +1944,16 @@ class JudgeQueueStripViewTest(ViewTestCase):
         self.enable_review()
         launch = self.make_judge_run(self.user)
         now = timezone.now()
-        JudgeRun.objects.filter(pk=launch.pk).update(created=now - timedelta(minutes=5))
+        ProducerRun.objects.filter(pk=launch.pk).update(
+            created=now - timedelta(minutes=5)
+        )
         excluded = [
             self.make_judge_run(self.user, scope=self.translation, mode="recheck"),
             # The drain pass runs without an actor, as in production.
             self.make_judge_run(None, scope=self.translation, mode="drain"),
         ]
         for offset, run in enumerate(excluded, start=1):
-            JudgeRun.objects.filter(pk=run.pk).update(
+            ProducerRun.objects.filter(pk=run.pk).update(
                 created=now + timedelta(minutes=offset)
             )
 
@@ -1896,14 +1976,16 @@ class JudgeQueueStripViewTest(ViewTestCase):
         launch = self.make_judge_run(self.user, scope=self.translation)
         recheck = self.make_judge_run(self.user, scope=self.translation, mode="recheck")
         now = timezone.now()
-        JudgeRun.objects.filter(pk=launch.pk).update(created=now - timedelta(minutes=1))
-        JudgeRun.objects.filter(pk=recheck.pk).update(created=now)
+        ProducerRun.objects.filter(pk=launch.pk).update(
+            created=now - timedelta(minutes=1)
+        )
+        ProducerRun.objects.filter(pk=recheck.pk).update(created=now)
 
         response = self.client.get(self.translation.get_absolute_url())
         self.assertEqual(
-            [run.pk for run in response.context["judge_runs"]], [launch.pk]
+            [run.pk for run in response.context["producer_runs"]], [launch.pk]
         )
-        self.assertEqual(response.context["judge_last_run"].pk, launch.pk)
+        self.assertEqual(response.context["producer_last_run"].pk, launch.pk)
         self.assertNotContains(
             response, reverse("judge-run", kwargs={"pk": recheck.pk})
         )
@@ -1942,15 +2024,15 @@ class JudgeQueueStripViewTest(ViewTestCase):
     def test_last_run_does_not_leak_across_components(self) -> None:
         self.enable_review()
         other = self.create_json_mono(name="Other component", project=self.project)
-        JudgeRun.objects.create(
+        ProducerRun.objects.create(
             actor=self.user,
-            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_type=ProducerRun.ScopeType.COMPONENT,
             scope_id=str(other.pk),
             scope_label=str(other),
             scope_path=other.get_absolute_url(),
             requested_mode="judge",
             cap=10,
-            status=JudgeRun.Status.COMPLETED,
+            status=ProducerRun.Status.COMPLETED,
         )
         response = self.client.get(self.component.get_absolute_url())
         self.assertIsNone(response.context["judge_queue"]["last_run"])
@@ -1962,34 +2044,34 @@ class JudgeQueueStripViewTest(ViewTestCase):
         # translation-scoped launch, so the translation page carries its
         # own last-run link instead.
         self.enable_review()
-        run = JudgeRun.objects.create(
+        run = ProducerRun.objects.create(
             actor=self.user,
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(self.translation.pk),
             scope_label=str(self.translation),
             scope_path=self.translation.get_absolute_url(),
             requested_mode="judge",
             cap=10,
-            status=JudgeRun.Status.COMPLETED,
+            status=ProducerRun.Status.COMPLETED,
         )
         response = self.client.get(self.translation.get_absolute_url())
-        self.assertEqual(response.context["judge_last_run"].pk, run.pk)
+        self.assertEqual(response.context["producer_last_run"].pk, run.pk)
         self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
 
     def test_translation_page_hides_last_run_without_permission(self) -> None:
         # Default test user has no translation.auto/unit.review grant.
-        JudgeRun.objects.create(
+        ProducerRun.objects.create(
             actor=self.user,
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(self.translation.pk),
             scope_label=str(self.translation),
             scope_path=self.translation.get_absolute_url(),
             requested_mode="judge",
             cap=10,
-            status=JudgeRun.Status.COMPLETED,
+            status=ProducerRun.Status.COMPLETED,
         )
         response = self.client.get(self.translation.get_absolute_url())
-        self.assertIsNone(response.context["judge_last_run"])
+        self.assertIsNone(response.context["producer_last_run"])
 
     def test_translation_last_run_does_not_leak_from_another_translation(
         self,
@@ -1998,18 +2080,18 @@ class JudgeQueueStripViewTest(ViewTestCase):
         other = self.component.translation_set.exclude(pk=self.translation.pk).first()
         if other is None:
             self.skipTest("fixture has only one target translation")
-        JudgeRun.objects.create(
+        ProducerRun.objects.create(
             actor=self.user,
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(other.pk),
             scope_label=str(other),
             scope_path=other.get_absolute_url(),
             requested_mode="judge",
             cap=10,
-            status=JudgeRun.Status.COMPLETED,
+            status=ProducerRun.Status.COMPLETED,
         )
         response = self.client.get(self.translation.get_absolute_url())
-        self.assertIsNone(response.context["judge_last_run"])
+        self.assertIsNone(response.context["producer_last_run"])
 
     def test_translation_last_run_includes_another_actors_launch(self) -> None:
         # The translation page carries the same contract as the card
@@ -2019,9 +2101,9 @@ class JudgeQueueStripViewTest(ViewTestCase):
         self.enable_review()
         other_run = self.make_judge_run(self.anotheruser, scope=self.translation)
         response = self.client.get(self.translation.get_absolute_url())
-        self.assertEqual(response.context["judge_last_run"].pk, other_run.pk)
+        self.assertEqual(response.context["producer_last_run"].pk, other_run.pk)
         self.assertEqual(
-            [run.pk for run in response.context["judge_runs"]], [other_run.pk]
+            [run.pk for run in response.context["producer_runs"]], [other_run.pk]
         )
 
     def test_translation_last_run_is_the_newest_launch_whoever_made_it(self) -> None:
@@ -2033,14 +2115,14 @@ class JudgeQueueStripViewTest(ViewTestCase):
         now = timezone.now()
         own_run = self.make_judge_run(self.user, scope=self.translation)
         other_run = self.make_judge_run(self.anotheruser, scope=self.translation)
-        JudgeRun.objects.filter(pk=own_run.pk).update(
+        ProducerRun.objects.filter(pk=own_run.pk).update(
             created=now - timedelta(minutes=1)
         )
-        JudgeRun.objects.filter(pk=other_run.pk).update(created=now)
+        ProducerRun.objects.filter(pk=other_run.pk).update(created=now)
         response = self.client.get(self.translation.get_absolute_url())
-        self.assertEqual(response.context["judge_last_run"].pk, other_run.pk)
+        self.assertEqual(response.context["producer_last_run"].pk, other_run.pk)
         self.assertEqual(
-            [run.pk for run in response.context["judge_runs"]],
+            [run.pk for run in response.context["producer_runs"]],
             [other_run.pk, own_run.pk],
         )
 
@@ -2206,31 +2288,81 @@ class JudgeRunReportViewTest(ViewTestCase):
         self,
         scope=None,
         *,
-        status=JudgeRun.Status.COMPLETED,
-        scope_type=JudgeRun.ScopeType.COMPONENT,
-    ) -> JudgeRun:
+        status=ProducerRun.Status.COMPLETED,
+        scope_type=ProducerRun.ScopeType.COMPONENT,
+        requested_mode="judge",
+    ) -> ProducerRun:
         scope = scope or self.component
-        return JudgeRun.objects.create(
+        return ProducerRun.objects.create(
             actor=self.user,
             scope_type=scope_type,
             scope_id=str(scope.pk),
             scope_label=str(scope),
             scope_path=scope.get_absolute_url(),
             requested_query="state:empty",
-            requested_mode="judge",
+            requested_mode=requested_mode,
             cap=1000,
             status=status,
             started=timezone.now() - timedelta(minutes=5),
             finished=(
                 timezone.now()
-                if status in {JudgeRun.Status.COMPLETED, JudgeRun.Status.FAILED}
+                if status in {ProducerRun.Status.COMPLETED, ProducerRun.Status.FAILED}
                 else None
             ),
         )
 
+    def test_report_uses_the_producer_run_template(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        response = self.client.get(self.report_url(run))
+        self.assertTemplateUsed(response, "producer-run.html")
+
+    def test_translation_run_needs_only_the_launch_permission(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        run = self.create_run(requested_mode="translate")
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 200)
+
+    def test_judge_run_still_needs_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        run = self.create_run(requested_mode="judge")
+        self.component.project.translation_review = False
+        self.component.project.save(update_fields=["translation_review"])
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 404)
+
+    def test_report_restores_category_and_project_language_scopes(self) -> None:
+        self.enable_review()
+        category = self.create_category(project=self.project)
+        project_language = ProjectLanguage(self.project, self.translation.language)
+        for scope, scope_type in (
+            (category, ProducerRun.ScopeType.CATEGORY),
+            (project_language, ProducerRun.ScopeType.PROJECT_LANGUAGE),
+        ):
+            with self.subTest(scope=scope):
+                scope_id = (
+                    f"{scope.project.pk}-{scope.language.pk}"
+                    if isinstance(scope, ProjectLanguage)
+                    else str(scope.pk)
+                )
+                run = ProducerRun.objects.create(
+                    actor=self.user,
+                    scope_type=scope_type,
+                    scope_id=scope_id,
+                    scope_label=str(scope),
+                    scope_path=scope.get_absolute_url(),
+                    requested_mode="judge",
+                    cap=100,
+                )
+                response = self.client.get(self.report_url(run))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["scope"].pk, scope.pk)
+
     def add_row(
         self,
-        run: JudgeRun,
+        run: ProducerRun,
         unit=None,
         *,
         unit_id_snapshot: int | None = None,
@@ -2265,7 +2397,7 @@ class JudgeRunReportViewTest(ViewTestCase):
             **overrides,
         )
 
-    def report_url(self, run: JudgeRun) -> str:
+    def report_url(self, run: ProducerRun) -> str:
         return reverse("judge-run", kwargs={"pk": run.pk})
 
     def make_verdict(self, unit, *, resolution: str = "") -> JudgeVerdict:
@@ -2501,7 +2633,7 @@ class JudgeRunReportViewTest(ViewTestCase):
 
     def test_refused_run_shows_the_refusal_and_no_unparsed_row(self) -> None:
         self.enable_review()
-        run = self.create_run(status=JudgeRun.Status.FAILED)
+        run = self.create_run(status=ProducerRun.Status.FAILED)
         run.failure = "The LLM judge endpoint refused the request (HTTP 400)."
         run.save(update_fields=["failure"])
         response = self.client.get(self.report_url(run))
@@ -2562,15 +2694,15 @@ class JudgeRunReportViewTest(ViewTestCase):
         self,
     ) -> None:
         self.enable_review()
-        for status in JudgeRun.Status.values:
+        for status in ProducerRun.Status.values:
             with self.subTest(status=status):
                 run = self.create_run(status=status)
                 response = self.client.get(self.report_url(run))
                 self.assertEqual(response.status_code, 200)
                 self.assertContains(response, run.get_status_display())
-                if status in {JudgeRun.Status.QUEUED, JudgeRun.Status.RUNNING}:
+                if status in {ProducerRun.Status.QUEUED, ProducerRun.Status.RUNNING}:
                     self.assertContains(response, "still in progress")
-                if status == JudgeRun.Status.FAILED:
+                if status == ProducerRun.Status.FAILED:
                     self.assertContains(response, "failed")
                 self.assertContains(response, "No strings in this outcome.")
 
@@ -2589,15 +2721,15 @@ class JudgeRunReportViewTest(ViewTestCase):
         self.enable_review()
         run = self.create_run()
         component_pk = self.component.pk
-        run2 = JudgeRun.objects.create(
+        run2 = ProducerRun.objects.create(
             actor=self.user,
-            scope_type=JudgeRun.ScopeType.COMPONENT,
+            scope_type=ProducerRun.ScopeType.COMPONENT,
             scope_id="999999999",
             scope_label="gone",
             scope_path="/",
             requested_mode="judge",
             cap=10,
-            status=JudgeRun.Status.COMPLETED,
+            status=ProducerRun.Status.COMPLETED,
         )
         self.assertNotEqual(run2.scope_id, str(component_pk))
         response = self.client.get(self.report_url(run2))
@@ -2631,7 +2763,7 @@ class JudgeRunReportViewTest(ViewTestCase):
         response = self.client.get(self.report_url(run), {"outcome": "made-up"})
         self.assertEqual(response.status_code, 404)
 
-    def test_no_query_path_emits_a_cost_figure(self) -> None:
+    def test_no_query_path_still_emits_a_cost_figure(self) -> None:
         self.enable_review()
         run = self.create_run()
         self.add_row(run, self.get_unit(), outcome=JudgeRunUnit.Outcome.MAJOR)
@@ -2647,8 +2779,8 @@ class JudgeRunReportViewTest(ViewTestCase):
                 self.report_url(run), {"outcome": key} if key else {}
             )
             content = response.content.decode().lower()
-            self.assertNotIn("cost", content)
-            self.assertNotIn("$", content)
+            self.assertIn("cost", content)
+            self.assertIn("$", content)
 
     def test_report_page_query_count_does_not_grow_with_row_count(self) -> None:
         self.enable_review()
@@ -2810,7 +2942,7 @@ class JudgeRunReportViewTest(ViewTestCase):
         self.assertIn("/search/", component_response.context["blocking_review_url"])
 
         translation_run = self.create_run(
-            self.translation, scope_type=JudgeRun.ScopeType.TRANSLATION
+            self.translation, scope_type=ProducerRun.ScopeType.TRANSLATION
         )
         self.add_row(
             translation_run,
@@ -3019,10 +3151,10 @@ class JudgeProducerTriageViewTest(ViewTestCase):
         ):
             first = self.client.post(url, follow=True)
             second = self.client.post(url, follow=True)
-        runs = JudgeRun.objects.filter(requested_mode="recheck")
+        runs = ProducerRun.objects.filter(requested_mode="recheck")
         self.assertEqual(runs.count(), 1)
         run = runs.get()
-        self.assertEqual(run.status, JudgeRun.Status.QUEUED)
+        self.assertEqual(run.status, ProducerRun.Status.QUEUED)
         self.assertEqual(run.requested_query, recheck_query(unit.pk))
         self.assertEqual(run.cap, 1)
         self.assertEqual(run.task_id, "task-1")
@@ -3044,23 +3176,26 @@ class JudgeProducerTriageViewTest(ViewTestCase):
             self.client.post(
                 reverse("judge-recheck", kwargs={"pk": unit.pk}), follow=True
             )
-        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 2)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 2
+        )
         self.assertNotEqual(
-            JudgeRun.objects.exclude(pk=run.pk).get().status, JudgeRun.Status.COMPLETED
+            ProducerRun.objects.exclude(pk=run.pk).get().status,
+            ProducerRun.Status.COMPLETED,
         )
 
-    def _completed_recheck(self, unit) -> JudgeRun:
+    def _completed_recheck(self, unit) -> ProducerRun:
         translation = unit.translation
-        return JudgeRun.objects.create(
+        return ProducerRun.objects.create(
             actor=self.user,
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(translation.pk),
             scope_label=str(translation),
             scope_path=translation.get_absolute_url(),
             requested_query=recheck_query(unit.pk),
             requested_mode="recheck",
             cap=1,
-            status=JudgeRun.Status.COMPLETED,
+            status=ProducerRun.Status.COMPLETED,
         )
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
@@ -3076,8 +3211,8 @@ class JudgeProducerTriageViewTest(ViewTestCase):
             response = self.client.post(
                 reverse("judge-recheck", kwargs={"pk": unit.pk}), follow=True
             )
-        run = JudgeRun.objects.get(requested_mode="recheck")
-        self.assertEqual(run.status, JudgeRun.Status.FAILED)
+        run = ProducerRun.objects.get(requested_mode="recheck")
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
         self.assertTrue(run.failure)
         self.assertContains(response, "re-check has been queued", status_code=200)
 
@@ -3426,7 +3561,9 @@ class JudgeProducerTriageViewTest(ViewTestCase):
         refreshed = self.get_unit()
         self.assertEqual(refreshed.state, STATE_TRANSLATED)
         self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
-        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 1)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 1
+        )
 
     def test_unit_page_renders_the_candidate_row_in_server_html(self) -> None:
         unit = self.get_unit()
@@ -3729,7 +3866,9 @@ class JudgeManualSaveTest(ViewTestCase):
         self.edit_unit("Hello, world!\n", "Ahoj\n", review=str(STATE_APPROVED))
         unit = self.get_unit()
         self.assertEqual(unit.state, STATE_APPROVED)
-        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 0)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 0
+        )
 
     def test_unchanged_save_keeps_a_held_fuzzy_string(self) -> None:
         self.grant_only(["unit.edit", "unit.review", "translation.auto"])
@@ -3740,7 +3879,9 @@ class JudgeManualSaveTest(ViewTestCase):
         self.edit_unit("Hello, world!\n", "Ahoj\n", review=str(STATE_FUZZY))
         unit = self.get_unit()
         self.assertEqual(unit.state, STATE_FUZZY)
-        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 0)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 0
+        )
 
     def test_manual_save_of_changed_text_lifts_a_held_string(self) -> None:
         self.grant_only(["unit.edit", "unit.review", "translation.auto"])
@@ -3751,7 +3892,9 @@ class JudgeManualSaveTest(ViewTestCase):
         self.edit_unit("Hello, world!\n", "Nový cíl po opravě", review=str(STATE_FUZZY))
         unit = self.get_unit()
         self.assertEqual(unit.state, STATE_TRANSLATED)
-        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 1)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 1
+        )
 
     def test_crlf_target_is_not_mistaken_for_an_edit(self) -> None:
         """A stored CRLF must not make an identical save look like a fix."""
@@ -3767,7 +3910,9 @@ class JudgeManualSaveTest(ViewTestCase):
         self.edit_unit("Hello, world!\n", "Ahoj\nsvete\n", review=str(STATE_APPROVED))
         unit = self.get_unit()
         self.assertEqual(unit.state, STATE_APPROVED)
-        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 0)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 0
+        )
 
     def test_manual_save_of_changed_text_recheck(self) -> None:
         self.grant_only(["unit.edit", "unit.review", "translation.auto"])
@@ -3782,7 +3927,7 @@ class JudgeManualSaveTest(ViewTestCase):
         self.assertEqual(queued.call_count, 1)
         unit = self.get_unit()
         self.assertEqual(unit.state, STATE_TRANSLATED)
-        runs = JudgeRun.objects.filter(requested_mode="recheck")
+        runs = ProducerRun.objects.filter(requested_mode="recheck")
         self.assertEqual(runs.count(), 1)
         self.assertEqual(runs.get().requested_query, recheck_query(unit.pk))
         self.assert_redirects_offset(response, unit.translation.get_translate_url(), 2)
@@ -3800,7 +3945,9 @@ class JudgeManualSaveTest(ViewTestCase):
         self.assertEqual(response.status_code, 302)
         unit = self.get_unit()
         self.assertEqual(unit.state, STATE_TRANSLATED)
-        self.assertEqual(JudgeRun.objects.filter(requested_mode="recheck").count(), 1)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 1
+        )
 
     def test_manual_save_unjudged_string_no_recheck(self) -> None:
         self.grant_only(["unit.edit", "unit.review", "translation.auto"])
@@ -3811,7 +3958,7 @@ class JudgeManualSaveTest(ViewTestCase):
         ) as queued:
             self.edit_unit("Thank you for using Weblate.", "Děkuji za Use Weblate")
         self.assertEqual(queued.call_count, 0)
-        self.assertEqual(JudgeRun.objects.count(), 0)
+        self.assertEqual(ProducerRun.objects.count(), 0)
         unit = self.get_unit("Thank you for using Weblate.")
         self.assertEqual(unit.state, STATE_TRANSLATED)
 
@@ -3822,7 +3969,7 @@ class JudgeManualSaveTest(ViewTestCase):
         response = self.edit_unit("Hello, world!\n", "Nový cíl po opravě", follow=True)
         self.assertContains(response, "awaits a judge re-check")
         self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
-        self.assertEqual(JudgeRun.objects.count(), 0)
+        self.assertEqual(ProducerRun.objects.count(), 0)
 
     def test_manual_save_recheck_configuration_error(self) -> None:
         self.grant_only(["unit.edit", "unit.review", "translation.auto"])
@@ -3837,7 +3984,7 @@ class JudgeManualSaveTest(ViewTestCase):
             )
         self.assertContains(response, "The judge is not configured.")
         self.assertEqual(self.get_unit().state, STATE_TRANSLATED)
-        self.assertEqual(JudgeRun.objects.count(), 0)
+        self.assertEqual(ProducerRun.objects.count(), 0)
 
 
 @override_settings(
@@ -3914,18 +4061,18 @@ class JudgeVerdictCardRenderTest(ViewTestCase):
         )
         return suggestion
 
-    def _completed_recheck(self, unit) -> JudgeRun:
+    def _completed_recheck(self, unit) -> ProducerRun:
         translation = unit.translation
-        return JudgeRun.objects.create(
+        return ProducerRun.objects.create(
             actor=self.user,
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(translation.pk),
             scope_label=str(translation),
             scope_path=translation.get_absolute_url(),
             requested_query=recheck_query(unit.pk),
             requested_mode="recheck",
             cap=1,
-            status=JudgeRun.Status.QUEUED,
+            status=ProducerRun.Status.QUEUED,
         )
 
     def test_stale_shows_only_recheck(self) -> None:
@@ -4487,16 +4634,16 @@ class JudgeCardLocalizationTest(ViewTestCase):
         unit = self.get_unit()
         self.make_verdict(unit, "critical")
         translation_obj = unit.translation
-        JudgeRun.objects.create(
+        ProducerRun.objects.create(
             actor=self.user,
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(translation_obj.pk),
             scope_label=str(translation_obj),
             scope_path=translation_obj.get_absolute_url(),
             requested_query=recheck_query(unit.pk),
             requested_mode="recheck",
             cap=1,
-            status=JudgeRun.Status.QUEUED,
+            status=ProducerRun.Status.QUEUED,
         )
         with translation.override("ru"):
             response = self.client.get(unit.get_absolute_url())
@@ -4508,3 +4655,101 @@ class JudgeCardLocalizationTest(ViewTestCase):
         with translation.override("ru"):
             response = self.client.get(unit.get_absolute_url())
         self.assertContains(response, "Вернуть в очередь")
+
+
+class CheapRouterMachinery(MachineTranslation):
+    """Service that resolves a model per target language, as the routers do."""
+
+    name = "Cheap router"
+
+    def resolve_model(self, code: str) -> str:
+        return "vendor/cheap"
+
+    def download_translations(self, *args, **kwargs):
+        return iter(())
+
+
+class DearRouterMachinery(CheapRouterMachinery):
+    name = "Dear router"
+
+    def resolve_model(self, code: str) -> str:
+        return "vendor/dear"
+
+
+@override_settings(
+    WEBLATE_MACHINERY=[
+        "weblate.trans.tests.test_judge_views.CheapRouterMachinery",
+        "weblate.trans.tests.test_judge_views.DearRouterMachinery",
+    ]
+)
+class MachineTranslationCostPreviewTest(ViewTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        self.component.project.machinery_settings = {
+            "cheap-router": {"key": "test"},
+            "dear-router": {"key": "test"},
+        }
+        self.component.project.save(update_fields=["machinery_settings"])
+
+    def price_history(self, service: str, model: str, per_unit: str) -> None:
+        """Five priced requests, the minimum ``recent_cost_range`` accepts."""
+        for _ in range(5):
+            LLMUsageLog.objects.create(
+                model=model,
+                service=service,
+                project_id_snapshot=self.component.project_id,
+                operation=LLMUsageLog.Operation.TRANSLATION,
+                prompt_tokens=10,
+                unit_count=2,
+                batch_size=2,
+                cost_usd=Decimal(per_unit) * 2,
+            )
+
+    def request_preview(self, engines: list[str]) -> dict:
+        response = self.client.get(
+            reverse(
+                "auto_translation_preview",
+                kwargs={"path": self.component.get_url_path()},
+            ),
+            {
+                "mode": "translate",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "threshold": 80,
+                "engines": engines,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        return response.json()
+
+    def test_preview_sums_every_selected_engine_for_a_string(self) -> None:
+        """Both engines are asked for every unit, so their prices add up."""
+        self.price_history("cheap-router", "vendor/cheap", "0.001")
+        self.price_history("dear-router", "vendor/dear", "0.005")
+        payload = self.request_preview(["cheap-router", "dear-router"])
+
+        cost = payload["pretranslation_cost"]
+        self.assertTrue(cost["available"])
+        writable = payload["writable"]
+        self.assertGreater(writable, 0)
+        # Every language resolves the same pair of models, so the interval
+        # collapses onto the exact per-string sum.
+        self.assertEqual(Decimal(cost["min"]), Decimal("0.006") * writable)
+        self.assertEqual(Decimal(cost["max"]), Decimal("0.006") * writable)
+
+    def test_preview_refuses_a_partial_price(self) -> None:
+        """Pricing some pairs of a run and dropping the rest is a lie."""
+        self.price_history("cheap-router", "vendor/cheap", "0.001")
+
+        cost = self.request_preview(["cheap-router", "dear-router"])[
+            "pretranslation_cost"
+        ]
+
+        self.assertFalse(cost["available"])
+
+    def test_preview_is_unavailable_without_price_history(self) -> None:
+        cost = self.request_preview(["cheap-router"])["pretranslation_cost"]
+
+        self.assertFalse(cost["available"])

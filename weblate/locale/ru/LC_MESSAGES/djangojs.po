@@ -758,3 +758,33 @@ msgstr[2] "%s часов назад"
 
 #~ msgid "Translate using MyMemory"
 #~ msgstr "Перевести используя MyMemory"
+
+msgid "View run report"
+msgstr "Открыть отчёт прогона"
+
+msgid "Estimated machine translation cost: %(min)s to %(max)s USD."
+msgstr "Оценка стоимости машинного перевода: от %(min)s до %(max)s USD."
+
+msgid "Estimated machine translation cost is unavailable."
+msgstr "Оценка стоимости машинного перевода недоступна."
+
+msgid "Estimated judge cost: %(min)s to %(max)s USD."
+msgstr "Оценка стоимости судьи: от %(min)s до %(max)s USD."
+
+msgid "Estimated judge cost is unavailable."
+msgstr "Оценка стоимости судьи недоступна."
+
+msgid ""
+"%(matched)s matching strings will be considered by the selected machine "
+"translation engines."
+msgstr ""
+"Выбранные движки машинного перевода рассмотрят %(matched)s подходящих строк."
+
+msgid "Automatic translation preview input is invalid."
+msgstr "Некорректные параметры предпросмотра автоматического перевода."
+
+msgid ""
+"Automatic translation preview is unavailable. You can still apply this run."
+msgstr ""
+"Предпросмотр автоматического перевода недоступен. Запуск всё равно можно "
+"применить."
