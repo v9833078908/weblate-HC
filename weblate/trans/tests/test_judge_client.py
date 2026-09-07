@@ -46,7 +46,7 @@ from weblate.trans.judge import (
     validate_judge_configuration,
 )
 from weblate.trans.judge_loop import _AVAILABILITY_FAILURE_KINDS
-from weblate.trans.models.judge import JudgeRequestAttempt
+from weblate.trans.models.judge import JudgeRequestAttempt, ProducerRun
 from weblate.trans.models.llm_usage import LLMUsageLog
 from weblate.utils.tests import http_mock
 
@@ -2308,6 +2308,41 @@ class JudgeUsageLogTest(TestCase):
         self.assertEqual(row.component_slug, "ui")
         self.assertEqual(row.target_language_code, "fr")
         self.assertEqual(row.cost_usd, Decimal("0.123456789123456789"))
+
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_is_billed_to_the_judge_run(self) -> None:
+        payload = _reply(
+            [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+        )
+        payload["usage"] = {
+            "prompt_tokens": 11,
+            "completion_tokens": 7,
+            "cost": 0.001,
+        }
+        http_mock.register("POST", CHAT_URL, json=payload)
+        run = ProducerRun.objects.create(
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id="1",
+            scope_label="Test",
+            scope_path="/projects/test/test/",
+            requested_mode="judge",
+            cap=100,
+        )
+        request_verdicts(
+            [REQ],
+            model="vendor/model-a",
+            run=run,
+            persist_attempts=True,
+        )
+        self.assertEqual(
+            LLMUsageLog.objects.get(model="vendor/model-a").run_id, run.pk
+        )
 
     @override_settings(
         JUDGE_ENABLED=True,

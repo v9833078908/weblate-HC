@@ -12,6 +12,8 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 
+from weblate.machinery.base import BatchMachineTranslation
+from weblate.trans.models import ProducerRun
 from weblate.trans.models.llm_usage import (
     LLMUsageLog,
     parse_provider_cost,
@@ -19,6 +21,11 @@ from weblate.trans.models.llm_usage import (
     run_spend,
 )
 from weblate.trans.tests.test_views import ComponentTestCase
+
+
+class LLMUsageRunAttributionTest(TestCase):
+    def test_service_attribute_defaults_to_none(self) -> None:
+        self.assertIsNone(BatchMachineTranslation.usage_run_id)
 
 
 class LLMUsageLogModelTest(TestCase):
