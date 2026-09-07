@@ -7,6 +7,8 @@
 **Architecture:** `JudgeRun` переименовывается в `ProducerRun` (state-only миграция, таблица `trans_judgerun` остаётся на месте) и начинает создаваться для запуска автоперевода, который обращается к машинному переводу (`auto_source="mt"`), а не только для судейского. Запуск из памяти переводов (`auto_source="others"`) прогона не создаёт: он ничего не стоит, и чек ему не нужен. Каждая строка `LLMUsageLog` получает FK на прогон, поэтому расход прогона считается одним `aggregate()` без временных окон. Страница отчёта получает общую карточку расхода для обоих режимов и две MT-специфичные карточки вместо судейской триажной.
 
 **Tech Stack:** Django 5 ORM, `SeparateDatabaseAndState`-миграции, Celery, Django templates + Bootstrap 5, crispy-forms, vanilla JS (`weblate/static/loader-bootstrap.js`), pytest через `./rundev.sh test`.
+**Review:** 2026-09-07 — implementation-ready after a source-level review. The review closed four correctness holes: every supported automatic-translation scope now gets a restorable receipt; a swallowed MT failure finalizes the receipt as failed; an incomplete price never becomes a per-string price; and the ordinary-MT preview keeps its own eligibility semantics instead of inheriting the judge cap.
+
 
 ## Global Constraints
 
@@ -17,9 +19,10 @@
 - Коммиты — Conventional Commits: `<type>(<scope>): <description>`.
 - Тесты запускаются внутри контейнера: `./rundev.sh test <path>`. Хостовый `uv run pytest` требует отдельной настройки БД и в этом плане не используется.
 - Линт после каждой задачи не запускается; один прогон `uv run prek run --all-files` в последней задаче.
-- `cost_usd = NULL` означает «неизвестно», никогда «ноль». Ни одна агрегация не подставляет ноль на месте `NULL`.
+- У отдельной строки леджера `cost_usd = NULL` означает «цена не сообщена». Агрегат может показать `0` только как сумму **известных** цен, но рядом с `unpriced_requests > 0` он обязан явно назвать цену неполной; ни карточка, ни средняя цена за строку не имеют права представить такой запуск бесплатным.
 - Правило переименования: symbol-aware переименования выполняются инструментом `lsp` (`action: "rename"`), не текстовой заменой.
 - URL-имя маршрута `judge-run` **сохраняется** во всех задачах: на него ссылаются шаблоны, `weblate/trans/tasks.py` и внешние закладки продюсеров. Переименовывается модель и Python-символы, не публичный идентификатор маршрута.
+- Перед каждым коммитом проверить `git status --short` и добавить только файлы текущей задачи. Не использовать `git add <directory>`: это захватывает чужие изменения в том же дереве.
 
 ---
 
@@ -33,7 +36,7 @@
 
 **Interfaces:**
 - Consumes: ничего.
-- Produces: `weblate.trans.models.ProducerRun` с теми же полями и `Meta.db_table = "trans_judgerun"`; обратный аксессор `User.producer_runs`; классы `ProducerRun.ScopeType`, `ProducerRun.Status`. Задачи 2-11 используют только это имя.
+- Produces: `weblate.trans.models.ProducerRun` с теми же полями и `Meta.db_table = "trans_judgerun"`; обратный аксессор `User.producer_runs`; классы `ProducerRun.ScopeType`, `ProducerRun.Status`. `ScopeType` покрывает **каждый** объект, который принимает `BatchAutoTranslate`: `Translation`, `Component`, `Category`, `Project`, `ProjectLanguage`, `Workspace`. Задачи 2-11 используют только это имя.
 
 - [ ] **Step 1: Написать падающий тест**
 
@@ -57,6 +60,19 @@ class ProducerRunModelTest(TestCase):
             cap=100,
         )
         self.assertEqual([item.pk for item in user.producer_runs.all()], [run.pk])
+
+    def test_scope_types_cover_every_automatic_translation_target(self) -> None:
+        self.assertEqual(
+            {value for value, _label in ProducerRun.ScopeType.choices},
+            {
+                "translation",
+                "component",
+                "category",
+                "project",
+                "project-language",
+                "workspace",
+            },
+        )
 ```
 
 Импорты в шапке файла: добавить `ProducerRun` в существующий импорт из `weblate.trans.models`, а `User` — из `weblate.auth.models`, если его там ещё нет. `TestCase` берётся из `django.test`.
@@ -74,11 +90,11 @@ Expected: FAIL с `ImportError: cannot import name 'ProducerRun' from 'weblate.t
 {"action": "rename", "file": "weblate/trans/models/judge.py", "line": 276, "symbol": "JudgeRun", "new_name": "ProducerRun"}
 ```
 
-Это правит определение и все 232 ссылки в `weblate/trans/`, `weblate/api/tests.py` и тестах. Файлы миграций `0107_*` и `0111_*` править **нельзя**: исторические миграции хранят старое имя, и это корректно. Если LSP тронул файл в `weblate/trans/migrations/`, откатить именно этот файл через `git checkout -- <path>`.
+Это правит определение и все 232 ссылки в `weblate/trans/`, `weblate/api/tests.py` и тестах. Файлы миграций `0107_*` и `0111_*` править **нельзя**: исторические миграции хранят старое имя, и это корректно. Если LSP тронул файл в `weblate/trans/migrations/`, откатить **только этот исторический файл** через `git restore --source=HEAD -- <path>`; новую `0121_producer_run.py` не откатывать.
 
 - [ ] **Step 4: Дописать модель руками**
 
-`weblate/trans/models/judge.py`, класс `ProducerRun`: обновить докстринг, `related_name` и `Meta`.
+`weblate/trans/models/judge.py`, класс `ProducerRun`: обновить докстринг, `ScopeType`, `related_name` и `Meta`.
 
 ```python
 class ProducerRun(models.Model):
@@ -92,7 +108,16 @@ class ProducerRun(models.Model):
     ``AutoForm`` ("translate", "suggest", "fuzzy", "approved", "judge")
     plus the two non-launch passes "recheck" and "drain".
     """
+    class ScopeType(models.TextChoices):
+        TRANSLATION = "translation"
+        COMPONENT = "component"
+        CATEGORY = "category"
+        PROJECT = "project"
+        PROJECT_LANGUAGE = "project-language"
+        WORKSPACE = "workspace"
 ```
+
+`ProjectLanguage.pk` уже является стабильной строкой `"<project-pk>-<language-pk>"` (`weblate/utils/stats.py:1325-1327`), поэтому помещается в существующее `scope_id` без новой колонки. Task 2 восстановит обёртку по обоим PK; `scope_path` остаётся снятым при запуске URL-снимком.
 
 В поле `actor` заменить `related_name="judge_runs"` на `related_name="producer_runs"`.
 
@@ -130,8 +155,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # The model is renamed in state only. Renaming the table would move
-        # every stored judge run, and its foreign keys are column-identical.
+        # Model name, reverse accessor, table name, display options and the
+        # two new application-level scope choices are state only. No existing
+        # row, table, column, index, or FK moves.
         migrations.SeparateDatabaseAndState(
             state_operations=[
                 migrations.RenameModel(old_name="JudgeRun", new_name="ProducerRun"),
@@ -145,19 +171,34 @@ class Migration(migrations.Migration):
                         "verbose_name_plural": "Producer runs",
                     },
                 ),
+                migrations.AlterField(
+                    model_name="producerrun",
+                    name="actor",
+                    field=models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="producer_runs",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                migrations.AlterField(
+                    model_name="producerrun",
+                    name="scope_type",
+                    field=models.CharField(
+                        choices=[
+                            ("translation", "Translation"),
+                            ("component", "Component"),
+                            ("category", "Category"),
+                            ("project", "Project"),
+                            ("project-language", "Project language"),
+                            ("workspace", "Workspace"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
             ],
             database_operations=[],
-        ),
-        migrations.AlterField(
-            model_name="producerrun",
-            name="actor",
-            field=models.ForeignKey(
-                blank=True,
-                null=True,
-                on_delete=django.db.models.deletion.SET_NULL,
-                related_name="producer_runs",
-                to=settings.AUTH_USER_MODEL,
-            ),
         ),
     ]
 ```
@@ -165,7 +206,7 @@ class Migration(migrations.Migration):
 - [ ] **Step 6: Проверить, что состояние миграций сходится**
 
 Run: `DJANGO_SETTINGS_MODULE=weblate.settings_test uv run ./manage.py makemigrations trans --check --dry-run`
-Expected: `No changes detected` (БД не нужна). Если печатает предложенную миграцию — состояние не совпало с моделью; сверить `db_table`, `related_name` и `options`.
+Expected: `No changes detected` (БД не нужна). Если печатает предложенную миграцию — состояние не совпало с моделью; сверить `db_table`, `related_name`, `scope_type.choices` и `options`.
 
 - [ ] **Step 7: Запустить тесты**
 
@@ -175,7 +216,7 @@ Expected: PASS, ни одного `ImportError`
 - [ ] **Step 8: Коммит**
 
 ```bash
-git add weblate/trans/models/judge.py weblate/trans/models/__init__.py weblate/trans/migrations/0121_producer_run.py weblate/trans/ weblate/api/tests.py
+git add weblate/trans/models/judge.py weblate/trans/models/__init__.py weblate/trans/migrations/0121_producer_run.py weblate/trans/autotranslate.py weblate/trans/judge.py weblate/trans/judge_loop.py weblate/trans/tasks.py weblate/trans/views/basic.py weblate/trans/views/judge.py weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_judge_client.py weblate/trans/tests/test_judge_deferrals.py weblate/trans/tests/test_judge_loop.py weblate/trans/tests/test_judge_views.py weblate/trans/tests/test_commands.py weblate/api/tests.py
 git commit -m "refactor(trans): rename JudgeRun to ProducerRun without moving its table"
 ```
 
@@ -185,16 +226,17 @@ git commit -m "refactor(trans): rename JudgeRun to ProducerRun without moving it
 
 **Files:**
 - Modify: `weblate/trans/models/judge.py` (добавить `RUN_KIND_LABELS`)
-- Modify: `weblate/trans/views/judge.py:54-59,308-323,396-427,430-544`
-- Modify: `weblate/trans/views/basic.py:82,828,1010-1022,1129-1132`
+- Modify: `weblate/trans/views/judge.py:43-60,308-323,396-427,430-544`
+- Modify: `weblate/trans/views/basic.py:82,775-856,1010-1022,1129-1132`
 - Rename: `weblate/templates/judge-run.html` → `weblate/templates/producer-run.html`
 - Rename: `weblate/templates/snippets/judge-runs-menu.html` → `weblate/templates/snippets/producer-runs-menu.html`
-- Modify: `weblate/templates/snippets/autoform.html:57-59`
+- Modify: `weblate/templates/snippets/autoform.html:57-60`
+- Modify: `weblate/templates/snippets/judge-readiness.html:3-37`
 - Test: `weblate/trans/tests/test_judge_views.py`
 
 **Interfaces:**
 - Consumes: `ProducerRun` из Task 1.
-- Produces: `recent_producer_runs(scope, *, user, limit=10) -> list[ProducerRun]`, `producer_run_modes(user, scope) -> tuple[str, ...]`, `user_can_view_producer_run(user, scope, run) -> bool`, view `producer_run(request, pk)`, шаблон `producer-run.html`, сниппет `producer-runs-menu.html`, контекстные ключи `producer_runs` и `producer_last_run`, константы `HISTORY_MODES` и `JUDGE_MODES`. Маршрут по-прежнему называется `judge-run`.
+- Produces: `recent_producer_runs(scope, *, user, limit=10) -> list[ProducerRun]`, `producer_run_modes(user, scope) -> tuple[str, ...]`, `user_can_view_producer_run(user, scope, run) -> bool`, view `producer_run(request, pk)`, шаблон `producer-run.html`, сниппет `producer-runs-menu.html`, контекстные ключи `producer_runs` и `producer_last_run`, константы `HISTORY_MODES`, `JUDGE_MODES`, `MT_LAUNCH_MODES`. `judge_queue` остаётся именем существующего контекста, но получает `can_run_judge`: при одном `translation.auto` он может показать историю MT, не выдавая судейский CTA. Маршрут по-прежнему называется `judge-run`.
 
 - [ ] **Step 1: Написать падающие тесты**
 
@@ -229,14 +271,30 @@ git commit -m "refactor(trans): rename JudgeRun to ProducerRun without moving it
         run = self.create_run(requested_mode="judge")
         response = self.client.get(reverse("judge-run", kwargs={"pk": run.pk}))
         self.assertEqual(response.status_code, 404)
+
+    def test_report_restores_category_and_project_language_scopes(self) -> None:
+        self.enable_review()
+        category = self.create_category(project=self.project)
+        project_language = ProjectLanguage(self.project, self.translation.language)
+        for scope, scope_type in (
+            (category, ProducerRun.ScopeType.CATEGORY),
+            (project_language, ProducerRun.ScopeType.PROJECT_LANGUAGE),
+        ):
+            with self.subTest(scope=scope):
+                run = self.create_run(scope=scope, scope_type=scope_type)
+                response = self.client.get(
+                    reverse("judge-run", kwargs={"pk": run.pk})
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["scope"].pk, scope.pk)
 ```
 
-Хелпер `create_run` расширить необязательным аргументом `requested_mode="judge"` и передавать его в `ProducerRun.objects.create(...)` вместо жёстко прошитой строки (`weblate/trans/tests/test_judge_views.py:2221`).
+Хелпер `create_run` расширить необязательным аргументом `requested_mode="judge"` и передавать его в `ProducerRun.objects.create(...)` вместо жёстко прошитой строки (`weblate/trans/tests/test_judge_views.py:2221`). Импортировать `ProjectLanguage` из `weblate.utils.stats`. Эти два scope-теста обязательны: `auto_translation` принимает Category и ProjectLanguage (`weblate/trans/views/edit.py:1710-1753`), а старый `_create_judge_run` их отвергает.
 
 - [ ] **Step 2: Запустить тест и убедиться, что он падает**
 
-Run: `./rundev.sh test weblate/trans/tests/test_judge_views.py -k test_report_uses_the_producer_run_template`
-Expected: FAIL с `Template 'producer-run.html' was not a template used to render the response`
+Run: `./rundev.sh test weblate/trans/tests/test_judge_views.py -k 'producer_run_template or translation_run_needs_only or restores_category'`
+Expected: FAIL: шаблон ещё старый, а `ProducerRun.ScopeType` / `_get_scope` ещё не знают новые scope.
 
 - [ ] **Step 3: Переименовать символы через LSP**
 
@@ -254,42 +312,54 @@ Expected: FAIL с `Template 'producer-run.html' was not a template used to rende
 
 После третьего — проверить, что в `weblate/urls.py` запись стала `weblate.trans.views.judge.producer_run` при неизменном `name="judge-run"`.
 
-- [ ] **Step 4: Сделать право просмотра зависимым от режима прогона**
+- [ ] **Step 4: Восстановить scope и сделать право просмотра зависимым от режима**
 
-`weblate/trans/views/judge.py`: рядом с `HISTORY_MODES` (строка 59) добавить список судейских режимов и две функции; `settings` из `django.conf` в этом модуле уже импортирован.
+`weblate/trans/views/judge.py`: импортировать `Category` из `weblate.trans.models`, `Language` из `weblate.lang.models` и `ProjectLanguage` из `weblate.utils.stats`. В `_SCOPE_MODELS` добавить `ProducerRun.ScopeType.CATEGORY: Category`. Перед обычным поиском модели в `_get_scope` добавить отдельный путь для не-ORM ProjectLanguage:
 
 ```python
-# The modes whose report shows judge verdicts. Everything else in
-# HISTORY_MODES is a plain automatic translation launch.
+    if run.scope_type == ProducerRun.ScopeType.PROJECT_LANGUAGE:
+        try:
+            project_id, language_id = map(int, run.scope_id.split("-", 1))
+            return ProjectLanguage(
+                Project.objects.get(pk=project_id),
+                Language.objects.get(pk=language_id),
+            )
+        except (Project.DoesNotExist, Language.DoesNotExist, ValueError) as error:
+            raise Http404 from error
+```
+
+Нельзя заменять это родительским `Project`: пользователь может иметь `translation.auto` лишь на одном языке (`weblate/trans/tests/test_autotranslate.py:598-628`), и отчёт должен повторно проверяться в том же узком scope, в котором он был запущен.
+
+Рядом с `HISTORY_MODES` добавить явные множества режимов. Не трактовать неизвестный будущий `requested_mode` как MT: это мог бы открыть судейский отчёт без `unit.review`.
+
+```python
+# Modes that contain verdict data and must retain the review gate.
 JUDGE_MODES = ("judge", "recheck", "drain")
+# Modes produced by AutoForm that contain only the launcher-visible receipt.
+MT_LAUNCH_MODES = ("translate", "suggest", "fuzzy", "approved")
 
 
 def producer_run_modes(user, scope) -> tuple[str, ...]:
-    """
-    Which of ``HISTORY_MODES`` this user may currently see for this scope.
-
-    A judge run shows verdicts, so it stays behind ``unit.review``. A plain
-    automatic translation run shows only its own scope, what it wrote and
-    what it cost, so the permission that launched it is the permission that
-    reads it. Requiring ``unit.review`` for those would hide the launcher's
-    own receipt on every project without a review workflow, because
-    ``check_unit_review`` denies that permission outright when
-    ``translation_review`` is off - a superuser included.
-    """
+    """Which of ``HISTORY_MODES`` this user may currently see for this scope."""
     if not user.has_perm("translation.auto", scope):
         return ()
-    if settings.JUDGE_ENABLED and user.has_perm("unit.review", scope):
-        return HISTORY_MODES
-    return tuple(mode for mode in HISTORY_MODES if mode not in JUDGE_MODES)
+    may_review = settings.JUDGE_ENABLED and user.has_perm("unit.review", scope)
+    return tuple(
+        mode
+        for mode in HISTORY_MODES
+        if mode in MT_LAUNCH_MODES or (may_review and mode in JUDGE_MODES)
+    )
 
 
 def user_can_view_producer_run(user, scope, run) -> bool:
     """Whether ``user`` currently (not at launch time) may view this run."""
     if not user.has_perm("translation.auto", scope):
         return False
+    if run.requested_mode in MT_LAUNCH_MODES:
+        return True
     if run.requested_mode in JUDGE_MODES:
         return settings.JUDGE_ENABLED and user.has_perm("unit.review", scope)
-    return True
+    return False
 ```
 
 Тело `user_can_view_producer_run` после `lsp rename` заменяется целиком на этот вариант; вызов во вьюхе (`weblate/trans/views/judge.py:436`) получает третий аргумент:
@@ -318,9 +388,9 @@ def recent_producer_runs(
         return []
 ```
 
-Докстринг дополнить абзацем: судейские режимы попадают в список только при `JUDGE_ENABLED` и `unit.review`, поэтому меню на инстансе с выключенным судьёй показывает только запуски автоперевода.
+Докстринг дополнить абзацем: судейские режимы попадают в список только при `JUDGE_ENABLED` и `unit.review`, а MT-режимы — при `translation.auto`. Категорийные и project-language прогоны всегда открываются по `report_url` завершившейся задачи: у существующих scope-меню нет точного SQL-предиката для их составного покрытия, и добавление ещё одной истории/витрины намеренно вне этого чека.
 
-- [ ] **Step 5: Переименовать шаблоны и контекст**
+- [ ] **Step 5: Переименовать шаблоны, контекст и открыть MT-историю без review**
 
 ```bash
 git mv weblate/templates/judge-run.html weblate/templates/producer-run.html
@@ -362,14 +432,26 @@ RUN_KIND_LABELS: dict[str, StrOrPromise] = {
             ),
 ```
 
-`weblate/trans/views/basic.py`: переименовать локальные переменные и контекстные ключи `judge_runs` → `producer_runs`, `judge_last_run` → `producer_last_run`, поправить импорт на строке 82 и передать пользователя в оба вызова. Вызов на строке 828 становится `recent_producer_runs(obj, user=user)` (взять того же пользователя, которым уже пользуется окружающий код). Блок на строках 1015-1022 сжимается до двух строк, потому что фильтрация по правам теперь внутри функции, а привязка к `JUDGE_ENABLED` для MT-прогонов была бы неверной:
+`weblate/trans/views/basic.py`: переименовать локальные переменные и контекстные ключи `judge_runs` → `producer_runs`, `judge_last_run` → `producer_last_run`, поправить импорт на строке 82 и передать пользователя в оба вызова. Вызов на строке 828 становится `recent_producer_runs(obj, user=user)`.
+
+В `judge_queue_strip_context` не оставлять старний ранний выход `if not can_run: return None`: он требует `unit.review`, поэтому до этой правки скрывает историю запущенного MT от самого пользователя. Разделить права:
 
 ```python
-    producer_runs = recent_producer_runs(obj, user=user)
-    producer_last_run = producer_runs[0] if producer_runs else None
+    if not user.has_perm("translation.auto", obj):
+        return None
+    can_run_judge = judge_configuration_ready() and user.has_perm(
+        "unit.review", obj
+    )
+    runs = recent_producer_runs(obj, user=user)
+    if not can_run_judge and not runs:
+        return None
 ```
 
-`weblate/templates/snippets/autoform.html:57-59`:
+Считать `counts`, `hand_off_ready`, `breakdown_url` и `run_url` только при `can_run_judge`; добавить `"can_run_judge": can_run_judge` в возвращаемый словарь. В `judge-readiness.html` показывать count/ready/download, :guilabel:`Breakdown by check` и :guilabel:`Run the judge` только внутри `{% if judge_queue.can_run_judge %}`. При `False` и непустом `runs` карточка остаётся как история MT: заголовок `{% translate "Automatic translation runs" %}` и только `producer-runs-menu.html`. Так permission `translation.auto` даёт путь к своему чеку, но не раскрывает ни вердикт, ни судейские кнопки.
+
+В `JudgeQueueStripViewTest` добавить сценарий с ролью ровно `translation.auto`, `translation_review=False` и сохранённым `requested_mode="translate"`: компонентная страница показывает URL отчёта и текст `Automatic translation runs`, но не `Run the judge`; direct URL этого MT-прогона возвращает 200. Роль создать по существующему паттерну `JudgeProducerTriageViewTest.grant` (строки 2799-2816): `Role` с `Permission.objects.get(codename="translation.auto")`, `Group(..., project_selection=SELECTION_ALL, language_selection=SELECTION_ALL)`, затем `self.user.clear_permissions_cache()`.
+
+`weblate/templates/snippets/autoform.html:57-60`:
 
 ```html
       {% if producer_runs %}
@@ -377,7 +459,7 @@ RUN_KIND_LABELS: dict[str, StrOrPromise] = {
       {% endif %}
 ```
 
-Проверить остальные использования: `grep -rn "judge-runs-menu\|judge_runs\|judge_last_run\|judge-run.html" weblate/` — не должно остаться ни одного совпадения, кроме `name="judge-run"` в `weblate/urls.py` и `reverse("judge-run", ...)`.
+Проверить только переименованные surface-символы: `grep -rn "judge-runs-menu\|judge_runs\|judge_last_run\|judge-run.html" weblate/`. Допустимы устойчивые публичные/судейские имена: маршрут `judge-run`, классы `JudgeRunUnit`, метаданные кандидата `judge_run_id` и исторические миграции.
 
 - [ ] **Step 6: Запустить тесты**
 
@@ -387,7 +469,7 @@ Expected: PASS
 - [ ] **Step 7: Коммит**
 
 ```bash
-git add weblate/trans/views/judge.py weblate/trans/views/basic.py weblate/trans/models/judge.py weblate/templates weblate/urls.py weblate/trans/tests/test_judge_views.py
+git add weblate/trans/views/judge.py weblate/trans/views/basic.py weblate/trans/models/judge.py weblate/templates/producer-run.html weblate/templates/snippets/producer-runs-menu.html weblate/templates/snippets/judge-readiness.html weblate/templates/snippets/autoform.html weblate/urls.py weblate/trans/tests/test_judge_views.py
 git commit -m "refactor(trans): name the run report after the producer launch, not the judge"
 ```
 
@@ -497,7 +579,7 @@ git commit -m "feat(trans): link each LLM usage row to the producer run that pai
 - Modify: `weblate/trans/judge.py:1482-1502`
 - Modify: `weblate/trans/autotranslate.py:589-597`
 - Modify: `weblate/trans/judge_loop.py:170-190,1468`
-- Test: `weblate/trans/tests/test_llm_usage.py`, `weblate/machinery/tests.py`
+- Test: `weblate/trans/tests/test_llm_usage.py`, `weblate/machinery/tests.py`, `weblate/trans/tests/test_judge_client.py`
 
 **Interfaces:**
 - Consumes: `LLMUsageLog.run` из Task 3.
@@ -537,12 +619,53 @@ class LLMUsageRunAttributionTest(TestCase):
         self.assertEqual(LLMUsageLog.objects.get().run_id, run.pk)
 ```
 
-Хелперы `mock_response_priced`, `get_machine`, `assert_translate` и константы `SUPPORTED` / `SOURCE_TRANSLATED` / `EXPECTED_LEN` уже используются существующим тестом `test_usage_recorded` в этом же классе; если `assert_translate` не принимает `machine=`, вызвать `machine.translate(...)` напрямую тем же способом, каким это делает соседний тест.
+В `JudgeUsageLogTest` в `weblate/trans/tests/test_judge_client.py` добавить второй, независимый от MT, чек судейской проводки:
+
+```python
+    @override_settings(
+        JUDGE_ENABLED=True,
+        JUDGE_API_KEY="sk-test",
+        JUDGE_BATCH_SIZE=5,
+        JUDGE_REQUEST_SLEEP=0.0,
+    )
+    @http_mock.activate
+    def test_usage_is_billed_to_the_judge_run(self) -> None:
+        payload = _reply(
+            [{"id": 0, "verdict": "pass", "errors": [], "back_translation": ""}]
+        )
+        payload["usage"] = {
+            "prompt_tokens": 11,
+            "completion_tokens": 7,
+            "cost": 0.001,
+        }
+        http_mock.register("POST", CHAT_URL, json=payload)
+        run = ProducerRun.objects.create(
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id="1",
+            scope_label="Test",
+            scope_path="/projects/test/test/",
+            requested_mode="judge",
+            cap=100,
+        )
+        request_verdicts(
+            [REQ],
+            model="vendor/model-a",
+            run=run,
+            persist_attempts=True,
+        )
+        self.assertEqual(
+            LLMUsageLog.objects.get(model="vendor/model-a").run_id, run.pk
+        )
+```
+
+Add `ProducerRun` to that file's model import. This guards the only path where MT's instance attribute is not involved.
+
+`assert_translate` уже принимает keyword-only `machine` (`weblate/machinery/tests.py:457-492`), поэтому вызывать ровно этот хелпер. Импорты: в `test_llm_usage.py` добавить `BatchMachineTranslation` из `weblate.machinery.base` и `ProducerRun` из `weblate.trans.models`; в `weblate/machinery/tests.py` добавить `ProducerRun` к импортам моделей.
 
 - [ ] **Step 2: Запустить тесты и убедиться, что они падают**
 
-Run: `./rundev.sh test weblate/trans/tests/test_llm_usage.py -k LLMUsageRunAttributionTest weblate/machinery/tests.py -k test_usage_is_billed_to_the_run`
-Expected: FAIL с `AttributeError: type object 'BatchMachineTranslation' has no attribute 'usage_run_id'`
+Run: `./rundev.sh test weblate/trans/tests/test_llm_usage.py -k LLMUsageRunAttributionTest weblate/machinery/tests.py -k test_usage_is_billed_to_the_run weblate/trans/tests/test_judge_client.py -k usage_is_billed_to_the_judge_run`
+Expected: FAIL: MT-путь ещё не знает `usage_run_id`, судейская строка ещё не получает `run_id`.
 
 - [ ] **Step 3: Добавить атрибут сервиса**
 
@@ -615,13 +738,13 @@ def repair_targets(
 
 - [ ] **Step 8: Запустить тесты**
 
-Run: `./rundev.sh test weblate/trans/tests/test_llm_usage.py weblate/machinery/tests.py -k LLMUsage weblate/trans/tests/test_judge_client.py weblate/trans/tests/test_judge_loop.py`
+Run: `./rundev.sh test weblate/trans/tests/test_llm_usage.py -k LLMUsage weblate/machinery/tests.py -k test_usage_is_billed_to_the_run weblate/trans/tests/test_judge_client.py -k 'usage_is_billed_to_the_judge_run or usage_is_recorded_for_a_successful_batch' weblate/trans/tests/test_judge_loop.py`
 Expected: PASS
 
 - [ ] **Step 9: Коммит**
 
 ```bash
-git add weblate/machinery/base.py weblate/machinery/openai.py weblate/trans/judge.py weblate/trans/autotranslate.py weblate/trans/judge_loop.py weblate/trans/tests/test_llm_usage.py weblate/machinery/tests.py
+git add weblate/machinery/base.py weblate/machinery/openai.py weblate/trans/judge.py weblate/trans/autotranslate.py weblate/trans/judge_loop.py weblate/trans/tests/test_llm_usage.py weblate/trans/tests/test_judge_client.py weblate/machinery/tests.py
 git commit -m "feat(trans): bill judge, pretranslation and repair requests to their run"
 ```
 
@@ -650,10 +773,11 @@ class RunSpend:
     cost_usd: Decimal
     unpriced_requests: int
 
+
 def run_spend(run_id, operation: str) -> RunSpend
 ```
 
-`cost_usd` — сумма только известных цен; `unpriced_requests` — сколько запросов цену не сообщили. Ноль в `cost_usd` при непустом `unpriced_requests` не означает бесплатный прогон, и шаблон обязан показать оба числа.
+`cost_usd` — сумма только известных цен; `unpriced_requests` — сколько запросов цену не сообщили. При `unpriced_requests > 0` ноль в `cost_usd` не означает бесплатный прогон: Task 7 показывает неполноту и не строит среднюю цену строки.
 
 - [ ] **Step 1: Написать падающий тест**
 
@@ -815,7 +939,7 @@ def run_spend(run_id, operation: str) -> RunSpend:
 - [ ] **Step 4: Запустить тест**
 
 Run: `./rundev.sh test weblate/trans/tests/test_llm_usage.py -k RunSpendTest`
-Expected: 7 passed
+Expected: 6 passed
 
 - [ ] **Step 5: Коммит**
 
@@ -829,22 +953,28 @@ git commit -m "feat(trans): aggregate one run's LLM spend per operation"
 ### Task 6: Прогон создаётся для запуска машинного перевода
 
 **Files:**
-- Modify: `weblate/trans/autotranslate.py:1193-1280,1354-1390,1407-1424`
-- Test: `weblate/trans/tests/test_autotranslate.py`
+- Modify: `weblate/trans/autotranslate.py:1193-1280,1313-1390,1407-1424`
+- Test: `weblate/trans/tests/test_autotranslate.py`, `weblate/trans/tests/test_judge_autotranslate.py`
 
 **Interfaces:**
 - Consumes: `ProducerRun` из Task 1, `usage_run_id`-проводку из Task 4.
-- Produces: `BatchAutoTranslate.active_producer_run: ProducerRun | None` — непустой для судейского запуска и для любого запуска с `auto_source="mt"`, `None` для запуска из памяти переводов; `AutoTranslate.producer_run` вместо `judge_run`; `ProducerRun.requested_mode` равен режиму `AutoForm`.
+- Produces: `BatchAutoTranslate.active_producer_run: ProducerRun | None` — непустой для судейского запуска и для любого запуска с `auto_source="mt"` на **всех** шести поддержанных scope; `None` для запуска из памяти переводов; `AutoTranslate.producer_run` вместо `judge_run`; `ProducerRun.requested_mode` равен режиму `AutoForm`.
 
-- [ ] **Step 1: Написать падающий тест**
+- [ ] **Step 1: Написать падающие тесты**
 
 Добавить в `weblate/trans/tests/test_autotranslate.py`:
 
 ```python
 class ProducerRunCreationTest(ViewTestCase):
-    def _perform(self, mode: str, *, auto_source: str = "mt") -> BatchAutoTranslate:
+    def _perform(
+        self,
+        mode: str,
+        *,
+        scope=None,
+        auto_source: str = "mt",
+    ) -> BatchAutoTranslate:
         auto = BatchAutoTranslate(
-            self.component,
+            self.component if scope is None else scope,
             user=self.user,
             q="",
             mode=mode,
@@ -872,17 +1002,30 @@ class ProducerRunCreationTest(ViewTestCase):
         auto = self._perform("suggest")
         self.assertEqual(auto.active_producer_run.requested_mode, "suggest")
 
-    def test_translation_memory_launch_records_no_run(self) -> None:
-        """A launch that asks no model has no cost, so it gets no receipt.
+    def test_category_and_project_language_launches_record_their_own_scopes(
+        self,
+    ) -> None:
+        category = self.create_category(project=self.component.project)
+        project_language = ProjectLanguage(
+            self.component.project, self.get_translation().language
+        )
+        for scope, scope_type in (
+            (category, ProducerRun.ScopeType.CATEGORY),
+            (project_language, ProducerRun.ScopeType.PROJECT_LANGUAGE),
+        ):
+            with self.subTest(scope=scope):
+                run = self._perform("translate", scope=scope).active_producer_run
+                self.assertIsNotNone(run)
+                self.assertEqual(run.scope_type, scope_type)
+                self.assertEqual(run.scope_id, str(scope.pk))
 
-        It must also not take one of the ten rows in the scope's run
-        history away from a launch that did cost money.
-        """
+    def test_translation_memory_launch_records_no_run(self) -> None:
+        """A launch that asks no model has no cost, so it gets no receipt."""
         auto = self._perform("translate", auto_source="others")
         self.assertIsNone(auto.active_producer_run)
         self.assertFalse(ProducerRun.objects.exists())
 
-    def test_failed_launch_is_finalized_as_failed(self) -> None:
+    def test_exception_marks_the_launch_failed(self) -> None:
         auto = BatchAutoTranslate(
             self.component,
             user=self.user,
@@ -903,16 +1046,34 @@ class ProducerRunCreationTest(ViewTestCase):
                 source_component_ids=None,
             )
         run = auto.active_producer_run
+        self.assertIsNotNone(run)
         run.refresh_from_db()
         self.assertEqual(run.status, ProducerRun.Status.FAILED)
         self.assertEqual(run.failure, "boom")
+
+    def test_swallowed_mt_failure_finalizes_the_run_as_failed(self) -> None:
+        """AutoTranslate records expected provider errors instead of raising."""
+
+        def fail(auto_translate, **_kwargs) -> str:
+            auto_translate.failure_message = "provider unavailable"
+            return auto_translate.failure_message
+
+        with mock.patch.object(
+            AutoTranslate, "perform", autospec=True, side_effect=fail
+        ):
+            auto = self._perform("translate")
+        run = auto.active_producer_run
+        self.assertIsNotNone(run)
+        run.refresh_from_db()
+        self.assertEqual(run.status, ProducerRun.Status.FAILED)
+        self.assertEqual(run.failure, "provider unavailable")
 ```
 
-Тесты офлайновые: `"weblate"` не настроен в машинерии тестового проекта, поэтому `fetch_mt` отфильтрует его и ни одного HTTP-запроса не сделает. Прогон при этом создаётся, потому что условие — `auto_source`, а не наличие пригодного движка.
+Тесты офлайновые: `"weblate"` не настроен в машинерии тестового проекта, поэтому `fetch_mt` отфильтрует его и ни одного HTTP-запроса не сделает. Прогон при этом создаётся, потому что условие — `auto_source`, а не наличие пригодного движка. Последний тест моделирует путь `AutoTranslate.perform()`: он глотает `MachineTranslationError`, записывает `failure_message` и возвращает его (`weblate/trans/autotranslate.py:1006-1010`); внешний `ValueError` его не покрывает.
 
-Импорты: `from unittest import mock`, `BatchAutoTranslate` из `weblate.trans.autotranslate`, `ProducerRun` из `weblate.trans.models`, `ViewTestCase` из `weblate.trans.tests.test_views`.
+Импорты: `from unittest import mock`, `AutoTranslate`, `BatchAutoTranslate` из `weblate.trans.autotranslate`, `ProducerRun` из `weblate.trans.models`, `ProjectLanguage` из `weblate.utils.stats`, `ViewTestCase` из `weblate.trans.tests.test_views`.
 
-- [ ] **Step 2: Запустить тест и убедиться, что он падает**
+- [ ] **Step 2: Запустить тесты и убедиться, что они падают**
 
 Run: `./rundev.sh test weblate/trans/tests/test_autotranslate.py -k ProducerRunCreationTest`
 Expected: FAIL с `AttributeError: 'BatchAutoTranslate' object has no attribute 'active_producer_run'`
@@ -923,11 +1084,35 @@ Expected: FAIL с `AttributeError: 'BatchAutoTranslate' object has no attribute 
 {"action": "rename", "file": "weblate/trans/autotranslate.py", "line": 1056, "symbol": "active_judge_run", "new_name": "active_producer_run"}
 ```
 
-Затем переименовать конструкторный параметр и атрибут `judge_run` у `AutoTranslate` в `producer_run`: найти его объявление (`grep -n "judge_run" weblate/trans/autotranslate.py`) и выполнить `lsp rename` на объявлении. После этого поправить строку из Task 4, шаг 6, на `self.producer_run`.
+Затем переименовать конструкторный параметр и атрибут `judge_run` у `AutoTranslate` в `producer_run`: найти его объявление (`grep -n "judge_run" weblate/trans/autotranslate.py`) и выполнить `lsp rename` на объявлении. После этого поправить строку из Task 4, Step 6, на `self.producer_run`.
 
 - [ ] **Step 4: Создавать прогон для платного запуска**
 
-`weblate/trans/autotranslate.py`, `_create_judge_run` (строка 1248): переименовать в `_create_producer_run` через `lsp rename` и заменить конец функции так, чтобы снимок конфигурации судьи писался только для судейского режима:
+`weblate/trans/autotranslate.py`, `_create_judge_run` (строка 1248): переименовать в `_create_producer_run` через `lsp rename`. В начале его `match scope` покрыть каждый тип, принимаемый конструктором:
+
+```python
+        match scope:
+            case Translation():
+                scope_type = ProducerRun.ScopeType.TRANSLATION
+            case Component():
+                scope_type = ProducerRun.ScopeType.COMPONENT
+            case Category():
+                scope_type = ProducerRun.ScopeType.CATEGORY
+            case Project():
+                scope_type = ProducerRun.ScopeType.PROJECT
+            case ProjectLanguage():
+                scope_type = ProducerRun.ScopeType.PROJECT_LANGUAGE
+            case Workspace():
+                scope_type = ProducerRun.ScopeType.WORKSPACE
+            case _:
+                msg = (
+                    "A producer run requires a translation, component, category, "
+                    "project, project language, or workspace"
+                )
+                raise ValueError(msg)
+```
+
+Заменить конец метода так, чтобы снимок конфигурации судьи писался только для судейского режима:
 
 ```python
         return ProducerRun.objects.create(
@@ -948,13 +1133,7 @@ Expected: FAIL с `AttributeError: 'BatchAutoTranslate' object has no attribute 
         )
 ```
 
-Заодно заменить сообщение об ошибке в `case _:` на нейтральное:
-
-```python
-                msg = "A producer run requires a translation, component, project, or workspace"
-```
-
-В `_perform` (строки 1385-1390) заменить создание прогона:
+В `_perform` заменить создание прогона:
 
 ```python
         judge_preview = self.preview_judge_scope() if self.mode == "judge" else None
@@ -970,11 +1149,11 @@ Expected: FAIL с `AttributeError: 'BatchAutoTranslate' object has no attribute 
         self.active_producer_run = producer_run
 ```
 
-и далее по функции заменить локальную `judge_run` на `producer_run` (строки 1386-1387, 1420, 1426-1442 и остальные вхождения в этой функции — найти через `grep -n "judge_run" weblate/trans/autotranslate.py`). Условия, которые относятся именно к судье, обязаны остаться привязанными к `self.mode == "judge"`, а не к наличию прогона: `_record_skipped_judge_units` вызывается только в судейском режиме.
+Далее по функции заменить локальную `judge_run` на `producer_run` (строки 1386-1387, 1420, 1426-1442 и остальные вхождения в этой функции — найти через `grep -n "judge_run" weblate/trans/autotranslate.py`). Условия, которые относятся именно к судье, обязаны остаться привязанными к `self.mode == "judge"`, а не к наличию прогона: `_record_skipped_judge_units` вызывается только в судейском режиме.
 
 - [ ] **Step 5: Финализировать прогон в любом режиме**
 
-`weblate/trans/autotranslate.py`, `_finish_judge_run` (строка 1313): переименовать в `_finish_producer_run` через `lsp rename`. В `perform` (строки 1362-1375) заменить телом:
+`weblate/trans/autotranslate.py`, `_finish_judge_run` (строка 1313): переименовать в `_finish_producer_run` через `lsp rename`. В `perform` заменить телом:
 
 ```python
     def perform(
@@ -1000,8 +1179,16 @@ Expected: FAIL с `AttributeError: 'BatchAutoTranslate' object has no attribute 
                 )
             raise
         if self.active_producer_run is not None:
+            # AutoTranslate turns expected provider failures into
+            # ``failure_message`` and returns normally. A receipt must expose
+            # that outcome rather than incorrectly claim completion.
+            status = (
+                ProducerRun.Status.FAILED
+                if self.failure_message
+                else ProducerRun.Status.COMPLETED
+            )
             self._finish_producer_run(
-                self.active_producer_run, ProducerRun.Status.COMPLETED
+                self.active_producer_run, status, self.failure_message or ""
             )
         return message
 ```
@@ -1010,16 +1197,15 @@ Expected: FAIL с `AttributeError: 'BatchAutoTranslate' object has no attribute 
 
 - [ ] **Step 6: Запустить тесты**
 
-Run: `./rundev.sh test weblate/trans/tests/test_autotranslate.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_judge_views.py`
+Run: `./rundev.sh test weblate/trans/tests/test_autotranslate.py -k ProducerRunCreationTest weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_judge_views.py`
 Expected: PASS
 
 - [ ] **Step 7: Коммит**
 
 ```bash
-git add weblate/trans/autotranslate.py weblate/trans/tests/test_autotranslate.py
+git add weblate/trans/autotranslate.py weblate/trans/tests/test_autotranslate.py weblate/trans/tests/test_judge_autotranslate.py
 git commit -m "feat(trans): record a producer run for every paid automatic translation launch"
 ```
-
 ---
 
 ### Task 7: Карточка расхода на отчёте прогона
@@ -1055,9 +1241,11 @@ git commit -m "feat(trans): record a producer run for every paid automatic trans
         self.assertEqual(response.context["translation_spend"].cost_usd, Decimal("0.25"))
         self.assertContains(response, "0.25")
 
-    def test_report_names_unpriced_requests_instead_of_showing_zero(self) -> None:
+    def test_report_names_unpriced_requests_and_hides_the_average(self) -> None:
         self.enable_review()
         run = self.create_run()
+        run.summary = {"written": 1}
+        run.save(update_fields=["summary"])
         LLMUsageLog.objects.create(
             model="m1",
             run=run,
@@ -1069,7 +1257,25 @@ git commit -m "feat(trans): record a producer run for every paid automatic trans
         )
         response = self.client.get(reverse("judge-run", kwargs={"pk": run.pk}))
         self.assertEqual(response.context["judge_spend"].unpriced_requests, 1)
+        self.assertIsNone(response.context["cost_per_written"])
         self.assertContains(response, "did not report a price")
+        self.assertNotContains(response, "USD per written string")
+
+    def test_report_keeps_a_zero_valued_complete_average(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        run.summary = {"written": 2}
+        run.save(update_fields=["summary"])
+        LLMUsageLog.objects.create(
+            model="m1",
+            run=run,
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            batch_size=2,
+            cost_usd=Decimal(0),
+        )
+        response = self.client.get(reverse("judge-run", kwargs={"pk": run.pk}))
+        self.assertEqual(response.context["cost_per_written"], Decimal(0))
+        self.assertContains(response, "0.000000 USD per written string")
 
     def test_report_omits_the_cost_card_without_any_request(self) -> None:
         self.enable_review()
@@ -1091,13 +1297,17 @@ Expected: FAIL с `KeyError: 'translation_spend'`
 ```python
     translation_spend = run_spend(run.pk, LLMUsageLog.Operation.TRANSLATION)
     judge_spend = run_spend(run.pk, LLMUsageLog.Operation.JUDGE)
-    # Cost per string is deliberately divided by what the run actually wrote,
-    # not by what its filter matched: dividing by matched strings understates
-    # the price of every run that skipped most of its scope.
+    # A per-written-string price is an exact figure only when *every* request
+    # reported a price. Showing the known subtotal divided by written strings
+    # while another request is unpriced would present a lower bound as a price.
     written = run.summary.get("written") or 0
+    requests = translation_spend.requests + judge_spend.requests
+    unpriced_requests = (
+        translation_spend.unpriced_requests + judge_spend.unpriced_requests
+    )
     cost_per_written = (
         (translation_spend.cost_usd + judge_spend.cost_usd) / written
-        if written and (translation_spend.cost_usd or judge_spend.cost_usd)
+        if written and requests and not unpriced_requests
         else None
     )
 ```
@@ -1175,7 +1385,7 @@ Expected: FAIL с `KeyError: 'translation_spend'`
         </tbody>
       </table>
       <div class="card-footer text-muted">
-        {% if cost_per_written %}
+        {% if cost_per_written is not None %}
           {% blocktranslate with amount=cost_per_written|floatformat:6 %}{{ amount }} USD per written string.{% endblocktranslate %}
         {% endif %}
         {% translate "Prices are the provider's own; a request without a reported price is unknown, never free." %}
@@ -1213,7 +1423,7 @@ git commit -m "feat(trans): show what a producer run cost on its own report"
 
 **Interfaces:**
 - Consumes: Task 6 (`_finish_producer_run`), Task 7 (карточка расхода).
-- Produces: `ProducerRun.summary["written"]` (int) для не-судейских прогонов; контекстные ключи `is_judge_run` (bool) и `language_spend` (`list[dict]` с ключами `language`, `model`, `requests`, `strings_sent`, `cost_usd`, `unpriced_requests`).
+- Produces: `ProducerRun.summary["written"]` (int) для не-судейских прогонов; контекстные ключи `is_judge_run` (bool) и `language_spend` (`list[dict]` с ключами `language`, `service`, `model`, `requests`, `strings_sent`, `cost_usd`, `unpriced_requests`).
 
 - [ ] **Step 1: Написать падающие тесты**
 
@@ -1238,12 +1448,18 @@ git commit -m "feat(trans): show what a producer run cost on its own report"
         self.assertNotContains(response, "What to do")
         self.assertContains(response, "What was written")
 
-    def test_translation_run_report_breaks_spend_down_by_language(self) -> None:
+    def test_translation_run_report_breaks_spend_down_by_provider_language_model(
+        self,
+    ) -> None:
         self.enable_review()
         run = self.create_run(requested_mode="translate")
-        for language_code, cost in (("fr", "0.10"), ("ja", "0.40")):
+        for language_code, service, cost in (
+            ("fr", "openrouter", "0.10"),
+            ("ja", "litellm", "0.40"),
+        ):
             LLMUsageLog.objects.create(
-                model=f"vendor/{language_code}",
+                model="vendor/shared-model",
+                service=service,
                 run=run,
                 operation=LLMUsageLog.Operation.TRANSLATION,
                 target_language_code=language_code,
@@ -1254,8 +1470,11 @@ git commit -m "feat(trans): show what a producer run cost on its own report"
         response = self.client.get(reverse("judge-run", kwargs={"pk": run.pk}))
         rows = response.context["language_spend"]
         self.assertEqual(
-            [(row["language"], row["cost_usd"]) for row in rows],
-            [("ja", Decimal("0.40")), ("fr", Decimal("0.10"))],
+            [(row["language"], row["service"], row["model"], row["cost_usd"]) for row in rows],
+            [
+                ("ja", "litellm", "vendor/shared-model", Decimal("0.40")),
+                ("fr", "openrouter", "vendor/shared-model", Decimal("0.10")),
+            ],
         )
 ```
 
@@ -1279,27 +1498,30 @@ Expected: FAIL с `KeyError: 'is_judge_run'` и `KeyError: 'written'`
 `weblate/trans/views/judge.py`, рядом с расчётом расхода из Task 7:
 
 ```python
-    is_judge_run = run.requested_mode in {"judge", "recheck", "drain"}
+    is_judge_run = run.requested_mode in JUDGE_MODES
     language_spend = [
         {
             "language": row["target_language_code"],
+            "service": row["service"],
             "model": row["model"],
             "requests": row["requests"],
             "strings_sent": row["strings_sent"] or 0,
+            # This is the known subtotal; the adjacent count makes an
+            # unpriced row visibly incomplete rather than silently free.
             "cost_usd": row["cost_usd"] or Decimal(0),
             "unpriced_requests": row["unpriced_requests"],
         }
         for row in LLMUsageLog.objects.filter(
             run_id=run.pk, operation=LLMUsageLog.Operation.TRANSLATION
         )
-        .values("target_language_code", "model")
+        .values("target_language_code", "service", "model")
         .annotate(
             requests=Count("id"),
             strings_sent=Sum("batch_size"),
             cost_usd=Sum("cost_usd"),
             unpriced_requests=Count("id", filter=Q(cost_usd__isnull=True)),
         )
-        .order_by("-cost_usd", "target_language_code")
+        .order_by("-cost_usd", "target_language_code", "service", "model")
     ]
 ```
 
@@ -1323,13 +1545,13 @@ Expected: FAIL с `KeyError: 'is_judge_run'` и `KeyError: 'written'`
         </p>
         {% if translation_spend.requests %}
           <p class="text-muted mb-0">
-            {% blocktranslate with sent=translation_spend.strings_sent %}{{ sent }} strings were sent to the model; the rest came from the machinery cache or were duplicate sources, and cost nothing.{% endblocktranslate %}
+            {% blocktranslate with sent=translation_spend.strings_sent %}{{ sent }} strings were sent to the model. Other matching strings may have come from the machinery cache, been duplicate sources, or remained unchanged because the model returned no usable result.{% endblocktranslate %}
           </p>
         {% else %}
           <p class="text-muted mb-0">{% translate "No large language model was used by this run." %}</p>
         {% endif %}
         <p class="mt-2 mb-0">
-          <a href="{{ scope_review_url }}">{% translate "Open the strings this run asked for" %}</a>
+          <a href="{{ scope_query_url }}">{% translate "Open current strings matching this run's filter" %}</a>
         </p>
       </div>
     </div>
@@ -1337,12 +1559,13 @@ Expected: FAIL с `KeyError: 'is_judge_run'` и `KeyError: 'written'`
     {% if language_spend %}
       <div class="card mb-3">
         <div class="card-header">
-          <h4 class="card-title">{% translate "Cost by language and model" %}</h4>
+          <h4 class="card-title">{% translate "Cost by language, provider, and model" %}</h4>
         </div>
         <table class="table mb-0">
           <thead>
             <tr>
               <th>{% translate "Language" %}</th>
+              <th>{% translate "Provider" %}</th>
               <th>{% translate "Model" %}</th>
               <th>{% translate "Requests" %}</th>
               <th>{% translate "Strings sent" %}</th>
@@ -1353,6 +1576,7 @@ Expected: FAIL с `KeyError: 'is_judge_run'` и `KeyError: 'written'`
             {% for row in language_spend %}
               <tr>
                 <td>{{ row.language|default:"-" }}</td>
+                <td>{{ row.service|default:"-" }}</td>
                 <td>{{ row.model }}</td>
                 <td>{{ row.requests }}</td>
                 <td>{{ row.strings_sent }}</td>
@@ -1371,17 +1595,17 @@ Expected: FAIL с `KeyError: 'is_judge_run'` и `KeyError: 'written'`
   {% endif %}
 ```
 
-Во вьюху добавить ссылку, по которой открываются строки прогона:
+Во вьюху добавить ссылку на **текущий** результат сохранённого фильтра — это не список исторически записанных строк:
 
 ```python
-    scope_review_url = (
+    scope_query_url = (
         _review_url(scope, run.requested_query)
         if run.requested_query
         else scope.get_absolute_url()
     )
 ```
 
-и передать её в контекст как `"scope_review_url": scope_review_url,`.
+и передать её в контекст как `"scope_query_url": scope_query_url,`. `Change` не ссылается на прогон, поэтому обещать «строки, которые спросил этот прогон» было бы неправдой: фильтр мог дать иной набор после следующих изменений.
 
 - [ ] **Step 6: Запустить тесты**
 
@@ -1391,7 +1615,7 @@ Expected: PASS
 - [ ] **Step 7: Коммит**
 
 ```bash
-git add weblate/trans/autotranslate.py weblate/trans/views/judge.py weblate/templates/producer-run.html weblate/trans/tests
+git add weblate/trans/autotranslate.py weblate/trans/views/judge.py weblate/templates/producer-run.html weblate/trans/tests/test_autotranslate.py weblate/trans/tests/test_judge_views.py
 git commit -m "feat(trans): report what an automatic translation run wrote and what each language cost"
 ```
 
@@ -1411,10 +1635,10 @@ git commit -m "feat(trans): report what an automatic translation run wrote and w
 
 - [ ] **Step 1: Написать падающие тесты**
 
-В `weblate/trans/tests/test_autotranslate.py`:
+В `weblate/trans/tests/test_autotranslate.py` **заменить** существующий `test_non_judge_task_result_has_no_report_url` (строки 940-953): он закрепляет уходящий контракт и после Task 6 обязан исчезнуть.
 
 ```python
-    def test_task_result_links_to_the_report(self) -> None:
+    def test_non_judge_task_result_links_to_its_report(self) -> None:
         result = auto_translate(
             user_id=self.user.id,
             mode="translate",
@@ -1424,12 +1648,31 @@ git commit -m "feat(trans): report what an automatic translation run wrote and w
             engines=["weblate"],
             threshold=80,
             component_id=self.component.id,
-            component_wide=True,
+            enforce_permissions=False,
         )
-        self.assertTrue(result["report_url"].startswith("/judge-runs/"))
+        run = ProducerRun.objects.get()
+        self.assertEqual(
+            result["report_url"], reverse("judge-run", kwargs={"pk": run.pk})
+        )
+
+    def test_component_mt_task_result_links_to_its_report(self) -> None:
+        result = auto_translate_component(
+            self.component.id,
+            mode="translate",
+            q="",
+            auto_source="mt",
+            engines=["weblate"],
+            threshold=80,
+            user_id=self.user.id,
+            enforce_permissions=False,
+        )
+        run = ProducerRun.objects.get()
+        self.assertEqual(
+            result["report_url"], reverse("judge-run", kwargs={"pk": run.pk})
+        )
 ```
 
-Именованные аргументы обязательны: `auto_translate` объявлена как keyword-only (`weblate/trans/tasks.py:989-1013`). Импортировать `auto_translate` из `weblate.trans.tasks`; тест опирается на `CELERY_TASK_ALWAYS_EAGER`, который в тестовых настройках уже включён.
+`auto_translate` — keyword-only (`weblate/trans/tasks.py:989-1013`); `auto_translate_component` уже импортирован и вызывается существующим судейским тестом рядом со старым контрактом. `ProducerRun` приходит из импорта Task 1.
 
 В `weblate/trans/tests/test_judge_views.py`, в `JudgeRunReportViewTest`:
 
@@ -1448,7 +1691,7 @@ git commit -m "feat(trans): report what an automatic translation run wrote and w
 
 - [ ] **Step 2: Запустить тесты и убедиться, что они падают**
 
-Run: `./rundev.sh test weblate/trans/tests/test_autotranslate.py -k report_url weblate/trans/tests/test_judge_views.py -k history_menu_lists_a_translation_run`
+Run: `./rundev.sh test weblate/trans/tests/test_autotranslate.py -k 'non_judge_task_result_links or component_mt_task_result_links' weblate/trans/tests/test_judge_views.py -k history_menu_lists_a_translation_run`
 Expected: FAIL с `KeyError: 'report_url'` и `AssertionError: ... not found in []`
 
 - [ ] **Step 3: Ставить `report_url` для любого прогона**
@@ -1508,7 +1751,7 @@ Expected: PASS
 - [ ] **Step 7: Коммит**
 
 ```bash
-git add weblate/trans/tasks.py weblate/static/loader-bootstrap.js weblate/trans/views/judge.py weblate/trans/models/judge.py weblate/templates/snippets/producer-runs-menu.html weblate/trans/tests
+git add weblate/trans/tasks.py weblate/static/loader-bootstrap.js weblate/trans/views/judge.py weblate/trans/models/judge.py weblate/templates/snippets/producer-runs-menu.html weblate/trans/tests/test_autotranslate.py weblate/trans/tests/test_judge_views.py
 git commit -m "feat(trans): link every finished run to its report and list MT runs in the history"
 ```
 
@@ -1525,7 +1768,7 @@ git commit -m "feat(trans): link every finished run to its report and list MT ru
 
 **Interfaces:**
 - Consumes: `recent_cost_range` (существующий, `weblate/trans/models/llm_usage.py:126-153`).
-- Produces: `BatchAutoTranslate.preview_mt_scope() -> MTScopePreview` (поля `matched`, `writable`, `per_translation: list[tuple[Translation, int]]`); эндпоинт `auto_translation_preview` отвечает для любого режима; `pretranslation_cost` — интервал: цена одной строки для языка равна **сумме** по всем выбранным движкам, а границы интервала — минимум и максимум этой суммы по языкам скоупа, умноженные на `writable`; при хотя бы одной неоценимой паре (язык × движок) — `available: false`. Элемент превью переименован в `id_auto_run_preview`.
+- Produces: `BatchAutoTranslate.preview_mt_scope() -> MTScopePreview` для **не-судейского** запуска (поля `matched`, `writable`, `per_translation: list[tuple[Translation, int]]`); эндпоинт `auto_translation_preview` отвечает для любого режима. Для обычного MT `pretranslation_cost` — интервал: цена одной строки для языка равна **сумме** по всем выбранным движкам, а границы интервала — минимум и максимум этой суммы по языкам скоупа, умноженные на `writable`; при хотя бы одной неоценимой паре с ненулевым числом строк — `available: false`. Судейский preview и его cap/кандидатная арифметика остаются отдельной, существующей веткой. Элемент превью переименован в `id_auto_run_preview`.
 
 - [ ] **Step 1: Написать падающие тесты**
 
@@ -1574,7 +1817,7 @@ git commit -m "feat(trans): link every finished run to its report and list MT ru
                 cost_usd=Decimal(per_unit) * 2,
             )
 
-    def request_preview(self, engines: list[str]) -> dict:
+    def request_preview(self, engines: list[str], *, q: str = "state:empty") -> dict:
         response = self.client.get(
             reverse(
                 "auto_translation_preview",
@@ -1582,7 +1825,7 @@ git commit -m "feat(trans): link every finished run to its report and list MT ru
             ),
             {
                 "mode": "translate",
-                "q": "state:empty",
+                "q": q,
                 "auto_source": "mt",
                 "threshold": 80,
                 "engines": engines,
@@ -1622,7 +1865,6 @@ git commit -m "feat(trans): link every finished run to its report and list MT ru
         expected = sum(
             translation.unit_set.exclude(state=STATE_READONLY)
             .search("state:empty", parser="unit")
-            .filter(state__lt=STATE_TRANSLATED)
             .count()
             for translation in self.component.translation_set.exclude(
                 language=self.component.source_language
@@ -1646,9 +1888,63 @@ git commit -m "feat(trans): link every finished run to its report and list MT ru
         self.component.project.save(update_fields=["machinery_settings"])
         cost = self.request_preview(["openrouter"])["pretranslation_cost"]
         self.assertFalse(cost["available"])
+
+    def test_preview_counts_previously_translated_strings_when_asked(self) -> None:
+        translation = self.get_translation()
+        unit = translation.unit_set.exclude(state=STATE_READONLY).first()
+        assert unit is not None
+        unit.translate(self.user, ["Already translated"], STATE_TRANSLATED)
+        self.configure_routed_engines()
+        self.price_history("openrouter", "vendor/cheap", "0.001")
+        payload = self.request_preview(["openrouter"], q=f"id:{unit.pk}")
+        self.assertEqual(payload["matched"], 1)
+        # Standard MT executes AutoTranslate.get_units() directly. Unlike a
+        # judge pretranslation, it does not discard an existing target merely
+        # because overwrite_existing is false.
+        self.assertEqual(payload["writable"], 1)
+
+    def test_preview_does_not_require_price_history_for_zero_row_language(self) -> None:
+        translation = self.get_translation()
+        unit = translation.unit_set.exclude(state=STATE_READONLY).first()
+        assert unit is not None
+        self.component.project.machinery_settings = {
+            "openrouter": {
+                "key": "test",
+                "routing": {translation.language.code: "vendor/cheap"},
+            }
+        }
+        self.component.project.save(update_fields=["machinery_settings"])
+        self.price_history("openrouter", "vendor/cheap", "0.001")
+        cost = self.request_preview(["openrouter"], q=f"id:{unit.pk}")[
+            "pretranslation_cost"
+        ]
+        self.assertTrue(cost["available"])
 ```
 
 `self.kw_translation` — существующий атрибут `ViewTestCase`, которым пользуются тесты превью на строках 193 и 249. `Decimal`, `LLMUsageLog`, `STATE_READONLY` и `STATE_TRANSLATED` дописать в импорты файла. Настройка машинерии повторяет уже принятый в репозитории приём (`weblate/trans/tests/test_judge_views.py:3132`, `weblate/trans/tests/test_tasks.py:579-583`).
+
+В `JudgeProducerTriageViewTest`, у которого уже есть `grant(["translation.auto"])` и роль без review (строки 2799-2816), добавить регрессию permission-gate:
+
+```python
+    def test_mt_preview_needs_only_automatic_translation_permission(self) -> None:
+        self.component.project.translation_review = False
+        self.component.project.save(update_fields=["translation_review"])
+        self.grant(["translation.auto"])
+        response = self.client.get(
+            reverse("auto_translation_preview", kwargs=self.kw_translation),
+            {
+                "mode": "translate",
+                "q": "state:empty",
+                "auto_source": "mt",
+                "engines": [],
+                "threshold": 80,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["judge_cost"]["available"])
+```
+
+This is the end-to-end permission contract: the same user can launch an MT run and inspect its forecast even where the project deliberately has no review workflow.
 
 - [ ] **Step 2: Запустить тесты и убедиться, что они падают**
 
@@ -1675,7 +1971,7 @@ class MTScopePreview:
 
 ```python
     def preview_mt_scope(self) -> MTScopePreview:
-        """Matched and writable string counts per target translation."""
+        """Actual non-judge MT eligibility per target translation."""
         rows: list[tuple[Translation, int]] = []
         matched = 0
         for translation in self.translations:
@@ -1688,32 +1984,51 @@ class MTScopePreview:
                 mode=self.mode,
                 component_wide=self.component_wide,
                 unit_ids=self.unit_ids,
+                allow_non_shared_tm_source_components=(
+                    self.allow_non_shared_tm_source_components
+                ),
                 overwrite_existing=self.overwrite_existing,
             ).get_units()
-            matched += units.count()
-            if not self.overwrite_existing:
-                units = units.filter(state__lt=STATE_TRANSLATED)
-            rows.append((translation, units.count()))
+            count = units.count()
+            matched += count
+            # Ordinary MT calls get_units() without the judge-only
+            # ``not unit.translated`` filter. A zero-row translation makes no
+            # request and therefore must not demand a price history.
+            if count:
+                rows.append((translation, count))
         return MTScopePreview(
             matched=matched,
-            writable=sum(count for _translation, count in rows),
+            writable=matched,
             per_translation=rows,
         )
 ```
 
-Две `COUNT`-запроса на язык. Эндпоинт превью уже дебаунсится на 250 мс и уже строит `AutoTranslate` на язык в судейском режиме, так что профиль запросов не меняется качественно.
+Один `COUNT` на язык. `writable == matched` намеренно: в не-судейском режиме именно все строки `AutoTranslate.get_units()` пойдут в `fetch_mt`; семантика judge-only `overwrite_existing` сюда не переносится.
 
 - [ ] **Step 4: Отвязать эндпоинт от судейского режима**
 
 `weblate/trans/views/edit.py:1626`:
 
 ```python
+    autoform = AutoForm(form_obj, request.user, request.GET)
     if not autoform.is_valid():
         return JsonResponse({"errors": autoform.errors}, status=400)
     mode = autoform.cleaned_data["mode"]
+    if mode == "judge" and not request.user.has_perm("unit.review", form_obj):
+        raise PermissionDenied
+    batch = BatchAutoTranslate(
+        obj,
+        user=request.user,
+        q=autoform.cleaned_data["q"],
+        mode=mode,
+        component_wide=isinstance(obj, Component),
+        overwrite_existing=autoform.cleaned_data["overwrite_existing"],
+    )
+    judge_preview = batch.preview_judge_scope() if mode == "judge" else None
+    mt_preview = batch.preview_mt_scope() if mode != "judge" else None
 ```
 
-Ниже, при создании `BatchAutoTranslate`, передавать `mode=mode`. Судейский блок (`preview_judge_scope()` и расчёт `judge_cost`) обернуть в `if mode == "judge":`, оставив `judge_cost = {"available": False}` по умолчанию, а `matched`/`writable` в ответе брать из `preview_mt_scope()`, которая работает в любом режиме. Судейские ключи (`processed`, `remaining`, `judge_calls_initial`, `judge_calls_worst_case`) в не-судейском режиме отдавать нулями.
+Судейская ветка сохраняет текущую семантику полностью: `preview = judge_preview`, `judge_cost` и прежняя, cap-ограниченная оценка pretranslation остаются в `if mode == "judge"`. Для не-судейской ветки использовать `preview = mt_preview`, `judge_cost = {"available": False}`, `processed = remaining = judge_calls_initial = judge_calls_worst_case = 0`; возвращать `matched` и `writable` именно из `mt_preview`. Нельзя подменять judge preview MT-preview: у судьи `processed` ограничен cap, а pretranslate касается только writable строк выбранной capped-последовательности.
 
 - [ ] **Step 5: Оценивать MT по всему скоупу**
 
@@ -1742,7 +2057,11 @@ class MTScopePreview:
 ```python
     pretranslation_cost: dict[str, str | bool] = {"available": False}
     engine_ids = autoform.cleaned_data["engines"]
-    if autoform.cleaned_data["auto_source"] == "mt" and engine_ids:
+    if (
+        mode != "judge"
+        and autoform.cleaned_data["auto_source"] == "mt"
+        and engine_ids
+    ):
         per_string: list[Decimal] = []
         complete = bool(mt_preview.per_translation)
         for translation, _writable in mt_preview.per_translation:
@@ -1777,37 +2096,63 @@ class MTScopePreview:
 
 - [ ] **Step 6: Показывать превью в любом режиме**
 
-`weblate/templates/snippets/autoform.html:60`:
+В `<form>` заменить `data-judge-preview-url` на `data-auto-preview-url`, а строку превью — на:
 
 ```html
       <p class="d-none" id="id_auto_run_preview" aria-live="polite"></p>
 ```
 
-`weblate/static/loader-bootstrap.js`: в блоке `document.querySelectorAll("form[data-judge-preview-url]")` заменить селектор превью на `#id_auto_run_preview`, убрать ранний выход по режиму (строки 1352-1357) и разделить текст на две ветви:
+В `weblate/static/loader-bootstrap.js` заменить весь блок `form[data-judge-preview-url]` (1330-1442) на `form[data-auto-preview-url]`. Назвать функцию `updateAutoPreview`; она должна не делать HTTP-запрос для memory-only запуска, но для judge всегда оставаться активной (судья вызывает LLM независимо от radio `auto_source`):
 
 ```javascript
-    const updatePreview = () => {
+    const isJudge = () => mode.value === "judge";
+    const usesMachineTranslation = () =>
+      isJudge() ||
+      form.querySelector('[name="auto_source"]:checked')?.value === "mt";
+
+    const updateAutoPreview = () => {
+      if (!usesMachineTranslation()) {
+        controller?.abort();
+        window.clearTimeout(timer);
+        hidePreview();
+        apply.disabled = false;
+        return;
+      }
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
-        /* unchanged fetch block */
-      }, 250);
-    };
-```
-
-Текст собирать так, чтобы судейские числа появлялись только в судейском режиме:
-
-```javascript
-            const isJudge = mode.value === "judge";
+        controller?.abort();
+        controller = new AbortController();
+        const params = new URLSearchParams(new FormData(form));
+        fetch(`${form.dataset.autoPreviewUrl}?${params}`, {
+          signal: controller.signal,
+        })
+          .then((response) => {
+            if (response.status === 400) {
+              return response.json().then(() => {
+                const error = new Error("Invalid automatic translation preview");
+                error.invalid = true;
+                throw error;
+              });
+            }
+            if (!response.ok) {
+              throw new Error("Automatic translation preview failed");
+            }
+            return response.json();
+          })
+          .then((data) => {
+            const judge = isJudge();
             const costs = [
               data.pretranslation_cost.available
                 ? interpolate(
-                    gettext("Estimated machine translation cost: %(min)s to %(max)s USD."),
+                    gettext(
+                      "Estimated machine translation cost: %(min)s to %(max)s USD.",
+                    ),
                     data.pretranslation_cost,
                     true,
                   )
                 : gettext("Estimated machine translation cost is unavailable."),
             ];
-            if (isJudge) {
+            if (judge) {
               costs.push(
                 data.judge_cost.available
                   ? interpolate(
@@ -1818,7 +2163,7 @@ class MTScopePreview:
                   : gettext("Estimated judge cost is unavailable."),
               );
             }
-            const scope = isJudge
+            const scope = judge
               ? interpolate(
                   gettext(
                     "%(matched)s matching strings: %(processed)s will be judge-evaluated, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap.",
@@ -1827,7 +2172,7 @@ class MTScopePreview:
                   true,
                 )
               : interpolate(
-                  gettext("%(matched)s matching strings, %(writable)s of them writable."),
+                  gettext("%(matched)s matching strings will be considered by the selected machine translation engines."),
                   data,
                   true,
                 );
@@ -1835,19 +2180,34 @@ class MTScopePreview:
               "Estimates come from this project's recent runs and are not a guarantee.",
             )}`;
             showPreview();
-            apply.disabled = isJudge && data.processed === 0;
+            apply.disabled = judge && data.processed === 0;
+          })
+          .catch((error) => {
+            if (error.name === "AbortError") {
+              return;
+            }
+            preview.textContent = error.invalid
+              ? gettext("Automatic translation preview input is invalid.")
+              : gettext(
+                  "Automatic translation preview is unavailable. You can still apply this run.",
+                );
+            showPreview();
+            apply.disabled = Boolean(error.invalid);
+          });
+      }, 250);
+    };
 ```
 
-Оставить `mode.addEventListener("change", updatePreview)` и остальные слушатели, заменив имя функции.
+Bind `updateAutoPreview` to `mode` change, query input, `overwrite_existing`, `engines`, and every `auto_source` radio change; call it once after binding. This preserves abort/debounce and the existing safe `textContent` rendering, removes the judge-only wording, and makes switching MT → memory hide a now-inapplicable cost estimate.
 
 - [ ] **Step 7: Запустить тесты**
 
-Run: `./rundev.sh test weblate/trans/tests/test_judge_views.py -k preview`
+Run: `./rundev.sh test weblate/trans/tests/test_judge_views.py -k 'preview or mt_preview_needs_only'`
 Expected: PASS
 
 - [ ] **Step 8: Проверить вживую**
 
-Открыть <http://localhost:3001/projects/> → любой проект → :guilabel:`Operations` → :guilabel:`Batch automatic translation`, выбрать режим :guilabel:`Add as translation`, источник :guilabel:`Machine translation`. Ожидается: строка превью появляется без выбора судейского режима и содержит либо диапазон в долларах, либо явное «unavailable», и подпись про оценку.
+Через browser automation открыть <http://localhost:3001/projects/> → любой проект → :guilabel:`Operations` → :guilabel:`Batch automatic translation`. Проверить четыре состояния на реальной DOM-поверхности: (1) non-judge + MT — строка preview показывается и даёт диапазон либо explicit `unavailable`; (2) переключение на `Other translation components` скрывает строку и не блокирует apply; (3) judge сохраняет cap-текст и обе раздельные оценки; (4) пользователь с одним `translation.auto` видит обычный MT-preview без review. Снимок/observed DOM — доказательство; платный запуск не выполнять.
 
 - [ ] **Step 9: Коммит**
 
@@ -1876,13 +2236,13 @@ git commit -m "feat(trans): estimate machine translation cost for every automati
 
 - [ ] **Step 2: Гайд продюсера**
 
-В `docs/product/guides/producer-guide-weblate.md` в раздел про автоперевод добавить короткий абзац: где найти отчёт прогона (кнопка в уведомлении о завершении и меню истории прогонов в форме), что означает «цена не сообщена», и почему «отправлено в модель» меньше числа записанных строк (кэш машинерии и дубликаты источника не тарифицируются).
+В `docs/product/guides/producer-guide-weblate.md` в раздел про автоперевод добавить короткий абзац: отчёт открывается кнопкой в уведомлении о завершении и из истории на форме; `price unknown` означает, что provider не сообщил стоимость хотя бы одного запроса; «отправлено в модель» считает запросы, а остальные строки могли прийти из кэша, быть дубликатами или остаться без usable-ответа. Ссылка из отчёта открывает **текущие** строки по сохранённому фильтру, а не исторически точный список применённых строк.
 
 - [ ] **Step 3: Русские переводы новых строк**
 
 Добавить в `weblate/locale/ru/LC_MESSAGES/django.po` записи **только** для строк, введённых этим планом, вручную, не запуская `makemessages` по всему проекту: массовый прогон `msgmerge` помечает несвязанные строки как `fuzzy`, а `msgfmt` их пропускает, что молча откатывает уже готовые переводы.
 
-Строки для перевода: `What it cost`, `Operation`, `Requests`, `Strings sent`, `Tokens`, `USD`, `Machine translation`, `LLM judge`, `What was written`, `Cost by language and model`, `Language`, `Model`, `price unknown`, `Open the strings this run asked for`, `No large language model was used by this run.`, `View run report`, `Producer run`, `Automatic translation run`, `Automatic suggestion run`, `Judge re-check`, `Deferred judge retry`, плюс формы множественного числа для трёх `blocktranslate count` блоков и строки оценки из JS.
+Проверить каждую строку, введённую Task 2 и 7-10. Точный чек-лист msgid: `Producer run`, `Producer runs`, `Judge re-check`, `Deferred judge retry`, `Automatic translation run`, `Automatic suggestion run`, `Automatic translation runs`, `What it cost`, `Operation`, `Requests`, `Strings sent`, `Tokens`, `USD`, `LLM judge`, `What was written`, `Cost by language, provider, and model`, `Language`, `Provider`, `Model`, `price unknown`, `No large language model was used by this run.`, `Open current strings matching this run's filter`, `View run report`, `Estimated machine translation cost: %(min)s to %(max)s USD.`, `Estimated machine translation cost is unavailable.`, `Estimated judge cost: %(min)s to %(max)s USD.`, `Estimated judge cost is unavailable.`, `%(matched)s matching strings will be considered by the selected machine translation engines.`, `Estimates come from this project's recent runs and are not a guarantee.`, `Automatic translation preview input is invalid.`, `Automatic translation preview is unavailable. You can still apply this run.`, а также plural/placeholder формы: `reply not fully applied`, `request did not report a price`, `string was written`, `%(amount)s USD per written string.`, `%(cached)s prompt tokens were served from the provider's own cache.`, длинная строка Task 8 про sent/cache/duplicate/no usable result и существующий judge scope-текст, если его msgid меняется.
 
 Затем скомпилировать:
 
@@ -1909,7 +2269,7 @@ Expected: PASS
 - [ ] **Step 7: Коммит и пуш**
 
 ```bash
-git add docs weblate/locale/ru/LC_MESSAGES
+git add docs/changes.rst docs/product/guides/producer-guide-weblate.md docs/product/plans/2026-09-07-mt-run-cost-receipt.md weblate/locale/ru/LC_MESSAGES/django.po
 git commit -m "docs(trans): document the producer run cost report"
 git push
 ```
@@ -1920,9 +2280,9 @@ git push
 
 Явно не входит в этот план, чтобы не расползаться:
 
-- **Список конкретных записанных строк** в MT-отчёте. Судейский список стоит на `JudgeRunUnit`; у автоперевода per-unit записей нет, а `Change` не ссылается на прогон. Отчёт даёт агрегаты и ссылку по сохранённому запросу прогона.
+- **Список конкретных записанных строк** в MT-отчёте. Судейский список стоит на `JudgeRunUnit`; у автоперевода per-unit записей нет, а `Change` не ссылается на прогон. Отчёт даёт агрегаты и ссылку по сохранённому запросу, которая показывает текущий, а не исторический набор.
 - **Отчёт «Расход LLM» за период** как пятый `Report.Kind`. Это финансовая витрина, а не чек прогона, и она не отвечает на вопрос «сколько стоил вот этот запуск», когда прогоны перекрываются.
 - **Бюджеты и лимиты**: пороги, hard stop, трансляция провайдерского `403` про исчерпанный бюджет в читаемую ошибку.
-- **Отдельный счётчик попаданий локального кэша машинерии.** Считать его пришлось бы в `weblate/machinery/base.py:1040-1044`, а этот код исполняется в пуле потоков; `len(sources) − Σ len(pending)` для этого не годится, потому что тот же `continue` срабатывает на пустом источнике и на rate limit (`base.py:1010-1011`). Пока отчёт показывает «отправлено в модель» из `batch_size` и честно называет остаток кэшем или дубликатами источника.
+- **Отдельный счётчик попаданий локального кэша машинерии.** Считать его пришлось бы в `weblate/machinery/base.py:1040-1044`, а этот код исполняется в пуле потоков; `len(sources) − Σ len(pending)` для этого не годится, потому что тот же `continue` срабатывает на пустом источнике и на rate limit (`base.py:1010-1011`). Отчёт показывает `batch_size` как число строк, отправленных в модель; различие с числом matched/written может также означать неиспользуемый ответ, а не только кэш или дубликат.
 - **BYOK-учёт**: чтение `cost_details.upstream_inference_cost` в отдельную колонку. Нужно только при переходе на собственные провайдерские ключи; сейчас расход идёт с кредитов OpenRouter, где `usage.cost` полон.
 - **Чек для запуска из памяти переводов** (`auto_source="others"`). Такой запуск не обращается к модели, ничего не стоит и прогона не создаёт; его итог по-прежнему сообщает сообщение о завершении задачи («N strings were updated»). Это же удерживает десять строк истории прогонов за платными запусками.
