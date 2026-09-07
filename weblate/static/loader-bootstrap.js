@@ -1845,7 +1845,7 @@ onReady(() => {
               const link = document.createElement("a");
               link.href = result.report_url;
               link.className = "btn btn-sm btn-primary";
-              link.textContent = gettext("View judge report");
+              link.textContent = gettext("View run report");
               actions.appendChild(link);
             }
           }
