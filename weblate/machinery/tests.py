@@ -63,6 +63,7 @@ from weblate.machinery.base import (
     InternalMachineTranslation,
     MachineryRateLimitError,
     MachineTranslationError,
+    TranslationDownloadPlan,
 )
 from weblate.machinery.cyrtranslit import CyrTranslitTranslation
 from weblate.machinery.deepl import DeepLTranslation
@@ -4828,6 +4829,42 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
             machine.batch_translate(units)
 
         fetch_terms.assert_called_once_with(units, include_variants=False)
+
+    @http_mock.activate
+    def test_single_string_fetches_glossary_terms(self) -> None:
+        """The single-string path shares the batch's glossary prefetch."""
+        unit = make_unit(code=self.SUPPORTED, source="Hello", target="target")
+        machine = self.get_machine(use_cache=True)
+
+        def request_callback(
+            _prompt: str,
+            content: str,
+            _previous_content: str,
+            _previous_response: str,
+        ) -> str:
+            return json.dumps(
+                [
+                    {"id": item["id"], "parts": [{"type": "text", "text": "Ahoj"}]}
+                    for item in json.loads(content)["strings"]
+                ]
+            )
+
+        def fetch(fetched: list[Unit], *, include_variants: bool) -> None:
+            for fetched_unit in fetched:
+                fetched_unit.glossary_terms = []
+
+        with (
+            patch(
+                "weblate.machinery.llm.fetch_glossary_terms", side_effect=fetch
+            ) as fetch_terms,
+            patch("weblate.machinery.llm.get_glossary_terms", return_value=[]),
+            patch.object(
+                machine, "fetch_llm_translations", side_effect=request_callback
+            ),
+        ):
+            machine.translate(unit)
+
+        fetch_terms.assert_called_once_with([unit], include_variants=False)
 
     def test_batch_glossary_full_payload_independent_of_matcher(self) -> None:
         """Задача 2: below the limit the whole glossary is sent, matcher unused."""
@@ -9773,6 +9810,35 @@ class ViewsTest(FixtureTestCase):
             exception=error,
         )
 
+    @override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                # Own cache, so no suggestion cached by another test answers here.
+                "LOCATION": "views-shared-stop",
+            }
+        }
+    )
+    def test_translate_asgi_reports_a_shared_stop(self) -> None:
+        service = self.ensure_dummy_mt()
+        unit = self.get_unit()
+        self.async_client.force_login(self.user)
+        # The service was stopped by somebody else's automatic translation run.
+        service({}).set_rate_limit()
+
+        response = async_to_sync(self.async_client.post)(
+            reverse("js-translate", kwargs={"unit_id": unit.id, "service": "dummy"})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["responseStatus"], 500)
+        self.assertEqual(
+            data["responseDetails"],
+            "Service is currently rate limited, try again later.",
+        )
+        self.assertEqual(data["translations"], [])
+
     def test_translate_escapes_html(self) -> None:
         self.ensure_dummy_mt()
         unit = self.get_unit()
@@ -11270,3 +11336,19 @@ class RateLimitedAnswerTest(TestCase):
         self.assertEqual(
             machine.translate(make_unit(code="cs", source=self.SOURCE)), expected
         )
+
+    def test_an_empty_answer_of_its_own_is_not_blamed_on_a_stop(self) -> None:
+        machine = self.get_machine()
+        machine.set_rate_limit()
+        # A stop that began after the request was planned skipped nothing, so
+        # the empty answer is the service's own and must not be reported as one.
+        plan = TranslationDownloadPlan(
+            output=[[]],
+            pending={},
+            pending_units={},
+            pending_texts={},
+            pending_occurrences={},
+            cache_keys={},
+        )
+
+        machine.raise_when_stopped(plan)

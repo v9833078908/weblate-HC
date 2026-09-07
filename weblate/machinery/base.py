@@ -102,6 +102,8 @@ class TranslationDownloadPlan:
     pending_texts: dict[str, str]
     pending_occurrences: dict[str, int]
     cache_keys: dict[str, str | None]
+    # Whether the stop kept a string that had no cached answer from being asked.
+    stopped: bool = False
 
 
 class BatchMachineTranslation(DocVersionsMixin):
@@ -496,13 +498,16 @@ class BatchMachineTranslation(DocVersionsMixin):
     def set_rate_limit(self, period: int | None = None) -> None:
         cache.set(self.rate_limit_cache, True, period or self.rate_limit_period)
 
-    def raise_when_stopped(self, results: list[list[TranslationResultDict]]) -> None:
-        """Turn a stop that answered nothing into something the user can act on."""
-        if any(results) or not self.is_rate_limited():
-            return
+    def raise_stopped(self) -> None:
+        """Report a stop as something the user can act on."""
         raise MachineryRateLimitError(
             gettext("Service is currently rate limited, try again later.")
         )
+
+    def raise_when_stopped(self, plan: TranslationDownloadPlan) -> None:
+        """Report a stop that left the request without any answer at all."""
+        if plan.stopped and not any(plan.output):
+            self.raise_stopped()
 
     def is_rate_limit_error(self, exc: Exception) -> bool:
         if isinstance(exc, MachineryRateLimitError):
@@ -863,20 +868,21 @@ class BatchMachineTranslation(DocVersionsMixin):
         """Return list of machine translations."""
         prepared = self._prepare_translate(unit, source_language=source_language)
         if prepared is None:
-            # A stop empties the supported languages, so an unsupported pair is
-            # not a trustworthy answer while it lasts.
-            self.raise_when_stopped([])
+            # A stop empties the supported languages, so language support cannot
+            # be told apart from the stop while it lasts.
+            if self.is_rate_limited():
+                self.raise_stopped()
             return []
         mapped_source_language, target_language, sources = prepared
-        results = self._translate_sources(
+        plan = self._translate_sources_plan(
             mapped_source_language,
             target_language,
             sources,
             user,
             threshold=threshold,
         )
-        self.raise_when_stopped(results)
-        return results
+        self.raise_when_stopped(plan)
+        return plan.output
 
     async def atranslate(
         self,
@@ -891,18 +897,19 @@ class BatchMachineTranslation(DocVersionsMixin):
             unit, source_language=source_language
         )
         if prepared is None:
-            await sync_to_async(self.raise_when_stopped)([])
+            if await sync_to_async(self.is_rate_limited)():
+                self.raise_stopped()
             return []
         mapped_source_language, target_language, sources = prepared
-        results = await self._atranslate_sources(
+        plan = await self._atranslate_sources_plan(
             mapped_source_language,
             target_language,
             sources,
             user,
             threshold=threshold,
         )
-        self.raise_when_stopped(results)
-        return results
+        self.raise_when_stopped(plan)
+        return plan.output
 
     async def adownload_multiple_translations(
         self,
@@ -956,14 +963,14 @@ class BatchMachineTranslation(DocVersionsMixin):
             )
         }
 
-    def _translate_sources(
+    def _translate_sources_plan(
         self,
         source_language,
         target_language,
         sources: list[tuple[str, Unit | None]],
         user=None,
         threshold: int = MACHINERY_DEFAULT_THRESHOLD,
-    ) -> list[list[TranslationResultDict]]:
+    ) -> TranslationDownloadPlan:
         plan = self._prepare_translation_download(
             source_language, target_language, sources, threshold
         )
@@ -975,9 +982,9 @@ class BatchMachineTranslation(DocVersionsMixin):
                 user=user,
                 threshold=threshold,
             )
-        return plan.output
+        return plan
 
-    async def _atranslate_sources(
+    def _translate_sources(
         self,
         source_language,
         target_language,
@@ -985,6 +992,18 @@ class BatchMachineTranslation(DocVersionsMixin):
         user=None,
         threshold: int = MACHINERY_DEFAULT_THRESHOLD,
     ) -> list[list[TranslationResultDict]]:
+        return self._translate_sources_plan(
+            source_language, target_language, sources, user, threshold
+        ).output
+
+    async def _atranslate_sources_plan(
+        self,
+        source_language,
+        target_language,
+        sources: list[tuple[str, Unit | None]],
+        user=None,
+        threshold: int = MACHINERY_DEFAULT_THRESHOLD,
+    ) -> TranslationDownloadPlan:
         plan = await sync_to_async(self._prepare_translation_download)(
             source_language, target_language, sources, threshold
         )
@@ -996,7 +1015,21 @@ class BatchMachineTranslation(DocVersionsMixin):
                 user=user,
                 threshold=threshold,
             )
-        return plan.output
+        return plan
+
+    async def _atranslate_sources(
+        self,
+        source_language,
+        target_language,
+        sources: list[tuple[str, Unit | None]],
+        user=None,
+        threshold: int = MACHINERY_DEFAULT_THRESHOLD,
+    ) -> list[list[TranslationResultDict]]:
+        return (
+            await self._atranslate_sources_plan(
+                source_language, target_language, sources, user, threshold
+            )
+        ).output
 
     def _prepare_translation_download(
         self,
@@ -1018,6 +1051,7 @@ class BatchMachineTranslation(DocVersionsMixin):
         # A stop must not be asked for anything, but its cached answers stay
         # correct and free, so the stop applies to requests only.
         rate_limited = self.is_rate_limited()
+        stopped = False
         for index, (text, unit) in enumerate(sources):
             original_source = text
             replacements: dict[str, str]
@@ -1063,6 +1097,7 @@ class BatchMachineTranslation(DocVersionsMixin):
                 continue
 
             if rate_limited:
+                stopped = True
                 continue
             pending[pending_key].append((index, unit, original_source, replacements))
             pending_units[pending_key] = unit
@@ -1077,6 +1112,7 @@ class BatchMachineTranslation(DocVersionsMixin):
             pending_texts=pending_texts,
             pending_occurrences=pending_occurrences,
             cache_keys=cache_keys,
+            stopped=stopped,
         )
 
     def _download_pending_translations(

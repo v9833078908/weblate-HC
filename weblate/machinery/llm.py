@@ -129,7 +129,7 @@ if TYPE_CHECKING:
     from .base import (
         DownloadMultipleTranslations,
         SettingsDict,
-        TranslationResultDict,
+        TranslationDownloadPlan,
     )
     from .forms import LLMBasicMachineryForm
 
@@ -507,18 +507,18 @@ class BaseLLMTranslation(BatchMachineTranslation):
         if units:
             fetch_glossary_terms(list(units.values()), include_variants=False)
 
-    def _translate_sources(
+    def _translate_sources_plan(
         self,
         source_language,
         target_language,
         sources: list[tuple[str, Unit | None]],
         user=None,
         threshold: int = MACHINERY_DEFAULT_THRESHOLD,
-    ) -> list[list[TranslationResultDict]]:
+    ) -> TranslationDownloadPlan:
         started_cache = self._ensure_secondary_context_cache()
         try:
             self._prefetch_glossary_terms(sources)
-            return super()._translate_sources(
+            return super()._translate_sources_plan(
                 source_language, target_language, sources, user, threshold
             )
         finally:
