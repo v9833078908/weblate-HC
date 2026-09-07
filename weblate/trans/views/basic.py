@@ -65,7 +65,7 @@ from weblate.trans.models import (
     Change,
     Component,
     ComponentList,
-    JudgeRun,
+    ProducerRun,
     JudgeVerdict,
     Project,
     Translation,
@@ -1012,7 +1012,7 @@ def show_translation(
     # run doubles as the translation page's "latest report". The permission
     # gate is the strip's own: without translation.auto and unit.review the
     # list stays empty and the include renders nothing.
-    judge_runs: list[JudgeRun] = []
+    judge_runs: list[ProducerRun] = []
     if (
         settings.JUDGE_ENABLED
         and user.has_perm("translation.auto", obj)

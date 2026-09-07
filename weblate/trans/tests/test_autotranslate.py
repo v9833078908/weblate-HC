@@ -46,7 +46,7 @@ from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models import (
     Change,
     Component,
-    JudgeRun,
+    ProducerRun,
     PendingUnitChange,
     Project,
     Translation,
@@ -931,7 +931,7 @@ class AutoTranslationTest(ViewTestCase):
                 component_id=self.component.id,
                 enforce_permissions=False,
             )
-        run = JudgeRun.objects.get()
+        run = ProducerRun.objects.get()
         self.assertIn("report_url", result)
         self.assertEqual(
             result["report_url"], reverse("judge-run", kwargs={"pk": run.pk})
@@ -950,7 +950,7 @@ class AutoTranslationTest(ViewTestCase):
             enforce_permissions=False,
         )
         self.assertNotIn("report_url", result)
-        self.assertFalse(JudgeRun.objects.exists())
+        self.assertFalse(ProducerRun.objects.exists())
 
     @override_settings(
         JUDGE_ENABLED=True,
@@ -970,7 +970,7 @@ class AutoTranslationTest(ViewTestCase):
                 user_id=self.user.id,
                 enforce_permissions=False,
             )
-        run = JudgeRun.objects.get()
+        run = ProducerRun.objects.get()
         self.assertEqual(
             result["report_url"], reverse("judge-run", kwargs={"pk": run.pk})
         )

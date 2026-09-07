@@ -43,7 +43,7 @@ from weblate.trans.models import (
     Unit,
 )
 from weblate.trans.models.judge import (
-    JudgeRun,
+    ProducerRun,
     JudgeRunUnit,
     JudgeVerdict,
     compute_context_hash,
@@ -297,7 +297,7 @@ class AutoTranslate(BaseAutoTranslate):
         allow_non_shared_tm_source_components: bool = False,
         overwrite_existing: bool = False,
         judge_limit: int | None = None,
-        judge_run: JudgeRun | None = None,
+        judge_run: ProducerRun | None = None,
         judge_pretranslate: bool = True,
         judge_mutating_repairs: bool = True,
         judge_candidate_severities: tuple[str, ...] = DEFAULT_CANDIDATE_SEVERITIES,
@@ -1053,7 +1053,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         self.judge_mutating_repairs = judge_mutating_repairs
         self.judge_candidate_severities = judge_candidate_severities
         self.judge_scope = obj
-        self.active_judge_run: JudgeRun | None = None
+        self.active_judge_run: ProducerRun | None = None
 
         match obj:
             case Translation():
@@ -1190,7 +1190,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 translation.component.project_id
             ][translation.language_id].workflow_settings
 
-    def _adopt_judge_run(self) -> JudgeRun:
+    def _adopt_judge_run(self) -> ProducerRun:
         """
         Move the queued re-check run created by the view to RUNNING.
 
@@ -1213,12 +1213,12 @@ class BatchAutoTranslate(BaseAutoTranslate):
         # workers must never both observe QUEUED and both pay for the seats.
         with transaction.atomic():
             claimed = (
-                JudgeRun.objects.select_for_update()
+                ProducerRun.objects.select_for_update()
                 .filter(
                     pk=self.judge_run_id,
-                    scope_type=JudgeRun.ScopeType.TRANSLATION,
+                    scope_type=ProducerRun.ScopeType.TRANSLATION,
                     requested_mode="recheck",
-                    status=JudgeRun.Status.QUEUED,
+                    status=ProducerRun.Status.QUEUED,
                 )
                 .first()
             )
@@ -1227,7 +1227,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 and expected_unit is not None
                 and claimed.requested_query == f"id:{expected_unit}"
             ):
-                claimed.status = JudgeRun.Status.RUNNING
+                claimed.status = ProducerRun.Status.RUNNING
                 claimed.started = timezone.now()
                 if task_id:
                     claimed.task_id = task_id
@@ -1238,24 +1238,24 @@ class BatchAutoTranslate(BaseAutoTranslate):
         if claimed is None:
             msg = gettext("The re-check run is no longer available.")
             raise ValueError(msg)
-        claimed.status = JudgeRun.Status.FAILED
+        claimed.status = ProducerRun.Status.FAILED
         claimed.finished = timezone.now()
         claimed.failure = gettext("The re-check request does not match the run.")
         claimed.save(update_fields=["status", "finished", "failure"])
         msg = claimed.failure
         raise ValueError(msg)
 
-    def _create_judge_run(self) -> JudgeRun:
+    def _create_judge_run(self) -> ProducerRun:
         scope = self.judge_scope
         match scope:
             case Translation():
-                scope_type = JudgeRun.ScopeType.TRANSLATION
+                scope_type = ProducerRun.ScopeType.TRANSLATION
             case Component():
-                scope_type = JudgeRun.ScopeType.COMPONENT
+                scope_type = ProducerRun.ScopeType.COMPONENT
             case Project():
-                scope_type = JudgeRun.ScopeType.PROJECT
+                scope_type = ProducerRun.ScopeType.PROJECT
             case Workspace():
-                scope_type = JudgeRun.ScopeType.WORKSPACE
+                scope_type = ProducerRun.ScopeType.WORKSPACE
             case _:
                 msg = (
                     "Judge runs require a translation, component, project, or workspace"
@@ -1264,7 +1264,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         task_id = (
             current_task.request.id if current_task and current_task.request.id else ""
         )
-        return JudgeRun.objects.create(
+        return ProducerRun.objects.create(
             actor=self.user,
             task_id=task_id,
             started=timezone.now(),
@@ -1275,13 +1275,13 @@ class BatchAutoTranslate(BaseAutoTranslate):
             requested_query=self.q,
             requested_mode=self.mode,
             cap=settings.JUDGE_MAX_UNITS_PER_RUN,
-            status=JudgeRun.Status.RUNNING,
+            status=ProducerRun.Status.RUNNING,
             configuration_snapshot=judge_configuration_snapshot(),
         )
 
     @staticmethod
     def _record_skipped_judge_units(
-        run: JudgeRun,
+        run: ProducerRun,
         units: Sequence[Unit],
         reason: JudgeRunUnit.SkipReason,
     ) -> None:
@@ -1312,14 +1312,14 @@ class BatchAutoTranslate(BaseAutoTranslate):
 
     def _finish_judge_run(
         self,
-        run: JudgeRun,
-        status: JudgeRun.Status,
+        run: ProducerRun,
+        status: ProducerRun.Status,
         failure: str = "",
     ) -> None:
         # A run is finalized exactly once: a second call (for example a
         # redundant exception handler further up the same call stack)
         # must never overwrite an already-terminal run.
-        if run.status in {JudgeRun.Status.COMPLETED, JudgeRun.Status.FAILED}:
+        if run.status in {ProducerRun.Status.COMPLETED, ProducerRun.Status.FAILED}:
             return
         run.status = status
         run.finished = timezone.now()
@@ -1370,7 +1370,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         except Exception as error:
             if self.active_judge_run is not None:
                 self._finish_judge_run(
-                    self.active_judge_run, JudgeRun.Status.FAILED, str(error)
+                    self.active_judge_run, ProducerRun.Status.FAILED, str(error)
                 )
             raise
 
@@ -1535,9 +1535,9 @@ class BatchAutoTranslate(BaseAutoTranslate):
             self._finish_judge_run(
                 judge_run,
                 (
-                    JudgeRun.Status.FAILED
+                    ProducerRun.Status.FAILED
                     if self.failure_message
-                    else JudgeRun.Status.COMPLETED
+                    else ProducerRun.Status.COMPLETED
                 ),
                 self.failure_message or "",
             )

@@ -47,7 +47,7 @@ from weblate.trans.models import (
 )
 from weblate.trans.models.judge import (
     JudgeRequestAttempt,
-    JudgeRun,
+    ProducerRun,
     JudgeRunUnit,
     JudgeVerdict,
     compute_context_hash,
@@ -1957,8 +1957,8 @@ class JudgeCloseRefusedVerdictsCommandTest(ComponentTestCase):
         return JudgeVerdict.objects.create(unit=unit, request_attempt=attempt, **kwargs)
 
     def make_run_unit(self, unit, verdict, outcome) -> JudgeRunUnit:
-        run = JudgeRun.objects.create(
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
+        run = ProducerRun.objects.create(
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(self.translation.pk),
             scope_label="test/test",
             scope_path="test/test",

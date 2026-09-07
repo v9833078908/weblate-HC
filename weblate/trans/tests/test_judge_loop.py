@@ -44,7 +44,7 @@ from weblate.trans.judge_loop import (
 from weblate.trans.models.judge import (
     JudgeDeferral,
     JudgeRequestAttempt,
-    JudgeRun,
+    ProducerRun,
     JudgeVerdict,
     compute_context_hash,
     compute_target_hash,
@@ -553,8 +553,8 @@ class JudgeLoopTest(ViewTestCase):
     def assert_caller_failure(self, failure) -> None:
         first = self.get_unit()
         second = self.get_unit(source="Thank you for using Weblate.")
-        run = JudgeRun.objects.create(
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
+        run = ProducerRun.objects.create(
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(first.translation_id),
             scope_label=str(first.translation),
             scope_path=first.translation.get_absolute_url(),
@@ -648,8 +648,8 @@ class JudgeLoopTest(ViewTestCase):
 
     def test_shared_judge_run_allocates_request_rounds_monotonically(self) -> None:
         unit = self.get_unit()
-        run = JudgeRun.objects.create(
-            scope_type=JudgeRun.ScopeType.TRANSLATION,
+        run = ProducerRun.objects.create(
+            scope_type=ProducerRun.ScopeType.TRANSLATION,
             scope_id=str(unit.translation_id),
             scope_label=str(unit.translation),
             scope_path=unit.translation.get_absolute_url(),

@@ -1032,14 +1032,14 @@ def auto_translate(
             # and keep suppressing every replacement re-check for that unit.
             if judge_run_id:
                 from weblate.trans.models.judge import (  # ruff: ignore[import-outside-top-level]
-                    JudgeRun,
+                    ProducerRun,
                 )
 
-                JudgeRun.objects.filter(
+                ProducerRun.objects.filter(
                     pk=judge_run_id,
-                    status__in=[JudgeRun.Status.QUEUED, JudgeRun.Status.RUNNING],
+                    status__in=[ProducerRun.Status.QUEUED, ProducerRun.Status.RUNNING],
                 ).update(
-                    status=JudgeRun.Status.FAILED,
+                    status=ProducerRun.Status.FAILED,
                     finished=timezone.now(),
                     failure=result["message"],
                 )

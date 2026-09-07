@@ -30,7 +30,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy, pgettext_lazy
 
-from weblate.trans.models import Component, JudgeRun, JudgeRunUnit, Project, Translation
+from weblate.trans.models import Component, ProducerRun, JudgeRunUnit, Project, Translation
 from weblate.trans.models.judge import SEVERITY_RANK, JudgeVerdict
 from weblate.trans.models.project import CommitPolicyChoices
 from weblate.workspaces.models import Workspace
@@ -41,10 +41,10 @@ if TYPE_CHECKING:
     from weblate.auth.models import AuthenticatedHttpRequest
 
 _SCOPE_MODELS: dict[str, type[Model]] = {
-    JudgeRun.ScopeType.TRANSLATION: Translation,
-    JudgeRun.ScopeType.COMPONENT: Component,
-    JudgeRun.ScopeType.PROJECT: Project,
-    JudgeRun.ScopeType.WORKSPACE: Workspace,
+    ProducerRun.ScopeType.TRANSLATION: Translation,
+    ProducerRun.ScopeType.COMPONENT: Component,
+    ProducerRun.ScopeType.PROJECT: Project,
+    ProducerRun.ScopeType.WORKSPACE: Workspace,
 }
 
 _OUTCOME = JudgeRunUnit.Outcome
@@ -305,7 +305,7 @@ def _annotate_row(row: JudgeRunUnit) -> None:
         )
 
 
-def _get_scope(run: JudgeRun):
+def _get_scope(run: ProducerRun):
     """Resolve the run's closed scope, or 404 when it no longer exists."""
     model = _SCOPE_MODELS.get(run.scope_type)
     if model is None:
@@ -339,27 +339,27 @@ def _scope_run_query(scope: Translation | Component | Project | Workspace) -> Q:
     """
     match scope:
         case Translation():
-            return Q(scope_type=JudgeRun.ScopeType.TRANSLATION, scope_id=str(scope.pk))
+            return Q(scope_type=ProducerRun.ScopeType.TRANSLATION, scope_id=str(scope.pk))
         case Component():
             return Q(
-                scope_type=JudgeRun.ScopeType.COMPONENT, scope_id=str(scope.pk)
+                scope_type=ProducerRun.ScopeType.COMPONENT, scope_id=str(scope.pk)
             ) | Q(
-                scope_type=JudgeRun.ScopeType.TRANSLATION,
+                scope_type=ProducerRun.ScopeType.TRANSLATION,
                 scope_id__in=Translation.objects.filter(component=scope)
                 .annotate(_scope_id=Cast("pk", CharField()))
                 .values("_scope_id"),
             )
         case Project():
             return (
-                Q(scope_type=JudgeRun.ScopeType.PROJECT, scope_id=str(scope.pk))
+                Q(scope_type=ProducerRun.ScopeType.PROJECT, scope_id=str(scope.pk))
                 | Q(
-                    scope_type=JudgeRun.ScopeType.COMPONENT,
+                    scope_type=ProducerRun.ScopeType.COMPONENT,
                     scope_id__in=Component.objects.filter(project=scope)
                     .annotate(_scope_id=Cast("pk", CharField()))
                     .values("_scope_id"),
                 )
                 | Q(
-                    scope_type=JudgeRun.ScopeType.TRANSLATION,
+                    scope_type=ProducerRun.ScopeType.TRANSLATION,
                     scope_id__in=Translation.objects.filter(component__project=scope)
                     .annotate(_scope_id=Cast("pk", CharField()))
                     .values("_scope_id"),
@@ -367,21 +367,21 @@ def _scope_run_query(scope: Translation | Component | Project | Workspace) -> Q:
             )
         case Workspace():
             return (
-                Q(scope_type=JudgeRun.ScopeType.WORKSPACE, scope_id=str(scope.pk))
+                Q(scope_type=ProducerRun.ScopeType.WORKSPACE, scope_id=str(scope.pk))
                 | Q(
-                    scope_type=JudgeRun.ScopeType.PROJECT,
+                    scope_type=ProducerRun.ScopeType.PROJECT,
                     scope_id__in=Project.objects.filter(workspace=scope)
                     .annotate(_scope_id=Cast("pk", CharField()))
                     .values("_scope_id"),
                 )
                 | Q(
-                    scope_type=JudgeRun.ScopeType.COMPONENT,
+                    scope_type=ProducerRun.ScopeType.COMPONENT,
                     scope_id__in=Component.objects.filter(project__workspace=scope)
                     .annotate(_scope_id=Cast("pk", CharField()))
                     .values("_scope_id"),
                 )
                 | Q(
-                    scope_type=JudgeRun.ScopeType.TRANSLATION,
+                    scope_type=ProducerRun.ScopeType.TRANSLATION,
                     scope_id__in=Translation.objects.filter(
                         component__project__workspace=scope
                     )
@@ -397,7 +397,7 @@ def recent_judge_runs(
     scope: Translation | Component | Project | Workspace,
     *,
     limit: int = 10,
-) -> list[JudgeRun]:
+) -> list[ProducerRun]:
     """
     Return the scope's most recent producer launches, newest first, materialized.
 
@@ -419,7 +419,7 @@ def recent_judge_runs(
     production.
     """
     return list(
-        JudgeRun.objects.filter(
+        ProducerRun.objects.filter(
             _scope_run_query(scope), requested_mode__in=HISTORY_MODES
         )
         .order_by("-created")
@@ -429,7 +429,7 @@ def recent_judge_runs(
 
 @login_required
 def judge_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
-    run = get_object_or_404(JudgeRun.objects.select_related("actor"), pk=pk)
+    run = get_object_or_404(ProducerRun.objects.select_related("actor"), pk=pk)
     scope = _get_scope(run)
     # Permission is re-checked against the current user, never inferred from
     # the stored actor: a launcher can lose access after the run completes.
