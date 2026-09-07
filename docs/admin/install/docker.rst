@@ -2375,6 +2375,7 @@ LLM judge
 .. envvar:: WEBLATE_JUDGE_REQUEST_DEADLINE
 .. envvar:: WEBLATE_JUDGE_TRANSPORT_RETRIES
 .. envvar:: WEBLATE_JUDGE_MAY_APPROVE
+.. envvar:: WEBLATE_JUDGE_CONSENSUS_REJECT
 .. envvar:: WEBLATE_JUDGE_REASONING_EFFORT
 
     .. versionadded:: 2026.8.1
@@ -2383,6 +2384,12 @@ LLM judge
     <auto-translation>` mode. The provider endpoint defaults to OpenRouter
     and is set by :setting:`JUDGE_BASE_URL`. See :setting:`JUDGE_ENABLED`
     and related settings.
+
+    ``WEBLATE_JUDGE_CONSENSUS_REJECT`` sets :setting:`JUDGE_CONSENSUS_REJECT`:
+    ``1`` (the default) requires unanimous critical agreement across parsed
+    seats, while ``0`` restores the site-wide rollback behavior where any
+    critical holds the string. Changing it requires recreating all application
+    processes.
 
     .. seealso::
 
@@ -2398,6 +2405,7 @@ LLM judge
        * :setting:`JUDGE_REQUEST_DEADLINE`
        * :setting:`JUDGE_TRANSPORT_RETRIES`
        * :setting:`JUDGE_MAY_APPROVE`
+       * :setting:`JUDGE_CONSENSUS_REJECT`
        * :setting:`JUDGE_REASONING_EFFORT`
 
 .. envvar:: WEBLATE_JUDGE_FALLBACK_BASE_URL

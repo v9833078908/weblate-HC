@@ -66,7 +66,7 @@ JTBD заказчика: «когда мы выкатываем апдейт и�
 flowchart LR
   ALL[Строки под фильтром] --> J1[Судья 1<br/>deepseek-v4-pro]
   ALL --> J2[Судья 2<br/>qwen3-235b]
-  J1 --> M{{Вердикт = max severity}}
+  J1 --> M{{Вердикт = max severity; critical по политике инстанса, consensus по умолчанию}}
   J2 --> M
   M -->|pass| OK[state 30]
   M -->|flag| SHIP[state 20<br/>отгружается, не подтверждено]

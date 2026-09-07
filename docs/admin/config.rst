@@ -1761,6 +1761,34 @@ anything.
    * :setting:`JUDGE_MODEL_SEAT_1`
    * :setting:`JUDGE_MODEL_SEAT_2`
    * :setting:`JUDGE_MAY_APPROVE`
+   * :setting:`JUDGE_CONSENSUS_REJECT`
+
+.. setting:: JUDGE_CONSENSUS_REJECT
+
+JUDGE_CONSENSUS_REJECT
+----------------------
+
+.. versionadded:: 2026.8.1
+
+Requires unanimous agreement across parsed seats before a round produces a
+``critical`` verdict (holding the string for human triage). When one seat
+reports ``critical`` while another parsed seat reports a lower severity
+(``major``, ``minor``, or ``none``), the round demotes the disputed defect to
+``major`` (:guilabel:`FLAG`), shipping the translation with advisory evidence
+instead of blocking it. Defaults to ``True``.
+
+Set to ``False`` to restore the original "highest severity wins" rollback
+behavior, where any parsed ``critical`` holds the string regardless of what
+the other seat reported.
+
+All application processes (web workers, Celery workers, management commands)
+must use the same value. Changing this setting affects read-time verdicts and
+future projections but does not rewrite stored unit states or check rows.
+
+.. seealso::
+
+   * :setting:`JUDGE_ENABLED`
+   * :setting:`JUDGE_MAY_APPROVE`
 
 .. setting:: JUDGE_API_KEY
 
@@ -1809,8 +1837,11 @@ JUDGE_MODEL_SEAT_1, JUDGE_MODEL_SEAT_2
 .. versionadded:: 2026.8.1
 
 OpenRouter model identifiers for the two seats of the judge collegium. Both
-seats judge every string independently; the string's verdict is the
-strictest of the two, so a seat can never lower what the other seat found.
+seats judge every string independently; below critical the string's verdict
+is the strictest of the two. With :setting:`JUDGE_CONSENSUS_REJECT` enabled,
+a critical hold requires both seats to agree (see :ref:`llm-judge`);
+disabling it restores the original strictest-seat policy where either seat's
+critical holds the string.
 Configuring the same model on both seats is a valid configuration, not an
 error. Both fields must be set, together with :setting:`JUDGE_API_KEY`,
 for :setting:`JUDGE_ENABLED` to have an effect.

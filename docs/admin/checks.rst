@@ -163,10 +163,16 @@ mode is off site-wide until all four are configured, and it requires the
 :guilabel:`Add as approved translation` does.
 
 Both configured models (called seats) judge every selected string
-independently, and the string's verdict is the strictest of the two: a seat
-can never lower what the other seat found. Each seat's opinion, and any
-disagreement between them, is shown on the ``judge`` checks card of the
-string.
+independently. Below critical the string's verdict is the strictest of the
+two: a seat can never lower what the other seat found. With
+:setting:`JUDGE_CONSENSUS_REJECT` enabled (the default), a critical is held
+only when both seats grade the string critical; a critical from one seat
+that the other seat grades lower is shown as a major, so the string ships
+with both opinions attached instead of being held on one seat's word. An
+administrator can disable :setting:`JUDGE_CONSENSUS_REJECT` site-wide to
+restore the original rule where either seat's critical holds the string.
+Each seat's opinion and any disagreement are shown on the ``judge`` checks
+card of the string.
 
 Both seats receive the glossary entries matched against each string, including
 their source and target explanations and effective flags. Each entry uses the
@@ -198,7 +204,11 @@ and only an audited producer decision, not a checks dismissal, resolves one.
 
 A ``critical`` verdict holds the string automatically at :ref:`needs editing
 <states>`; only an authorized reviewer can ship it, by recording an
-``accepted_as_is`` decision. A ``major`` verdict ships as
+``accepted_as_is`` decision. Under the default consensus policy
+(:setting:`JUDGE_CONSENSUS_REJECT`), a ``critical`` verdict requires unanimous
+agreement across parsed seats: a disputed critical demotes to ``major``,
+shipping as translated with ``judge-flag`` evidence attached instead of holding
+the string. A ``major`` verdict ships as
 :ref:`translated <states>` with ``judge-flag`` evidence attached: it does not
 block delivery on its own, and a reviewer can accept it as-is directly,
 without first escalating it. A ``minor`` verdict is non-blocking evidence,
