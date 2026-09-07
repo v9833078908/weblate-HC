@@ -79,7 +79,7 @@ from weblate.trans.models.judge import active_verdict, compute_context_hash
 from weblate.trans.models.project import prefetch_project_flags
 from weblate.trans.models.translation import GhostTranslation
 from weblate.trans.util import render, sort_unicode, translation_percent
-from weblate.trans.views.judge import recent_judge_runs
+from weblate.trans.views.judge import recent_producer_runs
 from weblate.trans.views.reports import get_reports_context
 from weblate.trans.workspace_move import can_offer_project_move
 from weblate.utils import messages
@@ -815,18 +815,17 @@ def judge_queue_strip_context(
     """
     if isinstance(obj, Component) and obj.is_glossary:
         return None
-    judge_ready = judge_configuration_ready()
-    can_run = (
-        judge_ready
-        and user.has_perm("translation.auto", obj)
-        and user.has_perm("unit.review", obj)
+    if not user.has_perm("translation.auto", obj):
+        return None
+    can_run_judge = judge_configuration_ready() and user.has_perm(
+        "unit.review", obj
     )
-    if not can_run:
+    runs = recent_producer_runs(obj, user=user)
+    if not can_run_judge and not runs:
         return None
     counts = None
     hand_off_ready = False
-    runs = recent_judge_runs(obj)
-    if translations is not None:
+    if can_run_judge and translations is not None:
         needs_human = not_reviewed = unparsed = judge_total = 0
         for translation in translations:
             if not isinstance(translation, Translation) or translation.is_source:
@@ -853,6 +852,7 @@ def judge_queue_strip_context(
         "last_run": runs[0] if runs else None,
         "hand_off_ready": hand_off_ready,
         "download_url": reverse("download", kwargs={"path": obj.get_url_path()}),
+        "can_run_judge": can_run_judge,
     }
 
 
@@ -1012,14 +1012,10 @@ def show_translation(
     # run doubles as the translation page's "latest report". The permission
     # gate is the strip's own: without translation.auto and unit.review the
     # list stays empty and the include renders nothing.
-    judge_runs: list[ProducerRun] = []
-    if (
-        settings.JUDGE_ENABLED
-        and user.has_perm("translation.auto", obj)
-        and user.has_perm("unit.review", obj)
-    ):
-        judge_runs = recent_judge_runs(obj)
-    judge_last_run = judge_runs[0] if judge_runs else None
+    producer_runs: list[ProducerRun] = []
+    if user.has_perm("translation.auto", obj):
+        producer_runs = recent_producer_runs(obj, user=user)
+    producer_last_run = producer_runs[0] if producer_runs else None
     form = get_upload_form(user, obj)
 
     search_form = SearchForm(
@@ -1127,8 +1123,8 @@ def show_translation(
             "judge_row_count": judge_row_count,
             "judge_request_estimate": judge_request_estimate,
             "judge_verdicts_exist": judge_verdicts_exist,
-            "judge_runs": judge_runs,
-            "judge_last_run": judge_last_run,
+            "producer_runs": producer_runs,
+            "producer_last_run": producer_last_run,
         },
     )
 

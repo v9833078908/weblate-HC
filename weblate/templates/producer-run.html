@@ -6,7 +6,7 @@
   <li class="breadcrumb-item">
     <a href="{{ scope.get_absolute_url }}">{{ run.scope_label }}</a>
   </li>
-  <li class="breadcrumb-item">{% translate "Judge run" %}</li>
+  <li class="breadcrumb-item">{{ run_kind_label }}</li>
 {% endblock breadcrumbs %}
 
 {% block content %}

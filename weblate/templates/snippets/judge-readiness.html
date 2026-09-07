@@ -3,38 +3,28 @@
 {% if judge_queue %}
   <section class="card mb-3" aria-labelledby="judge-queue-heading">
     <div class="card-header">
-      <h2 class="card-title" id="judge-queue-heading">{% translate "AI judge" %}</h2>
+      <h2 class="card-title" id="judge-queue-heading">
+        {% if judge_queue.can_run_judge %}{% translate "AI judge" %}{% else %}{% translate "Automatic translation runs" %}{% endif %}
+      </h2>
     </div>
     <div class="card-body">
-      {% if judge_queue.counts %}
-        <ul class="list-inline mb-3">
-          <li class="list-inline-item">
-            <strong>{{ judge_queue.counts.needs_human }}</strong> {% translate "needs a human" %}
-          </li>
-          <li class="list-inline-item">
-            <strong>{{ judge_queue.counts.not_reviewed }}</strong> {% translate "not reviewed" %}
-          </li>
-          <li class="list-inline-item">
-            <strong>{{ judge_queue.counts.unparsed }}</strong> {% translate "last attempt returned nothing" %}
-          </li>
-        </ul>
-      {% endif %}
-      {% if judge_queue.hand_off_ready %}
-        <p class="list-group-item-text">
-          {% translate "Every judged string is clean and current: this component looks ready to hand off." %}
-        </p>
-      {% endif %}
-      <div class="d-flex flex-wrap align-items-center gap-2">
-        {% if judge_queue.hand_off_ready %}
-          <a class="btn btn-sm btn-success" href="{{ judge_queue.download_url }}">{% translate "Download for hand-off" %}</a>
+      {% if judge_queue.can_run_judge %}
+        {% if judge_queue.counts %}
+          <ul class="list-inline mb-3">
+            <li class="list-inline-item"><strong>{{ judge_queue.counts.needs_human }}</strong> {% translate "needs a human" %}</li>
+            <li class="list-inline-item"><strong>{{ judge_queue.counts.not_reviewed }}</strong> {% translate "not reviewed" %}</li>
+            <li class="list-inline-item"><strong>{{ judge_queue.counts.unparsed }}</strong> {% translate "last attempt returned nothing" %}</li>
+          </ul>
         {% endif %}
-        {% if judge_queue.runs %}
-          {% include "snippets/judge-runs-menu.html" with runs=judge_queue.runs current_path=request.path %}
-        {% else %}
-          <a class="btn btn-sm btn-outline-secondary" href="{{ judge_queue.breakdown_url }}">{% translate "Breakdown by check" %}</a>
-        {% endif %}
-        <a class="btn btn-sm btn-outline-primary" href="{{ judge_queue.run_url }}">{% translate "Run the judge" %}</a>
-      </div>
+        {% if judge_queue.hand_off_ready %}<p class="list-group-item-text">{% translate "Every judged string is clean and current: this component looks ready to hand off." %}</p>{% endif %}
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          {% if judge_queue.hand_off_ready %}<a class="btn btn-sm btn-success" href="{{ judge_queue.download_url }}">{% translate "Download for hand-off" %}</a>{% endif %}
+          {% if judge_queue.runs %}{% include "snippets/producer-runs-menu.html" with runs=judge_queue.runs current_path=request.path %}{% else %}<a class="btn btn-sm btn-outline-secondary" href="{{ judge_queue.breakdown_url }}">{% translate "Breakdown by check" %}</a>{% endif %}
+          <a class="btn btn-sm btn-outline-primary" href="{{ judge_queue.run_url }}">{% translate "Run the judge" %}</a>
+        </div>
+      {% else %}
+        {% include "snippets/producer-runs-menu.html" with runs=judge_queue.runs current_path=request.path %}
+      {% endif %}
     </div>
   </section>
 {% endif %}

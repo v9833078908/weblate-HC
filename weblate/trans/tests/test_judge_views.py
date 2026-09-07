@@ -27,7 +27,7 @@ from weblate.trans.judge_loop import (
     queue_judge_recheck,
     recheck_query,
 )
-from weblate.trans.models import Component, Project, Translation
+from weblate.trans.models import Category, Component, Project, Translation
 from weblate.trans.models.change import Change
 from weblate.trans.models.judge import (
     ProducerRun,
@@ -53,6 +53,7 @@ from weblate.utils.state import (
     STATE_TRANSLATED,
 )
 from weblate.workspaces.models import Workspace
+from weblate.utils.stats import ProjectLanguage
 
 
 def judge_context_hash(unit) -> str:
@@ -1658,17 +1659,17 @@ class JudgeQueueStripViewTest(ViewTestCase):
         run = self.make_judge_run(self.user, scope=translation)
         run_url = reverse("judge-run", kwargs={"pk": run.pk})
         # The translation page carries the runs in its own context key
-        # (judge_runs, the list itself); component and project pages reach
+        # (producer_runs, the list itself); component and project pages reach
         # them through the strip's judge_queue.
         for page_url, runs_key in (
-            (translation.get_absolute_url(), "judge_runs"),
+            (translation.get_absolute_url(), "producer_runs"),
             (self.component.get_absolute_url(), "judge_queue"),
             (self.project.get_absolute_url(), "judge_queue"),
         ):
             response = self.client.get(page_url)
             runs = (
                 response.context[runs_key]
-                if runs_key == "judge_runs"
+                if runs_key == "producer_runs"
                 else response.context[runs_key]["runs"]
             )
             self.assertEqual(runs[0].pk, run.pk)
@@ -1902,9 +1903,9 @@ class JudgeQueueStripViewTest(ViewTestCase):
 
         response = self.client.get(self.translation.get_absolute_url())
         self.assertEqual(
-            [run.pk for run in response.context["judge_runs"]], [launch.pk]
+            [run.pk for run in response.context["producer_runs"]], [launch.pk]
         )
-        self.assertEqual(response.context["judge_last_run"].pk, launch.pk)
+        self.assertEqual(response.context["producer_last_run"].pk, launch.pk)
         self.assertNotContains(
             response, reverse("judge-run", kwargs={"pk": recheck.pk})
         )
@@ -1974,7 +1975,7 @@ class JudgeQueueStripViewTest(ViewTestCase):
             status=ProducerRun.Status.COMPLETED,
         )
         response = self.client.get(self.translation.get_absolute_url())
-        self.assertEqual(response.context["judge_last_run"].pk, run.pk)
+        self.assertEqual(response.context["producer_last_run"].pk, run.pk)
         self.assertContains(response, reverse("judge-run", kwargs={"pk": run.pk}))
 
     def test_translation_page_hides_last_run_without_permission(self) -> None:
@@ -1990,7 +1991,7 @@ class JudgeQueueStripViewTest(ViewTestCase):
             status=ProducerRun.Status.COMPLETED,
         )
         response = self.client.get(self.translation.get_absolute_url())
-        self.assertIsNone(response.context["judge_last_run"])
+        self.assertIsNone(response.context["producer_last_run"])
 
     def test_translation_last_run_does_not_leak_from_another_translation(
         self,
@@ -2010,7 +2011,7 @@ class JudgeQueueStripViewTest(ViewTestCase):
             status=ProducerRun.Status.COMPLETED,
         )
         response = self.client.get(self.translation.get_absolute_url())
-        self.assertIsNone(response.context["judge_last_run"])
+        self.assertIsNone(response.context["producer_last_run"])
 
     def test_translation_last_run_includes_another_actors_launch(self) -> None:
         # The translation page carries the same contract as the card
@@ -2020,9 +2021,9 @@ class JudgeQueueStripViewTest(ViewTestCase):
         self.enable_review()
         other_run = self.make_judge_run(self.anotheruser, scope=self.translation)
         response = self.client.get(self.translation.get_absolute_url())
-        self.assertEqual(response.context["judge_last_run"].pk, other_run.pk)
+        self.assertEqual(response.context["producer_last_run"].pk, other_run.pk)
         self.assertEqual(
-            [run.pk for run in response.context["judge_runs"]], [other_run.pk]
+            [run.pk for run in response.context["producer_runs"]], [other_run.pk]
         )
 
     def test_translation_last_run_is_the_newest_launch_whoever_made_it(self) -> None:
@@ -2039,9 +2040,9 @@ class JudgeQueueStripViewTest(ViewTestCase):
         )
         ProducerRun.objects.filter(pk=other_run.pk).update(created=now)
         response = self.client.get(self.translation.get_absolute_url())
-        self.assertEqual(response.context["judge_last_run"].pk, other_run.pk)
+        self.assertEqual(response.context["producer_last_run"].pk, other_run.pk)
         self.assertEqual(
-            [run.pk for run in response.context["judge_runs"]],
+            [run.pk for run in response.context["producer_runs"]],
             [other_run.pk, own_run.pk],
         )
 
@@ -2209,6 +2210,7 @@ class JudgeRunReportViewTest(ViewTestCase):
         *,
         status=ProducerRun.Status.COMPLETED,
         scope_type=ProducerRun.ScopeType.COMPONENT,
+        requested_mode="judge",
     ) -> ProducerRun:
         scope = scope or self.component
         return ProducerRun.objects.create(
@@ -2218,7 +2220,7 @@ class JudgeRunReportViewTest(ViewTestCase):
             scope_label=str(scope),
             scope_path=scope.get_absolute_url(),
             requested_query="state:empty",
-            requested_mode="judge",
+            requested_mode=requested_mode,
             cap=1000,
             status=status,
             started=timezone.now() - timedelta(minutes=5),
@@ -2228,6 +2230,55 @@ class JudgeRunReportViewTest(ViewTestCase):
                 else None
             ),
         )
+    def test_report_uses_the_producer_run_template(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        response = self.client.get(self.report_url(run))
+        self.assertTemplateUsed(response, "producer-run.html")
+
+    def test_translation_run_needs_only_the_launch_permission(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        run = self.create_run(requested_mode="translate")
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 200)
+
+    def test_judge_run_still_needs_review(self) -> None:
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_superuser"])
+        run = self.create_run(requested_mode="judge")
+        self.component.project.translation_review = False
+        self.component.project.save(update_fields=["translation_review"])
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.status_code, 404)
+
+    def test_report_restores_category_and_project_language_scopes(self) -> None:
+        self.enable_review()
+        category = self.create_category(project=self.project)
+        project_language = ProjectLanguage(self.project, self.translation.language)
+        for scope, scope_type in (
+            (category, ProducerRun.ScopeType.CATEGORY),
+            (project_language, ProducerRun.ScopeType.PROJECT_LANGUAGE),
+        ):
+            with self.subTest(scope=scope):
+                scope_id = (
+                    f"{scope.project.pk}-{scope.language.pk}"
+                    if isinstance(scope, ProjectLanguage)
+                    else str(scope.pk)
+                )
+                run = ProducerRun.objects.create(
+                    actor=self.user,
+                    scope_type=scope_type,
+                    scope_id=scope_id,
+                    scope_label=str(scope),
+                    scope_path=scope.get_absolute_url(),
+                    requested_mode="judge",
+                    cap=100,
+                )
+                response = self.client.get(self.report_url(run))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["scope"].pk, scope.pk)
+
 
     def add_row(
         self,

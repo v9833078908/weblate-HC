@@ -20,6 +20,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import models
@@ -28,11 +29,20 @@ from django.db.models.functions import Cast
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
-from django.utils.translation import gettext_lazy, pgettext_lazy
+from django.utils.translation import gettext, gettext_lazy, pgettext_lazy
 
-from weblate.trans.models import Component, ProducerRun, JudgeRunUnit, Project, Translation
-from weblate.trans.models.judge import SEVERITY_RANK, JudgeVerdict
+from weblate.lang.models import Language
+from weblate.trans.models import (
+    Category,
+    Component,
+    JudgeRunUnit,
+    ProducerRun,
+    Project,
+    Translation,
+)
+from weblate.trans.models.judge import RUN_KIND_LABELS, SEVERITY_RANK, JudgeVerdict
 from weblate.trans.models.project import CommitPolicyChoices
+from weblate.utils.stats import ProjectLanguage
 from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
@@ -43,6 +53,7 @@ if TYPE_CHECKING:
 _SCOPE_MODELS: dict[str, type[Model]] = {
     ProducerRun.ScopeType.TRANSLATION: Translation,
     ProducerRun.ScopeType.COMPONENT: Component,
+    ProducerRun.ScopeType.CATEGORY: Category,
     ProducerRun.ScopeType.PROJECT: Project,
     ProducerRun.ScopeType.WORKSPACE: Workspace,
 }
@@ -56,8 +67,12 @@ _RESOLUTION = JudgeVerdict.Resolution
 # "recheck" and the deferral drain pass writes "drain". An allowlist rather
 # than an exclusion list: a mode added later must opt into the menu
 # explicitly instead of silently competing with real launches for its rows.
-HISTORY_MODES = ("judge",)
+HISTORY_MODES = ("judge", "translate", "suggest", "fuzzy", "approved")
 
+# Modes that contain verdict data and must retain the review gate.
+JUDGE_MODES = ("judge", "recheck", "drain")
+# Modes produced by AutoForm that contain only the launcher-visible receipt.
+MT_LAUNCH_MODES = ("translate", "suggest", "fuzzy", "approved")
 # Buckets that make up the producer's "what to do" list. Ordered by what
 # costs the producer most to leave alone: critical, major, minor, then the
 # two transport/evidence buckets that need a re-check.
@@ -307,6 +322,15 @@ def _annotate_row(row: JudgeRunUnit) -> None:
 
 def _get_scope(run: ProducerRun):
     """Resolve the run's closed scope, or 404 when it no longer exists."""
+    if run.scope_type == ProducerRun.ScopeType.PROJECT_LANGUAGE:
+        try:
+            project_id, language_id = map(int, run.scope_id.split("-", 1))
+            return ProjectLanguage(
+                Project.objects.get(pk=project_id),
+                Language.objects.get(pk=language_id),
+            )
+        except (Project.DoesNotExist, Language.DoesNotExist, ValueError) as error:
+            raise Http404 from error
     model = _SCOPE_MODELS.get(run.scope_type)
     if model is None:
         raise Http404
@@ -316,11 +340,27 @@ def _get_scope(run: ProducerRun):
         raise Http404 from error
 
 
-def user_can_view_judge_run(user, scope) -> bool:
-    """Whether ``user`` currently (not at launch time) may view a run's scope."""
-    return user.has_perm("translation.auto", scope) and user.has_perm(
-        "unit.review", scope
+def producer_run_modes(user, scope) -> tuple[str, ...]:
+    """Which of ``HISTORY_MODES`` this user may currently see for this scope."""
+    if not user.has_perm("translation.auto", scope):
+        return ()
+    may_review = settings.JUDGE_ENABLED and user.has_perm("unit.review", scope)
+    return tuple(
+        mode
+        for mode in HISTORY_MODES
+        if mode in MT_LAUNCH_MODES or (may_review and mode in JUDGE_MODES)
     )
+
+
+def user_can_view_producer_run(user, scope, run) -> bool:
+    """Whether ``user`` currently may view this run."""
+    if not user.has_perm("translation.auto", scope):
+        return False
+    if run.requested_mode in MT_LAUNCH_MODES:
+        return True
+    if run.requested_mode in JUDGE_MODES:
+        return settings.JUDGE_ENABLED and user.has_perm("unit.review", scope)
+    return False
 
 
 def _scope_run_query(scope: Translation | Component | Project | Workspace) -> Q:
@@ -393,9 +433,10 @@ def _scope_run_query(scope: Translation | Component | Project | Workspace) -> Q:
             return Q(pk=None)
 
 
-def recent_judge_runs(
+def recent_producer_runs(
     scope: Translation | Component | Project | Workspace,
     *,
+    user,
     limit: int = 10,
 ) -> list[ProducerRun]:
     """
@@ -418,9 +459,12 @@ def recent_judge_runs(
     which is exactly how a 462-string component launch became unreachable on
     production.
     """
+    modes = producer_run_modes(user, scope)
+    if not modes:
+        return []
     return list(
         ProducerRun.objects.filter(
-            _scope_run_query(scope), requested_mode__in=HISTORY_MODES
+            _scope_run_query(scope), requested_mode__in=modes
         )
         .order_by("-created")
         .select_related("actor")[:limit]
@@ -428,12 +472,12 @@ def recent_judge_runs(
 
 
 @login_required
-def judge_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
+def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
     run = get_object_or_404(ProducerRun.objects.select_related("actor"), pk=pk)
     scope = _get_scope(run)
     # Permission is re-checked against the current user, never inferred from
     # the stored actor: a launcher can lose access after the run completes.
-    if not user_can_view_judge_run(request.user, scope):
+    if not user_can_view_producer_run(request.user, scope, run):
         raise Http404
 
     outcome = request.GET.get("outcome", "")
@@ -518,10 +562,13 @@ def judge_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
 
     return render(
         request,
-        "judge-run.html",
+        "producer-run.html",
         {
             "run": run,
             "scope": scope,
+            "run_kind_label": RUN_KIND_LABELS.get(
+                run.requested_mode, gettext("Producer run")
+            ),
             "stats": [
                 (key, label, counts[key]) for key, label in _OUTCOME_LABELS.items()
             ],

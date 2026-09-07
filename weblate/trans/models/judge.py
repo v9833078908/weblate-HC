@@ -42,9 +42,10 @@ from weblate.utils.state import (
 )
 
 if TYPE_CHECKING:
+    from django_stubs_ext import StrOrPromise
+
     from weblate.auth.models import User
     from weblate.glossary.models import GlossaryPromptEntry
-
 JUDGE_ERROR_SEPARATOR = " | "
 JUDGE_REPAIR_REQUIREMENT = (
     "Fix all listed errors while preserving the remaining meaning, placeholders, and "
@@ -272,6 +273,18 @@ def compute_judge_request_identity(
         ]
     )
 
+
+#: Human label for a run's launch mode, shown as the report's breadcrumb and
+#: in the run-history menu. Mirrors AutoForm's own mode labels.
+RUN_KIND_LABELS: dict[str, StrOrPromise] = {
+    "judge": gettext_lazy("Judge run"),
+    "recheck": gettext_lazy("Judge re-check"),
+    "drain": gettext_lazy("Deferred judge retry"),
+    "translate": gettext_lazy("Automatic translation run"),
+    "suggest": gettext_lazy("Automatic suggestion run"),
+    "fuzzy": gettext_lazy("Automatic translation run"),
+    "approved": gettext_lazy("Automatic translation run"),
+}
 
 class ProducerRun(models.Model):
     """
