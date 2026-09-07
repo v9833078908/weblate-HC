@@ -274,8 +274,8 @@ reported as a style error less often than a wrongly assumed one.
 
 The component page shows an :guilabel:`AI judge` summary with the same
 ``needs a human``, ``not reviewed``, and ``unparsed`` counts described
-above, plus a link to the checks breakdown while no run exists yet and a
-menu of recent runs once one does. A :guilabel:`Download for hand-off`
+above, plus a link to the checks breakdown while no launch exists yet and a
+menu of recent launches once one does. A :guilabel:`Download for hand-off`
 action appears only once
 those cached counts read zero *and* an authoritative, uncached recheck
 agrees: no current critical, no stale target, no glossary or explanation
@@ -297,8 +297,14 @@ result that started it. The run report lists checked, matched, cached, and
 skipped counts, and repaired, rolled back, minor, major, critical, unparsed,
 stale-conflict, accepted-as-is, and escalated outcomes; each count opens the
 matching paginated list of strings. A finished component, project, or
-translation page shows its recent runs: a :guilabel:`Latest report` button
-opening the newest one, with earlier runs listed in a menu beside it.
+translation page shows its recent launches: a :guilabel:`Latest report`
+button opening the newest one, with earlier launches listed in a menu
+beside it. The menu lists launches only. A one-string
+:guilabel:`Re-check this string` from the string editor, and the automatic
+retry of a string the judge left unanswered, are recorded as runs with
+their own reports too, but their outcome is read on that string's own
+:guilabel:`AI judge verdict` card, so a handful of them can never push a
+component-wide launch out of the menu.
 Access to a run report
 requires the same
 automatic translation and review permissions as launching one, re-checked

@@ -51,6 +51,13 @@ _OUTCOME = JudgeRunUnit.Outcome
 _REPAIR = JudgeRunUnit.RepairStatus
 _RESOLUTION = JudgeVerdict.Resolution
 
+# The launch modes the per-scope run history lists. A producer launch from
+# the automatic translation form is "judge"; ``queue_judge_recheck`` writes
+# "recheck" and the deferral drain pass writes "drain". An allowlist rather
+# than an exclusion list: a mode added later must opt into the menu
+# explicitly instead of silently competing with real launches for its rows.
+HISTORY_MODES = ("judge",)
+
 # Buckets that make up the producer's "what to do" list. Ordered by what
 # costs the producer most to leave alone: critical, major, minor, then the
 # two transport/evidence buckets that need a re-check.
@@ -392,16 +399,29 @@ def recent_judge_runs(
     limit: int = 10,
 ) -> list[JudgeRun]:
     """
-    Return the scope's most recent runs, newest first, as a materialized list.
+    Return the scope's most recent producer launches, newest first, materialized.
 
     Callers take ``runs[0]`` as the newest run and iterate the remainder for
     the menu, so the list is evaluated exactly once - never ``.first()`` or
     ``[0]`` on the queryset itself, either of which would issue a second
     ``LIMIT 1`` query ahead of the menu's ``LIMIT 10`` and silently double
     the page's query budget.
+
+    Only ``HISTORY_MODES`` reaches the menu. The two excluded modes are
+    ``JudgeRun`` rows too, but neither is a launch a producer returns to a
+    scope page to find: an editor one-unit re-check ("recheck") reports its
+    outcome on that string's own verdict card, and the deferred-retry drain
+    pass ("drain") has no actor at all. Both are still addressable by URL,
+    and a re-check is still linked from the task alert that finishes it.
+    Without this filter the cheapest action in the product evicts the most
+    expensive one: ten one-string re-checks fill the whole ten-row window,
+    which is exactly how a 462-string component launch became unreachable on
+    production.
     """
     return list(
-        JudgeRun.objects.filter(_scope_run_query(scope))
+        JudgeRun.objects.filter(
+            _scope_run_query(scope), requested_mode__in=HISTORY_MODES
+        )
         .order_by("-created")
         .select_related("actor")[:limit]
     )

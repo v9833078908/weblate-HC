@@ -1569,7 +1569,11 @@ class JudgeQueueStripViewTest(ViewTestCase):
         self.assertNotIn(self.user.profile.get_user_name(), menu_markup)
 
     def make_judge_run(
-        self, actor, scope=None, status=JudgeRun.Status.COMPLETED
+        self,
+        actor,
+        scope=None,
+        status=JudgeRun.Status.COMPLETED,
+        mode: str = "judge",
     ) -> JudgeRun:
         if scope is None:
             scope = self.component
@@ -1585,7 +1589,7 @@ class JudgeQueueStripViewTest(ViewTestCase):
             scope_id=str(scope.pk),
             scope_label=str(scope),
             scope_path=scope.get_absolute_url(),
-            requested_mode="judge",
+            requested_mode=mode,
             cap=10,
             status=status,
         )
@@ -1850,6 +1854,59 @@ class JudgeQueueStripViewTest(ViewTestCase):
                 )
             ),
             9,
+        )
+
+    def test_editor_recheck_and_drain_runs_stay_out_of_the_history(self) -> None:
+        # A one-string editor re-check and the deferred-retry drain pass are
+        # JudgeRun rows, but neither is a launch a producer comes back to a
+        # scope page to find. Listing them let the cheapest action in the
+        # product evict the most expensive one: on production ten
+        # ``id:<unit>`` re-checks filled the whole ten-row window and put a
+        # 462-string launch out of reach. Both excluded runs are newer than
+        # the launch here, so an unfiltered menu would show them first.
+        self.enable_review()
+        launch = self.make_judge_run(self.user)
+        now = timezone.now()
+        JudgeRun.objects.filter(pk=launch.pk).update(created=now - timedelta(minutes=5))
+        excluded = [
+            self.make_judge_run(self.user, scope=self.translation, mode="recheck"),
+            # The drain pass runs without an actor, as in production.
+            self.make_judge_run(None, scope=self.translation, mode="drain"),
+        ]
+        for offset, run in enumerate(excluded, start=1):
+            JudgeRun.objects.filter(pk=run.pk).update(
+                created=now + timedelta(minutes=offset)
+            )
+
+        response = self.client.get(self.component.get_absolute_url())
+        self.assertEqual(
+            [run.pk for run in response.context["judge_queue"]["runs"]], [launch.pk]
+        )
+        self.assertEqual(response.context["judge_queue"]["last_run"].pk, launch.pk)
+        for run in excluded:
+            report_url = reverse("judge-run", kwargs={"pk": run.pk})
+            self.assertNotContains(response, report_url)
+            # Kept out of the menu, never orphaned: the report itself still
+            # opens by URL, and the outcome is read on the string's card.
+            self.assertEqual(self.client.get(report_url).status_code, 200)
+
+    def test_translation_page_history_lists_launches_only(self) -> None:
+        # A re-check is translation-scoped, so the translation page is where
+        # it competes most directly with that translation's own launches.
+        self.enable_review()
+        launch = self.make_judge_run(self.user, scope=self.translation)
+        recheck = self.make_judge_run(self.user, scope=self.translation, mode="recheck")
+        now = timezone.now()
+        JudgeRun.objects.filter(pk=launch.pk).update(created=now - timedelta(minutes=1))
+        JudgeRun.objects.filter(pk=recheck.pk).update(created=now)
+
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertEqual(
+            [run.pk for run in response.context["judge_runs"]], [launch.pk]
+        )
+        self.assertEqual(response.context["judge_last_run"].pk, launch.pk)
+        self.assertNotContains(
+            response, reverse("judge-run", kwargs={"pk": recheck.pk})
         )
 
     def test_breakdown_button_only_with_zero_runs(self) -> None:
