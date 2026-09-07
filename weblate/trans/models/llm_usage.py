@@ -4,12 +4,14 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import ClassVar
 
 from django.core.exceptions import ValidationError
 from django.core.validators import DecimalValidator
 from django.db import models
+from django.db.models import Count, Q, Sum
 
 from weblate.trans.defines import COMPONENT_NAME_LENGTH, LANGUAGE_CODE_LENGTH
 
@@ -94,6 +96,13 @@ class LLMUsageLog(models.Model):
         blank=True,
         related_name="usage_logs",
     )
+    run = models.ForeignKey(
+        "trans.ProducerRun",
+        on_delete=models.deletion.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="usage_logs",
+    )
 
     class Meta:
         ordering: ClassVar[list[str]] = ["-created_at"]
@@ -105,6 +114,10 @@ class LLMUsageLog(models.Model):
             models.Index(
                 fields=["request_attempt", "-created_at"],
                 name="llm_usage_attempt_recent_idx",
+            ),
+            models.Index(
+                fields=["run", "-created_at"],
+                name="llm_usage_run_recent_idx",
             ),
             models.Index(
                 fields=[
@@ -122,6 +135,48 @@ class LLMUsageLog(models.Model):
     def __str__(self) -> str:
         return f"{self.model} {self.total_tokens} tokens ${self.cost_usd}"
 
+
+@dataclass(frozen=True)
+class RunSpend:
+    requests: int
+    unusable_requests: int
+    strings_sent: int
+    prompt_tokens: int
+    completion_tokens: int
+    reasoning_tokens: int
+    cached_tokens: int
+    cost_usd: Decimal
+    unpriced_requests: int
+
+
+def run_spend(run_id, operation: str) -> RunSpend:
+    totals = LLMUsageLog.objects.filter(run_id=run_id, operation=operation).aggregate(
+        requests=Count("id"),
+        unusable_requests=Count(
+            "id",
+            filter=Q(
+                outcome__in=(LLMUsageLog.Outcome.PARTIAL, LLMUsageLog.Outcome.REFUSED)
+            ),
+        ),
+        strings_sent=Sum("batch_size"),
+        prompt_tokens=Sum("prompt_tokens"),
+        completion_tokens=Sum("completion_tokens"),
+        reasoning_tokens=Sum("reasoning_tokens"),
+        cached_tokens=Sum("cached_tokens"),
+        cost_usd=Sum("cost_usd"),
+        unpriced_requests=Count("id", filter=Q(cost_usd__isnull=True)),
+    )
+    return RunSpend(
+        requests=totals["requests"] or 0,
+        unusable_requests=totals["unusable_requests"] or 0,
+        strings_sent=totals["strings_sent"] or 0,
+        prompt_tokens=totals["prompt_tokens"] or 0,
+        completion_tokens=totals["completion_tokens"] or 0,
+        reasoning_tokens=totals["reasoning_tokens"] or 0,
+        cached_tokens=totals["cached_tokens"] or 0,
+        cost_usd=totals["cost_usd"] or Decimal(0),
+        unpriced_requests=totals["unpriced_requests"] or 0,
+    )
 
 def recent_cost_range(
     project_id_snapshot: int, service: str, model: str, operation: str
