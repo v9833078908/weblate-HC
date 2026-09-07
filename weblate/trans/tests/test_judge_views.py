@@ -39,7 +39,6 @@ from weblate.trans.models.judge import (
     resolve_verdict,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog
-from weblate.trans.models.project import CommitPolicyChoices
 from weblate.trans.models.suggestion import Suggestion
 from weblate.trans.models.unit import Unit
 from weblate.trans.tasks import generate_judge_candidate
@@ -2277,6 +2276,7 @@ class JudgeRunReportViewTest(ViewTestCase):
             judge_model="vendor/model-a",
             seat=1,
             target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(unit.target),
             context_hash=judge_context_hash(unit),
             resolution=resolution,
         )
@@ -2295,6 +2295,7 @@ class JudgeRunReportViewTest(ViewTestCase):
             judge_model="vendor/model-a",
             seat=seat,
             target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(unit.target),
             context_hash=judge_context_hash(unit),
             errors=[
                 {
@@ -2361,6 +2362,100 @@ class JudgeRunReportViewTest(ViewTestCase):
         self.assertEqual(stats["repaired"], 1)
         self.assertEqual(stats["escalated"], 1)
         self.assertEqual(stats["accepted-as-is"], 0)
+        self.assertEqual(stats["changed-since-run"], 0)
+
+    def test_changed_since_run_is_an_overlay_not_a_fixed_outcome(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        critical_unit, passed_unit = list(self.translation.unit_set.all()[:2])
+
+        critical_verdict = self.make_verdict_with_error(
+            critical_unit, severity="critical", category="mistranslation"
+        )
+        passed_verdict = JudgeVerdict.objects.create(
+            unit=passed_unit,
+            max_severity=JudgeVerdict.Severity.NONE,
+            model_verdict=JudgeVerdict.Verdict.PASS,
+            judge_model="vendor/model-a",
+            seat=1,
+            target_hash=compute_target_hash(passed_unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(passed_unit.target),
+            context_hash=judge_context_hash(passed_unit),
+        )
+        critical_row = self.add_row(
+            run,
+            critical_unit,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+            verdict=critical_verdict,
+        )
+        passed_row = self.add_row(
+            run,
+            passed_unit,
+            outcome=JudgeRunUnit.Outcome.PASSED,
+            verdict=passed_verdict,
+        )
+        Unit.objects.filter(pk__in=[critical_unit.pk, passed_unit.pk]).update(
+            target="text changed after this report"
+        )
+
+        default = self.client.get(self.report_url(run))
+        self.assertEqual(default.context["counts"]["critical"], 1)
+        self.assertEqual(default.context["counts"]["passed"], 1)
+        self.assertEqual(default.context["counts"]["actionable"], 1)
+        self.assertEqual(default.context["triage"]["blocking"], 1)
+        self.assertEqual(default.context["counts"]["changed-since-run"], 2)
+        self.assertEqual(
+            [row.pk for row in default.context["page_obj"]], [critical_row.pk]
+        )
+
+        changed = self.client.get(
+            self.report_url(run), {"outcome": "changed-since-run"}
+        )
+        self.assertCountEqual(
+            [row.pk for row in changed.context["page_obj"]],
+            [critical_row.pk, passed_row.pk],
+        )
+
+    def test_hashless_verdict_is_not_classified_as_changed(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        row = self.add_row(
+            run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL, verdict=verdict
+        )
+        JudgeVerdict.objects.filter(pk=row.verdict_id).update(target_storage_hash=None)
+        Unit.objects.filter(pk=unit.pk).update(target="different but unknown")
+
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.context["counts"]["critical"], 1)
+        self.assertEqual(response.context["counts"]["changed-since-run"], 0)
+
+    def test_changed_since_run_disappears_when_the_target_is_restored(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL, verdict=verdict)
+        original = unit.target
+        Unit.objects.filter(pk=unit.pk).update(target="later text")
+        self.assertEqual(
+            self.client.get(self.report_url(run)).context["counts"][
+                "changed-since-run"
+            ],
+            1,
+        )
+        Unit.objects.filter(pk=unit.pk).update(target=original)
+        self.assertEqual(
+            self.client.get(self.report_url(run)).context["counts"][
+                "changed-since-run"
+            ],
+            0,
+        )
 
     def test_cached_evidence_appears_once_and_is_labeled_cached(self) -> None:
         self.enable_review()
@@ -2635,25 +2730,6 @@ class JudgeRunReportViewTest(ViewTestCase):
         self.assertNotContains(response, "outcome=cached")
         self.assertContains(response, "Matched 1")
 
-    def test_blocks_release_reflects_the_scope_project_commit_policy(
-        self,
-    ) -> None:
-        self.enable_review()
-        run = self.create_run()
-        self.add_row(
-            run, unit_id_snapshot=900220, outcome=JudgeRunUnit.Outcome.CRITICAL
-        )
-
-        self.project.commit_policy = CommitPolicyChoices.WITHOUT_NEEDS_EDITING
-        self.project.save(update_fields=["commit_policy"])
-        blocking_response = self.client.get(self.report_url(run))
-        self.assertTrue(blocking_response.context["triage"]["blocks_release"])
-
-        self.project.commit_policy = CommitPolicyChoices.ALL
-        self.project.save(update_fields=["commit_policy"])
-        shipping_response = self.client.get(self.report_url(run))
-        self.assertFalse(shipping_response.context["triage"]["blocks_release"])
-
     def test_blocking_excludes_critical_rows_accepted_as_is(self) -> None:
         self.enable_review()
         run = self.create_run()
@@ -2774,6 +2850,79 @@ class JudgeRunReportViewTest(ViewTestCase):
         self.assertContains(
             response, "The judge reply for this string could not be used."
         )
+
+    def test_row_marker_compares_with_the_verdict_target(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL, verdict=verdict)
+        Unit.objects.filter(pk=unit.pk).update(target="changed after judgement")
+
+        response = self.client.get(
+            self.report_url(run), {"outcome": "changed-since-run"}
+        )
+        [row] = response.context["page_obj"]
+        self.assertFalse(row.current_target_matches)
+        self.assertEqual(str(row.action), "Check the current verdict")
+        self.assertContains(response, "current text changed since this run")
+        self.assertNotContains(response, "Fix and re-check")
+
+    def test_hashless_marker_compares_with_the_final_run_snapshot(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        row = self.add_row(
+            run,
+            unit,
+            outcome=JudgeRunUnit.Outcome.UNPARSED,
+            input_target=["before automatic processing"],
+        )
+        # The run itself finished with the current text. A start-of-run comparison
+        # would mark this clean row stale; the final snapshot must not.
+        JudgeRunUnit.objects.filter(pk=row.pk).update(
+            after_target=unit.get_target_plurals()
+        )
+        clean = self.client.get(self.report_url(run), {"outcome": "unparsed"})
+        self.assertTrue(clean.context["page_obj"][0].current_target_matches)
+        self.assertNotContains(clean, "current text changed since this run")
+
+        Unit.objects.filter(pk=unit.pk).update(target="changed after completion")
+        changed = self.client.get(self.report_url(run), {"outcome": "unparsed"})
+        self.assertFalse(changed.context["page_obj"][0].current_target_matches)
+        self.assertContains(changed, "current text changed since this run")
+
+    def test_hero_card_separates_historical_and_changed_counts(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL, verdict=verdict)
+        Unit.objects.filter(pk=unit.pk).update(target="later target")
+
+        response = self.client.get(self.report_url(run))
+        self.assertContains(
+            response,
+            "1 critical outcome from this run still needs a producer decision.",
+        )
+        self.assertContains(response, "Open currently blocking strings")
+        self.assertContains(response, "1 string has changed since this run.")
+        self.assertContains(response, "?outcome=changed-since-run")
+        self.assertNotContains(response, "Fixed since this run")
+        self.assertNotContains(response, "needs a fix before release")
+
+    def test_static_outcome_labels_do_not_claim_current_state(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(run, self.get_unit(), outcome=JudgeRunUnit.Outcome.MAJOR)
+        response = self.client.get(self.report_url(run))
+        self.assertContains(response, "Run outcomes needing attention: 1")
+        self.assertContains(response, "Major in this run: 1")
+        self.assertNotContains(response, "Major not fixed")
 
 
 @override_settings(

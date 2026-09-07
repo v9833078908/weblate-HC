@@ -37,36 +37,35 @@
     </div>
     <div class="card-body">
       {% if triage.blocking %}
-        {% if triage.blocks_release %}
-          <p>
-            {% blocktranslate count counter=triage.blocking %}{{ counter }} string will not ship until you fix it.{% plural %}{{ counter }} strings will not ship until you fix them.{% endblocktranslate %}
-          </p>
-        {% else %}
-          <p>
-            {% blocktranslate count counter=triage.blocking %}{{ counter }} string is rejected and needs a fix before release.{% plural %}{{ counter }} strings are rejected and need a fix before release.{% endblocktranslate %}
-          </p>
-        {% endif %}
+        <p>
+          {% blocktranslate count counter=triage.blocking %}{{ counter }} critical outcome from this run still needs a producer decision.{% plural %}{{ counter }} critical outcomes from this run still need a producer decision.{% endblocktranslate %}
+        </p>
         {% if triage.top_category %}
           <p class="text-muted">
             {% blocktranslate with category=triage.top_category.label count counter=triage.top_category.count %}Biggest problem: {{ category }} ({{ counter }} string).{% plural %}Biggest problem: {{ category }} ({{ counter }} strings).{% endblocktranslate %}
           </p>
         {% endif %}
-        <a class="btn btn-primary" href="{{ blocking_review_url }}">{% translate "Open the blocking strings" %}</a>
+        <a class="btn btn-primary" href="{{ blocking_review_url }}">{% translate "Open currently blocking strings" %}</a>
       {% elif triage.major or triage.minor %}
-        <p>{% translate "Nothing is blocked from shipping." %}</p>
+        <p>{% translate "No critical outcome from this run awaits a decision." %}</p>
         <a class="btn btn-primary" href="{{ needs_review_url }}">{% translate "Open the flagged strings" %}</a>
       {% elif triage.needs_recheck %}
         <p>{% translate "The judge left no usable verdict for some strings." %}</p>
         <a class="btn btn-primary" href="{{ recheck_review_url }}">{% translate "Re-check them" %}</a>
       {% else %}
         <p>
-          {% blocktranslate count counter=triage.passed %}Nothing needs action. {{ counter }} string passed.{% plural %}Nothing needs action. {{ counter }} strings passed.{% endblocktranslate %}
+          {% blocktranslate count counter=triage.passed %}This run needed no action. {{ counter }} string passed.{% plural %}This run needed no action. {{ counter }} strings passed.{% endblocktranslate %}
         </p>
       {% endif %}
       {% if triage.candidates %}
         <a class="btn btn-outline-primary" href="?outcome=candidates">
           {% blocktranslate count counter=triage.candidates %}Review {{ counter }} suggested fix{% plural %}Review {{ counter }} suggested fixes{% endblocktranslate %}
         </a>
+      {% endif %}
+      {% if triage.changed_since_run %}
+        <p class="text-muted mt-2">
+          <a href="?outcome=changed-since-run">{% blocktranslate count counter=triage.changed_since_run %}{{ counter }} string has changed since this run. Check its current verdict.{% plural %}{{ counter }} strings have changed since this run. Check their current verdicts.{% endblocktranslate %}</a>
+        </p>
       {% endif %}
     </div>
   </div>

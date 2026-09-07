@@ -23,16 +23,19 @@ from urllib.parse import urlencode
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Case, CharField, Q, Value, When
-from django.db.models.functions import Cast
+from django.db.models import Case, CharField, F, Q, Value, When
+from django.db.models.functions import MD5, Cast
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy, pgettext_lazy
 
 from weblate.trans.models import Component, JudgeRun, JudgeRunUnit, Project, Translation
-from weblate.trans.models.judge import SEVERITY_RANK, JudgeVerdict
-from weblate.trans.models.project import CommitPolicyChoices
+from weblate.trans.models.judge import (
+    SEVERITY_RANK,
+    JudgeVerdict,
+    compute_target_storage_hash,
+)
 from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
@@ -73,12 +76,13 @@ _ACTIONABLE_OUTCOMES = (
 # order is display order. The report-local list uses the identical filter,
 # so a header count and its drill-down row count can never disagree.
 _OUTCOME_LABELS = {
-    "actionable": gettext_lazy("Needs action"),
-    "critical": gettext_lazy("Critical held"),
-    "major": gettext_lazy("Major not fixed"),
-    "minor": gettext_lazy("Minor noted"),
+    "actionable": gettext_lazy("Run outcomes needing attention"),
+    "critical": gettext_lazy("Critical in this run"),
+    "major": gettext_lazy("Major in this run"),
+    "minor": gettext_lazy("Minor in this run"),
     "unparsed": gettext_lazy("Unparsed"),
     "stale-conflict": gettext_lazy("Stale conflict"),
+    "changed-since-run": gettext_lazy("Changed since this run"),
     "candidates": gettext_lazy("Suggested fixes"),
     "repaired": gettext_lazy("Repaired"),
     "rolled-back": gettext_lazy("Rolled back"),
@@ -122,10 +126,20 @@ _SEVERITY_QUERY = {
 }
 
 
+def _changed_since_run(rows: QuerySet) -> QuerySet:
+    """Rows whose current target differs from this report's judged target."""
+    return rows.filter(
+        unit__isnull=False,
+        verdict__target_storage_hash__isnull=False,
+    ).exclude(verdict__target_storage_hash=MD5(F("unit__target")))
+
+
 def _filter_outcome(rows: QuerySet, key: str) -> QuerySet:
     """Apply one report bucket's filter. ``key`` must be pre-validated."""
     if key == "actionable":
         return rows.filter(outcome__in=_ACTIONABLE_OUTCOMES)
+    if key == "changed-since-run":
+        return _changed_since_run(rows)
     if key == "passed":
         return rows.filter(outcome=_OUTCOME.PASSED)
     if key == "candidates":
@@ -235,31 +249,6 @@ _ACTION_BY_OUTCOME = {
 }
 
 
-def _blocks_release(scope) -> bool:
-    """
-    Whether a held critical genuinely stops the string from shipping.
-
-    The export writes every state by default; FUZZY is excluded only under
-    WITHOUT_NEEDS_EDITING / APPROVED_ONLY (finding 2), so "will not ship"
-    may be claimed only when the policy actually says that. A Workspace
-    mixes projects: claim it only when every project in it blocks.
-    """
-    blocking_policies = {
-        CommitPolicyChoices.WITHOUT_NEEDS_EDITING,
-        CommitPolicyChoices.APPROVED_ONLY,
-    }
-    if isinstance(scope, Project):
-        return scope.commit_policy in blocking_policies
-    if isinstance(scope, Component):
-        return scope.project.commit_policy in blocking_policies
-    if isinstance(scope, Translation):
-        return scope.component.project.commit_policy in blocking_policies
-    policies = list(
-        Project.objects.filter(workspace=scope).values_list("commit_policy", flat=True)
-    )
-    return bool(policies) and all(policy in blocking_policies for policy in policies)
-
-
 def _annotate_row(row: JudgeRunUnit) -> None:
     """
     Compute the template-facing row fields.
@@ -268,9 +257,17 @@ def _annotate_row(row: JudgeRunUnit) -> None:
     component, project and verdict.
     """
     unit = row.unit
-    row.current_target_matches = (  # type: ignore[attr-defined]
-        unit is not None and unit.get_target_plurals() == row.input_target
-    )
+    verdict = row.verdict
+    if unit is None:
+        row.current_target_matches = False  # type: ignore[attr-defined]
+    elif verdict is not None and verdict.target_storage_hash:
+        row.current_target_matches = (  # type: ignore[attr-defined]
+            verdict.target_storage_hash == compute_target_storage_hash(unit.target)
+        )
+    else:
+        row.current_target_matches = (  # type: ignore[attr-defined]
+            unit.get_target_plurals() == row.after_target
+        )
     row.editor_url = unit.get_absolute_url() if unit is not None else ""  # type: ignore[attr-defined]
     if unit is None:
         row.source_text = ""  # type: ignore[attr-defined]
@@ -278,7 +275,7 @@ def _annotate_row(row: JudgeRunUnit) -> None:
     else:
         row.source_text = " / ".join(unit.get_source_plurals())  # type: ignore[attr-defined]
         row.target_text = " / ".join(unit.get_target_plurals())  # type: ignore[attr-defined]
-    primary = row.verdict.primary_error if row.verdict else None
+    primary = verdict.primary_error if verdict else None
     if primary is not None:
         label = _CATEGORY_LABELS.get(
             primary.get("category"), primary.get("category", "")
@@ -290,6 +287,8 @@ def _annotate_row(row: JudgeRunUnit) -> None:
         )
     if unit is None:
         row.action = ""  # type: ignore[attr-defined]
+    elif not row.current_target_matches:
+        row.action = gettext_lazy("Check the current verdict")  # type: ignore[attr-defined]
     elif row.repair_status == _REPAIR.CANDIDATE_STORED:
         row.action = gettext_lazy("Review the suggested fix")  # type: ignore[attr-defined]
     elif row.repair_status == _REPAIR.APPLIED:
@@ -488,10 +487,6 @@ def judge_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
         .count()
     )
     needs_recheck = counts["unparsed"] + counts["stale-conflict"]
-    # Does a critical actually hold the string back from export? Only under
-    # a restrictive commit policy (finding 2): the default policy still
-    # ships a rejected string, so the page must not claim otherwise.
-    blocks_release = _blocks_release(scope)
     categories = _category_rows(
         _filter_outcome(base_rows, "actionable").filter(
             outcome__in=(_OUTCOME.CRITICAL, _OUTCOME.MAJOR, _OUTCOME.MINOR)
@@ -512,7 +507,7 @@ def judge_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
         + counts["major"]
         + counts["minor"]
         + needs_recheck,
-        "blocks_release": blocks_release,
+        "changed_since_run": counts["changed-since-run"],
         "top_category": categories[0] if categories else None,
     }
 

@@ -1,6 +1,14 @@
 # Judge Run Report Current-text Overlay Plan
 
-**Status:** proposed, revised after source review; awaiting approval. Not started.
+**Status (2026-09-07):** code and docs for all four tasks are written and
+committed on `feat/judge-run-report-change-overlay`, but the plan is **not
+complete**: Task 3, Step 5 (the local browser pass over the hero card, the
+changed-since-run button, the per-row action and keyboard focus) has not been
+performed, so its acceptance criteria are unverified. No dev instance serves
+this worktree's code - the shared `dev-docker` stack mounts the main checkout -
+and standing up an isolated stack was not authorized. Automated verification
+ran host-side against the published PostgreSQL on `5434`: full judge
+regression `374 passed, 19 subtests`, no failures. Not deployed; no migration.
 
 ## Decision
 
