@@ -31083,3 +31083,54 @@ msgstr "Совпало %(matched)s &middot; проверено %(checked)s &midd
 #~ msgctxt "naturaltime"
 #~ msgid "%(delta)s from now"
 #~ msgstr "через %(delta)s"
+
+msgid "View run report"
+msgstr "Открыть отчёт прогона"
+
+msgid "Cost"
+msgstr "Стоимость"
+
+msgid "Requests sent"
+msgstr "Отправлено запросов"
+
+msgid "Strings sent"
+msgstr "Отправлено строк"
+
+msgid "Prompt tokens"
+msgstr "Токены запроса"
+
+msgid "Completion tokens"
+msgstr "Токены ответа"
+
+msgid "Price unknown for some requests; total is incomplete."
+msgstr "Цена некоторых запросов неизвестна; сумма неполная."
+
+msgid "What was written"
+msgstr "Что записано"
+
+msgid "No large language model was used by this run."
+msgstr "В этом запуске большая языковая модель не использовалась."
+
+msgid "Cost by language, provider, and model"
+msgstr "Стоимость по языку, провайдеру и модели"
+
+msgid "Language"
+msgstr "Язык"
+
+msgid "Provider"
+msgstr "Провайдер"
+
+msgid "Model"
+msgstr "Модель"
+
+msgid "USD"
+msgstr "USD"
+
+msgid "price unknown"
+msgstr "цена неизвестна"
+
+msgid "Estimated machine translation cost is unavailable."
+msgstr "Оценка стоимости машинного перевода недоступна."
+
+msgid "Automatic translation preview is unavailable. You can still apply this run."
+msgstr "Предпросмотр автоматического перевода недоступен. Запуск всё равно можно применить."
