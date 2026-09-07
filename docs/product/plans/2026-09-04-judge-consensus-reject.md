@@ -2,7 +2,8 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Status:** implemented on 2026-09-04, commits 33d2058..ccaae68; not yet deployed.
+**Status:** implemented on 2026-09-07 in commits 33d2058, f605b24, 8abb64f,
+ccaae68 (code) and f2a050e (docs); deployed on 2026-09-07.
 
 **Goal:** With the site-wide `JUDGE_CONSENSUS_REJECT` setting enabled (the
 default), a string is held (`REJECT` -> `STATE_FUZZY`, excluded from the
