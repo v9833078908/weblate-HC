@@ -27,8 +27,8 @@ fork. Upstream docs do NOT cover:
 - `WEBLATE_ADD_CHECK` / `WEBLATE_ADD_MACHINERY` env registration
   (`weblate/utils/environment.py`, folded into `CHECK_LIST` by
   `settings_docker.py`) instead of editing settings lists
-- `docs/product/` (all new fork documentation; plans, designs, measurements,
-  research, reviews, audits, reports, meetings, archive, vision, and guides;
+- `docs/product/`, `docs/operations/` (Russian fork docs; former
+  `docs/llm-first/` and `docs/guides/` are merged into `docs/product/`;
   layout rule in `AGENTS.md`, "Documentation layout")
 
 Any question touching these: read local files, not upstream.

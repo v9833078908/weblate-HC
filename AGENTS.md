@@ -14,7 +14,7 @@ inherited from the original codebase.
   modules or introducing a new subsystem. For such work, propose a plan - what
   will change, in which files, how it will be verified, what is out of scope -
   and wait for approval before editing. Multi-step plans go in the matching
-  `docs/product/plans/` directory (see "Documentation layout" below) following
+  `docs/<area>/plans/` directory (see "Documentation layout" below) following
   the existing files there.
 - Everything else needs no plan: answering questions, reading code, research,
   bug fixes, small or local changes, documentation edits, test additions, and
@@ -223,11 +223,11 @@ Repository-specific parts:
 - `weblate-mcp/` (gitignored, its own git repo) - vendored `@mmntm/weblate-mcp`,
   a NestJS MCP server that talks to the local Weblate REST API. Its `.env` points
   at `http://localhost:3001/api/`.
-- `docs/product/` - all new fork documentation (mostly in Russian) for
-  game-localization workflows. Plans, designs, measurements, research, reviews,
-  audits, reports, meetings, archive, vision, and guides all go here; see
-  "Documentation layout" below. Existing legacy files elsewhere are not
-  destinations for new fork documentation.
+- `docs/product/`, `docs/operations/` - fork documentation (mostly in Russian)
+  for game-localization workflows: `product` covers the fork and the LLM-first
+  TMS, `operations` covers live instances and individual games. Former
+  `docs/llm-first/` and `docs/guides/` were merged into `docs/product/`. See
+  "Documentation layout" below for the rule that decides where a file goes.
 - `analysis/probes/`, `analysis/data/` - one-off measurement scripts and the
   corpora, golden sets and run outputs they read and write. Not documentation:
   nothing here is part of the product, and both directories are excluded from
@@ -298,12 +298,22 @@ with `file` so local git repos can be used as translation sources.
 
 ## Documentation layout
 
-All new fork documentation lives under `docs/product/`. Use
-`docs/product/<genre>/<YYYY-MM-DD>-<slug>.md`; do not create new fork
-documents under `docs/llm-first/`, `docs/operations/`, or `docs/guides/`.
-Those locations are legacy locations for existing files. `docs/product/` is
-the sole destination for new fork documents, whether they describe the
-LLM-first roadmap, product behavior, operations, or evergreen guidance.
+New fork documentation lives in one of two areas:
+
+- `docs/product/` - everything about the fork itself and the LLM-first TMS:
+  the roadmap, judge, MT machinery, autofix layer, quality gates, loc-kit
+  intake, glossary UI, checks, exports, dev-environment work. This is the
+  default destination.
+- `docs/operations/` - work bound to a live instance or one game: production
+  tasks, LQA audits, reports, team meetings.
+
+Both vocabularies are closed. Do not create new documents under
+`docs/llm-first/` or `docs/guides/`: those areas were merged into
+`docs/product/` and no longer receive files.
+
+A dated document goes to `docs/<area>/<genre>/<YYYY-MM-DD>-<slug>.md`; a
+living document that is updated in place carries no date
+(`docs/product/guides/<slug>.md`, `docs/product/vision/<slug>.md`).
 
 | Genre | What belongs there |
 | --- | --- |
@@ -312,12 +322,12 @@ LLM-first roadmap, product behavior, operations, or evergreen guidance.
 | `measurements/` | numbers from a run: reproducible, dated |
 | `research/` | a synthesis of external sources or of another system |
 | `reviews/` | a review of a plan, design or change |
-| `audits/` | an LQA audit of a live component |
+| `audits/` | an LQA audit of a live component (`docs/operations/` only) |
 | `reports/` | a status or summary written for a human |
-| `meetings/` | material from a meeting with a game team |
+| `meetings/` | material from a meeting with a game team (`docs/operations/` only) |
 | `archive/` | superseded, kept for history |
-| `vision/` | vision and roadmap |
-| `guides/` | evergreen contracts and instructions, updated in place |
+| `vision/` | vision and roadmap (`docs/product/` only) |
+| `guides/` | evergreen contracts and instructions, undated, updated in place (`docs/product/` only) |
 
 Naming: directories are lowercase and hyphenated; a dated snapshot always
 carries its date first (`2026-08-24-slug.md`), a living document carries none;
