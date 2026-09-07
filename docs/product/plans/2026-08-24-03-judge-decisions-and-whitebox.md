@@ -10,11 +10,11 @@ and code-feasibility review. **Status:** proposed, awaiting implementation
 approval.
 
 **Series:** third slice of the judge UI series defined in
-`docs/llm-first/designs/2026-08-13-judge-native-ui-design.md` (row
+`docs/product/designs/2026-08-13-judge-native-ui-design.md` (row
 «3. Решения и белый ящик»), after:
 
-- `docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md` (implemented);
-- `docs/llm-first/plans/2026-08-22-02-judge-navigation-readiness.md`
+- `docs/product/plans/2026-08-13-01-judge-verdict-core.md` (implemented);
+- `docs/product/plans/2026-08-22-02-judge-navigation-readiness.md`
   (approved, implementation pending).
 
 **Dependency:** Plan 02 must land in full before this plan starts. Plan 03
@@ -1000,7 +1000,7 @@ git commit -m "feat(judge): query producer decision states"
 - Modify: `weblate/trans/tests/test_views.py`
 - Modify: `weblate/trans/tests/test_judge_views.py`
 - Modify: `weblate/trans/tests/test_remote.py`
-- Modify: `docs/llm-first/plans/2026-08-22-02-judge-navigation-readiness.md`
+- Modify: `docs/product/plans/2026-08-22-02-judge-navigation-readiness.md`
 
 ### Step 1: Write failing readiness/Delivery tests
 
@@ -1045,7 +1045,7 @@ git add \
   weblate/trans/tests/test_views.py \
   weblate/trans/tests/test_judge_views.py \
   weblate/trans/tests/test_remote.py \
-  docs/llm-first/plans/2026-08-22-02-judge-navigation-readiness.md
+  docs/product/plans/2026-08-22-02-judge-navigation-readiness.md
 git commit -m "feat(judge): drain held queue by producer decision"
 ```
 
@@ -1057,7 +1057,7 @@ git commit -m "feat(judge): drain held queue by producer decision"
 
 - Modify: `docs/user/translating.rst`
 - Modify: `docs/changes.rst`
-- Modify: `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md`
+- Modify: `docs/product/designs/2026-08-13-judge-native-ui-design.md`
 - Review and modify only if its stated conditions apply:
   `docs/security/threat-model.rst`
 - Modify only implementation/test files required by in-scope review fixes
@@ -1138,7 +1138,7 @@ Stage only files actually changed:
 
 ```bash
 git add docs/user/translating.rst docs/changes.rst \
-  docs/llm-first/designs/2026-08-13-judge-native-ui-design.md
+  docs/product/designs/2026-08-13-judge-native-ui-design.md
 git commit -m "docs(judge): document producer decisions and whitebox"
 git status --short
 git push

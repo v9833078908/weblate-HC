@@ -9,14 +9,14 @@
 
 Основание:
 
-- `docs/llm-first/measurements/2026-08-14-st2-zh-judge-run.md` (прогон без
+- `docs/product/measurements/2026-08-14-st2-zh-judge-run.md` (прогон без
   глоссария, ручная разметка, прогон с глоссарием)
 - `analysis/data/st2-zh-judge-annotations.json` (разметка и ground truth)
-- `docs/llm-first/measurements/2026-08-13-phase0-measurements.md` (израсходованный
+- `docs/product/measurements/2026-08-13-phase0-measurements.md` (израсходованный
   срез, рекомендация 7)
-- `docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md` (задача 5 —
+- `docs/product/plans/2026-08-13-01-judge-verdict-core.md` (задача 5 —
   обязательный `description`)
-- `docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md`
+- `docs/product/plans/2026-08-14-intra-component-consistency-check.md`
   (глоссарный чек включается до калибровки)
 
 ## Постановка
@@ -47,7 +47,7 @@
 второе — и оно должно выполниться раньше:
 
 1. **`check_glossary` включён на компоненте калибровки.** План:
-   `docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md`, задача 1.
+   `docs/product/plans/2026-08-14-intra-component-consistency-check.md`, задача 1.
    Без этого судья получает в промпте инструкцию «не переоткрывай
    `checks`», но самих checks нет — и работает вхолостую.
 2. **Обязательное поле `description`** (план 1, задача 5). Любое
@@ -169,7 +169,7 @@
 
 - [ ] `check_glossary` включён, глоссарий наполнен и починен по
       гранулярности.
-- [ ] `docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md`
+- [ ] `docs/product/plans/2026-08-11-glossary-morphological-enforcement.md`
       задачи 1-2 отгружены **до** запечатывания среза: стем-матчер
       меняет состав глоссария в промпте (замерено на S&T2: 106 -> 206
       пар), и срез, запечатанный до него, будет израсходован впустую.
@@ -188,7 +188,7 @@
 
 | Пункт | Куда |
 |---|---|
-| Межстрочная согласованность | `docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md` |
-| Реализация судьи в продукте | `docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md` |
+| Межстрочная согласованность | `docs/product/plans/2026-08-14-intra-component-consistency-check.md` |
+| Реализация судьи в продукте | `docs/product/plans/2026-08-13-01-judge-verdict-core.md` |
 | Цель auto-pass ≥90% | несовместима с корпусом; переписывание — решение владельца |
 | Прод-прогон backfill автофиксов `--apply` | предусловие боевого прогона |

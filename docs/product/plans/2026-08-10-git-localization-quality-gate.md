@@ -116,7 +116,7 @@ false positives and existing findings are zero. Do not create a permanent
 baseline that silently accepts new defects.
 
 Two constraints on this promotion path follow from the Cathedral comparison
-(`docs/llm-first/research/2026-08-11-cathedral-localizer-analysis.md`) and from the
+(`docs/product/research/2026-08-11-cathedral-localizer-analysis.md`) and from the
 verified glossary check semantics:
 
 - LLM judge results enter `validation-report.json` only through the closed,
@@ -600,7 +600,7 @@ Cover:
 For `corpus.inconsistent-translation`, take regression fixtures from the
 measured col4/fr drift corpus: 84 of 146 repeated-source groups render
 differently while the stock Weblate `inconsistent` check flags none of them
-(`docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md`).
+(`docs/product/plans/2026-08-14-intra-component-consistency-check.md`).
 
 Use the measured defects as regression fixtures:
 
@@ -637,7 +637,7 @@ data with explicit tests matching Weblate's current punctuation-spacing
 behavior. Group repeated-source units in one component to find inconsistent
 translations, and keep the grouping key and source normalization in a single
 helper inside this validation package: the planned Weblate-side repeat-drift
-check (`docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md`)
+check (`docs/product/plans/2026-08-14-intra-component-consistency-check.md`)
 must import that helper rather than re-derive the groups, the same way the
 custom autofixes import the separator regexes from the custom checks. Two
 implementations of the grouping are exactly the authoring/enforcement drift
@@ -1671,7 +1671,7 @@ workflow is verified. Never repair a failed cutover by force-pushing `main`.
 
 **Files:**
 
-- Modify: `docs/guides/producer-guide.md`
+- Modify: `docs/product/guides/producer-guide.md`
 - Modify: `deploy/README.md`
 - Modify: `docs/changes.rst`
 - Review: `docs/security/threat-model.rst`
@@ -1737,7 +1737,7 @@ uv run prek run --files \
   deploy/environment.example \
   deploy/Dockerfile \
   deploy/vps.sh \
-  docs/guides/producer-guide.md \
+  docs/product/guides/producer-guide.md \
   deploy/README.md \
   docs/changes.rst
 ```
@@ -1763,7 +1763,7 @@ The final implementation is complete only when all of these are observed:
 
 ```bash
 git add \
-  docs/guides/producer-guide.md \
+  docs/product/guides/producer-guide.md \
   deploy/README.md \
   docs/changes.rst
 git commit -m "docs(localization): document Git delivery and release gates"

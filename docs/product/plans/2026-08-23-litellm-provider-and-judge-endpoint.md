@@ -7,10 +7,10 @@ proxy, but the configured second judge seat `qwen/qwen3-235b-a22b-2507` does not
 exist there, and an available qwen candidate fails strict parsing and also fails
 with no HTTP status at ~30.5 s. Under step 4 no model was substituted; the next
 move is an R3 eval, not a seat swap. Measured in
-`docs/llm-first/measurements/2026-08-26-litellm-preflight.md`. The containerised
+`docs/product/measurements/2026-08-26-litellm-preflight.md`. The containerised
 deployment in step 1 and the production rollout remain pending.
 **Realizes:** the phase-4 roadmap item "Переезд судьи на корпоративный
-LiteLLM-прокси" (`docs/llm-first/vision/llm-first-product-architecture.md:660-676`)
+LiteLLM-прокси" (`docs/product/vision/llm-first-product-architecture.md:660-676`)
 plus a second routed machinery provider so machine translation can also run
 through the corporate proxy.
 
@@ -335,7 +335,7 @@ stop after Task 6.
 4. If any route or seat fails, stop. Do not substitute a model or weaken the
    schema; record the result and start the R3 eval path.
 5. Only after success, mark the phase-4 endpoint increment implemented in
-   `docs/llm-first/vision/llm-first-product-architecture.md` and commit/push
+   `docs/product/vision/llm-first-product-architecture.md` and commit/push
    that status update separately. Task 7 never holds the implementation commit
    from Task 6 hostage.
 

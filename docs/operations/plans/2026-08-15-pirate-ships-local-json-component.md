@@ -100,8 +100,8 @@ Handoff directory и CSV-компонент не меняются. JSON bytes, v
 После production validation закоммитить и запушить только:
 
 - этот execution record;
-- удаление `docs/llm-first/archive/2026-08-10-llm-first-p1-setup.md`;
-- новый `docs/llm-first/plans/2026-08-15-llm-first-auto-translation-rollout.md`.
+- удаление `docs/product/archive/2026-08-10-llm-first-p1-setup.md`;
+- новый `docs/product/plans/2026-08-15-llm-first-auto-translation-rollout.md`.
 
 Перед commit выполнить `git diff --check` и целевые documentation hooks.
 

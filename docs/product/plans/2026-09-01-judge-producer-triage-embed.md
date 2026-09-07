@@ -24,7 +24,7 @@ unresolved `REJECT` is still held.
 (Bootstrap/jQuery), pytest, Docker Compose dev instance.
 
 **Research:**
-`docs/llm-first/research/2026-09-01-judge-producer-triage-embed-research.md`.
+`docs/product/research/2026-09-01-judge-producer-triage-embed-research.md`.
 Product decision 2026-09-01 supersedes that document's sequencing: Solution 3
 is a first-increment requirement. The smallest safe increment therefore
 contains Solution 1, the one-unit re-check substrate from Solution 2, and the
@@ -32,7 +32,7 @@ stored-candidate lifecycle from Solution 3.
 
 **Status:** implemented (Tasks 1-11 complete, all 11 commits) and **merged to
 `main`** as `e499e7e`, alongside the availability fallback of
-`docs/llm-first/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`.
+`docs/product/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`.
 Both features verified green together on merged `main`: 486 passed, 47
 subtests, zero failures across all seven judge test files. Not deployed. One
 migration shipped for the `candidate-stored` audit choice on the existing
@@ -236,7 +236,7 @@ major rewrite lands on a shipping human translation, guarded only by
 deterministic-check regression (`judge_loop.py:466-471`) and a second opinion
 from the same seats that raised the flag, on a signal whose measured precision
 at `>=major` is 0.51-0.54
-(`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:68-79`).
+(`docs/product/measurements/2026-08-19-severity-recalibration-final.md:68-79`).
 The severity policy already states majors are mostly false positives or matters
 of taste and should ship with evidence rather than be blocked
 (`models/judge.py:702-707`); auto-rewriting them contradicts that rationale.
@@ -462,7 +462,7 @@ Commit: `feat(judge): add conservative hand-off readiness`.
 
 - `docs/admin/checks.rst`
 - `docs/changes.rst`
-- `docs/guides/producer-guide-weblate.md`
+- `docs/product/guides/producer-guide-weblate.md`
 - review and modify if required: `docs/security/threat-model.rst`
 
 Document that this is judge-guided repair MT, not literal text from a judge

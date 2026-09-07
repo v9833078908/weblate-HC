@@ -302,9 +302,9 @@ Source | Target | Context | Note | Rule
 
 Есть только calibration scripts и design docs:
 
-- `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md`;
-- `docs/llm-first/measurements/2026-08-14-st2-zh-judge-run.md`;
-- `docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md`;
+- `docs/product/designs/2026-08-13-judge-native-ui-design.md`;
+- `docs/product/measurements/2026-08-14-st2-zh-judge-run.md`;
+- `docs/product/plans/2026-08-13-01-judge-verdict-core.md`;
 - `analysis/probes/col4-judge-eval.py`;
 - `analysis/probes/st2-judge-experiment.py`.
 
@@ -576,15 +576,15 @@ run и языком. Не следует использовать его как 
 
 ### Связанные исследования и дизайны
 
-- `docs/llm-first/vision/llm-first-product-architecture.md`;
-- `docs/llm-first/vision/2026-08-10-llm-first-product-research.md`;
-- `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md`;
-- `docs/llm-first/measurements/2026-08-13-phase0-measurements.md`;
-- `docs/llm-first/measurements/2026-08-14-st2-zh-judge-run.md`;
-- `docs/llm-first/reviews/2026-08-11-llm-prompt-and-pipeline-review.md`;
-- `docs/guides/producer-guide.md`;
-- `docs/guides/continuous-localization-loop.md`;
-- `docs/guides/loc-kit-ingest.md`.
+- `docs/product/vision/llm-first-product-architecture.md`;
+- `docs/product/vision/2026-08-10-llm-first-product-research.md`;
+- `docs/product/designs/2026-08-13-judge-native-ui-design.md`;
+- `docs/product/measurements/2026-08-13-phase0-measurements.md`;
+- `docs/product/measurements/2026-08-14-st2-zh-judge-run.md`;
+- `docs/product/reviews/2026-08-11-llm-prompt-and-pipeline-review.md`;
+- `docs/product/guides/producer-guide.md`;
+- `docs/product/guides/continuous-localization-loop.md`;
+- `docs/product/guides/loc-kit-ingest.md`.
 
 ## 12. Проверка выводов
 

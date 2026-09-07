@@ -623,7 +623,7 @@ class JudgeWorkflowCommandTest(ComponentTestCase):
 
 class JudgeReleaseAdvisoryHoldsCommandTest(ComponentTestCase):
     """
-    Task 4 of docs/llm-first/plans/2026-08-25-02-judge-run-history-and-resolution-follow-up.md.
+    Task 4 of docs/product/plans/2026-08-25-02-judge-run-history-and-resolution-follow-up.md.
 
     Builds the exact "legacy advisory hold" shape by hand: a unit at
     STATE_NEEDS_CHECKING whose newest Change is the automatic transition
@@ -925,7 +925,7 @@ class JudgeReleaseAdvisoryHoldsCommandTest(ComponentTestCase):
 
 
 class JudgeBackfillCandidatesCommandTest(ComponentTestCase):
-    """Task 8 of docs/llm-first/plans/2026-09-02-producer-editor-pareto.md."""
+    """Task 8 of docs/product/plans/2026-09-02-producer-editor-pareto.md."""
 
     def setUp(self) -> None:
         super().setUp()

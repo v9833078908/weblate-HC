@@ -6,7 +6,7 @@
 ru->fr, interleaved 5 critical / 5 major / 5 clean. The `test` split (433) and
 `st2-zh-groundtruth.json` were not touched: both are reserved for decisions, and
 exposing them to candidate selection is the post-selection bias the two-stage
-design in `docs/llm-first/plans/2026-08-27-judge-set-ab-openrouter-vs-litellm.md`
+design in `docs/product/plans/2026-08-27-judge-set-ab-openrouter-vs-litellm.md`
 exists to prevent.
 
 Production path throughout: payload built with the judge's own `_segment`,

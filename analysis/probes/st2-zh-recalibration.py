@@ -6,7 +6,7 @@
 """
 Severity recalibration on the sealed zh_Hans slice (S&T2 summer-update, 124 units).
 
-Executes plan docs/llm-first/plans/2026-08-14-judge-severity-recalibration.md,
+Executes plan docs/product/plans/2026-08-14-judge-severity-recalibration.md,
 track 2. Three arms, all with the project glossary in the prompt and the
 "conformance necessary but never sufficient" rule (settled by the 2026-08-14
 run):
@@ -19,7 +19,7 @@ run):
                       tests whether judge-invisible render defects, 24207-class,
                       become visible when the judged artifact is the rendered string)
 
-Plan docs/llm-first/plans/2026-08-20-judge-prompt-universalization.md adds three
+Plan docs/product/plans/2026-08-20-judge-prompt-universalization.md adds three
 more arms on the same corpus and the same gates. They carry the universal prompt
 that is meant to ship, so their payload and schema follow the product
 (weblate/trans/judge.py) rather than arm D: production field names, the data
@@ -183,7 +183,7 @@ placeholder string looks plausible."""
 UNIVERSAL_ARMS = ("E", "F", "G")
 
 # Arms E/F/G: the universal prompt (plan
-# docs/llm-first/plans/2026-08-20-judge-prompt-universalization.md). Neutral to
+# docs/product/plans/2026-08-20-judge-prompt-universalization.md). Neutral to
 # genre, platform and engine; the setting arrives in {project_context}. The text
 # below is what ships in weblate/trans/judge_prompts/verdict.txt, so the arm and
 # the product cannot drift. Two deviations from arm D are forced by that

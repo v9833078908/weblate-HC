@@ -91,7 +91,7 @@ writer кладёт их в `termEntry@weblate-flags` (`loc_kit_ingest/writer.py
 
 ## Задача 3. Документация
 
-- `docs/guides/producer-guide-weblate.md`: в разделе про UI и диалоги в одном
+- `docs/product/guides/producer-guide-weblate.md`: в разделе про UI и диалоги в одном
   ките заменить «нужны два проекта ради разного тона» на поле компонента.
 - `docs/changes.rst`: запись в текущий неизданный раздел.
 - `docs/security/threat-model.rst`: проверить, срабатывает ли хоть одно из

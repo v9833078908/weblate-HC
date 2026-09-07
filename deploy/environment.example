@@ -162,7 +162,7 @@ WEBLATE_JUDGE_MAY_APPROVE=0
 # `extra_body.enable_thinking=false` reaches the upstream deployment.
 # Seat 2 uses it: 12x faster with equal-or-better recall. Seat 1 does not:
 # the same shape works but costs recall, so DeepSeek keeps its reasoning.
-# docs/llm-first/measurements/2026-09-03-judge-thinking-passthrough.md
+# docs/product/measurements/2026-09-03-judge-thinking-passthrough.md
 WEBLATE_JUDGE_REASONING_EFFORT=
 WEBLATE_JUDGE_RESPONSE_FORMAT=json_schema
 WEBLATE_JUDGE_STREAM=0

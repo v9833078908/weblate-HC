@@ -54,7 +54,7 @@ tradeoff). None of the 12 produced an invariant violation or a bounty-key regres
 ## Reading these zeros
 
 The component is 100% translated and was fully repaired on 2026-08-24
-(`docs/llm-first/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md`), so zero firings
+(`docs/product/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md`), so zero firings
 under both implementations is the expected outcome for a clean component, not a null result:
 it confirms no regression on real translations, including the 12 real CJK-run targets this
 plan's design specifically had to get right. It does not exercise the abbreviation

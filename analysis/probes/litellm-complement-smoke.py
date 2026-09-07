@@ -18,7 +18,7 @@ This is a **smoke, not a measurement**. n = 1, 15 units, one repeat. It can
 disqualify a candidate (unparsed, flags everything, misses everything) and it
 can rank candidates coarsely. It cannot decide the migration: that needs the
 registered two-stage run in
-`docs/llm-first/plans/2026-08-27-judge-set-ab-openrouter-vs-litellm.md`.
+`docs/product/plans/2026-08-27-judge-set-ab-openrouter-vs-litellm.md`.
 
 Corpus discipline. Units come **only** from the `dev` split of
 `analysis/data/col4-judge-golden.json`. The `test` split (433 records) stays
@@ -121,7 +121,7 @@ def thinking_payload(model: str) -> dict:
 
 # A transport failure is not a model verdict, and this proxy produces them
 # (~30.5 s silent reset, measured in
-# docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md).
+# docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md).
 # Three attempts with backoff, because two back-to-back attempts both landed on
 # the reset in the first run of this probe.
 ATTEMPTS = 3

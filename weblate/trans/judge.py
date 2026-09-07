@@ -54,7 +54,7 @@ PROMPT_SCHEMA_REVISION = "judge-verdict-v3"
 # rejected with HTTP 500, and a bare `thinking` is accepted and then silently
 # dropped, which is why two seats configured "off" kept reporting ~90%
 # reasoning tokens. See
-# docs/llm-first/measurements/2026-09-03-judge-thinking-passthrough.md.
+# docs/product/measurements/2026-09-03-judge-thinking-passthrough.md.
 _LITELLM_REASONING_VALUES = frozenset(
     {
         "",

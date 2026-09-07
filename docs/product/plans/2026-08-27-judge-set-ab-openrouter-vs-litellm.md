@@ -41,7 +41,7 @@ and in exactly two, because seat 1 is held identical:
 **Seat 1 sends no reasoning field in any arm**, so the model runs its own
 default thinking on both gateways. That is the configuration the 12-of-12,
 17–23 s result was measured under
-(`docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md:141-146`:
+(`docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md:141-146`:
 `EFFORT=""` sends no reasoning field and the default applies). Writing "reasoning
 on" for seat 1 would describe the same request while implying an explicit
 setting, and an explicit setting on one side only would add a third varying
@@ -102,7 +102,7 @@ Two consequences, and the second is the one that reshapes this plan:
    belongs to the model, not the slot".
 2. **No model's membership is assumed, including `deepseek-v4-pro`'s.** On
    zh_Hans it is the weaker member by a wide margin
-   (`docs/llm-first/plans/2026-08-26-judge-seat-pair-search.md:24-33`, arm H,
+   (`docs/product/plans/2026-08-26-judge-seat-pair-search.md:24-33`, arm H,
    n = 5):
 
 | arm H, zh_Hans | missed_crit | REAL@14 | FP | noise |
@@ -154,7 +154,7 @@ evidence class stated — none of it substitutes for stage 1:
 | `atlas_glm-5.1` | stage 0 3/3 at 7.4–15.0 s; stage 3 2 parsed / 3 reset | **none** | off |
 
 Four candidates give six pairs. Sources:
-`docs/llm-first/measurements/2026-08-26-litellm-stage0-compatibility.md`,
+`docs/product/measurements/2026-08-26-litellm-stage0-compatibility.md`,
 `…-judge-seat-pair-search-stage3.md:68-84,119-133`,
 `…-litellm-transport-reset-rate.md:61-146`.
 
@@ -163,7 +163,7 @@ Three unresolved qualifications:
 - The `qwen3.8-max` judgment row is a **single unrepeated run on a 15-unit
   slice**, and its source document explicitly refuses to read it as a
   clearance. An earlier sample recorded the same model at 0/5 parseable
-  (`docs/llm-first/archive/2026-08-26-litellm-judge-seat-r3-eval.md:69-70`);
+  (`docs/product/archive/2026-08-26-litellm-judge-seat-r3-eval.md:69-70`);
   that row measured its default thinking mode, which resets at ~30.5 s, so it
   is superseded rather than contradictory.
 - **The vendor documents that the mode this proxy forces is the less reliable
@@ -273,7 +273,7 @@ pair's.
 | **B** | stage-1 winner | LiteLLM | the migration candidate |
 
 A2 and A3 are drawn from the per-model table in
-`docs/llm-first/measurements/judge-measurements-index.md:16-20`. Those
+`docs/product/measurements/judge-measurements-index.md:16-20`. Those
 published numbers are what makes them worth registering; they are **not** the
 comparison. Under R3 they came from a different payload, so every arm here is
 re-measured in this session.
@@ -339,7 +339,7 @@ Two things must exist in the product before stage 1:
 - **Per-slot reasoning effort**, so the mode map can be expressed at all:
   `JUDGE_REASONING_EFFORT_SEAT_1` / `_SEAT_2`, each falling back to the endpoint
   value when empty
-  (`docs/llm-first/plans/2026-08-26-judge-provider-failover.md:154-161`). The
+  (`docs/product/plans/2026-08-26-judge-provider-failover.md:154-161`). The
   knob is per slot; the *value* comes from the model's row in the mode map.
 - **The vendor thinking toggle for LiteLLM hosts.** It is vendor-specific —
   `enable_thinking` for Qwen, `thinking.type` for DeepSeek, GLM and Kimi — so
@@ -470,10 +470,10 @@ on **the same VPS as this Weblate** (`/home/dev01/localization`, containers
 same proxy host** with `ACTIVE_AI_PROVIDER=litellm`,
 `LITELLM_MODEL=deepseek-ai/deepseek-v4-flash` and
 `LITELLM_REVIEW_MODEL=QWEN3.7-plus`
-(`docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md:14-19`,
+(`docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md:14-19`,
 read from `/app/litellm_api_helper.py` and `/app/.env` in the running
 container; the system itself is analysed in
-`docs/llm-first/research/2026-08-11-cathedral-localizer-analysis.md`).
+`docs/product/research/2026-08-11-cathedral-localizer-analysis.md`).
 
 **What it proves:** the proxy carries this workload in production, on a
 DeepSeek + Qwen combination, continuously. The transport objection that stopped
@@ -483,7 +483,7 @@ the earlier seat search is not a property of the host.
 translator plus a reviewer in a cascade, not a two-seat collegium of equals, and
 a plan that hard-coded "DeepSeek + Qwen because cathedral uses them" would be
 choosing by analogy — precisely what R3 forbids
-(`docs/llm-first/plans/2026-08-26-judge-provider-failover.md:41-43`). Its
+(`docs/product/plans/2026-08-26-judge-provider-failover.md:41-43`). Its
 default route, `deepseek-ai/deepseek-v4-flash`, returns **403 on our key**.
 
 **Where it is directly useful — request discipline.** The two systems differ on

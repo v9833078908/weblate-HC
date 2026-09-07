@@ -3,7 +3,7 @@
 Дата: 2026-08-24. Инстанс: dev. Прод не трогался.
 
 Вопрос: верна ли гипотеза плана
-`docs/llm-first/archive/2026-08-24-glossary-check-no-space-languages.md` — что
+`docs/product/archive/2026-08-24-glossary-check-no-space-languages.md` — что
 шум `check-glossary` есть свойство флективных языков, а в ja/ko/th/zh_Hans/vi
 чек пригоден для панели. План заархивирован по результату этого замера.
 
@@ -78,7 +78,7 @@ Space Arena на 300 терминов состоит из общеупотреб
 
 Контраст, который это подтверждает: st2 `summer-update`, глоссарий **30**
 специфичных терминов — 5 срабатываний на 124 юнита, 0 ложных
-(`docs/llm-first/measurements/2026-08-18-severity-recalibration-status.md`).
+(`docs/product/measurements/2026-08-18-severity-recalibration-status.md`).
 Dev `heart-abyss/temple/en`, глоссарий **12** терминов — 4 срабатывания на 676
 юнитов, 0.6 %.
 

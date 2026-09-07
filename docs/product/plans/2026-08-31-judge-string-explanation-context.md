@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python, Django models, dataclasses, JSON prompt payloads, unittest/pytest.
 
-**Design:** `docs/llm-first/designs/2026-08-31-judge-string-explanation-context.md`.
+**Design:** `docs/product/designs/2026-08-31-judge-string-explanation-context.md`.
 
 **Status (2026-08-31): implemented and verified at `98a0b57`.** The focused
 Judge suite passes 370 tests plus 9 subtests; the Judge management-command
@@ -133,7 +133,7 @@ git commit -m "fix(judge): invalidate verdicts on explanation changes"
 **Files:**
 
 - Modify: `docs/changes.rst`
-- Modify: `docs/guides/continuous-localization-loop.md`
+- Modify: `docs/product/guides/continuous-localization-loop.md`
 
 ### Step 1: Update documentation
 
@@ -142,7 +142,7 @@ Document that the Judge receives both file-derived developer notes and producer-
 ### Step 2: Run scoped lint and focused tests
 
 ```bash
-uv run prek run --files weblate/trans/judge.py weblate/trans/judge_loop.py weblate/trans/models/judge.py weblate/trans/judge_prompts/verdict.txt weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_client.py weblate/trans/tests/test_judge_loop.py weblate/trans/tests/test_judge_round.py weblate/trans/tests/test_judge_views.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_commands.py weblate/checks/tests/test_judge.py docs/changes.rst docs/guides/continuous-localization-loop.md
+uv run prek run --files weblate/trans/judge.py weblate/trans/judge_loop.py weblate/trans/models/judge.py weblate/trans/judge_prompts/verdict.txt weblate/trans/tests/test_judge.py weblate/trans/tests/test_judge_client.py weblate/trans/tests/test_judge_loop.py weblate/trans/tests/test_judge_round.py weblate/trans/tests/test_judge_views.py weblate/trans/tests/test_judge_autotranslate.py weblate/trans/tests/test_commands.py weblate/checks/tests/test_judge.py docs/changes.rst docs/product/guides/continuous-localization-loop.md
 ```
 
 Expected: PASS.
@@ -150,7 +150,7 @@ Expected: PASS.
 ### Step 3: Commit
 
 ```bash
-git add docs/changes.rst docs/guides/continuous-localization-loop.md
+git add docs/changes.rst docs/product/guides/continuous-localization-loop.md
 git commit -m "docs(judge): document string explanation context"
 ```
 

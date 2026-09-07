@@ -220,5 +220,5 @@ description, comment, or explanation, or supply an explicit profile
   «Партия» заполнено Explanation. Не вызывать автоперевод: сквозной
   контракт `source_explanation` проверяет детерминированный тест визарда через
   `BaseLLMTranslation._get_glossary_entry`.
-- `docs/guides/loc-kit-ingest.md`, раздел вывода профиля; запись в
+- `docs/product/guides/loc-kit-ingest.md`, раздел вывода профиля; запись в
   `docs/changes.rst`.

@@ -11,14 +11,14 @@
   качестве, либо максимально прозрачный процесс. «Человек ревьюит
   low-confidence строки» из ресеча — персона, которой не существует.
 - Ревизия LLM-пути по коду:
-  `docs/llm-first/reviews/2026-08-11-llm-prompt-and-pipeline-review.md`.
+  `docs/product/reviews/2026-08-11-llm-prompt-and-pipeline-review.md`.
 - Замер глоссарного гейта:
-  `docs/llm-first/measurements/2026-08-11-glossary-enforcement-analysis.md` и план
-  `docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md`.
+  `docs/product/measurements/2026-08-11-glossary-enforcement-analysis.md` и план
+  `docs/product/plans/2026-08-11-glossary-morphological-enforcement.md`.
 - План релизного гейта:
-  `docs/llm-first/plans/2026-08-10-git-localization-quality-gate.md`.
+  `docs/product/plans/2026-08-10-git-localization-quality-gate.md`.
 - Три исследования 2026-08-11 (полные отчёты с источниками в
-  `docs/llm-first/research/`): дизайн LLM-судьи
+  `docs/product/research/`): дизайн LLM-судьи
   (`2026-08-11-llm-judge-design-research.md`), UX конкурентов
   (`2026-08-11-judge-ux-competitor-research.md`), поверхности
   интеграции в UI Weblate
@@ -96,7 +96,7 @@ EVENT_CHANGE. Дефолты: `mode=suggest`, `auto_source=others` (память
    подключён к игровым чекам.
 6. LLM виден в UI только как вкладка suggestions — опция, не дефолтный поток.
 
-### Архивные планы (docs/llm-first/archive/)
+### Архивные планы (docs/product/archive/)
 
 - `llm-judge-external-pipeline.md` — доархитектурный черновик внешнего
   LLM-judge. Его факты о REST-курсорe, хэше target, идемпотентности и
@@ -107,7 +107,7 @@ EVENT_CHANGE. Дефолты: `mode=suggest`, `auto_source=others` (память
   НЕ реализован.
 - `2026-08-05-routed-llm-machinery.md` (+ design) — RoutedLLMTranslation.
   РЕАЛИЗОВАН.
-- `docs/guides/continuous-localization-loop.md` — полный цикл
+- `docs/product/guides/continuous-localization-loop.md` — полный цикл
   git -> Weblate -> git с рекомендациями по addon'ам.
 
 ---
@@ -286,7 +286,7 @@ IPE (Intelligent Post-Editing) — автоматический LLM-шаг до�
 > на падеже термин отсутствует и в его промпте. Каскад дал recall
 > 72.9% [64.2, 80.1] на терминологии даже когда термин в промпте есть.
 > Владелец класса — слой 0:
-> `docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md`.
+> `docs/product/plans/2026-08-11-glossary-morphological-enforcement.md`.
 >
 > Части 1-3, 5 и 6 остаются в силе.
 
@@ -332,7 +332,7 @@ IPE (Intelligent Post-Editing) — автоматический LLM-шаг до�
    сигнал. Литература единодушна: RTT как оценщик ненадёжен — ошибки
    гасятся в round-trip, парафраз даёт ложные тревоги (WMT22 QE, ACL
    2023). Это заменяет основной критерий архивного черновика
-   `docs/llm-first/archive/llm-judge-external-pipeline.md`: BT остаётся, но переезжает
+   `docs/product/archive/llm-judge-external-pipeline.md`: BT остаётся, но переезжает
    из механизма оценки в слой улик.
 6. Терминология: детерминированный матч первым, LLM — только на
    промахах (паттерн IFMTBench), и только advisory для склоняемых
@@ -369,7 +369,7 @@ flowchart LR
 замерам детерминированный слой снимает 40-60% дефектов бесплатно;
 критичный детерминированный провал до судьи не доходит вообще.
 Добивка слоя (quick wins из разбора Cathedral, план
-`docs/llm-first/plans/2026-08-11-layer0-autofix-quick-wins.md`): расширение автофикса
+`docs/product/plans/2026-08-11-layer0-autofix-quick-wins.md`): расширение автофикса
 терминала на `!`, `?`, `:` (+83 юнита той же болезни) и backfill-команда
 `reapply_autofixes` — автофиксы работают только на записи
 (`unit.py:2406`), исторические ~1380 дефектных юнитов иначе не
@@ -427,7 +427,7 @@ low-resource языков и эскалация при разногласии с
    critical-разметку молча.)
 
 Механика подтверждена сканом кода
-(`docs/llm-first/research/2026-08-11-judge-weblate-ui-integration.md`):
+(`docs/product/research/2026-08-11-judge-weblate-ui-integration.md`):
 
 - Check-строки, созданные внешним процессом, полноценно живут в UI:
   красный бейдж в списках, карточка «Things to check», фильтры
@@ -444,7 +444,7 @@ low-resource языков и эскалация при разногласии с
 ### 4.4 Прозрачность: UI по фазам
 
 Консенсус конкурентов и cross-domain паттерны — в
-`docs/llm-first/research/2026-08-11-judge-ux-competitor-research.md`. Два главных: Phrase
+`docs/product/research/2026-08-11-judge-ux-competitor-research.md`. Два главных: Phrase
 отделяет вкладку «AI checks» от детерминированных «QA checks» — судья
 не должен визуально смешиваться с фактами; SPF.io и Crowdin показывают
 back-translation именно для ревьюера, не читающего целевой язык.
@@ -521,7 +521,7 @@ end_stop 58-71 против 18-28).
 ревью не включено. `process_mt` — уже пишет по батчам
 (`AutoTranslate.store_batch`), с неявной возобновляемостью через
 фильтр по state. Подробности и оставшийся объём —
-`docs/llm-first/plans/2026-08-12-phase0-implementation.md`.
+`docs/product/plans/2026-08-12-phase0-implementation.md`.
 
 ### Фаза 0 — измеримость и транспорт (сейчас)
 
@@ -531,7 +531,7 @@ end_stop 58-71 против 18-28).
   доказательство, что свободнотекстовый контракт с моделью деградирует
   на два десятка процентов и бьёт по стоимости (19.6% потерянных
   вердиктов = вдвое раздутая стадия правки). Дизайн эксперимента —
-  `docs/llm-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md`.
+  `docs/product/plans/2026-08-11-phase0-schema-and-judge-calibration.md`.
 - **Трек B:** B0 и B1 выполнены: зафиксирован золотой набор COL4 из
   919 записей — clean 419, terminology 195, mutation 305. До фазы 2
   остаётся B2: калибровка двух судей, выбор промпта и go/no-go порогов.
@@ -559,7 +559,7 @@ end_stop 58-71 против 18-28).
 
 ### Фаза 1 — терминология и hard/advisory (план морфологии, усечённый)
 
-Порядок внутри `docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md`
+Порядок внутри `docs/product/plans/2026-08-11-glossary-morphological-enforcement.md`
 меняется под судью:
 
 - Задачи 3 и 4 (hard/advisory + пер-термин/пер-язык режим) — первыми:
@@ -571,7 +571,7 @@ end_stop 58-71 против 18-28).
 - Задача 1 (стемминг источника) — **отложена**: глоссарий <=300 уже
   уходит в промпт целиком; стемминг нужен только термбейсам >300.
 
-Плюс добивка слоя 0 — `docs/llm-first/plans/2026-08-11-layer0-autofix-quick-wins.md`:
+Плюс добивка слоя 0 — `docs/product/plans/2026-08-11-layer0-autofix-quick-wins.md`:
 
 - автофикс добавленных `!`, `?`, `:` (XS; снимается вместе с французской
   парой NBSP/NNBSP+знак, до backfill — чтобы тот прошёл одним проходом);
@@ -584,17 +584,17 @@ end_stop 58-71 против 18-28).
 ### Фаза 2 — судья v1 (после успешной калибровки B2)
 
 Дополнено 2026-08-22: ядро судьи (план
-`docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md`) и универсализация промпта
-(плечо H плана `docs/llm-first/plans/2026-08-20-judge-prompt-universalization.md`)
+`docs/product/plans/2026-08-13-01-judge-verdict-core.md`) и универсализация промпта
+(плечо H плана `docs/product/plans/2026-08-20-judge-prompt-universalization.md`)
 реализованы. Ремонтный контур и review-gate (план
-`docs/llm-first/archive/2026-08-22-03-judge-review-gate.md`, superseded) развёрнуты на проде:
+`docs/product/archive/2026-08-22-03-judge-review-gate.md`, superseded) развёрнуты на проде:
 major/critical вердикты на записываемых строках получают один ремонтный
 кандидат от `openrouter`-machinery и повторное суждение обоих мест;
 прошедший ремонт становится `Translated`, нерешённый critical держится
 автоматически на `Needs editing` + `judge-reject` до аудируемого решения
 ревьюера (исключён из экспорта через `WITHOUT_NEEDS_EDITING`).
 
-**Обновлено планом `docs/llm-first/plans/2026-08-25-01-judge-producer-ux-and-delivery.md`
+**Обновлено планом `docs/product/plans/2026-08-25-01-judge-producer-ux-and-delivery.md`
 (не задеплоено в прод, требует отдельного одобрения):** нерешённый major
 больше не держится на `Needs checking` — он отгружается как `Translated` с
 доказательством `judge-flag` (advisory, не блокирует поставку); minor
@@ -652,18 +652,18 @@ with an LLM judge»), автоматического расписания нет
 Дополнено 2026-08-22 — три плана этой фазы:
 
 - **Соседние реплики в контексте судьи** —
-  `docs/llm-first/plans/2026-08-20-judge-dialog-context.md` (статус:
+  `docs/product/plans/2026-08-20-judge-dialog-context.md` (статус:
   **отклонён по замеру 2026-09-04**). Плечо H2 - `prev_source`/`next_source`
   соседей по `position` в сегменте плюс абзац в `verdict.txt` - измерено
   на 109 диалоговых юнитах hub-1 против продовых сидений
-  (`docs/llm-first/measurements/2026-09-04-judge-dialog-context-paired.md`):
+  (`docs/product/measurements/2026-09-04-judge-dialog-context-paired.md`):
   на seat 2 вердикты не меняются вовсе, на seat 1 разница внутри шума,
   мотивирующие ложные срабатывания остаются при дословно поданном соседе;
   цена +9-10 % входа на каждом юните. Дыра «изолированный сегмент»
   остаётся известным ограничением судьи. Обратная гипотеза - соседние
   target - не измерялась.
 - **Сцена как единица контекста для машинного перевода** —
-  `docs/llm-first/plans/2026-09-04-scene-context-for-mt.md` (статус:
+  `docs/product/plans/2026-09-04-scene-context-for-mt.md` (статус:
   ожидает одобрения). Преемник отклонённого ±1: переводчик, не судья;
   сцена по ключу `context`, не сосед по `position`. Три плеча - прод,
   порядок `position` с батчами в границах сцены, плюс блок сцены
@@ -671,7 +671,7 @@ with an LLM judge»), автоматического расписания нет
   детерминированной метрикой форм обращения (§6.2 LQA, 19 находок) и
   слепым LQA расхождений; судья - отдельная постановка после гейтов.
 - **`RepeatDriftCheck` и аудит живого глоссария** —
-  `docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md`
+  `docs/product/plans/2026-08-14-intra-component-consistency-check.md`
   (статус: реализован, выключен по умолчанию; не задеплоен). Детерминированный
   TargetCheck: одинаковый исходник в одном проекте и языке обязан иметь
   одинаковый перевод (на col4/data/fr 57.5% групп повторов разошлись, стоковый

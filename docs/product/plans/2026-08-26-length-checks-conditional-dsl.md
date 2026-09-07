@@ -518,7 +518,7 @@ git commit -m "fix(judge): repair over-budget automatic translations"
 - Modify: `dev-docker/docker-compose.yml`
 - Modify: `deploy/environment.example`
 - Modify: `docs/changes.rst`
-- Modify: `docs/guides/producer-guide-weblate.md`
+- Modify: `docs/product/guides/producer-guide-weblate.md`
 
 ### Step 1: Replace only the two check classes
 
@@ -541,7 +541,7 @@ so the final registry has one implementation per inherited check ID.
 ### Step 2: Add user-facing documentation
 
 Add a short Russian subsection immediately after the existing `Флаги перевода`
-bullet in `docs/guides/producer-guide-weblate.md`:
+bullet in `docs/product/guides/producer-guide-weblate.md`:
 
 - Project/component flags are defaults; a source-file or unit flag overrides
   them for a specific UI slot.
@@ -578,11 +578,11 @@ uv run prek run ruff-check ruff-format --files \
   --skip typos --skip reuse --skip kingfisher-auto
 uv run prek run --files \
   docs/changes.rst \
-  docs/guides/producer-guide-weblate.md \
+  docs/product/guides/producer-guide-weblate.md \
   --skip typos --skip reuse --skip kingfisher-auto
 
 git add dev-docker/docker-compose.yml deploy/environment.example \
-  docs/changes.rst docs/guides/producer-guide-weblate.md
+  docs/changes.rst docs/product/guides/producer-guide-weblate.md
 git commit -m "feat(checks): register conditional max-length budgets"
 ```
 

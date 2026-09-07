@@ -134,7 +134,7 @@ render -> parse-back) и несёт LLM и переводчику осмысле
 - Перевод пустых ячеек и правка расхождений в целевых языках (только фиксация в
   заметке).
 - Флаги `exact`/`not-applicable` для омонимов (это уже про живой компонент,
-  `docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md`, задача 1).
+  `docs/product/plans/2026-08-11-glossary-morphological-enforcement.md`, задача 1).
 
 ## Результат (2026-08-18)
 

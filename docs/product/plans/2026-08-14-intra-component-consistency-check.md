@@ -38,15 +38,15 @@
 
 Имя файла осталось `intra-component-consistency-check.md`, хотя чек стал
 проектным: на этот путь ссылаются
-`docs/llm-first/plans/2026-08-10-git-localization-quality-gate.md:603`,
-`docs/llm-first/plans/2026-08-14-judge-severity-recalibration.md:191`,
-`docs/llm-first/plans/2026-08-17-session-canon.md:15`,
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:616` и
-`docs/llm-first/vision/llm-first-product-architecture.md:665-671`.
+`docs/product/plans/2026-08-10-git-localization-quality-gate.md:603`,
+`docs/product/plans/2026-08-14-judge-severity-recalibration.md:191`,
+`docs/product/plans/2026-08-17-session-canon.md:15`,
+`docs/product/measurements/2026-08-13-phase0-measurements.md:616` и
+`docs/product/vision/llm-first-product-architecture.md:665-671`.
 Переименование порвало бы пять ссылок ради косметики.
 
 Место в дорожной карте: `### Фаза 4 — масштабирование, по данным`
-(`docs/llm-first/vision/llm-first-product-architecture.md:644`, добавление от
+(`docs/product/vision/llm-first-product-architecture.md:644`, добавление от
 2026-08-22, строки 663-671). Текст карты всё ещё говорит «внутри одного
 компонента» и «дрожит на 16%» — обновляется задачей 12.
 
@@ -59,7 +59,7 @@
 | 3 | флаги `ignore-case`/`ignore-punctuation`/`ignore-whitespace` (R3) | **удалены** | косметика объясняет 6 групп из 122 (5%); гасится штатным `ignore-repeat-drift` без кода |
 | 4 | стемминг обязателен в аудите глоссария | **не входит в v1** | стем-дубли на проде: 5 групп, все 5 намеренные (`Артефакт`/`Артефакты`, `Яйцо`/`Яйца`, …) |
 | 5 | класс аудита «target термина X = source термина Y» | заменён на «один перевод на несколько терминов» | исходный класс структурно невозможен при ru-источнике и латинских целях: замерено 0; новый даёт 24 ячейки с настоящими дефектами (`скупщик`/`торговец` → один перевод в bg/de/es) |
-| 6 | «шумовой пол судьи 16%» | 22-31% | замер n=2 опровергнут замером n=5: `docs/llm-first/measurements/2026-08-18-severity-recalibration-partial.md:56-59`, финал `2026-08-19-severity-recalibration-final.md:72-90` |
+| 6 | «шумовой пол судьи 16%» | 22-31% | замер n=2 опровергнут замером n=5: `docs/product/measurements/2026-08-18-severity-recalibration-partial.md:56-59`, финал `2026-08-19-severity-recalibration-final.md:72-90` |
 | 7 | ссылка `misc/heart-abyss-hub-1-translation-qa.md` | `docs/operations/audits/2026-08-20-heart-abyss-hub-1-translation-qa.md` | файл переехал (`docs/product/plans/2026-08-24-docs-structure-convention.md:182`) |
 | 8 | `get_related_checks` назван частью батч-механики | убрано | метод живёт в `weblate/checks/source.py:93-96` и относится к source-чекам |
 | 9 | приёмка без числа | приёмка привязана к замеру: 122 группы / 259 юнитов на `need-for-greed` | иначе приёмка непроверяема |
@@ -77,14 +77,14 @@
 
 | Замер | Среда | Результат |
 |---|---|---|
-| Трек C фазы 0, `col4/data/fr` | dev-зеркало (`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:1-7`) | 146 групп с одинаковым нормализованным источником, 84 (57.5%) переведены по-разному; стоковый `inconsistent` не пометил **0 из 84**; групп, где хотя бы два юнита делят `context` — 0 (`:505-511`) |
+| Трек C фазы 0, `col4/data/fr` | dev-зеркало (`docs/product/measurements/2026-08-13-phase0-measurements.md:1-7`) | 146 групп с одинаковым нормализованным источником, 84 (57.5%) переведены по-разному; стоковый `inconsistent` не пометил **0 из 84**; групп, где хотя бы два юнита делят `context` — 0 (`:505-511`) |
 | Аудит `heart-abyss/hub-1` | прод | 23 повторяющиеся строки дали 25 расхождений (FR 16, EN 9) (`docs/operations/audits/2026-08-20-heart-abyss-hub-1-translation-qa.md:147-149`); стоковый чек — 0 из 25 (`:251`); §15.3 ставит класс на второе место по влиянию после судьи |
 | `need-for-greed`, 8 компонентов, 18 языков | прод, 2026-09-03 | 5 117 повторных групп, 290 расходящихся; после исключения глоссария — **122 группы, 259 юнитов**, из них 118 внутри компонента и 4 между; стоковый `inconsistent` — 0 из 122; размер группы максимум 6 юнитов (`docs/operations/measurements/2026-09-03-need-for-greed-repeat-drift.md`) |
 
 Почему детерминированный чек, а не судья: повтор — сравнение строк, а не
 понимание смысла. `==` решается точно, бесплатно и воспроизводимо, тогда как
 два идентичных прогона судьи расходятся на 22-31% юнитов
-(`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:72-90`).
+(`docs/product/measurements/2026-08-19-severity-recalibration-final.md:72-90`).
 Судья к тому же видит каждый сегмент батча изолированно, и «два разных перевода
 одного текста» в отрыве друг от друга выглядит как законная вариативность: на
 hub-1 этот класс дали только ручной аудит и предложенный чек, 0 — судья и 0 —
@@ -97,9 +97,9 @@ hub-1 этот класс дали только ручной аудит и пр�
 | стоковый `inconsistent` | скоуп у него уже проектный (`batch_project_wide = True` на `:88`, проектный фильтр `component__project=component.project` в `check_component` на `:118`), дыра не в радиусе, а в ключе: группирует по `id_hash = hash(source, context)`; `context` в монолингвальных форматах — ключ строки, различный у каждого юнита, поэтому одинаковый текст под разными ключами в одну группу не попадает | `weblate/checks/consistency.py:88,112-160`, `weblate/trans/models/unit.py:377-392` |
 | распространение перевода | тот же фильтр `source` **и** `context` | `weblate/trans/models/unit.py:2577-2586` |
 | `reused` | обратное направление: разные источники, один перевод | `weblate/checks/consistency.py:172-207` |
-| сессионный канон | предотвращение внутри одного прогона автоперевода, не детекция накопленного корпуса; сам план это оговаривает | `docs/llm-first/plans/2026-08-17-session-canon.md:27-31,174-175` |
-| гейт `corpus.inconsistent-translation` | **вторая реализация того же правила** по экспортированным файлам, а не потребитель строк чека | `docs/llm-first/plans/2026-08-10-git-localization-quality-gate.md:597-603` |
-| `check_glossary` | остаётся `default_disabled` решением 2026-08-11; этим планом не пересматривается | `docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md:8-19` |
+| сессионный канон | предотвращение внутри одного прогона автоперевода, не детекция накопленного корпуса; сам план это оговаривает | `docs/product/plans/2026-08-17-session-canon.md:27-31,174-175` |
+| гейт `corpus.inconsistent-translation` | **вторая реализация того же правила** по экспортированным файлам, а не потребитель строк чека | `docs/product/plans/2026-08-10-git-localization-quality-gate.md:597-603` |
+| `check_glossary` | остаётся `default_disabled` решением 2026-08-11; этим планом не пересматривается | `docs/product/plans/2026-08-11-glossary-morphological-enforcement.md:8-19` |
 
 Единственное определение правила (его обязан цитировать план гейта, а не
 изобретать своё): **в пределах одного проекта и одного языка два юнита с
@@ -1155,7 +1155,7 @@ git commit -m "test(glossary): pin the audit baseline and folding rules"
 - Изменить: `docs/admin/management.rst` (после `reapply_autofixes`, в блоке форковых команд; файл **не** упорядочен по алфавиту, так что порядок тематический)
 - Изменить: `docs/changes.rst` (верхняя нерелизная секция `Weblate 2026.8.1`)
 - Изменить: `weblate/locale/ru/LC_MESSAGES/django.po` (три новые строки — вручную)
-- Изменить: `docs/llm-first/vision/llm-first-product-architecture.md:665-671`
+- Изменить: `docs/product/vision/llm-first-product-architecture.md:665-671`
 
 **Шаг 1. Перегенерировать снимки.**
 
@@ -1220,7 +1220,7 @@ DJANGO_SETTINGS_MODULE=weblate.settings_test uv run ./manage.py compilemessages
 проекта; правим только нужные записи.
 
 **Шаг 6: обновить карту** — в
-`docs/llm-first/vision/llm-first-product-architecture.md:665-671` заменить
+`docs/product/vision/llm-first-product-architecture.md:665-671` заменить
 «внутри одного компонента» на проектный скоуп и «16%» на «22-31%», сослаться
 на замер 2026-09-03.
 
@@ -1398,14 +1398,14 @@ PROD_WEBLATE_API_TOKEN=... uv run python analysis/probes/source-repeat-drift.py 
 - **`enforced_checks`**: чек туда не добавляется, только документируется
   запрет.
 - **Предотвращение дрейфа** (канон в прогоне автоперевода):
-  `docs/llm-first/plans/2026-08-17-session-canon.md`. Общий хелпер
+  `docs/product/plans/2026-08-17-session-canon.md`. Общий хелпер
   нормализации из решения 3 того плана остаётся его риском R5; этот план
   сознательно не заводит второй хелпер — он сравнивает точные строки, и
   нормализовать нечего.
 - **Интеграция с CI-гейтом** `corpus.inconsistent-translation`: правило
   определено выше один раз, и план гейта обязан цитировать его, а не
   изобретать свою нормализацию
-  (`docs/llm-first/plans/2026-08-10-git-localization-quality-gate.md:597-603`).
+  (`docs/product/plans/2026-08-10-git-localization-quality-gate.md:597-603`).
 - **Включение на проде и любой прод-прогон**: только по отдельному одобрению.
 
 ## Риски

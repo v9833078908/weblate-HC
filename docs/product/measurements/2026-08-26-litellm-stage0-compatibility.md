@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-26. **Status:** measured.
 **Covers:** stage 0 and stage 1 of
-`docs/llm-first/plans/2026-08-26-judge-seat-pair-search.md`.
+`docs/product/plans/2026-08-26-judge-seat-pair-search.md`.
 **Probes:** `analysis/probes/litellm-model-compat.py`,
 `analysis/probes/litellm-cut-diagnostic.py`.
 
@@ -46,7 +46,7 @@ total duration, and the judge's hardcoded `"stream": False`
 (`weblate/trans/judge.py:542`) is what exposes us to it.
 
 This single mechanism explains three earlier mysteries at once, and corrects a
-retraction made in `docs/llm-first/measurements/2026-08-26-litellm-preflight.md`:
+retraction made in `docs/product/measurements/2026-08-26-litellm-preflight.md`:
 
 1. The four preflight failures with `status=None` at ~30.5 s.
 2. The `ConnectionResetError`s from the `urllib` harness that were written off as

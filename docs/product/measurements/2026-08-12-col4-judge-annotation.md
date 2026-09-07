@@ -1,7 +1,7 @@
 # COL4 fr: разметка B0 — error analysis реального вывода
 
 Дата: 2026-08-12. Задача B0 плана
-`docs/llm-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md`.
+`docs/product/plans/2026-08-11-phase0-schema-and-judge-calibration.md`.
 
 Разметчики: Fable (Anthropic) — исходные 260 строк;
 `openai-codex-gpt-5.6-terra-2026-08-12` — top-up из 300 строк. Человек-

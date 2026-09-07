@@ -1,6 +1,6 @@
 # First judge run on dev — 2026-08-20
 
-Acceptance run for `docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md`
+Acceptance run for `docs/product/plans/2026-08-13-01-judge-verdict-core.md`
 (task 13, step 7). Dev instance only (`localhost:3001`); nothing on production
 was touched.
 
@@ -84,9 +84,9 @@ run ($1.69/1000 strings) is roughly five times the phase-0 rate
    default is `NOT has:judge`.
 
    Findings 1 and 2 are one piece of work and both are now recorded in plan 2's
-   scope (`docs/llm-first/designs/2026-08-13-judge-native-ui-design.md`, "Планы первого
+   scope (`docs/product/designs/2026-08-13-judge-native-ui-design.md`, "Планы первого
    тира" and "Известные временные разрывы"; deferral table in
-   `docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md`). They share one
+   `docs/product/plans/2026-08-13-01-judge-verdict-core.md`). They share one
    dependency — the `has:judge` filter that plan 2 introduces — so fixing the
    counter before that filter exists would be work thrown away.
 3. **Judge spend was unattributed.** All four usage rows carried a blank

@@ -140,7 +140,7 @@ no extra evidence and must not receive accidental extra weight.
 - Hashing persona, style, prompt version, checks or other pre-existing judge
   context fields. This increment updates the glossary portion only.
 - The judge hang and per-batch durability work tracked in
-  `docs/llm-first/plans/2026-08-22-02-judge-navigation-readiness.md`.
+  `docs/product/plans/2026-08-22-02-judge-navigation-readiness.md`.
 - Any production read or paid model call. Task 6 requires separate approval.
 
 ---
@@ -917,7 +917,7 @@ git commit -m "feat(judge): define glossary context semantics"
 **Files:**
 
 - Modify: `docs/admin/checks.rst`
-- Modify: `docs/guides/loc-kit-ingest.md`
+- Modify: `docs/product/guides/loc-kit-ingest.md`
 - Inspect only: `docs/changes.rst`
 
 `AGENTS.md` is not part of this task: it contains no user-facing judge
@@ -951,7 +951,7 @@ Expected: `docs/user/glossary.rst` defines the label.
 
 ### Step 2: Update the living loc-kit guide after the builder move
 
-In `docs/guides/loc-kit-ingest.md`, replace the private machinery reference in
+In `docs/product/guides/loc-kit-ingest.md`, replace the private machinery reference in
 the TBX explanation paragraph with
 `weblate.glossary.models.build_glossary_prompt_entry`. Do not rewrite dated
 historical plans or archived designs that accurately name the API available at
@@ -974,7 +974,7 @@ in the commit.
 ```bash
 uv run prek run rst-http rumdl rumdl-fmt end-of-file-fixer \
   trailing-whitespace --files docs/admin/checks.rst \
-  docs/guides/loc-kit-ingest.md
+  docs/product/guides/loc-kit-ingest.md
 ```
 
 Expected: Passed. Inspect `git status` immediately afterwards. Hooks must not
@@ -983,7 +983,7 @@ cause unrelated user files to be staged, restored or committed.
 ### Step 5: Commit
 
 ```bash
-git add docs/admin/checks.rst docs/guides/loc-kit-ingest.md
+git add docs/admin/checks.rst docs/product/guides/loc-kit-ingest.md
 git commit -m "docs(judge): describe glossary entry context"
 ```
 
@@ -1029,7 +1029,7 @@ uv run prek run ruff-check ruff-format rst-http rumdl rumdl-fmt \
   weblate/trans/tests/test_judge_loop.py \
   weblate/trans/tests/test_judge_round.py \
   weblate/trans/tests/test_loc_kit_ingest_contract.py \
-  docs/admin/checks.rst docs/guides/loc-kit-ingest.md
+  docs/admin/checks.rst docs/product/guides/loc-kit-ingest.md
 ```
 
 Expected: Passed. Compare `git status` with Task 0; do not discard or stage
@@ -1053,7 +1053,7 @@ import cycle.
 
 ```bash
 rg -n "_get_glossary_entry|LLMGlossaryEntry|LLM_GLOSSARY_FLAGS" \
-  weblate/ docs/guides/
+  weblate/ docs/product/guides/
 rg -n "term\.source, term\.target" \
   weblate/trans/judge_loop.py weblate/trans/models/judge.py \
   weblate/trans/views/edit.py
@@ -1090,7 +1090,7 @@ unrelated user change entered any commit. Change this document's status to
 commands/results, and commit only that status update:
 
 ```bash
-git add docs/llm-first/plans/2026-08-24-judge-glossary-symmetry.md
+git add docs/product/plans/2026-08-24-judge-glossary-symmetry.md
 git commit -m "docs(judge): record glossary symmetry verification"
 ```
 
@@ -1188,7 +1188,7 @@ Write the frozen set description, exact configuration, per-repetition seat
 results, collegium result, cache tokens, request count and cost to:
 
 ```text
-docs/llm-first/measurements/2026-08-24-judge-glossary-symmetry-run.md
+docs/product/measurements/2026-08-24-judge-glossary-symmetry-run.md
 ```
 
 Commit and push the measurement separately. It is evidence about the

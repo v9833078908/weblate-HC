@@ -3,7 +3,7 @@
 Status: implemented 2026-09-03 (tasks 1-9; the /plan-design-review step ran as a
 manual pass over the changed templates because no such instrument exists as a
 tool, and the browser pass ran against the live dev instance). Reviewed in
-`docs/llm-first/reviews/2026-09-03-judge-run-navigation-review.md`; its
+`docs/product/reviews/2026-09-03-judge-run-navigation-review.md`; its
 amendments F1-F6 are folded into the design and tasks below. Amended
 2026-09-03 by F7 (row hierarchy) after the shipped control was seen on live
 data, together with a layout fix for the control's own presentation: the
@@ -11,7 +11,7 @@ theme makes `.btn-group` a block-level flex container
 (`weblate/static/styles/main.css`), which stretched the split button across
 the whole card.
 
-Follow-up to `docs/llm-first/plans/2026-09-03-judge-run-report-pareto.md`, which
+Follow-up to `docs/product/plans/2026-09-03-judge-run-report-pareto.md`, which
 rebuilt the report page itself. That plan assumed the producer arrives at the
 report; this one makes arriving possible at all.
 
@@ -252,7 +252,7 @@ Full judge suites (`test_judge_views.py`, `test_judge.py`,
 `test_judge_round.py`), `prek run --files` on every touched file, a
 `/plan-design-review` pass over the changed templates (the design-review
 instrument earlier plans record in their verification tables, for example
-`docs/llm-first/plans/2026-08-27-judge-seat-parallelism.md`), then one
+`docs/product/plans/2026-08-27-judge-seat-parallelism.md`), then one
 batched browser pass on the development instance at desktop and mobile widths
 covering `/projects/col4/` (six runs, the worst case),
 `/projects/need-for-greed/` (one run, the degraded case), a project with

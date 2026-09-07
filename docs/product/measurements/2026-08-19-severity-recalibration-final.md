@@ -9,9 +9,9 @@ python3 хоста VPS). 403-блок безопасности OpenRouter, об�
 2026-08-18, за ночь снялся; добор прошёл с троттлингом `--sleep 10` без
 единого 403. Корпус read-only, прод не менялся.
 
-Основание: `docs/llm-first/plans/2026-08-14-judge-severity-recalibration.md`.
-Постановка и постановка эталона: `docs/llm-first/measurements/2026-08-18-severity-recalibration-status.md`
-и частичный замер `docs/llm-first/measurements/2026-08-18-severity-recalibration-partial.md`.
+Основание: `docs/product/plans/2026-08-14-judge-severity-recalibration.md`.
+Постановка и постановка эталона: `docs/product/measurements/2026-08-18-severity-recalibration-status.md`
+и частичный замер `docs/product/measurements/2026-08-18-severity-recalibration-partial.md`.
 Скоринг воспроизводим: `analysis/probes/st2-zh-score.py`
 (`python3 st2-zh-score.py --truth st2-zh-groundtruth.json --out-dir st2-zh-recal`).
 

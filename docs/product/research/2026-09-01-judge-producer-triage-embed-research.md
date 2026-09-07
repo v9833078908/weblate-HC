@@ -14,15 +14,15 @@ files as of the document date.
 
 Related documents:
 
-- `docs/llm-first/vision/llm-first-product-architecture.md` - sections 4.3-4.4
+- `docs/product/vision/llm-first-product-architecture.md` - sections 4.3-4.4
   (verdict write contract, V1-V3 UI evolution; the suggestion candidate is
   assigned to V3).
-- `docs/llm-first/plans/2026-08-25-01-judge-producer-ux-and-delivery.md` - the
+- `docs/product/plans/2026-08-25-01-judge-producer-ux-and-delivery.md` - the
   shipped producer surface (resolutions, launchers, progress).
-- `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md` - verdict card
+- `docs/product/designs/2026-08-13-judge-native-ui-design.md` - verdict card
   design, including the unimplemented "correction proposal as a suggestion" for
   reject.
-- `docs/llm-first/research/2026-08-11-judge-ux-competitor-research.md` - early
+- `docs/product/research/2026-08-11-judge-ux-competitor-research.md` - early
   competitor research (pre-dating the card implementation).
 
 ## 1. Problem
@@ -523,7 +523,7 @@ variants from the tab, the stored candidate will pay off.
    per-unit "Re-check" (2 baseline judge calls per press) and whether it is
    offered to every reviewer or only to holders of `unit.review`.
 2. **Write the implementation plan** at
-   `docs/llm-first/plans/2026-09-01-judge-producer-triage-embed.md` and get
+   `docs/product/plans/2026-09-01-judge-producer-triage-embed.md` and get
    it approved before editing (working agreement). Proposed task cut:
    - Task 1, freshness invariant + drift-card action: regression tests
      pinning the existing gate (see 2.3 - no production change); the

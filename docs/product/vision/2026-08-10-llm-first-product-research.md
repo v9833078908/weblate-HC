@@ -73,7 +73,7 @@ EVENT_CHANGE. Дефолты: `mode=suggest`, `auto_source=others` (память
    подключён к игровым чекам.
 6. LLM виден в UI только как вкладка suggestions — опция, не дефолтный поток.
 
-### Архивные планы (docs/llm-first/archive/)
+### Архивные планы (docs/product/archive/)
 
 - `llm-judge-external-pipeline.md` — доархитектурный черновик внешнего
   LLM-judge; не реализован и заменён архитектурой
@@ -83,7 +83,7 @@ EVENT_CHANGE. Дефолты: `mode=suggest`, `auto_source=others` (память
   НЕ реализован.
 - `2026-08-05-routed-llm-machinery.md` (+ design) — RoutedLLMTranslation.
   РЕАЛИЗОВАН.
-- `docs/guides/continuous-localization-loop.md` — полный цикл
+- `docs/product/guides/continuous-localization-loop.md` — полный цикл
   git -> Weblate -> git с рекомендациями по addon'ам.
 
 ---
@@ -293,7 +293,7 @@ IPE (Intelligent Post-Editing) — автоматический LLM-шаг до�
 ### P4 — историческое предложение, заменено архитектурой
 
 - Калибровка судьи выполняется по
-  `docs/llm-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md`;
+  `docs/product/plans/2026-08-11-phase0-schema-and-judge-calibration.md`;
   реализация судьи следует части 4
   `llm-first-product-architecture.md`, а не архивному ночному
   Celery-проходу.

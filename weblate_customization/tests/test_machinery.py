@@ -237,10 +237,10 @@ class RoutedReplyFormatTest(SimpleTestCase):
     Non-strict, applied unconditionally to every chat payload. The root is
     an object envelope (``{"translations": [...]}``), not a bare array,
     because OpenAI-family providers reject an array-rooted schema outright
-    (see ``docs/llm-first/plans/2026-09-03-candidate-readiness-and-repair-visibility.md``,
+    (see ``docs/product/plans/2026-09-03-candidate-readiness-and-repair-visibility.md``,
     task 2). A hardening pass to ``strict`` mode is tracked separately and
     deliberately out of scope here (see
-    ``docs/llm-first/plans/2026-08-12-phase0-implementation.md``, task 1).
+    ``docs/product/plans/2026-08-12-phase0-implementation.md``, task 1).
     """
 
     def machine(self) -> RoutedLLMTranslation:

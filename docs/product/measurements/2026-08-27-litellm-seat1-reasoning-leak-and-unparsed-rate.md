@@ -189,4 +189,4 @@ not been measured.
   `weblate/trans/models/judge.py`, `weblate/trans/autotranslate.py`, and
   `weblate/utils/search.py`.
 - Earlier controlled LiteLLM batch measurements:
-  `docs/llm-first/measurements/2026-08-27-litellm-complement-smoke.md`.
+  `docs/product/measurements/2026-08-27-litellm-complement-smoke.md`.

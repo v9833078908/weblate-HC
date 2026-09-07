@@ -6,7 +6,7 @@
 """
 Measure the judge repair loop on fresh machine translation.
 
-Plan: docs/llm-first/plans/2026-08-25-judge-repair-loop-measurement.md
+Plan: docs/product/plans/2026-08-25-judge-repair-loop-measurement.md
 
 Runs inside the dev container, against a throwaway component built from
 `analysis/data/st2-zh-units.jsonl`. The zh_Hans translation is created
@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import datetime
 import json
 import math
 import os
@@ -49,20 +48,26 @@ if TYPE_CHECKING:
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "weblate.settings_docker")
 django.setup()
 
-from django.conf import settings  # noqa: E402
-from django.utils import timezone  # noqa: E402
+from django.conf import settings  # ruff: ignore[module-import-not-at-top-of-file]
+from django.utils import timezone  # ruff: ignore[module-import-not-at-top-of-file]
 
-from weblate.auth.models import User  # noqa: E402
-from weblate.lang.models import Language  # noqa: E402
-from weblate.trans.autotranslate import AutoTranslate  # noqa: E402
-from weblate.trans.models import (  # noqa: E402
+from weblate.auth.models import User  # ruff: ignore[module-import-not-at-top-of-file]
+from weblate.lang.models import (
+    Language,
+)
+from weblate.trans.autotranslate import (
+    AutoTranslate,
+)
+from weblate.trans.models import (  # ruff: ignore[module-import-not-at-top-of-file]
     Change,
     Component,
     LLMUsageLog,
     Project,
     Translation,
 )
-from weblate.trans.models.judge import JudgeVerdict  # noqa: E402
+from weblate.trans.models.judge import (
+    JudgeVerdict,
+)
 
 PROJECT_SLUG = "judge-repair-probe"
 COMPONENT_SLUG = "st2-summer-update"
@@ -85,9 +90,9 @@ def out_dir() -> Path:
 def load_corpus() -> list[dict[str, Any]]:
     rows = [
         json.loads(line)
-        for line in (data_dir() / "st2-zh-units.jsonl").read_text(
-            encoding="utf-8"
-        ).splitlines()
+        for line in (data_dir() / "st2-zh-units.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
         if line.strip()
     ]
     if len({row["context"] for row in rows}) != len(rows):
@@ -136,7 +141,11 @@ def stage_setup(*, recreate: bool) -> None:
     # shipped path will ever repair.
     write_po(repo / f"{TARGET_LANG}.po", rows, language=TARGET_LANG, key="")
 
-    env = {**os.environ, "GIT_AUTHOR_NAME": "probe", "GIT_AUTHOR_EMAIL": "p@example.org"}
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "probe",
+        "GIT_AUTHOR_EMAIL": "p@example.org",
+    }
     env["GIT_COMMITTER_NAME"] = "probe"
     env["GIT_COMMITTER_EMAIL"] = "p@example.org"
     subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True, env=env)
@@ -209,7 +218,8 @@ def _snapshot(
     before: dict[int, dict[str, Any]],
     tag: str,
 ) -> Path:
-    """Persist everything the run produced, successful or not.
+    """
+    Persist everything the run produced, successful or not.
 
     An aborted run is evidence too: the OpenRouter batch refusal of
     2026-08-25 is a shipped-path failure, and deleting the component
@@ -271,7 +281,7 @@ def _snapshot(
     # timing is reported as unavailable rather than as a week-long run.
     salvaged = status == "collected"
     payload = {
-        "plan": "docs/llm-first/plans/2026-08-25-judge-repair-loop-measurement.md",
+        "plan": "docs/product/plans/2026-08-25-judge-repair-loop-measurement.md",
         "status": status,
         "error": error,
         "message": message,
@@ -296,9 +306,7 @@ def _snapshot(
         "usage": usage,
     }
     path = out_dir() / (f"run-{tag}.json" if tag else "run.json")
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8"
-    )
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
     return path
 
 
@@ -379,7 +387,7 @@ def stage_run(*, tag: str, collect_only: bool) -> None:
         )
         if auto.failure_message:
             status, error = "failed", auto.failure_message
-    except BaseException as exc:  # noqa: BLE001 - evidence beats a clean exit
+    except BaseException as exc:
         status, error = "crashed", f"{type(exc).__name__}: {exc}"
         raise
     finally:
@@ -399,7 +407,8 @@ def stage_run(*, tag: str, collect_only: bool) -> None:
 
 
 def repair_pairs(run: dict[str, Any]) -> list[dict[str, Any]]:
-    """Reconstruct pre-repair and post-repair text from the change log.
+    """
+    Reconstruct pre-repair and post-repair text from the change log.
 
     Phase 1 writes the machine translation, the repair writes over it.
     Both are ordinary unit writes, so the persisted history carries the
@@ -501,7 +510,8 @@ def stage_score(*, run_name: str = "run.json") -> None:
     }
     labels_path = out_dir() / "review-labels.tsv"
     if not labels_path.exists():
-        raise SystemExit(f"missing {labels_path}: the human stage has not returned")
+        msg = f"missing {labels_path}: the human stage has not returned"
+        raise SystemExit(msg)
 
     with labels_path.open(encoding="utf-8", newline="") as handle:
         rows = [
@@ -567,8 +577,13 @@ def stage_score(*, run_name: str = "run.json") -> None:
             if post_ok:
                 fixed += 1
         detail.append(
-            {"pair_id": pair_id, "pre_ok": pre_ok, "post_ok": post_ok,
-             "post_better": post_better, "unit": item["unit"]}
+            {
+                "pair_id": pair_id,
+                "pre_ok": pre_ok,
+                "post_ok": post_ok,
+                "post_better": post_better,
+                "unit": item["unit"],
+            }
         )
 
     result = {
@@ -595,8 +610,13 @@ def stage_score(*, run_name: str = "run.json") -> None:
     }
     path = out_dir() / "metrics.json"
     path.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(json.dumps({k: v for k, v in result.items() if k != "detail"},
-                     ensure_ascii=False, indent=1))
+    print(
+        json.dumps(
+            {k: v for k, v in result.items() if k != "detail"},
+            ensure_ascii=False,
+            indent=1,
+        )
+    )
     print(f"wrote {path}")
 
 

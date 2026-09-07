@@ -1,7 +1,7 @@
 # План: универсальный системный промпт судьи
 
 Дата: 2026-08-20. Статус: **выполнен**, с одной правкой по итогам замера.
-Результат замера - `docs/llm-first/measurements/2026-08-20-judge-prompt-universalization-run.md`.
+Результат замера - `docs/product/measurements/2026-08-20-judge-prompt-universalization-run.md`.
 Переписанный промпт (плечо E, раздел «Итоговый текст промпта» ниже) **отклонён**:
 он пропускает 3 настоящих `critical` из 7 против 1 у базовой линии. В прод
 поехало минимальное изменение (плечо H): измеренный текст плеча D, в котором
@@ -10,10 +10,10 @@
 выполнены как написано.
 База: `plan/judge-verdict-core` на `628a91c` (`fix(judge): harden verdict
 orchestration and state writes`, второй агент). Предыдущий план этой линии -
-`docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md` (реализован, слит в
+`docs/product/plans/2026-08-13-01-judge-verdict-core.md` (реализован, слит в
 `main` как `dc103cc`, прод на `8f147ab`, судья на проде выключен).
 
-Правило R3 дизайна (`docs/llm-first/designs/2026-08-13-judge-native-ui-design.md:241`):
+Правило R3 дизайна (`docs/product/designs/2026-08-13-judge-native-ui-design.md:241`):
 изменение формулировки промпта обнуляет замер, поэтому правки текста идут одним
 срезом с повторным прогоном на корпусе замера. Этот план и есть такой срез.
 
@@ -28,10 +28,10 @@ orchestration and state writes`, второй агент). Предыдущий 
 | Синтаксис плейсхолдеров различается по проектам: `{0}` (pirate-ships 337, space-arena 229, S&T2 58 юнитов), `{name}` (space-arena 111, need-for-greed 45), `{[PARAM0]}`, `%KEY%`, Unity-теги, BBCode (heart-abyss), `$` (col4, 6 юнитов) | подсчёт по исходным юнитам каждого компонента |
 | `_PLACEHOLDER_RE` не покрывает `{name}`: 156 юнитов на проде остаются без `rendered_source`/`rendered_target` | `weblate/trans/judge.py:53` + подсчёт совпадений на проде |
 | Plural-юнитов на проде нет ни в одном компоненте | `source__contains` разделителя `\x1e\x1e` |
-| Зашитый в промпт жанр WWII дал ложный `major` на CoL4 | `docs/llm-first/measurements/2026-08-20-judge-first-dev-run.md`, находка 5 |
+| Зашитый в промпт жанр WWII дал ложный `major` на CoL4 | `docs/product/measurements/2026-08-20-judge-first-dev-run.md`, находка 5 |
 
 Внешние источники по промпту судьи собраны отдельно:
-`docs/llm-first/research/2026-08-20-judge-prompt-best-practices.md` (PoLL arXiv 2404.18796,
+`docs/product/research/2026-08-20-judge-prompt-best-practices.md` (PoLL arXiv 2404.18796,
 AutoMQM ACL 2023.wmt-1.100, GEMBA-MQM V2 WMT25, персоны EMNLP Findings 2024).
 
 ## Границы
@@ -47,7 +47,7 @@ AutoMQM ACL 2023.wmt-1.100, GEMBA-MQM V2 WMT25, персоны EMNLP Findings 20
 5. Замер обоих спорных решений на корпусе S&T2 ru->zh_Hans **до** правки
    продового кода, включая вариант без поля `verdict` у модели.
 6. Дымовой прогон на dev по существующему сценарию
-   `docs/llm-first/measurements/2026-08-20-judge-dev-test-scenario-col4.md`.
+   `docs/product/measurements/2026-08-20-judge-dev-test-scenario-col4.md`.
 
 ### Не входит
 
@@ -97,7 +97,7 @@ AutoMQM ACL 2023.wmt-1.100, GEMBA-MQM V2 WMT25, персоны EMNLP Findings 20
 корпусу.
 
 **D6. Гейты замера - те же, что в плане калибровки**
-(`docs/llm-first/plans/2026-08-14-judge-severity-recalibration.md`, скорер
+(`docs/product/plans/2026-08-14-judge-severity-recalibration.md`, скорер
 `analysis/probes/st2-zh-score.py`):
 
 - `missed_crit` = 0 в **каждом** прогоне;
@@ -194,7 +194,7 @@ python3 analysis/probes/st2-zh-score.py --truth analysis/data/st2-zh-groundtruth
 
 ### Step 3: Отчёт
 
-`docs/llm-first/measurements/2026-08-20-judge-prompt-universalization-run.md`: таблица D / E / F / G
+`docs/product/measurements/2026-08-20-judge-prompt-universalization-run.md`: таблица D / E / F / G
 по `missed_crit`, `false_crit`, `REAL@14`, `REAL@24`, `FP`, шумовой пол;
 вердикт по каждому гейту D6; отдельно - воспроизвелся ли на плече G ложный
 `major` от отсутствия контекста.
@@ -304,7 +304,7 @@ def test_reasoning_effort_is_sent_when_configured(self) -> None:
 
 ## Задача 6. Дымовой прогон на dev
 
-По существующему сценарию `docs/llm-first/measurements/2026-08-20-judge-dev-test-scenario-col4.md`
+По существующему сценарию `docs/product/measurements/2026-08-20-judge-dev-test-scenario-col4.md`
 на `col4/common/tr`, судья включён только в
 `dev-docker/docker-compose.override.yml` (gitignored):
 

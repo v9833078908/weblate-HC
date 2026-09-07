@@ -120,7 +120,7 @@ language pair.
   checks; the selected units may simply be clean, but no LiteLLM seat pair has
   ever been scored against ground truth, so this canary cannot say whether the
   verdicts are correct. See
-  `docs/llm-first/plans/2026-08-26-judge-provider-failover.md:44-52`.
+  `docs/product/plans/2026-08-26-judge-provider-failover.md:44-52`.
 - Cost attribution through the corporate proxy is blind: every one of the 38
   usage rows carries `cost_usd=None`. OpenRouter reports cost; LiteLLM does not.
 - The 275-unit backlog on this translation, left by the 2026-08-28 OpenRouter
@@ -146,7 +146,7 @@ attempts against an alias the team key cannot access, and the 50 `http-other`
 attempts on `atlas/qwen3.8-max` are LiteLLM model names sent to the default
 OpenRouter endpoint before `WEBLATE_JUDGE_BASE_URL` was set. Both causes are
 recorded in
-`docs/llm-first/measurements/2026-09-01-02-judge-seat-parallelism-production.md:16-26`.
+`docs/product/measurements/2026-09-01-02-judge-seat-parallelism-production.md:16-26`.
 Seat 2 also carries exactly one `deadline` attempt, the 120.095 s event that
 produced the 150 s deadline.
 

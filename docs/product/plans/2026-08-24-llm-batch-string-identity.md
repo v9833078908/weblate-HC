@@ -12,7 +12,7 @@
 
 ## Why this exists
 
-`docs/llm-first/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` §3 measured the defect on
+`docs/product/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` §3 measured the defect on
 production: in `heart-abyss/hub-1` the German target of `hub1_asuna_1_6` holds the translation of
 `_1_7`, `_1_7` holds `_1_8`, `_1_8` holds `_1_9`, and `_1_6`'s own content is absent from German
 entirely. All 396 units of all 9 languages are raw `mt:openrouter` output with exactly one human
@@ -71,7 +71,7 @@ repository argues against it:
   does not make the decision.
 
 Batch size would not have prevented the defect that prompted this plan in any case. The German
-rotation in `docs/llm-first/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` §5.1 spans four
+rotation in `docs/product/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` §5.1 spans four
 consecutive units, which fits inside a batch of five, and the Indonesian content loss in
 `2026-08-24-batch-misalignment-radius-scan.md` §4.1 spans two. The batch-size lever is already at
 its measured optimum, so this defect has to be addressed in the protocol.

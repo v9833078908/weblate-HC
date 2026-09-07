@@ -4,7 +4,7 @@ Date: 2026-08-24. Instance: `l10n.herocraft.com`.
 Tool: `.omp/skills/weblate-lqa/scripts/detect_misalignment.py` (commit `b37bb2d`).
 
 This scan answers one question raised by the German rotation found in
-`docs/llm-first/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` §5.1: how
+`docs/product/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` §5.1: how
 much more of production holds the same defect. It is read-only.
 
 ## 1. Radius

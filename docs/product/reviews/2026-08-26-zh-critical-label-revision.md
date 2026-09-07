@@ -143,7 +143,7 @@ judge grading it `major` should be treated as having failed.
 The existing `missed_crit` counter charges a candidate both for failing to see a
 defect and for seeing it and grading it lower. Those are separate faults and
 only the first should end a candidate's run. The split gate is task 2 of
-`docs/llm-first/plans/2026-08-26-zh-critical-label-revision-and-split-gate.md`.
+`docs/product/plans/2026-08-26-zh-critical-label-revision-and-split-gate.md`.
 
 This review does not re-open Stage 4. Whether any candidate deserves further
 paid runs is decided after the split gate is computed, and needs its own

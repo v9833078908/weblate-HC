@@ -12,13 +12,13 @@
 
 - На `col4/data/fr` **84 из 146** групп с одинаковым источником переведены
   по-разному; стоковый чек `inconsistent` не пометил ни одной
-  (`docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md`).
+  (`docs/product/plans/2026-08-14-intra-component-consistency-check.md`).
   Замер не разбит на уровни A/B — сделать это частью продового замера (ниже):
   аппарат инъекции окупается, только если значимая доля групп — уровень B,
   а не точные повторы, которые кэш и так во многом дедуплицирует.
 - У Cathedral механизм `first_mentions` — самый весомый рычаг конвейера:
   23.4 % строк стадии правки закрываются подстановкой канона
-  (`docs/llm-first/research/2026-08-11-cathedral-localizer-analysis.md`, раздел 4.1:
+  (`docs/product/research/2026-08-11-cathedral-localizer-analysis.md`, раздел 4.1:
   ключ `(source_lang, source_text[, semantic_tag])`, подстрочный отбор ≥ 3
   символов, **до 15 пар** в секцию `Glossary / Previous Mentions`). Оговорка:
   23.4 % — это **жёсткая подстановка без вызова модели**, что здесь вне
@@ -108,7 +108,7 @@
    `weblate_customization.textkey` (NFC, casefold, вырезать плейсхолдеры
    `{0}`/`%KEY%`, схлопнуть пробелы, срезать конечную пунктуацию).
    Тот же хелпер обязан использоваться RepeatDriftCheck и гейтом
-   (`docs/llm-first/plans/2026-08-10-git-localization-quality-gate.md`, Task 4) —
+   (`docs/product/plans/2026-08-10-git-localization-quality-gate.md`, Task 4) —
    две реализации группировки запрещены (контракт документарный, пока те
    планы не перейдут на импорт — риск R5). Дизамбигуация: для ключей
    ≤ 3 символов в ключ входит `unit.context` (приём Cathedral 4.1 —

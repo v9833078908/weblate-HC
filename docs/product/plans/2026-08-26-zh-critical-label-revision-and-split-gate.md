@@ -2,10 +2,10 @@
 
 **Date:** 2026-08-26. **Status:** completed. All four tasks landed; the split
 gate did not produce a Stage 4 candidate.
-**Follows:** `docs/llm-first/plans/2026-08-26-judge-seat-pair-search.md`, which
+**Follows:** `docs/product/plans/2026-08-26-judge-seat-pair-search.md`, which
 stopped at Stage 3 with no surviving candidate.
 **Rule:** R3 - changing the prompt or the model invalidates a measurement
-(`docs/llm-first/vision/llm-first-product-architecture.md:674`). This plan
+(`docs/product/vision/llm-first-product-architecture.md:674`). This plan
 changes neither. It changes how a stored verdict is *scored*, so every affected
 number is recomputed from the stored Stage 3 verdicts rather than re-requested.
 
@@ -57,7 +57,7 @@ the sealed severity, the revised severity, an `in_gate` flag, and the reason.
 defect is unprovable from text (`24130`) or it lives in the source (`24208`).
 
 Record the same reasoning in prose in
-`docs/llm-first/reviews/2026-08-26-zh-critical-label-revision.md`.
+`docs/product/reviews/2026-08-26-zh-critical-label-revision.md`.
 
 Verification: the overlay parses, covers exactly the seven sealed criticals, and
 every entry carries a reason.
@@ -91,7 +91,7 @@ split-gate numbers are derived from it by the scorer rather than by hand.
 
 ### Task 4: record the outcome
 
-Amend `docs/llm-first/measurements/2026-08-26-judge-seat-pair-search-stage3.md`
+Amend `docs/product/measurements/2026-08-26-judge-seat-pair-search-stage3.md`
 with a section reporting the split-gate result. Do not rewrite the original
 table: the transport numbers stand, only their interpretation changes. State
 plainly whether any candidate becomes Stage 4 eligible.

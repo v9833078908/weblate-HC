@@ -20,12 +20,12 @@ verdict identity changes.
 **Tech stack:** Python 3.14, Django settings and migrations, httpx2 streaming,
 Celery, pytest, Docker Compose.
 
-**Supersedes:** `docs/llm-first/plans/2026-08-26-judge-provider-failover.md`
+**Supersedes:** `docs/product/plans/2026-08-26-judge-provider-failover.md`
 Stages B and C, and the design decisions D1-D4, D6 it delegated to
-`docs/llm-first/plans/2026-08-27-judge-reliability-hardening.md` (which was
+`docs/product/plans/2026-08-27-judge-reliability-hardening.md` (which was
 never started; its harness deliverables landed instead through the parallelism
 and deadline plans). It also overrides one sentence of
-`docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md:453-456`
+`docs/product/plans/2026-08-28-litellm-judge-stabilization.md:453-456`
 ("there is no automatic OpenRouter fallback in the code") by owner decision on
 2026-09-01. The rest of that plan's safety argument is kept verbatim: OpenRouter
 is not a quality resolver, and a disliked verdict can never be replaced by a
@@ -43,7 +43,7 @@ into `judge_fallback_endpoint`, so the direct `request_verdicts` API is gated
 like a producer-launched run.
 
 **Task 7: run 2026-09-02, three arms of four pass.**
-`docs/llm-first/measurements/2026-09-02-judge-openrouter-fallback-dev-smoke.md`
+`docs/product/measurements/2026-09-02-judge-openrouter-fallback-dev-smoke.md`
 records it. Proven live against real endpoints: one fallback attempt per batch
 per seat after a primary availability failure, the fallback completing the
 batch, `served_provider=openrouter` provenance on the result, a configured
@@ -64,7 +64,7 @@ own separate approval per `AGENTS.md`.
 
 **Dependency gate: satisfied 2026-09-01.** Branch
 `docs/llm-usage-attribution-plan` is merged to `main` as `0011d3c`, Tasks 1-5 of
-`docs/llm-first/plans/2026-08-31-llm-usage-cost-attribution.md` are implemented
+`docs/product/plans/2026-08-31-llm-usage-cost-attribution.md` are implemented
 there. Migrations `0114_judge_request_invalid_kind`,
 `0115_judge_run_unit_refused_outcome` and `0116_judge_deferral_closed_retention`
 were then taken by the merged `feat/judge-zero-unparsed` work, so this plan's
@@ -101,7 +101,7 @@ for both seats, in parallel, and it is stable today:
 | Both seats served by `hcbifrost.herocraft.com/litellm/v1` | production container environment |
 | Seat 1 `deepseek-v4-pro`, batch 2, stream, 120 s, `thinking.disabled`, `json_schema` | production container environment |
 | Seat 2 `atlas/qwen3.8-max`, batch 1, stream, 150 s, `json_schema` | production container environment |
-| 38/38 attempts HTTP 200, zero failure kinds, zero retries, 50 verdicts over 25 units, zero unparsed, 50.15% overlap | `docs/llm-first/measurements/2026-09-01-03-judge-litellm-nfg-es-canary.md` |
+| 38/38 attempts HTTP 200, zero failure kinds, zero retries, 50 verdicts over 25 units, zero unparsed, 50.15% overlap | `docs/product/measurements/2026-09-01-03-judge-litellm-nfg-es-canary.md` |
 | First-byte p95 5.705 s / 2.746 s against a 20 s envelope | same |
 | `JUDGE_DEFERRAL_ENABLED=0`, so no unit is ever queued and an unparsed unit is terminally unjudged | production container environment, `weblate/trans/judge_loop.py:758-759` |
 | No fallback exists: no `JUDGE_FALLBACK_*` setting, no second-endpoint resend, no `judge_provider` on `JudgeVerdict` | repo-wide search; `weblate/trans/judge.py:178-199` is the only endpoint resolver, with one `settings.JUDGE_BASE_URL` reader |
@@ -154,7 +154,7 @@ and conflating them is the main risk in reading this plan.
 | Two seats judging in parallel | `JUDGE_SEATS = (1, 2)` with the seat barrier (`weblate/trans/judge_loop.py:921-1069`); measured 50.15% window overlap | live |
 | Visible verdict | inline card `weblate/templates/snippets/judge-verdict.html` on the translate page, plus the run report `weblate/templates/judge-run.html` | live |
 | Fallback in place | Tasks 1-7 of this plan | not started |
-| No unparsed | **neither the fallback nor the queue.** Measured: 101 of the 102 diagnosable unparsed verdicts came from a refused request (HTTP 400/401), 1 from the old shared deadline, 0 from a LiteLLM model answer (`docs/llm-first/measurements/2026-09-01-04-judge-unparsed-attribution.md`) | LiteLLM under the running profiles is at 0 unparsed for seat 1 (97 verdicts) and 1 in 98 attempts for seat 2; the missing control is fail-fast on a permanently refused request |
+| No unparsed | **neither the fallback nor the queue.** Measured: 101 of the 102 diagnosable unparsed verdicts came from a refused request (HTTP 400/401), 1 from the old shared deadline, 0 from a LiteLLM model answer (`docs/product/measurements/2026-09-01-04-judge-unparsed-attribution.md`) | LiteLLM under the running profiles is at 0 unparsed for seat 1 (97 verdicts) and 1 in 98 attempts for seat 2; the missing control is fail-fast on a permanently refused request |
 
 **The fallback does not reduce unparsed, by design.** `_FAILOVER_FAILURE_KINDS`
 (Task 4) excludes every protocol failure: `invalid-json`, `invalid-envelope`,
@@ -167,7 +167,7 @@ a different model would silently average two configurations, which R3 forbids.
 
 **So "no unparsed" belongs to another plan.** Both halves of it - the refusal
 fail-fast and the durable queue - are Tasks 1-7 of
-`docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`.
+`docs/product/plans/2026-09-01-03-judge-zero-unparsed.md`.
 The record is measured, not assumed: HTTP 400 has no fail-fast rule, so the run of
 2026-09-01 05:59 *completed* after 50 consecutive refused batches and wrote 50
 `unparsed` verdicts across two request rounds of run `48bfbd72`; only `http-auth`
@@ -185,7 +185,7 @@ queue's real job is narrower and still worth having: it keeps a `deadline` or
 or for the 275-unit backlog on that same language, which the Non-goals below
 exclude on purpose. A producer-visible "stable, no unparsed" claim at real scope
 needs the refusal path closed and the queue enabled, which is
-`docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`, not this plan.
+`docs/product/plans/2026-09-01-03-judge-zero-unparsed.md`, not this plan.
 
 ## Non-goals
 
@@ -193,7 +193,7 @@ needs the refusal path closed and the queue enabled, which is
   per-seat deadlines.
 - Quality scoring of the LiteLLM pair. No LiteLLM seat pair has ever been scored
   against ground truth
-  (`docs/llm-first/plans/2026-08-26-judge-provider-failover.md:44-52`); by owner
+  (`docs/product/plans/2026-08-26-judge-provider-failover.md:44-52`); by owner
   decision on 2026-09-01 this remains outside this plan and keeps its own
   tracking document.
 - A third endpoint, provider weighting or load balancing. This is a fallback,
@@ -224,7 +224,7 @@ that cannot succeed.
 It was rejected for three reasons, in increasing order of weight:
 
 1. It sits against the spirit of retained D2
-   (`docs/llm-first/plans/2026-08-26-judge-provider-failover.md:81-95`), which
+   (`docs/product/plans/2026-08-26-judge-provider-failover.md:81-95`), which
    rejects run-level failover. Demotion is admittedly not the alternative D2
    names - it uses no health probe and every batch still receives a fallback
    attempt, so no batch is lost - but it does move the failover decision from
@@ -394,7 +394,7 @@ uv run pytest weblate/trans/tests/test_judge_client.py -k fallback
 - Wire all eight through `_conf.py`, `settings_example.py` and
   `settings_docker.py` with `WEBLATE_` twins, placed with the existing `JUDGE_*`
   entries. While in `_conf.py`, add the three long-standing omissions recorded
-  at `docs/llm-first/plans/2026-08-26-judge-provider-failover.md:298-302`
+  at `docs/product/plans/2026-08-26-judge-provider-failover.md:298-302`
   (`JUDGE_REQUEST_DEADLINE`, `JUDGE_REASONING_EFFORT`,
   `JUDGE_TRANSPORT_RETRIES`) so the file stops drifting.
 - Add `judge_fallback_endpoint() -> JudgeEndpoint | None`, returning `None` when
@@ -544,7 +544,7 @@ sets differ in both directions and each difference is load-bearing:
   the defect. This case is not hypothetical: the 2026-09-01 rollout produced 50
   such attempts because LiteLLM model names reached the default
   OpenRouter endpoint
-  (`docs/llm-first/measurements/2026-09-01-03-judge-litellm-nfg-es-canary.md`).
+  (`docs/product/measurements/2026-09-01-03-judge-litellm-nfg-es-canary.md`).
   A fallback would have silently "fixed" that misconfiguration and doubled the
   bill.
 - `http-auth` is here but not in the availability set. Per D3, an entitlement
@@ -556,7 +556,7 @@ sets differ in both directions and each difference is load-bearing:
   endpoint produced no complete answer inside the seat's absolute bound, which
   is unavailability for that request. The known objection - that a deadline
   should shrink the batch rather than repeat the same shape
-  (`docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md:257-261`) -
+  (`docs/product/plans/2026-08-28-litellm-judge-stabilization.md:257-261`) -
   still holds for the primary: the existing adaptive halving must still be
   applied to the primary's budget, and the fallback attempt is additional, not a
   substitute. **The missing policy is an outage short-circuit within a run, not
@@ -752,7 +752,7 @@ Add the `WEBLATE_JUDGE_FALLBACK_*` envvars to
 `docs/admin/install/docker.rst` around `:2366-2376`. While there, add the
 existing undocumented `WEBLATE_JUDGE_*` per-seat entries if any are still
 missing, as recorded at
-`docs/llm-first/plans/2026-08-27-judge-reliability-hardening.md:789-793`.
+`docs/product/plans/2026-08-27-judge-reliability-hardening.md:789-793`.
 
 ### Step 2: Threat model
 
@@ -798,7 +798,7 @@ docs(judge): document the fallback judge endpoint
 **Files:**
 
 - Modify: `analysis/probes/litellm-seat-diagnostic.py` or create a sibling probe
-- Create: `docs/llm-first/measurements/<date>-judge-fallback-forced-smoke.md`
+- Create: `docs/product/measurements/<date>-judge-fallback-forced-smoke.md`
 
 ### Step 1: Forced-failover arm, using a permitted trigger
 
@@ -941,7 +941,7 @@ implementation.
    request within 25% of its deadline.
 
    `candidate_severities=()` is required and is not a detail. Since
-   `docs/llm-first/plans/2026-09-01-judge-producer-triage-embed.md` merged,
+   `docs/product/plans/2026-09-01-judge-producer-triage-embed.md` merged,
    `needs_candidate` deliberately ignores `writable_ids` and the remaining
    attempt budget, so a default-severity canary calls `repair_targets` and
    pays a real machine-translation batch per round for every unresolved
@@ -955,7 +955,7 @@ implementation.
    budget and for the candidate table alike. The same override applies to any
    canary in step 1 or step 6 that goes through `run_judge_batch`.
 4. **The durable queue is not enabled here.** It moved to Tasks 6-7 of
-   `docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`, together with the
+   `docs/product/plans/2026-09-01-03-judge-zero-unparsed.md`, together with the
    refusal fail-fast it depends on, because the queue completes "no unparsed" and
    has nothing to do with endpoint availability. Do not set
    `WEBLATE_JUDGE_DEFERRAL_ENABLED` from this plan. The fallback is correct with
@@ -986,7 +986,7 @@ queue is enabled, any fallback attempt on a failure kind outside
 half of one seat's batches failed over (the primary is unhealthy and the run is
 paying its remaining finite per-batch wait budget), or a reappearance of the
 ~30 s first-byte reset recorded in
-`docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md`.
+`docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md`.
 
 ## Risks
 
@@ -1000,11 +1000,11 @@ paying its remaining finite per-batch wait budget), or a reappearance of the
   it does not make it comparable. Any future quality measurement must filter on
   provider, or it will silently average two different configurations, which is
   what rule R3 exists to prevent
-  (`docs/llm-first/vision/llm-first-product-architecture.md:674`).
+  (`docs/product/vision/llm-first-product-architecture.md:674`).
 - **Cost visibility is asymmetric.** The attribution prerequisite records the
   exact service and immutable scope of delivered judge responses, but LiteLLM
   still reports no cost and a request with no response body writes no usage row.
   A run that fails over is partially priced: report unknown, never zero.
 - **Two credentials, two rotation paths.** The credential rotation operation of
-  `docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md:345-358`
+  `docs/product/plans/2026-08-28-litellm-judge-stabilization.md:345-358`
   remains open and now covers one more secret.

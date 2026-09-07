@@ -10,7 +10,7 @@ Serves phase 3 ("the refactor changed nothing", fallback unconfigured) and
 phase 5 ("fallback configured and idle") of
 docs/operations/plans/2026-09-02-judge-fallback-and-triage-rollout.md, and the
 rollback smoke of Rollout step 6 in
-docs/llm-first/plans/2026-09-01-02-judge-openrouter-availability-fallback.md.
+docs/product/plans/2026-09-01-02-judge-openrouter-availability-fallback.md.
 
 It goes through ``run_judge_batch`` rather than ``request_verdicts``, because
 the acceptance criteria are about a real run: cache behaviour, per-seat

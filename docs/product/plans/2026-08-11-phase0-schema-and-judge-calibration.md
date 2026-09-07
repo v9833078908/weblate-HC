@@ -1,6 +1,6 @@
 > **Итог 2026-08-13.** Фаза 0 закрыта: B2' и C выполнены, A2 остановлен,
 > запечатанный `test` израсходован единственным прогоном. Всё в
-> `docs/llm-first/measurements/2026-08-13-phase0-measurements.md`. Четыре вывода
+> `docs/product/measurements/2026-08-13-phase0-measurements.md`. Четыре вывода
 > меняют постановку, а не только закрывают её.
 > Первый: каскад двух ступеней проигрывает одиночному судье (сквозной
 > recall 70.7-87.1% против 94.0%), потому что ступень A почти не даёт
@@ -45,14 +45,14 @@ validate-evaluator): LLM-нативная разметка золотого на
 механизм; апгрейд до strict+конверт сознательно отложен. A2 в исходном
 4-плечевом виде невыполнима без переключателя схемы в коде; замена —
 разовый снимок текущего кода против уже записанных чисел. Подробности —
-`docs/llm-first/plans/2026-08-12-phase0-implementation.md`.
+`docs/product/plans/2026-08-12-phase0-implementation.md`.
 Основание:
-`docs/llm-first/vision/llm-first-product-architecture.md` (часть 5, фаза 0),
-`docs/llm-first/research/2026-08-11-llm-judge-design-research.md`,
-`docs/llm-first/reviews/2026-08-11-llm-prompt-and-pipeline-review.md`
+`docs/product/vision/llm-first-product-architecture.md` (часть 5, фаза 0),
+`docs/product/research/2026-08-11-llm-judge-design-research.md`,
+`docs/product/reviews/2026-08-11-llm-prompt-and-pipeline-review.md`
 (пп. 8.2, 3.5).
 Пересмотрен 2026-08-13 по решению дизайна
-`docs/llm-first/designs/2026-08-13-judge-native-ui-design.md`: судья —
+`docs/product/designs/2026-08-13-judge-native-ui-design.md`: судья —
 двухступенчатый каскад (ступень A фильтрует полноту на всех строках,
 ступень B другого семейства разбирает только её flag/reject), а не
 выбор единственного судьи. Плечи и метрики задачи B2 заменены ниже
@@ -128,7 +128,7 @@ Standalone-скрипт без Django: ключ OpenRouter передаётся 
 Разметчики реального вывода: Fable (Anthropic) разметил исходные 260
 строк, `openai-codex-gpt-5.6-terra-2026-08-12` — top-up из 300 строк;
 человек-переводчик на этом этапе недоступен. Прецедент глубины разбора —
-`docs/llm-first/measurements/2026-08-11-col4-fr-autotranslate-report.md` (п. 5).
+`docs/product/measurements/2026-08-11-col4-fr-autotranslate-report.md` (п. 5).
 Следствие для интерпретации: семейство судьи может коррелировать с
 семейством разметчика. B2 репортирует метрики отдельно по
 Fable-разметке, OpenAI-разметке и конструктивным стратам (глоссарные
@@ -137,18 +137,18 @@ Fable-разметке, OpenAI-разметке и конструктивным 
 выбор должен оставаться обоснованным на конструктивных стратах.
 С 2026-08-13 выбор — не «какой судья единственный», а «какая модель
 занимает ступень A и какая — ступень B» каскада (дизайн
-`docs/llm-first/designs/2026-08-13-judge-native-ui-design.md`). У family bias
+`docs/product/designs/2026-08-13-judge-native-ui-design.md`). У family bias
 появляется второе следствие: ступени A и B обязаны быть из разных
 семейств, поэтому замер, показывающий преимущество одного семейства,
 ограничивает то, какую ступень оно может занять.
 
 ### Задача B0. Разметка реального вывода (error analysis)
 
-Файлы: `docs/llm-first/measurements/2026-08-12-col4-judge-annotation.md` (протокол и разметка),
+Файлы: `docs/product/measurements/2026-08-12-col4-judge-annotation.md` (протокол и разметка),
 записи вливаются в `col4-judge-golden.json`.
 
 **Выполнена и дополнена 2026-08-12**:
-`docs/llm-first/measurements/2026-08-12-col4-judge-annotation.md` +
+`docs/product/measurements/2026-08-12-col4-judge-annotation.md` +
 `analysis/data/col4-b0-annotations.jsonl` (исходные 260 юнитов) +
 `analysis/data/col4-b0-annotations-topup-20260812.jsonl` (300 новых
 кандидатов random-clean). Всего 560 юнитов: 436 pass / 124 defect;
@@ -239,7 +239,7 @@ upper bound `false-flag <= 10%` допускается не более 9 false f
 ### Задача B2. Прогон судей
 
 Файлы: `analysis/probes/col4-judge-eval.py`, результат в
-`docs/llm-first/measurements/2026-08-XX-judge-calibration.md`.
+`docs/product/measurements/2026-08-XX-judge-calibration.md`.
 
 - Судьи: Anthropic mid-tier и OpenAI mini-tier через OpenRouter; точные
   ID фиксируются в результатах из каталога моделей на момент прогона.
@@ -257,7 +257,7 @@ upper bound `false-flag <= 10%` допускается не более 9 false f
   считается отдельной колонкой (`unparsed`), не попадает ни в flag,
   ни в reject.
 - Плечи — каскад по дизайну
-  `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md`:
+  `docs/product/designs/2026-08-13-judge-native-ui-design.md`:
   - плечо 1: модель X — ступень A на всём сплите, модель Y — ступень
     B только на flag+reject ступени A;
   - плечо 2: зеркальное (Y — ступень A, X — ступень B);
@@ -314,7 +314,7 @@ upper bound `false-flag <= 10%` допускается не более 9 false f
 ## Трек C. Пробник дрейфа не-глоссарных повторов
 
 Файлы: `analysis/probes/col4-repeat-drift-probe.py`, результат — раздел в
-`docs/llm-first/measurements/2026-08-XX-judge-calibration.md`.
+`docs/product/measurements/2026-08-XX-judge-calibration.md`.
 
 Проверка переносимости правки 10.1 Cathedral (рантайм-канон
 first_mentions, 23.4% их стадии правки) на нашу систему, где точные
@@ -337,8 +337,8 @@ first_mentions, 23.4% их стадии правки) на нашу систем
 ## Вне объёма
 
 - Запись вердиктов в Weblate, состояния юнитов и UI описаны в дизайне
-  `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md` и отгружаются
-  планами из `docs/llm-first/plans/`; этот план покрывает только
+  `docs/product/designs/2026-08-13-judge-native-ui-design.md` и отгружаются
+  планами из `docs/product/plans/`; этот план покрывает только
   измерение.
 - Короткий промпт переводчика — отдельный эксперимент после схемы.
 - CometKiwi и low-resource языки — фаза 4.

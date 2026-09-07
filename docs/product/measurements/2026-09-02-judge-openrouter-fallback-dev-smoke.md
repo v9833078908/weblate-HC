@@ -8,7 +8,7 @@ Probe: `analysis/probes/judge-fallback-forced-smoke.py`, run through
 Code: `main` at `0191a7c` (fallback implementation merged as `382fd51`).
 
 This is Task 7 evidence for
-`docs/llm-first/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`.
+`docs/product/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`.
 It is a dev-container measurement only. No Rollout step was performed: nothing
 in the running dev environment block was changed, and production was not
 touched beyond a read-only fetch of two existing credentials.

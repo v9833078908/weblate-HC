@@ -60,7 +60,7 @@ The production radius scan also rules out identical-target collision as an
 independent blocker. Of 57 duplicate-target findings, 55 were legitimate
 convergence of identical or synonymous sources, one was a terminology collapse,
 and only one belonged to the misbinding class
-(`docs/llm-first/measurements/2026-08-24-batch-misalignment-radius-scan.md`).
+(`docs/product/measurements/2026-08-24-batch-misalignment-radius-scan.md`).
 
 ## Scope
 
@@ -625,9 +625,9 @@ git commit -m "feat(alignment): add blind matrix verifier client"
 - Create: `analysis/probes/test_batch_alignment_eval.py`
 - Read only: `.omp/skills/weblate-lqa/tests/misalignment_regression.json`
 - Read only:
-  `docs/llm-first/measurements/2026-08-24-batch-misalignment-radius-scan.md`
+  `docs/product/measurements/2026-08-24-batch-misalignment-radius-scan.md`
 - Read only:
-  `docs/llm-first/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md`
+  `docs/product/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md`
 
 #### Step 1: Write failing corpus and mutation tests
 
@@ -904,10 +904,10 @@ git commit -m "test(alignment): record shadow calibration"
 **Files:**
 
 - Create:
-  `docs/llm-first/measurements/2026-08-24-batch-semantic-alignment-shadow.md`
-- Modify: `docs/llm-first/measurements/judge-measurements-index.md`
+  `docs/product/measurements/2026-08-24-batch-semantic-alignment-shadow.md`
+- Modify: `docs/product/measurements/judge-measurements-index.md`
 - Modify:
-  `docs/llm-first/plans/2026-08-24-llm-batch-semantic-alignment-design.md`
+  `docs/product/plans/2026-08-24-llm-batch-semantic-alignment-design.md`
 
 #### Step 1: Write the measurement report from the artifact
 
@@ -947,9 +947,9 @@ versus cached-pair policy, retry semantics and downstream write-path tests.
 
 ```bash
 uv run prek run rumdl-fmt --files \
-  docs/llm-first/plans/2026-08-24-llm-batch-semantic-alignment-design.md \
-  docs/llm-first/measurements/2026-08-24-batch-semantic-alignment-shadow.md \
-  docs/llm-first/measurements/judge-measurements-index.md
+  docs/product/plans/2026-08-24-llm-batch-semantic-alignment-design.md \
+  docs/product/measurements/2026-08-24-batch-semantic-alignment-shadow.md \
+  docs/product/measurements/judge-measurements-index.md
 
 uv run prek run \
   trailing-whitespace \
@@ -957,9 +957,9 @@ uv run prek run \
   mixed-line-ending \
   codespell \
   --files \
-  docs/llm-first/plans/2026-08-24-llm-batch-semantic-alignment-design.md \
-  docs/llm-first/measurements/2026-08-24-batch-semantic-alignment-shadow.md \
-  docs/llm-first/measurements/judge-measurements-index.md
+  docs/product/plans/2026-08-24-llm-batch-semantic-alignment-design.md \
+  docs/product/measurements/2026-08-24-batch-semantic-alignment-shadow.md \
+  docs/product/measurements/judge-measurements-index.md
 ```
 
 Expected: all focused hooks pass.
@@ -989,9 +989,9 @@ verifier. Revisit both decisions in any production integration plan.
 
 ```bash
 git add \
-  docs/llm-first/plans/2026-08-24-llm-batch-semantic-alignment-design.md \
-  docs/llm-first/measurements/2026-08-24-batch-semantic-alignment-shadow.md \
-  docs/llm-first/measurements/judge-measurements-index.md
+  docs/product/plans/2026-08-24-llm-batch-semantic-alignment-design.md \
+  docs/product/measurements/2026-08-24-batch-semantic-alignment-shadow.md \
+  docs/product/measurements/judge-measurements-index.md
 git commit -m "docs(llm-first): record alignment shadow results"
 git push origin HEAD
 ```

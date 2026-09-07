@@ -43,7 +43,7 @@ projections and statistics. With it disabled, it uses the representative's
 same session: on production run `36a5be4a`, 20 of the 36 critical holds with
 intact per-seat evidence came from seat 2 alone while seat 1 recorded zero
 errors on 11 of the 13 analyst-clean holds. Prompt work was measured in
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md` and
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md` and
 cannot reach the R2 gate; its R3 conclusion ("the gate leaves severity-only")
 was never implemented. Recomputed offline on the sealed zh corpus
 (`analysis/data/st2-zh-recal`, arms C and D, 5 paired runs each), the rule
@@ -1023,8 +1023,8 @@ git commit -m "chore(judge): satisfy mypy on the round severity attribute"
 - Modify: `docs/admin/config.rst:1811-1813`
 - Modify: `docs/admin/install/docker.rst:2366-2401`
 - Modify: `docs/changes.rst` (top unreleased section, "Improvements")
-- Modify: `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md:69`
-- Modify: `docs/llm-first/plans/2026-09-04-judge-consensus-reject.md` (this file: status)
+- Modify: `docs/product/designs/2026-08-13-judge-native-ui-design.md:69`
+- Modify: `docs/product/plans/2026-09-04-judge-consensus-reject.md` (this file: status)
 
 **Step 1: `docs/admin/checks.rst`**
 
@@ -1079,7 +1079,7 @@ Add under `.. rubric:: Improvements` of the unreleased section:
 
 **Step 4: design diagram**
 
-In `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md:69` change
+In `docs/product/designs/2026-08-13-judge-native-ui-design.md:69` change
 `M{{Вердикт = max severity}}` to
 `M{{Вердикт = max severity; critical по политике инстанса, consensus по умолчанию}}`.
 
@@ -1091,7 +1091,7 @@ Change `**Status:** proposed, awaiting approval.` to
 **Step 6: Commit**
 
 ```sh
-git add docs/admin/checks.rst docs/admin/config.rst docs/admin/install/docker.rst docs/changes.rst docs/llm-first/designs/2026-08-13-judge-native-ui-design.md docs/llm-first/plans/2026-09-04-judge-consensus-reject.md
+git add docs/admin/checks.rst docs/admin/config.rst docs/admin/install/docker.rst docs/changes.rst docs/product/designs/2026-08-13-judge-native-ui-design.md docs/product/plans/2026-09-04-judge-consensus-reject.md
 git commit -m "docs(judge): document the critical aggregation policy"
 git push
 ```
@@ -1169,7 +1169,7 @@ for consensus_reject in (True, False):
 ```
 
 Record both numbers in the implementation report. If the result needs a dated
-`docs/llm-first/measurements/` note, add and commit that note after this
+`docs/product/measurements/` note, add and commit that note after this
 verification. A regression worth acting on is a judge-filtered listing that
 stops answering in interactive time. The false branch should stay near the
 old-query baseline because it does not build `disputed_critical`.

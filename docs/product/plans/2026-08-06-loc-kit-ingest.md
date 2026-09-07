@@ -3,7 +3,7 @@
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 >
 > **Status (2026-08-06): implemented and verified.** Deviations from this plan
-> are documented in `docs/guides/loc-kit-ingest.md`: the profile is now inferred
+> are documented in `docs/product/guides/loc-kit-ingest.md`: the profile is now inferred
 > from the kit's header row (`infer.py`, `--profile` became optional evidence
 > output), and the component-creation UI accepts kits directly through the
 > universal "Upload translation files" tab (`create_component_from_kit`,
@@ -26,7 +26,7 @@ target explanations for Routed LLM.
 `openpyxl`, Translate Toolkit `pofile` and `tbxfile`, existing Weblate
 `PoMonoFormat`, `TBXFormat`, glossary and LLM test helpers, pytest.
 
-**Design spec:** `docs/guides/loc-kit-ingest.md`.
+**Design spec:** `docs/product/guides/loc-kit-ingest.md`.
 
 ---
 
@@ -425,7 +425,7 @@ Rules to enforce:
 - Root only has `schema_version` and non-empty `components`.
 - Kind is exactly `po` or `tbx`; PO only accepts keyed grammar and TBX only
   accepts `term-description-pairs`.
-- Match the closed schema in `docs/guides/loc-kit-ingest.md` exactly. Fields
+- Match the closed schema in `docs/product/guides/loc-kit-ingest.md` exactly. Fields
   specific to the other kind are errors, not ignored configuration; omitted
   optional PO arrays and grammar defaults are materialized once by the loader.
 - Every configured header is exact. `header: ""` is valid for an intentionally
@@ -1026,7 +1026,7 @@ git commit -m "test(loc-ingest): verify generated files through Weblate"
 **Files:**
 
 - Create: `weblate_customization/tests/test_loc_kit_ingest_live.py`
-- Modify: `docs/guides/loc-kit-ingest.md` only if the observed UI labels differ
+- Modify: `docs/product/guides/loc-kit-ingest.md` only if the observed UI labels differ
 
 **Step 1: Write the skipped-by-default live test.**
 
@@ -1093,7 +1093,7 @@ unavailable, record the test as skipped with the exact prerequisite, not passed.
 **Step 5: Commit.**
 
 ```bash
-git add weblate_customization/tests/test_loc_kit_ingest_live.py docs/guides/loc-kit-ingest.md
+git add weblate_customization/tests/test_loc_kit_ingest_live.py docs/product/guides/loc-kit-ingest.md
 git commit -m "test(loc-ingest): add opt-in glossary LLM smoke"
 ```
 
@@ -1103,7 +1103,7 @@ git commit -m "test(loc-ingest): add opt-in glossary LLM smoke"
 
 **Files:**
 
-- Modify: `docs/guides/loc-kit-ingest.md` only for observed runbook corrections
+- Modify: `docs/product/guides/loc-kit-ingest.md` only for observed runbook corrections
 - Modify: `docs/product/plans/2026-08-06-loc-kit-ingest.md` only if implementation
   discovers a plan defect
 
@@ -1144,7 +1144,7 @@ Expected: configured checks pass or only pre-existing unrelated failures remain.
 
 **Step 4: Check documentation invariants.**
 
-- `docs/guides/loc-kit-ingest.md` and this plan agree on profile-only parsing,
+- `docs/product/guides/loc-kit-ingest.md` and this plan agree on profile-only parsing,
   PO/TBX division, bilingual TBX topology, `xml_lang`, atomic output and test
   layers.
 - No command promises an uninstalled `loc-ingest` executable; all commands use
@@ -1157,7 +1157,7 @@ Expected: configured checks pass or only pre-existing unrelated failures remain.
 ```bash
 git add loc_kit_ingest/ weblate/trans/tests/test_loc_kit_ingest_contract.py \
   weblate_customization/tests/test_loc_kit_ingest_live.py \
-  docs/guides/loc-kit-ingest.md docs/product/plans/2026-08-06-loc-kit-ingest.md
+  docs/product/guides/loc-kit-ingest.md docs/product/plans/2026-08-06-loc-kit-ingest.md
 git commit -m "feat(loc-ingest): import profiled kits into Weblate formats"
 ```
 

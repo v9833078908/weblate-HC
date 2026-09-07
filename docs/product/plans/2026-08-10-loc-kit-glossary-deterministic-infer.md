@@ -559,7 +559,7 @@ git commit -m "feat(loc-kit): skip sheet selection for single-sheet glossary upl
 **Files:**
 
 - Modify: `docs/changes.rst` — верхняя (нерелизнутая) секция
-- Modify: `docs/guides/loc-kit-ingest.md` — раздел про glossary-workflow
+- Modify: `docs/product/guides/loc-kit-ingest.md` — раздел про glossary-workflow
 - Modify: `AGENTS.md` — абзац про `loc_kit_ingest` («optional OpenRouter profile proposal» → «deterministic inference first, optional OpenRouter fallback»)
 
 **Step 1:** changes.rst, кратко: glossary tables with only language columns are now mapped deterministically; the sheet-selection step is skipped for single-sheet files.
@@ -569,7 +569,7 @@ git commit -m "feat(loc-kit): skip sheet selection for single-sheet glossary upl
 **Step 3: commit**
 
 ```bash
-git add docs/changes.rst docs/guides/loc-kit-ingest.md AGENTS.md
+git add docs/changes.rst docs/product/guides/loc-kit-ingest.md AGENTS.md
 git commit -m "docs(loc-kit): document deterministic glossary inference"
 ```
 

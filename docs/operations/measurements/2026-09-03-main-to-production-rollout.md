@@ -183,5 +183,5 @@ open deferrals: 0
 - **25 находок аудита глоссария**: правка терминов, не код.
 - **`repeat-drift` на остальных семи проектах**: каждый требует своей пробы.
 - **Очередь отложек** (`WEBLATE_JUDGE_DEFERRAL_ENABLED=1`): не включалась,
-  Task 7 плана `docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`.
+  Task 7 плана `docs/product/plans/2026-09-01-03-judge-zero-unparsed.md`.
 - **Backfill кандидатов** (фаза 8): выполнен 2026-09-04, см. фазу 8.

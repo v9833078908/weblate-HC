@@ -5,7 +5,7 @@ seats `deepseek-v4-pro` and `qwen3.8-max` through the corporate LiteLLM proxy at
 `hcbifrost.herocraft.com`.
 
 Implementation decisions based on this research are recorded in
-`docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md`.
+`docs/product/plans/2026-08-28-litellm-judge-stabilization.md`.
 
 ## Executive finding
 
@@ -48,7 +48,7 @@ This research combines:
 - source and history inspection of the Judge client, parser, prompt and repair
   path;
 - the dated LiteLLM measurements and raw run summaries already committed under
-  `docs/llm-first/measurements/` and `analysis/data/`;
+  `docs/product/measurements/` and `analysis/data/`;
 - four independent read-only research tracks on Luna covering run history,
   parser taxonomy, upstream documentation and reliability design;
 - sanitized inspection of the corporate proxy's `/models` and `/model/info`
@@ -140,8 +140,8 @@ and construct repair guidance deterministically from validated errors.
 ## Observed Qwen non-streaming reset and streaming workaround
 
 The strongest transport experiment is recorded in
-`docs/llm-first/measurements/2026-08-26-litellm-stage0-compatibility.md` and
-`docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md`.
+`docs/product/measurements/2026-08-26-litellm-stage0-compatibility.md` and
+`docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md`.
 
 When the blanket exception handler was removed from the diagnostic path, the
 failure chain was:
@@ -195,7 +195,7 @@ non-streaming calls after 31.5-31.8 seconds with no first byte, while both
 streaming calls completed with first bytes after 6.6-8.8 seconds. Therefore the
 reported public-nginx change was not sufficient and the owner remains
 unlocalized. See
-`docs/llm-first/measurements/2026-08-28-hcbifrost-timeout-change-control.md`.
+`docs/product/measurements/2026-08-28-hcbifrost-timeout-change-control.md`.
 
 ### Evidence from the Game Pulse client repository
 
@@ -587,11 +587,11 @@ HMACs rather than unkeyed hashes of user text.
 - `weblate/trans/judge.py`
 - `weblate/trans/judge_prompts/verdict.txt`
 - `weblate/trans/models/judge.py`
-- `docs/llm-first/measurements/2026-08-26-litellm-stage0-compatibility.md`
-- `docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md`
-- `docs/llm-first/measurements/2026-08-27-litellm-complement-smoke.md`
-- `docs/llm-first/measurements/2026-08-27-litellm-seat1-reasoning-leak-and-unparsed-rate.md`
-- `docs/llm-first/plans/2026-08-27-judge-reliability-hardening.md`
+- `docs/product/measurements/2026-08-26-litellm-stage0-compatibility.md`
+- `docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md`
+- `docs/product/measurements/2026-08-27-litellm-complement-smoke.md`
+- `docs/product/measurements/2026-08-27-litellm-seat1-reasoning-leak-and-unparsed-rate.md`
+- `docs/product/plans/2026-08-27-judge-reliability-hardening.md`
 - commit `082ec67` — model-generated repair instruction contract
 - commit `841d6eb` — narrow `"None"` sentinel normalization
 

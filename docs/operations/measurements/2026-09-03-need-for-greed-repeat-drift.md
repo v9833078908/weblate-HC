@@ -97,7 +97,7 @@ hu 6 | id 6 | it 6 | lt 6 | en 4 | nl 4 | ro 4
 Ни одна из 122 групп не содержит двух юнитов с одинаковым `context`, то есть
 **стоковый `inconsistent` не видит ни одной (0 из 122)**. Это третье
 независимое подтверждение архитектурного вывода: на dev-зеркале col4/fr было 0
-из 84 (`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:505-511`),
+из 84 (`docs/product/measurements/2026-08-13-phase0-measurements.md:505-511`),
 на проде hub-1 — 0 из 25
 (`docs/operations/audits/2026-08-20-heart-abyss-hub-1-translation-qa.md:251`).
 Отдельно проверено, что проект в момент замера чист: после пересчёта

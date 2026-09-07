@@ -13,7 +13,7 @@
 репозиторный Git-flow. Он не может автоматически получать новые ключи из
 игрового репозитория. Рабочий
 контракт для нового компонента находится в
-`docs/guides/game-repo-integration-contract.md`.
+`docs/product/guides/game-repo-integration-contract.md`.
 
 ## Результат выполнения
 

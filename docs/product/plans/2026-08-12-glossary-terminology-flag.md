@@ -416,7 +416,7 @@ git commit -m "test(loc-kit): glossary terms reach a newly added language"
 **Files:**
 
 - Modify: `docs/changes.rst`
-- Modify: `docs/guides/loc-kit-ingest.md`
+- Modify: `docs/product/guides/loc-kit-ingest.md`
 
 **Step 1: Changelog entry**
 
@@ -429,7 +429,7 @@ Add to the top, unreleased section of `docs/changes.rst`, matching the surroundi
 
 **Step 2: Spec note**
 
-In `docs/guides/loc-kit-ingest.md`, in the section describing what the glossary workflow creates, add one
+In `docs/product/guides/loc-kit-ingest.md`, in the section describing what the glossary workflow creates, add one
 sentence: imported terms are flagged as terminology, which is what makes them appear in glossary
 languages added later. Read the surrounding section first and match its wording; do not restructure it.
 
@@ -441,7 +441,7 @@ Expected: PASS.
 **Step 4: Commit and push**
 
 ```bash
-git add docs/changes.rst docs/guides/loc-kit-ingest.md
+git add docs/changes.rst docs/product/guides/loc-kit-ingest.md
 git commit -m "docs(loc-kit): note terminology flagging on glossary import"
 git push
 ```

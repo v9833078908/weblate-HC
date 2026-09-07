@@ -58,7 +58,7 @@ c50f83a feat(loc): add cannon_reload_hint string  <- коммит разрабо
   либо сшивать по ключу на выходе).
 
 Первичный сев таких компонентов из лок-кита (CSV/TSV/XLSX) делает
-`loc_kit_ingest` (см. `docs/guides/loc-kit-ingest.md`): для строковых
+`loc_kit_ingest` (см. `docs/product/guides/loc-kit-ingest.md`): для строковых
 компонентов он выдаёт монолингвальный PO, где игровой Id - это ключ
 (`context`), колонка персонажа - developer comment, числовые колонки -
 `location`.

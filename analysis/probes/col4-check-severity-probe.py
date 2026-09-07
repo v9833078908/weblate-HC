@@ -19,7 +19,7 @@ inflection puts a letter where the word-boundary rule wants a non-letter. Those
 terms never reach the prompt at all for that string.
 
 Prints ``glossary_matcher_fingerprint`` first: compare results across runs only
-when it matches (docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md,
+when it matches (docs/product/plans/2026-08-11-glossary-morphological-enforcement.md,
 Задача 5).
 """
 

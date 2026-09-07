@@ -60,7 +60,7 @@ Google Sheet (авто-зеркало, read-only для людей)
 
 1. **Фаза 0. Вход без трения.** Текущая таблица команды импортируется в Weblate:
    `loc_kit_ingest` принимает CSV/TSV/XLSX напрямую в UI создания компонента
-   (см. `docs/guides/loc-kit-ingest.md`). Продюсер не делает ничего.
+   (см. `docs/product/guides/loc-kit-ingest.md`). Продюсер не делает ничего.
 2. **Фаза 1. Параллельный контур.** Работа идёт в Weblate. Скрипт на VPS после
    каждого батча выгружает CSV через Weblate API и пишет в его Google Sheet через
    Sheets API. **Ссылка для плагина движка не меняется** - внешние разработчики не
@@ -170,5 +170,5 @@ celebrate early wins, вовлечение сопротивляющегося в
   <https://translated.com/resources/translation-change-management-organizational-transformation>
 - Weblate, загрузка и выгрузка файлов:
   <https://docs.weblate.org/en/latest/user/files.html>
-- Внутренние документы: `docs/guides/loc-kit-ingest.md`,
-  `docs/guides/continuous-localization-loop.md`, `docs/guides/producer-guide.md`
+- Внутренние документы: `docs/product/guides/loc-kit-ingest.md`,
+  `docs/product/guides/continuous-localization-loop.md`, `docs/product/guides/producer-guide.md`

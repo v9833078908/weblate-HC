@@ -9,7 +9,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.1 Phase 0 — Model Screening on dev (fr, 376 records)
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:148-161`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:148-161`
 
 | Model | recall H | spec. H | recall R | false critical | unparsed | $ |
 |---|---|---|---|---|---|---|
@@ -25,7 +25,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.2 Phase 0 — Cascade Results on train+dev (fr, 483 records)
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:205-212`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:205-212`
 
 | Arm | A | B | recall A | escalation | recall through | spec. through | false critical | $/1000 |
 |---|---|---|---|---|---|---|---|---|
@@ -39,7 +39,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.3 Phase 0 — Overturn Analysis (Why Cascades Fail)
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:220-227`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:220-227`
 
 | Arm | overturned | correct | **wrong** |
 |---|---|---|---|
@@ -52,7 +52,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.4 Phase 0 — Union / Collegium on train+dev (fr, 483 records, reconstruction)
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:305-310`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:305-310`
 
 | | `deepseek` alone | union |
 |---|---|---|
@@ -67,7 +67,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.5 Phase 0 — Union Measured Directly on train+dev (fr, mixed split)
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:330-335`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:330-335`
 
 | | predicted by reconstruction | measured |
 |---|---|---|
@@ -78,7 +78,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.6 Phase 0 — Sealed Test (fr, 433 records: 167 clean, 146 major, 120 critical)
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:345-352`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:345-352`
 
 | | recall H | spec. H | recall R | critical → pass | major → pass | false flag | terminology |
 |---|---|---|---|---|---|---|---|
@@ -91,7 +91,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.7 Phase 0 — Model Selection Did Not Reproduce
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:360-367`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:360-367`
 
 | | train+dev | test |
 |---|---|---|
@@ -103,7 +103,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.8 Phase 0 — Go/No-Go Thresholds Against Sealed Test
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:388-395`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:388-395`
 
 | Plan threshold | Requirement | `deepseek` alone | union | Status |
 |---|---|---|---|---|
@@ -117,7 +117,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.9 Phase 0 — Auto-Pass ≥90% Is Arithmetically Impossible
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:375-384`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:375-384`
 
 | Judge | recall H | spec. H | auto-pass | miss among auto-pass |
 |---|---|---|---|---|
@@ -130,7 +130,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.10 Phase 0 — Prompt/Glossary Bloat: Prod vs Mirror
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:91-100`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:91-100`
 
 | Metric | Prod, batch 10 | Mirror, 2026-08-13 |
 |---|---|---|
@@ -143,7 +143,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.11 Phase 0 — family-bias Check (Specificity on Clean Strings by Labeler)
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:186-193`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:186-193`
 
 | Judge | Fable-labeled (n=65) | Codex-labeled (n=124) |
 |---|---|---|
@@ -157,7 +157,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.12 Phase 0 — Track C: Repeat Drift (fr, 3941 units, glossary excluded)
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:532-540`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:532-540`
 
 | Metric | Value |
 |---|---|
@@ -179,7 +179,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.14 Phase 0 — Total Spend
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:615-627`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:615-627`
 
 | Article | $ |
 |---|---|
@@ -196,7 +196,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.15 Severity Recalibration — Noise Floor (zh_Hans, n=5, arm A baseline)
 
-`docs/llm-first/measurements/2026-08-18-severity-recalibration-partial.md:88-96`
+`docs/product/measurements/2026-08-18-severity-recalibration-partial.md:88-96`
 
 | Configuration | flip ≥flag | any-severity flip |
 |---|---|---|
@@ -208,7 +208,7 @@ Every number carries `path:line` and verbatim source text.
 
 ### 1.16 Severity Recalibration — Baseline Severity Matrix (zh_Hans, collegium, n=5)
 
-`docs/llm-first/measurements/2026-08-18-severity-recalibration-partial.md:107-116`
+`docs/product/measurements/2026-08-18-severity-recalibration-partial.md:107-116`
 
 ```text
 truth\judge   none  minor  major  crit
@@ -224,7 +224,7 @@ critical        1     1      5     28
 
 ### 1.17 Severity Recalibration — Baseline Metrics (zh_Hans, collegium, n=5)
 
-`docs/llm-first/measurements/2026-08-18-severity-recalibration-partial.md:104-105`
+`docs/product/measurements/2026-08-18-severity-recalibration-partial.md:104-105`
 
 | Configuration | missed_crit | false_crit | REAL@14 | REAL@24 | FP (none→≥major) | noise ≥flag |
 |---|---|---|---|---|---|---|
@@ -234,7 +234,7 @@ critical        1     1      5     28
 
 ### 1.18 Severity Recalibration — Final Noise Floor (zh_Hans, n=5, all arms)
 
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:72-87`
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md:72-87`
 
 | Arm | Config | flip ≥flag | any-severity |
 |---|---|---|---|
@@ -252,7 +252,7 @@ critical        1     1      5     28
 
 ### 1.19 Severity Recalibration — Arm A Reproduces Baseline
 
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:93-98`
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md:93-98`
 
 | | missed_crit | false_crit | REAL@24 | FP |
 |---|---|---|---|---|
@@ -261,7 +261,7 @@ critical        1     1      5     28
 
 ### 1.20 Severity Recalibration — Collegium Comparison (zh_Hans, n=5, medians)
 
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:100-106`
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md:100-106`
 
 | Arm | missed_crit | false_crit | REAL@14 | REAL@24 | FP | prec@≥major | rec@≥major | noise ≥flag |
 |---|---|---|---|---|---|---|---|---|
@@ -271,7 +271,7 @@ critical        1     1      5     28
 
 ### 1.21 Severity Recalibration — Severity Matrices (truth × judge, 5 collegium runs = 620 observations)
 
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:108-111`
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md:108-111`
 
 ```text
 A:  none 315/13/62/25   minor 57/2/15/11   major 29/1/32/23   crit 1/1/5/28
@@ -281,7 +281,7 @@ C:  none 321/25/43/26   minor 58/1/20/6    major 21/3/32/29   crit 4/3/5/23
 
 ### 1.22 Severity Recalibration — R1 Gate (arm B — mandatory `description`)
 
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:115-120`
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md:115-120`
 
 | | prec med | rec med |
 |---|---|---|
@@ -292,7 +292,7 @@ C:  none 321/25/43/26   minor 58/1/20/6    major 21/3/32/29   crit 4/3/5/23
 
 ### 1.23 Severity Recalibration — R2 Gate (severity rubric)
 
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:126-133`
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md:126-133`
 
 | | missed_crit per run | zero in all | false_crit per run | median |
 |---|---|---|---|---|
@@ -304,7 +304,7 @@ C:  none 321/25/43/26   minor 58/1/20/6    major 21/3/32/29   crit 4/3/5/23
 
 ### 1.24 Severity Recalibration — Arm C Improvement Profile
 
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:148-155`
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md:148-155`
 
 - noise ≥flag: 39→30/124 collegium (−23%)
 - REAL@14: 11→12/14 (only arm that caught all 14 anchor defects in at least one run: run1 gave 14/14)
@@ -313,7 +313,7 @@ C:  none 321/25/43/26   minor 58/1/20/6    major 21/3/32/29   crit 4/3/5/23
 
 ### 1.25 Severity Recalibration — Persistent Blind Spots
 
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:158-163`
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md:158-163`
 
 - **24207** — missed by all judges in all arms and all 15 runs: placeholder rendering defect
 - **24208** (broken word order) — caught extremely rarely
@@ -322,7 +322,7 @@ C:  none 321/25/43/26   minor 58/1/20/6    major 21/3/32/29   crit 4/3/5/23
 
 ### 1.26 Severity Recalibration — Arm D (Render-Preview) Collegium C vs D
 
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:215-221`
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md:215-221`
 
 | metric | C | D |
 |---|---|---|
@@ -336,7 +336,7 @@ C:  none 321/25/43/26   minor 58/1/20/6    major 21/3/32/29   crit 4/3/5/23
 
 ### 1.27 Severity Recalibration — Arm D Render-Class Per-Unit (collegium, severity by runs)
 
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:227-233`
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md:227-233`
 
 | unit | defect | C | D |
 |---|---|---|---|
@@ -354,7 +354,7 @@ C:  none 321/25/43/26   minor 58/1/20/6    major 21/3/32/29   crit 4/3/5/23
 
 ### 1.29 Phase 0 — Temperature Schema Probe
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:130-137`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:130-137`
 
 | Model | schema+require+temp | schema+require | schema+temp | schema |
 |---|---|---|---|---|
@@ -367,7 +367,7 @@ C:  none 321/25/43/26   minor 58/1/20/6    major 21/3/32/29   crit 4/3/5/23
 
 ### 1.30 System Prompt — Verdict-Invariant Consistency
 
-`docs/llm-first/measurements/2026-08-13-phase0-measurements.md:119-120`
+`docs/product/measurements/2026-08-13-phase0-measurements.md:119-120`
 
 > "Вердикт выводится из максимальной severity в коде, а не берётся из поля `verdict` модели — инвариант 4 архитектуры; расхождение между двумя считается отдельным счётчиком и оказалось пренебрежимым (0 у deepseek/haiku/command-a/gpt-5.4-mini, 1 у qwen, 8 у sonnet-5)."
 
@@ -417,7 +417,7 @@ C:  none 321/25/43/26   minor 58/1/20/6    major 21/3/32/29   crit 4/3/5/23
 
 The severity scale (none/minor/major/critical) is defined by **player impact**:
 
-`docs/llm-first/plans/2026-08-14-judge-severity-recalibration.md:153-156`:
+`docs/product/plans/2026-08-14-judge-severity-recalibration.md:153-156`:
 > "Рубрика через **последствие для игрока**: `critical` = игрок не поймёт, что произошло, или получит неверную информацию; `major` = смысл искажён, но восстановим; `minor` = стиль и регистр."
 
 But the scale **cannot be used as a gate** — the measurements show it is unreliable in both directions.
@@ -614,12 +614,12 @@ The `context_hash` mechanism (`judge-verdict-core.md:376-385`) is designed to in
 
 ### 5.1 Severity Definitions (from the Rubric)
 
-`docs/llm-first/plans/2026-08-14-judge-severity-recalibration.md:153-156`:
+`docs/product/plans/2026-08-14-judge-severity-recalibration.md:153-156`:
 > "Рубрика через **последствие для игрока**: `critical` = игрок не поймёт, что произошло, или получит неверную информацию; `major` = смысл искажён, но восстановим; `minor` = стиль и регистр."
 
 ### 5.2 Severity → Verdict Mapping (in Code)
 
-`docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md:613-619`:
+`docs/product/plans/2026-08-13-01-judge-verdict-core.md:613-619`:
 
 ```python
 _SEVERITY_VERDICT = {
@@ -632,7 +632,7 @@ _SEVERITY_VERDICT = {
 
 ### 5.3 Verdict → State Mapping
 
-`docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md:636-649`:
+`docs/product/plans/2026-08-13-01-judge-verdict-core.md:636-649`:
 
 - PASS + enable_review → STATE_APPROVED (state 30)
 - PASS without review → STATE_TRANSLATED (state 20)
@@ -644,19 +644,19 @@ _SEVERITY_VERDICT = {
 
 **The measurements endorse the severity-to-verdict mapping as specified, but do NOT endorse using severity as a reliable gate.**
 
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:196-199`:
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md:196-199`:
 > "1. **R1 не пройден** (обязательный `description`: recall 0.75→0.67).
 > 2. **R2 не пройден** (ни одно плечо не ловит все critical во всех повторах; ложные critical 4-5/124 против ≤2).
 > 3. **R3 сработал** → severity-гейт возвращается в дизайн."
 
 The practical carry-forward is:
 
-`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md:200-201`:
+`docs/product/measurements/2026-08-19-severity-recalibration-final.md:200-201`:
 > "4. Практический перенос: плечо C — лучший кандидат в дефолт (стабильность, REAL@14, FP deepseek), но severity-поле в нём использовать как гейт нельзя."
 
 And the implementation config is **arm D** (arm C + render-preview):
 
-`docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md:16-20`:
+`docs/product/plans/2026-08-13-01-judge-verdict-core.md:16-20`:
 > "Конфигурация клиента (задача 5) — **плечо D** замера: промпт плеча C (обязательный `description` + рубрика severity «последствие для игрока», `RUBRIC_RULE`) **плюс** детерминированные рендер-превью плейсхолдеров во входе (`render_preview`, `RENDER_RULE`)."
 
 ### 5.5 Summary of the Verdict Pipeline

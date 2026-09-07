@@ -602,7 +602,7 @@ print('accepted:', len(suggestions))
 **Files:**
 
 - Modify: `docs/changes.rst` (unreleased section, Improvements)
-- Modify: `docs/guides/producer-guide.md:402-407, 424-426`
+- Modify: `docs/product/guides/producer-guide.md:402-407, 424-426`
 - Modify: `AGENTS.md` (customization section)
 
 Changelog, one entry:
@@ -644,7 +644,7 @@ and becomes stale for dev after Task 3.
   - Production runtime rollout is confirmed read-only on 2026-08-15: `hcgameloc-weblate-1` is healthy at revision `02f8d2f`, and both custom checks and autofixes are loaded.
   - Production data confirms `82` suggestion-creation records by `mt:openrouter` and `translated_units = 82`; however, `Suggestion.accept()` records are `0`, `79` suggestions were removed by cleanup, and `3` remain pending (`28`, `38`, `53`). The exact scoped acceptance operation from this task was not run.
   - The French `DEMO_THANKS`, `DATA_LOADING`, and `BUG_TEXT` targets are clean; `DEMO_THANKS` was corrected by a user edit, not by the planned suggestion-acceptance batch. Persisted `game-line-break` failures remain for the expected real defects.
-- [~] **T6 (P2)** - `docs/changes.rst`, `docs/guides/producer-guide.md`, `AGENTS.md`.
+- [~] **T6 (P2)** - `docs/changes.rst`, `docs/product/guides/producer-guide.md`, `AGENTS.md`.
   - Documentation changes are present and the relevant formatting, Ruff, YAML, Sphinx, and codespell hooks pass.
   - The full `prek` run is not green because of unrelated existing REUSE/typos errors in `analysis/data/col4-glossary-append-2026-08-14.csv` and `analysis/data/col4-id-defects.tsv`, plus the pre-existing `docs/changes.rst:12` bullet-stop failure.
 

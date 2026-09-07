@@ -1,8 +1,8 @@
 # План перевода Pirate Ships на Weblate — встреча с командой
 
 **Дата:** 2026-08-14
-**Контекст:** `docs/guides/game-repo-integration-contract.md` (контракт согласован,
-полный цикл прогнан на стенде), `docs/guides/continuous-localization-loop.md`
+**Контекст:** `docs/product/guides/game-repo-integration-contract.md` (контракт согласован,
+полный цикл прогнан на стенде), `docs/product/guides/continuous-localization-loop.md`
 (ролевой туториал).
 
 ---

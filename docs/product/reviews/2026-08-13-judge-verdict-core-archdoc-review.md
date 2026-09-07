@@ -1,7 +1,7 @@
 # ArchDoc Review: Judge Core Requirements from Design Documents
 
 Review of two design documents against the implementation plan
-`docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md`.
+`docs/product/plans/2026-08-13-01-judge-verdict-core.md`.
 All citations are `path:line` with verbatim quotes.
 
 ---
@@ -10,7 +10,7 @@ All citations are `path:line` with verbatim quotes.
 
 ### 1.1 System Invariants (architecture.md:4.1)
 
-1. **Determinism first.** `docs/llm-first/vision/llm-first-product-architecture.md:368-369`
+1. **Determinism first.** `docs/product/vision/llm-first-product-architecture.md:368-369`
    > Всё детерминированно проверяемое проверяется кодом — автофиксами и
    > чеками, не промптом и не судьёй.
 
@@ -217,7 +217,7 @@ All citations are `path:line` with verbatim quotes.
 
 | План | Файл | Содержимое | Готово, когда |
 |---|---|---|---|
-| **1. Вердикт** | `docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md` | `JudgeVerdict` + миграция, классы judge-чеков, клиент судьи (промпт — плечо C замера 2026-08-19), коллегия двух судей и починка в Celery, режим `judge` в `AutoForm` + чекбокс перезаписи, fail-safe state 10, удержание critical до решения человека, карточка на юните, обратный перевод в форме, протухание, исключение судейских чеков из «Things to check» | прогон на фильтре даёт построчный вердикт; `critical` не уходит в сборку без решения человека; навигация через `check:judge-*` |
+| **1. Вердикт** | `docs/product/plans/2026-08-13-01-judge-verdict-core.md` | `JudgeVerdict` + миграция, классы judge-чеков, клиент судьи (промпт — плечо C замера 2026-08-19), коллегия двух судей и починка в Celery, режим `judge` в `AutoForm` + чекбокс перезаписи, fail-safe state 10, удержание critical до решения человека, карточка на юните, обратный перевод в форме, протухание, исключение судейских чеков из «Things to check» | прогон на фильтре даёт построчный вердикт; `critical` не уходит в сборку без решения человека; навигация через `check:judge-*` |
 
 Acceptance criterion verbatim:
 > прогон на фильтре даёт построчный вердикт; `critical` не уходит в

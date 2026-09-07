@@ -16,7 +16,7 @@
 
 `llm.py:1049-1090, 1196-1248`: `source`, `parts`, `context`/`key`, `explanation` (source_unit с фолбэком), `note`, `secondary`, `plural`, `failing_checks`, `glossary_advisories`, `placeholders`, существующий `translation`. Корень: `source_language`, `target_language`, `glossary`, `strings`. Батч переводчика — 10 строк, concurrency 2 (`llm.py:385-397`).
 
-**Соседних реплик нет ни у переводчика, ни у судьи**: `Unit.nearby` — только UI (`weblate/trans/models/unit.py:2329-2367`); судья кладёт в сегмент id, key, source, target, rendered, note, explanation, glossary, checks (`weblate/trans/judge.py:914-923`); план ±1 окна не реализован (`docs/llm-first/plans/2026-08-20-judge-dialog-context.md:1-16`). В данных remediation `previous_source` заполнен у 2/396 юнитов (0.5 %).
+**Соседних реплик нет ни у переводчика, ни у судьи**: `Unit.nearby` — только UI (`weblate/trans/models/unit.py:2329-2367`); судья кладёт в сегмент id, key, source, target, rendered, note, explanation, glossary, checks (`weblate/trans/judge.py:914-923`); план ±1 окна не реализован (`docs/product/plans/2026-08-20-judge-dialog-context.md:1-16`). В данных remediation `previous_source` заполнен у 2/396 юнитов (0.5 %).
 
 Никакого другого project/component-поля (agreement, instructions, check_flags) до промпта не доходит.
 
@@ -77,7 +77,7 @@
 
 ### heart-abyss/hub-1 full-LQA (396 реплик × 9 языков, чистый MT)
 
-`docs/llm-first/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md:7-30, :165-172`:
+`docs/product/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md:7-30, :165-172`:
 
 | Класс | Кол-во | Примеры | Анкор |
 |---|---|---|---|
@@ -120,7 +120,7 @@ audit = `docs/operations/audits/2026-08-20-heart-abyss-hub-1-translation-qa.md`.
 
 ### Эффект project_context у судьи
 
-`docs/llm-first/measurements/2026-08-20-judge-prompt-universalization-run.md:55-80`: с persona/style как project_context `missed_critical = 0` во всех прогонах против baseline; нейтральный фолбэк — FP 20 / noise 39 против 13 / 26.
+`docs/product/measurements/2026-08-20-judge-prompt-universalization-run.md:55-80`: с persona/style как project_context `missed_critical = 0` во всех прогонах против baseline; нейтральный фолбэк — FP 20 / noise 39 против 13 / 26.
 
 ### Модельное сравнение
 

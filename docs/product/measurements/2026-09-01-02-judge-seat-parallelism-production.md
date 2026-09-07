@@ -23,7 +23,7 @@ The first production attempts exposed three rollout assumptions, not fan-out def
 
 With endpoint, key, and alias corrected, one seat-2 single-string stream exceeded the global 120-second deadline at 120.095 seconds. The runbook stopped the canary immediately. The run was revoked, its durable `JudgeRun` was marked failed, and no further opportunistic retry was used to claim success.
 
-Commits `53f2ac1` and `7ce79a9` added and deployed independent request deadlines. The supporting 25-request production measurement is recorded in `docs/llm-first/measurements/2026-09-01-judge-seat-deadline.md`: all requests parsed, median 16.740 seconds, nearest-rank p95 100.594 seconds, and maximum 108.473 seconds under a 300-second diagnostic ceiling. The measured maximum plus 25%, rounded up to the next 30 seconds, set seat 2 to 150 seconds. Seat 1 stayed at 120 seconds.
+Commits `53f2ac1` and `7ce79a9` added and deployed independent request deadlines. The supporting 25-request production measurement is recorded in `docs/product/measurements/2026-09-01-judge-seat-deadline.md`: all requests parsed, median 16.740 seconds, nearest-rank p95 100.594 seconds, and maximum 108.473 seconds under a 300-second diagnostic ceiling. The measured maximum plus 25%, rounded up to the next 30 seconds, set seat 2 to 150 seconds. Seat 1 stayed at 120 seconds.
 
 ## Strict bounded canary
 

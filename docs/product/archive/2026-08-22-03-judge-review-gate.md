@@ -1,7 +1,7 @@
 # LLM judge repair and review-gate rollout plan
 
 > **Superseded 2026-08-25** by
-> `docs/llm-first/plans/2026-08-25-01-judge-producer-ux-and-delivery.md`.
+> `docs/product/plans/2026-08-25-01-judge-producer-ux-and-delivery.md`.
 > Point 4 below (an unresolved `major` becomes `Needs checking`) is no
 > longer current: a `major` now ships as `Translated` with advisory
 > `judge-flag` evidence, and a resolution is an audited producer decision

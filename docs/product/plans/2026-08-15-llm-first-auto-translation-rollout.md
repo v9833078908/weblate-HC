@@ -3,7 +3,7 @@
 > **Статус:** план реализации. Текущий rollout не включает judge pipeline.
 > Judge-ready этап ниже является продолжением этого же контракта, но
 > выполняется только после реализации
-> `docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md`.
+> `docs/product/plans/2026-08-13-01-judge-verdict-core.md`.
 
 ## Цель
 

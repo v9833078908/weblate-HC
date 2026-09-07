@@ -21,7 +21,7 @@ That plan and this one can be executed in either order. They share no source fil
 |---|---|---|
 | Code | `loc_kit_ingest/*`, `weblate/utils/views.py`, `weblate/trans/views/create.py`, `weblate/trans/forms.py` | `weblate/trans/models/project.py`, `weblate/machinery/{models,views,llm}.py`, `weblate/api/views.py`, new `weblate/glossary/management/` |
 | Tests | `loc_kit_ingest/tests/*`, `weblate/trans/tests/test_loc_kit_ingest_contract.py` | `weblate/machinery/tests.py`, `weblate/glossary/tests.py` |
-| Docs | `docs/guides/loc-kit-ingest.md` | `docs/admin/machine.rst`, `docs/api.rst` |
+| Docs | `docs/product/guides/loc-kit-ingest.md` | `docs/admin/machine.rst`, `docs/api.rst` |
 
 Two files are touched by both and will conflict textually if the branches diverge:
 

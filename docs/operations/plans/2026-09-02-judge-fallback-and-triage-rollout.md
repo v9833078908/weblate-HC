@@ -7,9 +7,9 @@
 
 План сводит гейты двух планов в один порядок:
 
-- `docs/llm-first/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`
-- `docs/llm-first/plans/2026-09-01-judge-producer-triage-embed.md`
-- `docs/llm-first/plans/2026-08-31-llm-usage-cost-attribution.md` (предпосылка)
+- `docs/product/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`
+- `docs/product/plans/2026-09-01-judge-producer-triage-embed.md`
+- `docs/product/plans/2026-08-31-llm-usage-cost-attribution.md` (предпосылка)
 
 ## Что установлено
 
@@ -140,7 +140,7 @@ fallback («очередь здесь не включаем») соблюдён 
 
 ### Фаза 2. Smoke атрибуции
 
-По `docs/llm-first/plans/2026-08-31-llm-usage-cost-attribution.md:2339-2356`,
+По `docs/product/plans/2026-08-31-llm-usage-cost-attribution.md:2339-2356`,
 после первого нового LLM-батча. Приёмка: `priced_complete=yes` и
 `attribution_complete=yes`; иначе назвать конкретные строки и причину до того,
 как сумма попадёт в отчёт. Ожидаемый временный эффект, не регрессия:
@@ -189,7 +189,7 @@ judge-расход по сервисам (`LLMUsageLog`). Записать в д
 
 - **Очередь отложек не включается этой выкаткой.** `DEFERRAL_ENABLED=0` в
   проде, менять нельзя: она относится к
-  `docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md`.
+  `docs/product/plans/2026-09-01-03-judge-zero-unparsed.md`.
 - **Откат кода** - предыдущий образ, схема впереди безопасна (см. выше).
 - **Откат fallback** - это переключение двух эндпоинтов, а не одна настройка:
   сначала очистить все восемь `WEBLATE_JUDGE_FALLBACK_*`, затем поставить
@@ -208,4 +208,4 @@ judge-расход по сервисам (`LLMUsageLog`). Записать в д
 `401`/`403`, породивший больше одного fallback-вызова; прогон, в котором больше
 половины батчей одного сида ушли в fallback (primary нездоров); возвращение
 ~30-секундного сброса на первом байте из
-`docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md`.
+`docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md`.

@@ -8,9 +8,9 @@
 `Tempest_f2p`, SCM-Manager в офисной сети). Все числа и ответы сервисов в
 разделе «Замеренное состояние» получены на живых системах 2026-08-11.
 
-Смежные документы: `docs/guides/continuous-localization-loop.md` (полный цикл по
-ролям), `docs/guides/producer-guide.md` (работа продюсера в интерфейсе),
-`docs/guides/loc-kit-ingest.md` (импорт терминологии), `deploy/README.md`
+Смежные документы: `docs/product/guides/continuous-localization-loop.md` (полный цикл по
+ролям), `docs/product/guides/producer-guide.md` (работа продюсера в интерфейсе),
+`docs/product/guides/loc-kit-ingest.md` (импорт терминологии), `deploy/README.md`
 (боевой стенд).
 
 ## Статус на 2026-08-12

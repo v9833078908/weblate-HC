@@ -6,7 +6,7 @@
 Offline probe for the deterministic batch anchor gate.
 
 Answers the two questions Task 1 of
-`docs/llm-first/plans/2026-08-25-deterministic-batch-anchor-gate.md` must settle
+`docs/product/plans/2026-08-25-deterministic-batch-anchor-gate.md` must settle
 before any code ships:
 
 1. At what minimum target length do two *different* sources stop legitimately
@@ -230,8 +230,10 @@ def report_convergence(name: str, pairs: list[tuple[str, str, str]]) -> None:
         f"    positional distance min={min(item[1] for item in found)} "
         f"max={max(item[1] for item in found)}"
     )
-    print(f"    pairs closer than a 10-unit window: "
-          f"{sum(1 for item in found if item[1] < 10)}")
+    print(
+        f"    pairs closer than a 10-unit window: "
+        f"{sum(1 for item in found if item[1] < 10)}"
+    )
     for length, distance, text, left, right in sorted(found, key=lambda i: -i[0]):
         print(
             f"    len={length:3d} dist={distance:4d} {text[:44]!r} "
@@ -242,7 +244,9 @@ def report_convergence(name: str, pairs: list[tuple[str, str, str]]) -> None:
 def report_separators(name: str, pairs: list[tuple[str, str, str]]) -> None:
     tight = sum(1 for _c, source, _t in pairs if separator_is_tight(source))
     loose = sum(
-        1 for _c, source, _t in pairs if "$" in source and not separator_is_tight(source)
+        1
+        for _c, source, _t in pairs
+        if "$" in source and not separator_is_tight(source)
     )
     print(f"  {name}: sources with tight $ = {tight}, with loose/currency $ = {loose}")
 

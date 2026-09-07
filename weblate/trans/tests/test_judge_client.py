@@ -1722,7 +1722,7 @@ class JudgeClientTest(SimpleTestCase):
         # The corporate LiteLLM gateway closes a connection near 30 s under
         # load. The reply carries no status, so the rate-limit branch cannot
         # see it: measured at 33% of requests for one route, 0% for another
-        # (docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md).
+        # (docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md).
         http_mock.register_callback(
             "POST",
             CHAT_URL,

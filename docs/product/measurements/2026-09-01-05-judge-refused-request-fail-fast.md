@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Plan `docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md` (Tasks 1-5)
+Plan `docs/product/plans/2026-09-01-03-judge-zero-unparsed.md` (Tasks 1-5)
 removes the mechanism by which a refused judge request (HTTP 400/401) became a
 fake `unparsed` verdict, a paid retry, or a deferral. This document records
 what was proven, at which commit, and what remains unproven.

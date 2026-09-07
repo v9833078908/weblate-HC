@@ -3,7 +3,7 @@
 **Date:** 2026-08-26. **Status:** superseded the same day. This run stopped
 with no candidate through the gate, and that conclusion no longer stands: the
 disqualifying signal was proxy load at the hour of the run. Read
-`docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md` first;
+`docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md` first;
 this file is kept for its per-seat numbers and the split-gate re-score.
 
 ## Method
@@ -55,7 +55,7 @@ The table above stands: the transport numbers and the sealed-truth `missed_crit`
 are what the run produced. What changed afterwards is the reading of
 `missed_crit`, because the seven sealed critical labels were reviewed against
 the human artifacts in
-`docs/llm-first/reviews/2026-08-26-zh-critical-label-revision.md`. Six of the
+`docs/product/reviews/2026-08-26-zh-critical-label-revision.md`. Six of the
 seven defects are real; only `24221` survives as critical, `24130` lacks
 evidence either way, and the rest are major.
 
@@ -164,7 +164,7 @@ is what the seat search asked. The seats stay on OpenRouter.
 
 ## Overturned on the same day
 
-`docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md`
+`docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md`
 repeated today's judge payload against `deepseek-v4-pro` twelve times and
 recorded zero resets, where this run recorded six of eight. The disqualifying
 signal is proxy load at the hour of the run, not a property of the route.

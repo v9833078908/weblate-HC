@@ -6,8 +6,8 @@
 `deploy/vps.sh` (openrouter.ai в локальной среде не резолвится). Данные
 корпуса read-only с прода, прод не менялся.
 
-Основание: `docs/llm-first/plans/2026-08-14-judge-severity-recalibration.md`.
-Постановка и заготовки: `docs/llm-first/measurements/2026-08-18-severity-recalibration-status.md`.
+Основание: `docs/product/plans/2026-08-14-judge-severity-recalibration.md`.
+Постановка и заготовки: `docs/product/measurements/2026-08-18-severity-recalibration-status.md`.
 Скоринг воспроизводим: `analysis/probes/st2-zh-score.py`
 (`python3 st2-zh-score.py --truth st2-zh-groundtruth.json --out-dir st2-zh-recal`).
 

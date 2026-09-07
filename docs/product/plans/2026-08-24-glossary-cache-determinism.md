@@ -132,7 +132,7 @@ count does not change there.
 - `Project.invalidate_glossary_cache` and the automaton cache: this plan changes
   only the per-instance slot.
 - What `full` prefetches, and the default value of either argument.
-- Task 6 of `docs/llm-first/plans/2026-08-24-judge-glossary-symmetry.md`.
+- Task 6 of `docs/product/plans/2026-08-24-judge-glossary-symmetry.md`.
 
 ## Task 1: Record both failing directions
 

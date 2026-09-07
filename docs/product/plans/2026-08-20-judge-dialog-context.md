@@ -5,14 +5,14 @@
 
 История: план в редакции 2026-08-20 ждал одобрения, реализован не был.
 Ревью 2026-09-04
-(`docs/llm-first/reviews/2026-09-04-judge-dialog-context-review.md`)
+(`docs/product/reviews/2026-09-04-judge-dialog-context-review.md`)
 нашло, что корпус плана не содержит диалога, а код и прод ушли от
 описанного; по указанию владельца замер проведён до переписывания плана,
 и замер закрыл вопрос. Эта редакция фиксирует, что установлено, почему
 план не нужен, и что его переоткроет. Ссылки на этот файл из
-`docs/llm-first/designs/2026-08-13-judge-native-ui-design.md`,
-`docs/llm-first/vision/llm-first-product-architecture.md` и
-`docs/llm-first/research/2026-08-25-speech-style-control-research.md`
+`docs/product/designs/2026-08-13-judge-native-ui-design.md`,
+`docs/product/vision/llm-first-product-architecture.md` и
+`docs/product/research/2026-08-25-speech-style-control-research.md`
 остаются действительными.
 
 ## Гипотеза
@@ -55,7 +55,7 @@ checks`, ничего о соседях. На связном диалоге эт
 
 ## Замер
 
-`docs/llm-first/measurements/2026-09-04-judge-dialog-context-paired.md`,
+`docs/product/measurements/2026-09-04-judge-dialog-context-paired.md`,
 драйвер `analysis/probes/judge-dialog-context-probe.py`. 109 юнитов трёх
 подряд идущих сцен hub-1 (fr), соседи по `position` из полного дампа,
 оба продовых сиденья, одинаковые батчи в плечах H (прод как есть) и H2
@@ -82,7 +82,7 @@ pass в обоих плечах, смысл в `1_18` вне окна; един�
 и переделку 16 вызовов hash. `JudgeRequest`, `_segment`,
 `compute_context_hash`, `verdict.txt` не меняются. Дыра «изолированный
 сегмент» остаётся задокументированной в
-`docs/llm-first/designs/2026-08-13-judge-native-ui-design.md` (поправка
+`docs/product/designs/2026-08-13-judge-native-ui-design.md` (поправка
 2026-08-20) как известное ограничение судьи.
 
 Не входило и не входит: соседние target, окно k > 1, поиск соседа по

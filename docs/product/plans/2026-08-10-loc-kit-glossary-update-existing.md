@@ -628,7 +628,7 @@ Do not stage `weblate/glossary/tests.py` if it was not changed.
 **Files:**
 
 - Modify: `docs/changes.rst`
-- Modify: `docs/guides/loc-kit-ingest.md`
+- Modify: `docs/product/guides/loc-kit-ingest.md`
 - Modify: `AGENTS.md`
 
 **Step 1: добавить changelog entry.**
@@ -656,14 +656,14 @@ Do not stage `weblate/glossary/tests.py` if it was not changed.
 
 **Step 4: перечитать изменённые тексты.**
 
-Run: `git diff --check && git diff -- docs/changes.rst docs/guides/loc-kit-ingest.md AGENTS.md`
+Run: `git diff --check && git diff -- docs/changes.rst docs/product/guides/loc-kit-ingest.md AGENTS.md`
 
 Expected: no whitespace errors; documentation does not describe overwrite or loss of explanations.
 
 **Step 5: commit.**
 
 ```bash
-git add docs/changes.rst docs/guides/loc-kit-ingest.md AGENTS.md
+git add docs/changes.rst docs/product/guides/loc-kit-ingest.md AGENTS.md
 git commit -m "docs(loc-kit): describe append-only glossary updates"
 ```
 

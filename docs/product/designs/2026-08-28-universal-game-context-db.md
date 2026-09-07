@@ -295,7 +295,7 @@ Localazy (formality, tone, sentiment, preferred gender и пер-языковы�
 `it`/`it-IT`, `pt`/`pt-BR`/`pt-PT`, `pl`/`pl-PL` — две конвенции, голый ISO из
 excel-импорта и BCP-47 из google_play. Поле `weblate_language_code` отдельное, а
 не вычисляемое, потому что ISO 639-1 и ISO 3166-1 расходятся на трёх кодах, о
-чём уже предупреждает `docs/guides/game-repo-integration-contract.md:136-162`.
+чём уже предупреждает `docs/product/guides/game-repo-integration-contract.md:136-162`.
 
 ## Слой 5. Ограничения
 

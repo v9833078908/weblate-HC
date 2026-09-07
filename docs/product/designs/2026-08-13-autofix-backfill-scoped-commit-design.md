@@ -2,7 +2,7 @@
 
 Дата: 2026-08-13. Статус: дизайн реализован и проверен 2026-08-15.
 
-Продолжение `docs/llm-first/plans/2026-08-11-layer0-autofix-quick-wins.md`.
+Продолжение `docs/product/plans/2026-08-11-layer0-autofix-quick-wins.md`.
 
 ## Проблема
 
@@ -58,7 +58,7 @@ Candidate query исключает glossary components, templates, source transl
 и read-only units. Эти условия повторяются под row lock.
 
 Терминальный автофикс обрабатывает только `.?!`. `:` исключён: измерение в
-`docs/llm-first/measurements/2026-08-12-autofix-terminal-punctuation.md` показало риск снятия турецкого
+`docs/product/measurements/2026-08-12-autofix-terminal-punctuation.md` показало риск снятия турецкого
 маркера прямой речи.
 
 ## Альтернативы

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 
 # Closed language allowlist: a language joins only after a corpus measurement,
-# see docs/llm-first/measurements/2026-08-11-glossary-enforcement-analysis.md. Indonesian is
+# see docs/product/measurements/2026-08-11-glossary-enforcement-analysis.md. Indonesian is
 # deliberately absent (Snowball conflates distinct words there).
 MORPHOLOGY_LANGUAGES: dict[str, str] = {
     "ru": "russian",
@@ -97,7 +97,7 @@ def is_acronym(term: str) -> bool:
     actively harmful: Russian Snowball turns ``НИИ`` into ``ни``, which is a
     very common particle, so the term would match unrelated text. The rule
     matches the one the measurements in
-    ``docs/llm-first/measurements/2026-08-11-glossary-enforcement-analysis.md`` were taken with -
+    ``docs/product/measurements/2026-08-11-glossary-enforcement-analysis.md`` were taken with -
     the probes there compared acronyms case-sensitively for the same reason.
     """
     return term.isupper() and len(term) <= 5

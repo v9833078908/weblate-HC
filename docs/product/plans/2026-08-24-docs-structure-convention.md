@@ -130,55 +130,55 @@ analysis/
 
 | Было | Станет |
 | --- | --- |
-| `docs/specs/continuous-localization-loop.md` | `docs/guides/continuous-localization-loop.md` |
-| `docs/specs/game-repo-integration-contract.md` | `docs/guides/game-repo-integration-contract.md` |
-| `docs/specs/loc-kit-ingest.md` | `docs/guides/loc-kit-ingest.md` |
-| `docs/specs/producer-guide-weblate.md` | `docs/guides/producer-guide.md` |
-| `docs/LLM-first/plans/old/2026-08-05-routed-llm-machinery.md` | `docs/llm-first/archive/2026-08-05-routed-llm-machinery.md` |
-| `docs/LLM-first/plans/old/2026-08-07-project-scoped-llm-context.md` | `docs/llm-first/archive/2026-08-07-project-scoped-llm-context.md` |
-| `docs/LLM-first/plans/old/llm-judge-external-pipeline.md` | `docs/llm-first/archive/llm-judge-external-pipeline.md` |
-| `docs/LLM-first/2026-08-05-routed-llm-machinery-design.md` | `docs/llm-first/designs/2026-08-05-routed-llm-machinery-design.md` |
-| `docs/LLM-first/2026-08-13-judge-native-ui-design.md` | `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md` |
-| `docs/specs/2026-08-11-col4-fr-autotranslate-report.md` | `docs/llm-first/measurements/2026-08-11-col4-fr-autotranslate-report.md` |
-| `docs/specs/2026-08-11-glossary-enforcement-analysis.md` | `docs/llm-first/measurements/2026-08-11-glossary-enforcement-analysis.md` |
-| `docs/misc/autofix-terminal-punctuation.md` | `docs/llm-first/measurements/2026-08-12-autofix-terminal-punctuation.md` |
-| `docs/misc/col4-judge-annotation.md` | `docs/llm-first/measurements/2026-08-12-col4-judge-annotation.md` |
-| `docs/LLM-first/2026-08-13-phase0-measurements.md` | `docs/llm-first/measurements/2026-08-13-phase0-measurements.md` |
-| `docs/misc/2026-08-14-st2-zh-judge-run.md` | `docs/llm-first/measurements/2026-08-14-st2-zh-judge-run.md` |
-| `docs/misc/2026-08-14-minto-summary.md` | `docs/llm-first/measurements/2026-08-14-st2-zh-judge-summary.md` |
-| `docs/LLM-first/2026-08-18-severity-recalibration-measurements.md` | `docs/llm-first/measurements/2026-08-18-severity-recalibration-partial.md` |
-| `docs/LLM-first/2026-08-18-severity-recalibration-status.md` | `docs/llm-first/measurements/2026-08-18-severity-recalibration-status.md` |
-| `docs/LLM-first/2026-08-19-severity-recalibration-final.md` | `docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md` |
-| `docs/misc/2026-08-20-judge-dev-test-scenario-col4.md` | `docs/llm-first/measurements/2026-08-20-judge-dev-test-scenario-col4.md` |
-| `docs/misc/judge-first-dev-run-2026-08-20.md` | `docs/llm-first/measurements/2026-08-20-judge-first-dev-run.md` |
-| `docs/misc/2026-08-20-judge-prompt-universalization-run.md` | `docs/llm-first/measurements/2026-08-20-judge-prompt-universalization-run.md` |
-| `docs/LLM-first/agent_researches/measurements-report.md` | `docs/llm-first/measurements/judge-measurements-index.md` |
-| `docs/plans/2026-08-10-git-localization-quality-gate.md` | `docs/llm-first/plans/2026-08-10-git-localization-quality-gate.md` |
-| `docs/plans/2026-08-11-glossary-morphological-enforcement.md` | `docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md` |
-| `docs/LLM-first/plans/2026-08-11-layer0-autofix-quick-wins.md` | `docs/llm-first/plans/2026-08-11-layer0-autofix-quick-wins.md` |
-| `docs/LLM-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md` | `docs/llm-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md` |
-| `docs/LLM-first/plans/2026-08-12-phase0-implementation.md` | `docs/llm-first/plans/2026-08-12-phase0-implementation.md` |
-| `docs/LLM-first/plans/2026-08-13-01-judge-verdict-core.md` | `docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md` |
-| `docs/LLM-first/plans/2026-08-14-intra-component-consistency-check.md` | `docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md` |
-| `docs/LLM-first/plans/2026-08-14-judge-severity-recalibration.md` | `docs/llm-first/plans/2026-08-14-judge-severity-recalibration.md` |
-| `docs/plans/2026-08-14-llm-usage-tracking.md` | `docs/llm-first/plans/2026-08-14-llm-usage-tracking.md` |
-| `docs/LLM-first/plans/2026-08-15-llm-first-auto-translation-rollout.md` | `docs/llm-first/plans/2026-08-15-llm-first-auto-translation-rollout.md` |
-| `docs/LLM-first/plans/2026-08-17-session-canon.md` | `docs/llm-first/plans/2026-08-17-session-canon.md` |
-| `docs/LLM-first/plans/2026-08-20-judge-dialog-context.md` | `docs/llm-first/plans/2026-08-20-judge-dialog-context.md` |
-| `docs/LLM-first/plans/2026-08-20-judge-prompt-universalization.md` | `docs/llm-first/plans/2026-08-20-judge-prompt-universalization.md` |
-| `docs/LLM-first/plans/2026-08-22-02-judge-navigation-readiness.md` | `docs/llm-first/plans/2026-08-22-02-judge-navigation-readiness.md` |
-| `docs/plans/2026-08-22-03-judge-review-gate.md` | `docs/llm-first/plans/2026-08-22-03-judge-review-gate.md` |
-| `docs/LLM-first/plans/2026-08-23-litellm-provider-and-judge-endpoint.md` | `docs/llm-first/plans/2026-08-23-litellm-provider-and-judge-endpoint.md` |
-| `docs/LLM-first/2026-08-11-cathedral-localizer-analysis.md` | `docs/llm-first/research/2026-08-11-cathedral-localizer-analysis.md` |
-| `docs/LLM-first/agent_researches/2026-08-11-judge-ux-competitor-research.md` | `docs/llm-first/research/2026-08-11-judge-ux-competitor-research.md` |
-| `docs/LLM-first/agent_researches/2026-08-11-judge-weblate-ui-integration.md` | `docs/llm-first/research/2026-08-11-judge-weblate-ui-integration.md` |
-| `docs/LLM-first/agent_researches/2026-08-11-llm-judge-design-research.md` | `docs/llm-first/research/2026-08-11-llm-judge-design-research.md` |
-| `docs/LLM-first/2026-08-20-judge-prompt-best-practices.md` | `docs/llm-first/research/2026-08-20-judge-prompt-best-practices.md` |
-| `docs/specs/2026-08-11-llm-first-prompt-and-pipeline-review.md` | `docs/llm-first/reviews/2026-08-11-llm-prompt-and-pipeline-review.md` |
-| `docs/LLM-first/plans/2026-08-13-01-judge-verdict-core-review-archdoc.md` | `docs/llm-first/reviews/2026-08-13-judge-verdict-core-archdoc-review.md` |
-| `docs/LLM-first/llm-first-product-research.md` | `docs/llm-first/vision/2026-08-10-llm-first-product-research.md` |
-| `docs/LLM-first/2026-08-15-llm-first-producer-product-research.md` | `docs/llm-first/vision/2026-08-15-producer-first-product-research.md` |
-| `docs/LLM-first/llm-first-product-architecture.md` | `docs/llm-first/vision/llm-first-product-architecture.md` |
+| `docs/specs/continuous-localization-loop.md` | `docs/product/guides/continuous-localization-loop.md` |
+| `docs/specs/game-repo-integration-contract.md` | `docs/product/guides/game-repo-integration-contract.md` |
+| `docs/specs/loc-kit-ingest.md` | `docs/product/guides/loc-kit-ingest.md` |
+| `docs/specs/producer-guide-weblate.md` | `docs/product/guides/producer-guide.md` |
+| `docs/LLM-first/plans/old/2026-08-05-routed-llm-machinery.md` | `docs/product/archive/2026-08-05-routed-llm-machinery.md` |
+| `docs/LLM-first/plans/old/2026-08-07-project-scoped-llm-context.md` | `docs/product/archive/2026-08-07-project-scoped-llm-context.md` |
+| `docs/LLM-first/plans/old/llm-judge-external-pipeline.md` | `docs/product/archive/llm-judge-external-pipeline.md` |
+| `docs/LLM-first/2026-08-05-routed-llm-machinery-design.md` | `docs/product/designs/2026-08-05-routed-llm-machinery-design.md` |
+| `docs/LLM-first/2026-08-13-judge-native-ui-design.md` | `docs/product/designs/2026-08-13-judge-native-ui-design.md` |
+| `docs/specs/2026-08-11-col4-fr-autotranslate-report.md` | `docs/product/measurements/2026-08-11-col4-fr-autotranslate-report.md` |
+| `docs/specs/2026-08-11-glossary-enforcement-analysis.md` | `docs/product/measurements/2026-08-11-glossary-enforcement-analysis.md` |
+| `docs/misc/autofix-terminal-punctuation.md` | `docs/product/measurements/2026-08-12-autofix-terminal-punctuation.md` |
+| `docs/misc/col4-judge-annotation.md` | `docs/product/measurements/2026-08-12-col4-judge-annotation.md` |
+| `docs/LLM-first/2026-08-13-phase0-measurements.md` | `docs/product/measurements/2026-08-13-phase0-measurements.md` |
+| `docs/misc/2026-08-14-st2-zh-judge-run.md` | `docs/product/measurements/2026-08-14-st2-zh-judge-run.md` |
+| `docs/misc/2026-08-14-minto-summary.md` | `docs/product/measurements/2026-08-14-st2-zh-judge-summary.md` |
+| `docs/LLM-first/2026-08-18-severity-recalibration-measurements.md` | `docs/product/measurements/2026-08-18-severity-recalibration-partial.md` |
+| `docs/LLM-first/2026-08-18-severity-recalibration-status.md` | `docs/product/measurements/2026-08-18-severity-recalibration-status.md` |
+| `docs/LLM-first/2026-08-19-severity-recalibration-final.md` | `docs/product/measurements/2026-08-19-severity-recalibration-final.md` |
+| `docs/misc/2026-08-20-judge-dev-test-scenario-col4.md` | `docs/product/measurements/2026-08-20-judge-dev-test-scenario-col4.md` |
+| `docs/misc/judge-first-dev-run-2026-08-20.md` | `docs/product/measurements/2026-08-20-judge-first-dev-run.md` |
+| `docs/misc/2026-08-20-judge-prompt-universalization-run.md` | `docs/product/measurements/2026-08-20-judge-prompt-universalization-run.md` |
+| `docs/LLM-first/agent_researches/measurements-report.md` | `docs/product/measurements/judge-measurements-index.md` |
+| `docs/plans/2026-08-10-git-localization-quality-gate.md` | `docs/product/plans/2026-08-10-git-localization-quality-gate.md` |
+| `docs/plans/2026-08-11-glossary-morphological-enforcement.md` | `docs/product/plans/2026-08-11-glossary-morphological-enforcement.md` |
+| `docs/LLM-first/plans/2026-08-11-layer0-autofix-quick-wins.md` | `docs/product/plans/2026-08-11-layer0-autofix-quick-wins.md` |
+| `docs/LLM-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md` | `docs/product/plans/2026-08-11-phase0-schema-and-judge-calibration.md` |
+| `docs/LLM-first/plans/2026-08-12-phase0-implementation.md` | `docs/product/plans/2026-08-12-phase0-implementation.md` |
+| `docs/LLM-first/plans/2026-08-13-01-judge-verdict-core.md` | `docs/product/plans/2026-08-13-01-judge-verdict-core.md` |
+| `docs/LLM-first/plans/2026-08-14-intra-component-consistency-check.md` | `docs/product/plans/2026-08-14-intra-component-consistency-check.md` |
+| `docs/LLM-first/plans/2026-08-14-judge-severity-recalibration.md` | `docs/product/plans/2026-08-14-judge-severity-recalibration.md` |
+| `docs/plans/2026-08-14-llm-usage-tracking.md` | `docs/product/plans/2026-08-14-llm-usage-tracking.md` |
+| `docs/LLM-first/plans/2026-08-15-llm-first-auto-translation-rollout.md` | `docs/product/plans/2026-08-15-llm-first-auto-translation-rollout.md` |
+| `docs/LLM-first/plans/2026-08-17-session-canon.md` | `docs/product/plans/2026-08-17-session-canon.md` |
+| `docs/LLM-first/plans/2026-08-20-judge-dialog-context.md` | `docs/product/plans/2026-08-20-judge-dialog-context.md` |
+| `docs/LLM-first/plans/2026-08-20-judge-prompt-universalization.md` | `docs/product/plans/2026-08-20-judge-prompt-universalization.md` |
+| `docs/LLM-first/plans/2026-08-22-02-judge-navigation-readiness.md` | `docs/product/plans/2026-08-22-02-judge-navigation-readiness.md` |
+| `docs/plans/2026-08-22-03-judge-review-gate.md` | `docs/product/plans/2026-08-22-03-judge-review-gate.md` |
+| `docs/LLM-first/plans/2026-08-23-litellm-provider-and-judge-endpoint.md` | `docs/product/plans/2026-08-23-litellm-provider-and-judge-endpoint.md` |
+| `docs/LLM-first/2026-08-11-cathedral-localizer-analysis.md` | `docs/product/research/2026-08-11-cathedral-localizer-analysis.md` |
+| `docs/LLM-first/agent_researches/2026-08-11-judge-ux-competitor-research.md` | `docs/product/research/2026-08-11-judge-ux-competitor-research.md` |
+| `docs/LLM-first/agent_researches/2026-08-11-judge-weblate-ui-integration.md` | `docs/product/research/2026-08-11-judge-weblate-ui-integration.md` |
+| `docs/LLM-first/agent_researches/2026-08-11-llm-judge-design-research.md` | `docs/product/research/2026-08-11-llm-judge-design-research.md` |
+| `docs/LLM-first/2026-08-20-judge-prompt-best-practices.md` | `docs/product/research/2026-08-20-judge-prompt-best-practices.md` |
+| `docs/specs/2026-08-11-llm-first-prompt-and-pipeline-review.md` | `docs/product/reviews/2026-08-11-llm-prompt-and-pipeline-review.md` |
+| `docs/LLM-first/plans/2026-08-13-01-judge-verdict-core-review-archdoc.md` | `docs/product/reviews/2026-08-13-judge-verdict-core-archdoc-review.md` |
+| `docs/LLM-first/llm-first-product-research.md` | `docs/product/vision/2026-08-10-llm-first-product-research.md` |
+| `docs/LLM-first/2026-08-15-llm-first-producer-product-research.md` | `docs/product/vision/2026-08-15-producer-first-product-research.md` |
+| `docs/LLM-first/llm-first-product-architecture.md` | `docs/product/vision/llm-first-product-architecture.md` |
 | `docs/misc/heart-abyss-hub-1-translation-qa.md` | `docs/operations/audits/2026-08-20-heart-abyss-hub-1-translation-qa.md` |
 | `docs/misc/2026-08-22-ui-multilingual-lqa-de-fr.md` | `docs/operations/audits/2026-08-22-ui-multilingual-lqa-de-fr.md` |
 | `docs/misc/2026-08-22-victory-banner-common-de-lqa-audit.md` | `docs/operations/audits/2026-08-22-victory-banner-common-de-lqa.md` |
@@ -249,7 +249,7 @@ analysis/
 пути» — обязательная приёмка). В том же проходе закрываются 32 битые ссылки,
 из них механически исправимые:
 
-- `docs/specs/producer-guide.md` → `docs/guides/producer-guide.md`
+- `docs/specs/producer-guide.md` → `docs/product/guides/producer-guide.md`
   (10 ссылок; файл всё время звался `producer-guide-weblate.md`);
 - `plans/...` относительно `docs/LLM-first/` там, где файл лежит в
   `docs/plans/` (6 ссылок, включая фазу 1 роадмапа);
@@ -260,7 +260,7 @@ analysis/
 
 `plans/2026-08-13-02-judge-navigation-and-readiness.md` указывает на файл,
 который в итоге вышел как
-`docs/llm-first/plans/2026-08-22-02-judge-navigation-readiness.md`, — ссылка
+`docs/product/plans/2026-08-22-02-judge-navigation-readiness.md`, — ссылка
 переписана на него.
 
 Остальные ведут на артефакты, которых в репозитории нет: они получают путь по
@@ -269,12 +269,12 @@ analysis/
 
 - `analysis/probes/col4-b0-dump.py` — дамп фазы 0, не закоммичен;
 - `analysis/data/col4-schema-eval.json` — вывод плеча A2, прогон остановлен;
-- `docs/llm-first/measurements/2026-08-XX-judge-calibration.md` — сводный отчёт
+- `docs/product/measurements/2026-08-XX-judge-calibration.md` — сводный отчёт
   фазы 0, вместо него вышли три документа замеров;
-- `docs/llm-first/measurements/2026-08-20-judge-dialog-context-run.md` — замер
+- `docs/product/measurements/2026-08-20-judge-dialog-context-run.md` — замер
   плеча H2, план ещё не одобрен;
-- `docs/llm-first/archive/2026-08-10-llm-first-p1-setup.md` — удалён;
-- `docs/llm-first/plans/2026-08-13-03-judge-decisions-and-whitebox.md` — третий
+- `docs/product/archive/2026-08-10-llm-first-p1-setup.md` — удалён;
+- `docs/product/plans/2026-08-13-03-judge-decisions-and-whitebox.md` — третий
   план нарезки судьи, не написан.
 
 ## Обновление кода и конфигов
@@ -286,11 +286,11 @@ analysis/
 | `.claude/skills/weblate-docs/SKILL.md:30` | список путей |
 | `pyproject.toml` | `[tool.check-manifest] ignore`: добавить `analysis/*`, `analysis/*/*`, `analysis/*/*/*`; `[tool.codespell] skip`: два пути; `[tool.ruff.lint.per-file-ignores]`: `docs/misc/*.py` → `analysis/probes/*.py`; `[tool.typos.files] extend-exclude`: 4 записи `docs/misc/*` → `analysis/data/*` |
 | `REUSE.toml` | шесть `docs/misc/**.*` → `analysis/**`; заодно убрать мёртвые `misc/**.json`, `misc/**.md`, `misc/**.tsv` (корневого `misc/` в репозитории нет) |
-| `weblate/checks/morphology.py:23,100` | `docs/specs/2026-08-11-glossary-enforcement-analysis.md` → `docs/llm-first/measurements/...` |
+| `weblate/checks/morphology.py:23,100` | `docs/specs/2026-08-11-glossary-enforcement-analysis.md` → `docs/product/measurements/...` |
 | `weblate/checks/tests/test_glossary_checks.py:271`, `weblate/glossary/tests.py:1233` | путь плана морфологии |
 | `weblate/glossary/tests.py:1363` | «the probes in `docs/misc`» → `analysis/probes` |
 | `weblate/machinery/llm.py:321`, `weblate/machinery/tests.py:4156` | `docs/misc/col4-batch-size-eval.json` → `analysis/data/...` |
-| `weblate/trans/judge.py:146,159` | два пути в `analysis/probes` и `docs/llm-first/measurements` |
+| `weblate/trans/judge.py:146,159` | два пути в `analysis/probes` и `docs/product/measurements` |
 | `weblate_customization/tests/test_machinery.py:189` | `docs/LLM-first/plans/2026-08-12-phase0-implementation.md` |
 | `analysis/probes/col4-fr-monitor.sh:15` | дефолт `OUT=docs/misc/col4-fr-monitor.log` → `analysis/data/...`; `cd "$(dirname "$0")/../.."` остаётся корректным (глубина та же) |
 | `analysis/probes/*.py` | пути в docstring'ах и примерах запуска (13 файлов) |

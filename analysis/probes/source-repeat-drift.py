@@ -15,7 +15,7 @@ string key:
     within one project and one target language, take every group of units
     whose SOURCE text is identical and whose targets are not.
 
-Feeds docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md:
+Feeds docs/product/plans/2026-08-14-intra-component-consistency-check.md:
 
 1. group counts per language, split into intra-component and
    cross-component-only drift (the plan's scope decision R1);

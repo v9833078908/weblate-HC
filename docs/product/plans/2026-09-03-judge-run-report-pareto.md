@@ -13,7 +13,7 @@ change is confined to `weblate/trans/views/judge.py` (context) and
 existing view: `translate` for a translation-scoped run, `search` for a
 component/project/workspace-scoped run. The producer decisions themselves
 (accept the judge-guided fix, keep as is, send back to queue, fix by hand)
-stay where `docs/llm-first/plans/2026-09-02-producer-editor-pareto.md` put
+stay where `docs/product/plans/2026-09-02-producer-editor-pareto.md` put
 them - on the translate page verdict card. This page only routes to them.
 
 **Tech stack:** Python 3.14, Django templates (Bootstrap 5), gettext

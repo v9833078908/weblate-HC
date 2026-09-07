@@ -13,7 +13,7 @@ native Weblate checks, and give the producer one coherent surface to launch the
 judge, follow its phase, inspect repairs, and record a delivery decision.
 
 This is the first of two plans. The deferred run-history and migration work is
-in `docs/llm-first/plans/2026-08-25-02-judge-run-history-and-resolution-follow-up.md`.
+in `docs/product/plans/2026-08-25-02-judge-run-history-and-resolution-follow-up.md`.
 
 ## Decided behavior
 

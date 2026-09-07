@@ -1,7 +1,7 @@
 # Bound a judge run and keep the verdicts it paid for (superseded)
 
 **Date:** 2026-08-24. **Status:** superseded and absorbed into
-`docs/llm-first/plans/2026-08-24-auto-translate-queue-and-progress.md`,
+`docs/product/plans/2026-08-24-auto-translate-queue-and-progress.md`,
 Tasks 1-3 and the Decisions section. Do not implement this document
 independently.
 
@@ -41,7 +41,7 @@ Queue starvation is configuration, not code.
 
 ## Relationship to Plan 02
 
-`docs/llm-first/plans/2026-08-22-02-judge-navigation-readiness.md` Task 6
+`docs/product/plans/2026-08-22-02-judge-navigation-readiness.md` Task 6
 ("Share preview scope, cap, and judge progress reporting") threads a progress
 callback through exactly the seam this plan creates:
 
@@ -72,7 +72,7 @@ Task 6's progress tick then ignores both arguments. This is a one-line change
 to an approved plan; nothing else in Task 6 moves. Do not start Task 6 against
 the old signature.
 
-`docs/llm-first/plans/2026-08-24-judge-progress-reporting.md` is a superseded
+`docs/product/plans/2026-08-24-judge-progress-reporting.md` is a superseded
 stub and stays superseded. This plan does not revive it.
 
 ---

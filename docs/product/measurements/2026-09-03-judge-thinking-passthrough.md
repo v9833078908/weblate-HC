@@ -58,7 +58,7 @@ seat 2  reasoning ''                   payload {}
 Seat 2's empty value means "send no reasoning field", so the model was on its
 own default, which for Qwen is thinking on. Seat 1 did send a disable field and
 still reported 87.7% reasoning tokens - the leak first recorded in
-`docs/llm-first/measurements/2026-08-27-litellm-seat1-reasoning-leak-and-unparsed-rate.md`,
+`docs/product/measurements/2026-08-27-litellm-seat1-reasoning-leak-and-unparsed-rate.md`,
 whose root cause is established here.
 
 `GET /model/info` explains it. All 23 proxy aliases declare their thinking mode
@@ -103,7 +103,7 @@ The paired A/B below refutes it: that was variance. This model emits 32 to 3,432
 completion tokens on the *same* unit and prompt at temperature 0, so no
 three-sample cell on this endpoint can carry a claim.
 
-`docs/llm-first/research/2026-08-28-litellm-judge-stability-root-cause.md`
+`docs/product/research/2026-08-28-litellm-judge-stability-root-cause.md`
 already noted that Game Pulse translates its Qwen `[no-think]` suffix into
 `extra_body.enable_thinking=false` against this same proxy. That note was
 correct and was not acted on.
@@ -280,6 +280,6 @@ the thinking arm on 4 of 5.
   `_run_seats`, `_request_identity`, `_cached_verdict` in
   `weblate/trans/judge_loop.py`.
 - Prior records this supersedes or explains:
-  `docs/llm-first/measurements/2026-08-27-litellm-seat1-reasoning-leak-and-unparsed-rate.md`,
-  `docs/llm-first/measurements/2026-08-27-litellm-complement-smoke.md`,
-  `docs/llm-first/research/2026-08-28-litellm-judge-stability-root-cause.md`.
+  `docs/product/measurements/2026-08-27-litellm-seat1-reasoning-leak-and-unparsed-rate.md`,
+  `docs/product/measurements/2026-08-27-litellm-complement-smoke.md`,
+  `docs/product/research/2026-08-28-litellm-judge-stability-root-cause.md`.

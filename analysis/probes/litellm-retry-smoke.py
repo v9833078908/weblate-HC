@@ -18,7 +18,7 @@ model, and an empty value sends no reasoning field so the model's own default
 applies.
 
 Results are recorded in
-`docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md`.
+`docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md`.
 """
 
 from __future__ import annotations

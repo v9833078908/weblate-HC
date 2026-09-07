@@ -30,7 +30,7 @@ or setting was modified. Probe preserved at
 ## Result 1: the stabilization work did help, and the record shows where
 
 The mechanisms specified by
-`docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md` are in the code and
+`docs/product/plans/2026-08-28-litellm-judge-stabilization.md` are in the code and
 are what makes this attribution possible at all:
 
 | Plan task | State in code | Evidence |
@@ -38,7 +38,7 @@ are what makes this attribution possible at all:
 | 1. Judge output contract, `instruction` decoupled from parsing | implemented | `JudgeResult.instruction` is historical-only (`weblate/trans/judge.py:166-168`), tolerated in a segment (`:711`), written empty (`weblate/trans/judge_loop.py:275`) |
 | 2. Typed diagnostics and safe provenance | implemented | closed `FAILURE_KINDS` (`weblate/trans/judge.py:49-67`), `JudgeRequestAttempt` with `provider`, `endpoint_fingerprint`, `failure_kind` (`weblate/trans/models/judge.py:231-308`) |
 | 3. Immutable per-seat request profiles | implemented | `JudgeSeatProfile` (`weblate/trans/judge.py:99-119`), `_resolve_profile` with `inherit` (`:358-460`) |
-| 4. Streaming and gateway transport | implemented, later extended | `_read_sse` with absolute and idle bounds (`weblate/trans/judge.py:901-1001`, idle at `:912-914`), then per-seat deadlines from `docs/llm-first/plans/2026-09-01-judge-per-seat-deadline.md` |
+| 4. Streaming and gateway transport | implemented, later extended | `_read_sse` with absolute and idle bounds (`weblate/trans/judge.py:901-1001`, idle at `:912-914`), then per-seat deadlines from `docs/product/plans/2026-09-01-judge-per-seat-deadline.md` |
 | 5. Classified recovery and adaptive batching | implemented | kind-driven retries (`weblate/trans/judge.py:1520-1559`), halving and recovery (`:1416-1432`), width-one isolation (`:1561-1593`) |
 | 6. Durable deferred queue | in code, **off in production** | `JudgeDeferral`, `_sync_deferral` (`weblate/trans/judge_loop.py:747-834`), `drain_judge_deferrals` (`:1636-1681`), `WEBLATE_JUDGE_DEFERRAL_ENABLED=0` |
 | 7. Credential rotation | outside this measurement | security runbook, not observable from the database |
@@ -72,7 +72,7 @@ OpenRouter carries 756 unparsed verdicts. Zero unparsed on OpenRouter was one da
 The comparison is not clean in either direction: the pairs differ by model
 (`qwen/qwen3-235b-a22b-2507` versus `atlas/qwen3.8-max`), batch width and deadline,
 so R3 forbids reading the difference as a provider result
-(`docs/llm-first/vision/llm-first-product-architecture.md:674`).
+(`docs/product/vision/llm-first-product-architecture.md:674`).
 
 ## Result 3: LiteLLM's 51 are a ten-minute rollout window, not LiteLLM behaviour
 
@@ -90,7 +90,7 @@ Both failing fingerprints existed only during rollout: `b7849441` from 05:59 to
 05:59 and 06:09 on 2026-09-01, and every one records `provider="openrouter"` while
 carrying a LiteLLM model name: the serving endpoint was OpenRouter's while the
 configured models were LiteLLM's. That is deployment correction 1 of
-`docs/llm-first/measurements/2026-09-01-02-judge-seat-parallelism-production.md`
+`docs/product/measurements/2026-09-01-02-judge-seat-parallelism-production.md`
 (production `.env` lacked `WEBLATE_JUDGE_BASE_URL`), not a proxy or model property.
 
 Per running profile:
@@ -131,7 +131,7 @@ they were written as `JudgeVerdict.unparsed=True` against 101 units and the verd
 card renders them as "The latest judge answer was not parsed".
 
 The plan specified fail-fast for `401/403` only
-(`docs/llm-first/plans/2026-08-28-litellm-judge-stabilization.md:262`). That is
+(`docs/product/plans/2026-08-28-litellm-judge-stabilization.md:262`). That is
 implemented: `http-auth` raises immediately (`weblate/trans/judge.py:1516-1517`).
 `http-other` has no equivalent rule, so the 05:59 run **completed** after 50
 consecutive HTTP 400 batches across two request rounds of one run (`48bfbd72`),
@@ -158,4 +158,4 @@ writing 50 unparsed verdicts instead of stopping after the first refusal.
 5. The 756 OpenRouter unparsed verdicts predate attempt recording, so their kinds
    cannot be named from the database. The 716 from 2026-08-28 are already attributed
    to a model and alias misconfiguration in
-   `docs/llm-first/research/2026-08-28-litellm-judge-stability-root-cause.md`.
+   `docs/product/research/2026-08-28-litellm-judge-stability-root-cause.md`.

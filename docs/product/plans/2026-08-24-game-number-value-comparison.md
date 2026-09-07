@@ -22,7 +22,7 @@ literal ones. There is no per-language "supported notation" switch and no compat
 
 ## Why this fix exists
 
-`docs/llm-first/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` section 3.1 measured two
+`docs/product/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` section 3.1 measured two
 production strings across nine languages:
 
 | Context | Russian value | Defective target | Actual value |
@@ -660,9 +660,9 @@ git commit -m "test(checks): gate game-number on the local corpora"
 **Files:**
 
 - Modify: `docs/changes.rst:31`
-- Modify: `docs/guides/producer-guide.md:397`
-- Modify: `docs/guides/producer-guide-weblate.md:397`
-- Modify: `docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md:7,9,1320-1682,1684`
+- Modify: `docs/product/guides/producer-guide.md:397`
+- Modify: `docs/product/guides/producer-guide-weblate.md:397`
+- Modify: `docs/product/plans/2026-08-24-llm-batch-string-identity.md:7,9,1320-1682,1684`
 
 ### Step 1: Extend the unreleased changelog entry
 
@@ -683,7 +683,7 @@ Both guides describe the check for the game teams and carry the same row. Replac
 
 ### Step 3: Retire the superseded Part B
 
-In `docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md`:
+In `docs/product/plans/2026-08-24-llm-batch-string-identity.md`:
 
 1. Replace lines 1320 to 1682, from `## Part B: make game-number compare values, not digits`
    through the `---` separator preceding `### Out of scope` at line 1684, with:
@@ -711,11 +711,11 @@ In `docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md`:
 uv run prek run rst-double-space rst-http rst-bullet-stop sphinx-lint codespell \
   --files docs/changes.rst
 uv run prek run rumdl codespell trailing-whitespace end-of-file-fixer \
-  --files docs/guides/producer-guide.md docs/guides/producer-guide-weblate.md \
-  docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md
-git add docs/changes.rst docs/guides/producer-guide.md \
-  docs/guides/producer-guide-weblate.md \
-  docs/llm-first/plans/2026-08-24-llm-batch-string-identity.md
+  --files docs/product/guides/producer-guide.md docs/product/guides/producer-guide-weblate.md \
+  docs/product/plans/2026-08-24-llm-batch-string-identity.md
+git add docs/changes.rst docs/product/guides/producer-guide.md \
+  docs/product/guides/producer-guide-weblate.md \
+  docs/product/plans/2026-08-24-llm-batch-string-identity.md
 git commit -m "docs(checks): document game-number value comparison"
 ```
 

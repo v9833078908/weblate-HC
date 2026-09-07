@@ -21,11 +21,11 @@
   `FLAG` -> `STATE_NEEDS_CHECKING`
 - `weblate/utils/state.py:41` + `weblate/trans/models/unit.py:2884-2890` —
   оба состояния блокируются политикой `WITHOUT_NEEDS_EDITING`
-- `docs/llm-first/plans/2026-08-22-03-judge-review-gate.md:8-15` — модель
+- `docs/product/plans/2026-08-22-03-judge-review-gate.md:8-15` — модель
   цены ошибки, которая держится на сходимости починки
-- `docs/llm-first/measurements/judge-measurements-index.md:569-573` —
+- `docs/product/measurements/judge-measurements-index.md:569-573` —
   эффективность петли починки не измерена
-- `docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md` —
+- `docs/product/measurements/2026-08-19-severity-recalibration-final.md` —
   плечо D, шумовой пол, R3
 - `analysis/data/st2-zh-units.jsonl`, `analysis/data/st2-zh-groundtruth.json`
 - `docs/operations/plans/2026-08-14-st2-zh-corrected-export.md` — человеческая
@@ -230,7 +230,7 @@
       **до** применения R1-R3.
 - [ ] Решение по `FLAG` принято ровно по R1-R3, без переформулировки.
 - [ ] Результат — отдельный документ замеров в
-      `docs/llm-first/measurements/`.
+      `docs/product/measurements/`.
 - [ ] Долг на сертификацию записан числом.
 
 ## Что этот план не закрывает

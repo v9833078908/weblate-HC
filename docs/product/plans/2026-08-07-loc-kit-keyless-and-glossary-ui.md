@@ -393,7 +393,7 @@ cd loc_kit_ingest && uv run pytest tests/test_pipeline.py tests/test_failure_mat
 **Files:**
 
 - Modify: `loc_kit_ingest/cli.py` only if help text needs clarification.
-- Modify: `docs/guides/loc-kit-ingest.md` in Part E.
+- Modify: `docs/product/guides/loc-kit-ingest.md` in Part E.
 
 Do not add `--terms`, `--suggest-profile`, or an OpenRouter dependency to the CLI. Existing `--profile` is the universal CLI entry point for a v2 record-map. Update its help text only if needed to say that the profile can define a TBX record-map glossary.
 
@@ -592,7 +592,7 @@ After creation, assert `file_format == "tbx"`, `filemask == "tbx/*.tbx"`, `templ
 
 **Files:**
 
-- Modify: `docs/guides/loc-kit-ingest.md`
+- Modify: `docs/product/guides/loc-kit-ingest.md`
 
 Update the Russian specification without rewriting unrelated sections:
 

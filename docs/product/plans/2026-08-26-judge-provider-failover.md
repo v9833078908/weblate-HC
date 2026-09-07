@@ -1,7 +1,7 @@
 # LiteLLM judge seats in production, with OpenRouter as the fallback
 
 **Date:** 2026-08-26. **Status:** mechanism absorbed 2026-08-27, Stage A still
-open. `docs/llm-first/plans/2026-08-27-judge-reliability-hardening.md` now owns
+open. `docs/product/plans/2026-08-27-judge-reliability-hardening.md` now owns
 D1-D4, D6, D7 and Stages B-C - the two-endpoint configuration, the per-seat
 per-batch fallback, the availability-only trigger list, the `judge_provider`
 field and the parser-invalid-`200` safety rule - because that plan needs the
@@ -9,10 +9,10 @@ fallback as its terminal machine resolver and must not carry a competing
 migration. D5 (cache reuse) is superseded there by a stricter predicate. What
 remains live here is **Stage A**: no LiteLLM seat pair has been scored against
 ground truth, and scoring is tracked by
-`docs/llm-first/plans/2026-08-27-judge-set-ab-openrouter-vs-litellm.md`.
+`docs/product/plans/2026-08-27-judge-set-ab-openrouter-vs-litellm.md`.
 Stage A and Stage D each still need their own explicit go before they run.
 **Rule:** R3 - changing the prompt or the model invalidates the measurement
-(`docs/llm-first/vision/llm-first-product-architecture.md:674`).
+(`docs/product/vision/llm-first-product-architecture.md:674`).
 
 ## Goal
 
@@ -25,7 +25,7 @@ verdict we dislike into a second opinion.
 
 Three measurements, all on 2026-08-26:
 
-- `docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md` -
+- `docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md` -
   Stage 3's disqualification of every DeepSeek route was proxy load at that
   hour. `deepseek-v4-pro` answered today's judge payload, strict schema
   included, in 8.9 s, and reset 0 of 12 times.
@@ -179,7 +179,7 @@ with the existing harness, not with new probes.
 1. Candidate pool: the routes that held the production prompt, which today
    means `deepseek-v4-pro` with reasoning on, `qwen3.8-max` with reasoning off,
    and any route from
-   `docs/llm-first/measurements/2026-08-26-litellm-stage0-compatibility.md`
+   `docs/product/measurements/2026-08-26-litellm-stage0-compatibility.md`
    that a fresh compatibility pass still admits. Re-run compatibility first:
    the proxy's behaviour is load-dependent and the Stage 0 sample is old.
 2. Corpora: the sealed `analysis/data/st2-zh-*` set and the frozen
@@ -189,7 +189,7 @@ with the existing harness, not with new probes.
    candidate is judged on recall first.
 4. Search the pair offline from stored verdicts. The objective is union recall
    across the two seats, not the best individual score.
-5. Record the run in `docs/llm-first/measurements/`, dated, with the model IDs,
+5. Record the run in `docs/product/measurements/`, dated, with the model IDs,
    the reasoning mode per model, and the batch width.
 
 **Acceptance:** a named pair with a recall number per corpus, and an explicit

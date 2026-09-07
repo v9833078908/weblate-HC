@@ -200,9 +200,9 @@ git commit -m "fix(trans): isolate autofix backfill pending changes"
 
 - Modify: `docs/admin/management.rst`
 - Modify: `docs/changes.rst`
-- Modify: `docs/llm-first/measurements/2026-08-12-autofix-terminal-punctuation.md`
+- Modify: `docs/product/measurements/2026-08-12-autofix-terminal-punctuation.md`
 - Modify: `analysis/data/col4-judge-golden.json`
-- Modify: `docs/llm-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md`
+- Modify: `docs/product/plans/2026-08-11-phase0-schema-and-judge-calibration.md`
 - Test: `weblate/trans/tests/test_autofix.py`
 
 ### Step 1: Обновить contract
@@ -233,8 +233,8 @@ Expected: modified modules/tests green; no newly introduced mypy errors.
 
 ```bash
 git add docs/admin/management.rst docs/changes.rst \
-  docs/llm-first/measurements/2026-08-12-autofix-terminal-punctuation.md analysis/data/col4-judge-golden.json \
-  docs/llm-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md \
+  docs/product/measurements/2026-08-12-autofix-terminal-punctuation.md analysis/data/col4-judge-golden.json \
+  docs/product/plans/2026-08-11-phase0-schema-and-judge-calibration.md \
   weblate/trans/tests/test_autofix.py
 git commit -m "docs(trans): describe scoped autofix backfill"
 /usr/bin/git push

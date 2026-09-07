@@ -4,7 +4,7 @@
 задача 6 (`JudgeDeferral`) есть в коде, но выключена на проде
 (`WEBLATE_JUDGE_DEFERRAL_ENABLED=0`); задача 7 - отдельная security-операция,
 вне этого статуса. Проверено по коду и по production-данным 2026-09-01:
-`docs/llm-first/measurements/2026-09-01-04-judge-unparsed-attribution.md`,
+`docs/product/measurements/2026-09-01-04-judge-unparsed-attribution.md`,
 раздел «Result 1» - там таблица «задача -> место в коде».
 
 **Что план не покрыл.** Правило fail-fast записано только для `401/403`
@@ -41,7 +41,7 @@ OpenRouter и обеспечить измеряемую стабильность
   canary.
 
 Этот план заменяет противоречащие части
-`docs/llm-first/plans/2026-08-27-judge-reliability-hardening.md`, включая тезис
+`docs/product/plans/2026-08-27-judge-reliability-hardening.md`, включая тезис
 «это не client defect».
 
 ## Implementation changes

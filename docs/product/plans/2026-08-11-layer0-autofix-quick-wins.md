@@ -54,7 +54,7 @@ production backfill и повторный dry-run завершены успеш�
 ## Замер (воспроизводимый)
 
 Полные цифры, метод и все спорные строки:
-**`docs/llm-first/measurements/2026-08-12-autofix-terminal-punctuation.md`**.
+**`docs/product/measurements/2026-08-12-autofix-terminal-punctuation.md`**.
 Скрипт: `analysis/probes/autofix-backfill-scan.py`.
 Артефакт: `analysis/data/autofix-backfill-2026-08-12.json`.
 
@@ -84,7 +84,7 @@ production backfill и повторный dry-run завершены успеш�
 1. **Source-blind предикат — верхняя граница, не объём.** «Target
    заканчивается знаком, которого нет в конце источника» даёт 92 против 70.
    Это ровно ошибка HT001/PH002 из разбора Cathedral
-   (`docs/llm-first/research/2026-08-11-cathedral-localizer-analysis.md`, раздел 6):
+   (`docs/product/research/2026-08-11-cathedral-localizer-analysis.md`, раздел 6):
    правило, глядящее только в target, пишет дефект источника на переводчика.
 2. **Разворачивать кавычки в target нельзя.** Первая редакция правила давала
    87 вместо 70, и все 17 лишних — порча: `…the inscription "armory."` →
@@ -170,7 +170,7 @@ production backfill и повторный dry-run завершены успеш�
 ## Задача 1. Решение по двоеточию (D11) — замер выполнен
 
 Замер прода выполнен 2026-08-12; скрипт, артефакт и все семь строк лежат в
-репозитории (`docs/llm-first/measurements/2026-08-12-autofix-terminal-punctuation.md`, раздел 5).
+репозитории (`docs/product/measurements/2026-08-12-autofix-terminal-punctuation.md`, раздел 5).
 Писать сканер больше не нужно — нужно **решение владельца**.
 
 Все семь юнитов с добавленным двоеточием — турецкий, компонент `CoL4/data`,
@@ -384,7 +384,7 @@ HUGGING_SEPARATOR = re.compile(rf"{SEPARATOR_SPACE}*\${SEPARATOR_SPACE}*")
 SPACING_CHARACTERS = re.compile(r"[ \u00a0\u202f\u2009]")
 TRAILING_SPACING = re.compile(r"[ \u00a0\u202f\u2009]+$")
 
-# ASCII only, as measured: docs/llm-first/measurements/2026-08-12-autofix-terminal-punctuation.md.
+# ASCII only, as measured: docs/product/measurements/2026-08-12-autofix-terminal-punctuation.md.
 TERMINAL_MARKS = ".!?:"
 # Closing quotes stripped from the SOURCE before comparing, so a source mark
 # hiding behind one is still seen (prod unit 180448, `с криком "Еретик!"`).
@@ -1205,7 +1205,7 @@ Golden set собран прототипом (`fixups: ["terminal-extension-!?:"
 **Files:**
 
 - Modify: `analysis/probes/col4-judge-goldenset-build.py`
-- Modify: `docs/llm-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md`
+- Modify: `docs/product/plans/2026-08-11-phase0-schema-and-judge-calibration.md`
 
 **Step 1:** прочитать сборщик и найти, где формируется литерал
 `normalization`.
@@ -1224,7 +1224,7 @@ git diff --stat analysis/data/col4-judge-golden.json
 
 Ожидание: меняются только метаданные. Если поменялись сами строки —
 прототип и отгруженный автофикс расходятся: зафиксировать расхождение в
-`docs/llm-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md`
+`docs/product/plans/2026-08-11-phase0-schema-and-judge-calibration.md`
 и пересчитать затронутые страты, а не подгонять код под набор.
 
 **Step 4:** в задаче B1 фазы 0 записать правило: первый пишущий прогон
@@ -1234,7 +1234,7 @@ git diff --stat analysis/data/col4-judge-golden.json
 **Step 5: Commit**
 
 ```bash
-git add analysis/probes/col4-judge-goldenset-build.py analysis/data/col4-judge-golden.json docs/llm-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md
+git add analysis/probes/col4-judge-goldenset-build.py analysis/data/col4-judge-golden.json docs/product/plans/2026-08-11-phase0-schema-and-judge-calibration.md
 git commit -m "chore(llm-first): pin the autofix fingerprint into the judge golden set"
 ```
 
@@ -1281,7 +1281,7 @@ dev-docker — деплой). Запросить подтверждение, з�
 последняя строка — `Dry run: nothing written.` Проверить, что новых
 `Change` не появилось.
 
-**Step 5: Записать результат** в `docs/llm-first/measurements/2026-08-12-autofix-terminal-punctuation.md`
+**Step 5: Записать результат** в `docs/product/measurements/2026-08-12-autofix-terminal-punctuation.md`
 (отпечаток реестра, счётчики, дата).
 
 ### Runbook прод-прогона
@@ -1403,7 +1403,7 @@ git commit -m "docs(changes): note the terminal autofix and reapply_autofixes"
 5. `--apply` на одном dev-компоненте: цели починены, state сохранён,
    юниты без дефекта не тронуты, ровно один коммит на корень репозитория.
 6. Повторный `--apply`: `0 units to change`, ноль новых `Change`.
-7. `docs/llm-first/measurements/2026-08-12-autofix-terminal-punctuation.md` содержит вердикт по `:`.
+7. `docs/product/measurements/2026-08-12-autofix-terminal-punctuation.md` содержит вердикт по `:`.
 8. Отпечаток автофиксов совпадает у golden set и прод-инстанса.
 9. Прод-runbook пройден на `CoL4/data` целиком, включая повторный dry-run
    с `0 units to change`.

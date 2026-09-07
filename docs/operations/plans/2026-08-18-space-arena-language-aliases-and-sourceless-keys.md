@@ -276,7 +276,7 @@ note (все notes показываются в UI без обрезки, в от
 
 ### Задача 5. Документация
 
-- `docs/guides/loc-kit-ingest.md`: политика пустого источника и карта алиасов.
+- `docs/product/guides/loc-kit-ingest.md`: политика пустого источника и карта алиасов.
 - `docs/operations/meetings/2026-08-07-space-arena-dev-onboarding.md`: коды языков их кита,
   `language_aliases` для git-пути, требование «`en.json` - объединение ключей»
   и правило про `zip` вместо `zip:json` для round-trip.
@@ -321,7 +321,7 @@ note (все notes показываются в UI без обрезки, в от
 | 2 | `parser.py`: пустой источник при хотя бы одной заполненной цели - WARNING `po.missing_source` и импорт; пустой источник без целей - ERROR `po.key_without_content`. Число таких ключей печатается в отчёте (`pipeline.py`) и отдельным сообщением в форме загрузки (`views.py` `kit_info["sourceless"]` -> `create.py`) |
 | 3 | `infer.py`: заголовок, похожий на код языка, но не опознанный, получает явную заметку про developer comment |
 | 4 | `weblate/trans/tests/test_loc_kit_ingest_contract.py`: три новых теста - коды игры становятся переводами, ключ без источника становится юнитом с `source == ""`, ключ без текста вообще отклоняет кит |
-| 5 | `docs/admin/projects.rst` (новый раздел `loc-kit-tables`), `docs/guides/loc-kit-ingest.md`, `docs/operations/meetings/2026-08-07-space-arena-dev-onboarding.md` (раздел 4.1), `docs/changes.rst` |
+| 5 | `docs/admin/projects.rst` (новый раздел `loc-kit-tables`), `docs/product/guides/loc-kit-ingest.md`, `docs/operations/meetings/2026-08-07-space-arena-dev-onboarding.md` (раздел 4.1), `docs/changes.rst` |
 | 6 | Прогон на реальных китах, см. ниже |
 
 ### Проверка
@@ -422,7 +422,7 @@ PO-файлов, ноль ERROR, 8911 warning (намеренно пустые �
 не теряется, он просто перестаёт быть источником, и движок по-прежнему читает
 его из `en.json`. Русский источник вдобавок включает уже сделанную
 морфологическую сверку глоссария (Snowball-стемминг русской исходной формы,
-`docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md`).
+`docs/product/plans/2026-08-11-glossary-morphological-enforcement.md`).
 
 Цена решения - 237 ключей без русского текста, разложенные в
 `~/Downloads/SpaceArena_needs_ru.csv` (`key`, `en`, `kind`, пустая `ru`):

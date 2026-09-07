@@ -489,8 +489,8 @@ git commit -m "chore(checks): register GameNumberCheck in both environments"
 
 - Modify: `docs/changes.rst` (after line 26, inside the `2026.8.1` Improvements block)
 - Modify: `AGENTS.md:177-186` and `AGENTS.md:342-343`
-- Modify: `docs/guides/producer-guide.md:408` (add a table row)
-- Modify: `docs/guides/game-repo-integration-contract.md:97-125` (part 1.3)
+- Modify: `docs/product/guides/producer-guide.md:408` (add a table row)
+- Modify: `docs/product/guides/game-repo-integration-contract.md:97-125` (part 1.3)
 
 ### Step 1: Changelog
 
@@ -524,7 +524,7 @@ sentence that names the registered classes.
 
 ### Step 4: Producer guide
 
-Add one row after `docs/guides/producer-guide.md:408`, matching the terse
+Add one row after `docs/product/guides/producer-guide.md:408`, matching the terse
 symptom style of the table:
 
 ```markdown
@@ -540,7 +540,7 @@ are clean; and 95 source keys state a quantity as a word ("в течение т�
 секунд"), of which 70 are stat descriptions rather than prose. Both are edits
 in the developer's own table, and both are invisible to any check.
 
-Add three rows to the table at `docs/guides/game-repo-integration-contract.md:101-109`:
+Add three rows to the table at `docs/product/guides/game-repo-integration-contract.md:101-109`:
 
 ```markdown
 | Числовые характеристики | Цифрой или плейсхолдером из данных, не словом: «в течение 3 секунд», не «в течение трёх секунд» |
@@ -573,8 +573,8 @@ Expected: pass. The hooks cover RST and Markdown formatting; a malformed
 ### Step 7: Commit
 
 ```sh
-git add docs/changes.rst AGENTS.md docs/guides/producer-guide.md \
-        docs/guides/game-repo-integration-contract.md
+git add docs/changes.rst AGENTS.md docs/product/guides/producer-guide.md \
+        docs/product/guides/game-repo-integration-contract.md
 git commit -m "docs(checks): document game-number and the numeric source contract"
 ```
 

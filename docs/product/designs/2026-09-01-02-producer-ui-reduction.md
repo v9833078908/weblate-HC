@@ -4,7 +4,7 @@
 (formats, machinery) применены на dev-инстансе в тот же день (см. «Применение»),
 P1/P2 не реализованы.
 
-Продолжение `docs/llm-first/vision/2026-08-15-producer-first-product-research.md`
+Продолжение `docs/product/vision/2026-08-15-producer-first-product-research.md`
 (раздел 6 «Что скрыть или сделать неактивным»). Документ проверяет предложения
 против текущего кода, помечает источник каждого факта и фиксирует, что
 выключается флагом, что режимом, а что не выключается.
@@ -57,7 +57,7 @@ routed-движках через `ROUTED_ENGINES = ("openrouter", "litellm")` и
 | Add-on Automatic translation с дефолтом `auto_source=others` | не устанавливать (не устанавлен) | `[код]`/архитектура: addon без судьи наливает очередь state 20, которую некому разгребать; P1 ресеча отложен до фазы 3 |
 
 Особенность: `Suggestion`-механизм целиком не выключается. План
-`docs/llm-first/plans/2026-09-01-judge-producer-triage-embed.md` хранит
+`docs/product/plans/2026-09-01-judge-producer-triage-embed.md` хранит
 repair-кандидаты судьи как нативные `Suggestion`. Выключаются только
 voting/autoaccept.
 

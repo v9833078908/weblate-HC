@@ -16,14 +16,14 @@
 
 ## Provenance
 
-This plan is the merge of two independent investigations of the same 2026-08-24 production incident. The second is archived at `docs/llm-first/archive/2026-08-24-judge-run-resilience.md`; its deadline work, per-batch persistence, decisions, and hang-mechanism evidence are folded in below as Tasks 1-3.
+This plan is the merge of two independent investigations of the same 2026-08-24 production incident. The second is archived at `docs/product/archive/2026-08-24-judge-run-resilience.md`; its deadline work, per-batch persistence, decisions, and hang-mechanism evidence are folded in below as Tasks 1-3.
 
 Two corrections the merge forced, both against this document's earlier draft:
 
 1. **The hang mechanism was wrong.** The earlier draft read the 24-minute silence as "~12 silent 120 s timeouts". That is impossible - see "Mechanism" below. It was one stall inside a single request.
 2. **Task 8's cost claim was overstated.** `_cached_verdict` does not make redelivery free; verdicts are written per *seat*, so a restart mid-seat re-pays every batch of that seat. Task 3 is what actually makes Task 8 cheap, and the two now ship together.
 
-`docs/llm-first/plans/2026-08-22-02-judge-navigation-readiness.md` Task 6 was amended in the same change: the seam signature gained arguments, and the progress plumbing this plan ships is removed from its scope. That task retains the shared preview scope, the global cap, cap-aware `progress_steps`, and the completion summary.
+`docs/product/plans/2026-08-22-02-judge-navigation-readiness.md` Task 6 was amended in the same change: the seam signature gained arguments, and the progress plumbing this plan ships is removed from its scope. That task retains the shared preview scope, the global cap, cap-aware `progress_steps`, and the completion summary.
 
 ---
 
@@ -925,7 +925,7 @@ Automatic translation has been released for a long time, so this entry is requir
 ### Step 4: Confirm the superseded plan is archived
 
 Already done when this plan was merged: the resilience plan moved to
-`docs/llm-first/archive/2026-08-24-judge-run-resilience.md`, the genre
+`docs/product/archive/2026-08-24-judge-run-resilience.md`, the genre
 `AGENTS.md` defines for superseded documents. Nothing to do here beyond
 confirming no task above still references the old path.
 

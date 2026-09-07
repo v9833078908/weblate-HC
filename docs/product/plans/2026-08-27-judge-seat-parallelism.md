@@ -14,7 +14,7 @@ Genre: implementation. Output: one two-seat fan-out helper in
 split between the existing `ViewTestCase` fixture and a dedicated
 `TransactionTestCase`.
 
-Rule R3 (`docs/llm-first/vision/llm-first-product-architecture.md:686`) is not
+Rule R3 (`docs/product/vision/llm-first-product-architecture.md:686`) is not
 engaged: this plan changes neither the prompt nor either model. The logical
 batch plan also stays fixed: every uncached string is offered to the same two
 seats with each seat's own configured batch size. Actual POST attempts, spend
@@ -945,7 +945,7 @@ snapshot to the measurement record.
    - total judging wall time and overlap;
    - final verdict distribution.
 
-   Save the numbers under `docs/llm-first/measurements/`.
+   Save the numbers under `docs/product/measurements/`.
 
 ## Out of scope
 
@@ -1129,7 +1129,7 @@ the LiteLLM endpoint before trusting the overlap numbers there.
 - [x] Separate bounded production-run approval obtained
 - [x] Bounded production canary passed on 25 exact uncached units
 - [x] Comparable production measurement approved and recorded:
-      `docs/llm-first/measurements/2026-09-01-02-judge-seat-parallelism-production.md`
+      `docs/product/measurements/2026-09-01-02-judge-seat-parallelism-production.md`
 
 ## GSTACK REVIEW REPORT
 

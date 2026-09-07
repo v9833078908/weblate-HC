@@ -3,14 +3,14 @@
 **Date:** 2026-08-26. **Status:** closed, superseded. Stages 0-2 stand and
 their artifacts are reused; Stage 3's stop does not, because the gate it failed
 on measured proxy load. The search continues in
-`docs/llm-first/plans/2026-08-26-judge-provider-failover.md`, whose Stage A
+`docs/product/plans/2026-08-26-judge-provider-failover.md`, whose Stage A
 scores candidates against the corpus designed in
-`docs/llm-first/designs/2026-08-26-balanced-judge-evaluation-corpus.md`.
-**Supersedes:** `docs/llm-first/archive/2026-08-26-litellm-judge-seat-r3-eval.md`,
+`docs/product/designs/2026-08-26-balanced-judge-evaluation-corpus.md`.
+**Supersedes:** `docs/product/archive/2026-08-26-litellm-judge-seat-r3-eval.md`,
 which searched for a replacement for one seat against a single corpus. The
 objective is now the *pair*, measured on ru->zh_Hans and en->fr.
 **Rule:** R3 - changing the prompt or the model invalidates the measurement
-(`docs/llm-first/vision/llm-first-product-architecture.md:674`).
+(`docs/product/vision/llm-first-product-architecture.md:674`).
 
 ## What changed and why
 
@@ -39,7 +39,7 @@ across the 5 repeats, the union of flagged clean strings is 11 against `qwen`'s
 10, so it adds one. Both are reported here because a pair-selection rule that
 silently picks the kinder aggregation is how a weak seat gets justified.
 The repository already recorded this asymmetry -
-`docs/llm-first/measurements/judge-measurements-index.md:614` states the unique
+`docs/product/measurements/judge-measurements-index.md:614` states the unique
 second-family contribution was measured on fr and was zero on zh.
 
 That is the case for two corpora: a pair chosen on zh alone would be chosen
@@ -168,7 +168,7 @@ rubric-derived.
 
 **fr (need-for-greed/ui, 466 units, en->fr, not yet fetched).** No labels of any
 kind exist. Worse, the precedent set by the existing fr golden set is explicitly
-disowned in this repository: `docs/llm-first/plans/2026-08-25-judge-repair-loop-measurement.md:74-85`
+disowned in this repository: `docs/product/plans/2026-08-25-judge-repair-loop-measurement.md:74-85`
 records 266 defects from the synthetic generator, 167 passes labelled by two
 LLMs, **zero human labels**, and calls that corpus unsuitable for safety
 measurement.
@@ -180,7 +180,7 @@ So the fr arm is designed to measure only what construction can support:
 | does a seat catch a defect that is known to be there | yes - injected, label by construction |
 | do two seats catch *different* injected defects | yes - this is the pair signal we want |
 | what is the true false-positive rate | **no** - the originals are unlabelled, and `approved` is 0 for all 466 |
-| recall on natural defects, idioms, puns, register | **no** - `docs/llm-first/measurements/2026-08-12-col4-judge-annotation.md:129-150` states idiom and pun classes cannot be synthesized |
+| recall on natural defects, idioms, puns, register | **no** - `docs/product/measurements/2026-08-12-col4-judge-annotation.md:129-150` states idiom and pun classes cannot be synthesized |
 
 On the originals we therefore report **relative flag volume** (how loudly each
 model fires on unlabelled production strings) and treat it as a cost signal, not
@@ -210,7 +210,7 @@ fr is a decision for a human, not for an argmax.
 ## Gates
 
 Hard, applied to the pair, carried over from the D6 gates of
-`docs/llm-first/measurements/2026-08-20-judge-prompt-universalization-run.md:44-54`:
+`docs/product/measurements/2026-08-20-judge-prompt-universalization-run.md:44-54`:
 
 - zh: `missed_crit` = 0 in **every** repeat. This is the gate only arm H passed,
   and the migration must not silently give it up.
@@ -239,7 +239,7 @@ Solo numbers are diagnostic.
 ## Stage 0 outcome, and the decision it forces
 
 Measured in
-`docs/llm-first/measurements/2026-08-26-litellm-stage0-compatibility.md`. Two
+`docs/product/measurements/2026-08-26-litellm-stage0-compatibility.md`. Two
 facts change the plan.
 
 **The binding constraint is a time-to-first-byte reset, not model quality.** The
@@ -293,7 +293,7 @@ the first DeepSeek attempt reset at 30.8 s and returned five unparsed results.
 ### Stage 0: compatibility, not quality - completed
 
 The result is recorded in
-`docs/llm-first/measurements/2026-08-26-litellm-stage0-compatibility.md`.
+`docs/product/measurements/2026-08-26-litellm-stage0-compatibility.md`.
 Candidates are admitted only when `_parse_reply` accepts all five production
 segments. Qwen, GLM, two DeepSeek IDs and Kimi survive. MiniMax and MiMo fail
 the strict schema; doubao resets after ~30.5 s and needs streaming.
@@ -348,15 +348,15 @@ The completed smoke used all seven sealed zh criticals plus eight known-clean
 units, and 15 injected fr criticals. `qwen3.8-max` had no unparsed batches but
 missed 6/7 zh criticals; every other candidate had unparsed batches. The full
 results are in
-`docs/llm-first/measurements/2026-08-26-judge-seat-pair-search-stage3.md`.
+`docs/product/measurements/2026-08-26-judge-seat-pair-search-stage3.md`.
 No candidate reached Stage 4.
 
 **Stages 4 to 6 never ran.** The scorer and the measurement file named below
 were never produced, so those two paths do not exist. The design is kept
 because Stage A of
-`docs/llm-first/plans/2026-08-26-judge-provider-failover.md` reuses it, against
+`docs/product/plans/2026-08-26-judge-provider-failover.md` reuses it, against
 the corpus in
-`docs/llm-first/designs/2026-08-26-balanced-judge-evaluation-corpus.md`.
+`docs/product/designs/2026-08-26-balanced-judge-evaluation-corpus.md`.
 
 ### Stage 4: per-model runs
 
@@ -383,7 +383,7 @@ is not modified.
 The selected pair is re-run on the **full** 466-unit fr corpus and the full zh
 corpus, 5 repeats, to confirm the choice was not an artifact of the 150-unit
 slice. Then
-`docs/llm-first/measurements/2026-08-26-judge-seat-pair-search.md`: per-model and
+`docs/product/measurements/2026-08-26-judge-seat-pair-search.md`: per-model and
 per-pair tables, `missed_crit` per run, the Pareto front, complementarity
 decomposition, tokens, and the decision.
 

@@ -8,7 +8,7 @@
   - `heart-abyss-hub-1-units.tsv` — построчная выгрузка RU/EN/FR со всеми пометками
   - `heart-abyss-hub-1-metrics.json` — агрегированные метрики
 
-Документ на русском языке в соответствии с практикой `docs/operations/` и `docs/guides/`
+Документ на русском языке в соответствии с практикой `docs/operations/` и `docs/product/guides/`
 для материалов по игровой локализации.
 
 ## 1. Показания Weblate недостоверны
@@ -482,14 +482,14 @@ hub-1 персонаж — `Ray`.
 Датировано 2026-08-20. Оценка трёх незапущенных направлений с замерами на этом
 компоненте. Статус реализации проверен по коду и git:
 
-- **LLM-judge** (`docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md`) —
+- **LLM-judge** (`docs/product/plans/2026-08-13-01-judge-verdict-core.md`) —
   **реализован и слит в main** (merge 1615b6a): модель `JudgeVerdict`, коллегия
   двух мест (`deepseek/deepseek-v4-pro` + `qwen/qwen3-235b-a22b-2507`), промпт
   `weblate/trans/judge_prompts/verdict.txt`, 7 тестовых файлов. На проде выключен:
   `JUDGE_ENABLED=False`, ключа и мест нет (`docker exec ... env | grep JUDGE` —
   пусто).
-- **session-canon** (`docs/llm-first/plans/2026-08-17-session-canon.md`) — не начат.
-- **git-гейт** (`docs/llm-first/plans/2026-08-10-git-localization-quality-gate.md`) — не начат.
+- **session-canon** (`docs/product/plans/2026-08-17-session-canon.md`) — не начат.
+- **git-гейт** (`docs/product/plans/2026-08-10-git-localization-quality-gate.md`) — не начат.
 
 ### 15.1 Замер судьи на hub-1 (реальный промпт, реальные данные, OpenRouter)
 

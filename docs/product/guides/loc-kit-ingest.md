@@ -10,7 +10,7 @@
 
 Проверено как вход: `Temple.csv` (диалоги), `Terms.csv` (глоссарий/лор) и
 `UI.xlsx` (UI-строки). Реальные киты не попадают в тестовые фикстуры. Смежные
-конвенции форка: `docs/guides/continuous-localization-loop.md` (git ↔ Weblate,
+конвенции форка: `docs/product/guides/continuous-localization-loop.md` (git ↔ Weblate,
 игровой Id → location), `weblate_customization/` (`game-markup`-check и
 Routed LLM).
 

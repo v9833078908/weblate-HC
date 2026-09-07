@@ -1570,7 +1570,7 @@ git commit -m "test(loc-kit): pin the manual-profile fixture to the refusal cont
 
 **Files:**
 
-- Modify: `docs/changes.rst` (верхняя нерелизная секция), `docs/guides/loc-kit-ingest.md`, `docs/security/threat-model.rst`
+- Modify: `docs/changes.rst` (верхняя нерелизная секция), `docs/product/guides/loc-kit-ingest.md`, `docs/security/threat-model.rst`
 
 **Step 1: changelog**
 
@@ -1582,7 +1582,7 @@ git commit -m "test(loc-kit): pin the manual-profile fixture to the refusal cont
 
 **Step 2: спецификация**
 
-`docs/guides/loc-kit-ingest.md`:
+`docs/product/guides/loc-kit-ingest.md`:
 
 - в разделе record-map (`:343-376`) описать `ignored_columns` и `allow_empty_targets`. Явно сохранить формулировку про `tbx.unmapped_cell`, добавив к ней исключение: заполненная ячейка допустима только в колонке, **объявленной** в `ignored_columns`, header которой совпал с листом; неизвестная колонка по-прежнему ошибка;
 - в таблице диагностик (`:435-437`) уточнить, что `tbx.missing_target_term` — ошибка, если профиль не объявил `allow_empty_targets`; зафиксировать, что generated profile ставит flag только для target-языка с хотя бы одним term;
@@ -1601,7 +1601,7 @@ git commit -m "test(loc-kit): pin the manual-profile fixture to the refusal cont
 **Step 4: commit**
 
 ```bash
-git add docs/changes.rst docs/guides/loc-kit-ingest.md docs/security/threat-model.rst
+git add docs/changes.rst docs/product/guides/loc-kit-ingest.md docs/security/threat-model.rst
 git commit -m "docs(loc-kit): document delimiter detection, ignored columns and partial targets"
 ```
 
@@ -1624,7 +1624,7 @@ uv run prek run --files \
   loc_kit_ingest/tests/test_parser_tbx.py \
   weblate/trans/tests/test_loc_kit_ingest_contract.py \
   docs/changes.rst \
-  docs/guides/loc-kit-ingest.md \
+  docs/product/guides/loc-kit-ingest.md \
   docs/security/threat-model.rst
 uv run pylint loc_kit_ingest/
 uv run mypy --show-column-numbers weblate scripts/*.py ./*.py | ./scripts/filter-mypy.sh
@@ -1672,7 +1672,7 @@ main-checkout, с отдельным одобрением проверить т�
 
 ## Что вне объёма (сознательно)
 
-- **Generic-пропуск любой неизвестной колонки.** `_IGNORABLE_HEADERS` закрыт и содержит только наблюдавшийся `id`. Неизвестная заполненная колонка по-прежнему отказ: контракт «данные никогда не отбрасываются молча» (`docs/guides/loc-kit-ingest.md:372-374`) сохраняется. Расширять список — отдельным решением, с real-kit fixture и пересмотром fallback-контракта Task 11.
+- **Generic-пропуск любой неизвестной колонки.** `_IGNORABLE_HEADERS` закрыт и содержит только наблюдавшийся `id`. Неизвестная заполненная колонка по-прежнему отказ: контракт «данные никогда не отбрасываются молча» (`docs/product/guides/loc-kit-ingest.md:372-374`) сохраняется. Расширять список — отдельным решением, с real-kit fixture и пересмотром fallback-контракта Task 11.
 - **v1-грамматика `term-description-pairs`.** Пустой target там остаётся ошибкой; ручные v1-профили строгие.
 - **Пустой target-язык из одних descriptions.** `allow_empty_targets` означает gap в языке, содержащем хотя бы один term, а не создание пустого TBX-языка.
 - **Снятие numeric-guard и term-level `min_fill`.** Реальные киты порог проходят (минимум 29.2%), а снятие позволило бы одной случайной ячейке или descriptions создать целый target-язык и лишний TBX-файл.

@@ -1,7 +1,7 @@
 # Review of the judge run navigation plan
 
 **Date:** 2026-09-03.
-**Reviews:** `docs/llm-first/plans/2026-09-03-02-judge-run-navigation.md`
+**Reviews:** `docs/product/plans/2026-09-03-02-judge-run-navigation.md`
 (status: proposed, not approved).
 **Outcome:** approve with five amendments. Every load-bearing claim in the
 plan was re-checked against the tree and holds; the design is sound and the
@@ -49,7 +49,7 @@ No tool, script, or skill by that name exists in the repository, in
 `scripts/`, in `analysis/probes/`, or in any earlier plan; the only analogous
 instrument on record is a `/plan-design-review` row in the verification
 tables of earlier plans (for example
-`docs/llm-first/plans/2026-08-27-judge-seat-parallelism.md:1141`). As
+`docs/product/plans/2026-08-27-judge-seat-parallelism.md:1141`). As
 written, the step is not reproducible by a builder who was not in the room.
 Name the instrument (and how to run it) or drop the step.
 

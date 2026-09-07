@@ -74,7 +74,7 @@ never broken; it was starved by configuration and silent about it.
 
 ## The one invariant this plan changes
 
-`docs/llm-first/plans/2026-09-01-judge-producer-triage-embed.md` invariant 1
+`docs/product/plans/2026-09-01-judge-producer-triage-embed.md` invariant 1
 said that accepting a candidate writes `STATE_FUZZY`, so that only a fresh
 re-check can make the repaired text shippable. Decision 1 replaces that
 clause: acceptance writes `STATE_TRANSLATED`, and the queued re-check
@@ -191,7 +191,7 @@ honour the schema is still what keeps the parser's contract meaningful.
   gets the same result.
 - A manual live probe against `google/gemini-2.5-flash` and one
   OpenAI-family model both return 200 with the new payload, recorded in
-  `docs/llm-first/measurements/`.
+  `docs/product/measurements/`.
 
 ## Task 3: Refuse an unusable routing configuration before spending
 
@@ -251,7 +251,7 @@ the string translated rather than held.
   unavoidable; `Use suggested fix`, `Suggested fix` and `AI judge` are
   already translated, and a needed entry is added by a targeted edit plus
   `compilemessages`, never by a repository-wide `makemessages` run
-- Modify: `docs/guides/producer-guide-weblate.md`, `docs/changes.rst`
+- Modify: `docs/product/guides/producer-guide-weblate.md`, `docs/changes.rst`
 - Tests: `weblate/trans/tests/test_judge_views.py`,
   `weblate/trans/tests/test_judge.py`, `weblate/trans/tests/test_edit.py`
 - No view change: `_judge_view_context` already resolves `judge_candidate`

@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-26. **Status:** proposed, needs a decision on scope and cost.
 **Supplies:** Stage A of
-`docs/llm-first/plans/2026-08-26-judge-provider-failover.md`, which cannot name
+`docs/product/plans/2026-08-26-judge-provider-failover.md`, which cannot name
 a seat pair until a scored instrument exists.
 **Rule:** R3 - changing the prompt or the model invalidates the measurement.
 

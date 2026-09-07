@@ -79,7 +79,7 @@ proceedings, документация OpenRouter). Числа приводятс
 даёт - это и не удивительно, никто не измеряет заведомую дезинформацию. Но у нас
 есть собственный факт: на первом же боевом прогоне seat 1 забраковал корректное
 «Сэр», сославшись именно на выдуманный сеттинг
-(`docs/llm-first/measurements/2026-08-20-judge-first-dev-run.md`, finding 5). Это [ВЫВОД], а не
+(`docs/product/measurements/2026-08-20-judge-first-dev-run.md`, finding 5). Это [ВЫВОД], а не
 цитата из статьи: неверный контекст работает как якорь ровно с той же силой, с
 какой верный контекст помогает.
 
@@ -263,5 +263,5 @@ reasoning-токенов и 84% стоимости всего запуска, с
   KnowledgeNLP 2025 - <https://doi.org/10.18653/v1/2025.knowledgenlp-1.7> -
   польза доменного контекста на инференсе.
 - OpenRouter, *Reasoning Tokens* -
-  <https://openrouter.ai/docs/guides/best-practices/reasoning-tokens> -
+  <https://openrouter.ai/docs/product/guides/best-practices/reasoning-tokens> -
   параметры `reasoning.effort` / `reasoning.max_tokens` / `reasoning.exclude`.

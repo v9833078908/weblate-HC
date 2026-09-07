@@ -83,7 +83,7 @@ devanadari-danda, punctuation-spacing, safe-html
 ни интерробангов.
 
 Это тот же класс ошибки, что HT001 и PH002 в разборе Cathedral
-(`docs/llm-first/research/2026-08-11-cathedral-localizer-analysis.md`, раздел 6):
+(`docs/product/research/2026-08-11-cathedral-localizer-analysis.md`, раздел 6):
 правило, глядящее только в target, записывает дефект источника на
 переводчика. Счётчик source-blind предиката можно приводить как верхнюю
 границу, но не как объём работ.

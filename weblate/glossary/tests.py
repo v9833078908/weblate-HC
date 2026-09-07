@@ -1354,7 +1354,7 @@ class GlossaryStemMatcherTest(ViewTestCase):
     Uses a dedicated Russian-source project (the default ViewTestCase
     component/glossary are English-source) so the matcher can recover
     inflected Russian source forms per
-    docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md.
+    docs/product/plans/2026-08-11-glossary-morphological-enforcement.md.
     """
 
     CREATE_GLOSSARIES: bool = True

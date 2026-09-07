@@ -3,24 +3,24 @@
 **Date:** 2026-08-26. **Status:** archived, never approved and never run. It
 searched for a replacement for one seat against a single corpus; the objective
 became the pair, and then the whole seat search moved to
-`docs/llm-first/plans/2026-08-26-judge-provider-failover.md`. Kept for the
+`docs/product/plans/2026-08-26-judge-provider-failover.md`. Kept for the
 candidate reasoning, not as a plan of record.
-**Continues:** `docs/llm-first/plans/2026-08-23-litellm-provider-and-judge-endpoint.md`,
+**Continues:** `docs/product/plans/2026-08-23-litellm-provider-and-judge-endpoint.md`,
 task 7 step 4 - "If any route or seat fails, stop. Do not substitute a model or
 weaken the schema: record the result and start the R3 eval path".
 **Rule:** R3 - changing the prompt or the model invalidates the measurement
-(`docs/llm-first/vision/llm-first-product-architecture.md:674`). Seat models are
+(`docs/product/vision/llm-first-product-architecture.md:674`). Seat models are
 chosen by an eval on the S&T2 corpus, not by reasoning about model kinship.
 
 ## Why
 
 The LiteLLM preflight
-(`docs/llm-first/measurements/2026-08-26-litellm-preflight.md`) established that
+(`docs/product/measurements/2026-08-26-litellm-preflight.md`) established that
 the configured second seat `qwen/qwen3-235b-a22b-2507` does not exist on the
 corporate proxy. Seat 2 is not a configuration detail. The accepted two-model
 collegium works because the two models fail on substantially different strings -
 flagged by both 228, `deepseek` only 16, `qwen` only 34
-(`docs/llm-first/measurements/judge-measurements-index.md:90`).
+(`docs/product/measurements/judge-measurements-index.md:90`).
 
 On this specific language pair the missing seat is the one that does the work:
 
@@ -30,7 +30,7 @@ On this specific language pair the missing seat is the one that does the work:
 | `qwen` alone | 2/7 | 11/14 | 17/24 |
 | collegium | 1/7 | 11/14 | 18/24 |
 
-(`docs/llm-first/measurements/2026-08-18-severity-recalibration-partial.md:65-69`,
+(`docs/product/measurements/2026-08-18-severity-recalibration-partial.md:65-69`,
 whose conclusion at lines 91-92 is explicit: "`deepseek` - слабое место на этой
 паре языков".)
 
@@ -40,7 +40,7 @@ A "similar" model cannot be picked by name. It has to be measured.
 ## Established inputs (not the subject of this plan)
 
 1. **The accepted arm is H**, and H is what production runs
-   (`docs/llm-first/measurements/2026-08-20-judge-prompt-universalization-run.md:66-69`).
+   (`docs/product/measurements/2026-08-20-judge-prompt-universalization-run.md:66-69`).
    Collegium medians over 5 repeats:
 
    | Arm | missed_crit | false_crit | REAL@14 | REAL@24 | FP | noise >=flag |
@@ -186,7 +186,7 @@ Acceptance: collegium numbers against the anchor on every gate.
 
 ### Task 5: measurement document and decision
 
-`docs/llm-first/measurements/2026-08-26-litellm-judge-seat-r3.md`: per-seat and
+`docs/product/measurements/2026-08-26-litellm-judge-seat-r3.md`: per-seat and
 per-pair tables, `missed_crit` **per run** and not only the median, the 4x4
 matrix, noise, tokens, and the comparison with historical arm H as a reference.
 The decision is binary: there is a usable pair, or there is not.

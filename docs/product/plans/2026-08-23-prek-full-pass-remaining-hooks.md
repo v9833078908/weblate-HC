@@ -128,9 +128,9 @@ separate binary with separate configuration and does not read codespell's
 French/Indonesian/Turkish loc data) plus a handful of code-level false
 positives already fixed for codespell but not for typos: `nd`/`ein` in
 `docs/operations/plans/2026-08-19-space-arena-game-number-and-same-noise.md`, `recal` (an <!-- # codespell:ignore -->
-intentional abbreviation, `st2-zh-recal`) in three `analysis/data/`/`docs/llm-first/`
+intentional abbreviation, `st2-zh-recal`) in three `analysis/data/`/`docs/product/`
 files, `criticals` (plural noun, intentional) in
-`docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md`, `seconde` (a French
+`docs/product/plans/2026-08-13-01-judge-verdict-core.md`, `seconde` (a French
 in-game duration string, not a typo of "second") in
 `docs/product/plans/2026-08-17-game-number-check.md`.
 
@@ -154,10 +154,10 @@ blank line) 18, `MD040` (fenced code needs a language) 11, `MD031` (fenced
 code needs blank line) 8, `MD026` (trailing punctuation in heading) 8,
 `MD028` (blank line inside blockquote) 6, plus one each of `MD057` (broken
 relative link), `MD001` (heading level skip), `MD034` (bare URL), `MD058`.
-Heaviest files: `docs/llm-first/archive/2026-08-07-project-scoped-llm-context.md`
+Heaviest files: `docs/product/archive/2026-08-07-project-scoped-llm-context.md`
 (63), `docs/product/plans/2026-08-12-loc-kit-glossary-smarter-inference.md` (61),
-`docs/llm-first/archive/2026-08-05-routed-llm-machinery.md` (44),
-`docs/llm-first/plans/2026-08-14-llm-usage-tracking.md` (37).
+`docs/product/archive/2026-08-05-routed-llm-machinery.md` (44),
+`docs/product/plans/2026-08-14-llm-usage-tracking.md` (37).
 
 1. `rumdl-fmt` (the autofix hook) safely resolves `MD022`/`MD032`/`MD031`/
    `MD028` on its own - run it and accept the result for those rules.
@@ -186,22 +186,22 @@ Heaviest files: `docs/llm-first/archive/2026-08-07-project-scoped-llm-context.md
 ## Task 6: `doccmd` - remaining indented code excerpts
 
 **Files:** 17 files, 61 blocks (one file/block pair, in
-`docs/llm-first/reviews/2026-08-11-llm-prompt-and-pipeline-review.md`, is already
+`docs/product/reviews/2026-08-11-llm-prompt-and-pipeline-review.md`, is already
 fixed). Full list from the 2026-08-23 scan:
-`docs/llm-first/plans/2026-08-11-layer0-autofix-quick-wins.md` (6 blocks),
-`docs/llm-first/plans/2026-08-13-01-judge-verdict-core.md` (7),
-`docs/llm-first/archive/2026-08-05-routed-llm-machinery.md` (1),
+`docs/product/plans/2026-08-11-layer0-autofix-quick-wins.md` (6 blocks),
+`docs/product/plans/2026-08-13-01-judge-verdict-core.md` (7),
+`docs/product/archive/2026-08-05-routed-llm-machinery.md` (1),
 `docs/product/plans/2026-08-10-loc-kit-glossary-deterministic-infer.md` (4),
 `docs/product/plans/2026-08-10-loc-kit-glossary-note-column.md` (6),
 `docs/product/plans/2026-08-10-loc-kit-glossary-update-existing.md` (3),
 `docs/product/plans/2026-08-12-glossary-terminology-flag.md` (3),
 `docs/product/plans/2026-08-12-loc-kit-glossary-smarter-inference.md` (13),
-`docs/llm-first/plans/2026-08-14-llm-usage-tracking.md` (5),
+`docs/product/plans/2026-08-14-llm-usage-tracking.md` (5),
 `docs/product/plans/2026-08-17-microsoft-clarity-session-recordings.md` (7),
 `docs/operations/plans/2026-08-17-outgoing-mail-webnotify.md` (2),
 `docs/product/plans/2026-08-22-multilingual-spreadsheet-review-fixes.md` (2),
 `docs/product/plans/2026-08-22-nested-game-placeholder-protection.md` (1),
-`docs/llm-first/measurements/2026-08-11-col4-fr-autotranslate-report.md` (2).
+`docs/product/measurements/2026-08-11-col4-fr-autotranslate-report.md` (2).
 
 1. Same pattern as the already-fixed file: each block quotes a real code
    excerpt with its original (non-zero) indentation preserved, and several

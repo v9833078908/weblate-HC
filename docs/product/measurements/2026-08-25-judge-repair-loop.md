@@ -5,7 +5,7 @@
 повторов.
 
 Основание:
-`docs/llm-first/plans/2026-08-25-judge-repair-loop-measurement.md`,
+`docs/product/plans/2026-08-25-judge-repair-loop-measurement.md`,
 редакция 2.
 
 Среда: dev-docker, порт 3001, проект `judge-repair-probe`, компонент

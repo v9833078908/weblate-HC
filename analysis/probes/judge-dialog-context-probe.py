@@ -16,7 +16,7 @@ Paired probe for the dialog-context arm of the judge.
 Does a `context: {prev_source, next_source}` field change the judge's verdicts
 on dialogue?
 
-Plan under test: docs/llm-first/plans/2026-08-20-judge-dialog-context.md.
+Plan under test: docs/product/plans/2026-08-20-judge-dialog-context.md.
 
 Corpus: heart-abyss/hub-1, French, three contiguous scenes (`hub1_first_1`,
 `hub1_ramen_1`, `hub1_teahouse_1`, 109 units) from the sealed dump

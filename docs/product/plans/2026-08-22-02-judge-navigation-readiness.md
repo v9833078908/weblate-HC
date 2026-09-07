@@ -4,7 +4,7 @@
 
 **Date:** 2026-08-22, updated 2026-08-24. **Status:** approved, implementation
 pending. Absorbs the former judge progress reporting plan, now archived as
-`docs/llm-first/archive/2026-08-24-judge-progress-reporting.md`; Task 6 owns
+`docs/product/archive/2026-08-24-judge-progress-reporting.md`; Task 6 owns
 judge progress reporting.
 
 **Goal:** Give a producer a component-first Weblate path from per-language release readiness to exact LLM-judge queues and a bounded, cost-aware judge run, without implying that a probabilistic verdict approves a release.
@@ -424,7 +424,7 @@ git commit -m "feat(judge): track observed per-unit costs"
 ## Task 6: Share preview scope, cap, and judge progress reporting
 
 > **Amended 2026-08-24 by the incident plan**
-> `docs/llm-first/plans/2026-08-24-auto-translate-queue-and-progress.md`.
+> `docs/product/plans/2026-08-24-auto-translate-queue-and-progress.md`.
 > Two changes, because that plan lands first and creates the same seam:
 >
 > 1. **The seam signature carries arguments.** This task specified

@@ -508,7 +508,7 @@ git commit -m "test(loc-kit): cover note columns through the glossary wizard"
 **Files:**
 
 - Modify: `docs/admin/projects.rst:117-140`
-- Modify: `docs/guides/loc-kit-ingest.md:100-125, 271-278`
+- Modify: `docs/product/guides/loc-kit-ingest.md:100-125, 271-278`
 - Modify: `docs/changes.rst` under Weblate 2026.8.1 / Improvements
 
 **Step 1: public documentation.** Add one bullet after the layout bullet in `docs/admin/projects.rst`:
@@ -532,7 +532,7 @@ git commit -m "test(loc-kit): cover note columns through the glossary wizard"
 **Step 4: commit**
 
 ```bash
-git add docs/admin/projects.rst docs/guides/loc-kit-ingest.md docs/changes.rst
+git add docs/admin/projects.rst docs/product/guides/loc-kit-ingest.md docs/changes.rst
 git commit -m "docs(loc-kit): document glossary note columns"
 ```
 
@@ -558,7 +558,7 @@ uv run prek run --files \
   loc_kit_ingest/tests/test_infer_glossary.py \
   weblate/trans/tests/test_loc_kit_ingest_contract.py \
   docs/admin/projects.rst \
-  docs/guides/loc-kit-ingest.md \
+  docs/product/guides/loc-kit-ingest.md \
   docs/changes.rst
 ```
 
@@ -574,7 +574,7 @@ Do not invoke automatic translation in this smoke: Task 3 already proves the exa
 **Step 5: commit only if verification fixes require one**
 
 ```bash
-git add -- loc_kit_ingest/infer.py loc_kit_ingest/tests/test_infer_glossary.py weblate/trans/tests/test_loc_kit_ingest_contract.py docs/admin/projects.rst docs/guides/loc-kit-ingest.md docs/changes.rst
+git add -- loc_kit_ingest/infer.py loc_kit_ingest/tests/test_infer_glossary.py weblate/trans/tests/test_loc_kit_ingest_contract.py docs/admin/projects.rst docs/product/guides/loc-kit-ingest.md docs/changes.rst
 git commit -m "fix(loc-kit): close note-column verification defects"
 ```
 
@@ -586,7 +586,7 @@ git commit -m "fix(loc-kit): close note-column verification defects"
   - Verify: automatic and explicit-pairs tests.
 - [x] **T3 (P1)** - `weblate/trans/tests/test_loc_kit_ingest_contract.py` - assert the actual created French glossary unit exposes CSV text through the LLM glossary-entry contract.
   - Verify: exact `LocKitGlossaryUploadUITest` node.
-- [x] **T4 (P2)** - `docs/admin/projects.rst`, `docs/guides/loc-kit-ingest.md`, and `docs/changes.rst` - document the user-facing note column and remove the stale claim that v2 `record-map` is never inferred locally.
+- [x] **T4 (P2)** - `docs/admin/projects.rst`, `docs/product/guides/loc-kit-ingest.md`, and `docs/changes.rst` - document the user-facing note column and remove the stale claim that v2 `record-map` is never inferred locally.
   - Verify: docs source review and configured lint.
 - [x] **T5 (P2)** - `loc_kit_ingest/infer.py` - classify empty/populated note headers from the one-pass populated set.
   - Verify: empty-plus-populated and duplicate-populated tests.

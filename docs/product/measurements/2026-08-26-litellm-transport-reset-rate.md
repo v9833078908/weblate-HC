@@ -1,7 +1,7 @@
 # The LiteLLM resets are a latency race, not a model or payload property
 
 **Date:** 2026-08-26. **Supersedes the reading of:**
-`docs/llm-first/measurements/2026-08-26-judge-seat-pair-search-stage3.md`, whose
+`docs/product/measurements/2026-08-26-judge-seat-pair-search-stage3.md`, whose
 `unparsed` column disqualified five of seven routes.
 
 ## Why this was measured
@@ -152,7 +152,7 @@ batches was scored against ground truth.
    first, with reasoning on, because it is the only route that held the
    production prompt at either setting.
 2. The reasoning decision recorded in
-   `docs/llm-first/plans/2026-08-26-judge-seat-pair-search.md` was reasoning-off
+   `docs/product/plans/2026-08-26-judge-seat-pair-search.md` was reasoning-off
    for the whole pool. That is now wrong for DeepSeek and still right for Qwen,
    so the mode has to be per seat, which the existing per-model mapping already
    expresses.
@@ -161,7 +161,7 @@ batches was scored against ground truth.
    any retry budget or batch width is treated as settled.
 
 The work that follows from this is planned in
-`docs/llm-first/plans/2026-08-26-judge-provider-failover.md`: score the LiteLLM
+`docs/product/plans/2026-08-26-judge-provider-failover.md`: score the LiteLLM
 candidates, then run them as the primary seats with OpenRouter as an
 availability fallback.
 

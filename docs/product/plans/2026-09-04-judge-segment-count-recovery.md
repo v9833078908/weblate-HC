@@ -176,7 +176,7 @@ deployment:
    deployment, use the next full run to measure effectiveness: require zero
    terminal ``segment-count`` results, no schema-rejection response, and no
    material latency or cost regression.
-6. Publish the measured result under ``docs/llm-first/measurements/``. If
+6. Publish the measured result under ``docs/product/measurements/``. If
    either gate fails, retain or restore the current production configuration
    and investigate the provider response contract before rollout.
 

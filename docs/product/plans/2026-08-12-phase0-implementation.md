@@ -1,5 +1,5 @@
 > **Итог 2026-08-13.** Задачи 2, 3 и 4 исполнены; результаты и выводы —
-> `docs/llm-first/measurements/2026-08-13-phase0-measurements.md`. Кратко: задача 2
+> `docs/product/measurements/2026-08-13-phase0-measurements.md`. Кратко: задача 2
 > (A2) остановлена по собственному предписанию — fingerprint зеркала не
 > совпал с историческим и не может совпасть, пока хэш включает
 > `unit.id`. Задача 3 отгружена (`analysis/probes/col4-judge-eval.py`) и
@@ -17,11 +17,11 @@
 `analysis/data/col4-eval-baseline.json` нет ни одной записи с
 `_environment: "dev-docker mirror"` (снимок A2 не сделан). Спецификация
 задачи 3 ниже пересмотрена 2026-08-13 под каскад судей (дизайн-документ
-`docs/llm-first/designs/2026-08-13-judge-native-ui-design.md`); задачи 2 и 4
+`docs/product/designs/2026-08-13-judge-native-ui-design.md`); задачи 2 и 4
 по-прежнему ждут отдельного запуска (B2 и C — после отдельного
 подтверждения на реальную трату/прод-доступ). Основание:
-`docs/llm-first/plans/2026-08-11-phase0-schema-and-judge-calibration.md`,
-`docs/llm-first/vision/llm-first-product-architecture.md` (часть 5).
+`docs/product/plans/2026-08-11-phase0-schema-and-judge-calibration.md`,
+`docs/product/vision/llm-first-product-architecture.md` (часть 5).
 
 ## Почему этот план существует отдельно от дизайн-документа
 
@@ -127,7 +127,7 @@ no-regression / регрессия по каждому критерию выше
 цифра зависит от доли эскалаций) в объём этой задачи **не входит** —
 только код. Прогон ждёт отдельного подтверждения.
 
-По дизайн-документу `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md`
+По дизайн-документу `docs/product/designs/2026-08-13-judge-native-ui-design.md`
 скрипт меряет **каскад** из двух судей, а не двух независимых судей:
 
 - Автономный скрипт без Django-импортов; ключ OpenRouter — из
@@ -218,12 +218,12 @@ gated-действие независимо от read/write).
   минимальный объём).
 - Реальные платные прогоны `col4-judge-eval.py` (~$8-15) и
   `col4-repeat-drift-probe.py` против прода — отдельные подтверждения.
-- Итоговый отчёт `docs/llm-first/measurements/2026-08-XX-judge-calibration.md` —
+- Итоговый отчёт `docs/product/measurements/2026-08-XX-judge-calibration.md` —
   имеет смысл только после реальных прогонов задач 3 и 4.
 - `enforced_checks`, `translation_review`, auto-approve — не «фаза 2/3»:
   адресуются дизайн-документу
-  `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md` и вертикальным
-  срезам планов в `docs/llm-first/plans/`; этот документ остаётся
+  `docs/product/designs/2026-08-13-judge-native-ui-design.md` и вертикальным
+  срезам планов в `docs/product/plans/`; этот документ остаётся
   ограничен измерительным инструментарием фазы 0.
 
 ## Порядок

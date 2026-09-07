@@ -21,7 +21,7 @@
 `weblate.utils.requests.fetch_validated_url`, OpenRouter (strict JSON Schema, батчи),
 pytest + `weblate.utils.tests.http_mock`.
 
-**Основание:** `docs/llm-first/designs/2026-08-13-judge-native-ui-design.md` (разделы 1-4,
+**Основание:** `docs/product/designs/2026-08-13-judge-native-ui-design.md` (разделы 1-4,
 «Точки касания в коде», раздел «Планы первого тира»). Всё, что дизайн-док отнёс к
 планам 2 и 3, здесь не делается.
 
@@ -52,7 +52,7 @@ pytest + `weblate.utils.tests.http_mock`.
 (A11, задача 1).
 
 > **Поправка по замеру** (полный прогон
-> `docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md`, гейты R1-R3):
+> `docs/product/measurements/2026-08-19-severity-recalibration-final.md`, гейты R1-R3):
 > severity судьи — **не гарантия** (пропуски настоящих critical 1-5 за прогон, ложные
 > critical 4-5 на 124), поэтому `critical → state 10` реализуется как в плане, но
 > читается как **очередь на решение человека**, а не автоматический гарант «сломанное
@@ -95,7 +95,7 @@ fail-safe `state 10`, гейт по severity, удержание critical до �
    строк и оценка цены считают фиксированный `state:<translated`
    (`weblate/trans/views/basic.py:805-812`) вместо `q`, стоящего в форме, поэтому на
    переведённом компоненте форма обещает «0 строк» и затем судит 10
-   (`docs/llm-first/measurements/2026-08-20-judge-first-dev-run.md`). Счётчик уходит в план 2 вместе с
+   (`docs/product/measurements/2026-08-20-judge-first-dev-run.md`). Счётчик уходит в план 2 вместе с
    дефолтом: оба упираются в тот же фильтр.
 2. **Санкционированного override нет до плана 3.** `critical` держится состоянием `10`;
    «принять вопреки судье» делается штатной сменой состояния при праве `unit.review`.

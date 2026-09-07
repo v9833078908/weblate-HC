@@ -50,7 +50,7 @@ Explanation ставится через `Unit.update_explanation`
 **D. Отклонено: научить `po-mono` переносить explanation через translator
 comments PO.** Это меняет поведение всех po/po-mono компонентов во всех
 проектах и начинает писать контекст обратно в репозиторий игры, что прямо
-противоречит `docs/guides/game-repo-integration-contract.md:163-168`: контекста
+противоречит `docs/product/guides/game-repo-integration-contract.md:163-168`: контекста
 в файлах игры быть не должно, он живёт в Weblate.
 
 Выбирается **B** плюс маленькая часть A: колонку надо распознавать уже при
@@ -84,7 +84,7 @@ comment.
    `upload.perform` на компоненте. Черновик с `target_component` должен
    по-прежнему отклоняться вью создания компонента — так же, как это уже
    делает `LocKitGlossaryConfirmView`.
-7. **Документация:** раздел в `docs/guides/loc-kit-ingest.md`; запись в верхнюю
+7. **Документация:** раздел в `docs/product/guides/loc-kit-ingest.md`; запись в верхнюю
    секцию `docs/changes.rst` — изменение видимо пользователю.
 
 ## Границы
@@ -126,4 +126,4 @@ Weblate-level:
    право `source.edit`.
 
 Для глоссарных китов ничего делать не нужно: TBX уже несёт source и target
-explanation, шаблон и поведение описаны в `docs/guides/loc-kit-ingest.md`.
+explanation, шаблон и поведение описаны в `docs/product/guides/loc-kit-ingest.md`.

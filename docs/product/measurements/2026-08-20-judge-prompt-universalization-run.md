@@ -1,6 +1,6 @@
 # Прогон промптов судьи — 2026-08-20
 
-Замер по плану `docs/llm-first/plans/2026-08-20-judge-prompt-universalization.md`,
+Замер по плану `docs/product/plans/2026-08-20-judge-prompt-universalization.md`,
 задача 2. Корпус — запечатанный срез S&T2 summer-update ru->zh_Hans, 124 юнита,
 ground truth `analysis/data/st2-zh-groundtruth.json` (7 `critical`, 24 `major+`,
 83 чистых). Драйвер `analysis/probes/st2-zh-recalibration.py`, скорер
@@ -114,7 +114,7 @@ ground truth `analysis/data/st2-zh-groundtruth.json` (7 `critical`, 24 `major+`,
 ## Дымовой прогон на dev
 
 Компонент `need-for-greed/buyers`, `ru`, те же 10 строк, на которых 2026-08-20
-был зафиксирован ложный `major` (`docs/llm-first/measurements/2026-08-20-judge-first-dev-run.md`,
+был зафиксирован ложный `major` (`docs/product/measurements/2026-08-20-judge-first-dev-run.md`,
 находка 5). У проекта `machinery_settings` пуст, то есть промпт получил
 нейтральный фолбэк.
 

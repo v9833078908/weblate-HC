@@ -28,7 +28,7 @@ fork. Upstream docs do NOT cover:
   (`weblate/utils/environment.py`, folded into `CHECK_LIST` by
   `settings_docker.py`) instead of editing settings lists
 - `docs/product/`, `docs/operations/` (Russian fork docs; former
-  `docs/llm-first/` and `docs/guides/` are merged into `docs/product/`;
+  `docs/product/` and `docs/product/guides/` are merged into `docs/product/`;
   layout rule in `AGENTS.md`, "Documentation layout")
 
 Any question touching these: read local files, not upstream.

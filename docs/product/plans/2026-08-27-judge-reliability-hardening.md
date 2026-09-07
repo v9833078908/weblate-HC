@@ -6,13 +6,13 @@ before live probes:** they spend provider credits but write no production
 translations.
 
 This plan absorbs the *mechanism* of
-`docs/llm-first/plans/2026-08-26-judge-provider-failover.md` - its two-endpoint
+`docs/product/plans/2026-08-26-judge-provider-failover.md` - its two-endpoint
 configuration, per-seat/per-batch fallback, availability-only trigger list,
 `judge_provider` provenance field and parser-invalid-`200` safety rule (that
 plan's D1-D4, D6, D7 and Stages B-C), so that no second migration claims the
 same field. Its Stage A, scoring LiteLLM candidates against ground truth, is
 *not* absorbed: model selection stays with
-`docs/llm-first/plans/2026-08-27-judge-set-ab-openrouter-vs-litellm.md`.
+`docs/product/plans/2026-08-27-judge-set-ab-openrouter-vs-litellm.md`.
 
 ## The problem, stated as it actually is
 
@@ -71,16 +71,16 @@ is labelled a hypothesis and the plan does not lean on it.
 
 | measurement | result | source |
 |---|---|---|
-| LiteLLM, `qwen3.8-max`, reasoning **on** | 8/8 batches failed | `docs/llm-first/measurements/2026-08-26-litellm-transport-reset-rate.md:109-116` |
+| LiteLLM, `qwen3.8-max`, reasoning **on** | 8/8 batches failed | `docs/product/measurements/2026-08-26-litellm-transport-reset-rate.md:109-116` |
 | LiteLLM, `qwen3.8-max`, reasoning **off** | 0/8 batches failed, ~5.6-10 s | same, `:109-116` |
-| LiteLLM, DeepSeek seat, `thinking: disabled` | 37/37 billed rows still carried reasoning tokens | `docs/llm-first/measurements/2026-08-27-litellm-seat1-reasoning-leak-and-unparsed-rate.md:113-126` |
-| LiteLLM, batch 5, defect-bearing batches, `deepseek-v4-pro` | 0/3 in both reasoning configurations | `docs/llm-first/measurements/2026-08-27-litellm-complement-smoke.md:159-164` |
+| LiteLLM, DeepSeek seat, `thinking: disabled` | 37/37 billed rows still carried reasoning tokens | `docs/product/measurements/2026-08-27-litellm-seat1-reasoning-leak-and-unparsed-rate.md:113-126` |
+| LiteLLM, batch 5, defect-bearing batches, `deepseek-v4-pro` | 0/3 in both reasoning configurations | `docs/product/measurements/2026-08-27-litellm-complement-smoke.md:159-164` |
 | LiteLLM, batch 2, 15-unit dev slice, `deepseek-v4-pro` | 8/8 parsed, 10/10 caught, 12 attempts for 8 batches | same, `:222-233` |
 | LiteLLM, batch 3, same slice | 2/5 parsed; three requests returned no HTTP response after 30.5, 30.6, 30.9 s | same, `:222-233` |
-| LiteLLM, batch 2, `col4/common/fr`, 82 units | DeepSeek 66/82 unparsed (80.5%), Qwen 28/82 (34.1%) | `docs/llm-first/measurements/2026-08-27-litellm-seat1-reasoning-leak-and-unparsed-rate.md:20-68` |
+| LiteLLM, batch 2, `col4/common/fr`, 82 units | DeepSeek 66/82 unparsed (80.5%), Qwen 28/82 (34.1%) | `docs/product/measurements/2026-08-27-litellm-seat1-reasoning-leak-and-unparsed-rate.md:20-68` |
 | a previously unparsed unit, replayed unchanged | parsed | same, `:146-152` |
-| OpenRouter, `deepseek-v4-pro` + `qwen3-235b-a22b-2507`, 124 units | 0 unparsed | `docs/llm-first/measurements/2026-08-14-st2-zh-judge-run.md:38-55` |
-| OpenRouter, 376-record screen, six models | 0 unparsed | `docs/llm-first/measurements/2026-08-13-phase0-measurements.md:119-190` |
+| OpenRouter, `deepseek-v4-pro` + `qwen3-235b-a22b-2507`, 124 units | 0 unparsed | `docs/product/measurements/2026-08-14-st2-zh-judge-run.md:38-55` |
+| OpenRouter, 376-record screen, six models | 0 unparsed | `docs/product/measurements/2026-08-13-phase0-measurements.md:119-190` |
 
 Three readings, in decreasing confidence.
 
@@ -95,7 +95,7 @@ It fits every row: successes at 20.1-30.5 s, failures with no HTTP response at
 30.5-30.9 s, a thinking-on reset band at 30.6-31.1 s, and the same nominal
 batch 2 succeeding on a short dev slice while failing on French. The source
 measurement explicitly calls the batch-size result "an intervention, not a
-mechanism" (`docs/llm-first/measurements/2026-08-27-litellm-complement-smoke.md:235-238`),
+mechanism" (`docs/product/measurements/2026-08-27-litellm-complement-smoke.md:235-238`),
 and nothing we have compared target lengths, token counts or gateway timeouts
 across those corpora. Candidate confounds, all unmeasured: target length,
 completion tokens, reasoning tokens, proxy load at the hour, gateway timeout.
@@ -134,7 +134,7 @@ its timeout would be the wrong order of work.
 - Request logs contain no API key, prompt, target text, raw response, reasoning
   trace, or any unkeyed derivation of them.
 
-`docs/llm-first/plans/2026-08-27-judge-seat-parallelism.md` stays proposed and
+`docs/product/plans/2026-08-27-judge-seat-parallelism.md` stays proposed and
 gated: parallelism may not be used to compensate for anything here.
 
 ## Design decisions
@@ -216,7 +216,7 @@ New `JudgeVerdict` rows gain nullable provenance: `judge_run`,
 `request_attempt`, `judge_provider`, `endpoint_role`, `profile_fingerprint`,
 `request_fingerprint`, `batch_unit_count`, the keyed `batch_digest`, and
 `round_kind`. `judge_provider` is the field
-`docs/llm-first/plans/2026-08-26-judge-provider-failover.md:110-117` introduces;
+`docs/product/plans/2026-08-26-judge-provider-failover.md:110-117` introduces;
 it lands here and that plan is edited to consume it. Old rows stay valid
 historical evidence with blank provenance. `LLMUsageLog` gains a nullable
 one-to-one link to the attempt, so billed tokens join one exact request; a reset
@@ -430,7 +430,7 @@ setting drives both seats: `""` kills Qwen and `"none"` rescues Qwen while
 leaving DeepSeek at the ceiling, and the measurement concludes the pair "needs
 both the per-model reasoning knob the plan lists as a prerequisite **and** a
 batch size DeepSeek can finish inside 30 s"
-(`docs/llm-first/measurements/2026-08-27-litellm-complement-smoke.md:188-194`).
+(`docs/product/measurements/2026-08-27-litellm-complement-smoke.md:188-194`).
 D3 gives per-seat reasoning; D5 gives per-seat, self-adjusting size. This section
 adds the third axis and the limits of all three.
 
@@ -449,7 +449,7 @@ fault, a shared upstream host behind two gateways, or both providers degrading i
 the same hour remain correlated causes.
 
 **Fallback.** From the absorbed plan
-(`docs/llm-first/plans/2026-08-26-judge-provider-failover.md:53-66`):
+(`docs/product/plans/2026-08-26-judge-provider-failover.md:53-66`):
 `JUDGE_FALLBACK_BASE_URL` (empty disables everything), its own
 `JUDGE_FALLBACK_API_KEY`, `JUDGE_FALLBACK_MODEL_SEAT_1`,
 `JUDGE_FALLBACK_MODEL_SEAT_2`, `JUDGE_FALLBACK_REASONING_EFFORT`. Fallback is per
@@ -660,7 +660,7 @@ retried at the ceiling interval instead of hammered, and still never dropped - a
 prompt, schema or model change may make it judgeable later, and the queue is what
 remembers. The evidence says this case is rare or absent: a previously unparsed
 unit replayed unchanged and parsed
-(`docs/llm-first/measurements/2026-08-27-litellm-seat1-reasoning-leak-and-unparsed-rate.md:146-152`).
+(`docs/product/measurements/2026-08-27-litellm-seat1-reasoning-leak-and-unparsed-rate.md:146-152`).
 
 ### D10. Reports show the harness working, not a request for attention
 
@@ -1025,7 +1025,7 @@ Before enabling the harness or any non-zero retry setting:
    prompt and schema for both seat models, that a forced availability fault
    produces exactly one fallback attempt, and that split placement works.
 5. **Peers.** One arm holding profile and width fixed, varying only neighbours.
-6. Publish everything in `docs/llm-first/measurements/`.
+6. Publish everything in `docs/product/measurements/`.
 
 **Structural gate** (provable by tests, before `JUDGE_DEFERRAL_ENABLED` or
 `JUDGE_HARNESS_ENABLED` is turned on anywhere):
@@ -1059,11 +1059,11 @@ Before enabling the harness or any non-zero retry setting:
 If the empirical gate fails for a seat, the structural one still holds - nothing
 is lost or silent - and the remaining levers are the gateway timeout, the
 reasoning setting, or placement (D6). Model choice stays with
-`docs/llm-first/plans/2026-08-27-judge-set-ab-openrouter-vs-litellm.md`, whose
+`docs/product/plans/2026-08-27-judge-set-ab-openrouter-vs-litellm.md`, whose
 admission gate is "Unparsed rate <= 5%" in every repeat (`:207-210`).
 
 Only after both gates pass may
-`docs/llm-first/plans/2026-08-27-judge-seat-parallelism.md` receive a live
+`docs/product/plans/2026-08-27-judge-seat-parallelism.md` receive a live
 serial-versus-parallel canary approval, holding harness parameters, budgets and
 endpoints fixed.
 

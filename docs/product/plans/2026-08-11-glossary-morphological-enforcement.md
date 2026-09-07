@@ -16,7 +16,7 @@ LLM и отдельного решения. `GlossaryCheck` остаётся `de
 и решение по задаче 6 (go/no-go, ребейзлайн судьи) не выполнены - это требует
 доступа к продовым/dev-container данным и ручной разметки, вне рамок этой
 сессии. `GlossaryCheck` остаётся `default_disabled` до задачи 6. Обоснование и
-все числа - `docs/llm-first/measurements/2026-08-11-glossary-enforcement-analysis.md`.
+все числа - `docs/product/measurements/2026-08-11-glossary-enforcement-analysis.md`.
 
 Цель: когда LLM собирает глоссарий матчером, доводить до неё термины в
 склонённой форме источника и отдельно сделать глоссарный чек пригодным как
@@ -47,7 +47,7 @@ LLM и отдельного решения. `GlossaryCheck` остаётся `de
   72.9% [64.2, 80.1] на терминологии **с термином в промпте** — судья не
   страхует этот класс даже в лучших условиях. Владелец класса — этот
   план, а не калибровка судьи
-  (`docs/llm-first/designs/2026-08-13-judge-native-ui-design.md`, риск «Граница
+  (`docs/product/designs/2026-08-13-judge-native-ui-design.md`, риск «Граница
   ответственности судьи по глоссарию»).
 
 ## Задача 1. Режим и область применения пер-термин и пер-язык
@@ -170,7 +170,7 @@ advisory не смешивается с обычными failing checks и не 
 `analysis/probes/col4-visibility-adherence-probe.py`,
 `analysis/probes/col4-source-stem-probe.py`, новый общий helper отпечатка в
 продуктовом коде, результат в
-`docs/llm-first/measurements/2026-08-11-glossary-enforcement-analysis.md`.
+`docs/product/measurements/2026-08-11-glossary-enforcement-analysis.md`.
 
 - Прогнать замеры через продуктовые функции вместо локальных копий правил.
   Отдельно посчитать hard, advisory, снятые морфологией и ошибочно снятые

@@ -6,7 +6,7 @@ Date: 2026-09-04.
 
 Check whether the production LiteLLM seat-2 route accepts exact JSON Schema
 array cardinality before deploying
-``docs/llm-first/plans/2026-09-04-judge-segment-count-recovery.md``.
+``docs/product/plans/2026-09-04-judge-segment-count-recovery.md``.
 
 This is a compatibility smoke test, not an estimate of the post-deployment
 failure rate.

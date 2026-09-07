@@ -8,9 +8,9 @@
 
 **Tech stack:** Python 3.14, Django settings, httpx2 streaming, Celery, pytest, Docker Compose.
 
-**Design:** `docs/llm-first/designs/2026-09-01-01-judge-per-seat-deadline.md`.
+**Design:** `docs/product/designs/2026-09-01-01-judge-per-seat-deadline.md`.
 
-**Status:** completed and deployed 2026-09-01; production canary and comparable measurement passed. Evidence: `docs/llm-first/measurements/2026-09-01-02-judge-seat-parallelism-production.md`.
+**Status:** completed and deployed 2026-09-01; production canary and comparable measurement passed. Evidence: `docs/product/measurements/2026-09-01-02-judge-seat-parallelism-production.md`.
 
 ---
 
@@ -169,7 +169,7 @@ docs(judge): document per-seat request deadlines
 **Files:**
 
 - Create: `analysis/probes/judge-seat-deadline-measurement.py`
-- Create: `docs/llm-first/measurements/2026-09-01-judge-seat-deadline.md`
+- Create: `docs/product/measurements/2026-09-01-judge-seat-deadline.md`
 
 ### Step 1: Build a non-persisting probe
 
@@ -197,8 +197,8 @@ docs(judge): record the seat deadline measurement
 
 **Files:**
 
-- Modify: `docs/llm-first/plans/2026-08-27-judge-seat-parallelism.md`
-- Modify: `docs/llm-first/measurements/2026-09-01-judge-seat-deadline.md`
+- Modify: `docs/product/plans/2026-08-27-judge-seat-parallelism.md`
+- Modify: `docs/product/measurements/2026-09-01-judge-seat-deadline.md`
 
 ### Step 1: Regression verification
 

@@ -120,4 +120,4 @@
   менялся.
 - Пропуски коллегии, требующие сравнения с сиблингами, здесь закрыты
   вручную; автоматического механизма для этого по-прежнему нет — план
-  `docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md`.
+  `docs/product/plans/2026-08-14-intra-component-consistency-check.md`.

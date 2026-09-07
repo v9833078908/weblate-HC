@@ -9,7 +9,7 @@ Before the fail-fast fix (``http-request-invalid``), an HTTP 4xx refusal was
 classified ``http-other``: the judge client wrote an ``unparsed`` verdict and
 the run continued. Those verdicts are not opinions - the endpoint never
 answered - and they pollute the unparsed statistics and the producer verdict
-card (plan docs/llm-first/plans/2026-09-01-03-judge-zero-unparsed.md, Task 4).
+card (plan docs/product/plans/2026-09-01-03-judge-zero-unparsed.md, Task 4).
 
 The new kind is not retroactive: the historical 400 attempts remain
 ``http-other`` and the 401 attempt remains ``http-auth``, so selection is

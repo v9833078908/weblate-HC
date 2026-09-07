@@ -1,7 +1,7 @@
 # Producer editor Pareto reduction: research and recommendation
 
 Date: 2026-09-02. Status: research complete; the approved subset became
-`docs/llm-first/plans/2026-09-02-producer-editor-pareto.md`.
+`docs/product/plans/2026-09-02-producer-editor-pareto.md`.
 
 Trigger: the product owner opened
 `http://localhost:3001/translate/col4/data/fr/?q=check:judge-reject` and
@@ -16,7 +16,7 @@ Method: one live inventory of the running dev instance (headless browser,
 read-only), three read-only scouts (fork documentation, template map, judge
 verdict UI), and a manual verification of every fact the recommendation
 rests on. Source marks follow
-`docs/llm-first/designs/2026-09-01-02-producer-ui-reduction.md`: `[live]` is
+`docs/product/designs/2026-09-01-02-producer-ui-reduction.md`: `[live]` is
 a measurement on `localhost:3001`, `[code]` a static read with file:line,
 `[doc]` a statement from a fork document.
 
@@ -74,7 +74,7 @@ Read: `designs/2026-09-01-02-producer-ui-reduction.md`,
 `designs/2026-08-13-judge-native-ui-design.md`,
 `vision/2026-08-15-producer-first-product-research.md`,
 `vision/llm-first-product-architecture.md`,
-`docs/guides/producer-guide-weblate.md` (all under `docs/llm-first/` unless
+`docs/product/guides/producer-guide-weblate.md` (all under `docs/product/` unless
 stated).
 
 ### 2.1 Decided principles
@@ -415,4 +415,4 @@ report-to-editor link (wave 2), the persistent Producer/Advanced toggle
 | Include the rest of waves 0 and 1 (tabs, toolbar, pager, empty cards, Save and stay, shortcuts, hints)? | yes, all of it | plan Tasks 10-15; only wave 2/3 items remain deferred |
 
 The approved subset is the plan
-`docs/llm-first/plans/2026-09-02-producer-editor-pareto.md`.
+`docs/product/plans/2026-09-02-producer-editor-pareto.md`.

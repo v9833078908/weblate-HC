@@ -38,8 +38,8 @@ implementation not started. Scope reduced to the separator rule by decision of
 
 ## Why this exists
 
-`docs/llm-first/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` §5.1 and
-`docs/llm-first/measurements/2026-08-24-batch-misalignment-radius-scan.md` §4
+`docs/product/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` §5.1 and
+`docs/product/measurements/2026-08-24-batch-misalignment-radius-scan.md` §4
 measured three real content-misbinding defects in production. Commit `5ee14df`
 closed the *label-set* half of the class: a batch reply is paired with its
 sources through an echoed `id` (`weblate/machinery/llm.py:2445-2468`), and a
@@ -48,7 +48,7 @@ echoes every id correctly while carrying a neighbour's content.
 
 Task 1 measured five candidate deterministic rules before any code was written
 and eliminated four. Full numbers in
-`docs/llm-first/measurements/2026-08-25-deterministic-alignment-limits.md`.
+`docs/product/measurements/2026-08-25-deterministic-alignment-limits.md`.
 
 | Candidate rule | Verdict |
 | --- | --- |
@@ -118,7 +118,7 @@ Each was considered and rejected with evidence. Do not widen the change.
   `unique_together = ("component", "name")` (`weblate/trans/models/alert.py:85`),
   so the per-language dismissal that idea assumed does not exist.
 - **The n x n semantic verifier** of
-  `docs/llm-first/plans/2026-08-24-llm-batch-semantic-alignment-design.md`.
+  `docs/product/plans/2026-08-24-llm-batch-semantic-alignment-design.md`.
   Rejected on cost: about 548,800 classified relations on top of the producer.
 - **Changing `batch_size`.**
 - **Terminal punctuation or length in the gate.**
@@ -156,7 +156,7 @@ co-occur.
 
 **Precondition for revisiting:** measure the length distribution of the 55
 legitimate convergences in
-`docs/llm-first/measurements/2026-08-24-batch-misalignment-radius-scan.md` §4.
+`docs/product/measurements/2026-08-24-batch-misalignment-radius-scan.md` §4.
 That needs re-fetching those components through the API and is a separate,
 approved piece of work. Until then a hard refusal on a guessed threshold is a
 cost risk with no measured ceiling.
@@ -196,7 +196,7 @@ DJANGO_SETTINGS_MODULE=weblate.settings_test uv run pytest \
 **Files:**
 
 - Created: `analysis/probes/batch-anchor-threshold.py`
-- Created: `docs/llm-first/measurements/2026-08-25-deterministic-alignment-limits.md`
+- Created: `docs/product/measurements/2026-08-25-deterministic-alignment-limits.md`
 
 Ran offline over `analysis/data/heart-abyss-hub-1-units.tsv` (396 ru -> en, 396
 ru -> fr), `analysis/data/st2-zh-units.jsonl` (124 ru -> zh) and
@@ -223,8 +223,8 @@ uv run python analysis/probes/batch-anchor-threshold.py
 
 ```bash
 git add analysis/probes/batch-anchor-threshold.py \
-        docs/llm-first/measurements/2026-08-25-deterministic-alignment-limits.md \
-        docs/llm-first/plans/2026-08-25-llm-batch-separator-gate.md
+        docs/product/measurements/2026-08-25-deterministic-alignment-limits.md \
+        docs/product/plans/2026-08-25-llm-batch-separator-gate.md
 git commit -m "docs(llm-first): measure the deterministic alignment limits"
 ```
 

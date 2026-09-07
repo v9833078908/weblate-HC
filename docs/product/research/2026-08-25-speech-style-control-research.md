@@ -1,7 +1,7 @@
 # Register flattening in LLM machine translation: mechanisms, evidence, and what to measure first
 
 Date: 2026-08-25. Research document, no implementation. Motivated by
-`docs/llm-first/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` §6.1, where
+`docs/product/measurements/2026-08-24-heart-abyss-hub-1-full-lqa.md` §6.1, where
 **124 of 414** analyst-confirmed defects across nine target languages are register
 defects — the largest single class, present in every language.
 
@@ -61,7 +61,7 @@ inference, and inference regresses to the mean.
 
 **`persona` describes the game, not the voices.** For COL4 the persona already
 contains an explicit ban on softening crude strings, and it was measured travelling
-into the request intact (`docs/llm-first/measurements/2026-08-11-col4-fr-autotranslate-report.md:58-60`).
+into the request intact (`docs/product/measurements/2026-08-11-col4-fr-autotranslate-report.md:58-60`).
 For `heart-abyss` the same field holds a setting description. The mechanism is proven
 in this fork; the content was never written for this game.
 
@@ -76,9 +76,9 @@ register under the lowest severity — `judge_prompts/verdict.txt:21-31`:
 `weblate/trans/models/judge.py:215-245` maps minor to `pass`. No `judge-flag`, no
 queue, no gate. Register precision has never been measured: across the whole judge
 measurement history it appears as five findings in one 124-unit run
-(`docs/llm-first/measurements/2026-08-14-st2-zh-judge-run.md:57-59`), against overall
+(`docs/product/measurements/2026-08-14-st2-zh-judge-run.md:57-59`), against overall
 collegium precision 0.51-0.56 and recall 0.67-0.75
-(`docs/llm-first/measurements/2026-08-19-severity-recalibration-final.md`).
+(`docs/product/measurements/2026-08-19-severity-recalibration-final.md`).
 
 ## 3. Measurement on this corpus
 
@@ -133,7 +133,7 @@ Three readings, and the third matters most.
    crude sources and 48 softenings — almost all noise: `еб` matched `тебе`, `con`
    matched `conclu` / `consultez` / `contact`, `cul` matched `Cul-de-sac`. That is the
    documented glossary failure repeating exactly (`НИИ` inside `предназначении`,
-   `docs/llm-first/measurements/2026-08-11-glossary-enforcement-analysis.md:339-346`).
+   `docs/product/measurements/2026-08-11-glossary-enforcement-analysis.md:339-346`).
    With boundaries fixed, hand review of the 13 `en` candidates leaves roughly three
    clear escalations (`фигня` -> `what the fuck`, `Мне все равно` -> `I don't give a
    shit`, `Без понятия` -> `No fuckin' idea`), about four arguable, and about six
@@ -221,7 +221,7 @@ Detection stays a later, separately gated safeguard, never part of this step:
    `お前` / `てめえ` against a "refined" declaration, T-V drift inside one scene — all
    read the same declaration V0-V3 produces;
 3. nothing is enabled before its false-positive rate is measured, per the precedent in
-   `docs/llm-first/measurements/2026-08-11-glossary-enforcement-analysis.md`.
+   `docs/product/measurements/2026-08-11-glossary-enforcement-analysis.md`.
 
 ## 6. Measurement gates
 
@@ -274,7 +274,7 @@ Detection stays a later, separately gated safeguard, never part of this step:
   best system 59 % of the time ([EMNLP 2021](https://aclanthology.org/2021.emnlp-main.100.pdf)).
 - **Widening context speculatively.** The manga result degrades beyond one preceding
   scene, and our own judge plan already scopes dialogue context to the immediate
-  neighbours (`docs/llm-first/plans/2026-08-20-judge-dialog-context.md:71-99`).
+  neighbours (`docs/product/plans/2026-08-20-judge-dialog-context.md:71-99`).
 - **Treating obscenity fidelity as one global rule.** Rating boards make it a
   per-market decision (§4).
 
@@ -296,7 +296,7 @@ Detection stays a later, separately gated safeguard, never part of this step:
 
 ## 9. Roadmap placement
 
-`docs/llm-first/vision/llm-first-product-architecture.md` has no phase that owns
+`docs/product/vision/llm-first-product-architecture.md` has no phase that owns
 register control at generation time. Phase 0 owns measurement, Phase 2 the judge,
 Phase 4 context expansion. Nothing in the repository proposes per-character or
 per-scene style control: `2026-08-20-judge-dialog-context.md:64-65` explicitly

@@ -6,7 +6,7 @@ Genre: implementation. Output: one exception catch and two tests.
 
 Basis:
 
-- `docs/llm-first/measurements/2026-08-25-judge-repair-loop.md`, section 4.2
+- `docs/product/measurements/2026-08-25-judge-repair-loop.md`, section 4.2
 - `weblate/trans/judge_loop.py:305`: `repair_target` calls
   `MACHINERY[engine_id](setting).translate(unit, user)`, which can raise
   `MachineTranslationError`

@@ -37,12 +37,12 @@ tasks, httpx2 streaming, pytest.
 
 **Status:** Tasks 1-6 implemented and verified on branch `feat/judge-zero-unparsed`
 (`0f83dc5`..`4f47faa`); see
-`docs/llm-first/measurements/2026-09-01-05-judge-refused-request-fail-fast.md`.
+`docs/product/measurements/2026-09-01-05-judge-refused-request-fail-fast.md`.
 The Task 5 dev-container arms and Task 7 change a running instance and still
 need separate explicit approval.
 
 **Evidence this is needed:**
-`docs/llm-first/measurements/2026-09-01-04-judge-unparsed-attribution.md`
+`docs/product/measurements/2026-09-01-04-judge-unparsed-attribution.md`
 identifies HTTP 400/401 refusals as the dominant diagnosable incident and records
 the 05:59 run (`48bfbd72`) completing after 50 refused batches. Its aggregate
 mixes attempt and verdict facts: it also records that the 401 attempt at 06:05
@@ -64,7 +64,7 @@ production dry-run rather than asserting the contradictory historic total.
 Two contradictions follow from one kind carrying two meanings. A 400 is a
 configuration defect, yet it opens an availability circuit; and the availability
 fallback of
-`docs/llm-first/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`
+`docs/product/plans/2026-09-01-02-judge-openrouter-availability-fallback.md`
 deliberately refuses to fail over on it, so the same kind is simultaneously
 treated as an endpoint-health signal and as a request defect.
 
@@ -284,7 +284,7 @@ fix(judge): remove false refused verdicts from history
 
 - Modify: `docs/admin/config.rst`
 - Modify: `docs/changes.rst`
-- Create: `docs/llm-first/measurements/<date>-judge-refused-request-fail-fast.md`
+- Create: `docs/product/measurements/<date>-judge-refused-request-fail-fast.md`
 
 Documentation: one changelog entry in the unreleased section, and the new kind
 in the judge settings prose where the failure taxonomy is described. No new
@@ -377,7 +377,7 @@ feat(judge): retain closed deferred judge requests
 
 **Files:**
 
-- Create: `docs/llm-first/measurements/<date>-judge-deferral-queue-enabled.md`
+- Create: `docs/product/measurements/<date>-judge-deferral-queue-enabled.md`
 
 Production change, separate explicit approval. Preconditions, each verified
 before the flag moves: Tasks 1-6 deployed; the dev refusal arm proved zero

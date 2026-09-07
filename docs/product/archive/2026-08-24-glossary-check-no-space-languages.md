@@ -3,7 +3,7 @@
 Дата: 2026-08-24. Статус: закрыт, не реализован. Заархивирован 2026-08-24.
 
 Гипотеза плана опровергнута замером
-`docs/llm-first/measurements/2026-08-24-glossary-check-non-inflecting-targets.md`:
+`docs/product/measurements/2026-08-24-glossary-check-non-inflecting-targets.md`:
 языки без словоизменения дают не самые низкие срабатывания `check-glossary`,
 а самые высокие (vi 63 %, th 41 % юнитов против es 12 %, ru 18 %), при
 `hard = 0` во всех четырнадцати языках. Основание для включения чека по классу
@@ -21,16 +21,16 @@
 
 Предыстория, которую план не пересматривает:
 
-- `docs/llm-first/measurements/2026-08-11-glossary-enforcement-analysis.md` —
+- `docs/product/measurements/2026-08-11-glossary-enforcement-analysis.md` —
   на COL4 включённый чек дал бы 2 сообщения на 4023 юнита, оба ложные, а все
   85 настоящих дефектов сидели на стороне источника;
-- `docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md` —
+- `docs/product/plans/2026-08-11-glossary-morphological-enforcement.md` —
   задачи 1-5 задеплоены 2026-08-14, «`GlossaryCheck` остаётся
   `default_disabled`»;
-- `docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md` —
+- `docs/product/plans/2026-08-14-intra-component-consistency-check.md` —
   задача «включить `check_glossary`» удалена 2026-08-20, «включение чека
   per-component поверх этого решения планом не предусматривается»;
-- `docs/llm-first/plans/2026-08-10-git-localization-quality-gate.md:127-133` —
+- `docs/product/plans/2026-08-10-git-localization-quality-gate.md:127-133` —
   «Never promote `check_glossary` wholesale to blocking or to Weblate
   `enforced_checks`».
 
@@ -48,7 +48,7 @@ th `Blueprint` → `แบบแปลน`, `Ship` → `ยาน`. Это то�
 
 Офлайн-прогон по st2 zh_Hans подтверждает:
 `analysis/data/st2-zh-glossary-checks.json` — 5 срабатываний, 0 ложных
-(`docs/llm-first/measurements/2026-08-18-severity-recalibration-status.md`,
+(`docs/product/measurements/2026-08-18-severity-recalibration-status.md`,
 раздел «Офлайн `check_glossary`»).
 
 Механически это заложено в коде: границы слова отключаются для языков без
@@ -125,10 +125,10 @@ Per-cohort строка probe (`:192-196`) уже печатает нужное 
 источник, перевод, термин, его канонический таргет, тип срабатывания.
 
 Записать вывод и `glossary_matcher_fingerprint` в
-`docs/llm-first/measurements/2026-08-24-glossary-no-space-measurement.md`, а
+`docs/product/measurements/2026-08-24-glossary-no-space-measurement.md`, а
 выгрузку пар — в `analysis/data/` и закоммитить. Корпус в `/tmp` уже один раз
 пропадал и его тянули заново
-(`docs/llm-first/measurements/2026-08-18-severity-recalibration-status.md`,
+(`docs/product/measurements/2026-08-18-severity-recalibration-status.md`,
 раздел «Почему корпус не с `/tmp`»).
 
 ## Задача 3. Ревью сработавших строк
@@ -169,10 +169,10 @@ th и другие из `NO_SPACE_LANGUAGES`, если есть на проде;
 ## Задача 6. Привести решения в соответствие
 
 - дописать результат в
-  `docs/llm-first/measurements/2026-08-11-glossary-enforcement-analysis.md`
+  `docs/product/measurements/2026-08-11-glossary-enforcement-analysis.md`
   отдельным датированным разделом, не переписывая старые;
 - поправить критерий приёмки
-  `docs/llm-first/plans/2026-08-14-intra-component-consistency-check.md:173`:
+  `docs/product/plans/2026-08-14-intra-component-consistency-check.md:173`:
   «остаётся выключенным» → «выключен для языков с пробелами; для языков без
   пробелов — по замеру 2026-08-24»;
 - в `docs/operations/audits/2026-08-20-heart-abyss-hub-1-translation-qa.md`

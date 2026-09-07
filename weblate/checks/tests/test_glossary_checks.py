@@ -268,7 +268,7 @@ class GlossaryMorphologyEvaluatorTest(SimpleTestCase):
 
     Pure unit tests independent of DB fixture languages, covering the
     allowlisted (ru/de/tr) and non-allowlisted (id) acceptance cases from
-    docs/llm-first/plans/2026-08-11-glossary-morphological-enforcement.md.
+    docs/product/plans/2026-08-11-glossary-morphological-enforcement.md.
     """
 
     def build(

@@ -1,7 +1,7 @@
 # Judge run progress reporting (superseded)
 
 **Date:** 2026-08-24. **Status:** superseded and absorbed into
-`docs/llm-first/plans/2026-08-22-02-judge-navigation-readiness.md`, Task 6.
+`docs/product/plans/2026-08-22-02-judge-navigation-readiness.md`, Task 6.
 Do not implement this document independently.
 
 ## Reason for consolidation

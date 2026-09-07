@@ -23,13 +23,13 @@ dropdown tab, the component screenshots page, the string history).
 `weblate/static/editor/full.js`), gettext (`weblate/locale/ru`), pytest,
 Docker Compose dev instance on port 3001.
 
-**Design origin:** `docs/llm-first/designs/2026-09-01-02-producer-ui-reduction.md`
+**Design origin:** `docs/product/designs/2026-09-01-02-producer-ui-reduction.md`
 (P1 items), the review of the live page on 2026-09-02 (215 button/link
 actions in the DOM, 87 distinct controls; 62 of them are per-row copy buttons
 of the default "Nearby strings" tab), and the product owner's decisions in
 chat on 2026-09-02 recorded below.
 
-**Research:** `docs/llm-first/research/2026-09-02-producer-editor-pareto-research.md`
+**Research:** `docs/product/research/2026-09-02-producer-editor-pareto-research.md`
 (live inventory, the three scout reports, verified facts, and the full
 recommendation including the deferred waves).
 
@@ -101,7 +101,7 @@ wave 1 as template conditions.
 
 1. Generation never mutates the target; acceptance writes `STATE_FUZZY`; only a
    fresh re-check makes the accepted text shippable
-   (`docs/llm-first/plans/2026-09-01-judge-producer-triage-embed.md`, invariants 1 and 4).
+   (`docs/product/plans/2026-09-01-judge-producer-triage-embed.md`, invariants 1 and 4).
 2. Stale or context-drifted cards offer only "Re-check this string".
 3. Every producer decision still writes its immutable Change with actor and
    resolution; only the reason text may now be empty.
@@ -949,7 +949,7 @@ Commit: `feat(judge): add triage shortcuts and paid-request hints`.
 
 **Files:**
 
-- Modify: `docs/guides/producer-guide-weblate.md:495-535` (the AI judge step;
+- Modify: `docs/product/guides/producer-guide-weblate.md:495-535` (the AI judge step;
   edit only this guide)
 - Modify: `docs/admin/checks.rst:190-220`
 - Modify: `docs/admin/management.rst` (Task 8 entry, if not done there)

@@ -408,7 +408,7 @@ dictionary = "scripts/codespell.txt,-"
 # across this codebase; nothink is the reasoning-off model suffix in the
 # LiteLLM judge smoke probe
 ignore-words-list = "assertIn,Vai,master,bloc,mis,nd,ons,te,sanity-check,nothink"
-skip = '*.po,*.pot,*.json,*.jsonl,*.tmx,*.tbx,*.csv,*.tsv,*/vendor/*,weblate/trans/specialchars.py,weblate/trans/tests/data/known_hosts,docs/changes/contributors/*.rst,docs/llm-first/measurements/2026-08-12-col4-judge-annotation.md,docs/operations/audits/2026-08-20-heart-abyss-hub-1-translation-qa.md'
+skip = '*.po,*.pot,*.json,*.jsonl,*.tmx,*.tbx,*.csv,*.tsv,*/vendor/*,weblate/trans/specialchars.py,weblate/trans/tests/data/known_hosts,docs/changes/contributors/*.rst,docs/product/measurements/2026-08-12-col4-judge-annotation.md,docs/operations/audits/2026-08-20-heart-abyss-hub-1-translation-qa.md'
 
 [tool.coverage.paths]
 source = [
@@ -834,8 +834,8 @@ extend-exclude = [
   "analysis/data/glossary-drift-interaction-*",
   "analysis/data/hub1-remediation-2026-08-25/glossary",
   "docs/changes/contributors",
-  "docs/llm-first/measurements/2026-08-12-col4-judge-annotation.md",
-  "docs/llm-first/measurements/2026-09-04-glossary-morphology-vs-repeat-drift.md",
+  "docs/product/measurements/2026-08-12-col4-judge-annotation.md",
+  "docs/product/measurements/2026-09-04-glossary-morphology-vs-repeat-drift.md",
   "docs/specs",
   "scripts/codespell.txt",
   "scripts/spdx-license-list",

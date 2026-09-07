@@ -204,7 +204,7 @@ git commit -m "feat(loc-kit): apply glossary source flags"
 
 **Files:**
 
-- Modify: `docs/guides/loc-kit-ingest.md`
+- Modify: `docs/product/guides/loc-kit-ingest.md`
 - Modify: `docs/changes.rst`
 
 ### Step 1: Update the guide
@@ -231,7 +231,7 @@ Expected: PASS.
 ### Step 3: Run scoped lint
 
 ```bash
-uv run prek run --files loc_kit_ingest/profile.py loc_kit_ingest/infer.py loc_kit_ingest/model.py loc_kit_ingest/parser.py loc_kit_ingest/writer.py loc_kit_ingest/tests/test_profile_v2.py loc_kit_ingest/tests/test_infer_glossary.py loc_kit_ingest/tests/test_parser_tbx.py loc_kit_ingest/tests/test_model.py loc_kit_ingest/tests/test_writer.py weblate/trans/loc_kit.py weblate/trans/views/create.py weblate/templates/trans/loc_kit_glossary_preview.html weblate/trans/tests/test_loc_kit_profile_suggester.py weblate/trans/tests/test_loc_kit_ingest_contract.py docs/guides/loc-kit-ingest.md docs/changes.rst
+uv run prek run --files loc_kit_ingest/profile.py loc_kit_ingest/infer.py loc_kit_ingest/model.py loc_kit_ingest/parser.py loc_kit_ingest/writer.py loc_kit_ingest/tests/test_profile_v2.py loc_kit_ingest/tests/test_infer_glossary.py loc_kit_ingest/tests/test_parser_tbx.py loc_kit_ingest/tests/test_model.py loc_kit_ingest/tests/test_writer.py weblate/trans/loc_kit.py weblate/trans/views/create.py weblate/templates/trans/loc_kit_glossary_preview.html weblate/trans/tests/test_loc_kit_profile_suggester.py weblate/trans/tests/test_loc_kit_ingest_contract.py docs/product/guides/loc-kit-ingest.md docs/changes.rst
 ```
 
 Expected: PASS.
@@ -239,7 +239,7 @@ Expected: PASS.
 ### Step 4: Commit
 
 ```bash
-git add docs/guides/loc-kit-ingest.md docs/changes.rst
+git add docs/product/guides/loc-kit-ingest.md docs/changes.rst
 git commit -m "docs(loc-kit): document glossary source flags"
 ```
 
