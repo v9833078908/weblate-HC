@@ -1327,20 +1327,14 @@ onReady(() => {
     updateAutoSource();
   }
 
-  document.querySelectorAll("form[data-judge-preview-url]").forEach((form) => {
+  document.querySelectorAll("form[data-auto-preview-url]").forEach((form) => {
     const mode = form.querySelector('[name="mode"]');
     const query = form.querySelector('[name="q"]');
-    const preview = form.querySelector("#id_auto_judge_preview");
+    const preview = form.querySelector("#id_auto_run_preview");
     const apply = form.querySelector("#id_auto_apply");
-    if (mode === null || query === null || preview === null || apply === null) {
-      return;
-    }
+    if (mode === null || query === null || preview === null || apply === null) return;
     let timer;
     let controller;
-    /* autoform.html renders the preview with Bootstrap's `d-none` as well as
-     * an inline `display: none`. The global show()/hide() helpers only touch
-     * the inline style, and `.d-none { display: none !important }` outranks
-     * it, so the preview would stay invisible however much text it holds. */
     const showPreview = () => {
       preview.classList.remove("d-none");
       show(preview);
@@ -1349,8 +1343,13 @@ onReady(() => {
       hide(preview);
       preview.classList.add("d-none");
     };
-    const updateJudgePreview = () => {
-      if (mode.value !== "judge") {
+    const isJudge = () => mode.value === "judge";
+    const usesMachineTranslation = () =>
+      isJudge() || form.querySelector('[name="auto_source"]:checked')?.value === "mt";
+    const updateAutoPreview = () => {
+      if (!usesMachineTranslation()) {
+        controller?.abort();
+        window.clearTimeout(timer);
         hidePreview();
         apply.disabled = false;
         return;
@@ -1360,85 +1359,51 @@ onReady(() => {
         controller?.abort();
         controller = new AbortController();
         const params = new URLSearchParams(new FormData(form));
-        fetch(`${form.dataset.judgePreviewUrl}?${params}`, {
-          signal: controller.signal,
-        })
+        fetch(`${form.dataset.autoPreviewUrl}?${params}`, { signal: controller.signal })
           .then((response) => {
             if (response.status === 400) {
               return response.json().then(() => {
-                const error = new Error("Invalid judge preview");
+                const error = new Error("Invalid automatic translation preview");
                 error.invalid = true;
                 throw error;
               });
             }
-            if (!response.ok) {
-              throw new Error("Judge preview failed");
-            }
+            if (!response.ok) throw new Error("Automatic translation preview failed");
             return response.json();
           })
           .then((data) => {
-            const judgeCost = data.judge_cost.available
-              ? interpolate(
-                  gettext("Observed judge cost: %(min)s to %(max)s USD."),
-                  data.judge_cost,
-                  true,
-                )
-              : gettext("Observed judge cost is unavailable.");
-            const pretranslationCost = data.pretranslation_cost.available
-              ? interpolate(
-                  gettext(
-                    "Observed pretranslation cost: %(min)s to %(max)s USD.",
-                  ),
-                  data.pretranslation_cost,
-                  true,
-                )
-              : gettext("Observed pretranslation cost is unavailable.");
-            preview.textContent = interpolate(
-              gettext(
-                "%(matched)s matching strings: %(processed)s will be judge-evaluated, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap. %(initial)s initial and %(worst)s worst-case LLM requests. %(judgeCost)s %(pretranslationCost)s",
-              ),
-              {
-                matched: data.matched,
-                processed: data.processed,
-                writable: data.writable,
-                remaining: data.remaining,
-                initial: data.judge_calls_initial,
-                worst: data.judge_calls_worst_case,
-                judgeCost,
-                pretranslationCost,
-              },
-              true,
-            );
+            const cost = data.pretranslation_cost.available
+              ? interpolate(gettext("Estimated machine translation cost: %(min)s to %(max)s USD."), data.pretranslation_cost, true)
+              : gettext("Estimated machine translation cost is unavailable.");
+            const scope = isJudge()
+              ? interpolate(gettext("%(matched)s matching strings: %(processed)s will be judge-evaluated, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap."), data, true)
+              : interpolate(gettext("%(matched)s matching strings will be considered by the selected machine translation engines."), data, true);
+            preview.textContent = `${scope} ${cost}`;
+            if (isJudge()) {
+              const judgeCost = data.judge_cost.available
+                ? interpolate(gettext("Estimated judge cost: %(min)s to %(max)s USD."), data.judge_cost, true)
+                : gettext("Estimated judge cost is unavailable.");
+              preview.textContent += ` ${judgeCost}`;
+            }
             showPreview();
-            apply.disabled = data.processed === 0;
+            apply.disabled = isJudge() && data.processed === 0;
           })
           .catch((error) => {
-            if (error.name === "AbortError") {
-              return;
-            }
-            if (error.invalid) {
-              preview.textContent = gettext("Judge preview input is invalid.");
-              showPreview();
-              apply.disabled = true;
-              return;
-            }
-            preview.textContent = gettext(
-              "Judge preview is unavailable. You can still apply this run.",
-            );
+            if (error.name === "AbortError") return;
+            preview.textContent = error.invalid
+              ? gettext("Automatic translation preview input is invalid.")
+              : gettext("Automatic translation preview is unavailable. You can still apply this run.");
             showPreview();
-            apply.disabled = false;
+            apply.disabled = Boolean(error.invalid);
           });
       }, 250);
     };
-    mode.addEventListener("change", updateJudgePreview);
-    query.addEventListener("input", updateJudgePreview);
-    form
-      .querySelector('[name="overwrite_existing"]')
-      ?.addEventListener("change", updateJudgePreview);
-    form
-      .querySelector('[name="engines"]')
-      ?.addEventListener("change", updateJudgePreview);
-    updateJudgePreview();
+    mode.addEventListener("change", updateAutoPreview);
+    query.addEventListener("input", updateAutoPreview);
+    form.querySelector('[name="overwrite_existing"]')?.addEventListener("change", updateAutoPreview);
+    form.querySelector('[name="engines"]')?.addEventListener("change", updateAutoPreview);
+    form.querySelectorAll('[name="auto_source"]').forEach((input) => input.addEventListener("change", updateAutoPreview));
+    updateAutoPreview();
   });
 
   const findElements = (root, selector) => {

@@ -85,6 +85,11 @@ class JudgeScopePreview:
     initial_calls: int
     worst_case_calls: int
 
+@dataclass(frozen=True, slots=True)
+class MTScopePreview:
+    matched: int
+    writable: int
+    per_translation: list[tuple[Translation, int]]
 
 @dataclass(frozen=True, slots=True)
 class JudgeSummary:
@@ -1168,6 +1173,30 @@ class BatchAutoTranslate(BaseAutoTranslate):
             initial_calls=initial_calls,
             worst_case_calls=worst_case_calls,
         )
+
+    def preview_mt_scope(self) -> MTScopePreview:
+        rows: list[tuple[Translation, int]] = []
+        matched = 0
+        for translation in self.translations:
+            if not self._can_process_translation(translation):
+                continue
+            units = AutoTranslate(
+                user=self.user,
+                translation=translation,
+                q=self.q,
+                mode=self.mode,
+                component_wide=self.component_wide,
+                unit_ids=self.unit_ids,
+                allow_non_shared_tm_source_components=(
+                    self.allow_non_shared_tm_source_components
+                ),
+                overwrite_existing=self.overwrite_existing,
+            ).get_units()
+            count = units.count()
+            matched += count
+            if count:
+                rows.append((translation, count))
+        return MTScopePreview(matched=matched, writable=matched, per_translation=rows)
 
     def _preload_workflow_settings(self) -> None:
         self.translations = list(self.translations)

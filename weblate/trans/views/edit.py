@@ -6,6 +6,7 @@ from __future__ import annotations
 import contextlib
 import json
 import time
+from decimal import Decimal
 from math import ceil
 from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, TypedDict, cast
 
@@ -1620,84 +1621,110 @@ def auto_translation_preview(request: AuthenticatedHttpRequest, path):
         if isinstance(obj, (Category, ProjectLanguage))
         else obj
     )
-    if not request.user.has_perm("unit.review", form_obj):
-        raise PermissionDenied
     autoform = AutoForm(form_obj, request.user, request.GET)
-    if not autoform.is_valid() or autoform.cleaned_data["mode"] != "judge":
+    if not autoform.is_valid():
         return JsonResponse({"errors": autoform.errors}, status=400)
+    mode = autoform.cleaned_data["mode"]
+    if mode == "judge" and not request.user.has_perm("unit.review", form_obj):
+        raise PermissionDenied
     batch = BatchAutoTranslate(
         obj,
         user=request.user,
         q=autoform.cleaned_data["q"],
-        mode="judge",
+        mode=mode,
         component_wide=isinstance(obj, Component),
         overwrite_existing=autoform.cleaned_data["overwrite_existing"],
     )
-    preview = batch.preview_judge_scope()
-    project_ids = {
-        translation.component.project_id for translation in batch.translations
-    }
+    judge_preview = batch.preview_judge_scope() if mode == "judge" else None
+    mt_preview = batch.preview_mt_scope() if mode != "judge" else None
+    preview = judge_preview or mt_preview
     judge_cost: dict[str, str | bool] = {"available": False}
-    if len(project_ids) == 1:
-        project_id = project_ids.pop()
-        ranges = [
-            recent_cost_range(
-                project_id,
-                profile.provider,
-                profile.model,
-                LLMUsageLog.Operation.JUDGE,
-            )
-            for profile in judge_seat_profiles()
-        ]
-        if all(cost_range is not None for cost_range in ranges):
-            low = sum(cost_range[0] for cost_range in ranges if cost_range is not None)
-            high = sum(cost_range[1] for cost_range in ranges if cost_range is not None)
-            judge_cost = {
-                "available": True,
-                "min": format((low * preview.processed).normalize(), "f"),
-                "max": format(
-                    (
-                        high
-                        * preview.processed
-                        * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)
-                    ).normalize(),
-                    "f",
-                ),
-            }
+    if judge_preview is not None:
+        project_ids = {
+            translation.component.project_id for translation in batch.translations
+        }
+        if len(project_ids) == 1:
+            ranges = [
+                recent_cost_range(
+                    project_ids.copy().pop(),
+                    profile.provider,
+                    profile.model,
+                    LLMUsageLog.Operation.JUDGE,
+                )
+                for profile in judge_seat_profiles()
+            ]
+            if all(cost_range is not None for cost_range in ranges):
+                low = sum(cost_range[0] for cost_range in ranges if cost_range)
+                high = sum(cost_range[1] for cost_range in ranges if cost_range)
+                judge_cost = {
+                    "available": True,
+                    "min": format((low * judge_preview.processed).normalize(), "f"),
+                    "max": format(
+                        (
+                            high
+                            * judge_preview.processed
+                            * (settings.JUDGE_MAX_REPAIR_ATTEMPTS + 1)
+                        ).normalize(),
+                        "f",
+                    ),
+                }
     pretranslation_cost: dict[str, str | bool] = {"available": False}
-    if len(batch.translations) == 1 and len(autoform.cleaned_data["engines"]) == 1:
-        translation = batch.translations[0]
-        engine_id = autoform.cleaned_data["engines"][0]
-        configuration = translation.component.project.get_machinery_settings().get(
-            engine_id
-        )
-        if configuration is not None and engine_id in MACHINERY:
-            machine = MACHINERY[engine_id](configuration)
-            resolve_model = getattr(machine, "resolve_model", None)
-            if callable(resolve_model):
-                model = resolve_model(translation.language.code)
-                if isinstance(model, str):
-                    cost_range = recent_cost_range(
+    engine_ids = autoform.cleaned_data["engines"]
+    if mode != "judge" and autoform.cleaned_data["auto_source"] == "mt" and engine_ids:
+        configurations_by_translation = []
+        complete = bool(mt_preview and mt_preview.per_translation)
+        for translation, _writable in mt_preview.per_translation if mt_preview else []:
+            configurations = translation.component.project.get_machinery_settings()
+            low = high = Decimal(0)
+            for engine_id in engine_ids:
+                configuration = configurations.get(engine_id)
+                if configuration is None or engine_id not in MACHINERY:
+                    complete = False
+                    break
+                machine = MACHINERY[engine_id](configuration)
+                model = getattr(machine, "resolve_model", lambda _code: None)(
+                    translation.language.code
+                )
+                cost_range = (
+                    recent_cost_range(
                         translation.component.project_id,
                         machine.get_identifier(),
                         model,
                         LLMUsageLog.Operation.TRANSLATION,
                     )
-                    if cost_range is not None:
-                        low, high = cost_range
-                        pretranslation_cost = {
-                            "available": True,
-                            "min": format((low * preview.writable).normalize(), "f"),
-                            "max": format((high * preview.writable).normalize(), "f"),
-                        }
+                    if isinstance(model, str)
+                    else None
+                )
+                if cost_range is None:
+                    complete = False
+                    break
+                low += cost_range[0]
+                high += cost_range[1]
+            if not complete:
+                break
+            configurations_by_translation.extend((low, high))
+        if complete and configurations_by_translation and mt_preview:
+            pretranslation_cost = {
+                "available": True,
+                "min": format(
+                    min(item[0] for item in configurations_by_translation)
+                    * mt_preview.writable,
+                    "f",
+                ),
+                "max": format(
+                    max(item[1] for item in configurations_by_translation)
+                    * mt_preview.writable,
+                    "f",
+                ),
+            }
     return JsonResponse(
         {
             "matched": preview.matched,
-            "processed": preview.processed,
-            "remaining": preview.remaining,
+            "processed": judge_preview.processed if judge_preview else 0,
+            "remaining": judge_preview.remaining if judge_preview else 0,
             "writable": preview.writable,
-            "judge_calls_initial": preview.initial_calls,
-            "judge_calls_worst_case": preview.worst_case_calls,
+            "judge_calls_initial": judge_preview.initial_calls if judge_preview else 0,
+            "judge_calls_worst_case": judge_preview.worst_case_calls if judge_preview else 0,
             "judge_cost": judge_cost,
             "pretranslation_cost": pretranslation_cost,
         }
