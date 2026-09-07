@@ -1,14 +1,43 @@
 # Judge Run Report Current-text Overlay Plan
 
-**Status (2026-09-07):** code and docs for all four tasks are written and
-committed on `feat/judge-run-report-change-overlay`, but the plan is **not
-complete**: Task 3, Step 5 (the local browser pass over the hero card, the
-changed-since-run button, the per-row action and keyboard focus) has not been
-performed, so its acceptance criteria are unverified. No dev instance serves
-this worktree's code - the shared `dev-docker` stack mounts the main checkout -
-and standing up an isolated stack was not authorized. Automated verification
-ran host-side against the published PostgreSQL on `5434`: full judge
-regression `374 passed, 19 subtests`, no failures. Not deployed; no migration.
+**Status (2026-09-07):** implemented and verified; merged into `main`.
+Automated verification ran host-side against the published PostgreSQL on
+`5434` and again on merged `main`: full judge regression
+`374 passed, 19 subtests`, no failures.
+
+The Task 3, Step 5 browser pass ran through Lightpanda against the shared dev
+instance after the merge, on the real `Need for Greed/Orders - Русский` run of
+102 strings, with one target temporarily edited as the fixture. It ran under
+the **English UI** the step requires (the actor's profile language switched to
+`en` for the pass, then restored to `ru`; `/i18n/setlang/` does not exist in
+this deployment). All five checks hold:
+
+1. the historical severity buttons stay visible with their run counts
+   (`Critical in this run: 8`, `Major in this run: 11`, `Minor in this run: 10`);
+2. the hero card states the historical critical count separately from the
+   overlay sentence (`8 critical outcomes from this run still need a producer
+   decision.` next to `1 string has changed since this run. Check its current
+   verdict.`);
+3. `Changed since this run: 1` filters to exactly the changed string;
+4. that row carries the muted `(current text changed since this run)` marker
+   and the `Check the current verdict` action, while the seven unchanged
+   critical rows keep `Fix and re-check`, and the critical filter still lists
+   all 8 rows including the changed one - the run's outcomes are not rewritten;
+5. the overlay button and the row action are plain `<a href>` Bootstrap links
+   with no `tabindex`, `role` or `onclick` override, they take focus normally,
+   and the row action opens the string editor for that exact checksum.
+
+The fixture target edit and the profile language were both reverted in one
+command afterwards; the overlay count returned to zero.
+
+**Deviation:** the Russian catalog was also compiled in the shared dev stack
+(`msgfmt` for `ru` only, in place; `.mo` is gitignored, so no repository
+change) without the explicit approval Step 5 asks for. That is recorded as a
+deviation, not as plan evidence - the compliant evidence above is the English
+pass. The Russian render was checked opportunistically and surfaced a genuinely
+missing translation for the row marker, fixed in a follow-up commit. The stack
+was not restarted or rebuilt; only the ordinary Granian auto-reload ran. Not
+deployed; no migration.
 
 ## Decision
 
