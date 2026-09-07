@@ -1096,11 +1096,12 @@ class GlosbeTranslationTest(BaseMachineTranslationTest):
         """Test rate limit response handling."""
         # This raises an exception
         self.test_error()
-        # The second call should not perform due to rate limiting being cached
+        # The second call reports the stop instead of asking again
         machine = self.MACHINE_CLS(self.get_configuration())
-        self.assert_translate(
-            self.SUPPORTED, self.SOURCE_TRANSLATED, 0, machine=machine
-        )
+        with self.assertRaises(MachineryRateLimitError):
+            machine.translate(
+                make_unit(code=self.SUPPORTED, source=self.SOURCE_TRANSLATED)
+            )
 
     @http_mock.activate
     def test_ratelimit_set(self) -> None:
@@ -1108,9 +1109,10 @@ class GlosbeTranslationTest(BaseMachineTranslationTest):
         machine = self.MACHINE_CLS(self.get_configuration())
         machine.delete_cache()
         machine.set_rate_limit()
-        self.assert_translate(
-            self.SUPPORTED, self.SOURCE_TRANSLATED, 0, machine=machine
-        )
+        with self.assertRaises(MachineryRateLimitError):
+            machine.translate(
+                make_unit(code=self.SUPPORTED, source=self.SOURCE_TRANSLATED)
+            )
 
 
 class MyMemoryTranslationTest(BaseMachineTranslationTest):
@@ -1458,9 +1460,10 @@ class GoogleTranslationTest(BaseMachineTranslationTest):
         machine = self.MACHINE_CLS(self.get_configuration())
         machine.delete_cache()
         machine.set_rate_limit()
-        self.assert_translate(
-            self.SUPPORTED, self.SOURCE_TRANSLATED, 0, machine=machine
-        )
+        with self.assertRaises(MachineryRateLimitError):
+            machine.translate(
+                make_unit(code=self.SUPPORTED, source=self.SOURCE_TRANSLATED)
+            )
 
 
 class GoogleV3TranslationTest(BaseMachineTranslationTest):
@@ -11217,4 +11220,53 @@ class RateLimitStopTest(SimpleTestCase):
         # stop there costs every string of a run started meanwhile.
         self.assertLess(
             BaseLLMTranslation.rate_limit_period, DummyTranslation.rate_limit_period
+        )
+
+
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            # Own cache, so clearing a stop cannot disturb another test.
+            "LOCATION": "machinery-rate-limited-answer",
+        }
+    }
+)
+class RateLimitedAnswerTest(TestCase):
+    """What a service stopped by somebody else's run answers a user."""
+
+    SOURCE = "Hello, world!\n"
+
+    def setUp(self) -> None:
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+    def get_machine(self) -> DummyTranslation:
+        machine = DummyTranslation({})
+        machine.cache_translations = True
+        return machine
+
+    def test_stop_is_reported_instead_of_an_empty_answer(self) -> None:
+        machine = self.get_machine()
+        machine.set_rate_limit()
+
+        with self.assertRaises(MachineryRateLimitError):
+            machine.translate(make_unit(code="cs", source=self.SOURCE))
+
+    def test_stop_is_reported_by_the_asynchronous_path(self) -> None:
+        machine = self.get_machine()
+        machine.set_rate_limit()
+
+        with self.assertRaises(MachineryRateLimitError):
+            async_to_sync(machine.atranslate)(make_unit(code="cs", source=self.SOURCE))
+
+    def test_stopped_service_still_answers_from_cache(self) -> None:
+        machine = self.get_machine()
+        expected = machine.translate(make_unit(code="cs", source=self.SOURCE))
+        self.assertTrue(any(expected))
+        machine.set_rate_limit()
+
+        self.assertEqual(
+            machine.translate(make_unit(code="cs", source=self.SOURCE)), expected
         )

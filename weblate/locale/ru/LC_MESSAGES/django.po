@@ -7465,6 +7465,10 @@ msgstr "Поддерживаемые языки не найдены: %s"
 msgid "Could not fetch translation: %s"
 msgstr "Не удалось получить перевод: %s"
 
+#: weblate/machinery/base.py:506
+msgid "Service is currently rate limited, try again later."
+msgstr "Сейчас сервис ограничивает частоту запросов, повторите попытку позже."
+
 #: weblate/machinery/forms.py:39
 msgctxt "Automatic suggestion service configuration"
 msgid "Source language selection"

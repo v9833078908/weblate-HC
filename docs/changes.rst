@@ -100,6 +100,7 @@ Weblate 2026.8.1
 * :ref:`check-multiple-failures` no longer counts a dismissed check, so a source string is reported only while its translations still have checks awaiting a decision.
 * :ref:`check-prohibited-initial-character` no longer reports a translation, only the glossary term it translates, so a translation shortened for a narrow interface can start with a character such as ``%``.
 * An LLM judge run whose batch is too large to answer within :setting:`JUDGE_REQUEST_DEADLINE` now reduces the batch for the rest of that run, instead of repeating the same oversized batch until the run ends. A slow model previously lost every verdict of the run this way, because the reduction was recorded but only applied to the next run.
+* A machine translation service stopped after refusing somebody else's :ref:`automatic translation <auto-translation>` run now says so in the editor, instead of answering a single string with no suggestions and no reason; a suggestion already cached for that string is still served, because a stop only has to prevent new requests.
 
 .. rubric:: Compatibility
 
