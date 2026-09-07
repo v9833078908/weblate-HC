@@ -1056,7 +1056,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         self.workspace_source_component_ids: dict[int, list[int]] | None = None
         self.enforce_permissions = enforce_permissions
         self.overwrite_existing = overwrite_existing
-        self.judge_run_id = judge_run_id
+        self.producer_run_id = judge_run_id
         self.judge_pretranslate = judge_pretranslate
         self.judge_mutating_repairs = judge_mutating_repairs
         self.judge_candidate_severities = judge_candidate_severities
@@ -1402,7 +1402,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
     ) -> str:
         self.active_producer_run = None
         try:
-            return self._perform(
+            message = self._perform(
                 auto_source=auto_source,
                 engines=engines,
                 threshold=threshold,
@@ -1414,6 +1414,16 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     self.active_producer_run, ProducerRun.Status.FAILED, str(error)
                 )
             raise
+        if self.active_producer_run is not None:
+            status = (
+                ProducerRun.Status.FAILED
+                if self.failure_message
+                else ProducerRun.Status.COMPLETED
+            )
+            self._finish_producer_run(
+                self.active_producer_run, status, self.failure_message or ""
+            )
+        return message
 
     def _perform(  # ruff: ignore[complex-structure]
         self,
@@ -1463,34 +1473,34 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 ),
                 overwrite_existing=self.overwrite_existing,
                 judge_limit=judge_remaining,
-                producer_run=judge_run,
+                producer_run=producer_run,
                 judge_pretranslate=self.judge_pretranslate,
                 judge_mutating_repairs=self.judge_mutating_repairs,
                 judge_candidate_severities=self.judge_candidate_severities,
             )
             if not self._can_process_translation(translation):
-                if self.mode == "judge" and judge_run is not None:
+                if self.mode == "judge" and producer_run is not None:
                     self._record_skipped_judge_units(
-                        judge_run,
+                        producer_run,
                         list(auto_translate.get_units().order_by("position", "pk")),
                         JudgeRunUnit.SkipReason.PERMISSION,
                     )
                 self.set_progress(pos)
                 continue
-            if self.mode == "judge" and judge_run is not None:
+            if self.mode == "judge" and producer_run is not None:
                 matched_units = list(
                     auto_translate.get_units().order_by("position", "pk")
                 )
-                if not judge_remaining:
+                if judge_remaining is not None and not judge_remaining:
                     self._record_skipped_judge_units(
-                        judge_run,
+                        producer_run,
                         matched_units,
                         JudgeRunUnit.SkipReason.CAP,
                     )
                     self.set_progress(pos)
                     continue
                 self._record_skipped_judge_units(
-                    judge_run,
+                    producer_run,
                     matched_units[judge_remaining:],
                     JudgeRunUnit.SkipReason.CAP,
                 )

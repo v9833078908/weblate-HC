@@ -497,7 +497,7 @@ def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
             "model": row["model"],
             "requests": row["requests"],
             "strings_sent": row["strings_sent"] or 0,
-            "cost_usd": row["cost_usd"] or Decimal(0),
+            "cost_usd": row["known_cost_usd"] or Decimal(0),
             "unpriced_requests": row["unpriced_requests"],
         }
         for row in LLMUsageLog.objects.filter(
@@ -507,10 +507,10 @@ def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
         .annotate(
             requests=Count("id"),
             strings_sent=Sum("batch_size"),
-            cost_usd=Sum("cost_usd"),
+            known_cost_usd=Sum("cost_usd"),
             unpriced_requests=Count("id", filter=Q(cost_usd__isnull=True)),
         )
-        .order_by("-cost_usd", "target_language_code", "service", "model")
+        .order_by("-known_cost_usd", "target_language_code", "service", "model")
     ]
     scope_query_url = (
         _review_url(scope, run.requested_query)
