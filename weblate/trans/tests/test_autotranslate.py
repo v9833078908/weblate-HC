@@ -1440,6 +1440,10 @@ class ProducerRunCreationTest(ViewTestCase):
             q="",
             mode=mode,
             component_wide=True,
+            # The base component fixture may have no eligible strings when the
+            # built-in ``weblate`` machinery is disabled.  Pin the lifecycle
+            # probe to a real unit so the child AutoTranslate is dispatched.
+            unit_ids=[self.get_unit().pk],
         )
         auto.perform(
             auto_source=auto_source,
@@ -1493,6 +1497,7 @@ class ProducerRunCreationTest(ViewTestCase):
             q="",
             mode="translate",
             component_wide=True,
+            unit_ids=[self.get_unit().pk],
         )
         with (
             mock.patch.object(
