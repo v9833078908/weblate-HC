@@ -41,6 +41,7 @@ from weblate.trans.models import (
     Translation,
 )
 from weblate.trans.models.judge import RUN_KIND_LABELS, SEVERITY_RANK, JudgeVerdict
+from weblate.trans.models.llm_usage import LLMUsageLog, run_spend
 from weblate.trans.models.project import CommitPolicyChoices
 from weblate.utils.stats import ProjectLanguage
 from weblate.workspaces.models import Workspace
@@ -481,13 +482,19 @@ def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
         raise Http404
 
     outcome = request.GET.get("outcome", "")
+    is_judge_run = run.requested_mode in JUDGE_MODES
+    operation = (
+        LLMUsageLog.Operation.JUDGE
+        if is_judge_run
+        else LLMUsageLog.Operation.TRANSLATION
+    )
+    spend = run_spend(run.pk, operation)
     if outcome and outcome not in _OUTCOME_LABELS:
         raise Http404
     # No explicit filter: the producer default. The actionable buckets are
     # the whole point of the page; everything else stays one URL away.
     effective = outcome or "actionable"
     base_rows = JudgeRunUnit.objects.filter(run=run)
-    counts = {key: _filter_outcome(base_rows, key).count() for key in _OUTCOME_LABELS}
     rows = base_rows.select_related(
         "verdict",
         "unit__translation__language",
@@ -587,5 +594,7 @@ def producer_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
             "bucket": effective,
             "query_string": f"outcome={outcome}" if outcome else "",
             "page_obj": page,
+            "is_judge_run": is_judge_run,
+            "run_spend": spend,
         },
     )

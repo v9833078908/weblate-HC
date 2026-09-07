@@ -30,6 +30,19 @@
   {% for warning in run.warnings %}
     <div class="alert alert-warning">{{ warning }}</div>
   {% endfor %}
+  <div class="card mb-3">
+    <div class="card-header"><h4 class="card-title">{% translate "Cost" %}</h4></div>
+    <div class="card-body">
+      <p>{% translate "Requests sent" %}: {{ run_spend.requests }}</p>
+      <p>{% translate "Strings sent" %}: {{ run_spend.strings_sent }}</p>
+      <p>{% translate "Prompt tokens" %}: {{ run_spend.prompt_tokens }}</p>
+      <p>{% translate "Completion tokens" %}: {{ run_spend.completion_tokens }}</p>
+      <p>{% translate "Cost" %}: ${{ run_spend.cost_usd }}</p>
+      {% if run_spend.unpriced_requests %}
+        <p class="text-warning">{% translate "Price unknown for some requests; total is incomplete." %}</p>
+      {% endif %}
+    </div>
+  </div>
 
   <div class="card mb-3">
     <div class="card-header">
