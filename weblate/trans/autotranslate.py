@@ -297,7 +297,7 @@ class AutoTranslate(BaseAutoTranslate):
         allow_non_shared_tm_source_components: bool = False,
         overwrite_existing: bool = False,
         judge_limit: int | None = None,
-        judge_run: ProducerRun | None = None,
+        producer_run: ProducerRun | None = None,
         judge_pretranslate: bool = True,
         judge_mutating_repairs: bool = True,
         judge_candidate_severities: tuple[str, ...] = DEFAULT_CANDIDATE_SEVERITIES,
@@ -319,7 +319,7 @@ class AutoTranslate(BaseAutoTranslate):
         self.target_state = STATE_TRANSLATED
         self.overwrite_existing = overwrite_existing
         self.judge_limit = judge_limit
-        self.judge_run = judge_run
+        self.producer_run = producer_run
         self.judge_pretranslate = judge_pretranslate
         self.judge_mutating_repairs = judge_mutating_repairs
         self.judge_candidate_severities = judge_candidate_severities
@@ -595,7 +595,7 @@ class AutoTranslate(BaseAutoTranslate):
             key=lambda engine: engine.get_rank(),
             reverse=True,
         )
-        run_id = str(self.judge_run.pk) if self.judge_run is not None else None
+        run_id = str(self.producer_run.pk) if self.producer_run is not None else None
         for engine in engines:
             engine.usage_run_id = run_id
 
@@ -799,7 +799,7 @@ class AutoTranslate(BaseAutoTranslate):
         self.progress_steps = preview.worst_case_calls
         input_targets = {unit.id: unit.get_target_plurals() for unit in units}
         try:
-            run_kwargs = {} if self.judge_run is None else {"run": self.judge_run}
+            run_kwargs = {} if self.producer_run is None else {"run": self.producer_run}
             verdicts = run_judge_batch(
                 units,
                 writable_ids=writable_ids,
@@ -885,7 +885,7 @@ class AutoTranslate(BaseAutoTranslate):
                 % unparsed
             )
         self.post_process()
-        if self.judge_run is not None:
+        if self.producer_run is not None:
             repair_status: dict[int, str] = getattr(verdicts, "repair_status", {})
             initial_severity: dict[int, str] = getattr(verdicts, "initial_severity", {})
             attempt_counts: dict[int, int] = getattr(verdicts, "attempt_counts", {})
@@ -895,7 +895,7 @@ class AutoTranslate(BaseAutoTranslate):
                 if verdict is None:
                     request = build_request(unit)
                     JudgeRunUnit.objects.update_or_create(
-                        run=self.judge_run,
+                        run=self.producer_run,
                         unit_id_snapshot=unit.id,
                         defaults={
                             "unit": unit,
@@ -934,7 +934,7 @@ class AutoTranslate(BaseAutoTranslate):
                     )
                 )
                 JudgeRunUnit.objects.update_or_create(
-                    run=self.judge_run,
+                    run=self.producer_run,
                     unit_id_snapshot=unit.id,
                     defaults={
                         "unit": unit,
@@ -1056,7 +1056,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         self.judge_mutating_repairs = judge_mutating_repairs
         self.judge_candidate_severities = judge_candidate_severities
         self.judge_scope = obj
-        self.active_judge_run: ProducerRun | None = None
+        self.active_producer_run: ProducerRun | None = None
 
         match obj:
             case Translation():
@@ -1203,8 +1203,8 @@ class BatchAutoTranslate(BaseAutoTranslate):
         and QUEUED status match what the view committed to; a mismatched
         run is failed and the task refuses it.
         """
-        if self.judge_run_id is None:
-            return self._create_judge_run()
+        if self.producer_run_id is None:
+            return self._create_producer_run()
         expected_unit = (
             self.unit_ids[0] if self.unit_ids and len(self.unit_ids) == 1 else None
         )
@@ -1218,7 +1218,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
             claimed = (
                 ProducerRun.objects.select_for_update()
                 .filter(
-                    pk=self.judge_run_id,
+                    pk=self.producer_run_id,
                     scope_type=ProducerRun.ScopeType.TRANSLATION,
                     requested_mode="recheck",
                     status=ProducerRun.Status.QUEUED,
@@ -1248,20 +1248,25 @@ class BatchAutoTranslate(BaseAutoTranslate):
         msg = claimed.failure
         raise ValueError(msg)
 
-    def _create_judge_run(self) -> ProducerRun:
+    def _create_producer_run(self) -> ProducerRun:
         scope = self.judge_scope
         match scope:
             case Translation():
                 scope_type = ProducerRun.ScopeType.TRANSLATION
             case Component():
                 scope_type = ProducerRun.ScopeType.COMPONENT
+            case Category():
+                scope_type = ProducerRun.ScopeType.CATEGORY
             case Project():
                 scope_type = ProducerRun.ScopeType.PROJECT
+            case ProjectLanguage():
+                scope_type = ProducerRun.ScopeType.PROJECT_LANGUAGE
             case Workspace():
                 scope_type = ProducerRun.ScopeType.WORKSPACE
             case _:
-                msg = (
-                    "Judge runs require a translation, component, project, or workspace"
+                msg = gettext(
+                    "A producer run requires a translation, component, category, "
+                    "project, project language, or workspace"
                 )
                 raise ValueError(msg)
         task_id = (
@@ -1279,7 +1284,9 @@ class BatchAutoTranslate(BaseAutoTranslate):
             requested_mode=self.mode,
             cap=settings.JUDGE_MAX_UNITS_PER_RUN,
             status=ProducerRun.Status.RUNNING,
-            configuration_snapshot=judge_configuration_snapshot(),
+            configuration_snapshot=(
+                judge_configuration_snapshot() if self.mode == "judge" else {}
+            ),
         )
 
     @staticmethod
@@ -1313,7 +1320,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 },
             )
 
-    def _finish_judge_run(
+    def _finish_producer_run(
         self,
         run: ProducerRun,
         status: ProducerRun.Status,
@@ -1362,7 +1369,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
         threshold: int,
         source_component_ids: list[int] | None,
     ) -> str:
-        self.active_judge_run = None
+        self.active_producer_run = None
         try:
             return self._perform(
                 auto_source=auto_source,
@@ -1371,9 +1378,9 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 source_component_ids=source_component_ids,
             )
         except Exception as error:
-            if self.active_judge_run is not None:
-                self._finish_judge_run(
-                    self.active_judge_run, ProducerRun.Status.FAILED, str(error)
+            if self.active_producer_run is not None:
+                self._finish_producer_run(
+                    self.active_producer_run, ProducerRun.Status.FAILED, str(error)
                 )
             raise
 
@@ -1386,8 +1393,13 @@ class BatchAutoTranslate(BaseAutoTranslate):
         source_component_ids: list[int] | None,
     ) -> str:
         judge_preview = self.preview_judge_scope() if self.mode == "judge" else None
-        judge_run = self._adopt_judge_run() if judge_preview is not None else None
-        self.active_judge_run = judge_run
+        if judge_preview is not None:
+            producer_run = self._adopt_judge_run()
+        elif auto_source == "mt":
+            producer_run = self._create_producer_run()
+        else:
+            producer_run = None
+        self.active_producer_run = producer_run
         if judge_preview is not None:
             self.judge_summary = JudgeSummary()
         judge_remaining = judge_preview.processed if judge_preview is not None else None
@@ -1420,7 +1432,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 ),
                 overwrite_existing=self.overwrite_existing,
                 judge_limit=judge_remaining,
-                judge_run=judge_run,
+                producer_run=judge_run,
                 judge_pretranslate=self.judge_pretranslate,
                 judge_mutating_repairs=self.judge_mutating_repairs,
                 judge_candidate_severities=self.judge_candidate_severities,
@@ -1515,7 +1527,7 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     continue
 
             # A failure here propagates to perform()'s own handler, which
-            # finalizes the run exactly once (active_judge_run stays set);
+            # finalizes the run exactly once (active_producer_run stays set);
             # finalizing here too would double-write the same FAILED run.
             auto_translate.perform(
                 auto_source=auto_source,
@@ -1534,9 +1546,9 @@ class BatchAutoTranslate(BaseAutoTranslate):
             self.add_warning(
                 gettext("Judge run skipped because the per-run string cap was reached.")
             )
-        if judge_run is not None:
-            self._finish_judge_run(
-                judge_run,
+        if producer_run is not None:
+            self._finish_producer_run(
+                producer_run,
                 (
                     ProducerRun.Status.FAILED
                     if self.failure_message
