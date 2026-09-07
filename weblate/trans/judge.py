@@ -1499,6 +1499,7 @@ def _write_llm_usage(
         unit_count=len(batch),
         batch_size=len(batch),
         request_attempt=request_attempt,
+        run_id=request_attempt.run_id if request_attempt is not None else None,
     )
 
 

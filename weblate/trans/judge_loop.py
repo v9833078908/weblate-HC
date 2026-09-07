@@ -167,7 +167,9 @@ def _machinery_candidates(
     ]
 
 
-def repair_targets(units: list[Unit], user: User | None) -> dict[int, list[str]]:
+def repair_targets(
+    units: list[Unit], user: User | None, *, run_id: str | None = None
+) -> dict[int, list[str]]:
     """
     Return usable repair targets keyed by unit id, writing nothing.
 
@@ -185,6 +187,7 @@ def repair_targets(units: list[Unit], user: User | None) -> dict[int, list[str]]
         return {}
     setting = settings_map[engine_id]
     engine = MACHINERY[engine_id](setting)
+    engine.usage_run_id = run_id
     if engine.batch_size == 1:
         return _repair_targets_per_unit(engine, units, user)
     try:
@@ -1465,7 +1468,11 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                 or (item.needs_candidate and item.unit.id not in reused_candidate_ids)
             )
         ]
-        repairs = repair_targets(repairable_units, user) if repairable_units else {}
+        repairs = (
+            repair_targets(repairable_units, user, run_id=run_id)
+            if repairable_units
+            else {}
+        )
         unsupported_language = (
             unsupported_repair_language(repairable_units) if repairable_units else None
         )

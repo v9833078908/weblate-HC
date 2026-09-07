@@ -595,6 +595,9 @@ class AutoTranslate(BaseAutoTranslate):
             key=lambda engine: engine.get_rank(),
             reverse=True,
         )
+        run_id = str(self.judge_run.pk) if self.judge_run is not None else None
+        for engine in engines:
+            engine.usage_run_id = run_id
 
         # With a single service each batch is fetched and stored in one step,
         # so the bar counts strings once; otherwise fetching fills its first
