@@ -75,11 +75,54 @@ class JudgeRoundTest(ViewTestCase):
         )
 
     def test_status_annotations_reduce_the_fresh_round(self) -> None:
+        # Below critical: strictest seat, as in Python.
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "minor", seat=1, run_id=run)
+        self.make(unit, "major", seat=2, run_id=run)
+        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "major")
+
+    def test_status_annotations_demote_a_disputed_critical(self) -> None:
         unit = self.get_unit()
         run = uuid.uuid4()
         self.make(unit, "minor", seat=1, run_id=run)
         self.make(unit, "critical", seat=2, run_id=run)
+        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "major")
+        self.assertEqual(active_verdict(unit).effective_severity, "major")
+
+    def test_status_annotations_keep_a_unanimous_critical(self) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "critical", seat=1, run_id=run)
+        self.make(unit, "critical", seat=2, run_id=run)
         self.assertEqual(self.judge_status(unit)["judge_active_severity"], "critical")
+
+    def test_status_annotations_keep_a_lone_parsed_critical(self) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "critical", seat=1, run_id=run)
+        self.make(unit, "none", seat=2, run_id=run, unparsed=True)
+        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "critical")
+
+    def test_search_filters_follow_the_consensus_rule(self) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "none", seat=1, run_id=run)
+        self.make(unit, "critical", seat=2, run_id=run)
+        translation = unit.translation
+        self.assertEqual(list(translation.unit_set.search("judge:reject")), [])
+        self.assertEqual(list(translation.unit_set.search("judge:flag")), [unit])
+
+    @override_settings(JUDGE_CONSENSUS_REJECT=False)
+    def test_search_filters_follow_any_critical_policy_in_rollback_mode(self) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "none", seat=1, run_id=run)
+        self.make(unit, "critical", seat=2, run_id=run)
+        translation = unit.translation
+        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "critical")
+        self.assertEqual(list(translation.unit_set.search("judge:reject")), [unit])
+        self.assertEqual(list(translation.unit_set.search("judge:flag")), [])
 
     def test_request_round_keeps_transport_recovery_out_of_repair_attempts(
         self,
@@ -482,8 +525,13 @@ class JudgeRoundTest(ViewTestCase):
 
         active = active_verdict(unit)
         assert active is not None
+        # The retry cannot hide seat 1's critical: it is still the
+        # representative row and its evidence is intact. It can dispute
+        # it, though - a fresh parsed pass from the other seat makes the
+        # round a major (consensus REJECT), in Python and in SQL alike.
         self.assertEqual(active.max_severity, "critical")
-        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "critical")
+        self.assertEqual(active.effective_severity, "major")
+        self.assertEqual(self.judge_status(unit)["judge_active_severity"], "major")
 
     def test_mixed_run_assembly_reads_both_seats_fresh_opinions(self) -> None:
         # Both seats retried separately: each lands in its own round key

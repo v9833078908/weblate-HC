@@ -17,6 +17,7 @@ from django.db.models import (
     Case,
     CharField,
     Exists,
+    F,
     IntegerField,
     OuterRef,
     Q,
@@ -1169,6 +1170,29 @@ def judge_status_annotations() -> dict[str, models.Expression]:
         ),
         output_field=IntegerField(),
     )
+    if settings.JUDGE_CONSENSUS_REJECT:
+        # SQL twin of collegium_severity: a critical disputed by another
+        # current parsed seat reads as major.
+        disputed_critical = Exists(
+            JudgeVerdict.objects.filter(
+                unit_id=OuterRef(OuterRef("pk")),
+                target_storage_hash=MD5(OuterRef(OuterRef("target"))),
+                unparsed=False,
+            )
+            .exclude(_has_newer_sibling(newer_parsed=True))
+            .exclude(max_severity=JudgeVerdict.Severity.CRITICAL)
+        )
+        round_severity = Case(
+            When(
+                Q(max_severity=JudgeVerdict.Severity.CRITICAL) & disputed_critical,
+                then=Value(JudgeVerdict.Severity.MAJOR.value),
+            ),
+            default=F("max_severity"),
+            output_field=CharField(),
+        )
+    else:
+        # Old policy and old query cost: any critical remains critical.
+        round_severity = F("max_severity")
     # Some seat's freshest row (parsed or not) for the current text is a
     # transport failure: the per-seat view of the former "latest round has
     # no parsed row" signal.
@@ -1180,9 +1204,11 @@ def judge_status_annotations() -> dict[str, models.Expression]:
 
     return {
         "judge_active_severity": Subquery(
-            current_parsed_round.annotate(severity_rank=severity_rank)
+            current_parsed_round.annotate(
+                severity_rank=severity_rank, round_severity=round_severity
+            )
             .order_by("-severity_rank", "seat")
-            .values("max_severity")[:1],
+            .values("round_severity")[:1],
             output_field=CharField(),
         ),
         "judge_active_resolution": Subquery(  # type: ignore[dict-item]

@@ -6,7 +6,7 @@
 import uuid
 from unittest.mock import patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from weblate.trans.models.judge import (
     JudgeVerdict,
@@ -128,19 +128,28 @@ class StatsPrefetchTest(SimpleTestCase):
 
 
 class JudgeStatsTest(ViewTestCase):
-    def add_verdict(self, unit, severity: str, *, unparsed: bool = False, stale=False):
+    def add_verdict(
+        self,
+        unit,
+        severity: str,
+        *,
+        unparsed: bool = False,
+        stale=False,
+        seat: int = 1,
+        run_id: uuid.UUID | None = None,
+    ):
         return JudgeVerdict.objects.create(
             unit=unit,
             max_severity=severity,
             unparsed=unparsed,
             judge_model="vendor/model",
-            seat=1,
+            seat=seat,
             target_hash=compute_target_hash(unit.get_target_plurals()),
             target_storage_hash=(
                 "old-target" if stale else compute_target_storage_hash(unit.target)
             ),
             context_hash="context",
-            run_id=uuid.uuid4(),
+            run_id=run_id or uuid.uuid4(),
         )
 
     def refresh_stats(self) -> None:
@@ -271,3 +280,22 @@ class JudgeStatsTest(ViewTestCase):
         self.refresh_stats()
         self.assertEqual(self.translation.stats.judge_evaluated, 1)
         self.assertEqual(self.translation.stats.judge_pass, 1)
+
+    def test_judge_stats_follow_the_consensus_policy(self) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.add_verdict(unit, "none", seat=1, run_id=run)
+        self.add_verdict(unit, "critical", seat=2, run_id=run)
+        self.refresh_stats()
+        self.assertEqual(self.translation.stats.judge_flag, 1)
+        self.assertEqual(self.translation.stats.judge_reject, 0)
+
+    @override_settings(JUDGE_CONSENSUS_REJECT=False)
+    def test_judge_stats_follow_any_critical_policy_in_rollback_mode(self) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.add_verdict(unit, "none", seat=1, run_id=run)
+        self.add_verdict(unit, "critical", seat=2, run_id=run)
+        self.refresh_stats()
+        self.assertEqual(self.translation.stats.judge_flag, 0)
+        self.assertEqual(self.translation.stats.judge_reject, 1)
