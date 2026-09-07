@@ -971,8 +971,57 @@ class JudgeLoopTest(ViewTestCase):
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
 
     def test_verdict_takes_the_higher_severity(self) -> None:
+        # Disputed critical becomes a major (FLAG) under consensus reject.
+        _, verdict, _ = self.run_batch([MAJOR, CRITICAL], repair=None)
+        self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.FLAG)
+        self.assertEqual(verdict.effective_severity, "major")
+
+    @override_settings(JUDGE_CONSENSUS_REJECT=False)
+    def test_verdict_takes_the_higher_severity_in_rollback_mode(self) -> None:
         _, verdict, _ = self.run_batch([MAJOR, CRITICAL], repair=None)
         self.assertEqual(verdict.verdict, JudgeVerdict.Verdict.REJECT)
+        self.assertEqual(verdict.effective_severity, "critical")
+
+    def test_disputed_critical_does_not_trigger_critical_repair(self) -> None:
+        self.enable_repair_engine()
+        unit = self.get_unit()
+        writable_ids = {unit.id}
+        client = mock_request_verdicts([[CRITICAL], [MINOR]])
+        repair_mock = mock.Mock(return_value={unit.id: ["repaired text"]})
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+        ):
+            verdicts = run_judge_batch(
+                [unit],
+                writable_ids=writable_ids,
+                user=self.user,
+                candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
+            )
+        self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.FLAG)
+        repair_mock.assert_not_called()
+        self.assertEqual(unit.suggestion_set.count(), 0)
+
+    @override_settings(JUDGE_CONSENSUS_REJECT=False)
+    def test_disputed_critical_triggers_critical_repair_in_rollback_mode(self) -> None:
+        self.enable_repair_engine()
+        unit = self.get_unit()
+        writable_ids = {unit.id}
+        client = mock_request_verdicts([[CRITICAL], [MINOR]])
+        repair_mock = mock.Mock(return_value={unit.id: ["repaired text"]})
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch("weblate.trans.judge_loop.repair_targets", repair_mock),
+        ):
+            verdicts = run_judge_batch(
+                [unit],
+                writable_ids=writable_ids,
+                user=self.user,
+                candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
+            )
+        self.assertEqual(verdicts[unit.id].verdict, JudgeVerdict.Verdict.REJECT)
+        repair_mock.assert_called_once()
+        self.assertEqual(unit.suggestion_set.count(), 1)
 
     def test_flag_stores_a_candidate_without_a_second_round(self) -> None:
         # The flagged round generates one candidate and ends: the judged

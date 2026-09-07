@@ -449,6 +449,47 @@ class JudgeResolutionTest(ViewTestCase):
         refreshed = self.get_unit()
         self.assertEqual(refreshed.state, STATE_NEEDS_CHECKING)
 
+    def test_resolve_disputed_critical_escalates_to_needs_checking(self) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        v1 = self.make_verdict(unit, "critical", seat=1, run_id=run)
+        self.make_verdict(unit, "minor", seat=2, run_id=run)
+        resolved = resolve_verdict(
+            unit=unit,
+            expected_verdict_id=v1.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ESCALATED,
+            reason="flag escalation",
+        )
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_NEEDS_CHECKING)
+        self.assertEqual(resolved.effective_severity, "major")
+
+    @override_settings(JUDGE_CONSENSUS_REJECT=False)
+    def test_resolve_disputed_critical_in_rollback_mode_escalates_to_fuzzy(
+        self,
+    ) -> None:
+        self.enable_review()
+        unit = self.get_unit()
+        unit.translate(self.user, ["Ahoj"], STATE_TRANSLATED)
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        v1 = self.make_verdict(unit, "critical", seat=1, run_id=run)
+        self.make_verdict(unit, "minor", seat=2, run_id=run)
+        resolved = resolve_verdict(
+            unit=unit,
+            expected_verdict_id=v1.pk,
+            actor=self.user,
+            resolution=JudgeVerdict.Resolution.ESCALATED,
+            reason="reject escalation",
+        )
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_FUZZY)
+        self.assertEqual(resolved.effective_severity, "critical")
+
     def test_fresh_flag_can_be_accepted_as_is_directly(self) -> None:
         # Task 7: a fresh FLAG no longer needs the escalate-then-accept
         # round trip; Keep as is is reachable in one step, same as Reject.

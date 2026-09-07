@@ -1328,9 +1328,14 @@ def resolve_verdict(
         if representative.pk != expected_verdict_id:
             msg = "stale"
             raise JudgeResolutionError(msg, stale_message)
+        round_severity = getattr(representative, "_round_severity", None)
         representative = JudgeVerdict.objects.select_for_update().get(
             pk=representative.pk
         )
+        if round_severity is not None:
+            representative._round_severity = (  # ruff: ignore[private-member-access]
+                round_severity
+            )
         old_resolution = representative.resolution
         verdict = representative.verdict
         old_state = locked_unit.state

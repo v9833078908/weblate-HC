@@ -459,7 +459,7 @@ class JudgeDeferralTest(ViewTestCase):
             seat=2,
             attempt=0,
             run_id=uuid.uuid4(),
-            result=JudgeResult("none", "pass", [], ""),
+            result=JudgeResult("critical", "reject", [], ""),
             profile=resolve_judge_seat_profile(2),
             project_context="",
         )
@@ -489,6 +489,87 @@ class JudgeDeferralTest(ViewTestCase):
         self.assertEqual(run.scope_id, str(unit.translation_id))
         self.assertEqual(run.requested_mode, "drain")
         self.assertEqual(run.status, JudgeRun.Status.COMPLETED)
+        run_unit = JudgeRunUnit.objects.get(run=run, unit_id_snapshot=unit.pk)
+        self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.CRITICAL)
+        self.assertTrue(run_unit.projection_succeeded)
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, STATE_FUZZY)
+        self.assertEqual(unit.get_target_plurals(), before_target)
+
+    def test_drain_run_projects_a_recovered_disputed_critical_as_major(
+        self,
+    ) -> None:
+        unit = self.change_unit("Ahoj svete!")
+        before_target = unit.get_target_plurals()
+        _write_verdict(
+            unit,
+            build_request(unit),
+            seat=2,
+            attempt=0,
+            run_id=uuid.uuid4(),
+            result=JudgeResult("none", "pass", [], ""),
+            profile=resolve_judge_seat_profile(2),
+            project_context="",
+        )
+        self.defer(unit)
+        JudgeDeferral.objects.filter(unit=unit).update(
+            next_attempt_at=timezone.now() - timedelta(seconds=1)
+        )
+        critical = JudgeResult(
+            "critical",
+            "reject",
+            [{"span": "x", "category": "terminology", "severity": "critical"}],
+            "",
+        )
+        with mock.patch(
+            "weblate.trans.judge_loop.request_verdicts",
+            mock.Mock(side_effect=mock_request_verdicts([critical])),
+        ):
+            processed = drain_judge_deferrals()
+
+        self.assertEqual(processed, 1)
+        run = JudgeRun.objects.get()
+        run_unit = JudgeRunUnit.objects.get(run=run, unit_id_snapshot=unit.pk)
+        self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.MAJOR)
+        self.assertTrue(run_unit.projection_succeeded)
+        unit.refresh_from_db()
+        self.assertEqual(unit.state, 20)  # STATE_TRANSLATED
+        self.assertEqual(unit.get_target_plurals(), before_target)
+
+    @override_settings(JUDGE_CONSENSUS_REJECT=False)
+    def test_drain_run_projects_a_recovered_critical_hold_in_rollback_mode(
+        self,
+    ) -> None:
+        unit = self.change_unit("Ahoj svete!")
+        before_target = unit.get_target_plurals()
+        _write_verdict(
+            unit,
+            build_request(unit),
+            seat=2,
+            attempt=0,
+            run_id=uuid.uuid4(),
+            result=JudgeResult("none", "pass", [], ""),
+            profile=resolve_judge_seat_profile(2),
+            project_context="",
+        )
+        self.defer(unit)
+        JudgeDeferral.objects.filter(unit=unit).update(
+            next_attempt_at=timezone.now() - timedelta(seconds=1)
+        )
+        critical = JudgeResult(
+            "critical",
+            "reject",
+            [{"span": "x", "category": "terminology", "severity": "critical"}],
+            "",
+        )
+        with mock.patch(
+            "weblate.trans.judge_loop.request_verdicts",
+            mock.Mock(side_effect=mock_request_verdicts([critical])),
+        ):
+            processed = drain_judge_deferrals()
+
+        self.assertEqual(processed, 1)
+        run = JudgeRun.objects.get()
         run_unit = JudgeRunUnit.objects.get(run=run, unit_id_snapshot=unit.pk)
         self.assertEqual(run_unit.outcome, JudgeRunUnit.Outcome.CRITICAL)
         self.assertTrue(run_unit.projection_succeeded)

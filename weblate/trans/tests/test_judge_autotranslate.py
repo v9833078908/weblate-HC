@@ -1372,6 +1372,87 @@ class JudgeAutoTranslateTest(ViewTestCase):
             "Better translation",
         )
 
+    def test_recheck_disputed_critical_projects_as_major_without_candidate(
+        self,
+    ) -> None:
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Tolerable translation"], STATE_TRANSLATED)
+        critical = JudgeResult("critical", "reject", [], "")
+        minor = JudgeResult("minor", "pass", [], "")
+        client = mock.Mock(
+            side_effect=lambda requests, *, on_batch, seat, **_kwargs: (
+                on_batch(requests, [critical if seat == 1 else minor]),
+                [critical if seat == 1 else minor],
+            )[-1]
+        )
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q=recheck_query(unit.pk),
+            mode="judge",
+            unit_ids=[unit.pk],
+            judge_pretranslate=False,
+            judge_mutating_repairs=False,
+            judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
+        )
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.repair_targets",
+                return_value={unit.pk: ["Better translation"]},
+            ) as repair,
+        ):
+            auto.process_judge(engines=[], threshold=80)
+        self.assertEqual(client.call_count, 2)
+        repair.assert_not_called()
+        self.assertEqual(auto.judge_summary.major_not_fixed, 1)
+        self.assertEqual(auto.judge_summary.critical_held, 0)
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_TRANSLATED)
+        self.assertEqual(refreshed.suggestion_set.count(), 0)
+
+    @override_settings(JUDGE_CONSENSUS_REJECT=False)
+    def test_recheck_disputed_critical_holds_target_in_rollback_mode(self) -> None:
+        self.component.project.machinery_settings = {"openrouter": {"key": "test"}}
+        self.component.project.save(update_fields=["machinery_settings"])
+        unit = self.get_unit()
+        unit.translate(self.user, ["Tolerable translation"], STATE_TRANSLATED)
+        critical = JudgeResult("critical", "reject", [], "")
+        minor = JudgeResult("minor", "pass", [], "")
+        client = mock.Mock(
+            side_effect=lambda requests, *, on_batch, seat, **_kwargs: (
+                on_batch(requests, [critical if seat == 1 else minor]),
+                [critical if seat == 1 else minor],
+            )[-1]
+        )
+        auto = AutoTranslate(
+            translation=self.get_translation(),
+            user=self.user,
+            q=recheck_query(unit.pk),
+            mode="judge",
+            unit_ids=[unit.pk],
+            judge_pretranslate=False,
+            judge_mutating_repairs=False,
+            judge_candidate_severities=(JudgeVerdict.Severity.CRITICAL,),
+        )
+        with (
+            mock.patch("weblate.trans.judge_loop.request_verdicts", client),
+            mock.patch(
+                "weblate.trans.judge_loop.repair_targets",
+                return_value={unit.pk: ["Better translation"]},
+            ) as repair,
+        ):
+            auto.process_judge(engines=[], threshold=80)
+        self.assertEqual(client.call_count, 2)
+        repair.assert_called_once()
+        self.assertEqual(auto.judge_summary.major_not_fixed, 0)
+        self.assertEqual(auto.judge_summary.critical_held, 1)
+        refreshed = self.get_unit()
+        self.assertEqual(refreshed.state, STATE_FUZZY)
+        self.assertEqual(refreshed.suggestion_set.count(), 1)
+
     def test_worker_adopts_the_queued_recheck_run(self) -> None:
         unit = self.get_unit()
         run = self._make_queued_recheck_run(unit)

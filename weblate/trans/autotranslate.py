@@ -155,11 +155,11 @@ def _summarize_verdicts(
     for verdict in verdicts.values():
         if verdict.unparsed:
             unparsed += 1
-        elif verdict.max_severity == JudgeVerdict.Severity.CRITICAL:
+        elif verdict.effective_severity == JudgeVerdict.Severity.CRITICAL:
             critical_held += 1
-        elif verdict.max_severity == JudgeVerdict.Severity.MAJOR:
+        elif verdict.effective_severity == JudgeVerdict.Severity.MAJOR:
             major_not_fixed += 1
-        elif verdict.max_severity == JudgeVerdict.Severity.MINOR:
+        elif verdict.effective_severity == JudgeVerdict.Severity.MINOR:
             minor_noted += 1
         else:
             nothing_blocking += 1
@@ -927,7 +927,7 @@ class AutoTranslate(BaseAutoTranslate):
                     else (
                         JudgeRunUnit.Outcome.UNPARSED
                         if verdict.unparsed
-                        else severity_outcomes[verdict.max_severity]
+                        else severity_outcomes[verdict.effective_severity]
                     )
                 )
                 JudgeRunUnit.objects.update_or_create(
@@ -949,9 +949,9 @@ class AutoTranslate(BaseAutoTranslate):
                             unit.id, JudgeRunUnit.RepairStatus.NOT_ATTEMPTED
                         ),
                         "initial_severity": initial_severity.get(
-                            unit.id, verdict.max_severity
+                            unit.id, verdict.effective_severity
                         ),
-                        "final_severity": verdict.max_severity,
+                        "final_severity": verdict.effective_severity,
                         "attempt_count": attempt_counts.get(
                             unit.id, verdict.attempt + 1
                         ),

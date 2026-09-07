@@ -1490,7 +1490,9 @@ def run_judge_batch(  # ruff: ignore[complex-structure, too-many-locals, too-man
                 verdicts.cached_unit_ids.discard(unit.id)
                 continue
             verdicts[unit.id] = item.verdict
-            verdicts.initial_severity.setdefault(unit.id, item.verdict.max_severity)
+            verdicts.initial_severity.setdefault(
+                unit.id, item.verdict.effective_severity
+            )
             verdicts.attempt_counts[unit.id] = attempt + 1
             wants_repair = item.needs_candidate or item.needs_mutating_repair
             if item.needs_candidate and unit.id in reused_candidate_ids:
@@ -1691,7 +1693,7 @@ def _finalize_drain_run(
                     else JudgeRunUnit.Outcome.UNPARSED
                 )
             else:
-                outcome = _DRAIN_SEVERITY_OUTCOMES[verdict.max_severity]
+                outcome = _DRAIN_SEVERITY_OUTCOMES[verdict.effective_severity]
                 state = state_for_verdict(
                     verdict.verdict,
                     enable_review=locked.translation.enable_review,
@@ -1731,8 +1733,8 @@ def _finalize_drain_run(
                     "context_hash": context_hash,
                     "verdict": verdict,
                     "outcome": outcome,
-                    "initial_severity": verdict.max_severity if verdict else "",
-                    "final_severity": verdict.max_severity if verdict else "",
+                    "initial_severity": verdict.effective_severity if verdict else "",
+                    "final_severity": verdict.effective_severity if verdict else "",
                     "before_target": before_target,
                     "after_target": locked.get_target_plurals(),
                     "cached": False,

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import uuid
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
 from django.utils import translation
 
@@ -52,6 +52,29 @@ class JudgeCheckTest(ViewTestCase):
     def test_reject_verdict_makes_run_checks_create_the_row(self) -> None:
         unit = self.get_unit()
         self.make(unit, "critical")  # verdict property -> reject
+        unit.run_checks()
+        unit.clear_checks_cache()
+        self.assertIn("judge-reject", unit.all_checks_names)
+        self.assertNotIn("judge-flag", unit.all_checks_names)
+
+    def test_disputed_critical_creates_judge_flag_row(self) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "critical", seat=1, run_id=run)
+        self.make(unit, "minor", seat=2, run_id=run)
+        unit.run_checks()
+        unit.clear_checks_cache()
+        self.assertIn("judge-flag", unit.all_checks_names)
+        self.assertNotIn("judge-reject", unit.all_checks_names)
+
+    @override_settings(JUDGE_CONSENSUS_REJECT=False)
+    def test_disputed_critical_creates_judge_reject_row_in_rollback_mode(
+        self,
+    ) -> None:
+        unit = self.get_unit()
+        run = uuid.uuid4()
+        self.make(unit, "critical", seat=1, run_id=run)
+        self.make(unit, "minor", seat=2, run_id=run)
         unit.run_checks()
         unit.clear_checks_cache()
         self.assertIn("judge-reject", unit.all_checks_names)

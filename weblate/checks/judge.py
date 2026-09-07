@@ -61,7 +61,7 @@ class BaseJudgeCheck(TargetCheck):
 
     def check_target_unit(self, sources, targets, unit) -> bool:
         verdict = self._active_verdict(unit)
-        return verdict is not None and verdict.max_severity == self.judge_severity
+        return verdict is not None and verdict.effective_severity == self.judge_severity
 
     def check_target_with_flags(self, sources, targets, unit, all_flags) -> bool:
         # Deliberately not cached per check id: a newer verdict must
