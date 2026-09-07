@@ -296,7 +296,11 @@ as one durable run, addressed by its own URL, independent of the Celery task
 result that started it. The run report lists checked, matched, cached, and
 skipped counts, and repaired, rolled back, minor, major, critical, unparsed,
 stale-conflict, accepted-as-is, and escalated outcomes; each count opens the
-matching paginated list of strings. A finished component, project, or
+matching paginated list of strings. The outcome counts are immutable evidence
+from that run. When a current target no longer matches the text its run
+verdict judged, a separate :guilabel:`Changed since this run` count links to
+those strings; it records a change, not a confirmed fix.
+A finished component, project, or
 translation page shows its recent launches: a :guilabel:`Latest report`
 button opening the newest one, with earlier launches listed in a menu
 beside it. The menu lists launches only. A one-string
