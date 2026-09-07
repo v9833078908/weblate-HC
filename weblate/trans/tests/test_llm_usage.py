@@ -16,6 +16,7 @@ from weblate.trans.models.llm_usage import (
     LLMUsageLog,
     parse_provider_cost,
     recent_cost_range,
+    run_spend,
 )
 from weblate.trans.tests.test_views import ComponentTestCase
 
@@ -596,3 +597,28 @@ class RecentCostRangeTest(TestCase):
         )
 
         self.assertEqual((low, high), (Decimal("0.001"), Decimal("0.001")))
+
+
+class RunSpendSmokeTest(TestCase):
+    def test_unknown_price_is_reported_separately(self) -> None:
+        from weblate.trans.models import ProducerRun
+
+        run = ProducerRun.objects.create(
+            scope_type=ProducerRun.ScopeType.COMPONENT,
+            scope_id="1",
+            scope_label="Test",
+            scope_path="/projects/test/test/",
+            requested_mode="translate",
+            cap=100,
+        )
+        LLMUsageLog.objects.create(
+            model="m",
+            run=run,
+            operation=LLMUsageLog.Operation.TRANSLATION,
+            batch_size=2,
+            cost_usd=None,
+        )
+        spend = run_spend(run.pk, LLMUsageLog.Operation.TRANSLATION)
+        self.assertEqual(spend.requests, 1)
+        self.assertEqual(spend.strings_sent, 2)
+        self.assertEqual(spend.unpriced_requests, 1)
