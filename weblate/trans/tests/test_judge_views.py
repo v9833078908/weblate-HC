@@ -2277,6 +2277,7 @@ class JudgeRunReportViewTest(ViewTestCase):
             judge_model="vendor/model-a",
             seat=1,
             target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(unit.target),
             context_hash=judge_context_hash(unit),
             resolution=resolution,
         )
@@ -2295,6 +2296,7 @@ class JudgeRunReportViewTest(ViewTestCase):
             judge_model="vendor/model-a",
             seat=seat,
             target_hash=compute_target_hash(unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(unit.target),
             context_hash=judge_context_hash(unit),
             errors=[
                 {
@@ -2361,6 +2363,100 @@ class JudgeRunReportViewTest(ViewTestCase):
         self.assertEqual(stats["repaired"], 1)
         self.assertEqual(stats["escalated"], 1)
         self.assertEqual(stats["accepted-as-is"], 0)
+        self.assertEqual(stats["changed-since-run"], 0)
+
+    def test_changed_since_run_is_an_overlay_not_a_fixed_outcome(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        critical_unit, passed_unit = list(self.translation.unit_set.all()[:2])
+
+        critical_verdict = self.make_verdict_with_error(
+            critical_unit, severity="critical", category="mistranslation"
+        )
+        passed_verdict = JudgeVerdict.objects.create(
+            unit=passed_unit,
+            max_severity=JudgeVerdict.Severity.NONE,
+            model_verdict=JudgeVerdict.Verdict.PASS,
+            judge_model="vendor/model-a",
+            seat=1,
+            target_hash=compute_target_hash(passed_unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(passed_unit.target),
+            context_hash=judge_context_hash(passed_unit),
+        )
+        critical_row = self.add_row(
+            run,
+            critical_unit,
+            outcome=JudgeRunUnit.Outcome.CRITICAL,
+            verdict=critical_verdict,
+        )
+        passed_row = self.add_row(
+            run,
+            passed_unit,
+            outcome=JudgeRunUnit.Outcome.PASSED,
+            verdict=passed_verdict,
+        )
+        Unit.objects.filter(pk__in=[critical_unit.pk, passed_unit.pk]).update(
+            target="text changed after this report"
+        )
+
+        default = self.client.get(self.report_url(run))
+        self.assertEqual(default.context["counts"]["critical"], 1)
+        self.assertEqual(default.context["counts"]["passed"], 1)
+        self.assertEqual(default.context["counts"]["actionable"], 1)
+        self.assertEqual(default.context["triage"]["blocking"], 1)
+        self.assertEqual(default.context["counts"]["changed-since-run"], 2)
+        self.assertEqual(
+            [row.pk for row in default.context["page_obj"]], [critical_row.pk]
+        )
+
+        changed = self.client.get(
+            self.report_url(run), {"outcome": "changed-since-run"}
+        )
+        self.assertCountEqual(
+            [row.pk for row in changed.context["page_obj"]],
+            [critical_row.pk, passed_row.pk],
+        )
+
+    def test_hashless_verdict_is_not_classified_as_changed(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        row = self.add_row(
+            run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL, verdict=verdict
+        )
+        JudgeVerdict.objects.filter(pk=row.verdict_id).update(target_storage_hash=None)
+        Unit.objects.filter(pk=unit.pk).update(target="different but unknown")
+
+        response = self.client.get(self.report_url(run))
+        self.assertEqual(response.context["counts"]["critical"], 1)
+        self.assertEqual(response.context["counts"]["changed-since-run"], 0)
+
+    def test_changed_since_run_disappears_when_the_target_is_restored(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL, verdict=verdict)
+        original = unit.target
+        Unit.objects.filter(pk=unit.pk).update(target="later text")
+        self.assertEqual(
+            self.client.get(self.report_url(run)).context["counts"][
+                "changed-since-run"
+            ],
+            1,
+        )
+        Unit.objects.filter(pk=unit.pk).update(target=original)
+        self.assertEqual(
+            self.client.get(self.report_url(run)).context["counts"][
+                "changed-since-run"
+            ],
+            0,
+        )
 
     def test_cached_evidence_appears_once_and_is_labeled_cached(self) -> None:
         self.enable_review()

@@ -23,15 +23,19 @@ from urllib.parse import urlencode
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Case, CharField, Q, Value, When
-from django.db.models.functions import Cast
+from django.db.models import Case, CharField, F, Q, Value, When
+from django.db.models.functions import MD5, Cast
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy, pgettext_lazy
 
 from weblate.trans.models import Component, JudgeRun, JudgeRunUnit, Project, Translation
-from weblate.trans.models.judge import SEVERITY_RANK, JudgeVerdict
+from weblate.trans.models.judge import (
+    SEVERITY_RANK,
+    JudgeVerdict,
+    compute_target_storage_hash,
+)
 from weblate.trans.models.project import CommitPolicyChoices
 from weblate.workspaces.models import Workspace
 
@@ -79,6 +83,7 @@ _OUTCOME_LABELS = {
     "minor": gettext_lazy("Minor noted"),
     "unparsed": gettext_lazy("Unparsed"),
     "stale-conflict": gettext_lazy("Stale conflict"),
+    "changed-since-run": gettext_lazy("Changed since this run"),
     "candidates": gettext_lazy("Suggested fixes"),
     "repaired": gettext_lazy("Repaired"),
     "rolled-back": gettext_lazy("Rolled back"),
@@ -122,10 +127,20 @@ _SEVERITY_QUERY = {
 }
 
 
+def _changed_since_run(rows: QuerySet) -> QuerySet:
+    """Rows whose current target differs from this report's judged target."""
+    return rows.filter(
+        unit__isnull=False,
+        verdict__target_storage_hash__isnull=False,
+    ).exclude(verdict__target_storage_hash=MD5(F("unit__target")))
+
+
 def _filter_outcome(rows: QuerySet, key: str) -> QuerySet:
     """Apply one report bucket's filter. ``key`` must be pre-validated."""
     if key == "actionable":
         return rows.filter(outcome__in=_ACTIONABLE_OUTCOMES)
+    if key == "changed-since-run":
+        return _changed_since_run(rows)
     if key == "passed":
         return rows.filter(outcome=_OUTCOME.PASSED)
     if key == "candidates":
@@ -513,6 +528,7 @@ def judge_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
         + counts["minor"]
         + needs_recheck,
         "blocks_release": blocks_release,
+        "changed_since_run": counts["changed-since-run"],
         "top_category": categories[0] if categories else None,
     }
 
