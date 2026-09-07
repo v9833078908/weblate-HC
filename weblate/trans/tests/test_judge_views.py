@@ -39,7 +39,6 @@ from weblate.trans.models.judge import (
     resolve_verdict,
 )
 from weblate.trans.models.llm_usage import LLMUsageLog
-from weblate.trans.models.project import CommitPolicyChoices
 from weblate.trans.models.suggestion import Suggestion
 from weblate.trans.models.unit import Unit
 from weblate.trans.tasks import generate_judge_candidate
@@ -2731,25 +2730,6 @@ class JudgeRunReportViewTest(ViewTestCase):
         self.assertNotContains(response, "outcome=cached")
         self.assertContains(response, "Matched 1")
 
-    def test_blocks_release_reflects_the_scope_project_commit_policy(
-        self,
-    ) -> None:
-        self.enable_review()
-        run = self.create_run()
-        self.add_row(
-            run, unit_id_snapshot=900220, outcome=JudgeRunUnit.Outcome.CRITICAL
-        )
-
-        self.project.commit_policy = CommitPolicyChoices.WITHOUT_NEEDS_EDITING
-        self.project.save(update_fields=["commit_policy"])
-        blocking_response = self.client.get(self.report_url(run))
-        self.assertTrue(blocking_response.context["triage"]["blocks_release"])
-
-        self.project.commit_policy = CommitPolicyChoices.ALL
-        self.project.save(update_fields=["commit_policy"])
-        shipping_response = self.client.get(self.report_url(run))
-        self.assertFalse(shipping_response.context["triage"]["blocks_release"])
-
     def test_blocking_excludes_critical_rows_accepted_as_is(self) -> None:
         self.enable_review()
         run = self.create_run()
@@ -2913,6 +2893,36 @@ class JudgeRunReportViewTest(ViewTestCase):
         changed = self.client.get(self.report_url(run), {"outcome": "unparsed"})
         self.assertFalse(changed.context["page_obj"][0].current_target_matches)
         self.assertContains(changed, "current text changed since this run")
+
+    def test_hero_card_separates_historical_and_changed_counts(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL, verdict=verdict)
+        Unit.objects.filter(pk=unit.pk).update(target="later target")
+
+        response = self.client.get(self.report_url(run))
+        self.assertContains(
+            response,
+            "1 critical outcome from this run still needs a producer decision.",
+        )
+        self.assertContains(response, "Open currently blocking strings")
+        self.assertContains(response, "1 string has changed since this run.")
+        self.assertContains(response, "?outcome=changed-since-run")
+        self.assertNotContains(response, "Fixed since this run")
+        self.assertNotContains(response, "needs a fix before release")
+
+    def test_static_outcome_labels_do_not_claim_current_state(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        self.add_row(run, self.get_unit(), outcome=JudgeRunUnit.Outcome.MAJOR)
+        response = self.client.get(self.report_url(run))
+        self.assertContains(response, "Run outcomes needing attention: 1")
+        self.assertContains(response, "Major in this run: 1")
+        self.assertNotContains(response, "Major not fixed")
 
 
 @override_settings(

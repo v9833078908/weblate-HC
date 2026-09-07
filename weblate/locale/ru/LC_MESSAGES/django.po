@@ -25882,6 +25882,62 @@ msgstr[2] "Просмотреть %(counter)s предложенных испр�
 msgid "Matched %(matched)s &middot; checked %(checked)s &middot; cached %(cached)s."
 msgstr "Совпало %(matched)s &middot; проверено %(checked)s &middot; из кэша %(cached)s."
 
+#: weblate/templates/judge-run.html
+#, python-format
+msgid "%(counter)s string has changed since this run. Check its current verdict."
+msgid_plural "%(counter)s strings have changed since this run. Check their current verdicts."
+msgstr[0] "%(counter)s строка изменилась после этого прогона. Проверьте её текущий вердикт."
+msgstr[1] "%(counter)s строки изменились после этого прогона. Проверьте их текущие вердикты."
+msgstr[2] "%(counter)s строк изменилось после этого прогона. Проверьте их текущие вердикты."
+
+#: weblate/templates/judge-run.html
+#, python-format
+msgid "%(counter)s critical outcome from this run still needs a producer decision."
+msgid_plural "%(counter)s critical outcomes from this run still need a producer decision."
+msgstr[0] "Для %(counter)s критического результата этого прогона всё ещё нужно решение продюсера."
+msgstr[1] "Для %(counter)s критических результатов этого прогона всё ещё нужно решение продюсера."
+msgstr[2] "Для %(counter)s критических результатов этого прогона всё ещё нужно решение продюсера."
+
+#: weblate/templates/judge-run.html
+msgid "No critical outcome from this run awaits a decision."
+msgstr "В этом прогоне нет критических результатов, ожидающих решения."
+
+#: weblate/templates/judge-run.html
+#, python-format
+msgid "This run needed no action. %(counter)s string passed."
+msgid_plural "This run needed no action. %(counter)s strings passed."
+msgstr[0] "В этом прогоне не потребовалось действий. %(counter)s строка прошла проверку."
+msgstr[1] "В этом прогоне не потребовалось действий. %(counter)s строки прошли проверку."
+msgstr[2] "В этом прогоне не потребовалось действий. %(counter)s строк прошли проверку."
+
+#: weblate/templates/judge-run.html
+msgid "Open currently blocking strings"
+msgstr "Открыть текущие блокирующие строки"
+
+#: weblate/trans/views/judge.py
+msgid "Run outcomes needing attention"
+msgstr "Результаты прогона, требующие внимания"
+
+#: weblate/trans/views/judge.py
+msgid "Critical in this run"
+msgstr "Критично в этом прогоне"
+
+#: weblate/trans/views/judge.py
+msgid "Major in this run"
+msgstr "Значимо в этом прогоне"
+
+#: weblate/trans/views/judge.py
+msgid "Minor in this run"
+msgstr "Незначительно в этом прогоне"
+
+#: weblate/trans/views/judge.py
+msgid "Changed since this run"
+msgstr "Изменено после этого прогона"
+
+#: weblate/trans/views/judge.py
+msgid "Check the current verdict"
+msgstr "Проверить текущий вердикт"
+
 #~ msgid "Could not open a ticket, please try again later."
 #~ msgstr "Не удалось открыть заявку, попробуйте позже."
 

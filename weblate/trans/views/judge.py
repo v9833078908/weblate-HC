@@ -36,7 +36,6 @@ from weblate.trans.models.judge import (
     JudgeVerdict,
     compute_target_storage_hash,
 )
-from weblate.trans.models.project import CommitPolicyChoices
 from weblate.workspaces.models import Workspace
 
 if TYPE_CHECKING:
@@ -77,10 +76,10 @@ _ACTIONABLE_OUTCOMES = (
 # order is display order. The report-local list uses the identical filter,
 # so a header count and its drill-down row count can never disagree.
 _OUTCOME_LABELS = {
-    "actionable": gettext_lazy("Needs action"),
-    "critical": gettext_lazy("Critical held"),
-    "major": gettext_lazy("Major not fixed"),
-    "minor": gettext_lazy("Minor noted"),
+    "actionable": gettext_lazy("Run outcomes needing attention"),
+    "critical": gettext_lazy("Critical in this run"),
+    "major": gettext_lazy("Major in this run"),
+    "minor": gettext_lazy("Minor in this run"),
     "unparsed": gettext_lazy("Unparsed"),
     "stale-conflict": gettext_lazy("Stale conflict"),
     "changed-since-run": gettext_lazy("Changed since this run"),
@@ -248,31 +247,6 @@ _ACTION_BY_OUTCOME = {
     _OUTCOME.UNPARSED: gettext_lazy("Re-check"),
     _OUTCOME.STALE_CONFLICT: gettext_lazy("Re-check"),
 }
-
-
-def _blocks_release(scope) -> bool:
-    """
-    Whether a held critical genuinely stops the string from shipping.
-
-    The export writes every state by default; FUZZY is excluded only under
-    WITHOUT_NEEDS_EDITING / APPROVED_ONLY (finding 2), so "will not ship"
-    may be claimed only when the policy actually says that. A Workspace
-    mixes projects: claim it only when every project in it blocks.
-    """
-    blocking_policies = {
-        CommitPolicyChoices.WITHOUT_NEEDS_EDITING,
-        CommitPolicyChoices.APPROVED_ONLY,
-    }
-    if isinstance(scope, Project):
-        return scope.commit_policy in blocking_policies
-    if isinstance(scope, Component):
-        return scope.project.commit_policy in blocking_policies
-    if isinstance(scope, Translation):
-        return scope.component.project.commit_policy in blocking_policies
-    policies = list(
-        Project.objects.filter(workspace=scope).values_list("commit_policy", flat=True)
-    )
-    return bool(policies) and all(policy in blocking_policies for policy in policies)
 
 
 def _annotate_row(row: JudgeRunUnit) -> None:
@@ -513,10 +487,6 @@ def judge_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
         .count()
     )
     needs_recheck = counts["unparsed"] + counts["stale-conflict"]
-    # Does a critical actually hold the string back from export? Only under
-    # a restrictive commit policy (finding 2): the default policy still
-    # ships a rejected string, so the page must not claim otherwise.
-    blocks_release = _blocks_release(scope)
     categories = _category_rows(
         _filter_outcome(base_rows, "actionable").filter(
             outcome__in=(_OUTCOME.CRITICAL, _OUTCOME.MAJOR, _OUTCOME.MINOR)
@@ -537,7 +507,6 @@ def judge_run(request: AuthenticatedHttpRequest, pk) -> HttpResponse:
         + counts["major"]
         + counts["minor"]
         + needs_recheck,
-        "blocks_release": blocks_release,
         "changed_since_run": counts["changed-since-run"],
         "top_category": categories[0] if categories else None,
     }
