@@ -2871,6 +2871,49 @@ class JudgeRunReportViewTest(ViewTestCase):
             response, "The judge reply for this string could not be used."
         )
 
+    def test_row_marker_compares_with_the_verdict_target(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        verdict = self.make_verdict_with_error(
+            unit, severity="critical", category="mistranslation"
+        )
+        self.add_row(run, unit, outcome=JudgeRunUnit.Outcome.CRITICAL, verdict=verdict)
+        Unit.objects.filter(pk=unit.pk).update(target="changed after judgement")
+
+        response = self.client.get(
+            self.report_url(run), {"outcome": "changed-since-run"}
+        )
+        [row] = response.context["page_obj"]
+        self.assertFalse(row.current_target_matches)
+        self.assertEqual(str(row.action), "Check the current verdict")
+        self.assertContains(response, "current text changed since this run")
+        self.assertNotContains(response, "Fix and re-check")
+
+    def test_hashless_marker_compares_with_the_final_run_snapshot(self) -> None:
+        self.enable_review()
+        run = self.create_run()
+        unit = self.get_unit()
+        row = self.add_row(
+            run,
+            unit,
+            outcome=JudgeRunUnit.Outcome.UNPARSED,
+            input_target=["before automatic processing"],
+        )
+        # The run itself finished with the current text. A start-of-run comparison
+        # would mark this clean row stale; the final snapshot must not.
+        JudgeRunUnit.objects.filter(pk=row.pk).update(
+            after_target=unit.get_target_plurals()
+        )
+        clean = self.client.get(self.report_url(run), {"outcome": "unparsed"})
+        self.assertTrue(clean.context["page_obj"][0].current_target_matches)
+        self.assertNotContains(clean, "current text changed since this run")
+
+        Unit.objects.filter(pk=unit.pk).update(target="changed after completion")
+        changed = self.client.get(self.report_url(run), {"outcome": "unparsed"})
+        self.assertFalse(changed.context["page_obj"][0].current_target_matches)
+        self.assertContains(changed, "current text changed since this run")
+
 
 @override_settings(
     JUDGE_ENABLED=True,

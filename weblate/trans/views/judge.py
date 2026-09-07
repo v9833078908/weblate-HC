@@ -283,9 +283,17 @@ def _annotate_row(row: JudgeRunUnit) -> None:
     component, project and verdict.
     """
     unit = row.unit
-    row.current_target_matches = (  # type: ignore[attr-defined]
-        unit is not None and unit.get_target_plurals() == row.input_target
-    )
+    verdict = row.verdict
+    if unit is None:
+        row.current_target_matches = False  # type: ignore[attr-defined]
+    elif verdict is not None and verdict.target_storage_hash:
+        row.current_target_matches = (  # type: ignore[attr-defined]
+            verdict.target_storage_hash == compute_target_storage_hash(unit.target)
+        )
+    else:
+        row.current_target_matches = (  # type: ignore[attr-defined]
+            unit.get_target_plurals() == row.after_target
+        )
     row.editor_url = unit.get_absolute_url() if unit is not None else ""  # type: ignore[attr-defined]
     if unit is None:
         row.source_text = ""  # type: ignore[attr-defined]
@@ -293,7 +301,7 @@ def _annotate_row(row: JudgeRunUnit) -> None:
     else:
         row.source_text = " / ".join(unit.get_source_plurals())  # type: ignore[attr-defined]
         row.target_text = " / ".join(unit.get_target_plurals())  # type: ignore[attr-defined]
-    primary = row.verdict.primary_error if row.verdict else None
+    primary = verdict.primary_error if verdict else None
     if primary is not None:
         label = _CATEGORY_LABELS.get(
             primary.get("category"), primary.get("category", "")
@@ -305,6 +313,8 @@ def _annotate_row(row: JudgeRunUnit) -> None:
         )
     if unit is None:
         row.action = ""  # type: ignore[attr-defined]
+    elif not row.current_target_matches:
+        row.action = gettext_lazy("Check the current verdict")  # type: ignore[attr-defined]
     elif row.repair_status == _REPAIR.CANDIDATE_STORED:
         row.action = gettext_lazy("Review the suggested fix")  # type: ignore[attr-defined]
     elif row.repair_status == _REPAIR.APPLIED:
