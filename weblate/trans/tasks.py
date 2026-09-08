@@ -28,12 +28,18 @@ from django.utils.translation import gettext, ngettext, override
 from weblate.accounts.utils import remove_user
 from weblate.addons.events import AddonActivityLogReason, AddonActivityLogStatus
 from weblate.auth.models import AuthenticatedHttpRequest, User, get_anonymous
+from weblate.checks.models import CHECKS
 from weblate.lang.models import Language
 from weblate.logger import LOGGER
 from weblate.trans.actions import ActionEvents
 from weblate.trans.autotranslate import BatchAutoTranslate
 from weblate.trans.component_copy import copy_component_addons
 from weblate.trans.exceptions import FileParseError
+from weblate.trans.fix_check import (
+    perform_fix,
+    refresh_fix_check_lock,
+    release_fix_check_lock,
+)
 from weblate.trans.inherited_settings import apply_create_inheritance_defaults
 from weblate.trans.judge import JudgeError
 from weblate.trans.models import (
@@ -1191,6 +1197,143 @@ def auto_translate_component(
             "judge-run", kwargs={"pk": auto.active_producer_run.id}
         )
     return store_auto_translate_activity_log(activity_log_id, result)
+
+
+@app.task(
+    trail=False,
+    autoretry_for=(WeblateLockTimeoutError,),
+    retry_backoff=600,
+    retry_backoff_max=3600,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
+def fix_failing_checks(
+    *,
+    user_id: int | None,
+    check_id: str,
+    lock_key: str,
+    translation_id: int | None = None,
+    component_id: int | None = None,
+    project_id: int | None = None,
+    unit_ids: list[int] | None = None,
+) -> dict[str, Any]:
+    """
+    Mass-fix a failing check over one scope (Task 4 step 1).
+
+    Metadata is scope-shaped per decision 10: `translation_id` for a
+    translation scope, `component_id` for a component scope,
+    `project_id`/`user_id` alone for a project scope. `lock_key` is the
+    concurrency-guard reservation this run's caller already holds
+    (`fix_check_lock_key()`), keyed to `current_task.request.id`.
+
+    A terminal failure - the lock lease is lost, or any other exception -
+    is returned as `{"status": "failed", ...}`, never raised, so a dead
+    run can never surface as a Celery exception result the poller cannot
+    render (Task 4 step 2). `WeblateLockTimeoutError` while retries remain
+    is refreshed and re-raised, letting `autoretry_for` retry it.
+    """
+    user = User.objects.get(pk=user_id) if user_id else None
+    check_obj = CHECKS.get(check_id)
+    token: str = (current_task.request.id if current_task else None) or ""
+
+    if translation_id is not None:
+        translation = Translation.objects.get(pk=translation_id)
+        unit_set = translation.unit_set.all()
+        project = translation.component.project
+    elif component_id is not None:
+        component_obj = Component.objects.get(pk=component_id)
+        unit_set = Unit.objects.filter(translation__component=component_obj)
+        project = component_obj.project
+    elif project_id is not None:
+        project = Project.objects.get(pk=project_id)
+        unit_set = Unit.objects.filter(translation__component__project=project)
+    else:
+        msg = (
+            "One of translation_id, component_id, or project_id must be provided"
+        )
+        raise ValueError(msg)
+
+    if check_obj is None or check_obj.mass_fixup is None:
+        release_fix_check_lock(lock_key, token)
+        return {
+            "status": "failed",
+            "message": gettext("This check is no longer eligible for a mass fix."),
+        }
+
+    def progress_callback(done: int, total: int) -> bool:
+        if current_task and current_task.request.id:
+            current_task.update_state(
+                state="PROGRESS",
+                meta={
+                    "progress": 100 * done // total if total else 100,
+                    "done": done,
+                    "total": total,
+                },
+            )
+        return refresh_fix_check_lock(lock_key, token)
+
+    try:
+        result = perform_fix(
+            user,
+            unit_set,
+            project,
+            check_obj,
+            unit_ids,
+            progress_callback=progress_callback,
+        )
+    except WeblateLockTimeoutError:
+        if commit_lock_retries_exhausted():
+            release_fix_check_lock(lock_key, token)
+            report_error(
+                "Mass fix could not acquire the component lock in time",
+                project=project,
+            )
+            return {
+                "status": "failed",
+                "message": gettext(
+                    "Mass fix could not complete: the component stayed locked."
+                ),
+            }
+        # Retries remain: keep the reservation alive across the backoff and
+        # let `autoretry_for` requeue this run.
+        refresh_fix_check_lock(lock_key, token)
+        raise
+    except Exception as error:
+        report_error("Mass fix failed", project=project)
+        release_fix_check_lock(lock_key, token)
+        return {
+            "status": "failed",
+            "message": gettext("Mass fix failed: %s") % error,
+        }
+
+    counts = {
+        "fixed": result.fixed,
+        "denied": result.denied,
+        "manual": result.manual,
+        "stale_or_no_change": result.stale_or_no_change,
+        "verdicts_no_longer_current": result.verdicts_no_longer_current,
+    }
+
+    if result.aborted:
+        # The lock refresh failed mid-run: another run owns the
+        # reservation now, so this run must not release it.
+        return {
+            "status": "failed",
+            "message": gettext("Another run took over this fix."),
+            **counts,
+        }
+
+    release_fix_check_lock(lock_key, token)
+    return {
+        "status": "completed",
+        "message": ngettext(
+            "Mass fix completed, %d string was fixed.",
+            "Mass fix completed, %d strings were fixed.",
+            result.fixed,
+        )
+        % result.fixed,
+        **counts,
+    }
 
 
 @app.task(trail=False)

@@ -654,6 +654,12 @@ class ActionEvents(IntegerChoices):
         gettext_lazy("A producer recorded a decision on a judge verdict."),
         gettext_lazy("Judge verdict resolved"),
     )
+    # Translators: Name and description of event in the history
+    FIX_FAILING_CHECK = (
+        106,
+        gettext_lazy("A failing check was fixed automatically."),
+        gettext_lazy("Check fixed automatically"),
+    )
 
 
 # Actions which are logged
@@ -724,6 +730,7 @@ ACTIONS_CONTENT = {
     ActionEvents.NEW_UNIT,
     ActionEvents.ENFORCED_CHECK,
     ActionEvents.USER_REVERT,
+    ActionEvents.FIX_FAILING_CHECK,
 }
 
 # Actions shown on the repository management page
@@ -764,6 +771,7 @@ ACTIONS_SHOW_CONTENT = {
     ActionEvents.NEW_UNIT_REPO,
     ActionEvents.STRING_UPLOAD_UPDATE,
     ActionEvents.NEW_UNIT_UPLOAD,
+    ActionEvents.FIX_FAILING_CHECK,
 }
 
 # Actions indicating a repository merge failure

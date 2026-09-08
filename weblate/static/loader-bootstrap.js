@@ -1773,6 +1773,7 @@ onReady(() => {
           const data = await response.json();
           if (bar !== null) {
             bar.style.width = `${data.progress}%`;
+            bar.setAttribute("aria-valuenow", `${data.progress}`);
           }
           if (phase !== null) {
             phase.textContent = data.completed
@@ -2103,7 +2104,12 @@ onReady(() => {
 
   /* Clickable rows */
   document.querySelectorAll("tr[data-href]").forEach((row) => {
-    row.addEventListener("click", () => {
+    row.addEventListener("click", (event) => {
+      /* A nested link, button or form control already handles its own
+       * click; the row navigation must not steal it. */
+      if (event.target.closest("a, button, input, label, select, textarea")) {
+        return;
+      }
       window.location = row.dataset.href;
     });
   });
