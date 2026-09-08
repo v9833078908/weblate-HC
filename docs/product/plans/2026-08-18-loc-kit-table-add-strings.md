@@ -1,183 +1,283 @@
-# План: «Добавить новые строки из loc-kit таблицы» для обычного компонента
+# План: обновить строковый компонент из loc-kit таблицы
 
-## Контекст
+Дата: 2026-08-18. Переработан: 2026-09-08.
+Статус: согласован к реализации, не реализован.
+Связанный план общего Explanation-контракта и мастера создания:
+`docs/product/plans/2026-08-28-kit-explanation-on-string-import.md`.
+Ревью исходного Explanation-плана:
+`docs/product/reviews/2026-09-08-kit-explanation-plan-review.md`.
 
-Команда Space Arena работает китом-таблицей (CSV/XLSX: колонка-ключ + по
-колонке на язык), а компонент `space-arena/lockit` — обычный монолингвальный
-JSON, источник `ru`. Сейчас догрузить строки можно только родным аплоадом
-Weblate по одному языку за раз (`context,source[,target]`), что не подходит:
-таблица несёт 2+ языка в одной строке.
+## Цель
 
-Для глоссария такой путь уже есть — «Add new glossary terms from a loc-kit
-table» (`LocKitGlossaryUpdateStartView` -> preview -> `append_glossary_terms`).
-Нужен его аналог для обычного (не-glossary) компонента.
+Одна форма `loc-kit-strings-update` применяет CSV/TSV/XLSX к существующему
+обычному компоненту:
 
-Особый случай, который обязателен к учёту: источник `ru`, а у части строк
-русская ячейка пустая и текст только в `en` (неосновном). Это названия
-кораблей и т.п. — они должны сохранить английское значение, остаться без
-русского перевода и не попадать под машинный автоперевод.
+- добавляет отсутствующие ключи и их языковые значения;
+- применяет `read-only` и другие разрешённые флаги только к новым ключам;
+- добавляет или явно перезаписывает `Unit.explanation` существующих и новых
+  исходных юнитов;
+- никогда не меняет source, targets или flags уже существующего ключа.
 
-## Что уже есть и переиспользуется как есть
+Отдельного explanation-only view не создаётся. Это точка входа для
+существующего компонента в общий контракт из связанного плана; мастер
+создания вызывает тот же Explanation apply после `create_translations`.
 
-- `loc_kit_ingest.reader.read_sheets` — чтение CSV/TSV/XLSX.
-- `loc_kit_ingest.infer.infer_profile` — вывод профиля `po` из шапки; коды
-  языков резолвятся через `langcode` (`ch-s -> zh_Hans`, `jp -> ja`,
-  `kr -> ko`, и т.д.).
-- `loc_kit_ingest.parser.parse_component` -> `ParseResult`: `units` это
-  `StringUnit(key, values: dict[lang -> text], comments, references, row)`,
-  плюс диагностики `po.missing_source` (пустой источник при заполненной цели)
-  и `po.key_without_content` (пусто везде -> ERROR).
-- `weblate.trans.models.loc_kit.LocKitImportDraft` с полем `target_component`
-  — временный черновик загрузки, привязанный к существующему компоненту,
-  гейтится `upload.perform`.
-- Паттерн UI из глоссарного апдейта: start -> preview -> confirm,
-  `_insert_draft_and_map`, шаблоны `trans/loc_kit_glossary_update.html` и
-  `trans/loc_kit_glossary_preview.html`.
-- `weblate.utils.views.create_component_from_kit` — эталон конвертации
-  «таблица -> per-language PO» (тот же infer/parse/render), из него берём
-  порядок вызовов и обработку ошибок.
+Основной реальный сценарий — игровой JSON-компонент: строгий JSON не несёт
+developer comments, поэтому DB-only `Unit.explanation` является его
+единственным источником попометного контекста для редактора, MT и judge.
 
-## Чего не хватает (это и есть работа)
+## Существующие основания
 
-Аппендер для обычного компонента — аналог `append_glossary_terms`, но через
-`Translation.add_unit`, а не TBX. Плюс тонкая UI-обвязка вокруг того же
-черновика.
+- `loc_kit_ingest.reader.read_sheets` читает CSV/TSV/XLSX.
+- `infer_profile` и `parse_component` дают `StringUnit` и диагностики.
+- `LocKitImportDraft.target_component` хранит временную загрузку для
+  существующего компонента.
+- Глоссарный поток уже задаёт безопасный паттерн start -> preview -> confirm
+  (`LocKitGlossaryUpdateStartView`, `append_glossary_terms`).
+- `Translation.add_unit(..., is_batch_update=True)` добавляет новый
+  монолингвальный ключ сразу во все существующие языки.
+- `Unit.update_explanation` хранит DB-only Explanation и audit trail для
+  форматов с `supports_explanation=False`.
 
-### 1. `weblate/trans/loc_kit.py`: `append_translation_strings(...)`
+Связанный Explanation-план владеет schema v3, узкими заголовками
+Explanation, `StringUnit.explanation`/`flags` и общей функцией
+`apply_kit_explanations`. Этот план не создаёт второй парсер или второй
+Explanation-сервис.
 
-Сигнатура по образцу `append_glossary_terms`:
-`append_translation_strings(request, component, preview) -> StringsAppendResult`.
+## Общий preview/apply-контракт
 
-Логика (под `component.locked_for_update()`, порядок блокировок как в
-глоссарном аппендере):
+Preview строится из одного `ParseResult` и классифицирует каждую строку
+независимо по двум осям.
 
-1. Собрать `existing = set(source_translation.unit_set.values_list("context"))`.
-2. Классифицировать входящие `StringUnit` на новые и уже существующие по
-   `context`. **Append-only:** существующие ключи не трогаем вообще (ни
-   `source`, ни цели, ни флаги), считаем `skipped`.
-3. Для каждого нового ключа:
-   - `source_translation.add_unit(context=key, source=values.get(ru, ""),`
-     `target=[], is_batch_update=True)` — юнит создаётся сразу во всех языках
-     (`_add_unit_locked`, ветка `is_source`).
-   - Для каждого языка из профиля, где в строке есть непустое значение, кроме
-     `ru`: записать target в перевод этого языка
-     (`translation.unit_set.get(context=key).translate(...)` в батче).
-4. Недостающий язык (колонка есть в таблице, а языка в компоненте ещё нет —
-   новая колонка в будущем ките): как в `append_glossary_terms`, создать язык,
-   если у актора есть `translation.add`, иначе пометить `unavailable` и
-   продолжить с остальными. Никогда не падать на `translation_set.get()` и не
-   терять колонку молча — показать в превью и в итоге.
-5. Флаги из колонки `flags` (см. раздел 2): **после** записи значений применить
-   к исходному юниту флаги строки (обычно `read-only`). Порядок обязателен —
-   read-only блокирует правку, в т.ч. `en`. Флаг ставится на `ru`-юнит и
-   растекается на все языки через `get_all_flags` (`unit.py:2493`).
-6. Вернуть `StringsAppendResult(added, skipped, per_language, created_languages,`
-   `unavailable_languages, flagged)` для сообщения пользователю.
+### Строка
 
-Заметки к реализации:
+- `new`: ключа нет, строка может быть добавлена;
+- `existing`: ключ есть, source/targets/flags всегда остаются без изменений;
+- `invalid`: ERROR-диагностика блокирует весь confirm.
 
-- Пустой source в батч-добавлении разрешён: `add_unit(is_batch_update=True)`
-  пропускает `validate_new_unit_data` (проверено — `translation.py:2537`
-  `if not is_batch_update`), а тот иначе требовал бы `state=STATE_EMPTY` для
-  пустой строки. Одиночный UI-add этим путём не идёт.
-- Порядок «значение -> флаг»: read-only ставится **после** записи целей,
-  потому что read-only блокирует правку (в т.ч. `en`).
-- Флаг ставится на **исходный** (ru) юнит: `extra_flags += "read-only"`,
-  разотрётся на все языки через `get_all_flags` (`unit.py:2493`).
+### Explanation
 
-### 2. Управление read-only: колонка `flags` в таблице (решение принято)
+- `set`: ключ существует или будет создан, текущее Explanation пусто;
+- `unchanged`: значение уже равно входному;
+- `already_in_note`: file-owned `note` равен входному значению; Explanation
+  всё равно может быть установлен как редактируемый DB-owned контекст;
+- `blank`: ячейка пуста;
+- `missing_key`: ключ не существует и не будет создан из-за прав/ошибки;
+- `would_overwrite`: непустое значение отличается; по умолчанию пропуск,
+  применяется только с явным `overwrite=True`;
+- `unavailable`: у пользователя нет `source.edit`.
 
-Пустой `ru` бывает у названий (read-only) и у описаний (перевести позже) — в
-таблице они выглядят одинаково, автомат не различит. Решение (эволюция от
-глобальной галочки к пер-строчному контролю): **зарезервированная колонка
-`flags`** в ките. Её ячейка — флаги Weblate для строки (обычное значение
-`read-only`), применяются к исходному юниту; пустая ячейка = без флагов. Так в
-одном ките имена помечаются `read-only`, а описания остаются без флага — по
-строкам, без угадывания.
+Preview также показывает:
 
-Это тянет правку конвертера `loc_kit_ingest` (раньше была «вне объёма»):
+- новые и существующие ключи;
+- по языкам: значения, создаваемые и недоступные языки;
+- строки с пустым источником;
+- строки с `flags`;
+- Explanation по исходам выше;
+- число юнитов с актуальным judge-вердиктом, которые станут stale;
+- все ERROR-диагностики до любой мутации.
 
-- `infer.py`: распознать заголовок `flags` (набор
-  `_FLAGS_HEADERS = {"flags", "weblate-flags", "флаги"}`) как служебную колонку
-  — не язык (мимо `langcode`) и не заметку (мимо `_NOTE_HEADERS`), занести её в
-  профиль `po`. **Проверку `_FLAGS_HEADERS` поставить ДО ветки
-  `comments.append(entry)` (`infer.py:326-327`):** колонка `flags` в основном
-  пустая, а непустая неязыковая колонка сейчас сваливается в developer-comment
-  (fallback срабатывает, если заполнена хоть одна ячейка, `infer.py:310-317`),
-  иначе `read-only` вбивается в комментарий каждого юнита и в po-mono, и в
-  глоссарном пути. Проверить, что `infer_glossary_profile` колонку `flags`
-  игнорирует, а не тащит как ложную языковую/термин-колонку.
-- `model.py`: добавить `StringUnit.flags: str` (по умолчанию пустая).
-- `parser.py` `_parse_keyed`: заполнять `flags` из ячейки колонки.
-- Киты без колонки `flags` работают как раньше.
+Confirm вызывает единый coordinator под `transaction.atomic` и
+`component.locked_for_update()`:
 
-Валидация: флаг применяется через `weblate.checks.flags.Flags`; невалидное
-значение — ERROR в превью, а не тихое проглатывание.
+```python
+def apply_loc_kit_string_update(
+    *,
+    user: User,
+    component: Component,
+    preview: StringsUpdatePreview,
+    overwrite_explanations: bool,
+) -> StringsUpdateResult: ...
+```
 
-### 3. Вьюхи `weblate/trans/views/create.py`
+Coordinator сначала добавляет разрешённые новые строки, затем передаёт
+исходные `StringUnit` в общий `apply_kit_explanations`. Результат содержит
+`added`, `existing`, `flagged`, per-language counters,
+created/unavailable languages и `KitExplanationApplyResult`.
 
-Параллельно глоссарным (не переиспользуя `LocKitGlossaryConfirmView`, который
-явно отказывает не-glossary таргету):
+Если preview содержит ERROR, task не меняет ничего. Частичные `unavailable`
+по разрешениям или языкам не откатывают остальные разрешённые операции, но
+всегда видны до confirm и в результате.
 
-- `LocKitStringsUpdateStartView` — как `LocKitGlossaryUpdateStartView`, но
-  `get_component` требует **не** glossary, `has_template()` и `manage_units`
-  (иначе `add_unit` недоступен), плюс `upload.perform`.
-- `LocKitStringsPreviewView` — прогоняет `infer_profile`/`parse_component`,
-  показывает: сколько новых ключей, сколько уже есть (skip), по языкам —
-  сколько значений, сколько строк с пустым источником, сколько под `flags`
-  (read-only), какие языки будут созданы и какие недоступны; ERROR-диагностики
-  (`po.key_without_content`, невалидный флаг) блокируют применение.
-- `LocKitStringsConfirmView` — применяет через
-  `append_translation_strings`.
+## Права и eligibility
 
-### 4. Форма, шаблоны, URL, меню
+Компонент обязан:
 
-- `LocKitStringsUpdateForm` (поле `table`) — с `FormHelper(self);`
-  `form_tag = False` (конвенция репозитория, иначе crispy вложит вторую форму).
-  Галочка не нужна: read-only задаётся колонкой `flags` в самой таблице.
-- Шаблоны `trans/loc_kit_strings_update.html` и `..._preview.html` по образцу
-  глоссарных.
-- URL `loc-kit-strings-update` в `weblate/urls.py`.
-- Пункт меню в `weblate/templates/component.html` рядом с glossary-вариантом,
-  под `if user_can_upload_translation and not object.is_glossary and`
-  `object.manage_units`.
+- быть не glossary и не `locked`;
+- иметь монолингвальный template (`has_template()`);
+- поддерживать добавление юнитов для string-операции;
+- иметь `file_format_cls.supports_explanation == False` для
+  Explanation-операции.
+
+Доступ к start/preview разрешён, если пользователь может выполнить хотя бы
+одну мутацию:
+
+- новые строки: `upload.perform` и право управления/добавления юнитов;
+- Explanation: `source.edit` на компоненте.
+
+Preview отдельно показывает недоступную ось. Пользователь только с
+`source.edit` может применить пояснения к существующим ключам, но новые
+строки будут `unavailable`. Пользователь только с upload/add может добавить
+строки, но Explanation будут `unavailable`. Наличие `upload.perform` никогда
+не даёт право менять Explanation.
+
+Недостающий язык создаётся только при `translation.add`; иначе этот язык
+`unavailable`, остальные операции продолжаются.
+
+## Задачи
+
+### 1. Профиль и `StringUnit`
+
+**Владелец:** задача 1 связанного Explanation-плана.
+
+Schema v3 для PO добавляет scalar metadata `flags` и `explanation`.
+`_FLAGS_HEADERS = {"flags", "weblate-flags", "флаги"}` проверяется до
+fallback в comments. Explanation использует только узкий набор
+`explanation`, `explanations`, `пояснение`, `пояснения`; `Comment`,
+`Context`, `Description`, `Note` сохраняют прежнюю семантику developer
+comment. `StringUnit` получает оба значения, PO-рендер их не пишет.
+
+Флаг валидируется через `weblate.checks.flags.Flags`; невалидное значение —
+ERROR preview. Кит без обеих колонок не меняет v1-профиль и поведение.
+
+### 2. Добавление новых строк
+
+**Файлы:** `weblate/trans/loc_kit.py` и contract tests.
+
+Предлагаемый внутренний интерфейс:
+
+```python
+def append_translation_strings(
+    request: AuthenticatedHttpRequest,
+    component: Component,
+    preview: StringsUpdatePreview,
+) -> StringsAppendResult: ...
+```
+
+Внутри уже взятого component lock:
+
+1. Собрать существующие `Unit.context`.
+2. Существующие ключи полностью пропустить для source/targets/flags.
+3. Для нового ключа вызвать
+   `source_translation.add_unit(context=key, source=..., target=[],`
+   `is_batch_update=True)`.
+4. Записать непустые targets в языки из профиля.
+5. Создать отсутствующий язык при `translation.add`, иначе отметить
+   `unavailable`.
+6. После targets применить валидированные flags к исходному юниту: порядок
+   обязателен, потому что `read-only` блокирует последующую запись.
+
+Пустой source разрешён только в batch-path. Для строки с пустым `ru` и
+непустым `en`:
+
+- с `flags=read-only` английское значение сохраняется, все языки получают
+  read-only;
+- без флага источник остаётся untranslated с текущим согласованным
+  fallback-поведением;
+- полностью пустая строка — `po.key_without_content`, ERROR до confirm.
+
+### 3. Explanation в том же coordinator
+
+**Владелец функции:** задача 2 связанного Explanation-плана.
+
+После добавления новых строк coordinator вызывает `apply_kit_explanations`
+для всех строк preview. Для существующих ключей изменяется только
+Explanation; для новых — Explanation ставится после появления исходного
+юнита. Checkbox «перезаписать непустые пояснения» показывается только при
+`would_overwrite > 0` и `source.edit`.
+Explanation-набор не применяется в HTTP-транзакции: confirm резервирует
+draft, заранее сохраняет `apply_task_id` и ставит coordinator в Celery.
+Задача заново загружает `User`, component, draft, profile и preview;
+выполняет string и Explanation-части в одной транзакции. Состояния draft
+`PREVIEW_READY/FAILED -> APPLYING -> CONSUMED` и task id не допускают
+двойного confirm. После ошибки отдельный failure-handler переводит draft из
+`APPLYING` в `FAILED`, доступный для явного retry до expiry; исходная
+загрузка удаляется только после `CONSUMED`.
+
+### 4. Start, preview, confirm
+
+**Файлы:** `weblate/trans/views/create.py`, формы, `weblate/urls.py`.
+
+- `LocKitStringsUpdateStartView`: проверяет eligibility и наличие хотя бы
+  одной доступной операции, читает файл локально, затем создаёт
+  `LocKitImportDraft(target_component=component)`.
+- `LocKitStringsPreviewView`: вызывает schema v3 infer/parse, строит обе
+  классификации и permission matrix, не меняет компонент.
+- `LocKitStringsConfirmView`: заново загружает и проверяет draft,
+  permissions и компонент, отклоняет stale/consumed/expired draft,
+  атомарно резервирует task id и ставит coordinator ровно один раз.
+- URL: `loc-kit-strings-update`; отдельного explanation URL нет.
+
+Черновик остаётся owner-, session-, project- и component-bound. Глоссарный
+confirm продолжает отказывать draft с string target; component-creation
+confirm продолжает отказывать draft с `target_component`.
+
+### 5. Шаблоны и меню
+
+**Файлы:** `weblate/templates/trans/loc_kit_strings_update.html`,
+`weblate/templates/trans/loc_kit_strings_preview.html`,
+`weblate/templates/component.html`.
+
+Форма использует `FormHelper(self)` и `form_tag = False`. Preview показывает
+обе оси и объясняет частичный результат до confirm. Пункт меню видим, когда
+доступна хотя бы string- или Explanation-операция, а не только по
+`user_can_upload_translation`; запрещённый тип мутации не показывается как
+доступный.
+
+После confirm сообщение использует точные counters результата, включая
+`would_overwrite`, `unavailable` и created/unavailable languages.
+
+### 6. Документация
+
+Документацией владеет задача 6 связанного Explanation-плана:
+
+- loc-kit guide описывает schema v3, preview и существующий-component flow;
+- game-repo contract называет UI основным способом после реализации, а
+  API PATCH и `explanations.json` сохраняет как программный/аварийный путь и
+  долговечный источник восстановления;
+- одна changelog-запись покрывает создание и обновление.
 
 ## Проверка
 
-- Standalone: логика конвертации уже покрыта в `loc_kit_ingest/tests`.
-- Weblate-контракт, новый класс в
-  `weblate/trans/tests/test_loc_kit_ingest_contract.py`:
-  - таблица с 2+ языками добавляет новый ключ во все языки, цели проставлены
-    из своих колонок;
-  - строка с пустым `ru` + текст в `en` -> юнит с пустым source, `en` target
-    заполнен; при `flags=read-only` -> `state=READONLY` во всех языках, при
-    пустой ячейке -> обычный untranslated с фолбэком на английский;
-  - колонка `flags` с невалидным значением -> ERROR в превью, ничего не создано;
-  - язык, которого нет в компоненте: с правом `translation.add` создаётся, без
-    права -> пропуск с отметкой `unavailable`, остальные языки применяются;
-  - существующий ключ не меняется (append-only): ни target, ни флаги;
-  - строка без текста вообще (`po.key_without_content`) -> применение
-    заблокировано, ничего не создано;
-  - коды игры (`ch-s/jp/kr`) резолвятся в языки, а не в комментарии.
-- Живой прогон в dev-контейнере через реальную форму (как для zip): загрузить
-  маленькую таблицу на 3 языка, проверить компонент.
-- Мутационная: откат ветки read-only -> падает тест про флаги; откат
-  append-only guard -> падает тест про неизменность существующего ключа.
+Standalone (`cd loc_kit_ingest && uv run pytest`):
 
-## Вне объёма
+- `flags` и Explanation распознаются отдельно от languages/comments;
+- Comment + Explanation сохраняются как разные поля;
+- невалидный flag и две explanation-колонки дают ERROR;
+- v1/v2 и кит без служебных колонок не меняются;
+- ни flags, ни Explanation не появляются в PO.
 
-- Изменение существующих строк, их целей и флагов (это не append; отдельный
-  разговор про conflicts).
-- Автоопределение «имя vs описание» — не делаем, различие задаёт колонка
-  `flags`.
-- Деплой; глоссарный путь не трогаем.
+Weblate contract
+(`weblate/trans/tests/test_loc_kit_ingest_contract.py`):
 
-## Решения приняты
+- таблица с 2+ языками добавляет новый ключ во все доступные языки;
+- пустой `ru` + `en` соблюдает read-only/fallback-контракт;
+- существующий ключ не меняет source/targets/flags;
+- существующий и новый ключ получают Explanation при `source.edit`;
+- overwrite требует явной галочки; повторный прогон идемпотентен;
+- без `source.edit` Explanation unavailable, но разрешённые строки
+  добавляются; без string-permissions новые строки unavailable, но
+  разрешённые Explanation применяются;
+- отсутствующий язык создаётся только при `translation.add`;
+- ERROR блокирует все мутации; partial unavailable — нет;
+- повторный confirm не применяет draft второй раз;
+- повторный confirm не ставит вторую задачу; failed-task допускает явный
+  retry, consumed draft — нет;
+- coordinator получает `User`, а не HTTP request, и возвращает точные
+  counters через task result.
 
-1. read-only управляется **пер-строчно колонкой `flags`** в таблице (вариант B,
-   доведён от галочки к колонке — так имена и описания разделяются в одном
-   ките).
-2. Недостающий язык из таблицы: создаётся при праве `translation.add`, иначе
-   `unavailable` + показ в превью (никаких падений и тихих потерь).
-3. Превью показывает новые/skip, по языкам, число строк с пустым источником,
-   создаваемые/недоступные языки.
+Живой smoke-test в dev-контейнере:
+
+1. Загрузить небольшую таблицу с новым и существующим ключом,
+   Explanation + Comment, тремя языками и `read-only`.
+2. Проверить preview обеих осей и permission matrix.
+3. Confirm; проверить новые строки, Explanation, неизменность существующих
+   source/targets/flags и отсутствие metadata в файлах.
+4. Повторить с overwrite и без `source.edit`.
+
+Перед Weblate-тестами синхронизировать standalone-пакет:
+`cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/`.
+После целевых тестов — `uv run prek run --all-files`.
+
+Деплой не входит. `l10n.herocraft.com` и платные LLM-вызовы требуют
+отдельного явного разрешения.

@@ -1,131 +1,301 @@
-# Explanation из кита при импорте строкового компонента
+# Explanation из loc-kit для новых и существующих строковых компонентов
 
-Дата: 2026-08-28. Статус: предложен, не согласован. Правок кода пока нет.
-Ревью: `docs/product/reviews/2026-09-08-kit-explanation-plan-review.md`
-(итог: переработать).
+Дата: 2026-08-28. Переработан: 2026-09-08.
+Статус: согласован к реализации, не реализован.
+Ревью: `docs/product/reviews/2026-09-08-kit-explanation-plan-review.md`.
+Связанный план существующего компонента:
+`docs/product/plans/2026-08-18-loc-kit-table-add-strings.md`.
 
-Кит CSV/TSV/XLSX с колонками «ключ + языки + explanation», загруженный через
-вкладку «Отправить файлы перевода» мастера создания компонента, должен доводить
-колонку `explanation` до поля Explanation исходной строки, а не до developer
-comment.
+## Цель
 
-## Почему сейчас не работает
+Колонка `explanation` из CSV/TSV/XLSX должна попадать в
+`Unit.explanation` исходной строки и оставаться только в базе Weblate:
 
-Две независимые причины, обе проверены в коде.
+- при создании компонента через вкладку «Отправить файлы перевода» — из той
+  же загрузки, без повторной загрузки файла;
+- при загрузке таблицы в существующий строковый компонент — через общий
+  preview/apply-поток из связанного плана.
 
-**1. Формат не переносит explanation.** `supports_explanation` равен `True`
-ровно у одного класса — TBX (`weblate/formats/ttkit.py:3451`, `unit_class =
-TBXUnit`); базовое значение `False`
-(`weblate/formats/base.py:406`). Универсальная загрузка кита создаёт компонент
-`po-mono` (`weblate/utils/views.py:809-812`), а PO объяснение в файле не несёт.
+Объяснение не должно попадать в `.po` или игровой репозиторий. Исходные и
+целевые тексты, состояния, флаги и метки существующего ключа не меняются.
 
-**2. PO-ветка импортёра не знает про explanation.** В `infer_component`
-неязыковая колонка становится либо `references` (если содержит только числа),
-либо `comments` (`loc_kit_ingest/infer.py:372-376`) — то есть developer
-comment. Закрытый список `_NOTE_HEADERS` и `_find_note_column`
-(`infer.py:54-66`, `:528`) используются только глоссарной инференцией
-(`infer.py:680` внутри `infer_glossary_profile`, `:585`).
+## Что происходит сейчас
 
-Дополнительно: `kit_info` (`weblate/utils/views.py:809-825`) несёт только
-данные для предзаполнения формы и сообщений и потребляется единственным местом
-(`weblate/trans/views/create.py:624-678`). Ни одна попометная величина из кита
-до создания компонента не доживает.
+Контекст не теряется. Неязыковая текстовая колонка становится `comments`
+(`loc_kit_ingest/infer.py:374-378`), рендерится как developer comment `#.`
+только в PO языка-источника (`loc_kit_ingest/writer.py:52-57`) и загружается
+как `Unit.note`. `note` уже получают:
 
-## Варианты
+- машинный перевод (`weblate/machinery/llm.py:574-581`, `:1071-1075`);
+- judge (`weblate/trans/judge.py:915-918`,
+  `weblate/trans/judge_loop.py:122-123`);
+- редактор как «Source string description»
+  (`weblate/templates/translate.html:155-163`, `:918-923`).
 
-**A. Внутри мастера создания.** Требует переноса карты «ключ → explanation»
-между двумя шагами визарда и хука после `create_translations`: на момент
-отправки формы юнитов ещё нет, а сканирование может идти в Celery. Гонка и
-состояние в визарде.
+Проблема другая: `note` принадлежит файлу, а не локализации.
+`Unit.explanation` хранится в базе, редактируется под `source.edit`, имеет
+отдельную семантику в LLM-промпте и для строгого JSON игрового компонента
+является единственным носителем контекста: комментариев в таком файле нет
+(`docs/product/guides/game-repo-integration-contract.md:163-168`,
+`:239-261`).
 
-**B. Отдельный append-only проход по существующему компоненту (рекомендуется).**
-Повторяет форму уже существующего `append_glossary_terms`: оператор загружает
-кит против существующего строкового компонента, сопоставление по ключу,
-Explanation ставится через `Unit.update_explanation`
-(`weblate/trans/models/unit.py:2763`). Юниты уже существуют — гонки нет. Проход
-идемпотентен и повторяем, когда объяснения переписали. Переиспользует
-`LocKitImportDraft.target_component`
-(`weblate/trans/models/loc_kit.py:63-69`), который уже существует ровно для
-такого случая — черновик, привязанный к одному существующему компоненту, — и
-права `upload.perform` вместо права на создание компонента.
+Создание из таблицы сейчас тоже не может довести попометные данные до
+юнитов: файл разбирается внутри `TemporaryDirectory`
+(`weblate/utils/views.py:753-799`), наружу выходит только `kit_info`
+(`:809-825`), которое используется для полей формы и сообщений
+(`weblate/trans/views/create.py:624-682`).
 
-**D. Отклонено: научить `po-mono` переносить explanation через translator
-comments PO.** Это меняет поведение всех po/po-mono компонентов во всех
-проектах и начинает писать контекст обратно в репозиторий игры, что прямо
-противоречит `docs/product/guides/game-repo-integration-contract.md:163-168`: контекста
-в файлах игры быть не должно, он живёт в Weblate.
+## Выбранная архитектура
 
-Выбирается **B** плюс маленькая часть A: колонку надо распознавать уже при
-загрузке кита, чтобы оператор видел сообщение, а не молча получал developer
-comment.
+Это один контракт с двумя точками входа, а не два импортёра:
+
+1. Общая функция разбирает и применяет `{ключ -> explanation}`.
+2. Мастер создания сохраняет исходную загрузку как
+   `LocKitImportDraft` и после `create_translations` вызывает общую функцию
+   автоматически (A').
+3. Существующий компонент использует ту же функцию внутри единственного
+   `loc-kit-strings-update` preview/apply-потока. Отдельного
+   explanation-only view не создаётся.
+
+### Контракт данных
+
+В `loc_kit_ingest` вводится схема **v3 для PO metadata**:
+
+- v1 сохраняет прежнюю точную семантику keyed PO и
+  term-description-pairs TBX;
+- v2 сохраняет прежнюю точную семантику TBX `record-map`;
+- v3 разрешена только для `kind: "po"` и добавляет два необязательных
+  скалярных поля component: `explanation` и `flags`, каждое с
+  `column`, `header`, `name`;
+- профиль PO без обеих служебных колонок продолжает выводиться как v1;
+- TBX с `schema_version: 3` отклоняется.
+
+Один bump обслуживает этот план и уже принятое поле `flags` из связанного
+add-strings-плана; v1 не переинтерпретируется задним числом.
+
+`StringUnit` получает `explanation: str = ""` и `flags: str = ""`.
+`ParsedUnit` остаётся протоколом. PO-рендер не использует оба поля:
+служебные данные доступны потребителю `ParseResult`, но не появляются в
+артефакте.
+
+Для Explanation используется узкий закрытый набор заголовков:
+`explanation`, `explanations`, `пояснение`, `пояснения`.
+`comment`, `comments`, `note`, `context`, `description` и их текущие
+локализованные варианты остаются developer comments. Две заполненные
+explanation-колонки — ошибка инференции, а не склейка или выбор первой.
+
+### Общая функция применения
+
+Предлагаемый интерфейс в `weblate/trans/loc_kit.py`:
+
+```python
+def apply_kit_explanations(
+    *,
+    user: User,
+    component: Component,
+    units: Sequence[StringUnit],
+    overwrite: bool,
+) -> KitExplanationApplyResult: ...
+```
+
+`KitExplanationApplyResult` считает `set`, `unchanged`, `blank`,
+`missing_key`, `would_overwrite` и `already_in_note`; preview использует ту
+же классификацию до мутации.
+
+Инварианты:
+
+- сопоставление по `StringUnit.key == Unit.context` среди исходных юнитов;
+  `writer.py:49` кладёт ключ в `msgid`, а `PoMonoUnit.context`
+  (`weblate/formats/ttkit.py:847-860`) возвращает его при пустом `msgctxt`;
+- компонент не glossary, не `locked`;
+- `component.file_format_cls.supports_explanation` обязан быть `False`;
+  тем самым DB-only обеспечивается самой функцией;
+- требуется `source.edit` на компоненте; `upload.perform` не заменяет его;
+- пустое входное значение — `blank`, отсутствующий ключ — `missing_key`;
+- равное значение — `unchanged`, повторный прогон не создаёт `Change`;
+- непустое существующее значение без `overwrite=True` —
+  `would_overwrite`, остальные строки продолжают применяться;
+- источник, targets, state, flags и labels существующего юнита не меняются;
+- запись только через `Unit.update_explanation`, чтобы сохранить историю и
+  естественную инвалидацию judge-контекста.
+
+Если `note` уже равен новому `explanation`, объяснение всё равно ставится,
+чтобы стать редактируемым; исход классифицируется как `already_in_note`.
+LLM MT и judge при равных нормализованных значениях передают только
+`explanation`, чтобы не дублировать контекст.
+
+### Права
+
+- существующий компонент: загрузить/добавить строки можно под
+  `upload.perform` и `unit.add`, применить Explanation — только под
+  `source.edit`;
+- мастер создания: если в ките есть Explanation, до сохранения черновика
+  проверяется `source.edit` на проекте; после создания исходного перевода
+  право повторно проверяется на компоненте;
+- background task не сериализует HTTP request: creation-path переиспользует
+  существующий `acting_user_id`, dedicated existing-component task получает
+  `user_id`, оба заново загружают `User` и передают объект в сервис;
+- потеря права между этими проверками не приводит к частичному применению:
+  draft переходит в retryable `FAILED`, Explanation не меняются.
 
 ## Задачи
 
-1. **`loc_kit_ingest`, PO-ветка: распознать колонку объяснения.**
-   Переиспользовать `_NOTE_HEADERS`. Колонка перестаёт попадать в `comments` и
-   объявляется отдельным полем профиля. Решение по схеме принять явно: схема
-   закрытая и версионированная, неизвестные поля отклоняются, поэтому нужен
-   выбор между необязательным полем в v1 `keyed` и новой версией. Это смена
-   поведения: сегодня колонка с заголовком `explanation` уезжает в developer
-   comment, поэтому нужна запись в гайде.
-2. **`loc_kit_ingest`: не менять рендер PO.** Объяснение не должно попадать в
-   `.po`. Карта «ключ → explanation» — только результат разбора.
-3. **`ParsedUnit`/`model.py`:** добавить поле `explanation` рядом с
-   существующими; в отчёт добавить число строк с объяснением.
-4. **`weblate/utils/views.py`:** расширить `kit_info` числом найденных
-   объяснений и записью в `notes`, называющей колонку, чтобы визард сообщал о
-   находке.
-5. **Новое: `apply_kit_explanations(request, component, preview)`** — строковый
-   аналог `append_glossary_terms`. Сопоставление по `Unit.context` среди
-   исходных юнитов. Правила: целевые строки, флаги и метки не трогаются
-   никогда; непустое существующее объяснение не перезаписывается без явного
-   согласия оператора; попометные причины пропуска (`missing_key`, `blank`,
-   `unchanged`) — частичный success, а не отказ; проход блокируется целиком
-   только при несовпадении языка-источника.
-6. **Вью и шаблон** для черновика с заполненным `target_component`, под правом
-   `upload.perform` на компоненте. Черновик с `target_component` должен
-   по-прежнему отклоняться вью создания компонента — так же, как это уже
-   делает `LocKitGlossaryConfirmView`.
-7. **Документация:** раздел в `docs/product/guides/loc-kit-ingest.md`; запись в верхнюю
-   секцию `docs/changes.rst` — изменение видимо пользователю.
+### 1. Схема v3 и разбор служебных колонок
 
-## Границы
+**Результат:** `flags` и Explanation однозначно живут в `ParseResult`, но не
+в PO.
 
-- Только source explanation. Пер-языковые `Unit.explanation` для строковых
-  компонентов — отдельная поверхность, в этот инкремент не входит.
-- Ни один класс формата не меняется; объяснение не появляется в файлах и не
-  уходит обратно в репозиторий игры.
-- Деплой не входит. `l10n.herocraft.com` требует отдельного явного разрешения.
+**Файлы:** `loc_kit_ingest/profile.py`, `infer.py`, `model.py`, `parser.py`,
+`writer.py`, тесты и schema-раздел
+`docs/product/guides/loc-kit-ingest.md`.
 
-## Проверка
+**Действия:**
 
-Standalone (`cd loc_kit_ingest && uv run pytest`):
+- добавить `SCHEMA_VERSION_PO_METADATA = 3` и v3 PO-only closed schema;
+- добавить два scalar metadata-поля component и проверки коллизий колонок;
+- распознавать `_EXPLANATION_HEADERS` и уже согласованный `_FLAGS_HEADERS`
+  до fallback в `comments`;
+- заполнить `StringUnit.explanation`/`flags`;
+- сохранить прежний PO-рендер: ни Explanation, ни flags в файл не идут;
+- v1/v2 и кит без служебных колонок не менять.
 
-- кит с колонкой `explanation` даёт профиль с полем объяснения, а не с
-  `comments`-записью;
-- отрендеренный `.po` не содержит текста объяснения ни в каком виде;
-- профиль с неизвестным полем по-прежнему отклоняется;
-- кит без такой колонки даёт ровно тот же профиль, что сейчас.
+**Проверка:** `cd loc_kit_ingest && uv run pytest`; отдельные сценарии:
+Explanation + Comment сохраняются в разных полях; две explanation-колонки
+отклоняются; неизвестное поле отклоняется; v1/v2 parse-back не меняется;
+в отрендеренном PO нет текста Explanation и flags.
 
-Weblate-level:
+### 2. Общий preview/apply-контракт
 
-- применение к существующему компоненту ставит Explanation ровно тем ключам,
-  которые есть в обоих; отсутствующий ключ — пропуск с причиной, не ошибка;
-- повторный прогон того же кита не создаёт изменений (идемпотентность);
-- целевые строки, флаги и метки не изменены;
-- пользователь без `upload.perform` на компоненте получает отказ;
-- черновик с `target_component` отклоняется вью создания компонента.
+**Результат:** один сервис классифицирует и применяет пояснения для обеих
+точек входа.
 
-## Что доступно оператору до реализации
+**Файлы:** `weblate/trans/loc_kit.py`,
+`weblate/trans/tasks.py`, `weblate/trans/models/loc_kit.py`, миграция,
+`weblate/trans/tests/test_loc_kit_ingest_contract.py`.
 
-Обходных путей два, оба рабочие сегодня.
+**Действия:**
 
-1. **API.** Поле `explanation` юнита доступно на запись
-   (`weblate/api/serializers.py:3477-3481`): импортировать компонент как
-   обычно, затем проставить объяснения скриптом по ключу.
-2. **UI, вручную.** Explanation исходной строки правится в модалке «Edit
-   additional string info» (карандаш у строки Explanation в карточке Details),
-   право `source.edit`.
+- реализовать `KitExplanationApplyResult`, preview-классификацию и
+  `apply_kit_explanations`;
+- закрепить eligibility, `source.edit`, overwrite и DB-only-инварианты;
+- блокировать исходные юниты в стабильном порядке;
+- confirm существующего компонента всегда ставит coordinator в Celery:
+  `LocKitImportDraft` получает состояния `APPLYING`/`FAILED` и nullable
+  `apply_task_id`; атомарный переход из `PREVIEW_READY`/`FAILED` в
+  `APPLYING` не допускает две задачи;
+- успешная task переводит draft в `CONSUMED`; обработчик ошибки отдельной
+  транзакцией переводит его из `APPLYING` в retryable `FAILED`, сохраняя
+  файл до expiry;
+- task заново читает и валидирует draft/profile/preview, передаёт в сервис
+  `User`, а не request; успешный результат помечает draft consumed;
+- preview показывает число юнитов с актуальным judge-вердиктом, которые
+  станут stale; ручной записи `JudgeVerdict`/`Unit.state` нет.
 
-Для глоссарных китов ничего делать не нужно: TBX уже несёт source и target
-explanation, шаблон и поведение описаны в `docs/product/guides/loc-kit-ingest.md`.
+**Проверка:** совпавшие ключи получают Explanation; повторный прогон
+идемпотентен; blank/missing/would-overwrite частично успешны; targets,
+state, flags, labels и файлы неизменны; нет `source.edit` — ни одной
+мутации; `supports_explanation=True`, glossary и locked отклоняются.
+
+### 3. Создание компонента: durable handoff A'
+
+**Результат:** одна загрузка через мастер создаёт компонент с Explanation;
+повторная загрузка не нужна.
+
+**Файлы:** `weblate/utils/views.py`,
+`weblate/trans/models/loc_kit.py`, `weblate/trans/models/component.py`,
+`weblate/trans/tasks.py`, `weblate/trans/views/create.py`, поля формы
+создания, тесты создания.
+
+**Действия:**
+
+- строковый table-upload сохранять в `LocKitImportDraft`; preview и
+  локальная валидация завершаются до создания компонента;
+- не хранить карту в `kit_info` и не полагаться на transient attribute
+  через Celery;
+- между шагами визарда нести UUID `draft.token`, а не доверенный клиенту
+  database id; перед `Component.save` разрешить token через
+  owner/session-bound `LocKitImportDraft.get_active` и только затем положить
+  внутренний `loc_kit_draft_id` на instance для явной сериализации в task
+  kwargs;
+- читать `loc_kit_draft_id` в `Component.save` и явно передать его через
+  eager-вызов `after_save`, `queue_background_task`,
+  `component_after_save` и `Component.after_save`;
+- worker загружает черновик по id, проверяет owner/project/component,
+  expiry, state и `source.edit`;
+- вызвать общую функцию после успешного `create_translations`;
+- если `create_translations` передало загрузку в `perform_load`, отложить
+  применение до появления `source_translation`, не помечать черновик
+  consumed и не терять draft id;
+- только успешное применение помечает draft consumed и удаляет файл;
+- исключение откатывает транзакцию, оставляет draft для безопасного
+  явного повтора до expiry и показывает background-task failure;
+- только в этом же cutover перестать направлять explanation-колонку в
+  `comments`/`#.`.
+
+**Проверка:** настоящий Celery-путь и eager-путь дают одинаковый результат;
+воркер получает id после повторной загрузки `Component` из БД; при deferred
+load применение происходит ровно один раз; expired/wrong-owner/wrong-project
+draft не применяется; ошибка не удаляет черновик; кит без Explanation
+проходит прежним путём.
+
+### 4. Существующий компонент: расширить add-strings
+
+**Результат:** B реализуется внутри `loc-kit-strings-update`, не отдельным
+view.
+
+**Источник задач:** разделы 1-4 и verification связанного
+`docs/product/plans/2026-08-18-loc-kit-table-add-strings.md`, обновлённые
+этим решением.
+
+Preview объединяет новые строки и Explanation: для существующего ключа
+source/targets/flags остаются append-only, но Explanation классифицируется
+отдельно. Confirm применяет новые строки, затем Explanation общей функцией;
+checkbox overwrite видим только при `would_overwrite > 0`. Без
+`source.edit` строки по-прежнему можно добавить, но Explanation получает
+`unavailable` и не меняется; это явно показано до confirm и в итоге.
+
+### 5. Убрать дубль контекста в LLM
+
+**Результат:** старый file-owned `note`, совпадающий с новым DB-owned
+Explanation, не дублируется в промпте.
+
+**Файлы:** `weblate/machinery/llm.py`, `weblate/trans/judge_loop.py` и
+существующие prompt/context-hash тесты.
+
+Нормализовать оба значения текущей общей нормализацией; при равенстве
+передавать только `explanation`. Разные значения сохраняются оба. Изменение
+Explanation по-прежнему меняет judge context hash и делает старый вердикт
+stale.
+
+### 6. Документация и changelog
+
+В том же изменении, что код:
+
+- `docs/product/guides/loc-kit-ingest.md`: schema v3, узкие заголовки,
+  создание за одну загрузку, общий existing-component preview;
+- `docs/product/guides/game-repo-integration-contract.md`: UI назвать
+  основным массовым способом после его появления; API PATCH оставить
+  программным/аварийным способом; `explanations.json` оставить долговечным
+  источником восстановления после пересоздания компонента или смены ключа;
+  добавить отдельную строку про loc-kit Explanation, не менять строку
+  developer comment -> `note`;
+- `docs/changes.rst`: одна запись в текущей unreleased-секции.
+
+## Общая проверка
+
+1. `cd loc_kit_ingest && uv run pytest`.
+2. Скопировать пакет в dev-контейнер:
+   `cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/`.
+3. `./rundev.sh test weblate/trans/tests/test_loc_kit_ingest_contract.py`
+   плюс затронутые тесты component creation / machinery / judge.
+4. Живой smoke-test на dev-инстансе:
+   - создать компонент из небольшого кита с Explanation + Comment;
+   - проверить Explanation, отдельный source description и отсутствие
+     обоих служебных полей в PO;
+   - тем же китом открыть `loc-kit-strings-update` для существующего JSON
+     компонента, проверить preview и overwrite;
+   - подтвердить, что targets/state/flags/labels не изменились.
+5. `uv run prek run --all-files`.
+
+Деплой не входит. `l10n.herocraft.com` и платные LLM-вызовы требуют
+отдельного явного разрешения.
