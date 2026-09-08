@@ -213,6 +213,17 @@ class TerminalFixupTest(SimpleTestCase):
         self.assertEqual(fixed, unit.target + "\u1038\u104b")
         self.assertFalse(EndQuestionCheck().check_single(unit.source, fixed, unit))
 
+    def test_end_question_burmese_bare_visarga_target_is_refused(self) -> None:
+        # A target that is *only* U+1038 (nothing real precedes it) cannot
+        # be safely fixed: there is no anchoring non-whitespace character
+        # for `strip_prefix` to consume it from, so an append would land
+        # after it and double it. `get_fixup` must leave it untouched
+        # (manual bucket), not produce "U+1038 U+1038 U+104B".
+        unit = make_unit(code="my", source="Save it?", target="\u1038")
+        fixed = self._fix(EndQuestionCheck(), unit)
+        self.assertEqual(fixed, unit.target)
+        self.assertNotEqual(fixed, "\u1038\u1038\u104b")
+
     def test_end_question_french_nnbsp(self) -> None:
         unit = make_unit(code="fr", source="Save it?", target="Sauvegarder")
         self.assertEqual(self._fix(EndQuestionCheck(), unit), "Sauvegarder\u202f?")

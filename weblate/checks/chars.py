@@ -428,6 +428,14 @@ TERMINAL_MARK_CHARS = frozenset(
         "|",
         "᱾",
         "။",
+        "\u1038",  # bare MYANMAR SIGN VISARGA - see `_terminal_append_fixup`'s
+        # `strip_prefix` docstring: `strip_prefix` only ever *consumes* a
+        # trailing U+1038 that a real character precedes; a target that is
+        # only U+1038 (or otherwise has nothing real before it) has no such
+        # character, so `(?<=\S)` cannot anchor before it, and without this
+        # entry the append would land *after* the existing U+1038 instead
+        # of consuming it, doubling it. Listing it here makes that
+        # degenerate case a conflict - refused, not mismutated.
         # end_colon
         ":",
         "：",
