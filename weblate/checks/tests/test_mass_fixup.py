@@ -455,11 +455,13 @@ class FixupJavaScriptParityTest(SimpleTestCase):
     def _fixtures(self):
         fixtures = []
 
-        def add(check, unit, prefix="target"):
+        def add(check, unit, prefix="target", extra_samples=()):
             fixups = check.get_fixup(unit)
             self.assertIsNotNone(fixups, f"{check.check_id} produced no fixup")
             for pattern, replacement, flags in ((p, r, f) for _, p, r, f in fixups):
-                samples = [f"{prefix}{tail}" for tail in self.SAMPLE_TAILS]
+                samples = [
+                    f"{prefix}{tail}" for tail in self.SAMPLE_TAILS
+                ] + list(extra_samples)
                 fixtures.append(
                     {
                         "pattern": pattern,
@@ -481,6 +483,21 @@ class FixupJavaScriptParityTest(SimpleTestCase):
         add(
             EndInterrobangCheck(),
             make_unit(code="fr", source="Vraiment?!", target="x"),
+        )
+        # Burmese end_question: the only fixup using `strip_prefix` (its
+        # pattern includes an optional literal U+1038 before the trailing
+        # `\s*$`), covered separately because the generic Latin
+        # `SAMPLE_TAILS` never end in U+1038 and would not exercise the
+        # doubling-avoidance branch at all.
+        add(
+            EndQuestionCheck(),
+            make_unit(code="my", source="Save it?", target="x"),
+            extra_samples=[
+                "သိမ်းမလား",  # ends in U+1038 - must not double it
+                "ကျန်းမာရေ",  # does not end in U+1038 - plain append
+                "\u1038",  # bare visarga
+                "",
+            ],
         )
         return fixtures
 
