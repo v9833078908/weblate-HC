@@ -42,16 +42,32 @@ it a tier and its fixup is proven to clear every check it touches.
 
 ## Decisions added on revision (2026-09-08)
 
-6. **Ownership rule.** A defect that an active autofix already repairs
-   deterministically belongs to the autofix layer, not to this feature. See
-   "Ownership boundary" below; it removes five checks from the original safe
-   list and is the reason the feature exists at all.
-7. **Terminal fixup contract.** A computed target is accepted only when the
-   set of failing terminal checks strictly shrinks and nothing else the fix
-   can touch starts failing. This mirrors the rule the fork's own terminal
-   autofix already applies in the removal direction
-   (`weblate_customization/src/weblate_customization/autofixes.py:112-141`).
-   The per-language mark table is an optimization, never the guarantee.
+6. **Ownership rule. This amends user decision 1 and needs the owner's
+   confirmation.** Five checks (`end_ellipsis`, `begin_space`, `end_space`,
+   `zero-width-space`, `punctuation_spacing`) leave the safe tier because the
+   autofix layer already repairs those defects both on write and, over the
+   historical corpus, through `reapply_autofixes`. The justification is not
+   redundancy alone - it is that the autofix path carries the stricter
+   protocol (bot actor, own scoped commit, foreign pending changes refused),
+   and duplicating those defects here would give one string two repair
+   policies. The cost is explicit and belongs to the owner, not to the
+   implementer: a producer with `unit.bulk_edit` but no container access
+   cannot clean those five from the UI, and the backfill stays an operator
+   task. If the owner rejects that tradeoff, the five return to the safe tier
+   unchanged under the decision-7 contract, and the ownership tests in Task 1
+   become mandatory rather than confirmatory. Nothing else in the plan
+   depends on which way this goes.
+7. **Terminal fixup contract.** A computed target is accepted only when
+   **both** hold: the selected `check_id` no longer fails, **and** the set of
+   failing terminal checks (`end_stop`, `end_colon`, `end_question`,
+   `end_exclamation`, `end_interrobang`) strictly shrinks with no member newly
+   appearing, and `punctuation_spacing` does not start failing. The
+   before/after comparison is over sets, so a unit that already failed an
+   unrelated terminal check is not rejected for that alone. This mirrors the
+   rule the fork's own terminal autofix applies in the removal direction
+   (`weblate_customization/src/weblate_customization/autofixes.py:112-141`),
+   extended to `end_interrobang`, which that autofix does not cover. The
+   per-language mark table is an optimization, never the guarantee.
 8. `ActionEvents.FIX_FAILING_CHECK = 106`. `105` is already
    `JUDGE_RESOLUTION` (`weblate/trans/actions.py:646-656`) and persisted
    action values are never renumbered.
@@ -113,11 +129,16 @@ actors, permissions, state handling and commit strategy.
 | `double_space`, `kabyle-characters` | **this feature, safe tier** | deterministic, no autofix owner |
 | `ellipsis` on a source string | **this feature, safe tier** (subject to Task 3) | autofixes never touch a template store path |
 
-Ownership is therefore split **by direction**, not by check id: the terminal
-checks legitimately appear in `RemoveAddedFinalStop.get_related_checks()`
-(`autofixes.py:108-110`), because that autofix decides *through* them. A
-registry test asserting "no tiered check is related to any active autofix"
-would be false by design and must not be written.
+Ownership is therefore split **by direction**, not by check id. Four of the
+five terminal checks - `end_stop`, `end_colon`, `end_question`,
+`end_exclamation` - legitimately appear in
+`RemoveAddedFinalStop.get_related_checks()` (`autofixes.py:52-57,108-110`),
+because that autofix decides *through* them while repairing only the removal
+direction. `end_interrobang` is **not** in that set, so it has no
+direction-overlap precedent at all; the engine's own before/after terminal-set
+contract (decision 7) is what covers it. A registry test asserting "no tiered
+check is related to any active autofix" would be false by design for the four
+and must not be written.
 
 Consequences the implementer must honour:
 
@@ -129,9 +150,9 @@ Consequences the implementer must honour:
      `fix_target()` pass unchanged - i.e. no active autofix already owns it;
   2. for the `review` tier, a target the engine has just repaired survives a
      `fix_target()` pass unchanged. This holds by construction -
-     `RemoveAddedFinalStop` only acts when a terminal check is currently
-     failing (`autofixes.py:134-135`) - and the test locks it in, so the two
-     layers can never fight over the same string.
+     `RemoveAddedFinalStop` only acts when one of its four terminal checks is
+     currently failing (`autofixes.py:134-135`) - and the test locks it in, so
+     the two layers can never fight over the same string.
 
 ## Production census (2026-08-25, read-only API, active checks only)
 
@@ -309,15 +330,18 @@ prior `collectstatic`; `./rundev.sh test` avoids that setup.
    checks themselves use (`chars.py:293-331,341-366,378-412,427-446,449-454`)
    and returns `None` for any pair it does not cover.
 4. **Contract (decision 7), and it is the acceptance criterion, not the
-   table:** a fixup result is accepted only when the set of failing terminal
-   checks strictly shrinks and no other check the fix can touch
-   (`punctuation_spacing`) starts failing. A unit failing two terminal checks
-   at once (source `.`, target `?`) is therefore `manual` unless one fix
-   clears both. This is the same rule the fork's own terminal autofix already
-   applies in the opposite direction, and the implementation should follow its
-   shape (`_failing()` over `TERMINAL_CHECKS`, refuse a trade -
-   `weblate_customization/src/weblate_customization/autofixes.py:112-141`).
-   The engine, not the helper, enforces it (Task 2, step 3).
+   table:** compute the set of failing terminal checks before and after the
+   fix. Accept only when the selected `check_id` is no longer in the "after"
+   set, the set strictly shrank, no member appeared that was not there before,
+   and `punctuation_spacing` did not start failing. A unit that already failed
+   an unrelated terminal check is not rejected for that alone; a unit failing
+   two terminal checks at once (source `.`, target `?`) is `manual` unless one
+   fix clears both. The set always includes `end_interrobang`, which the
+   fork's autofix does not cover. The implementation follows the shape of
+   `_failing()` over `TERMINAL_CHECKS`
+   (`weblate_customization/src/weblate_customization/autofixes.py:112-141`),
+   extended by that fifth check. The engine, not the helper, enforces it
+   (Task 2, step 3).
 5. Tests: per-check fixup tests (`....`, `1...5`, CJK/fr/el/ar variants,
    plurals); an overlap test proving a `.`/`?` pair is rejected rather than
    turned into `?.`; a parity test asserting every regex fixup emitted by a
@@ -349,8 +373,10 @@ tests in `weblate/trans/tests/test_fix_check.py`.
    `translation__component_id`, `translation_id`, `position`, `id` before
    computing final targets.
 3. Bucket every candidate:
-   - `eligible`: a permitted final target that clears this check and satisfies
-     the decision-7 contract;
+   - `eligible`: a permitted final target that satisfies the decision-7
+     before/after set contract in full - the selected check cleared, the
+     terminal set strictly smaller, no member newly appearing, no new
+     `punctuation_spacing` failure;
    - `manual`: no fixup, no final target change, an uncleared check, a
      conflicting terminal mark, or any newly introduced terminal /
      `punctuation_spacing` failure;
@@ -497,12 +523,26 @@ sibling view module), `weblate/templates/message.html`,
    `weblate/trans/views/edit.py:1780-1889`) and adds real progress:
    `current_task.update_state(PROGRESS)` every N units with an `X / Y` text,
    not only a percentage.
-2. The task result distinguishes success from failure explicitly and reports
-   fixed / denied / manual / stale-or-no-change and
-   `verdicts_no_longer_current`. Because the API treats any ready task as
-   `completed` and stringifies exceptions (`weblate/api/views.py:4955-4967`),
-   a failed or retry-exhausted run must produce a result payload the flash
-   renders as a failure - never an empty success.
+2. **Lifecycle without a new API surface.** The task API is not extended: it
+   keeps returning `completed/progress/result/log`
+   (`weblate/api/views.py:4955-4967`), and this feature adds no serializer
+   field, because every other flash consumer would have to be revalidated for
+   it. The lifecycle is expressed inside the two payloads the poller already
+   reads:
+   - `progress` carries the integer percentage, and
+     `current_task.update_state(PROGRESS)` carries `{"progress": N,
+     "done": X, "total": Y}` so the flash can render `X / Y`;
+   - `result` is a dict with an explicit `"status"` of `"completed"` or
+     `"failed"` plus the counters fixed / denied / manual /
+     stale-or-no-change / `verdicts_no_longer_current`, and, when failed, a
+     translated message.
+   Mapping in the poller: not ready → running; ready with
+   `result["status"] == "completed"` → success text; ready with `"failed"`,
+   with a non-dict result, or with a stringified exception → failure text.
+   The API treats any ready task as `completed` and stringifies exceptions, so
+   a retry-exhausted run must still land in that failure branch and never
+   render an empty success. The task therefore wraps its body and writes the
+   failure payload itself before re-raising.
 3. Metadata per decision 10: `translation_id` for a translation scope,
    `component_id` for a component scope, and `user_id` alone for a project
    scope. A project-scope task consequently has `component is None` in
@@ -516,16 +556,32 @@ sibling view module), `weblate/templates/message.html`,
    component-progress abort widget
    (`weblate/templates/component-progress.html:40-41`,
    `loader-bootstrap.js:1704-1718`).
-5. Concurrency guard: refuse to queue a second run for the same
-   `(check_id, scope)` while one is still running, using the actor's task list;
-   a mass fix over a project must not be startable five times in a row.
+5. **Concurrency guard as an explicit reservation.** The actor's task list
+   cannot serve here: its entries carry no check or scope identity
+   (`weblate/utils/celery.py:51-70` stores three ids and nothing else) and
+   offer no atomic acquire, so two simultaneous submits would both pass a
+   read-then-check. Use a cache reservation instead:
+   - key `fix-check-lock-{check_id}-{scope_type}-{scope_pk}`;
+   - acquire with `cache.add(key, task_id, timeout=CELERY_TASK_TIME_LIMIT)`,
+     which is atomic and fails when the key exists; a failed acquire returns
+     the "already running" message and queues nothing;
+   - the id is generated before publication and the reservation is taken
+     before `apply_async`, mirroring the reservation discipline already
+     accepted in
+     `docs/product/plans/2026-08-18-loc-kit-table-add-strings.md`;
+   - release in the task's `finally`, and only when the stored value equals
+     the running task id, so a stale release cannot free a newer run; the TTL
+     is the backstop for a lost worker;
+   - a failed publication releases the reservation in the same request.
 6. The only cancellation is the ordinary **Cancel** link before queueing. Do
    not promise undo, task cancellation or rollback after the task starts.
 
-**Verify:** view and JS tests assert task metadata per scope, the failure
-payload, the concurrency refusal and the ARIA updates; manual smoke in dev
-shows queued → running → result progress with keyboard- and screen
-reader-visible text.
+**Verify:** view and JS tests assert task metadata per scope, the completed
+and failed result payloads and their poller mapping, a duplicate submit for
+the same `(check_id, scope)` being refused while the first run holds the
+reservation, the reservation being released only by its own task id, and the
+ARIA updates; manual smoke in dev shows queued → running → result progress
+with keyboard- and screen reader-visible text.
 
 ## Task 5 - views, URLs, templates
 
@@ -673,7 +729,7 @@ pre-commit hooks for the touched file types run clean (never a bare
 | Risk | Mitigation |
 |---|---|
 | Fixup regex behaves differently in Python vs the JS single-unit button | parity test in Task 1, final-target parity after save-time autofix in Task 2, `KashidaCheck` left untiered while it uses `regex` syntax |
-| A terminal fix trades one check for another (`?` → `?.`) | decision 7: re-run every terminal check plus `punctuation_spacing`, reject any new failure, overlap test in Task 1 |
+| A terminal fix trades one check for another (`?` → `?.`) | decision 7: before/after terminal-set comparison including `end_interrobang`, selected check must clear, no member may newly appear, overlap test in Task 1 |
 | Two mass-mutation paths disagree | ownership boundary split by direction plus the two Task 1 idempotence tests |
 | Source cascade suppression leaks into normal editing | keyword-only `mark_source_change_fuzzy=True` default, existing template-only branch, default-path regression tests |
 | Source change lands in the database but not in the file | explicit pending-row construction in Task 3 step 3 and the `commit_pending()` test; failing that, the Task 3 decision gate removes source checks |
@@ -693,10 +749,14 @@ pre-commit hooks for the touched file types run clean (never a bare
    which is why this is a follow-up rather than a gate. Result belongs in
    `docs/product/measurements/`. If the manual share turns out to dominate,
    revisit whether the review tier earns its UI.
-2. **Source-side `...` at the point of entry.** Fixing ellipses in the
-   loc-kit/converter, where source text is produced, is a separate design
-   proposal. It would make Task 3 unnecessary, but it is not a defect of this
-   plan and does not block it.
+2. **Preventing source-side `...` at the point of entry.** Normalizing
+   ellipses where source text is produced (loc-kit/converter) would stop new
+   occurrences. It is **preventative only and not a substitute for Task 3**:
+   the loc-kit update flow deliberately never changes the source of an
+   existing key
+   (`docs/product/plans/2026-08-18-loc-kit-table-add-strings.md:29-36`), and
+   nothing establishes that every affected source string came through that
+   import path. Separate proposal, complementary, does not block this plan.
 3. **`multiple_failures` as triage.** The roll-up would be more useful as a
    drill-down to the primary checks and affected languages it already knows
    (`weblate/checks/source.py:143-178`) than as a row in the failing-check
