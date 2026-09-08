@@ -44,7 +44,10 @@ from translate.storage.pypo import pofile
 from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Permission, Role, User
 from weblate.formats.models import FILE_FORMATS
-from weblate.glossary.models import build_glossary_prompt_entry
+from weblate.glossary.models import (
+    build_glossary_prompt_entry,
+    get_glossary_term_modes,
+)
 from weblate.glossary.tasks import flag_glossary_terminology, sync_terminology
 from weblate.lang.models import Language
 from weblate.trans import loc_kit
@@ -636,7 +639,10 @@ GLOSSARY_NOTE_CSV = (
     "Самосбор,Samosbor,Samosbor,Термин вселенной.\n"
 )
 GLOSSARY_FLAGS_CSV = (
-    "ru,en,flags\nHeroCraft,HeroCraft,read-only\nСудно,Vessel,forbidden\n"
+    "ru,en,cs,flags\n"
+    "HeroCraft,HeroCraft,HeroCraft,read-only\n"
+    "Судно,Vessel,Plavidlo,forbidden\n"
+    "Точное,Exact,,exact\n"
 )
 
 
@@ -902,6 +908,14 @@ class LocKitGlossaryUploadUITest(ViewTestCase):
         self.assertIn("forbidden", source_units["Судно"].extra_flags)
         self.assertIn("read-only", read_only_entry["flags"])
         self.assertIn("forbidden", forbidden_entry["flags"])
+        self.assertIn("exact", target_units["Точное"].flags)
+        self.assertNotIn("exact", source_units["Точное"].extra_flags)
+        exact_modes = get_glossary_term_modes(target_units["Точное"])
+        self.assertEqual(exact_modes, {"exact"})
+        cs_exact = component.translation_set.get(language__code="cs").unit_set.get(
+            source="Точное"
+        )
+        self.assertNotIn("exact", cs_exact.extra_flags)
         source_units["HeroCraft"].update_extra_flags("terminology", self.user)
         flag_glossary_terminology(component.pk)
         source_units["HeroCraft"].refresh_from_db()
@@ -2047,6 +2061,24 @@ class LocKitGlossaryAppendServiceTest(ViewTestCase):
             set(forbidden.extra_flags.split(", ")),
             {"forbidden", "terminology"},
         )
+
+    def test_new_exact_flag_is_stored_only_on_nonempty_target(self) -> None:
+        preview = _append_preview(
+            {
+                "values": {"en": "Canonical", "cs": "Kanonický", "pl": ""},
+                "flags": ("exact",),
+            },
+            source_language="en",
+        )
+
+        result = loc_kit.append_glossary_terms(self._request(), self.glossary, preview)
+
+        source = self.glossary.source_translation.unit_set.get(source="Canonical")
+        target = self.cs.unit_set.get(source="Canonical")
+        self.assertIn("terminology", source.extra_flags)
+        self.assertNotIn("exact", source.extra_flags)
+        self.assertIn("exact", target.extra_flags)
+        self.assertEqual(result.languages["pl"].blank, 1)
 
     def test_incoming_source_flags_never_rewrite_existing_terms(self) -> None:
         seeded = self._seed("Characters", "Hero", "Hrdina")

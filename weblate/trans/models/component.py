@@ -1364,6 +1364,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
                 seed_source_component_id=seed_source_component_id,
                 copy_seed_addons=copy_seed_addons,
                 seed_author=seed_author,
+                loc_kit_exact=getattr(self, "loc_kit_exact", False),
             )
         else:
             self.queue_background_task(
@@ -1380,6 +1381,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
                 copy_seed_addons=copy_seed_addons,
                 seed_author=seed_author,
                 acting_user_id=acting_user_id,
+                loc_kit_exact=getattr(self, "loc_kit_exact", False),
             )
 
         if (
@@ -5707,7 +5709,26 @@ class Component(  # ruff: ignore[too-many-public-methods]
         if repository_update_succeeded:
             self.create_template_if_missing()
 
-    def after_save(
+    def normalize_loc_kit_exact_flags(self, user: User) -> None:
+        """
+        Keep a loc-kit ``exact`` glossary flag on populated targets only.
+
+        The TBX import copies ``weblate-flags`` onto both the source and the
+        target unit, while ``exact`` is a target-scoped mode. Populated
+        targets therefore keep it in their own ``extra_flags``, and the
+        source unit and every blank target lose it.
+        """
+        for translation in self.translation_set.all():
+            is_target = translation.language_id != self.source_language_id
+            for unit in translation.unit_set.all():
+                flags = Flags(unit.extra_flags)
+                if is_target and unit.target and "exact" in unit.flags:
+                    flags.merge("exact")
+                else:
+                    flags.remove("exact")
+                unit.update_extra_flags(flags.format(), user)
+
+    def after_save(  # ruff: ignore[complex-structure]
         self,
         *,
         changed_git: bool,
@@ -5720,6 +5741,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
         seed_source_component_id: int | None = None,
         copy_seed_addons: bool = False,
         seed_author: str | None = None,
+        loc_kit_exact: bool = False,
     ) -> None:
         # ruff: ignore[import-outside-top-level]
         from weblate.trans.component_copy import (
@@ -5757,6 +5779,8 @@ class Component(  # ruff: ignore[too-many-public-methods]
             )
         elif changed_git and repository_update_succeeded:
             was_change = self.create_translations()
+        if loc_kit_exact and repository_update_succeeded and self.acting_user:
+            self.normalize_loc_kit_exact_flags(self.acting_user)
 
         # Update variants (create_translation does this on change)
         if changed_variant and not was_change:

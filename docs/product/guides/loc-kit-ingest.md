@@ -144,10 +144,12 @@ uv run python -m loc_kit_ingest "/path/Temple.csv" \
    кандидата, а не семантика разбора: профиль всё равно проходит полный гейт,
    а человек видит термины до создания компонента. Успех сразу даёт локально
    валидированный превью (шаг 4); отказ переходит к шагу 3.
-   An exact, case-insensitive `flags` header declares source-scoped glossary
-   modes. Each non-empty cell is a comma-separated set containing only
-   `read-only` and `forbidden`; unknown, parameterized, or orphaned values are
-   rejected before preview.
+   An exact, case-insensitive `flags` header declares glossary flags. Each
+   non-empty cell is a comma-separated set containing only `read-only`,
+   `forbidden`, and `exact`; unknown, parameterized, or orphaned values are
+   rejected before preview. `read-only` and `forbidden` are inherited from the
+   source term. `exact` applies only to each non-empty imported target: an
+   absent or blank target, and a language added later, do not receive it.
 3. **Кандидат-профиль (опционально, fallback).** Если детерминированный вывод
    отказал и site-wide анализатор включён и настроен, из выбранного листа
    строится детерминированный структурный сэмпл и отправляется одним POST в
@@ -177,7 +179,8 @@ uv run python -m loc_kit_ingest "/path/Temple.csv" \
    после успеха оператор подтверждает создание, которое донастраивает
    `file_format="tbx"`, `filemask="tbx/*.tbx"`, пустой template, профильный
    язык-источник и `is_glossary=True`; эти поля неизменяемы в финальной форме.
-   Imported terms are marked as terminology, so they also appear in glossary languages added later.
+   Imported terms are marked as terminology, so they also appear in glossary
+   languages added later. They do not inherit `exact`.
 
 **Canonical producer template:**
 
@@ -189,9 +192,13 @@ Vessel,Судно,never use this wording; use Ship,forbidden
 
 The leftmost language is the source. Other language headers must be Weblate
 language codes. `definition` is a source explanation; any exact header from
-`_NOTE_HEADERS` is accepted. `flags` is optional and carries only `read-only`
-and `forbidden`, separated by commas. Weblate shows normalized flags in the
-preview, writes them into TBX, and adds `terminology` automatically.
+`_NOTE_HEADERS` is accepted. `flags` is optional and carries `read-only`,
+`forbidden`, and `exact`, separated by commas. `exact` is limited to the
+non-empty targets on its row; the shared column cannot express an exact rule
+for just one language. Weblate shows normalized flags in the preview, writes
+them into TBX, and adds `terminology` automatically. `forbidden` takes
+precedence over `exact`; `read-only` takes precedence over `exact`. Glossary
+matching remains case-insensitive.
 
 7. **Временный черновик.** Загруженный файл хранится в session-bound,
    owner-bound временном черновике не дольше одного часа; он удаляется при
@@ -249,9 +256,9 @@ unsupported: one source and at least one target language are required.
    на каждом добавленном target реально попадают в БД тем же путём, что и
    при первичном импорте (`Unit.update_explanation`); отсутствие notes не
    блокирует добавление термина.
-   Source flags on a new term are also preserved: imported `read-only` and
-   `forbidden` values are merged with the automatic `terminology` flag.
-   Existing terms keep their current flags.
+   `read-only` and `forbidden` values are merged with the automatic
+   `terminology` flag on the source. `exact` is stored only on each new,
+   non-empty target unit. Existing terms keep their current flags.
 9. **Apply блокируется целиком, если:** source language таблицы не
    совпадает с source language компонента, или один и тот же source
    встречается под другим context, чем уже существующий в глоссарии

@@ -459,6 +459,36 @@ class GlossaryMorphologyEvaluatorTest(SimpleTestCase):
         )
         self.assertEqual(hard, {"Корабль"})
 
+    def test_exact_with_forbidden_forbids_the_form(self) -> None:
+        unit = self.build(
+            target_code="ru",
+            term_source="Корабль",
+            term_target="Корабль",
+            term_flags="exact, forbidden",
+            source_text="Нужен Корабль здесь.",
+            target_text="старый Корабль тут",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit, "Нужен Корабль здесь.", "старый Корабль тут"
+        )
+        self.assertEqual(hard, {"Корабль"})
+        self.assertEqual(advisory, set())
+
+    def test_exact_with_read_only_requires_the_source_form(self) -> None:
+        unit = self.build(
+            target_code="ru",
+            term_source="Корабль",
+            term_target="Крейсер",
+            term_flags="exact, read-only",
+            source_text="Нужен Корабль здесь.",
+            target_text="Крейсер тут",
+        )
+        hard, advisory = evaluate_glossary_terms(
+            unit, "Нужен Корабль здесь.", "Крейсер тут"
+        )
+        self.assertEqual(hard, {"Корабль"})
+        self.assertEqual(advisory, set())
+
     def test_occurrence_count_blocks_partial_lift(self) -> None:
         """A source with the term twice needs the target to match it twice."""
         unit = self.build(

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 # --------------------------------------------------------------------------- #
-GLOSSARY_SOURCE_FLAGS = frozenset({"read-only", "forbidden"})
+GLOSSARY_SOURCE_FLAGS = frozenset({"exact", "read-only", "forbidden"})
 
 # Helpers
 # --------------------------------------------------------------------------- #
@@ -829,8 +829,8 @@ def _parse_record_map(
                         err(
                             "tbx.invalid_source_flag",
                             row_idx + 1,
-                            "source glossary flags must be comma-separated values "
-                            "from 'read-only' and 'forbidden'",
+                            "glossary flags must be comma-separated values "
+                            "from 'read-only', 'forbidden' and 'exact'",
                         )
                     else:
                         source_flags = tuple(sorted(set(tokens)))
