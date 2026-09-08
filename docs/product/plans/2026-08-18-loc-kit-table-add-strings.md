@@ -28,6 +28,12 @@ protocol»); остальные критерии («Проверка», стро
 `apply_kit_explanations`/`append_glossary_terms`, из-за чего двойной или
 конкурентный confirm одного драфта не был идемпотентен - см. второй
 Follow-up в том же файле ревью.
+Follow-up code review закрыл ещё два Important: проверены new-key
+`read-only`/пустой source-language contracts, а preview считает target-юниты
+с актуальным judge-вердиктом, которые смена Explanation сделает stale.
+`loc_kit_explanations` также доезжает через deferred `perform_load`, а не
+теряется при lock timeout; см. третий Follow-up в файле ревью.
+
 
 ## Цель
 

@@ -54,10 +54,16 @@ from weblate.trans import loc_kit
 from weblate.trans.loc_kit import PREVIEW_WARNING_LIMIT
 from weblate.trans.models import Category, Component, Project, Translation
 from weblate.trans.models.loc_kit import LOC_KIT_DRAFT_STORAGE, LocKitImportDraft
+from weblate.trans.tasks import perform_load
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.tests.utils import create_another_user
 from weblate.utils.lock import WeblateLockTimeoutError
-from weblate.utils.state import STATE_APPROVED, STATE_EMPTY, STATE_TRANSLATED
+from weblate.utils.state import (
+    STATE_APPROVED,
+    STATE_EMPTY,
+    STATE_READONLY,
+    STATE_TRANSLATED,
+)
 from weblate.utils.tests import http_mock
 from weblate.utils.views import create_component_from_kit
 from weblate.vcs.git import LocalRepository
@@ -649,6 +655,52 @@ class LocKitUniversalUploadContractTest(ViewTestCase):
         po_bytes = Path(component.full_path, "ru.po").read_bytes()
         self.assertNotIn(b"Casual greeting", po_bytes)
         self.assertNotIn(b"Farewell line", po_bytes)
+
+    def test_deferred_perform_load_applies_staged_explanations(self) -> None:
+        """
+        A load deferred to perform_load carries its staged explanations.
+
+        When create_translations hits a lock timeout and defers the load to
+        the perform_load task, the wizard's explanation map used to die with
+        the request; the task must carry it and apply it once translations
+        exist. Simulated by calling the task body synchronously the same way
+        the worker does.
+        """
+        self.user.is_superuser = True
+        self.user.save()
+        kit = "id,ru,en,Explanation\nline_1,Привет,Hello,Casual greeting\n"
+
+        with modify_settings(INSTALLED_APPS={"remove": "weblate.billing"}):
+            response = self.client.post(
+                reverse("create-component-zip"),
+                {
+                    "zipfile": self._upload("Deferred Kit.csv", kit),
+                    "name": "Deferred",
+                    "slug": "deferred",
+                    "project": self.project.pk,
+                    "source_language": self.component.source_language.pk,
+                },
+            )
+            form = response.context["form"]
+            params = {field: form[field].value() or "" for field in form.fields}
+            params.pop("inherit_new_lang", None)
+            params["new_lang"] = "none"
+            self.client.post(reverse("create-component-zip"), params, follow=True)
+
+        component = Component.objects.get(slug="deferred")
+        # Wipe explanations the eager path may already have applied, then
+        # rerun the load exactly as the deferred task would: the map must
+        # still reach the source units.
+        component.source_translation.unit_set.update(explanation="")
+        perform_load(
+            component.pk,
+            force=True,
+            loc_kit_explanations={"line_1": "Casual greeting"},
+            user_id=self.user.pk,
+        )
+
+        line1 = component.source_translation.unit_set.get(context="line_1")
+        self.assertEqual(line1.explanation, "Casual greeting")
 
     def test_create_view_without_explanation_column_needs_no_session_state(
         self,
@@ -3159,6 +3211,128 @@ class LocKitStringsUpdateServiceTest(ViewTestCase):
                 units=(self._row(),),
                 overwrite_explanations=False,
             )
+
+    def test_read_only_flag_lands_after_targets_on_a_new_key(self) -> None:
+        """
+        Flags apply only after every target is written.
+
+        ``read-only`` on the source unit flips its targets into
+        STATE_READONLY (``update_state``); writing targets after the flag
+        would overwrite that state back to STATE_TRANSLATED, silently
+        un-readonlying the row the table asked to freeze.
+        """
+        new_row = self._row(
+            key="frozen_key",
+            values={"en": "Locked", "cs": "Zamceno"},
+            flags="read-only",
+        )
+
+        result = loc_kit.append_translation_strings(
+            user=self.user, component=self.component, units=(new_row,)
+        )
+
+        self.assertEqual(result.added, 1)
+        source_unit = self.component.source_translation.unit_set.get(
+            context="frozen_key"
+        )
+        self.assertIn("read-only", source_unit.extra_flags)
+        cs_unit = self.component.translation_set.get(language__code="cs").unit_set.get(
+            context="frozen_key"
+        )
+        self.assertEqual(cs_unit.target, "Zamceno")
+        self.assertEqual(cs_unit.state, STATE_READONLY)
+
+    def test_blank_source_language_cell_keeps_english_value_under_read_only(
+        self,
+    ) -> None:
+        """
+        Blank ru + non-blank en + read-only keeps the English value frozen.
+
+        The plan's fallback contract for a row with an empty source-language
+        cell: the English value is stored, every language receives read-only,
+        and the source-language unit stays untranslated rather than being
+        fabricated from the key.
+        """
+        new_row = self._row(
+            key="promo",
+            values={"en": "Summer Sale", "ru": ""},
+            flags="read-only",
+        )
+
+        result = loc_kit.append_translation_strings(
+            user=self.user, component=self.component, units=(new_row,)
+        )
+
+        self.assertEqual(result.added, 1)
+        en_unit = self.component.translation_set.get(language__code="en").unit_set.get(
+            context="promo"
+        )
+        self.assertEqual(en_unit.target, "Summer Sale")
+        source_unit = self.component.source_translation.unit_set.get(context="promo")
+        self.assertEqual(source_unit.state, STATE_READONLY)
+        self.assertIn("read-only", source_unit.extra_flags)
+
+    def test_judge_stale_counter_counts_verdicts_the_apply_would_outdate(self) -> None:
+        """
+        The preview counts current-context verdicts an apply would stale.
+
+        A verdict is current when its context_hash matches the unit's live
+        context. Setting a fresh explanation changes that context, so the
+        target units judged against the old explanation must be counted
+        (the stale verdicts no longer match the live context).
+        """
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.models.judge import (
+            JudgeVerdict,
+            compute_context_hash,
+            compute_target_hash,
+            compute_target_storage_hash,
+        )
+
+        cs_unit = self.component.translation_set.get(language__code="cs").unit_set.get(
+            context="welcome_message"
+        )
+        context_hash = compute_context_hash(
+            source=cs_unit.source,
+            note=self.existing_unit.note,
+            explanation=self.existing_unit.explanation,
+            glossary_terms=[],
+        )
+        JudgeVerdict.objects.create(
+            unit=cs_unit,
+            max_severity=JudgeVerdict.Severity.NONE,
+            judge_model="vendor/model-a",
+            seat=1,
+            target_hash=compute_target_hash(cs_unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(cs_unit.target),
+            context_hash=context_hash,
+        )
+        JudgeVerdict.objects.create(
+            unit=cs_unit,
+            max_severity=JudgeVerdict.Severity.NONE,
+            judge_model="vendor/model-b",
+            seat=2,
+            target_hash=compute_target_hash(cs_unit.get_target_plurals()),
+            target_storage_hash=compute_target_storage_hash(cs_unit.target),
+            context_hash=context_hash,
+        )
+        row = self._row(explanation="Fresh note.")
+
+        before = loc_kit.count_judge_stale_after_explanations(
+            component=self.component, units=(row,), overwrite=True
+        )
+        self.assertEqual(before, 1)
+
+        loc_kit.apply_kit_explanations(
+            user=self.user,
+            component=self.component,
+            units=(row,),
+            overwrite=True,
+        )
+        after = loc_kit.count_judge_stale_after_explanations(
+            component=self.component, units=(row,), overwrite=True
+        )
+        self.assertEqual(after, 0)
 
     def test_new_key_add_is_locked_and_serialized(self) -> None:
         """

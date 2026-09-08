@@ -909,6 +909,57 @@ def _classify_kit_explanations(
     return to_apply, KitExplanationApplyResult(**counters)
 
 
+def count_judge_stale_after_explanations(
+    *, component: Component, units: Sequence[StringUnit], overwrite: bool
+) -> int:
+    """
+    Count units whose current-context judge verdict this apply would stale.
+
+    A verdict is current when its stored ``context_hash`` still equals the
+    hash of the unit's live context (``compute_context_hash`` over source,
+    note, explanation and glossary prompt entries) - the same notion the
+    judge loop uses to detect drift. Changing a source unit's explanation
+    changes that hash, so every target unit whose verdict was judged against
+    the old explanation needs a re-run (and a re-bill) afterwards. This
+    counts only units the apply would actually touch, so an unchanged or
+    skipped explanation row never reports a stale verdict.
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.glossary.models import get_matched_glossary_prompt_entries
+
+    from weblate.trans.models.judge import compute_context_hash, compute_target_hash
+
+    _check_explanation_apply_eligibility(component)
+    keys = {unit.key for unit in units if unit.explanation.strip()}
+    if not keys:
+        return 0
+    source_units = {
+        unit.context: unit
+        for unit in component.source_translation.unit_set.filter(context__in=keys)
+    }
+    to_apply, _result = _classify_kit_explanations(
+        source_units=source_units, units=units, overwrite=overwrite
+    )
+    if not to_apply:
+        return 0
+    stale = 0
+    for source_unit, _explanation in to_apply:
+        for target_unit in source_unit.unit_set.exclude(pk=source_unit.pk):
+            current_hash = compute_context_hash(
+                source=target_unit.source,
+                note=target_unit.source_unit.note,
+                explanation=target_unit.source_unit.explanation,
+                glossary_terms=get_matched_glossary_prompt_entries(target_unit),
+            )
+            if target_unit.judge_verdicts.filter(
+                unparsed=False,
+                target_hash=compute_target_hash(target_unit.get_target_plurals()),
+                context_hash=current_hash,
+            ).exists():
+                stale += 1
+    return stale
+
+
 def classify_kit_explanations(
     *,
     component: Component,

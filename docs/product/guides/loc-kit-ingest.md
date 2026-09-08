@@ -115,10 +115,13 @@ developer comment и уходят в `#.` только в PO языка-исто
 коду. Если хотя бы одна строка кита несёт непустой Explanation и оператор
 обладает `source.edit` на проекте, разобранные значения сохраняются в сессии
 браузера (`LOC_KIT_PENDING_EXPLANATIONS_KEY` в `weblate/trans/views/create.py`)
-между шагом конвертации и шагом подтверждения создания. После
-`create_translations` `Component.apply_loc_kit_explanations` идемпотентно
-применяет их через `weblate.trans.loc_kit.apply_kit_explanations` -
-source/target, состояние и флаги существующих ключей не меняются. Перенос
+между шагом конвертации и шагом подтверждения создания. После успешной
+загрузки переводов (`create_translations` или отложенный после lock timeout
+`perform_load`) `Component.apply_loc_kit_explanations` идемпотентно
+применяет значения через `weblate.trans.loc_kit.apply_kit_explanations` -
+source/target, состояние и флаги существующих ключей не меняются. Отложенный
+`perform_load` несёт тот же server-side map, поэтому Explanation не теряются
+из-за retry загрузки. Сам перенос между экраном конвертации и confirm
 ограничен той же HTTP-сессией: если она потеряна между двумя POST-ами
 визарда (истечение сессии, другая вкладка), Explanation молча не
 применяется, а компонент создаётся как обычно - тот же кит можно затем
@@ -317,9 +320,11 @@ unsupported: one source and at least one target language are required.
    `target_component`, owner- и session-bound, как и глоссарный черновик; тот
    же файл тоже сохраняется для истории/очистки, но confirm читает разобранные
    строки из `preview_json`, не перечитывает и не парсит файл заново.
-4. **Preview.** Показывает число новых и уже существующих ключей и разбивку
+4. **Preview.** Показывает число новых и уже существующих ключей, разбивку
    Explanation по исходам общего сервиса (`set`/`unchanged`/`blank`/
-   `missing_key`/`would_overwrite`/`already_in_note`); чекбокс «перезаписать
+   `missing_key`/`would_overwrite`/`already_in_note`) и число target-юнитов
+   с актуальным judge-вердиктом, которые смена Explanation сделает
+   устаревшими и потребует повторного judge-прогона. Чекбокс «перезаписать
    существующие, непустые Explanation» виден только при непустом
    `would_overwrite`.
 5. **Confirm.** Один вызов `weblate.trans.loc_kit.apply_loc_kit_string_update`

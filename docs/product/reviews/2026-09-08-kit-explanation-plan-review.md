@@ -56,6 +56,23 @@ format`/`mypy`, точечно по изменённым файлам, не по
 только потому, что сам сервис теперь идемпотентен под локом компонента, а
 не потому, что гонка на уровне драфта исключена; отдельная защита на
 уровне драфта не нужна, пока это единственный побочный эффект.
+**Follow-up 2026-09-08 (после code review):** закрыты два Important.
+`append_translation_strings` теперь имеет регрессии для нового
+`read-only`-ключа с targets и для sourceless row; это закрепляет порядок
+«targets → flags», при котором source flag переводит target units в
+`STATE_READONLY` только после записи текста. Preview существующего компонента
+считает именно target-юниты (не число judge seat) с parsed verdict, чьи
+`target_hash` и `context_hash` сейчас соответствуют живому target/note/
+Explanation/glossary context; смена Explanation сделает их stale и потребует
+следующего judge-прогона. Создание компонента больше не теряет session-staged
+Explanation при `WeblateLockTimeoutError`: map проходит через
+`create_translations` в retryable `perform_load` и применяется только после
+успешной загрузки unit. Новые проверки:
+`test_read_only_flag_lands_after_targets_on_a_new_key`,
+`test_blank_source_language_cell_keeps_english_value_under_read_only`,
+`test_judge_stale_counter_counts_verdicts_the_apply_would_outdate` и
+`test_deferred_perform_load_applies_staged_explanations`.
+
 
 ## Что проверено и подтверждается
 

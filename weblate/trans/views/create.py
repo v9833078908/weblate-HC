@@ -64,6 +64,7 @@ from weblate.trans.loc_kit import (
     build_glossary_structure_sample,
     cap_preview_warnings,
     classify_kit_explanations,
+    count_judge_stale_after_explanations,
     existing_string_keys,
     profile_document_from_envelope,
     request_profile_proposal,
@@ -2013,6 +2014,13 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
         explanation_preview = classify_kit_explanations(
             component=component, units=units, overwrite=False
         )
+        judge_stale_count = (
+            count_judge_stale_after_explanations(
+                component=component, units=units, overwrite=False
+            )
+            if can_apply_explanations
+            else 0
+        )
         context.update(
             {
                 "draft": draft,
@@ -2023,6 +2031,7 @@ class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
                 "can_add_strings": can_add_strings,
                 "can_apply_explanations": can_apply_explanations,
                 "explanation_preview": explanation_preview,
+                "judge_stale_count": judge_stale_count,
                 "confirm_form": kwargs.get("confirm_form")
                 or LocKitStringsConfirmForm(),
             }

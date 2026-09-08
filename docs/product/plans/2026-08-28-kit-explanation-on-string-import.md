@@ -27,6 +27,11 @@ smoke-test и деплой не выполнены - требуют отдель
 Пост-мерж ревью нашло и закрыло реальный дефект в задаче 4:
 `append_translation_strings` не брала `component.locked_for_update()` -
 см. второй Follow-up в том же файле ревью.
+Третий Follow-up того же ревью закрыл два Important после code review:
+deferred `perform_load` теперь сохраняет server-side Explanation map, а
+preview existing-component flow считает актуальные judge-вердикты, которые
+станут stale.
+
 
 ## Цель
 

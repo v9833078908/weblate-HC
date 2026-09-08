@@ -1198,7 +1198,6 @@ class Component(  # ruff: ignore[too-many-public-methods]
         seed_source_component_id = getattr(self, "seed_source_component_id", None)
         copy_seed_addons = getattr(self, "copy_seed_addons", False)
         seed_author = getattr(self, "seed_author", None)
-        loc_kit_explanations = getattr(self, "loc_kit_explanations", None)
         repository_redirect_changes = self.repository_redirect_changes or []
         if repository_redirect_changes and kwargs.get("update_fields") is not None:
             kwargs["update_fields"] = {
@@ -1367,7 +1366,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
                 copy_seed_addons=copy_seed_addons,
                 seed_author=seed_author,
                 loc_kit_exact=getattr(self, "loc_kit_exact", False),
-                loc_kit_explanations=loc_kit_explanations,
+                loc_kit_explanations=getattr(self, "loc_kit_explanations", None),
             )
         else:
             self.queue_background_task(
@@ -1385,7 +1384,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
                 seed_author=seed_author,
                 acting_user_id=acting_user_id,
                 loc_kit_exact=getattr(self, "loc_kit_exact", False),
-                loc_kit_explanations=loc_kit_explanations,
+                loc_kit_explanations=getattr(self, "loc_kit_explanations", None),
             )
 
         if (
@@ -4504,6 +4503,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
         from_link: bool = False,
         change: int | None = None,
         preserve_pending_units: bool = False,
+        loc_kit_explanations: dict[str, str] | None = None,
     ) -> bool:
         """Load translations from VCS."""
         if settings.CELERY_TASK_ALWAYS_EAGER:
@@ -4520,6 +4520,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
                 from_link=from_link,
                 change=change,
                 preserve_pending_units=preserve_pending_units,
+                loc_kit_explanations=loc_kit_explanations,
             )
 
         # When already in a Celery repository task, scan inline so the same
@@ -4536,6 +4537,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
                     from_link=from_link,
                     change=change,
                     preserve_pending_units=preserve_pending_units,
+                    loc_kit_explanations=loc_kit_explanations,
                 )
             except WeblateLockTimeoutError:
                 self.log_info("scheduling update in background after lock timeout")
@@ -4556,6 +4558,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
             from_link=from_link,
             change=change,
             preserve_pending_units=preserve_pending_units,
+            loc_kit_explanations=loc_kit_explanations,
             user_id=load_user.id if load_user is not None else None,
         )
         return False
@@ -4572,6 +4575,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
         from_link: bool = False,
         change: int | None = None,
         preserve_pending_units: bool = False,
+        loc_kit_explanations: dict[str, str] | None = None,
     ) -> bool:
         """
         Load translations from VCS synchronously.
@@ -4594,6 +4598,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
                 from_link=from_link,
                 change=change,
                 preserve_pending_units=preserve_pending_units,
+                loc_kit_explanations=loc_kit_explanations,
             )
 
     def check_template_valid(self) -> None:
@@ -4628,6 +4633,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
         from_link: bool = False,
         change: int | None = None,
         preserve_pending_units: bool = False,
+        loc_kit_explanations: dict[str, str] | None = None,
     ) -> bool:
         """Load translations from VCS."""
         # ruff: ignore[import-outside-top-level]
@@ -4849,6 +4855,11 @@ class Component(  # ruff: ignore[too-many-public-methods]
             Component.objects.filter(pk=self.pk).update(
                 processed_revision=current_revision
             )
+
+        if loc_kit_explanations and was_change and user:
+            # The deferred perform_load path carries the wizard's staged
+            # explanations here: apply them only once translations exist.
+            self.apply_loc_kit_explanations(loc_kit_explanations, user=user)
 
         if self.enforced_checks:
             update_enforced_checks.delay_on_commit(component=self.pk)
@@ -5732,7 +5743,9 @@ class Component(  # ruff: ignore[too-many-public-methods]
                     flags.remove("exact")
                 unit.update_extra_flags(flags.format(), user)
 
-    def apply_loc_kit_explanations(self, explanations: dict[str, str]) -> None:
+    def apply_loc_kit_explanations(
+        self, explanations: dict[str, str], *, user: User | None = None
+    ) -> None:
         """
         Apply a loc-kit's parsed key -> explanation cells to fresh source units.
 
@@ -5767,7 +5780,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
             return
         try:
             apply_kit_explanations(
-                user=self.acting_user,
+                user=user or self.acting_user,
                 component=self,
                 units=units,
                 overwrite=False,
@@ -5823,14 +5836,16 @@ class Component(  # ruff: ignore[too-many-public-methods]
             was_change = False
         elif changed_setup and repository_update_succeeded:
             was_change = self.create_translations(
-                force=True, changed_template=changed_template
+                force=True,
+                changed_template=changed_template,
+                loc_kit_explanations=loc_kit_explanations,
             )
         elif changed_git and repository_update_succeeded:
-            was_change = self.create_translations()
+            was_change = self.create_translations(
+                loc_kit_explanations=loc_kit_explanations
+            )
         if loc_kit_exact and repository_update_succeeded and self.acting_user:
             self.normalize_loc_kit_exact_flags(self.acting_user)
-        if loc_kit_explanations and was_change and self.acting_user:
-            self.apply_loc_kit_explanations(loc_kit_explanations)
 
         # Update variants (create_translation does this on change)
         if changed_variant and not was_change:

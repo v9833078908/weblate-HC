@@ -66,6 +66,12 @@
             <th scope="row">{% translate "Key not found in this component" %}</th>
             <td>{{ explanation_preview.missing_key_count }}</td>
           </tr>
+          {% if judge_stale_count %}
+            <tr>
+              <th scope="row">{% translate "Strings with a current judge verdict that will need re-judging" %}</th>
+              <td>{{ judge_stale_count }}</td>
+            </tr>
+          {% endif %}
         </tbody>
       </table>
 

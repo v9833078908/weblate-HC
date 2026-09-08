@@ -154,6 +154,7 @@ def perform_load(
     from_link: bool = False,
     change: int | None = None,
     preserve_pending_units: bool = False,
+    loc_kit_explanations: dict[str, str] | None = None,
     user_id: int | None = None,
 ) -> None:
     request: AuthenticatedHttpRequest | None = None
@@ -175,6 +176,7 @@ def perform_load(
         from_link=from_link,
         change=change,
         preserve_pending_units=preserve_pending_units,
+        loc_kit_explanations=loc_kit_explanations,
         request=request,
         user=user,
     )
