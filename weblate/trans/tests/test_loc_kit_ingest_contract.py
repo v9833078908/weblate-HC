@@ -3160,6 +3160,39 @@ class LocKitStringsUpdateServiceTest(ViewTestCase):
                 overwrite_explanations=False,
             )
 
+    def test_new_key_add_is_locked_and_serialized(self) -> None:
+        """
+        ``append_translation_strings`` runs under ``component.locked_for_update``.
+
+        A lock timeout - the same signal a genuinely concurrent confirm of the
+        same or an overlapping draft would raise - must abort before any unit
+        is written, exactly like the sibling ``apply_kit_explanations`` path.
+        Before this lock was added, a lock timeout here was silently ignored
+        and the new key was still written.
+        """
+        new_row = self._row(key="new_key", values={"en": "Hi"})
+
+        with (
+            patch.object(
+                Component,
+                "locked_for_update",
+                side_effect=WeblateLockTimeoutError("locked", lock=None),
+            ),
+            self.assertRaises(WeblateLockTimeoutError),
+        ):
+            loc_kit.apply_loc_kit_string_update(
+                user=self.user,
+                component=self.component,
+                units=(new_row,),
+                overwrite_explanations=False,
+            )
+
+        self.assertFalse(
+            self.component.source_translation.unit_set.filter(
+                context="new_key"
+            ).exists()
+        )
+
 
 class LocKitStringsUpdateViewTest(ViewTestCase):
     """The start -> preview -> confirm HTTP flow for an existing component."""
@@ -3267,3 +3300,28 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
             {"table": self._upload("key,en\na,A\n")},
         )
         self.assertEqual(response.status_code, 404)
+
+    def test_confirm_lock_timeout_keeps_draft_and_says_retry(self) -> None:
+        kit = "key,en\nnew_key,Hello\n"
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update", kwargs={"path": self.component.get_url_path()}
+            ),
+            {"table": self._upload(kit)},
+        )
+        preview_url = start["Location"]
+
+        with patch.object(
+            Component,
+            "locked_for_update",
+            side_effect=WeblateLockTimeoutError("locked", lock=None),
+        ):
+            response = self.client.post(preview_url, {"action": "confirm"}, follow=True)
+
+        self.assertContains(response, "retry")
+        self.assertTrue(LocKitImportDraft.objects.exists())
+        self.assertFalse(
+            self.component.source_translation.unit_set.filter(
+                context="new_key"
+            ).exists()
+        )

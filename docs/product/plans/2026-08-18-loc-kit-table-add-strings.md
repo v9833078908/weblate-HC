@@ -23,6 +23,11 @@ protocol»); остальные критерии («Проверка», стро
 `docs/product/plans/2026-08-28-kit-explanation-on-string-import.md`.
 Ревью исходного Explanation-плана:
 `docs/product/reviews/2026-09-08-kit-explanation-plan-review.md`.
+Пост-мерж ревью нашло и закрыло реальный дефект: `append_translation_strings`
+не брала `component.locked_for_update()`, в отличие от соседних
+`apply_kit_explanations`/`append_glossary_terms`, из-за чего двойной или
+конкурентный confirm одного драфта не был идемпотентен - см. второй
+Follow-up в том же файле ревью.
 
 ## Цель
 

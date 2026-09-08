@@ -1037,76 +1037,89 @@ def append_translation_strings(
     component is created only when at least one new row needs it and the
     caller holds ``translation.add``; otherwise it is reported unavailable
     and every other language still receives its rows.
+
+    Runs under ``component.locked_for_update()``, exactly like
+    ``apply_kit_explanations`` and ``append_glossary_terms``: two concurrent
+    calls for the same component - most notably a double-submitted confirm
+    of the same draft - serialize on the component lock, and the second one
+    re-derives ``existing_keys`` from the freshly locked component, so it
+    sees the first call's additions as already-existing keys instead of
+    adding them again.
     """
     _check_string_update_eligibility(component)
-    existing_keys = existing_string_keys(component)
-    new_units = [unit for unit in units if unit.key not in existing_keys]
-    existing_count = len(units) - len(new_units)
-    if not new_units:
-        return StringsAppendResult(existing=existing_count)
+    with transaction.atomic(), component.locked_for_update() as locked_component:
+        _check_string_update_eligibility(locked_component)
+        existing_keys = existing_string_keys(locked_component)
+        new_units = [unit for unit in units if unit.key not in existing_keys]
+        existing_count = len(units) - len(new_units)
+        if not new_units:
+            return StringsAppendResult(existing=existing_count)
 
-    source_lang = component.source_language.code
-    requested_codes = {
-        code
-        for unit in new_units
-        for code, value in unit.values.items()
-        if value.strip()
-    } - {source_lang}
-    translations_by_code = {
-        translation.language.code: translation
-        for translation in component.translation_set.select_related("language")
-        if translation.language_id != component.source_language_id
-    }
+        source_lang = locked_component.source_language.code
+        requested_codes = {
+            code
+            for unit in new_units
+            for code, value in unit.values.items()
+            if value.strip()
+        } - {source_lang}
+        translations_by_code = {
+            translation.language.code: translation
+            for translation in locked_component.translation_set.select_related(
+                "language"
+            )
+            if translation.language_id != locked_component.source_language_id
+        }
 
-    created_languages: list[str] = []
-    unavailable_languages: list[str] = []
-    for code in sorted(requested_codes - set(translations_by_code)):
-        translation = _resolve_append_language(
-            user=user, component=component, code=code
-        )
-        if translation is None:
-            unavailable_languages.append(code)
-        else:
-            translations_by_code[code] = translation
-            created_languages.append(code)
-
-    language_added: dict[str, int] = {}
-    for unit in new_units:
-        source_unit = component.source_translation.add_unit(
-            None,
-            unit.key,
-            unit.values.get(source_lang, ""),
-            [],
-            is_batch_update=True,
-            author=user,
-        )
-        if source_unit is None:
-            continue
-        for code, value in unit.values.items():
-            if code == source_lang or not value.strip():
-                continue
-            translation = translations_by_code.get(code)
+        created_languages: list[str] = []
+        unavailable_languages: list[str] = []
+        for code in sorted(requested_codes - set(translations_by_code)):
+            translation = _resolve_append_language(
+                user=user, component=locked_component, code=code
+            )
             if translation is None:
+                unavailable_languages.append(code)
+            else:
+                translations_by_code[code] = translation
+                created_languages.append(code)
+
+        language_added: dict[str, int] = {}
+        for unit in new_units:
+            source_unit = locked_component.source_translation.add_unit(
+                None,
+                unit.key,
+                unit.values.get(source_lang, ""),
+                [],
+                is_batch_update=True,
+                author=user,
+            )
+            if source_unit is None:
                 continue
-            target_unit = translation.unit_set.filter(context=unit.key).first()
-            if target_unit is None:
-                continue
-            target_unit.target = value
-            target_unit.state = STATE_TRANSLATED
-            target_unit.save(update_fields=["target", "state"], same_content=True)
-            language_added[code] = language_added.get(code, 0) + 1
-        # Flags land on the source unit only after every target is written:
-        # a read-only flag would otherwise block the target writes above.
-        if unit.flags.strip():
-            flags = Flags(unit.flags)
-            source_unit.update_extra_flags(flags.format(), user)
-    return StringsAppendResult(
-        added=len(new_units),
-        existing=existing_count,
-        language_added=language_added,
-        created_languages=tuple(created_languages),
-        unavailable_languages=tuple(unavailable_languages),
-    )
+            for code, value in unit.values.items():
+                if code == source_lang or not value.strip():
+                    continue
+                translation = translations_by_code.get(code)
+                if translation is None:
+                    continue
+                target_unit = translation.unit_set.filter(context=unit.key).first()
+                if target_unit is None:
+                    continue
+                target_unit.target = value
+                target_unit.state = STATE_TRANSLATED
+                target_unit.save(update_fields=["target", "state"], same_content=True)
+                language_added[code] = language_added.get(code, 0) + 1
+            # Flags land on the source unit only after every target is
+            # written: a read-only flag would otherwise block the target
+            # writes above.
+            if unit.flags.strip():
+                flags = Flags(unit.flags)
+                source_unit.update_extra_flags(flags.format(), user)
+        return StringsAppendResult(
+            added=len(new_units),
+            existing=existing_count,
+            language_added=language_added,
+            created_languages=tuple(created_languages),
+            unavailable_languages=tuple(unavailable_languages),
+        )
 
 
 @dataclass(frozen=True)

@@ -24,6 +24,9 @@ smoke-test и деплой не выполнены - требуют отдель
 Ревью: `docs/product/reviews/2026-09-08-kit-explanation-plan-review.md`.
 Связанный план существующего компонента:
 `docs/product/plans/2026-08-18-loc-kit-table-add-strings.md`.
+Пост-мерж ревью нашло и закрыло реальный дефект в задаче 4:
+`append_translation_strings` не брала `component.locked_for_update()` -
+см. второй Follow-up в том же файле ревью.
 
 ## Цель
 

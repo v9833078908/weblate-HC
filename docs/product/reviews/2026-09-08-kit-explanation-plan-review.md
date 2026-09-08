@@ -23,6 +23,40 @@
 `docs/product/plans/2026-08-18-loc-kit-table-add-strings.md`. Реализация не
 начата; оба плана сохраняют отдельный approval gate для кода и deployment.
 
+**Follow-up 2026-09-08 (после реализации):** код реализован и слит
+(`ca52f818a783eef6e27bef6035c146ddc2220ca2`, 118/118 тестов
+`test_loc_kit_ingest_contract.py` зелёные). Повторное ревью шипнутого кода
+нашло одно реальное расхождение с уже принятым в этом же файле паттерном:
+`append_translation_strings` (`weblate/trans/loc_kit.py`) писала новые
+юниты без `component.locked_for_update()`, в отличие от соседних
+`apply_kit_explanations` и `append_glossary_terms`, которые оба берут этот
+лок. Задача 2 связанного плана прямо требовала «внутри уже взятого
+component lock», но реализация его не взяла. Наблюдаемое следствие:
+`LocKitStringsPreviewView.post` читает `draft.state` без
+`select_for_update`, и до фикса при `WeblateLockTimeoutError` на шаге
+Explanation (взят соседним, уже локающим вызовом) строки из шага
+string-добавления уже были записаны в БД - то есть повторный/двойной
+confirm одного драфта или гонка с конкурентной мутацией того же
+компонента не были идемпотентны, вопреки заявленному в задаче 2 и в
+докстринге `apply_loc_kit_string_update` («each mutation keeps its own
+atomic transaction and locking»). Исправлено в той же сессии: вся функция
+теперь выполняется под `transaction.atomic()` +
+`component.locked_for_update()`, `existing_keys`/языки пере-читаются из
+свежего `locked_component`, так что конкурентный вызов видит уже
+добавленные ключи как `existing`, а не добавляет их повторно - тот же
+инвариант, что уже даёт `apply_kit_explanations`. Регресс подтверждён
+двумя тестами (`LocKitStringsUpdateServiceTest::test_new_key_add_is_locked_and_serialized`,
+`LocKitStringsUpdateViewTest::test_confirm_lock_timeout_keeps_draft_and_says_retry`):
+оба падают на предыдущей версии `loc_kit.py` (новый юнит успевал
+записаться до того, как соседний Explanation-шаг поднимал
+`WeblateLockTimeoutError`) и проходят после фикса. `ruff check`/`ruff
+format`/`mypy`, точечно по изменённым файлам, не показывают новых
+находок. Черновик (`LocKitImportDraft`) сам по себе по-прежнему не берёт
+`select_for_update` при чтении `state` во view - это осталось безопасным
+только потому, что сам сервис теперь идемпотентен под локом компонента, а
+не потому, что гонка на уровне драфта исключена; отдельная защита на
+уровне драфта не нужна, пока это единственный побочный эффект.
+
 ## Что проверено и подтверждается
 
 | Утверждение плана | Результат |
