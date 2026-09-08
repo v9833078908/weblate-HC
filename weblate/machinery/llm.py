@@ -1068,10 +1068,12 @@ class BaseLLMTranslation(BatchMachineTranslation):
             else:
                 result["context"] = context
 
-        if explanation := self._get_explanation_context(unit):
+        explanation = self._get_explanation_context(unit)
+        if explanation:
             result["explanation"] = explanation
 
-        if note := self._get_note_context(unit):
+        note = self._get_note_context(unit)
+        if note and note != explanation:
             result["note"] = note
 
         if secondary := self._get_secondary_context(

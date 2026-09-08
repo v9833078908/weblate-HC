@@ -1,7 +1,24 @@
 # План: обновить строковый компонент из loc-kit таблицы
 
 Дата: 2026-08-18. Переработан: 2026-09-08.
-Статус: редакция плана согласована; реализация не согласована и не начата.
+Статус: **реализован и проверен 2026-09-08** как задача 4 связанного плана
+`2026-08-28-kit-explanation-on-string-import.md` (`loc-kit-strings-update`:
+start/preview/confirm, `append_translation_strings` + общий
+`apply_kit_explanations`). Осознанное отступление: confirm синхронный,
+в одном HTTP-запросе, без Celery-протокола `APPLYING`/`FAILED`/
+`apply_task_id`, `reservation` и retry-семантики, описанных ниже в этом
+плане (раздел «Проверка») - вместо этого он повторяет уже принятый паттерн
+`append_glossary_terms`/`LocKitGlossaryPreviewView._apply_update`.
+Соответственно, критерии проверки этого плана про fast-worker visibility,
+retryable/terminal failure, duplicate task delivery и coordinator как
+Celery-задачу - неприменимы и не проверялись; для очень большого кита это
+означает пропорционально много `Change` в одной транзакции без прогресса
+или лимита. Компромисс задокументирован в
+`docs/product/guides/loc-kit-ingest.md` (раздел «Right size, not right
+protocol»); остальные критерии («Проверка», строки 262-296 этого файла, за
+вычетом Celery-специфичных) покрыты
+`weblate/trans/tests/test_loc_kit_ingest_contract.py::LocKitStringsUpdateServiceTest`
+и `::LocKitStringsUpdateViewTest`.
 Связанный план общего Explanation-контракта и мастера создания:
 `docs/product/plans/2026-08-28-kit-explanation-on-string-import.md`.
 Ревью исходного Explanation-плана:

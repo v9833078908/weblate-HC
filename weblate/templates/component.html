@@ -8,6 +8,7 @@
   {% perm 'translation.add' object as user_can_add_translation %}
   {% perm 'component.edit' object as user_can_edit_component %}
   {% perm 'upload.perform' object as user_can_upload_translation %}
+  {% perm 'source.edit' object.source_translation as user_can_edit_source_string %}
 
   <ul class="nav nav-pills">
     <li class="nav-item">
@@ -115,6 +116,14 @@
             <li>
               <a class="dropdown-item"
                  href="{% url 'loc-kit-glossary-update' path=object.get_url_path %}">{% translate "Add new glossary terms from a loc-kit table" %}</a>
+            </li>
+          {% endif %}
+        {% endif %}
+        {% if not object.is_glossary and not object.locked and object.has_template %}
+          {% if user_can_upload_translation or user_can_edit_source_string %}
+            <li>
+              <a class="dropdown-item"
+                 href="{% url 'loc-kit-strings-update' path=object.get_url_path %}">{% translate "Update from a loc-kit table" %}</a>
             </li>
           {% endif %}
         {% endif %}

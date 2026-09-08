@@ -264,10 +264,10 @@ def test_v1_rejects_the_v2_record_map_grammar():
         parse_profile(document)
 
 
-def test_unsupported_schema_version_fails():
+def test_v3_rejects_tbx_record_map():
     document = _one_row_document()
     document["schema_version"] = 3
-    with pytest.raises(ProfileError, match="profile.schema_version"):
+    with pytest.raises(ProfileError, match="profile.schema_kind"):
         parse_profile(document)
 
 

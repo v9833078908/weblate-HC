@@ -25,7 +25,11 @@ from typing import Any
 from translate.lang import data as lang_data
 
 from loc_kit_ingest.langcode import language_code
-from loc_kit_ingest.profile import SCHEMA_VERSION, SCHEMA_VERSION_RECORD_MAP
+from loc_kit_ingest.profile import (
+    SCHEMA_VERSION,
+    SCHEMA_VERSION_PO_METADATA,
+    SCHEMA_VERSION_RECORD_MAP,
+)
 
 # Language columns filled below this share of content rows are stray spillover,
 # not a translation: real languages in a kit cluster near 100% while accidental
@@ -82,6 +86,10 @@ _NOTE_HEADERS = frozenset(
 
 _IGNORABLE_HEADERS = frozenset({"id"})
 _SOURCE_FLAGS_HEADER = "flags"
+_EXPLANATION_HEADERS = frozenset(
+    {"explanation", "explanations", "пояснение", "пояснения"}
+)
+_FLAGS_HEADERS = frozenset({"flags", "weblate-flags", "флаги"})
 
 # Term/description detection. A glossary term is a name, a description is
 # prose: the gap is an order of magnitude in practice. Both bounds must hold,
@@ -193,6 +201,37 @@ def _banner_note(banner_rows: list[int]) -> str:
         f"{len(banner_rows)} row(s) hold no text in any language column and are "
         f"skipped as section banners: row(s) {shown}"
     )
+
+
+def _find_scalar_metadata_column(
+    header_row: list[str],
+    populated: set[int],
+    languages: dict[int, str],
+    headers: frozenset[str],
+    label: str,
+    notes: list[str],
+) -> int | None:
+    """Return the sole populated column declared for scalar PO metadata."""
+    recognised = [
+        col
+        for col in range(len(header_row))
+        if col not in languages and _cell(header_row, col).strip().casefold() in headers
+    ]
+    populated_columns = [col for col in recognised if col in populated]
+    notes.extend(
+        f"column {col + 1} ({_cell(header_row, col)!r}) is empty; excluded"
+        for col in recognised
+        if col not in populated
+    )
+    if len(populated_columns) > 1:
+        shown = ", ".join(str(col + 1) for col in populated_columns)
+        msg = f"columns {shown} all declare {label} metadata"
+        raise InferenceError(msg)
+    if not populated_columns:
+        return None
+    col = populated_columns[0]
+    notes.append(f"column {col + 1} ({_cell(header_row, col)!r}) -> {label}")
+    return col
 
 
 def _sanitize_component(name: str) -> str:
@@ -349,6 +388,22 @@ def infer_component(
         for col, value in enumerate(row):
             if value.strip():
                 populated.add(col)
+    explanation_col = _find_scalar_metadata_column(
+        header_row,
+        populated,
+        languages,
+        _EXPLANATION_HEADERS,
+        "explanation metadata",
+        notes,
+    )
+    flags_col = _find_scalar_metadata_column(
+        header_row,
+        populated,
+        languages,
+        _FLAGS_HEADERS,
+        "flags metadata",
+        notes,
+    )
     headed = {col for col in range(len(header_row)) if _cell(header_row, col).strip()}
     for col in sorted(populated | headed):
         if col <= _KEY_COLUMN:
@@ -356,6 +411,8 @@ def infer_component(
         # A column rejected as a language must not resurface as a comment: its
         # content is stray spillover and belongs in the report, not in the PO.
         if col in languages or (col in candidates and col not in demoted):
+            continue
+        if col in {explanation_col, flags_col}:
             continue
         values = column_values(col)
         if not any(v.strip() for v in values):
@@ -425,6 +482,18 @@ def infer_component(
             "allow_blank_rows": any(_is_blank_row(row) for row in data_rows),
         },
     }
+    if explanation_col is not None:
+        document["explanation"] = {
+            "column": explanation_col + 1,
+            "name": _cell(header_row, explanation_col),
+            "header": _cell(header_row, explanation_col),
+        }
+    if flags_col is not None:
+        document["flags"] = {
+            "column": flags_col + 1,
+            "name": _cell(header_row, flags_col),
+            "header": _cell(header_row, flags_col),
+        }
     return document, notes
 
 
@@ -461,7 +530,15 @@ def infer_profile(
         components.append(document)
         notes.extend(f"{name}: {note}" for note in sheet_notes)
 
-    return {"schema_version": SCHEMA_VERSION, "components": components}, notes
+    schema_version = (
+        SCHEMA_VERSION_PO_METADATA
+        if any(
+            "explanation" in component or "flags" in component
+            for component in components
+        )
+        else SCHEMA_VERSION
+    )
+    return {"schema_version": schema_version, "components": components}, notes
 
 
 def _classify_block(

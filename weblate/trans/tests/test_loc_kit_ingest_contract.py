@@ -30,7 +30,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError
@@ -55,6 +55,7 @@ from weblate.trans.loc_kit import PREVIEW_WARNING_LIMIT
 from weblate.trans.models import Category, Component, Project, Translation
 from weblate.trans.models.loc_kit import LOC_KIT_DRAFT_STORAGE, LocKitImportDraft
 from weblate.trans.tests.test_views import ViewTestCase
+from weblate.trans.tests.utils import create_another_user
 from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.state import STATE_APPROVED, STATE_EMPTY, STATE_TRANSLATED
 from weblate.utils.tests import http_mock
@@ -610,6 +611,65 @@ class LocKitUniversalUploadContractTest(ViewTestCase):
         )
         self.assertEqual(ja_unit.source, "")
         self.assertEqual(ja_unit.target, "ベータ限定")
+
+    def test_create_view_applies_kit_explanations_to_source_units(self) -> None:
+        self.user.is_superuser = True
+        self.user.save()
+        kit = (
+            "id,ru,en,Comment,Explanation\n"
+            "line_1,Привет,Hello,Shown on load,Casual greeting\n"
+            "line_2,Пока,Bye,,Farewell line\n"
+        )
+
+        with modify_settings(INSTALLED_APPS={"remove": "weblate.billing"}):
+            response = self.client.post(
+                reverse("create-component-zip"),
+                {
+                    "zipfile": self._upload("Space Kit - Explained.csv", kit),
+                    "name": "Explained",
+                    "slug": "explained",
+                    "project": self.project.pk,
+                    "source_language": self.component.source_language.pk,
+                },
+            )
+            self.assertContains(response, "will set 2 strings")
+
+            form = response.context["form"]
+            params = {field: form[field].value() or "" for field in form.fields}
+            params.pop("inherit_new_lang", None)
+            params["new_lang"] = "none"
+            self.client.post(reverse("create-component-zip"), params, follow=True)
+
+        component = Component.objects.get(slug="explained")
+        line1 = component.source_translation.unit_set.get(context="line_1")
+        line2 = component.source_translation.unit_set.get(context="line_2")
+        self.assertEqual(line1.explanation, "Casual greeting")
+        self.assertEqual(line1.note, "Shown on load")
+        self.assertEqual(line2.explanation, "Farewell line")
+        po_bytes = Path(component.full_path, "ru.po").read_bytes()
+        self.assertNotIn(b"Casual greeting", po_bytes)
+        self.assertNotIn(b"Farewell line", po_bytes)
+
+    def test_create_view_without_explanation_column_needs_no_session_state(
+        self,
+    ) -> None:
+        """A kit with no Explanation column never touches the pending session key."""
+        self.user.is_superuser = True
+        self.user.save()
+
+        with modify_settings(INSTALLED_APPS={"remove": "weblate.billing"}):
+            self.client.post(
+                reverse("create-component-zip"),
+                {
+                    "zipfile": self._upload("Space Kit - Dialogs.csv", self.KIT_CSV),
+                    "name": "Dialogs",
+                    "slug": "dialogs",
+                    "project": self.project.pk,
+                    "source_language": self.component.source_language.pk,
+                },
+            )
+
+        self.assertNotIn("loc_kit_pending_explanations", self.client.session)
 
 
 # --------------------------------------------------------------------------- #
@@ -2621,3 +2681,589 @@ class LocKitGlossaryAppendTerminologySyncTest(ViewTestCase):
         self.assertEqual(ja_unit.target, "Mahou")
         self.assertEqual(ja_unit.explanation, "Spellcaster.")
         self.assertEqual(ja_unit.source_unit.explanation, "Casts spells.")
+
+
+# --------------------------------------------------------------------------- #
+# DB-only Explanation import for ordinary string components
+# --------------------------------------------------------------------------- #
+
+
+class KitExplanationApplyServiceTest(ViewTestCase):
+    """String-kit explanation import changes only the source explanation."""
+
+    CREATE_GLOSSARIES: bool = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        self.component.source_translation.add_unit(
+            None,
+            "greeting",
+            "Привет",
+            author=self.user,
+        )
+
+    def test_matching_key_sets_source_explanation_without_rewriting_content(
+        self,
+    ) -> None:
+        source_unit = self.component.source_translation.unit_set.get(context="greeting")
+        source_unit.extra_flags = "read-only"
+        source_unit.save(update_fields=["extra_flags"], same_content=True)
+        source_unit.refresh_from_db()
+        prior_state = source_unit.state
+        prior_flags = source_unit.extra_flags
+
+        result = loc_kit.apply_kit_explanations(
+            user=self.user,
+            component=self.component,
+            units=(
+                StringUnit(
+                    key="greeting",
+                    values={"en": "Hello"},
+                    comments=(),
+                    references=(),
+                    row=2,
+                    explanation="A friendly opening.",
+                ),
+            ),
+            overwrite=False,
+        )
+
+        source_unit.refresh_from_db()
+        self.assertEqual(result.set_count, 1)
+        self.assertEqual(result.missing_key_count, 0)
+        self.assertEqual(source_unit.explanation, "A friendly opening.")
+        self.assertEqual(source_unit.source, "Привет")
+        self.assertEqual(source_unit.state, prior_state)
+        self.assertEqual(source_unit.extra_flags, prior_flags)
+
+    def test_rerun_with_same_value_is_unchanged_and_creates_no_change(self) -> None:
+        source_unit = self.component.source_translation.unit_set.get(context="greeting")
+        unit = StringUnit(
+            key="greeting",
+            values={"en": "Hello"},
+            comments=(),
+            references=(),
+            row=2,
+            explanation="A friendly opening.",
+        )
+        loc_kit.apply_kit_explanations(
+            user=self.user, component=self.component, units=(unit,), overwrite=False
+        )
+        change_count_after_first = source_unit.change_set.count()
+
+        result = loc_kit.apply_kit_explanations(
+            user=self.user, component=self.component, units=(unit,), overwrite=False
+        )
+
+        self.assertEqual(result.unchanged_count, 1)
+        self.assertEqual(result.set_count, 0)
+        self.assertEqual(source_unit.change_set.count(), change_count_after_first)
+
+    def test_blank_and_missing_key_are_classified_separately(self) -> None:
+        result = loc_kit.apply_kit_explanations(
+            user=self.user,
+            component=self.component,
+            units=(
+                StringUnit(
+                    key="greeting",
+                    values={},
+                    comments=(),
+                    references=(),
+                    row=2,
+                    explanation="   ",
+                ),
+                StringUnit(
+                    key="no_such_key",
+                    values={},
+                    comments=(),
+                    references=(),
+                    row=3,
+                    explanation="Orphan explanation.",
+                ),
+            ),
+            overwrite=False,
+        )
+
+        self.assertEqual(result.blank_count, 1)
+        self.assertEqual(result.missing_key_count, 1)
+        self.assertEqual(result.set_count, 0)
+
+    def test_nonempty_existing_value_needs_explicit_overwrite(self) -> None:
+        source_unit = self.component.source_translation.unit_set.get(context="greeting")
+        source_unit.update_explanation("Original meaning.", self.user)
+        unit = StringUnit(
+            key="greeting",
+            values={},
+            comments=(),
+            references=(),
+            row=2,
+            explanation="Replacement meaning.",
+        )
+
+        skipped = loc_kit.apply_kit_explanations(
+            user=self.user, component=self.component, units=(unit,), overwrite=False
+        )
+        source_unit.refresh_from_db()
+        self.assertEqual(skipped.would_overwrite_count, 1)
+        self.assertEqual(source_unit.explanation, "Original meaning.")
+
+        applied = loc_kit.apply_kit_explanations(
+            user=self.user, component=self.component, units=(unit,), overwrite=True
+        )
+        source_unit.refresh_from_db()
+        self.assertEqual(applied.set_count, 1)
+        self.assertEqual(source_unit.explanation, "Replacement meaning.")
+
+    def test_note_equal_to_explanation_is_still_set_and_flagged(self) -> None:
+        source_unit = self.component.source_translation.unit_set.get(context="greeting")
+        source_unit.note = "Shared context."
+        source_unit.save(update_fields=["note"], same_content=True)
+        unit = StringUnit(
+            key="greeting",
+            values={},
+            comments=(),
+            references=(),
+            row=2,
+            explanation="Shared context.",
+        )
+
+        result = loc_kit.apply_kit_explanations(
+            user=self.user, component=self.component, units=(unit,), overwrite=False
+        )
+
+        source_unit.refresh_from_db()
+        self.assertEqual(result.already_in_note_count, 1)
+        self.assertEqual(result.set_count, 1)
+        self.assertEqual(source_unit.explanation, "Shared context.")
+
+    def test_actor_without_source_edit_is_denied_and_mutates_nothing(self) -> None:
+        source_unit = self.component.source_translation.unit_set.get(context="greeting")
+        unit = StringUnit(
+            key="greeting",
+            values={},
+            comments=(),
+            references=(),
+            row=2,
+            explanation="Should never land.",
+        )
+
+        with self.assertRaises(PermissionDenied):
+            loc_kit.apply_kit_explanations(
+                user=self.anotheruser,
+                component=self.component,
+                units=(unit,),
+                overwrite=False,
+            )
+
+        source_unit.refresh_from_db()
+        self.assertEqual(source_unit.explanation, "")
+
+    def test_glossary_component_is_rejected(self) -> None:
+        glossary = self.project.glossaries[0]
+        unit = StringUnit(
+            key="greeting",
+            values={},
+            comments=(),
+            references=(),
+            row=2,
+            explanation="Never applies.",
+        )
+
+        with self.assertRaises(ValidationError):
+            loc_kit.apply_kit_explanations(
+                user=self.user, component=glossary, units=(unit,), overwrite=False
+            )
+
+    def test_locked_component_is_rejected(self) -> None:
+        self.component.locked = True
+        self.component.save(update_fields=["locked"])
+        unit = StringUnit(
+            key="greeting",
+            values={},
+            comments=(),
+            references=(),
+            row=2,
+            explanation="Never applies.",
+        )
+
+        with self.assertRaises(ValidationError):
+            loc_kit.apply_kit_explanations(
+                user=self.user, component=self.component, units=(unit,), overwrite=False
+            )
+
+    def test_classify_preview_matches_apply_without_mutating(self) -> None:
+        source_unit = self.component.source_translation.unit_set.get(context="greeting")
+        unit = StringUnit(
+            key="greeting",
+            values={},
+            comments=(),
+            references=(),
+            row=2,
+            explanation="Previewed only.",
+        )
+
+        preview = loc_kit.classify_kit_explanations(
+            component=self.component, units=(unit,), overwrite=False
+        )
+
+        source_unit.refresh_from_db()
+        self.assertEqual(preview.set_count, 1)
+        self.assertEqual(source_unit.explanation, "")
+
+        applied = loc_kit.apply_kit_explanations(
+            user=self.user, component=self.component, units=(unit,), overwrite=False
+        )
+        self.assertEqual(applied.set_count, preview.set_count)
+
+
+# --------------------------------------------------------------------------- #
+# Updating an existing string component from a loc-kit table
+# --------------------------------------------------------------------------- #
+
+
+class LocKitStringsUpdateServiceTest(ViewTestCase):
+    """apply_loc_kit_string_update adds new keys and sets Explanations."""
+
+    CREATE_GLOSSARIES: bool = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        self.component = self.create_json_mono(project=self.project, name="Strings")
+        self.component.new_lang = "add"
+        self.component.edit_template = True
+        self.component.save(update_fields=["new_lang", "edit_template"])
+        self.existing_unit = self.component.source_translation.add_unit(
+            None, "welcome_message", "Welcome!", author=self.user
+        )
+
+    def _row(self, **overrides) -> StringUnit:
+        base = {
+            "key": "welcome_message",
+            "values": {},
+            "comments": (),
+            "references": (),
+            "row": 2,
+            "explanation": "",
+            "flags": "",
+        }
+        base.update(overrides)
+        return StringUnit(**base)
+
+    def test_new_key_added_to_existing_and_newly_created_language(self) -> None:
+        new_row = self._row(
+            key="new_key",
+            values={"en": "Hello", "cs": "Ahoj", "de": "Hallo"},
+        )
+
+        result = loc_kit.apply_loc_kit_string_update(
+            user=self.user,
+            component=self.component,
+            units=(new_row,),
+            overwrite_explanations=False,
+        )
+
+        self.assertEqual(result.strings.added, 1)
+        self.assertIn("de", result.strings.created_languages)
+        cs_unit = self.component.translation_set.get(language__code="cs").unit_set.get(
+            context="new_key"
+        )
+        de_unit = self.component.translation_set.get(language__code="de").unit_set.get(
+            context="new_key"
+        )
+        self.assertEqual(cs_unit.target, "Ahoj")
+        self.assertEqual(de_unit.target, "Hallo")
+
+    def test_existing_key_source_target_and_flags_never_change(self) -> None:
+        self.existing_unit.extra_flags = "max-length:10"
+        self.existing_unit.save(update_fields=["extra_flags"], same_content=True)
+        cs_translation = self.component.translation_set.get(language__code="cs")
+        cs_before = cs_translation.unit_set.get(context="welcome_message").target
+
+        table_row = self._row(
+            values={"en": "DIFFERENT TEXT", "cs": "ZMENA"}, flags="read-only"
+        )
+        loc_kit.apply_loc_kit_string_update(
+            user=self.user,
+            component=self.component,
+            units=(table_row,),
+            overwrite_explanations=False,
+        )
+
+        self.existing_unit.refresh_from_db()
+        self.assertEqual(self.existing_unit.source, "Welcome!")
+        self.assertEqual(self.existing_unit.extra_flags, "max-length:10")
+        cs_after = cs_translation.unit_set.get(context="welcome_message").target
+        self.assertEqual(cs_after, cs_before)
+
+    def test_existing_and_new_key_get_explanation(self) -> None:
+        table_rows = (
+            self._row(explanation="Shown at startup."),
+            self._row(key="new_key", values={"en": "Hi"}, explanation="A greeting."),
+        )
+
+        result = loc_kit.apply_loc_kit_string_update(
+            user=self.user,
+            component=self.component,
+            units=table_rows,
+            overwrite_explanations=False,
+        )
+
+        self.existing_unit.refresh_from_db()
+        new_source = self.component.source_translation.unit_set.get(context="new_key")
+        self.assertEqual(self.existing_unit.explanation, "Shown at startup.")
+        self.assertEqual(new_source.explanation, "A greeting.")
+        self.assertEqual(result.explanations.set_count, 2)
+
+    def test_overwrite_requires_explicit_flag_and_rerun_is_idempotent(self) -> None:
+        self.existing_unit.update_explanation("Original.", self.user)
+        table_row = self._row(explanation="Replacement.")
+
+        skipped = loc_kit.apply_loc_kit_string_update(
+            user=self.user,
+            component=self.component,
+            units=(table_row,),
+            overwrite_explanations=False,
+        )
+        self.existing_unit.refresh_from_db()
+        self.assertEqual(skipped.explanations.would_overwrite_count, 1)
+        self.assertEqual(self.existing_unit.explanation, "Original.")
+
+        applied = loc_kit.apply_loc_kit_string_update(
+            user=self.user,
+            component=self.component,
+            units=(table_row,),
+            overwrite_explanations=True,
+        )
+        self.existing_unit.refresh_from_db()
+        self.assertEqual(applied.explanations.set_count, 1)
+        self.assertEqual(self.existing_unit.explanation, "Replacement.")
+
+        rerun = loc_kit.apply_loc_kit_string_update(
+            user=self.user,
+            component=self.component,
+            units=(table_row,),
+            overwrite_explanations=True,
+        )
+        self.assertEqual(rerun.explanations.unchanged_count, 1)
+        self.assertEqual(rerun.explanations.set_count, 0)
+
+    def _grant_only(self, user, codenames: list[str], name: str) -> None:
+        role = Role.objects.create(name=name)
+        role.permissions.add(*Permission.objects.filter(codename__in=codenames))
+        group = Group.objects.create(name=name, language_selection=SELECTION_ALL)
+        group.roles.add(role)
+        group.components.add(self.component)
+        user.groups.add(group)
+        user.clear_permissions_cache()
+
+    def test_without_source_edit_strings_still_add_explanations_unavailable(
+        self,
+    ) -> None:
+        editor = create_another_user(suffix="-add-only")
+        self._grant_only(editor, ["upload.perform", "unit.add"], "Add-only")
+        new_row = self._row(
+            key="new_key", values={"en": "Hi"}, explanation="Should not apply."
+        )
+
+        result = loc_kit.apply_loc_kit_string_update(
+            user=editor,
+            component=self.component,
+            units=(new_row,),
+            overwrite_explanations=False,
+        )
+
+        self.assertEqual(result.strings.added, 1)
+        self.assertEqual(result.explanations.unavailable_count, 1)
+        new_source = self.component.source_translation.unit_set.get(context="new_key")
+        self.assertEqual(new_source.explanation, "")
+
+    def test_without_upload_permission_explanations_still_apply_strings_unavailable(
+        self,
+    ) -> None:
+        editor = create_another_user(suffix="-explain-only")
+        self._grant_only(editor, ["source.edit"], "Explain-only")
+        rows = (
+            self._row(explanation="Existing key note."),
+            self._row(key="new_key", values={"en": "Hi"}),
+        )
+
+        result = loc_kit.apply_loc_kit_string_update(
+            user=editor,
+            component=self.component,
+            units=rows,
+            overwrite_explanations=False,
+        )
+
+        self.assertEqual(result.strings.added, 0)
+        self.assertEqual(result.strings.existing, 1)
+        self.existing_unit.refresh_from_db()
+        self.assertEqual(self.existing_unit.explanation, "Existing key note.")
+        self.assertFalse(
+            self.component.source_translation.unit_set.filter(
+                context="new_key"
+            ).exists()
+        )
+
+    def test_missing_language_without_translation_add_is_unavailable(self) -> None:
+        """
+        A missing language is created only with ``translation.add``.
+
+        This isolates that one branch by denying exactly that permission,
+        leaving the real ``upload.perform`` / ``unit.add`` grant that
+        authorizes the new key itself untouched.
+        """
+        editor = create_another_user(suffix="-no-add-lang")
+        self._grant_only(editor, ["upload.perform", "unit.add"], "No-add-language")
+        new_row = self._row(key="new_key", values={"en": "Hi", "de": "Hallo"})
+        real_has_perm = editor.has_perm
+
+        def deny_translation_add(perm, obj=None):
+            if perm == "translation.add":
+                return False
+            return real_has_perm(perm, obj)
+
+        with patch.object(editor, "has_perm", side_effect=deny_translation_add):
+            result = loc_kit.apply_loc_kit_string_update(
+                user=editor,
+                component=self.component,
+                units=(new_row,),
+                overwrite_explanations=False,
+            )
+
+        self.assertEqual(result.strings.added, 1)
+        self.assertIn("de", result.strings.unavailable_languages)
+        self.assertFalse(
+            self.component.translation_set.filter(language__code="de").exists()
+        )
+
+    def test_glossary_component_is_rejected(self) -> None:
+        glossary = self.project.glossaries[0]
+        with self.assertRaises(ValidationError):
+            loc_kit.apply_loc_kit_string_update(
+                user=self.user,
+                component=glossary,
+                units=(self._row(),),
+                overwrite_explanations=False,
+            )
+
+    def test_bilingual_component_is_rejected(self) -> None:
+        bilingual = self.create_po(project=self.project, name="Bilingual")
+        with self.assertRaises(ValidationError):
+            loc_kit.apply_loc_kit_string_update(
+                user=self.user,
+                component=bilingual,
+                units=(self._row(),),
+                overwrite_explanations=False,
+            )
+
+
+class LocKitStringsUpdateViewTest(ViewTestCase):
+    """The start -> preview -> confirm HTTP flow for an existing component."""
+
+    CREATE_GLOSSARIES: bool = True
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        self.component = self.create_json_mono(project=self.project, name="Strings")
+        self.component.new_lang = "add"
+        self.component.edit_template = True
+        self.component.save(update_fields=["new_lang", "edit_template"])
+        self.component.source_translation.add_unit(
+            None, "welcome_message", "Welcome!", author=self.user
+        )
+
+    def _upload(self, body: str):
+        return SimpleUploadedFile("update.csv", body.encode(), content_type="text/csv")
+
+    def test_full_flow_adds_string_and_sets_explanation(self) -> None:
+        kit = (
+            "key,en,cs,Explanation\n"
+            "welcome_message,Welcome!,Vitejte,Shown at startup.\n"
+            "goodbye_message,Goodbye!,Sbohem,Shown at exit.\n"
+        )
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update", kwargs={"path": self.component.get_url_path()}
+            ),
+            {"table": self._upload(kit)},
+        )
+        self.assertEqual(start.status_code, 302)
+        preview_url = start["Location"]
+
+        preview = self.client.get(preview_url)
+        self.assertContains(preview, "1")  # new_count rendered somewhere on the page
+
+        confirm = self.client.post(preview_url, {"action": "confirm"}, follow=True)
+        self.assertEqual(confirm.status_code, 200)
+
+        source_translation = self.component.source_translation
+        welcome = source_translation.unit_set.get(context="welcome_message")
+        goodbye = source_translation.unit_set.get(context="goodbye_message")
+        self.assertEqual(welcome.explanation, "Shown at startup.")
+        self.assertEqual(goodbye.explanation, "Shown at exit.")
+        cs_goodbye = self.component.translation_set.get(
+            language__code="cs"
+        ).unit_set.get(context="goodbye_message")
+        self.assertEqual(cs_goodbye.target, "Sbohem")
+        self.assertFalse(LocKitImportDraft.objects.exists())
+
+    def test_cancel_deletes_the_draft_without_changing_anything(self) -> None:
+        kit = "key,en\nnew_key,Hello\n"
+        start = self.client.post(
+            reverse(
+                "loc-kit-strings-update", kwargs={"path": self.component.get_url_path()}
+            ),
+            {"table": self._upload(kit)},
+        )
+        preview_url = start["Location"]
+
+        self.client.post(preview_url, {"action": "cancel"})
+
+        self.assertFalse(LocKitImportDraft.objects.exists())
+        self.assertFalse(
+            self.component.source_translation.unit_set.filter(
+                context="new_key"
+            ).exists()
+        )
+
+    def test_multi_sheet_workbook_is_rejected(self) -> None:
+        workbook = Workbook()
+        workbook.active.title = "One"
+        workbook.active.append(["key", "en"])
+        workbook.active.append(["a", "A"])
+        workbook.create_sheet("Two").append(["key", "en"])
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+
+        response = self.client.post(
+            reverse(
+                "loc-kit-strings-update", kwargs={"path": self.component.get_url_path()}
+            ),
+            {
+                "table": SimpleUploadedFile(
+                    "kit.xlsx",
+                    buffer.getvalue(),
+                    content_type=(
+                        "application/vnd.openxmlformats-officedocument."
+                        "spreadsheetml.sheet"
+                    ),
+                )
+            },
+        )
+
+        self.assertContains(response, "single-sheet")
+        self.assertFalse(LocKitImportDraft.objects.exists())
+
+    def test_glossary_component_has_no_start_route(self) -> None:
+        glossary = self.project.glossaries[0]
+        response = self.client.post(
+            reverse("loc-kit-strings-update", kwargs={"path": glossary.get_url_path()}),
+            {"table": self._upload("key,en\na,A\n")},
+        )
+        self.assertEqual(response.status_code, 404)

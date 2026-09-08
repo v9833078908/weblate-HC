@@ -39,6 +39,8 @@ def po_component(tmp_path):
             comments=("Character: Sample",),
             references=("42",),
             row=4,
+            explanation="Internal usage guidance",
+            flags="read-only",
         ),
     )
     result = ParseResult(
@@ -104,6 +106,9 @@ def test_po_roundtrip_preserves_exact_text_and_metadata(tmp_path, po_component):
     assert unit.getnotes("developer") == "Character: Sample"
     assert unit.getlocations() == ["42"]
     assert validate_rendered_component(comp, result, tmp_path) == ()
+    content = paths["ru"].read_text(encoding="utf-8")
+    assert "Internal usage guidance" not in content
+    assert "read-only" not in content
 
 
 def test_po_writes_one_file_per_language(tmp_path, po_component):

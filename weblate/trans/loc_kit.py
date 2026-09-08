@@ -17,24 +17,28 @@ from __future__ import annotations
 
 import json
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
 from django.conf import settings
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
 
+from weblate.checks.flags import Flags
 from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.requests import fetch_validated_url
+from weblate.utils.state import STATE_TRANSLATED
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
-    from loc_kit_ingest.model import Diagnostic, GlossaryTerm
-    from weblate.auth.models import AuthenticatedHttpRequest
-    from weblate.trans.models import Component, Translation
+    from loc_kit_ingest.model import Diagnostic, GlossaryTerm, StringUnit
+    from weblate.auth.models import AuthenticatedHttpRequest, User
+    from weblate.trans.models import Component, Translation, Unit
 
 
 # Fixed OpenRouter chat-completions endpoint. Not configurable, never derived
@@ -827,6 +831,339 @@ def validate_glossary_profile(
 
 
 # --------------------------------------------------------------------------- #
+# DB-only Explanation application for ordinary string components
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class KitExplanationApplyResult:
+    """Outcomes for one idempotent source-explanation application."""
+
+    set_count: int = 0
+    unchanged_count: int = 0
+    blank_count: int = 0
+    missing_key_count: int = 0
+    would_overwrite_count: int = 0
+    already_in_note_count: int = 0
+    # Never set by ``apply_kit_explanations`` itself: a caller that gates the
+    # whole operation on a permission check (rather than failing hard) fills
+    # this in for the rows it chose not to even attempt.
+    unavailable_count: int = 0
+
+
+def _check_explanation_apply_eligibility(component: Component) -> None:
+    """Reject formats where this operation could write context to a file."""
+    if component.is_glossary:
+        raise ValidationError(
+            _("Glossary components cannot import string explanations.")
+        )
+    if component.locked:
+        raise ValidationError(_("Locked components cannot import string explanations."))
+    if component.file_format_cls.supports_explanation:
+        raise ValidationError(
+            _("This component format stores explanations in translation files.")
+        )
+
+
+def _classify_kit_explanations(
+    *,
+    source_units: Mapping[str, Unit],
+    units: Sequence[StringUnit],
+    overwrite: bool,
+) -> tuple[list[tuple[Unit, str]], KitExplanationApplyResult]:
+    """
+    Classify each incoming explanation cell without mutating anything.
+
+    Returns the source units to actually write (paired with their new
+    explanation) plus the full outcome breakdown; a preview caller uses only
+    the counters, ``apply_kit_explanations`` writes the first element.
+    """
+    counters = {
+        "set_count": 0,
+        "unchanged_count": 0,
+        "blank_count": 0,
+        "missing_key_count": 0,
+        "would_overwrite_count": 0,
+        "already_in_note_count": 0,
+    }
+    to_apply: list[tuple[Unit, str]] = []
+    for incoming in units:
+        explanation = incoming.explanation.strip()
+        if not explanation:
+            counters["blank_count"] += 1
+            continue
+        source_unit = source_units.get(incoming.key)
+        if source_unit is None:
+            counters["missing_key_count"] += 1
+            continue
+        if source_unit.explanation == explanation:
+            counters["unchanged_count"] += 1
+            continue
+        if source_unit.explanation and not overwrite:
+            counters["would_overwrite_count"] += 1
+            continue
+        if source_unit.note.strip() == explanation:
+            counters["already_in_note_count"] += 1
+        to_apply.append((source_unit, explanation))
+        counters["set_count"] += 1
+    return to_apply, KitExplanationApplyResult(**counters)
+
+
+def classify_kit_explanations(
+    *,
+    component: Component,
+    units: Sequence[StringUnit],
+    overwrite: bool,
+) -> KitExplanationApplyResult:
+    """
+    Read-only preview of what ``apply_kit_explanations`` would do.
+
+    Never mutates; does not require or check ``source.edit`` itself, since
+    the caller decides how to represent an unavailable permission (a hard
+    eligibility problem still raises, exactly like the apply path).
+    """
+    _check_explanation_apply_eligibility(component)
+    keys = {unit.key for unit in units if unit.explanation.strip()}
+    source_units = {
+        unit.context: unit
+        for unit in component.source_translation.unit_set.filter(context__in=keys)
+    }
+    _to_apply, counters = _classify_kit_explanations(
+        source_units=source_units, units=units, overwrite=overwrite
+    )
+    return counters
+
+
+def apply_kit_explanations(
+    *,
+    user: User,
+    component: Component,
+    units: Sequence[StringUnit],
+    overwrite: bool,
+) -> KitExplanationApplyResult:
+    """
+    Apply parsed kit explanation cells to matching source units by context.
+
+    This service deliberately writes only through ``Unit.update_explanation``;
+    source text, target text, state, flags, labels and component files remain
+    untouched. The caller owns parsing and can reuse these counters for a
+    mutation-free preview.
+    """
+    _check_explanation_apply_eligibility(component)
+    if not user.has_perm("source.edit", component.source_translation):
+        raise PermissionDenied
+
+    keys = {unit.key for unit in units if unit.explanation.strip()}
+    with transaction.atomic(), component.locked_for_update() as locked_component:
+        _check_explanation_apply_eligibility(locked_component)
+        if not user.has_perm("source.edit", locked_component.source_translation):
+            raise PermissionDenied
+        source_units = {
+            unit.context: unit
+            for unit in locked_component.source_translation.unit_set.select_for_update()
+            .filter(context__in=keys)
+            .order_by("pk")
+        }
+        to_apply, result = _classify_kit_explanations(
+            source_units=source_units, units=units, overwrite=overwrite
+        )
+        for source_unit, explanation in to_apply:
+            source_unit.update_explanation(explanation, user)
+    return result
+
+
+# --------------------------------------------------------------------------- #
+# Update an existing string component from a loc-kit table
+# --------------------------------------------------------------------------- #
+
+
+def _check_string_update_eligibility(component: Component) -> None:
+    """Reject components this flow cannot touch, regardless of permission."""
+    if component.is_glossary:
+        raise ValidationError(
+            _("Glossary components use the glossary update flow instead.")
+        )
+    if component.locked:
+        raise ValidationError(_("Locked components cannot be updated from a table."))
+    if not component.has_template():
+        raise ValidationError(
+            _("Only monolingual components can be updated from a loc-kit table.")
+        )
+
+
+def existing_string_keys(component: Component) -> set[str]:
+    """Return every source ``Unit.context`` the component already has."""
+    return set(component.source_translation.unit_set.values_list("context", flat=True))
+
+
+@dataclass(frozen=True)
+class StringsAppendResult:
+    """Outcomes of adding brand-new loc-kit rows to a string component."""
+
+    added: int = 0
+    existing: int = 0
+    language_added: Mapping[str, int] = field(default_factory=dict)
+    created_languages: tuple[str, ...] = ()
+    unavailable_languages: tuple[str, ...] = ()
+
+
+def _resolve_append_language(
+    *, user: User, component: Component, code: str
+) -> Translation | None:
+    """Create a missing target language for the append, or return None."""
+    if not user.has_perm("translation.add", component.project):
+        return None
+    languages = component.get_all_available_languages()
+    if not user.has_perm("translation.add_more", component):
+        languages = languages.filter_for_add(component.project)
+    language = languages.filter(code=code).first()
+    if language is None:
+        return None
+    return component.add_new_language(language, None)
+
+
+def append_translation_strings(
+    *,
+    user: User,
+    component: Component,
+    units: Sequence[StringUnit],
+) -> StringsAppendResult:
+    """
+    Add loc-kit rows whose key does not exist yet, to every reachable language.
+
+    An existing key is never touched here: source, targets, and flags of a
+    key already present in the component stay exactly as they are, no matter
+    what the table carries for it. A target language absent from the
+    component is created only when at least one new row needs it and the
+    caller holds ``translation.add``; otherwise it is reported unavailable
+    and every other language still receives its rows.
+    """
+    _check_string_update_eligibility(component)
+    existing_keys = existing_string_keys(component)
+    new_units = [unit for unit in units if unit.key not in existing_keys]
+    existing_count = len(units) - len(new_units)
+    if not new_units:
+        return StringsAppendResult(existing=existing_count)
+
+    source_lang = component.source_language.code
+    requested_codes = {
+        code
+        for unit in new_units
+        for code, value in unit.values.items()
+        if value.strip()
+    } - {source_lang}
+    translations_by_code = {
+        translation.language.code: translation
+        for translation in component.translation_set.select_related("language")
+        if translation.language_id != component.source_language_id
+    }
+
+    created_languages: list[str] = []
+    unavailable_languages: list[str] = []
+    for code in sorted(requested_codes - set(translations_by_code)):
+        translation = _resolve_append_language(
+            user=user, component=component, code=code
+        )
+        if translation is None:
+            unavailable_languages.append(code)
+        else:
+            translations_by_code[code] = translation
+            created_languages.append(code)
+
+    language_added: dict[str, int] = {}
+    for unit in new_units:
+        source_unit = component.source_translation.add_unit(
+            None,
+            unit.key,
+            unit.values.get(source_lang, ""),
+            [],
+            is_batch_update=True,
+            author=user,
+        )
+        if source_unit is None:
+            continue
+        for code, value in unit.values.items():
+            if code == source_lang or not value.strip():
+                continue
+            translation = translations_by_code.get(code)
+            if translation is None:
+                continue
+            target_unit = translation.unit_set.filter(context=unit.key).first()
+            if target_unit is None:
+                continue
+            target_unit.target = value
+            target_unit.state = STATE_TRANSLATED
+            target_unit.save(update_fields=["target", "state"], same_content=True)
+            language_added[code] = language_added.get(code, 0) + 1
+        # Flags land on the source unit only after every target is written:
+        # a read-only flag would otherwise block the target writes above.
+        if unit.flags.strip():
+            flags = Flags(unit.flags)
+            source_unit.update_extra_flags(flags.format(), user)
+    return StringsAppendResult(
+        added=len(new_units),
+        existing=existing_count,
+        language_added=language_added,
+        created_languages=tuple(created_languages),
+        unavailable_languages=tuple(unavailable_languages),
+    )
+
+
+@dataclass(frozen=True)
+class StringsUpdateResult:
+    """Combined outcome of one loc-kit strings-update confirm."""
+
+    strings: StringsAppendResult
+    explanations: KitExplanationApplyResult
+
+
+def apply_loc_kit_string_update(
+    *,
+    user: User,
+    component: Component,
+    units: Sequence[StringUnit],
+    overwrite_explanations: bool,
+) -> StringsUpdateResult:
+    """
+    Add new loc-kit rows and set Explanations on one existing component.
+
+    The two mutations are independent successes, exactly as their preview
+    reports them: a user with only upload/add rights still gets new strings
+    added even though Explanation stays unavailable, and a user with only
+    ``source.edit`` still gets Explanations set even though new strings stay
+    unavailable. ``upload.perform`` alone never authorizes an Explanation
+    change. Each mutation keeps its own atomic transaction and locking, so
+    neither needs to nest inside the other's.
+    """
+    _check_string_update_eligibility(component)
+    can_add_strings = user.has_perm("upload.perform", component) and user.has_perm(
+        "unit.add", component.source_translation
+    )
+    if can_add_strings:
+        strings_result = append_translation_strings(
+            user=user, component=component, units=units
+        )
+    else:
+        existing_keys = existing_string_keys(component)
+        strings_result = StringsAppendResult(
+            existing=sum(1 for unit in units if unit.key in existing_keys)
+        )
+
+    if user.has_perm("source.edit", component.source_translation):
+        explanation_result = apply_kit_explanations(
+            user=user,
+            component=component,
+            units=units,
+            overwrite=overwrite_explanations,
+        )
+    else:
+        explanation_result = KitExplanationApplyResult(
+            unavailable_count=sum(1 for unit in units if unit.explanation.strip())
+        )
+    return StringsUpdateResult(strings=strings_result, explanations=explanation_result)
+
+
+# --------------------------------------------------------------------------- #
 # Append-only application of a validated preview to an existing glossary
 # --------------------------------------------------------------------------- #
 
@@ -1206,11 +1543,19 @@ __all__ = [
     "GlossaryPreview",
     "GlossaryProfileError",
     "GlossaryTermPreview",
+    "KitExplanationApplyResult",
     "ProfileProposalError",
     "SampleTooLargeError",
+    "StringsAppendResult",
+    "StringsUpdateResult",
     "append_glossary_terms",
+    "append_translation_strings",
+    "apply_kit_explanations",
+    "apply_loc_kit_string_update",
     "build_glossary_structure_sample",
     "cap_preview_warnings",
+    "classify_kit_explanations",
+    "existing_string_keys",
     "load_profile_prompt",
     "profile_document_from_envelope",
     "request_profile_proposal",

@@ -37,13 +37,20 @@ class LocKitImportDraft(models.Model):
     session binding, and expired or consumed drafts behave as absent.
     """
 
+    class Kind(models.TextChoices):
+        GLOSSARY = "glossary", gettext_lazy("Glossary")
+        STRING = "string", gettext_lazy("String component")
+
     class State(models.TextChoices):
         UPLOADED = "uploaded", gettext_lazy("Uploaded")
         SHEET_SELECTED = "sheet-selected", gettext_lazy("Sheet selected")
         PREVIEW_READY = "preview-ready", gettext_lazy("Preview ready")
+        APPLYING = "applying", gettext_lazy("Applying")
+        FAILED = "failed", gettext_lazy("Failed")
         CONSUMED = "consumed", gettext_lazy("Consumed")
 
     token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.GLOSSARY)
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -81,6 +88,7 @@ class LocKitImportDraft(models.Model):
     state = models.CharField(
         max_length=20, choices=State.choices, default=State.UPLOADED
     )
+    apply_task_id = models.UUIDField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
 

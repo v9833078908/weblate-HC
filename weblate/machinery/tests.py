@@ -5180,6 +5180,21 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
         self.assertEqual(translation[cleaned_source][0]["text"], "Bonjour @@PH7@@!")
         self.assertEqual(label_languages, ["en", "en"])
 
+    def test_translate_omits_a_note_that_duplicates_explanation(self) -> None:
+        machine = self.get_machine()
+        unit = make_unit(
+            code="fr",
+            source="Hello",
+            note="  Shown on the greeting button.\n",
+        )
+        unit.source_unit.explanation = "Shown on the greeting button."
+
+        # ruff: ignore[private-member-access]
+        context = machine._get_string_context(unit.source, cast("Unit", unit))
+
+        self.assertEqual(context["explanation"], "Shown on the greeting button.")
+        self.assertNotIn("note", context)
+
     def test_translate_sends_developer_note(self) -> None:
         machine = self.get_machine()
         unit = make_unit(code="fr", source="Get out of here!", note="Joe")

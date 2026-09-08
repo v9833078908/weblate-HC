@@ -394,6 +394,16 @@ real_patterns = [
         name="loc-kit-glossary-update",
     ),
     path(
+        "loc-kit/strings/update/<object_path:path>/",
+        weblate.trans.views.create.LocKitStringsUpdateStartView.as_view(),
+        name="loc-kit-strings-update",
+    ),
+    path(
+        "loc-kit/strings/<uuid:token>/preview/",
+        weblate.trans.views.create.LocKitStringsPreviewView.as_view(),
+        name="loc-kit-strings-preview",
+    ),
+    path(
         "create/component/doc/",
         weblate.trans.views.create.CreateFromDoc.as_view(),
         name="create-component-doc",
