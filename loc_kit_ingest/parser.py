@@ -137,6 +137,8 @@ def _parse_keyed(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
     lang_columns = {l.code: l.column for l in component.languages}
     comment_cols = component.comments
     reference_cols = component.references
+    explanation_col = component.explanation
+    flags_col = component.flags
 
     for row_idx in range(component.header_row + 1, len(rows)):
         row_1based = row_idx + 1
@@ -187,6 +189,11 @@ def _parse_keyed(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
             [component.key.column, source_col]
             + [c.column for c in comment_cols]
             + [r.column for r in reference_cols]
+            + [
+                column.column
+                for column in (explanation_col, flags_col)
+                if column is not None
+            ]
             + list(lang_columns.values())
         )
         if len(row) <= max_col and len(row) < max_col + 1:
@@ -272,6 +279,13 @@ def _parse_keyed(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
             if _cell(rows, row_idx, r.column)
         )
 
+        explanation = (
+            _cell(rows, row_idx, explanation_col.column)
+            if explanation_col is not None
+            else ""
+        )
+        flags = _cell(rows, row_idx, flags_col.column) if flags_col is not None else ""
+
         units.append(
             StringUnit(
                 key=key,
@@ -279,6 +293,8 @@ def _parse_keyed(component: ComponentProfile, rows: list[list[str]]) -> ParseRes
                 comments=comments,
                 references=references,
                 row=row_1based,
+                explanation=explanation,
+                flags=flags,
             )
         )
 

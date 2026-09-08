@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% load crispy_forms_tags i18n %}
+
+{% block breadcrumbs %}
+  <li><a href="{% url 'show' path=object.get_url_path %}">{{ object }}</a></li>
+  <li><a href="#">{% translate "Strings update preview" %}</a></li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h4 class="panel-title">{% translate "Check the table before applying it" %}</h4>
+    </div>
+    <div class="panel-body">
+
+      <table class="table table-condensed">
+        <tbody>
+          <tr>
+            <th scope="row">{% translate "Rows in the table" %}</th>
+            <td>{{ row_count }}</td>
+          </tr>
+          <tr>
+            <th scope="row">{% translate "New keys" %}</th>
+            <td>{{ new_count }}</td>
+          </tr>
+          <tr>
+            <th scope="row">{% translate "Existing keys (source, targets, flags unchanged)" %}</th>
+            <td>{{ existing_count }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      {% if not can_add_strings %}
+        <div class="alert alert-warning" role="alert">
+          {% translate "You do not have permission to add strings; new keys will be skipped." %}
+        </div>
+      {% endif %}
+      {% if not can_apply_explanations %}
+        <div class="alert alert-warning" role="alert">
+          {% translate "You do not have the Edit source string permission; Explanations will not be changed." %}
+        </div>
+      {% endif %}
+
+      <h4>{% translate "Explanation" %}</h4>
+      <table class="table table-condensed">
+        <tbody>
+          <tr>
+            <th scope="row">{% translate "Will be set" %}</th>
+            <td>{{ explanation_preview.set_count }}</td>
+          </tr>
+          <tr>
+            <th scope="row">{% translate "Already the same value" %}</th>
+            <td>{{ explanation_preview.unchanged_count }}</td>
+          </tr>
+          <tr>
+            <th scope="row">{% translate "Existing, non-empty value (needs overwrite)" %}</th>
+            <td>{{ explanation_preview.would_overwrite_count }}</td>
+          </tr>
+          <tr>
+            <th scope="row">{% translate "Blank in the table" %}</th>
+            <td>{{ explanation_preview.blank_count }}</td>
+          </tr>
+          <tr>
+            <th scope="row">{% translate "Key not found in this component" %}</th>
+            <td>{{ explanation_preview.missing_key_count }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <form action="{% url 'loc-kit-strings-preview' token=draft.token %}" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="cancel" />
+        <input type="submit" value="{% translate "Cancel" %}" class="btn btn-default" />
+      </form>
+
+      <form action="{% url 'loc-kit-strings-preview' token=draft.token %}" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="confirm" />
+        {% if explanation_preview.would_overwrite_count %}
+          {% crispy confirm_form %}
+        {% endif %}
+        <input type="submit" value="{% translate "Apply" %}" class="btn btn-primary" />
+      </form>
+
+    </div>
+  </div>
+
+{% endblock content %}

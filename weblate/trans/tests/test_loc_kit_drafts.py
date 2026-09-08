@@ -105,6 +105,22 @@ class LocKitDraftModelTest(ViewTestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result.pk, draft.pk)
 
+    def test_apply_reservation_survives_reload(self) -> None:
+        draft = make_draft(
+            owner=self.user,
+            project=self.project,
+            state=LocKitImportDraft.State.PREVIEW_READY,
+        )
+        task_id = uuid.uuid4()
+
+        draft.state = LocKitImportDraft.State.APPLYING
+        draft.apply_task_id = task_id
+        draft.save(update_fields=["state", "apply_task_id"])
+        draft.refresh_from_db()
+
+        self.assertEqual(draft.state, LocKitImportDraft.State.APPLYING)
+        self.assertEqual(draft.apply_task_id, task_id)
+
     def test_unknown_token_returns_none(self) -> None:
         """A nonexistent token behaves identically to a mismatched one."""
         self.assertIsNone(

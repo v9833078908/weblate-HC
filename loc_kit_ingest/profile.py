@@ -24,7 +24,10 @@ _XML_LANG_RE = re.compile(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*")
 
 SCHEMA_VERSION = 1
 SCHEMA_VERSION_RECORD_MAP = 2
-SUPPORTED_SCHEMA_VERSIONS = frozenset({SCHEMA_VERSION, SCHEMA_VERSION_RECORD_MAP})
+SCHEMA_VERSION_PO_METADATA = 3
+SUPPORTED_SCHEMA_VERSIONS = frozenset(
+    {SCHEMA_VERSION, SCHEMA_VERSION_RECORD_MAP, SCHEMA_VERSION_PO_METADATA}
+)
 
 # Fields permitted per object, by nesting level.
 _ROOT_FIELDS = frozenset({"schema_version", "components"})
@@ -44,6 +47,7 @@ _PO_FIELDS = frozenset(
         "grammar",
     }
 )
+_PO_FIELDS_V3 = _PO_FIELDS | frozenset({"explanation", "flags"})
 _TBX_FIELDS = frozenset(
     {
         "sheet",
@@ -241,6 +245,8 @@ class ComponentProfile:
     grammar: KeyedGrammar | PairsGrammar | RecordMapGrammar
     key_language: str | None
     initial_target_languages: tuple[str, ...]
+    explanation: MetadataColumn | None = None
+    flags: MetadataColumn | None = None
 
 
 @dataclass(frozen=True)
@@ -371,6 +377,39 @@ def _parse_metadata_list(
         msg = "profile.invalid_value"
         raise _err(msg, f"'{field}' must be a list")
     return tuple(_parse_metadata_column(item, label=f"{field} entry") for item in items)
+
+
+def _check_po_column_locations(
+    *,
+    key: KeyColumn,
+    languages: tuple[LanguageColumn, ...],
+    comments: tuple[MetadataColumn, ...],
+    references: tuple[MetadataColumn, ...],
+    explanation: MetadataColumn | None,
+    flags: MetadataColumn | None,
+) -> None:
+    columns: dict[int, str] = {}
+    locations = [
+        ("key", key.column),
+        *((f"language {language.code!r}", language.column) for language in languages),
+        *((f"comment {comment.name!r}", comment.column) for comment in comments),
+        *(
+            (f"reference {reference.name!r}", reference.column)
+            for reference in references
+        ),
+    ]
+    if explanation is not None:
+        locations.append(("explanation", explanation.column))
+    if flags is not None:
+        locations.append(("flags", flags.column))
+    for label, column in locations:
+        if column in columns:
+            msg = "profile.duplicate_column"
+            raise _err(
+                msg,
+                f"duplicate column {column + 1} ({label} and {columns[column]})",
+            )
+        columns[column] = label
 
 
 # --------------------------------------------------------------------------- #
@@ -880,9 +919,16 @@ def _parse_component(
         msg = "profile.invalid_kind"
         raise _err(msg, f"unknown kind {kind!r}; must be 'po' or 'tbx'")
 
+    if schema_version == SCHEMA_VERSION_PO_METADATA and kind != "po":
+        msg = "profile.schema_kind"
+        raise _err(msg, "schema_version 3 supports only PO components")
+
     is_v2_tbx = schema_version == SCHEMA_VERSION_RECORD_MAP and kind == "tbx"
+    is_v3_po = schema_version == SCHEMA_VERSION_PO_METADATA and kind == "po"
     if is_v2_tbx:
         allowed = _TBX_FIELDS_V2
+    elif is_v3_po:
+        allowed = _PO_FIELDS_V3
     else:
         allowed = _PO_FIELDS if kind == "po" else _TBX_FIELDS
     _check_unknown(obj, allowed, label=f"component ({kind})")
@@ -975,6 +1021,8 @@ def _parse_component(
     references: tuple[MetadataColumn, ...] = ()
     key_language: str | None = None
     initial_target_languages: tuple[str, ...] = ()
+    explanation: MetadataColumn | None = None
+    flags: MetadataColumn | None = None
 
     if kind == "po":
         first_data_row = _require_int(obj, "first_data_row", label="component")
@@ -991,6 +1039,23 @@ def _parse_component(
         key = _parse_key_column(key_raw, label="key column")
         comments = _parse_metadata_list(obj, "comments", component=component)
         references = _parse_metadata_list(obj, "references", component=component)
+        if is_v3_po:
+            explanation_raw = obj.get("explanation")
+            flags_raw = obj.get("flags")
+            if explanation_raw is not None:
+                explanation = _parse_metadata_column(
+                    explanation_raw, label="explanation metadata"
+                )
+            if flags_raw is not None:
+                flags = _parse_metadata_column(flags_raw, label="flags metadata")
+            _check_po_column_locations(
+                key=key,
+                languages=languages,
+                comments=comments,
+                references=references,
+                explanation=explanation,
+                flags=flags,
+            )
         first_data_row -= 1  # 0-based
     else:
         if not is_v2_tbx:
@@ -1074,6 +1139,8 @@ def _parse_component(
         comments=comments,
         references=references,
         grammar=grammar,
+        explanation=explanation,
+        flags=flags,
         key_language=key_language,
         initial_target_languages=initial_target_languages,
     )

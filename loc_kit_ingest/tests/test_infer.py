@@ -215,3 +215,33 @@ def test_a_real_key_without_any_text_is_not_treated_as_a_banner():
     document, _notes = infer_component("Sheet1", rows, component="Test")
 
     assert document["grammar"]["skip_rows"] == []
+
+
+def test_explanation_metadata_stays_separate_from_developer_comments():
+    rows = [
+        ["key", "ru", "en", "Comment", "Explanation"],
+        ["greeting", "Привет", "Hello", "Shown on the home screen", "Warm welcome"],
+    ]
+
+    document, _notes = infer_profile({"UI": rows}, kit_stem="UI")
+    component = document["components"][0]
+
+    assert document["schema_version"] == 3
+    assert component["comments"] == [
+        {"column": 4, "name": "Comment", "header": "Comment"}
+    ]
+    assert component["explanation"] == {
+        "column": 5,
+        "name": "Explanation",
+        "header": "Explanation",
+    }
+
+
+def test_two_populated_explanation_columns_are_rejected():
+    rows = [
+        ["key", "ru", "en", "Explanation", "Пояснение"],
+        ["greeting", "Привет", "Hello", "Warm welcome", "Shown on the home screen"],
+    ]
+
+    with pytest.raises(InferenceError, match="explanation metadata"):
+        infer_component("UI", rows, component="UI")

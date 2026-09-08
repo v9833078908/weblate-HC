@@ -8,8 +8,9 @@ from pathlib import Path
 
 import pytest
 
+from loc_kit_ingest.infer import infer_profile
 from loc_kit_ingest.parser import parse_component
-from loc_kit_ingest.profile import load_profile
+from loc_kit_ingest.profile import load_profile, parse_profile
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -240,6 +241,45 @@ def test_key_is_not_trimmed(temple_component):
     ]
     result = parse_component(temple_component, rows)
     assert result.units[0].key == "  padded_key  "
+
+
+def test_keyed_parser_keeps_explanation_and_flags_outside_comments():
+    document, _notes = infer_profile(
+        {
+            "UI": [
+                ["key", "ru", "en", "Comment", "Explanation", "Flags"],
+                [
+                    "greeting",
+                    "Привет",
+                    "Hello",
+                    "Shown on the home screen",
+                    "Warm welcome",
+                    "read-only",
+                ],
+            ]
+        },
+        kit_stem="UI",
+    )
+    component = parse_profile(document).components[0]
+
+    unit = parse_component(
+        component,
+        [
+            ["key", "ru", "en", "Comment", "Explanation", "Flags"],
+            [
+                "greeting",
+                "Привет",
+                "Hello",
+                "Shown on the home screen",
+                "Warm welcome",
+                "read-only",
+            ],
+        ],
+    ).units[0]
+
+    assert unit.comments == ("Shown on the home screen",)
+    assert unit.explanation == "Warm welcome"
+    assert unit.flags == "read-only"
 
 
 # ---------------------------------------------------------------------------

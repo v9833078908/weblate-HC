@@ -1,7 +1,26 @@
 # Explanation из loc-kit для новых и существующих строковых компонентов
 
 Дата: 2026-08-28. Переработан: 2026-09-08.
-Статус: редакция плана согласована; реализация не согласована и не начата.
+Статус: **реализован и проверен 2026-09-08** в ворктри
+`feat/kit-explanation-string-import` (задачи 1-6 из раздела «Задачи»).
+Осознанное отступление от плана: задача 4 использует синхронный
+однопроходный confirm вместо Celery-протокола `APPLYING`/`FAILED`/
+`apply_task_id`, которого требует связанный план
+`2026-08-18-loc-kit-table-add-strings.md` - решение и компромисс описаны
+в `docs/product/guides/loc-kit-ingest.md` (раздел «Right size, not right
+protocol»); критерии проверки того плана, завязанные на этот протокол
+(видимость драфта до коммита задачи, retryable/terminal failure, duplicate
+task delivery), к синхронному дизайну неприменимы и не проверялись - нужно
+явное решение, устраивает ли синхронный вариант постоянно. Тесты зелёные:
+`cd loc_kit_ingest && uv run pytest` (312) и
+`weblate/trans/tests/test_loc_kit_ingest_contract.py` +
+`test_loc_kit_drafts.py` (136) при отдельном запуске; в общем прогоне
+периодически (не в каждом прогоне) флейкует до-существующий
+`LocKitGlossaryUploadUITest::test_*` вне зависимости от этого изменения
+(`RepositoryCommandError: Invalid revision range` - гонка в тестовом
+git-репозитории, воспроизводится и без задач 1-6). Синхронизация пакета в
+dev-контейнер (`cp loc_kit_ingest/*.py dev-docker/data/python/`), живой
+smoke-test и деплой не выполнены - требуют отдельного явного одобрения.
 Ревью: `docs/product/reviews/2026-09-08-kit-explanation-plan-review.md`.
 Связанный план существующего компонента:
 `docs/product/plans/2026-08-18-loc-kit-table-add-strings.md`.

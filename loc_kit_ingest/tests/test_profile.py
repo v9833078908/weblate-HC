@@ -78,7 +78,7 @@ def _write(tmp_path, obj, name="kit.loc-ingest.json"):
 
 
 def test_profile_rejects_an_unsupported_schema_version(tmp_path):
-    path = _write(tmp_path, {"schema_version": 3, "components": []})
+    path = _write(tmp_path, {"schema_version": 4, "components": []})
     with pytest.raises(ProfileError, match="schema_version"):
         load_profile(path)
 
@@ -466,3 +466,25 @@ def test_unknown_field_in_region_raises(valid_profile, tmp_path):
     path = _write(tmp_path, valid_profile)
     with pytest.raises(ProfileError, match="unknown field"):
         load_profile(path)
+
+
+def test_v3_po_profile_keeps_scalar_explanation_and_flags(valid_profile, tmp_path):
+    valid_profile["schema_version"] = 3
+    valid_profile["components"] = valid_profile["components"][:1]
+    valid_profile["components"][0]["explanation"] = {
+        "column": 6,
+        "name": "Explanation",
+        "header": "Explanation",
+    }
+    valid_profile["components"][0]["flags"] = {
+        "column": 7,
+        "name": "Flags",
+        "header": "Flags",
+    }
+
+    component = load_profile(_write(tmp_path, valid_profile)).components[0]
+
+    assert component.explanation is not None
+    assert component.explanation.column == 5
+    assert component.flags is not None
+    assert component.flags.column == 6

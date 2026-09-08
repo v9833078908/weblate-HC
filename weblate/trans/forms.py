@@ -3192,6 +3192,43 @@ class LocKitGlossaryUpdateForm(forms.Form):
         self.helper.form_tag = False
 
 
+class LocKitStringsUpdateForm(forms.Form):
+    """Stage a loc-kit table to update one existing string component."""
+
+    table = forms.FileField(
+        label=gettext_lazy("Loc-kit table (CSV, TSV, XLSX)"),
+        help_text=gettext_lazy(
+            "New keys are added to every language; an existing key's source, "
+            "targets and flags never change. The Explanation column can set "
+            "or update Unit.explanation on new and existing keys."
+        ),
+        validators=[
+            validate_component_zip_upload_size,
+            FileExtensionValidator(allowed_extensions=["csv", "tsv", "xlsx"]),
+        ],
+        widget=forms.FileInput(attrs={"accept": ".csv,.tsv,.xlsx"}),
+    )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_tag = False
+
+
+class LocKitStringsConfirmForm(forms.Form):
+    """Confirm applying a validated string-update preview."""
+
+    overwrite_explanations = forms.BooleanField(
+        label=gettext_lazy("Overwrite existing, non-empty Explanations"),
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_tag = False
+
+
 class ComponentDocCreateForm(ComponentProjectForm):
     docfile = forms.FileField(
         label=gettext_lazy("Document to translate"),

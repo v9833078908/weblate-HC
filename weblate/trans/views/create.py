@@ -42,6 +42,8 @@ from weblate.trans.forms import (
     LocKitGlossaryUpdateForm,
     LocKitProfileCorrectionForm,
     LocKitSheetSelectForm,
+    LocKitStringsConfirmForm,
+    LocKitStringsUpdateForm,
     ProjectCreateForm,
     ProjectImportCreateForm,
     ProjectImportForm,
@@ -58,8 +60,11 @@ from weblate.trans.loc_kit import (
     ProfileProposalError,
     SampleTooLargeError,
     append_glossary_terms,
+    apply_loc_kit_string_update,
     build_glossary_structure_sample,
     cap_preview_warnings,
+    classify_kit_explanations,
+    existing_string_keys,
     profile_document_from_envelope,
     request_profile_proposal,
     validate_glossary_profile,
@@ -95,6 +100,7 @@ if TYPE_CHECKING:
 
     from django.forms import Form
 
+    from loc_kit_ingest.model import StringUnit
     from weblate.auth.models import AuthenticatedHttpRequest
     from weblate.trans.forms import (
         ComponentProjectForm,
@@ -103,6 +109,7 @@ if TYPE_CHECKING:
 
 SESSION_CREATE_KEY = "session_component"
 INTEGRATION_IMPORT_VCS_KEY = "integration_import_vcs"
+LOC_KIT_PENDING_EXPLANATIONS_KEY = "loc_kit_pending_explanations"
 
 
 def get_creatable_projects(request: AuthenticatedHttpRequest):
@@ -610,6 +617,8 @@ class CreateFromZip(CreateComponent):
     @transaction.atomic
     def form_valid(self, form):
         if self.stage != "init":
+            if self.stage == "create":
+                self._attach_pending_kit_explanations(form)
             return super().form_valid(form)
 
         uploaded = form.cleaned_data["zipfile"]
@@ -661,6 +670,38 @@ class CreateFromZip(CreateComponent):
                     "source": kit_info["source_lang"],
                 },
             )
+            explanations = kit_info["explanations"]
+            if explanations:
+                if self.request.user.has_perm(
+                    "source.edit", form.cleaned_data["project"]
+                ):
+                    if not self.request.session.session_key:
+                        self.request.session.create()
+                    self.request.session[LOC_KIT_PENDING_EXPLANATIONS_KEY] = {
+                        "project": form.cleaned_data["project"].pk,
+                        "slug": form.cleaned_data["slug"],
+                        "explanations": explanations,
+                    }
+                    messages.info(
+                        self.request,
+                        ngettext(
+                            "The Explanation column will set %d string's "
+                            "Explanation once the component is created.",
+                            "The Explanation column will set %d strings' "
+                            "Explanations once the component is created.",
+                            len(explanations),
+                        )
+                        % len(explanations),
+                    )
+                else:
+                    messages.warning(
+                        self.request,
+                        gettext(
+                            "The Explanation column was found, but you do not "
+                            "have the Edit source string permission on this "
+                            "project; Explanations will not be imported."
+                        ),
+                    )
             if kit_info["sourceless"]:
                 messages.warning(
                     self.request,
@@ -682,6 +723,30 @@ class CreateFromZip(CreateComponent):
                 )
         self.request.method = "GET"
         return self.get(self.request)
+
+    def _attach_pending_kit_explanations(self, form) -> None:
+        """
+        Reattach the explanation map staged by this wizard's own init step.
+
+        The mapping is session-carried, not a persisted draft: it is small
+        (already-parsed, non-blank Explanation cells only), and the actual
+        apply happens later from ``Component.after_save`` through the same
+        idempotent, permission-rechecked service used by the existing-
+        component update flow. A session miss, project/slug mismatch, or a
+        Explanation-free upload all leave the component creation itself
+        completely unaffected - this only ever adds a transient attribute
+        ``Component.save`` forwards through the background task boundary.
+        """
+        pending = self.request.session.pop(LOC_KIT_PENDING_EXPLANATIONS_KEY, None)
+        if not pending:
+            return
+        if (
+            pending.get("project") == form.instance.project_id
+            and pending.get("slug") == form.instance.slug
+        ):
+            form.instance.loc_kit_explanations = pending["explanations"]
+            if form.instance.acting_user is None:
+                form.instance.acting_user = self.request.user
 
     def _start_glossary_draft(self, form, uploaded):
         """Store the upload as a temporary draft and go to sheet selection."""
@@ -1056,17 +1121,28 @@ class LocKitDraftMixin(View):
         )
         if draft is None:
             raise Http404
-        # An update draft is bound to an existing glossary component and
-        # is gated by upload access on that component, not by the
-        # component-creation wizard. translation.add is deliberately not
-        # required here: without it an operator can still add data to the
-        # languages that already exist.
+        # An update draft is bound to an existing target component and is
+        # gated by access on that component, not by the component-creation
+        # wizard. Glossary updates require upload.perform; string updates
+        # accept either the upload/add axis or source.edit alone, so an
+        # operator with only one of the two mutation rights can still reach
+        # the preview and see the other axis reported as unavailable.
         if draft.target_component_id is not None:
             component = draft.target_component
-            if (
-                not component.is_glossary
-                or component.locked
-                or not self.request.user.has_perm("upload.perform", component)
+            if component.locked:
+                raise Http404
+            if draft.kind == LocKitImportDraft.Kind.STRING:
+                if component.is_glossary or not component.has_template():
+                    raise Http404
+                if not (
+                    self.request.user.has_perm("upload.perform", component)
+                    or self.request.user.has_perm(
+                        "source.edit", component.source_translation
+                    )
+                ):
+                    raise Http404
+            elif not component.is_glossary or not self.request.user.has_perm(
+                "upload.perform", component
             ):
                 raise Http404
             return draft
@@ -1733,3 +1809,330 @@ class LocKitGlossaryUpdateStartView(TemplateView):
         except Exception:
             draft.delete_storage()
             raise
+
+
+# --------------------------------------------------------------------------- #
+# Loc-kit strings update: apply a table to one existing string component
+# --------------------------------------------------------------------------- #
+
+
+def _string_unit_to_json(unit: StringUnit) -> dict:
+    return {
+        "key": unit.key,
+        "values": dict(unit.values),
+        "comments": list(unit.comments),
+        "references": list(unit.references),
+        "row": unit.row,
+        "explanation": unit.explanation,
+        "flags": unit.flags,
+    }
+
+
+def _string_units_from_json(payload: str) -> tuple[StringUnit, ...]:
+    # ruff: ignore[import-outside-top-level]
+    from loc_kit_ingest.model import StringUnit as _StringUnit
+
+    return tuple(
+        _StringUnit(
+            key=row["key"],
+            values=dict(row["values"]),
+            comments=tuple(row["comments"]),
+            references=tuple(row["references"]),
+            row=row["row"],
+            explanation=row.get("explanation", ""),
+            flags=row.get("flags", ""),
+        )
+        for row in json.loads(payload)
+    )
+
+
+def _can_add_strings(user, component: Component) -> bool:
+    return user.has_perm("upload.perform", component) and user.has_perm(
+        "unit.add", component.source_translation
+    )
+
+
+def _can_apply_explanations(user, component: Component) -> bool:
+    return user.has_perm("source.edit", component.source_translation)
+
+
+@method_decorator(login_required, name="dispatch")
+class LocKitStringsUpdateStartView(TemplateView):
+    """
+    Stage a loc-kit table that updates one existing string component.
+
+    New keys are queued for every reachable language; the Explanation
+    column can set or update ``Unit.explanation`` on new and existing keys.
+    Nothing changes until the preview is confirmed.
+    """
+
+    template_name = "trans/loc_kit_strings_update.html"
+
+    def get_component(self) -> Component:
+        component = parse_path(self.request, self.kwargs["path"], (Component,))
+        if component.is_glossary or component.locked or not component.has_template():
+            raise Http404
+        if not (
+            _can_add_strings(self.request.user, component)
+            or _can_apply_explanations(self.request.user, component)
+        ):
+            raise Http404
+        return component
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["object"] = self.get_component()
+        context["form"] = kwargs.get("form") or LocKitStringsUpdateForm()
+        return context
+
+    @transaction.atomic
+    def post(self, request: AuthenticatedHttpRequest, **kwargs):
+        component = self.get_component()
+        form = LocKitStringsUpdateForm(request.POST, request.FILES)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form))
+        uploaded = form.cleaned_data["table"]
+
+        # ruff: ignore[import-outside-top-level]
+        from loc_kit_ingest.infer import InferenceError, infer_profile
+
+        # ruff: ignore[import-outside-top-level]
+        from loc_kit_ingest.model import Severity
+
+        # ruff: ignore[import-outside-top-level]
+        from loc_kit_ingest.parser import parse_component as parse_kit_component
+
+        # ruff: ignore[import-outside-top-level]
+        from loc_kit_ingest.profile import ProfileError, parse_profile
+
+        # ruff: ignore[import-outside-top-level]
+        from loc_kit_ingest.reader import ReaderError, read_sheets
+
+        filename = os.path.basename(getattr(uploaded, "name", "") or "")
+        uploaded.seek(0)
+        payload = uploaded.read()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            local = Path(tmpdir) / filename
+            local.write_bytes(payload)
+            try:
+                sheets = read_sheets(local)
+            except ReaderError as error:
+                form.add_error("table", gettext("Could not read the table: %s") % error)
+                return self.render_to_response(self.get_context_data(form=form))
+        if len(sheets) != 1:
+            form.add_error(
+                "table",
+                gettext("The workbook holds %d sheets; upload a single-sheet table.")
+                % len(sheets),
+            )
+            return self.render_to_response(self.get_context_data(form=form))
+        sheet_name, rows = next(iter(sheets.items()))
+
+        try:
+            document, _notes = infer_profile(
+                {sheet_name: rows}, kit_stem=component.slug, component=component.slug
+            )
+            profile = parse_profile(document)
+        except (InferenceError, ProfileError) as error:
+            form.add_error("table", gettext("Could not read the loc-kit: %s") % error)
+            return self.render_to_response(self.get_context_data(form=form))
+        if profile.components[0].kind != "po":
+            form.add_error(
+                "table", gettext("This table maps to a glossary layout, not strings.")
+            )
+            return self.render_to_response(self.get_context_data(form=form))
+
+        result = parse_kit_component(profile.components[0], rows)
+        errors = [d for d in result.diagnostics if d.severity is Severity.ERROR]
+        if errors:
+            shown = "; ".join(f"row {d.row}: {d.message}" for d in errors[:10])
+            form.add_error("table", gettext("The loc-kit has errors: %s") % shown)
+            return self.render_to_response(self.get_context_data(form=form))
+        if profile.components[0].source_lang != component.source_language.code:
+            form.add_error(
+                "table",
+                gettext(
+                    "The table's source language does not match the "
+                    "component's source language."
+                ),
+            )
+            return self.render_to_response(self.get_context_data(form=form))
+
+        if not request.session.session_key:
+            request.session.create()
+        draft = LocKitImportDraft(
+            owner=request.user,
+            session_key=request.session.session_key or "",
+            kind=LocKitImportDraft.Kind.STRING,
+            project=component.project,
+            category=component.category,
+            slug=component.slug,
+            name=component.name,
+            source_filename=filename,
+            target_component=component,
+            state=LocKitImportDraft.State.PREVIEW_READY,
+            preview_json=json.dumps(
+                [_string_unit_to_json(unit) for unit in result.units],
+                ensure_ascii=False,
+            ),
+        )
+        draft.uploaded.save(filename, ContentFile(payload), save=False)
+        try:
+            draft.save()
+        except Exception:
+            draft.delete_storage()
+            raise
+        return redirect("loc-kit-strings-preview", token=draft.token)
+
+
+@method_decorator(login_required, name="dispatch")
+class LocKitStringsPreviewView(LocKitDraftMixin, TemplateView):
+    """Show the validated preview, cancel, or confirm the table update."""
+
+    template_name = "trans/loc_kit_strings_preview.html"
+
+    def get_draft(self, token: str) -> LocKitImportDraft:
+        draft = super().get_draft(token)
+        if (
+            draft.kind != LocKitImportDraft.Kind.STRING
+            or draft.target_component_id is None
+        ):
+            raise Http404
+        return draft
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        draft = self.get_draft(self.kwargs["token"])
+        component = draft.target_component
+        units = _string_units_from_json(draft.preview_json)
+        existing_keys = existing_string_keys(component)
+        new_count = sum(1 for unit in units if unit.key not in existing_keys)
+        can_add_strings = _can_add_strings(self.request.user, component)
+        can_apply_explanations = _can_apply_explanations(self.request.user, component)
+        explanation_preview = classify_kit_explanations(
+            component=component, units=units, overwrite=False
+        )
+        context.update(
+            {
+                "draft": draft,
+                "object": component,
+                "row_count": len(units),
+                "new_count": new_count,
+                "existing_count": len(units) - new_count,
+                "can_add_strings": can_add_strings,
+                "can_apply_explanations": can_apply_explanations,
+                "explanation_preview": explanation_preview,
+                "confirm_form": kwargs.get("confirm_form")
+                or LocKitStringsConfirmForm(),
+            }
+        )
+        return context
+
+    def post(self, request: AuthenticatedHttpRequest, **kwargs):
+        draft = self.get_draft(kwargs["token"])
+        action = request.POST.get("action")
+
+        if action == "cancel":
+            draft.delete_storage()
+            draft.delete()
+            messages.info(request, gettext("Loc-kit strings update cancelled."))
+            return redirect(draft.target_component)
+
+        if action != "confirm":
+            raise Http404
+        if draft.state != LocKitImportDraft.State.PREVIEW_READY:
+            raise Http404
+
+        confirm_form = LocKitStringsConfirmForm(request.POST)
+        if not confirm_form.is_valid():
+            return self.render_to_response(
+                self.get_context_data(confirm_form=confirm_form)
+            )
+
+        component = draft.target_component
+        units = _string_units_from_json(draft.preview_json)
+        try:
+            result = apply_loc_kit_string_update(
+                user=request.user,
+                component=component,
+                units=units,
+                overwrite_explanations=confirm_form.cleaned_data[
+                    "overwrite_explanations"
+                ],
+            )
+        except WeblateLockTimeoutError:
+            messages.error(
+                request,
+                gettext(
+                    "The component is busy right now; nothing was changed. "
+                    "Please retry in a moment."
+                ),
+            )
+            return redirect("loc-kit-strings-preview", token=draft.token)
+        except ValidationError as error:
+            messages.error(request, "; ".join(error.messages))
+            return redirect("loc-kit-strings-preview", token=draft.token)
+
+        self._report_update_outcome(request, result)
+        draft.delete_storage()
+        draft.delete()
+        return redirect(component)
+
+    @staticmethod
+    def _report_update_outcome(request: AuthenticatedHttpRequest, result) -> None:
+        strings = result.strings
+        explanations = result.explanations
+        if strings.added:
+            messages.success(
+                request,
+                ngettext(
+                    "%d new string was added.",
+                    "%d new strings were added.",
+                    strings.added,
+                )
+                % strings.added,
+            )
+        for code in strings.unavailable_languages:
+            messages.warning(
+                request,
+                gettext("Language %s could not be added; its rows were skipped.")
+                % code,
+            )
+        if explanations.set_count:
+            messages.success(
+                request,
+                ngettext(
+                    "%d Explanation was set.",
+                    "%d Explanations were set.",
+                    explanations.set_count,
+                )
+                % explanations.set_count,
+            )
+        if explanations.would_overwrite_count:
+            messages.info(
+                request,
+                gettext(
+                    "%d existing, non-empty Explanation was left unchanged; "
+                    "confirm again with overwrite checked to replace it."
+                )
+                % explanations.would_overwrite_count,
+            )
+        if explanations.unavailable_count:
+            messages.warning(
+                request,
+                gettext(
+                    "%d Explanation could not be set: you do not have the "
+                    "Edit source string permission on this component."
+                )
+                % explanations.unavailable_count,
+            )
+        if not any(
+            [
+                strings.added,
+                explanations.set_count,
+                explanations.would_overwrite_count,
+                explanations.unavailable_count,
+            ]
+        ):
+            messages.info(request, gettext("Nothing in the table changed anything."))

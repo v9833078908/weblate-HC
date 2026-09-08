@@ -39,6 +39,8 @@ class StringUnit:
     comments: tuple[str, ...]
     references: tuple[str, ...]
     row: int
+    explanation: str = ""
+    flags: str = ""
 
 
 @dataclass(frozen=True)

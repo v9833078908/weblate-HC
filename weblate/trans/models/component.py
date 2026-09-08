@@ -24,6 +24,7 @@ from django.core.cache import cache
 from django.core.exceptions import (
     ImproperlyConfigured,
     ObjectDoesNotExist,
+    PermissionDenied,
     ValidationError,
 )
 from django.core.validators import MaxValueValidator
@@ -1197,6 +1198,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
         seed_source_component_id = getattr(self, "seed_source_component_id", None)
         copy_seed_addons = getattr(self, "copy_seed_addons", False)
         seed_author = getattr(self, "seed_author", None)
+        loc_kit_explanations = getattr(self, "loc_kit_explanations", None)
         repository_redirect_changes = self.repository_redirect_changes or []
         if repository_redirect_changes and kwargs.get("update_fields") is not None:
             kwargs["update_fields"] = {
@@ -1365,6 +1367,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
                 copy_seed_addons=copy_seed_addons,
                 seed_author=seed_author,
                 loc_kit_exact=getattr(self, "loc_kit_exact", False),
+                loc_kit_explanations=loc_kit_explanations,
             )
         else:
             self.queue_background_task(
@@ -1382,6 +1385,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
                 seed_author=seed_author,
                 acting_user_id=acting_user_id,
                 loc_kit_exact=getattr(self, "loc_kit_exact", False),
+                loc_kit_explanations=loc_kit_explanations,
             )
 
         if (
@@ -5728,6 +5732,49 @@ class Component(  # ruff: ignore[too-many-public-methods]
                     flags.remove("exact")
                 unit.update_extra_flags(flags.format(), user)
 
+    def apply_loc_kit_explanations(self, explanations: dict[str, str]) -> None:
+        """
+        Apply a loc-kit's parsed key -> explanation cells to fresh source units.
+
+        Called once, right after a kit-derived component's translations are
+        first loaded, so the same upload that created the component also sets
+        ``Unit.explanation`` without a second file upload. The underlying
+        service is idempotent and its own transaction is atomic, so a Celery
+        redelivery of this same task (identical kwargs) safely reclassifies
+        already-set explanations as unchanged instead of writing them twice.
+        A component format change or a revoked ``source.edit`` between the
+        kit upload and this call leaves explanations unapplied without
+        touching anything else about the component.
+        """
+        # ruff: ignore[import-outside-top-level]
+        from loc_kit_ingest.model import StringUnit
+
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.loc_kit import apply_kit_explanations
+
+        units = tuple(
+            StringUnit(
+                key=key,
+                values={},
+                comments=(),
+                references=(),
+                row=0,
+                explanation=explanation,
+            )
+            for key, explanation in explanations.items()
+        )
+        if not units:
+            return
+        try:
+            apply_kit_explanations(
+                user=self.acting_user,
+                component=self,
+                units=units,
+                overwrite=False,
+            )
+        except (ValidationError, PermissionDenied):
+            self.log_warning("could not apply loc-kit explanations")
+
     def after_save(  # ruff: ignore[complex-structure]
         self,
         *,
@@ -5742,6 +5789,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
         copy_seed_addons: bool = False,
         seed_author: str | None = None,
         loc_kit_exact: bool = False,
+        loc_kit_explanations: dict[str, str] | None = None,
     ) -> None:
         # ruff: ignore[import-outside-top-level]
         from weblate.trans.component_copy import (
@@ -5781,6 +5829,8 @@ class Component(  # ruff: ignore[too-many-public-methods]
             was_change = self.create_translations()
         if loc_kit_exact and repository_update_succeeded and self.acting_user:
             self.normalize_loc_kit_exact_flags(self.acting_user)
+        if loc_kit_explanations and was_change and self.acting_user:
+            self.apply_loc_kit_explanations(loc_kit_explanations)
 
         # Update variants (create_translation does this on change)
         if changed_variant and not was_change:

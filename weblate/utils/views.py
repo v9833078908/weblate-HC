@@ -821,6 +821,14 @@ def create_component_from_kit(data, uploaded):
             for d in diagnostics
             if d.severity is not Severity.ERROR
         ],
+        # Non-blank Explanation cells, keyed by the same key the PO writer
+        # uses for msgid. Never routed into `comments`/`#.`: the caller
+        # applies these to Unit.explanation once the component exists.
+        "explanations": {
+            unit.key: unit.explanation.strip()
+            for unit in result.units
+            if getattr(unit, "explanation", "").strip()
+        },
     }
     return fake, kit_info
 

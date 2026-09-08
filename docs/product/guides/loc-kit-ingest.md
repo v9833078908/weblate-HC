@@ -104,6 +104,27 @@ uv run python -m loc_kit_ingest "/path/Temple.csv" \
 с номерами обеих строк) блокируют загрузку до исправления таблицы. Расширение
 на новые форматы = суффикс в `KIT_TABLE_SUFFIXES` + поддержка в `reader.py`.
 
+**Explanation из той же загрузки.** Схема v3 (`schema_version: 3`, только
+`kind: "po"`) добавляет два необязательных scalar-поля component:
+`explanation` и `flags`, каждое с `column`/`header`/`name`. Узкий закрытый
+набор заголовков `explanation`, `explanations`, `пояснение`, `пояснения`
+распознаётся до fallback в `comments`; `comment`, `comments`, `note`,
+`context`, `description` и их текущие локализованные варианты остаются
+developer comment и уходят в `#.` только в PO языка-источника. Explanation
+никогда не попадает в файл: `StringUnit.explanation` доступен только вызывающему
+коду. Если хотя бы одна строка кита несёт непустой Explanation и оператор
+обладает `source.edit` на проекте, разобранные значения сохраняются в сессии
+браузера (`LOC_KIT_PENDING_EXPLANATIONS_KEY` в `weblate/trans/views/create.py`)
+между шагом конвертации и шагом подтверждения создания. После
+`create_translations` `Component.apply_loc_kit_explanations` идемпотентно
+применяет их через `weblate.trans.loc_kit.apply_kit_explanations` -
+source/target, состояние и флаги существующих ключей не меняются. Перенос
+ограничен той же HTTP-сессией: если она потеряна между двумя POST-ами
+визарда (истечение сессии, другая вкладка), Explanation молча не
+применяется, а компонент создаётся как обычно - тот же кит можно затем
+провести через `loc-kit-strings-update` (ниже), который ставит Explanation
+без ограничения по сессии.
+
 ### Глоссарий через UI: явный «Use as glossary»
 
 Тот же кит CSV/TSV/XLSX становится TBX-глоссарием только когда оператор явно
@@ -271,6 +292,61 @@ unsupported: one source and at least one target language are required.
     `sync_terminology` подхватывает его в языках, добавленных позже -
     структурной пустой парой, не меняя уже переведённые target.
 
+### Обновление существующего строкового компонента: `loc-kit-strings-update`
+
+Отдельный от глоссария и от мастера создания поток: таблица применяется к уже
+существующему обычному (не-глоссарному) монолингвальному компоненту. Основной
+сценарий - игровой JSON-компонент: строгий JSON не несёт developer comments,
+поэтому DB-only `Unit.explanation` - его единственный носитель попометного
+контекста для редактора, LLM MT и judge.
+
+1. **Вход.** Пункт меню компонента «Update from a loc-kit table» виден, когда
+   компонент не glossary, не заблокирован, монолингвальный
+   (`has_template()`), и у оператора есть `upload.perform` **или**
+   `source.edit` на исходный translation (шаблон `component.html`). Сам
+   `LocKitStringsUpdateStartView` перепроверяет точнее и пускает дальше, если
+   доступна хотя бы одна из двух мутаций: добавление строк (`upload.perform`
+   **и** `unit.add` на исходный translation) или простановка Explanation
+   (`source.edit` на него); ни одна не подразумевает другую.
+2. **Разбор.** Таблица читается через ту же schema v3 `infer_profile`/
+   `parse_component`, что и универсальная загрузка при создании; лист должен
+   резолвиться ровно в один `kind: "po"` компонент с тем же source language,
+   что и у целевого компонента, и без ERROR-диагностик.
+3. **Черновик.** Разобранные строки (`{key, values, comments, references,
+   explanation, flags}`) сохраняются в `LocKitImportDraft` с `kind=STRING` и
+   `target_component`, owner- и session-bound, как и глоссарный черновик; тот
+   же файл тоже сохраняется для истории/очистки, но confirm читает разобранные
+   строки из `preview_json`, не перечитывает и не парсит файл заново.
+4. **Preview.** Показывает число новых и уже существующих ключей и разбивку
+   Explanation по исходам общего сервиса (`set`/`unchanged`/`blank`/
+   `missing_key`/`would_overwrite`/`already_in_note`); чекбокс «перезаписать
+   существующие, непустые Explanation» виден только при непустом
+   `would_overwrite`.
+5. **Confirm.** Один вызов `weblate.trans.loc_kit.apply_loc_kit_string_update`
+   выполняет обе оси как независимые успехи:
+   - новые ключи - `append_translation_strings`: существующий ключ никогда не
+     трогает свои source/targets/flags; для нового ключа исходный юнит
+     создаётся через `Translation.add_unit(..., is_batch_update=True)`,
+     непустые targets записываются по языкам кита, затем на исходный юнит
+     накладываются провалидированные `weblate.checks.flags.Flags` - именно в
+     этом порядке, потому что `read-only` иначе заблокировал бы запись
+     targets; отсутствующий язык создаётся только при `translation.add`,
+     иначе помечается `unavailable_languages` без остановки остальных;
+   - Explanation - общий `apply_kit_explanations` из связанного плана; без
+     `source.edit` эта ось становится `unavailable`, но разрешённые новые
+     строки всё равно добавляются, и наоборот.
+   Confirm потребляет и удаляет черновик только после успешного применения;
+   отмена (`action=cancel`) удаляет черновик без изменений в компоненте.
+6. **Right size, not right protocol.** В отличие от Celery-протокола
+   `APPLYING`/`FAILED`/`apply_task_id`, которого этот файл не описывает нигде
+   больше, `loc-kit-strings-update` выполняет обе мутации синхронно в одном
+   HTTP-запросе - тем же способом, что уже принятый и работающий
+   `append_glossary_terms`/`LocKitGlossaryPreviewView._apply_update`. Для
+   очень большого кита (тысячи ключей на много языков) это создаёт
+   пропорционально много строк `Change` в одной транзакции; выделенная
+   асинхронная задача с ограничением или отчётом о прогрессе - открытый пункт
+   для последующего измерения, а не то, что реализовано сейчас.
+
 ### Рукописный профиль
 
 Профиль имеет `schema_version` 1 (PO и `term-description-pairs`) или 2
@@ -382,19 +458,22 @@ traversal, регистронезависимые коллизии и внеза
 заголовка была пустой. Это обычная форма таблиц, где первая колонка содержит
 описание термина и не подписана.
 
-### Закрытая схема v1 и v2
+### Закрытая схема v1, v2 и v3
 
-Поддерживаются две версии схемы. `schema_version: 1` сохраняет свою точную
+Поддерживаются три версии схемы. `schema_version: 1` сохраняет свою точную
 интерпретацию: PO-киты и `term-description-pairs` TBX. `schema_version: 2`
 добавляет аддитивно и только один TBX-грамматику `record-map`; для
 документированных простых раскладок (одна строка на термин, term/description-
 пары, опциональная колонка примечания) она выводится локально из заголовка
-кита. Для любой другой формы листа профиль поставляет либо оператор вручную,
-либо OpenRouter-кандидат с последующей локальной валидацией. Документ v1
-читается как
-v1 и не переинтерпретируется как v2. Все объекты обеих версий закрыты: поле, не
-перечисленное ниже, является `profile.unknown_field`, а не запасным источником
-данных.
+кита. `schema_version: 3` добавляет аддитивно и только к `kind: "po"`
+два необязательных scalar-поля component - `explanation` и `flags` - тем же
+`MetadataColumn`, что уже несут `comments`/`references`; ни один TBX-объект
+ни в v2, ни в v3 их не допускает. Для любой формы листа, не покрытой
+детерминированным выводом, профиль поставляет либо оператор вручную, либо
+OpenRouter-кандидат с последующей локальной валидацией. Документ читается
+ровно как заявленная версия и не переинтерпретируется как другая. Все
+объекты всех трёх версий закрыты: поле, не перечисленное ниже, является
+`profile.unknown_field`, а не запасным источником данных.
 
 | Объект | Разрешённые поля | Обязательные поля |
 |---|---|---|
@@ -408,17 +487,19 @@ v1 и не переинтерпретируется как v2. Все объек
 | Pair grammar | `type`, `skip_rows`, `regions` | `type`, `regions`; пропущенные `skip_rows` = `[]` |
 | Pair region | `section_row`, `first_term_row`, `last_description_row` | все |
 | TBX v2 component | common + `initial_target_languages` (без `key_language`) | `initial_target_languages` |
+| PO component (schema v3) | v1 PO fields + `explanation`, `flags` | как в v1; `explanation`, `flags` необязательны |
 | Record-map grammar (v2) | `type`, `skip_rows`, `regions`, `term_row_offset`, `section_field`, `notes`, `source_flags` | `type`, `regions`, `term_row_offset`; `section_field`, `notes` and `source_flags` are optional |
 | Record region | `first_record_row`, `last_record_row`, `record_stride`, `section_row`, `section_column` | `first_record_row`, `last_record_row`, `record_stride`; `section_row`+`section_column` идут вместе и опциональны |
 | Section field | `column`, `header`, `row_offset` | все |
 | Note field | `scope`, `column`, `header`, `row_offset`, `language` | `scope`, `column`, `header`, `row_offset`; `language` обязателен для `scope: "target"`, запрещён для `scope: "source"` |
 | Source flags field | `column`, `header`, `row_offset` | all |
 
-`comments` и `references` используют объект metadata-column. `key` использует
+`comments` и `references` используют объект metadata-column; `explanation` и
+`flags` (только v3, только PO) - тот же объект. `key` использует
 key-column object, поэтому у него нет `name`. `first_data_row`, `key`,
-`comments` и `references` запрещены для TBX; `key_language` и
-`initial_target_languages` запрещены для PO. Это запрещает полукейсовую или
-полупарную интерпретацию до открытия workbook.
+`comments`, `references`, `explanation` и `flags` запрещены для TBX;
+`key_language` и `initial_target_languages` запрещены для PO. Это запрещает
+полукейсовую или полупарную интерпретацию до открытия workbook.
 
 Для v2 `key_language` отсутствует (он не нужен: context строится Unicode-безопасно
 из `(section, term)`, а не из латинской key-колонки); v1 сохраняет `key_language`

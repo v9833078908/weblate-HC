@@ -710,6 +710,7 @@ def component_after_save(  # ruff: ignore[too-many-arguments]
     seed_author: str | None = None,
     acting_user_id: int | None = None,
     loc_kit_exact: bool = False,
+    loc_kit_explanations: dict[str, str] | None = None,
 ) -> dict[Literal["component"], int]:
     component = Component.objects.get(pk=pk)
     if acting_user_id is not None:
@@ -726,6 +727,7 @@ def component_after_save(  # ruff: ignore[too-many-arguments]
         copy_seed_addons=copy_seed_addons,
         seed_author=seed_author,
         loc_kit_exact=loc_kit_exact,
+        loc_kit_explanations=loc_kit_explanations,
     )
     return {"component": pk}
 

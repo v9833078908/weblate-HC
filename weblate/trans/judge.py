@@ -912,10 +912,12 @@ def _segment(index: int, req: JudgeRequest) -> dict:
     if rendered_source is not None or rendered_target is not None:
         segment["rendered_source"] = rendered_source or req.source
         segment["rendered_target"] = rendered_target or req.target
-    if req.note:
-        segment["note"] = req.note
-    if req.explanation:
-        segment["explanation"] = req.explanation
+    explanation = req.explanation.strip()
+    note = req.note.strip()
+    if note and note != explanation:
+        segment["note"] = note
+    if explanation:
+        segment["explanation"] = explanation
     if req.glossary_terms:
         segment["glossary"] = [dict(entry) for entry in req.glossary_terms]
     if req.failing_checks:
