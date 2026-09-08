@@ -570,63 +570,96 @@ sibling view module), `weblate/templates/message.html`,
    cannot serve here: its entries carry no check or scope identity
    (`weblate/utils/celery.py:51-70` stores three ids and nothing else) and
    offer no atomic acquire, so two simultaneous submits would both pass a
-   read-then-check. Use a cache reservation instead:
-   - key `fix-check-lock-{check_id}-{scope_type}-{scope_pk}`;
-   - a module-level `FIX_CHECK_LOCK_TTL = 3600` (one hour) as the timeout.
-     There is no `CELERY_TASK_TIME_LIMIT` in this project - no Celery time
-     limit is configured at all - so the TTL is stated here explicitly. It is
-     a **lease**, not a run-duration estimate: no claim is made about how long
-     a project-wide run takes, because nothing bounds it. The lease is
-     refreshed while the run makes progress (next bullet but one), so its only
-     job is to expire a reservation whose holder died or stalled;
-   - acquire with `cache.add(key, task_id, timeout=FIX_CHECK_LOCK_TTL)`,
-     which is an atomic set-if-absent and fails when the key exists; a failed
-     acquire returns the "already running" message and queues nothing. A
-     `get`-then-`set` pair is explicitly forbidden: two simultaneous POSTs
-     would both pass it;
-   - the id is generated before publication and the reservation is taken
-     before `apply_async`, mirroring the reservation discipline already
-     accepted in
-     `docs/product/plans/2026-08-18-loc-kit-table-add-strings.md`;
-   - **refresh the lease on every progress tick.** The same
-     `update_state(PROGRESS)` step of step 1 re-arms the reservation with
-     `cache.set(key, task_id, timeout=FIX_CHECK_LOCK_TTL)`, guarded by
-     task-id equality so it can never steal a newer holder's key. Without
-     this, a run longer than the TTL would lose its reservation mid-flight and
-     a second run could be queued over it; with it, the lease outlives any run
-     that is still moving.
-   - **release only on a terminal outcome**, and only when the stored value
-     equals the running task id, so a stale release cannot free a newer run.
-     A plain `finally` is wrong here: it runs on every attempt, including the
-     one that raises `WeblateLockTimeoutError` for `autoretry_for`, and would
-     free the reservation while the logical run is still queued for retry.
-     The release therefore sits on the two terminal paths only - the returned
-     `{"status": "completed", …}` and the returned `{"status": "failed", …}`
-     of step 2 - and never on the retry path. A retry re-arms the lease the
-     same way before re-raising, because the backoff itself can exceed the
-     TTL;
-   - **the guarantee, stated honestly:** no second run can be queued for the
-     same `(check_id, scope)` while a holder exists and keeps its lease
-     alive. A holder that stops making progress for longer than the TTL - a
-     killed worker, a stalled node - loses the lease and a second run becomes
-     possible. That case is bounded rather than prevented: `perform_fix`
-     recomputes every candidate at apply time, skips rows that no longer fail
-     the check, and is idempotent on re-apply (Task 2, step 6), so a duplicate
-     run wastes work but cannot corrupt a target;
-   - a failed publication releases the reservation in the same request.
+   read-then-check. The reservation is keyed by
+   `fix-check-lock-{check_id}-{scope_type}-{scope_pk}` - immutable scope
+   identity plus the check, never the actor - and is taken in the request
+   before `apply_async`, with the task id generated first, mirroring the
+   reservation discipline already accepted in
+   `docs/product/plans/2026-08-18-loc-kit-table-add-strings.md`.
+
+   The Django cache API has **no compare-and-set**: `cache.get` followed by
+   `cache.set`/`cache.delete` cannot be token-safe, and a holder whose lease
+   already expired would happily delete a newer holder's key. The plan
+   therefore does not claim token safety on top of it. Two implementations,
+   chosen by `is_redis_cache()` (`weblate/utils/cache.py:13-14`):
+
+   - **Redis (production, and the only configuration where the guard is
+     strict).** Do not use `cache.lock(...)`/`redis.lock.Lock` for the
+     handoff: its ownership token lives in `Lock.local.token`
+     (thread-local, set by `acquire()`), and `reacquire()`/`extend()` take no
+     token argument, so a lock acquired in the web request cannot be
+     refreshed from the worker without poking at that private attribute. Only
+     `Lock.do_release(expected_token)` accepts an explicit token. Use the raw
+     client instead - the same one `WeblateLock` reaches through
+     (`weblate/utils/lock.py:68-81`, `weblate/utils/cache.py:13-14`) - via
+     `caches["default"].client.get_client(write=True)`, and three public
+     operations, all verified against the installed redis-py:
+     - acquire in the request: `client.set(key, token, nx=True, ex=ttl)`
+       where `token` is the task id. `nx=True` makes it set-if-absent, so two
+       simultaneous POSTs cannot both win;
+     - refresh in the worker: a script registered once with
+       `client.register_script(...)` doing `GET` → compare token → `PEXPIRE`.
+       This is byte-for-byte what redis-py's own `LUA_REACQUIRE_SCRIPT` does;
+       registering it here keeps the plan off a private attribute rather than
+       inventing a new mechanism;
+     - release in the worker: the mirror script `GET` → compare token →
+       `DEL`, identical to redis-py's `LUA_RELEASE_SCRIPT`; equivalently
+       `Lock(client, key).do_release(token)`, which runs exactly that script
+       with an explicit token.
+     The worker refreshes on every progress tick of step 1 and releases on
+     the two terminal paths of step 2 - never on the retry path, where it
+     refreshes instead, because the backoff can exceed the lease. Both
+     scripts are no-ops for a foreign token, so a lapsed holder cannot free
+     or extend a newer run. That is the compare-and-set the Django cache API
+     does not offer.
+   - **Non-Redis cache (locmem in tests, small single-process deployments).**
+     No cross-process compare-and-set exists, so the guard degrades
+     explicitly: `cache.add(key, task_id, timeout=FIX_CHECK_LOCK_TTL)` for the
+     atomic enqueue refusal - `add` is set-if-absent on every backend, and a
+     `get`-then-`set` pair is forbidden because two simultaneous POSTs would
+     both pass it - and **no early release at all**; the reservation simply
+     expires. A short `FIX_CHECK_LOCK_TTL` matters here, so the module
+     constant is `FIX_CHECK_LOCK_TTL = 3600`, the same order as
+     `TASK_METADATA_TTL` (`weblate/utils/celery.py:44`) and the same value
+     `WeblateLock` uses for its Redis expiry (`weblate/utils/lock.py:48`).
+     The TTL is a **lease**, not a run-duration estimate: nothing bounds a
+     project-wide run, since this project configures no Celery time limit at
+     all.
+   - A failed publication releases the reservation in the same request on
+     Redis, and on the degraded path leaves it to expire.
+   - **The guarantee, stated honestly.** On Redis no second run can be queued
+     for the same `(check_id, scope)` while a holder keeps refreshing its
+     lease; a holder that stops making progress for longer than the lease -
+     killed worker, stalled node - loses it, and a second run becomes
+     possible. On a non-Redis cache the window is wider, because a finished
+     run holds its reservation until expiry and a lapsed one cannot be
+     distinguished. Either way the duplicate case is **bounded, not
+     prevented**: `perform_fix` recomputes every candidate at apply time,
+     skips rows that no longer fail the check, and is idempotent on re-apply
+     (Task 2, step 6), so a duplicate run wastes work but cannot corrupt a
+     target.
 6. The only cancellation is the ordinary **Cancel** link before queueing. Do
    not promise undo, task cancellation or rollback after the task starts.
 
 **Verify:** view and JS tests assert task metadata per scope, the completed
 and failed result payloads and their poller mapping, that a terminal failure
-is returned rather than raised, a duplicate submit for the same
-`(check_id, scope)` being refused while the first run holds the reservation,
-the lease being re-armed by a progress tick (so a run longer than
-`FIX_CHECK_LOCK_TTL` keeps its reservation), the lease surviving a retry, the
-refresh and the release both being refused when the stored task id differs,
-release happening only on a terminal outcome, and the ARIA updates; manual
-smoke in dev shows queued → running → result progress with keyboard- and
-screen reader-visible text.
+is returned rather than raised, and a duplicate submit for the same
+`(check_id, scope)` being refused while the first run holds the reservation.
+The token-safe half is Redis-only, and `weblate/settings_test.py` does **not**
+provide it: the default cache is LocMem (`:107`) and Redis is configured only
+for the `avatar` cache (`:109-113`), which `is_redis_cache()` never consults.
+That test therefore points the **default** cache at Redis itself with
+`override_settings(CACHES={"default": {"BACKEND":
+"django_redis.cache.RedisCache", "LOCATION": …}})` built from `CI_REDIS_HOST`
+and skips when that variable is absent; Django resets `caches` on a `CACHES`
+override, so `is_redis_cache()` sees the Redis backend. Under it: the lease is
+re-armed by a progress tick so a run longer than `FIX_CHECK_LOCK_TTL` keeps
+its reservation, it survives a retry, and a foreign token can neither refresh
+nor release it. On the degraded non-Redis path the test asserts the documented
+behaviour instead - atomic `add` refusal and expiry-only release, with no
+early delete. JS tests cover the ARIA updates; manual smoke in dev shows
+queued → running → result progress with keyboard- and screen reader-visible
+text.
 
 ## Task 5 - views, URLs, templates
 
