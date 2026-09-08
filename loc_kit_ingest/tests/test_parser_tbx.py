@@ -604,7 +604,19 @@ def test_record_map_allows_empty_source_flags() -> None:
     assert result.units[0].source_flags == ()
 
 
-@pytest.mark.parametrize("value", ["exact", "read-only:max", "read-only,"])
+def test_record_map_allows_exact_glossary_flag() -> None:
+    component = _flat_record_map(
+        source_flags={"column": 3, "header": "flags", "row_offset": 0}
+    )
+    rows = [["ru", "en", "flags"], ["Герой", "Hero", "exact"]]
+
+    result = parse_component(component, rows)
+
+    assert [d for d in result.diagnostics if d.severity is Severity.ERROR] == []
+    assert result.units[0].source_flags == ("exact",)
+
+
+@pytest.mark.parametrize("value", ["read-only:max", "read-only,"])
 def test_record_map_rejects_unsupported_source_flags(value: str) -> None:
     component = _flat_record_map(
         source_flags={"column": 3, "header": "flags", "row_offset": 0}

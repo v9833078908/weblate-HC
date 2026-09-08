@@ -1638,6 +1638,10 @@ class LocKitGlossaryConfirmView(LocKitDraftMixin, CreateComponent):
             fake.full_path,
             {f"tbx/{name}": data for name, data in preview.files.items()},
         )
+        form.instance.loc_kit_exact = any(
+            "exact" in term.source_flags for term in preview.all_terms
+        )
+        form.instance.acting_user = self.request.user
 
         response = super().form_valid(form)
 

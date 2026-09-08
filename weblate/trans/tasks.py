@@ -695,7 +695,7 @@ def component_alerts(component_ids=None) -> None:
     retry_backoff=60,
 )
 @transaction.atomic
-def component_after_save(
+def component_after_save(  # ruff: ignore[too-many-arguments]
     pk: int,
     *,
     changed_git: bool,
@@ -709,6 +709,7 @@ def component_after_save(
     copy_seed_addons: bool = False,
     seed_author: str | None = None,
     acting_user_id: int | None = None,
+    loc_kit_exact: bool = False,
 ) -> dict[Literal["component"], int]:
     component = Component.objects.get(pk=pk)
     if acting_user_id is not None:
@@ -724,6 +725,7 @@ def component_after_save(
         seed_source_component_id=seed_source_component_id,
         copy_seed_addons=copy_seed_addons,
         seed_author=seed_author,
+        loc_kit_exact=loc_kit_exact,
     )
     return {"component": pk}
 

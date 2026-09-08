@@ -1124,6 +1124,10 @@ def append_glossary_terms(
                             )
                             if target_unit is None:
                                 _raise_missing_target_unit(source)
+                            if "exact" in term.source_flags:
+                                flags = Flags(target_unit.extra_flags)
+                                flags.merge("exact")
+                                target_unit.update_extra_flags(flags.format(), user)
                             counters[code]["added"] += 1
                             first_addition = False
                             if source_unit is None:
@@ -1134,7 +1138,9 @@ def append_glossary_terms(
                             )
                             flags = Flags(source_unit.extra_flags)
                             flags.merge("terminology")
-                            flags.merge(term.source_flags)
+                            flags.merge(
+                                flag for flag in term.source_flags if flag != "exact"
+                            )
                             source_unit.update_extra_flags(flags.format(), user)
                             added_source_terms += 1
                     for term in preview.all_terms:

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -177,6 +178,24 @@ def test_tbx_preserves_source_flags(tmp_path, tbx_component):
     hero = next(unit for unit in parsed.units if unit.source == "Герой")
 
     assert hero.xmlelement.get("weblate-flags") == "read-only"
+    assert validate_rendered_component(comp, result, tmp_path) == ()
+
+
+def test_tbx_writes_exact_only_for_nonempty_target(tmp_path, tbx_component):
+    comp, result = tbx_component
+    term = replace(
+        result.units[0],
+        values={"ru": "Герой", "en": "Hero", "ja": ""},
+        source_flags=("exact", "read-only"),
+    )
+    result = replace(result, units=(term,))
+
+    paths = render_component(comp, result, tmp_path)
+
+    en = next(unit for unit in tbxfile.parsestring(paths["en"].read_bytes()).units)
+    ja = next(unit for unit in tbxfile.parsestring(paths["ja"].read_bytes()).units)
+    assert en.xmlelement.get("weblate-flags") == "exact, read-only"
+    assert ja.xmlelement.get("weblate-flags") == "read-only"
     assert validate_rendered_component(comp, result, tmp_path) == ()
 
 

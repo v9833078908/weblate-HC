@@ -143,6 +143,13 @@ def _validate_po(
 # --------------------------------------------------------------------------- #
 
 
+def _tbx_flags(term: GlossaryTerm, target: str) -> tuple[str, ...]:
+    """Return flags applicable to one target-language TBX entry."""
+    return tuple(
+        sorted(flag for flag in term.source_flags if flag != "exact" or bool(target))
+    )
+
+
 def _render_tbx(
     component: ComponentProfile, result: ParseResult, out_dir: Path
 ) -> dict[str, Path]:
@@ -172,11 +179,11 @@ def _render_tbx(
             assert isinstance(unit_data, GlossaryTerm)
             tbx_unit = store.addsourceunit(unit_data.values[source_lang])
             tbx_unit.setid(unit_data.context)
-            tbx_unit.target = unit_data.values.get(target_code, "")
-            if unit_data.source_flags:
-                tbx_unit.xmlelement.set(
-                    "weblate-flags", ", ".join(unit_data.source_flags)
-                )
+            target = unit_data.values.get(target_code, "")
+            tbx_unit.target = target
+            flags = _tbx_flags(unit_data, target)
+            if flags:
+                tbx_unit.xmlelement.set("weblate-flags", ", ".join(flags))
 
             source_explanation = unit_data.source_explanation
             target_explanation = unit_data.target_explanations.get(target_code, "")
@@ -286,7 +293,8 @@ def _validate_tbx(
                     if token.strip()
                 )
             )
-            if actual_flags != expected.source_flags:
+            expected_flags = _tbx_flags(expected, expected_target)
+            if actual_flags != expected_flags:
                 diagnostics.append(
                     Diagnostic(
                         Severity.ERROR,
@@ -294,8 +302,8 @@ def _validate_tbx(
                         component.component,
                         "",
                         0,
-                        f"source flags mismatch for context {ctx!r}: "
-                        f"expected {expected.source_flags!r}, got {actual_flags!r}",
+                        f"glossary flags mismatch for context {ctx!r}: "
+                        f"expected {expected_flags!r}, got {actual_flags!r}",
                     )
                 )
 
