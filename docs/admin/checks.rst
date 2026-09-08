@@ -325,6 +325,46 @@ unresolved ``major`` stopped blocking delivery on its own.
    * :ref:`project-commit_policy`
    * :setting:`JUDGE_ENABLED`
 
+.. _mass-fix-failing-checks:
+
+Mass-fixing failing checks
+---------------------------
+
+A check can offer a :guilabel:`Fix` button that repairs every string it
+currently fails across a translation, a component, or a whole project,
+instead of opening each string by hand. Only checks with a deterministic,
+meaning-preserving fixup participate; other failing checks have no
+:guilabel:`Fix` button anywhere.
+
+Participating checks fall into two tiers:
+
+* the **safe** tier applies after a single count confirmation - for
+  example ``Будет исправлено 12 строк`` - with no per-string preview;
+* the **review** tier always shows a per-string diff with a checkbox
+  before anything changes, using the same rendering as suggestions. A
+  review runs in batches of at most 250 eligible strings **per failing
+  check**; a scope with more matches needs a further pass once the shown
+  batch is fixed, since fixed strings stop matching the check and the next
+  reload picks up the following batch.
+
+Fixing a source string that only needs cosmetic repair - for example
+normalizing ``...`` to ``…`` - never marks its existing translations
+:guilabel:`Needs editing`. The edit is written straight to the translated
+files without going through the fuzzy/needs-editing cascade a normal
+source edit uses; a translation that itself contains the same defect is
+fixed separately, by running the button for that language.
+
+The button requires both the :guilabel:`Bulk edit strings` permission on
+the chosen scope and the ordinary :guilabel:`Edit source`/translate
+permission on every individual string; the second check is re-evaluated
+for every string at the moment the fix is applied, not only when the
+button is shown. A string with a current judge verdict that the fix would
+make stale is counted and shown before the change is applied; the fix
+does not queue a re-check on its own (see :ref:`llm-judge`).
+
+Mass-fixing has no undo. Review the preview before confirming, especially
+for a component- or project-wide run.
+
 .. _fonts:
 
 Managing fonts
