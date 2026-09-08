@@ -384,6 +384,40 @@ the code or `pytest-xdist`: the usual cause is the container sitting at its
 memory ceiling. Each xdist worker already gets its own temporary `DATA_DIR`
 (`weblate/settings_test.py`), so worker file collisions are not the cause.
 
+### Code intelligence (LSP)
+
+`.omp/lsp.json` (tracked) configures semantic code intelligence for the omp
+agent: `basedpyright` for navigation, references, renames and type
+diagnostics, plus `ruff` as the linter server. It is a plain LSP config, so
+any client that reads the same file benefits.
+
+The servers themselves are per-machine and are not part of `uv sync`:
+
+```sh
+uv tool install basedpyright   # provides basedpyright-langserver
+uv tool install ruff           # a broken pyenv `ruff` shim is not usable
+```
+
+Three settings in that file matter and should not be dropped:
+
+- `python.pythonPath: .venv/bin/python` - without it Django, Celery and
+  translate-toolkit do not resolve and every module turns into a false import
+  error. The path is relative, so each git worktree uses its own `.venv`.
+- `analysis.exclude` - `build/`, `.worktrees/`, `data-test/`,
+  `dev-docker/data/` and `weblate-mcp/` hold copies of the source tree.
+  Without the exclusion, `references` on `weblate/utils/state.py` returns 11
+  hits instead of 6, five of them inside generated `build/lib/`, and `rename`
+  would happily rewrite that copy too.
+- `pyright`, `pylsp` and `ty` are disabled - when several Python servers
+  resolve on `PATH`, the first one wins, and a globally installed
+  `pyright-langserver` from another project would otherwise take over without
+  any of the settings above.
+
+Use `references` before changing an exported symbol; a text search misses
+re-exports and shadowing. A server installed while a session is already
+running is not picked up: the binary lookup is cached per process, so restart
+the agent after installing one.
+
 ### weblate-mcp
 
 For any operation against the running Weblate instance (projects, components,
