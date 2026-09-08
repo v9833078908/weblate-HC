@@ -190,6 +190,7 @@ class KabyleCharactersCheck(TargetCheck):
         "Use standardized Latin Kabyle characters (e.g. ɣ instead of Greek γ; ɛ instead of ε)."
     )
     version_added = "5.12"
+    mass_fixup = "safe"
 
     confusable_to_standard: ClassVar[dict[str, str]] = {
         "\u03b3": "\u0263",
@@ -259,6 +260,7 @@ class DoubleSpaceCheck(TargetCheck):
     check_id = "double_space"
     name = gettext_lazy("Double space")
     description = gettext_lazy("Translation contains double space.")
+    mass_fixup = "safe"
 
     def check_single(self, source: str, target: str, unit: Unit):
         # One letter things are usually decimal/thousand separators
@@ -275,6 +277,225 @@ class DoubleSpaceCheck(TargetCheck):
         return [("regex", " {2,}", " ", "u")]
 
 
+def _is_french_terminal(unit: Unit) -> bool:
+    """Whether the unit's target language uses French terminal spacing."""
+    language = unit.translation.language
+    return language.is_base({"fr"}) and language.code != "fr_CA"
+
+
+def _terminal_mark(unit: Unit, base: str) -> str:
+    """
+    Render a terminal punctuation mark for the unit's target language.
+
+    `base` is one of ``.``, ``:``, ``?`` or ``!`` - the *family* the source
+    string's own terminal mark belongs to (the source may itself end with
+    any member of that family accepted by the matching check's branches
+    below, not only the plain ASCII character). The result satisfies the
+    matching terminal check's own accepted-marks set (CJK fullwidth marks,
+    the Greek and Arabic question marks, French non-breaking spacing before
+    ``:``, ``?`` and ``!``); everywhere else it is the plain ASCII mark
+    itself, which every remaining language branch in `EndStopCheck`/
+    `EndColonCheck`/`EndQuestionCheck`/`EndExclamationCheck` already
+    accepts. This table is only ever a proposal - the mass-fix engine
+    (`weblate/trans/fix_check.py`) recomputes the check before and after
+    applying it and discards anything that does not actually clear it.
+    """
+    language = unit.translation.language
+    if language.is_cjk():
+        return {".": "。", ":": "：", "?": "？", "!": "！"}[base]
+    if base == "?":
+        if language.is_base({"el"}):
+            return "\u037e"  # Greek question mark
+        if language.is_base({"ar"}):
+            return "؟"
+        if language.is_base({"my"}):
+            return MY_QUESTION_MARK
+    if _is_french_terminal(unit):
+        if base == ":":
+            return f"\u00a0{base}"
+        if base in FRENCH_PUNCTUATION_NNBSP:
+            return f"\u202f{base}"
+    return base
+
+
+# --- Source-side mark detection --------------------------------------------
+#
+# Whether the *source* string ends with a mark this check's target-language
+# branch treats as belonging to that check's family - i.e. whether a
+# missing counterpart in target is exactly what would make `check_single`
+# fail for this unit. Each function below is a direct, deliberately
+# unabbreviated transcription of the corresponding check's own branch
+# dispatch (same language gates, same per-branch accepted sets, including
+# the asymmetric ones where a branch's *source*-side gate is narrower than
+# what it accepts on the *target* side, e.g. Greek/Armenian/Burmese
+# `end_question`, which only ever gate on a literal ASCII ``?`` in source
+# even though they accept a wider target-side mark). Getting this wrong in
+# either direction is safe by construction - `_terminal_append_fixup`'s own
+# conflict guard and the mass-fix engine's before/after contract (Task 2)
+# both still gate the final write - but an under-broad predicate here would
+# silently leave real, currently-failing rows without a proposed fixup.
+def _stop_source_has_mark(source: str, target: str, unit: Unit) -> bool:
+    if not source:
+        return False
+    language = unit.translation.language
+    if language.is_cjk() and source[-1] in {":", ";"}:
+        # `EndStopCheck._check_ja`'s own gate; only entered for a source
+        # ending in `:`/`;`, never for a source ending in `.`/`。`/etc,
+        # which falls through to the default branch below instead.
+        return True
+    if language.is_base({"hy"}):
+        return source[-1] in {
+            ".",
+            "。",
+            "।",
+            "۔",
+            "։",
+            "·",
+            "෴",
+            "។",
+            ":",
+            "՝",
+            "?",
+            "!",
+            "`",
+        }
+    if language.is_base({"hi", "bn", "or"}):
+        return source[-1] in {".", "\u0964", "\u09f7", "|"}
+    if language.is_base({"sat"}):
+        return source[-1] in {".", "᱾"}
+    if language.is_base({"my"}):
+        if target.endswith(MY_QUESTION_MARK):
+            return False
+        return source[-1] in {".", "။"}
+    return source[-1] in {".", "。", "।", "۔", "։", "·", "෴", "។", "።"}
+
+
+def _colon_source_has_mark(source: str, unit: Unit) -> bool:
+    if not source:
+        return False
+    language = unit.translation.language
+    if language.is_base({"hy"}):
+        return source[-1] == ":"
+    if language.is_cjk():
+        return source[-1] in {":", ";"}
+    return source[-1] in {":", "：", "៖"}
+
+
+def _question_source_has_mark(source: str, unit: Unit) -> bool:
+    if not source:
+        return False
+    if unit.translation.language.is_base({"hy", "el", "my"}):
+        # `_check_hy`/`_check_el`/`_check_my` all gate on a literal `?` in
+        # source; the wider sets they compare against (`question_el`,
+        # `MY_QUESTION_MARK`, and hy's own `{"?", "՞", "："}`)  # ruff: ignore[ambiguous-unicode-character-comment]
+        # are target-side only.
+        return source[-1] == "?"
+    return source[-1] in {"?", "՞", "؟", "⸮", "？", "፧", "꘏", "⳺"}
+
+
+def _exclamation_source_has_mark(source: str, unit: Unit) -> bool:
+    if not source:
+        return False
+    if unit.translation.language.is_base({"my"}):
+        return source[-1] in {"!", "႟"}
+    return source[-1] in {"!", "！", "՜", "᥄", "႟", "߹"}
+
+
+# --- Conflict guard ----------------------------------------------------
+#
+# Every character some language branch of the matching terminal check
+# accepts on either side (source or target) as a terminal mark of that
+# family - a deliberately *wide* union, unlike the precise per-branch
+# detection above. A target already ending with one of these is never
+# touched by `_terminal_append_fixup`: appending over it would trade one
+# mismatched mark for another (`?` becoming `?.`) instead of clearing the
+# check, so the unit is left for a human (`manual` bucket). Being wide here
+# is safe - it can only make the guard refuse more often, never propose a
+# wrong fix.
+TERMINAL_MARK_CHARS = frozenset(
+    {
+        # end_stop
+        ".",
+        "。",
+        "।",
+        "۔",
+        "։",
+        "·",
+        "෴",
+        "។",
+        "።",
+        "\u09f7",
+        "|",
+        "᱾",
+        "။",
+        # end_colon
+        ":",
+        "：",
+        "៖",
+        "՝",
+        "`",
+        ";",
+        # end_question
+        "?",
+        "՞",
+        "؟",
+        "⸮",
+        "？",
+        "፧",
+        "꘏",
+        "⳺",
+        "\u037e",
+        # end_exclamation
+        "!",
+        "！",
+        "՜",
+        "᥄",
+        "႟",
+        "߹",
+        "¡",
+        # end_interrobang tails not already listed above
+        "⁈",
+        "⁉",
+        # never touch a deliberate ellipsis
+        "…",
+    }
+)
+_TERMINAL_CONFLICT_CLASS = "".join(
+    re.escape(char) for char in sorted(TERMINAL_MARK_CHARS)
+)
+
+
+def _terminal_append_fixup(mark: str, *, strip_prefix: str = "") -> list[FixupType]:
+    r"""
+    Build a fixup that appends `mark`, refusing an existing terminal mark.
+
+    The pattern matches only the (possibly empty) run of trailing
+    whitespace, and only when a real, non-whitespace character precedes it
+    and that character is not already some other terminal mark; replacing
+    that span with `mark` therefore either appends cleanly onto real
+    content, or - on an empty/whitespace-only target or a conflicting
+    existing mark - changes nothing at all. `(?<=\S)` (a real character
+    precedes), not `(?<!\s)` (merely "not whitespace", which is vacuously
+    true at the very start of an empty string): the latter would let an
+    untranslated or empty plural form be "fixed" into a bare mark on its
+    own.
+
+    `strip_prefix`, when given, is a single character consumed (at most
+    once) immediately before the append point if present. Burmese
+    `MY_QUESTION_MARK` is the two-codepoint sequence U+1038 VISARGA +
+    U+104B SECTION, and U+1038 is also an ordinary Burmese word-final
+    consonant marker; without this, a target already ending in U+1038
+    would get a *second*, spurious one from the mark itself. Consuming one
+    existing U+1038 first and then appending the full mark (whose own
+    leading U+1038 replaces the one consumed) keeps that single visarga
+    exactly once, immediately followed by the section mark, instead of
+    silently doubling it.
+    """
+    prefix_pattern = f"{re.escape(strip_prefix)}?" if strip_prefix else ""
+    pattern = rf"(?<![{_TERMINAL_CONFLICT_CLASS}])(?<=\S){prefix_pattern}\s*$"
+    return [("regex", pattern, mark, "u")]
+
+
 class EndStopCheck(TargetCheck):
     """Check for final stop."""
 
@@ -283,6 +504,7 @@ class EndStopCheck(TargetCheck):
     description = gettext_lazy(
         "Source and translation do not both end with a full stop."
     )
+    mass_fixup = "review"
 
     def _check_my(self, source: str, target: str):
         if target.endswith(MY_QUESTION_MARK):
@@ -330,6 +552,12 @@ class EndStopCheck(TargetCheck):
             source, target, -1, {".", "。", "।", "۔", "։", "·", "෴", "។", "።"}
         )
 
+    def get_fixup(self, unit: Unit) -> Iterable[FixupType] | None:
+        source = unit.source_string
+        if not _stop_source_has_mark(source, unit.target, unit):
+            return None
+        return _terminal_append_fixup(_terminal_mark(unit, "."))
+
 
 class EndColonCheck(TargetCheck):
     """Check for final colon."""
@@ -337,6 +565,7 @@ class EndColonCheck(TargetCheck):
     check_id = "end_colon"
     name = gettext_lazy("Mismatched colon")
     description = gettext_lazy("Source and translation do not both end with a colon.")
+    mass_fixup = "review"
 
     def should_skip(self, unit: Unit) -> bool:
         # Thai and Lojban do not have a colon
@@ -365,6 +594,12 @@ class EndColonCheck(TargetCheck):
             return self._check_ja(source, target)
         return self.check_chars(source, target, -1, {":", "：", "៖"})
 
+    def get_fixup(self, unit: Unit) -> Iterable[FixupType] | None:
+        source = unit.source_string
+        if not _colon_source_has_mark(source, unit):
+            return None
+        return _terminal_append_fixup(_terminal_mark(unit, ":"))
+
 
 class EndQuestionCheck(TargetCheck):
     """Check for final question mark."""
@@ -375,6 +610,7 @@ class EndQuestionCheck(TargetCheck):
         "Source and translation do not both end with a question mark."
     )
     question_el = ("?", ";", ";")
+    mass_fixup = "review"
 
     def should_skip(self, unit: Unit) -> bool:
         # Thai and Lojban do not have a question mark
@@ -411,6 +647,15 @@ class EndQuestionCheck(TargetCheck):
             source, target, -1, {"?", "՞", "؟", "⸮", "？", "፧", "꘏", "⳺"}
         )
 
+    def get_fixup(self, unit: Unit) -> Iterable[FixupType] | None:
+        source = unit.source_string
+        if not _question_source_has_mark(source, unit) or source.endswith(INTERROBANGS):
+            return None
+        mark = _terminal_mark(unit, "?")
+        if mark == MY_QUESTION_MARK:
+            return _terminal_append_fixup(mark, strip_prefix=MY_QUESTION_MARK[0])
+        return _terminal_append_fixup(mark)
+
 
 class EndExclamationCheck(TargetCheck):
     """Check for final exclamation mark."""
@@ -420,6 +665,7 @@ class EndExclamationCheck(TargetCheck):
     description = gettext_lazy(
         "Source and translation do not both end with an exclamation mark."
     )
+    mass_fixup = "review"
 
     def should_skip(self, unit: Unit) -> bool:
         # Thai, Lojban, and Armenian do not have an exclamation mark
@@ -445,6 +691,14 @@ class EndExclamationCheck(TargetCheck):
             return False
         return self.check_chars(source, target, -1, {"!", "！", "՜", "᥄", "႟", "߹"})
 
+    def get_fixup(self, unit: Unit) -> Iterable[FixupType] | None:
+        source = unit.source_string
+        if not _exclamation_source_has_mark(source, unit) or source.endswith(
+            INTERROBANGS
+        ):
+            return None
+        return _terminal_append_fixup(_terminal_mark(unit, "!"))
+
 
 class EndInterrobangCheck(TargetCheck):
     """Check for final interrobang expression."""
@@ -454,12 +708,22 @@ class EndInterrobangCheck(TargetCheck):
     description = gettext_lazy(
         "Source and translation do not both end with an interrobang expression."
     )
+    mass_fixup = "review"
 
     def check_single(self, source: str, target: str, unit: Unit):
         if not source or not target:
             return False
 
         return source.endswith(INTERROBANGS) != target.endswith(INTERROBANGS)
+
+    def get_fixup(self, unit: Unit) -> Iterable[FixupType] | None:
+        source = unit.source_string
+        if not source.endswith(INTERROBANGS):
+            return None
+        mark = next(form for form in INTERROBANGS if source.endswith(form))
+        if _is_french_terminal(unit):
+            mark = f"\u202f{mark}"
+        return _terminal_append_fixup(mark)
 
 
 class EndEllipsisCheck(TargetCheck):

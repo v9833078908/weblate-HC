@@ -77,6 +77,9 @@ class BaseCheck(ClassLoaderProtocol, DocVersionsMixin):
     batch_project_wide = False
     skip_suggestions = False
     extra_enable_strings: tuple[str, ...] = ()
+    # Mass-fix tier (docs/product/plans/2026-08-25-mass-fix-failing-checks.md).
+    # Set explicitly on concrete classes; never inferred from get_fixup.
+    mass_fixup: Literal["safe", "review"] | None = None
 
     def get_identifier(self) -> str:
         return self.check_id
