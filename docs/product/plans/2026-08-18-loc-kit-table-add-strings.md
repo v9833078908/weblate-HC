@@ -11,12 +11,13 @@ start/preview/confirm, `append_translation_strings` + общий
 `append_glossary_terms`/`LocKitGlossaryPreviewView._apply_update`.
 Соответственно, критерии проверки этого плана про fast-worker visibility,
 retryable/terminal failure, duplicate task delivery и coordinator как
-Celery-задачу - неприменимы и не проверялись; для очень большого кита это
-означает пропорционально много `Change` в одной транзакции без прогресса
-или лимита. Компромисс задокументирован в
-`docs/product/guides/loc-kit-ingest.md` (раздел «Right size, not right
-protocol»); остальные критерии («Проверка», строки 262-296 этого файла, за
-вычетом Celery-специфичных) покрыты
+Celery-задачу неприменимы и не проверялись. Синхронный вариант утверждён с
+пределом 5 000 непустых translation/flag/Explanation cells: он проверяется
+до draft и перед service apply, поэтому большой кит не создаёт мутаций, а
+пользователь получает требование разделить таблицу. Компромисс
+задокументирован в `docs/product/guides/loc-kit-ingest.md` (раздел «Right
+size, not right protocol»); остальные критерии («Проверка», строки 262-296
+этого файла, за вычетом Celery-специфичных) покрыты
 `weblate/trans/tests/test_loc_kit_ingest_contract.py::LocKitStringsUpdateServiceTest`
 и `::LocKitStringsUpdateViewTest`.
 Связанный план общего Explanation-контракта и мастера создания:
@@ -33,7 +34,11 @@ Follow-up code review закрыл ещё два Important: проверены n
 с актуальным judge-вердиктом, которые смена Explanation сделает stale.
 `loc_kit_explanations` также доезжает через deferred `perform_load`, а не
 теряется при lock timeout; см. третий Follow-up в файле ревью.
-
+Follow-up synchronous safety: измерение крупнейшего отслеживаемого кита
+(`analysis/data/heart-abyss-hub-1-units-9lang.tsv`, 396 строк и 3 960
+непустых cells) привело к пределу 5 000 cells. Guard существует в HTTP
+входе и в coordinator, поэтому прямой/retry вызов тоже не сможет обойти
+предел.
 
 ## Цель
 

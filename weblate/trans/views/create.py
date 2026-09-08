@@ -69,6 +69,7 @@ from weblate.trans.loc_kit import (
     profile_document_from_envelope,
     request_profile_proposal,
     validate_glossary_profile,
+    validate_loc_kit_string_update_size,
 )
 from weblate.trans.models import Category, Component, Project
 from weblate.trans.models.loc_kit import LocKitImportDraft
@@ -1958,6 +1959,11 @@ class LocKitStringsUpdateStartView(TemplateView):
                     "component's source language."
                 ),
             )
+            return self.render_to_response(self.get_context_data(form=form))
+        try:
+            validate_loc_kit_string_update_size(result.units)
+        except ValidationError as error:
+            form.add_error("table", "; ".join(error.messages))
             return self.render_to_response(self.get_context_data(form=form))
 
         if not request.session.session_key:

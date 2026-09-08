@@ -6,12 +6,11 @@
 Осознанное отступление от плана: задача 4 использует синхронный
 однопроходный confirm вместо Celery-протокола `APPLYING`/`FAILED`/
 `apply_task_id`, которого требует связанный план
-`2026-08-18-loc-kit-table-add-strings.md` - решение и компромисс описаны
-в `docs/product/guides/loc-kit-ingest.md` (раздел «Right size, not right
-protocol»); критерии проверки того плана, завязанные на этот протокол
-(видимость драфта до коммита задачи, retryable/terminal failure, duplicate
-task delivery), к синхронному дизайну неприменимы и не проверялись - нужно
-явное решение, устраивает ли синхронный вариант постоянно. Тесты зелёные:
+`2026-08-18-loc-kit-table-add-strings.md`. Решение утверждено: synchronous
+flow ограничен 5 000 непустых translation/flag/Explanation cells, с guard
+до создания draft и перед apply; большее нужно разделить на несколько
+таблиц. Асинхронный дизайн остаётся отдельным инкрементом, когда реальный
+kit не поместится в предел. Тесты зелёные:
 `cd loc_kit_ingest && uv run pytest` (312) и
 `weblate/trans/tests/test_loc_kit_ingest_contract.py` +
 `test_loc_kit_drafts.py` (136) при отдельном запуске; в общем прогоне
@@ -31,7 +30,6 @@ smoke-test и деплой не выполнены - требуют отдель
 deferred `perform_load` теперь сохраняет server-side Explanation map, а
 preview existing-component flow считает актуальные judge-вердикты, которые
 станут stale.
-
 
 ## Цель
 

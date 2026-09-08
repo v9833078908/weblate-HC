@@ -62,6 +62,11 @@ _TRUNCATION_MARKER = "…[truncated]"
 # are ever truncated; row signatures are never dropped.
 _CELL_EXCERPT_LIMIT = 80
 
+# ``loc-kit-strings-update`` is synchronous. Bound its work by every
+# non-empty input cell which may produce a unit, target, flag, or Explanation
+# write. The largest tracked string kit has 3,960 such cells.
+LOC_KIT_STRING_UPDATE_MAX_MUTATIONS = 5_000
+
 
 class SampleTooLargeError(Exception):
     """Raised when the structural sample cannot fit within ``max_bytes``."""
@@ -926,7 +931,6 @@ def count_judge_stale_after_explanations(
     """
     # ruff: ignore[import-outside-top-level]
     from weblate.glossary.models import get_matched_glossary_prompt_entries
-
     from weblate.trans.models.judge import compute_context_hash, compute_target_hash
 
     _check_explanation_apply_eligibility(component)
@@ -1026,6 +1030,35 @@ def apply_kit_explanations(
 # --------------------------------------------------------------------------- #
 # Update an existing string component from a loc-kit table
 # --------------------------------------------------------------------------- #
+
+
+def validate_loc_kit_string_update_size(units: Sequence[StringUnit]) -> None:
+    """
+    Reject a table too large for the synchronous strings-update transaction.
+
+    Count all non-empty translation, flag, and Explanation cells rather than
+    only rows: one key can write one source and many target units. This stays
+    conservative when another confirm changes key existence between preview
+    and apply, and the same guard can protect both the HTTP entry point and
+    direct service callers.
+    """
+    mutation_count = sum(
+        bool(value.strip())
+        for unit in units
+        for value in (*unit.values.values(), unit.flags, unit.explanation)
+    )
+    if mutation_count > LOC_KIT_STRING_UPDATE_MAX_MUTATIONS:
+        raise ValidationError(
+            _(
+                "This table has %(count)d non-empty cells, exceeding the "
+                "synchronous update limit of %(limit)d. Split it into "
+                "smaller tables."
+            )
+            % {
+                "count": mutation_count,
+                "limit": LOC_KIT_STRING_UPDATE_MAX_MUTATIONS,
+            }
+        )
 
 
 def _check_string_update_eligibility(component: Component) -> None:
@@ -1200,6 +1233,7 @@ def apply_loc_kit_string_update(
     neither needs to nest inside the other's.
     """
     _check_string_update_eligibility(component)
+    validate_loc_kit_string_update_size(units)
     can_add_strings = user.has_perm("upload.perform", component) and user.has_perm(
         "unit.add", component.source_translation
     )
@@ -1595,6 +1629,7 @@ def append_glossary_terms(
 
 __all__ = [
     "GLOSSARY_SCHEMA_VERSION",
+    "LOC_KIT_STRING_UPDATE_MAX_MUTATIONS",
     "OPENROUTER_API_ROOT",
     "OPENROUTER_CHAT_COMPLETIONS_URL",
     "OPENROUTER_REQUEST_TIMEOUT",
@@ -1624,4 +1659,5 @@ __all__ = [
     "profile_document_from_envelope",
     "request_profile_proposal",
     "validate_glossary_profile",
+    "validate_loc_kit_string_update_size",
 ]

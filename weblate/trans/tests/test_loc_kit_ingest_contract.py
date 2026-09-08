@@ -3367,6 +3367,34 @@ class LocKitStringsUpdateServiceTest(ViewTestCase):
             ).exists()
         )
 
+    def test_synchronous_limit_rejects_new_key_before_writing(self) -> None:
+        """
+        The synchronous flow refuses more parsed mutation cells than its limit.
+
+        The guard belongs in the service, not only in its HTTP caller: no
+        source unit may exist after a direct or retried call is rejected.
+        """
+        new_row = self._row(key="new_key", values={"en": "Hello", "cs": "Ahoj"})
+
+        with (
+            patch.object(
+                loc_kit, "LOC_KIT_STRING_UPDATE_MAX_MUTATIONS", 1, create=True
+            ),
+            self.assertRaisesRegex(ValidationError, "synchronous update limit"),
+        ):
+            loc_kit.apply_loc_kit_string_update(
+                user=self.user,
+                component=self.component,
+                units=(new_row,),
+                overwrite_explanations=False,
+            )
+
+        self.assertFalse(
+            self.component.source_translation.unit_set.filter(
+                context="new_key"
+            ).exists()
+        )
+
 
 class LocKitStringsUpdateViewTest(ViewTestCase):
     """The start -> preview -> confirm HTTP flow for an existing component."""
@@ -3494,6 +3522,29 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
 
         self.assertContains(response, "retry")
         self.assertTrue(LocKitImportDraft.objects.exists())
+        self.assertFalse(
+            self.component.source_translation.unit_set.filter(
+                context="new_key"
+            ).exists()
+        )
+
+    def test_start_over_limit_requests_smaller_table(self) -> None:
+        kit = "key,en,cs\nnew_key,Hello,Ahoj\n"
+
+        with patch.object(
+            loc_kit, "LOC_KIT_STRING_UPDATE_MAX_MUTATIONS", 1, create=True
+        ):
+            response = self.client.post(
+                reverse(
+                    "loc-kit-strings-update",
+                    kwargs={"path": self.component.get_url_path()},
+                ),
+                {"table": self._upload(kit)},
+            )
+
+        self.assertContains(response, "synchronous update limit")
+        self.assertContains(response, "smaller tables")
+        self.assertFalse(LocKitImportDraft.objects.exists())
         self.assertFalse(
             self.component.source_translation.unit_set.filter(
                 context="new_key"
