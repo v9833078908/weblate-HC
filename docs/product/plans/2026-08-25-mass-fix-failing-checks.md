@@ -597,20 +597,29 @@ sibling view module), `weblate/templates/message.html`,
      - acquire in the request: `client.set(key, token, nx=True, ex=ttl)`
        where `token` is the task id. `nx=True` makes it set-if-absent, so two
        simultaneous POSTs cannot both win;
-     - refresh in the worker: a script registered once with
-       `client.register_script(...)` doing `GET` → compare token → `PEXPIRE`.
-       This is byte-for-byte what redis-py's own `LUA_REACQUIRE_SCRIPT` does;
-       registering it here keeps the plan off a private attribute rather than
-       inventing a new mechanism;
-     - release in the worker: the mirror script `GET` → compare token →
+     - refresh in the worker: a fixed application helper wrapping a script
+       registered once with `client.register_script(...)` doing `GET` →
+       compare token → `PEXPIRE`. This is byte-for-byte what redis-py's own
+       `LUA_REACQUIRE_SCRIPT` does; registering it here keeps the plan off a
+       private attribute rather than inventing a new mechanism;
+     - release in the worker: the mirror helper, `GET` → compare token →
        `DEL`, identical to redis-py's `LUA_RELEASE_SCRIPT`; equivalently
        `Lock(client, key).do_release(token)`, which runs exactly that script
        with an explicit token.
+     Both helpers return a boolean and **the caller must act on it** - a
+     token mismatch is a lost lease, never a silent no-op:
+     - refresh returned false: another run owns the reservation. The task
+       stops after the unit in flight, reports the run as
+       `{"status": "failed", …}` with a "another run took over" message, and
+       does **not** attempt a release, because the key is not its own;
+     - release returned false: the lease had already lapsed. The task records
+       it (the run itself still reports its real outcome) and does not retry
+       the release.
      The worker refreshes on every progress tick of step 1 and releases on
      the two terminal paths of step 2 - never on the retry path, where it
-     refreshes instead, because the backoff can exceed the lease. Both
-     scripts are no-ops for a foreign token, so a lapsed holder cannot free
-     or extend a newer run. That is the compare-and-set the Django cache API
+     refreshes instead, because the backoff can exceed the lease. Because
+     both scripts compare before acting, a lapsed holder can neither free nor
+     extend a newer run. That is the compare-and-set the Django cache API
      does not offer.
    - **Non-Redis cache (locmem in tests, small single-process deployments).**
      No cross-process compare-and-set exists, so the guard degrades
@@ -654,10 +663,15 @@ That test therefore points the **default** cache at Redis itself with
 and skips when that variable is absent; Django resets `caches` on a `CACHES`
 override, so `is_redis_cache()` sees the Redis backend. Under it: the lease is
 re-armed by a progress tick so a run longer than `FIX_CHECK_LOCK_TTL` keeps
-its reservation, it survives a retry, and a foreign token can neither refresh
-nor release it. On the degraded non-Redis path the test asserts the documented
-behaviour instead - atomic `add` refusal and expiry-only release, with no
-early delete. JS tests cover the ARIA updates; manual smoke in dev shows
+its reservation, and it survives a retry. The handoff-safety assertions are
+the point of that test and must be explicit: with a newer token stored under
+the key, both helpers return **false** for the stale token, the stored value
+is still the newer token afterwards, and its TTL is unchanged; a false
+refresh makes the run stop and report failure without releasing, and a false
+release is recorded without retry. On the degraded non-Redis path the test
+asserts the documented behaviour instead - atomic `add` refusal and
+expiry-only release, with no early delete.
+JS tests cover the ARIA updates; manual smoke in dev shows
 queued → running → result progress with keyboard- and screen reader-visible
 text.
 
