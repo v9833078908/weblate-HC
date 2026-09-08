@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from collections import UserList
-from typing import TYPE_CHECKING, NamedTuple, Protocol
+from typing import TYPE_CHECKING, Literal, NamedTuple, Protocol
 from urllib.parse import quote
 
 from django.utils.functional import cached_property
@@ -35,6 +35,26 @@ class EngageTask(NamedTuple):
     url: str
     label: StrOrPromise
     total: int
+
+
+class TranslationChecklistItem(NamedTuple):
+    """
+    One row of `TranslationChecklistMixin.list_translation_checks`.
+
+    `check_id`/`mass_fixup` are set only by the per-`CHECKS` loop in
+    `list_translation_checks`; every aggregate bucket (`all`, `translated`,
+    labels, ...) leaves them `None` (docs/product/plans/
+    2026-08-25-mass-fix-failing-checks.md, Task 5 step 1).
+    """
+
+    query: str
+    name: StrOrPromise
+    total: int
+    color: str
+    words: int
+    characters: int
+    check_id: str | None = None
+    mass_fixup: Literal["safe", "review"] | None = None
 
 
 class TranslationChecklistMixin:
@@ -109,7 +129,13 @@ class TranslationChecklistMixin:
         # Process specific checks
         for check in CHECKS:
             check_obj = CHECKS[check]
-            result.add_if(self.stats, check_obj.url_id, "")
+            result.add_if(
+                self.stats,
+                check_obj.url_id,
+                "",
+                check_id=check_obj.check_id,
+                mass_fixup=check_obj.mass_fixup,
+            )
 
         # Grab comments
         result.add_if(self.stats, "comments", "")
@@ -133,23 +159,41 @@ class TranslationChecklistMixin:
 class TranslationChecklist(UserList):
     """Simple list wrapper for translation checklist."""
 
-    def add_if(self, stats, name, level) -> bool:
+    def add_if(
+        self,
+        stats,
+        name,
+        level,
+        *,
+        check_id: str | None = None,
+        mass_fixup: Literal["safe", "review"] | None = None,
+    ) -> bool:
         """Add to list if there are matches."""
         if getattr(stats, name) > 0:
-            self.add(stats, name, level)
+            self.add(stats, name, level, check_id=check_id, mass_fixup=mass_fixup)
             return True
         return False
 
-    def add(self, stats, name, level) -> None:
+    def add(
+        self,
+        stats,
+        name,
+        level,
+        *,
+        check_id: str | None = None,
+        mass_fixup: Literal["safe", "review"] | None = None,
+    ) -> None:
         """Add item to the list."""
         self.append(
-            (
-                FILTERS.get_filter_query(name),
-                FILTERS.get_filter_name(name),
-                getattr(stats, name),
-                level,
-                getattr(stats, f"{name}_words"),
-                getattr(stats, f"{name}_chars"),
+            TranslationChecklistItem(
+                query=FILTERS.get_filter_query(name),
+                name=FILTERS.get_filter_name(name),
+                total=getattr(stats, name),
+                color=level,
+                words=getattr(stats, f"{name}_words"),
+                characters=getattr(stats, f"{name}_chars"),
+                check_id=check_id,
+                mass_fixup=mass_fixup,
             )
         )
 

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% load crispy_forms_tags humanize i18n icons translations %}
+
+{% block breadcrumbs %}
+  {% path_object_breadcrumbs path_object %}
+  <li class="breadcrumb-item">
+    <a href="{% url 'checks' path=path_object.get_url_path name=check.check_id %}">{{ check.name }}</a>
+  </li>
+  <li class="breadcrumb-item">{% translate "Fix" %}</li>
+{% endblock breadcrumbs %}
+
+{% block content %}
+
+  <p>{{ check.description }}</p>
+
+  <p>
+    {% blocktranslate trimmed with scope=path_object %}
+      Scope: {{ scope }}.
+    {% endblocktranslate %}
+  </p>
+
+  {% if candidates.verdicts_no_longer_current %}
+    {% blocktranslate trimmed count count=candidates.verdicts_no_longer_current asvar verdict_msg %}
+      {{ count }} judge verdict will no longer be current after this fix.
+    {% plural %}
+      {{ count }} judge verdicts will no longer be current after this fix.
+    {% endblocktranslate %}
+    {% show_message "warning" verdict_msg %}
+  {% endif %}
+
+  <p class="text-muted">{% translate "This action has no undo." %}</p>
+
+  {% if check.mass_fixup == "safe" %}
+
+    <form method="post">
+      {% csrf_token %}
+      {% crispy form %}
+
+      <p>
+        {% blocktranslate trimmed count count=candidates.total_eligible %}
+          {{ count }} string will be fixed.
+        {% plural %}
+          {{ count }} strings will be fixed.
+        {% endblocktranslate %}
+      </p>
+
+      <button type="submit" class="btn btn-primary">
+        {% blocktranslate trimmed count count=candidates.total_eligible %}
+          Fix {{ count }} string
+        {% plural %}
+          Fix {{ count }} strings
+        {% endblocktranslate %}
+      </button>
+      <a href="{{ path_object.get_absolute_url }}" class="btn btn-link">{% translate "Cancel" %}</a>
+    </form>
+
+  {% else %}
+
+    <p>
+      {% blocktranslate trimmed count count=candidates.manual with denied=candidates.denied %}
+        {{ count }} string needs manual review and {{ denied }} could not be checked due to missing permission; neither is selectable below.
+      {% plural %}
+        {{ count }} strings need manual review and {{ denied }} could not be checked due to missing permission; none of them is selectable below.
+      {% endblocktranslate %}
+      <a href="{{ path_object.get_translate_url }}?q={{ check.url_id }}">{% translate "Browse" %}</a>
+    </p>
+
+    {% if candidates.remaining > 0 %}
+      {% blocktranslate trimmed count count=candidates.shown|length with total=candidates.total_eligible asvar limited_msg %}
+        Showing the first {{ count }} applicable of {{ total }}.
+      {% plural %}
+        Showing the first {{ count }} applicable of {{ total }}.
+      {% endblocktranslate %}
+      {% show_message "info" limited_msg %}
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      {% for error in form.non_field_errors %}<p class="text-danger">{{ error }}</p>{% endfor %}
+
+      {% if candidates.shown %}
+        <p>
+          <label>
+            <input type="checkbox" id="fix-check-select-all" />
+            {% blocktranslate trimmed count count=candidates.shown|length %}
+              Select all {{ count }} applicable on this page
+            {% plural %}
+              Select all {{ count }} applicable on this page
+            {% endblocktranslate %}
+          </label>
+        </p>
+
+        <div class="table-scroll"
+             tabindex="0"
+             role="region"
+             aria-label="{% translate "Scrollable table" %}">
+          <table class="table table-listing">
+            <thead>
+              <tr>
+                <th>{% translate "Fix" %}</th>
+                <th>{% translate "String" %}</th>
+                <th>{% translate "Fixed target" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in candidates.shown %}
+                <tr>
+                  <td>
+                    <label class="visually-hidden" for="fix-check-unit-{{ row.unit.pk }}">
+                      {% blocktranslate trimmed with context=row.unit.context language=row.unit.translation.language %}
+                        Select {{ context }} ({{ language }}) for fixing
+                      {% endblocktranslate %}
+                    </label>
+                    <input type="checkbox"
+                           name="unit_ids"
+                           value="{{ row.unit.pk }}"
+                           id="fix-check-unit-{{ row.unit.pk }}"
+                           class="fix-check-row" />
+                  </td>
+                  <td>
+                    <a href="{{ row.unit.get_absolute_url }}"
+                       class="btn btn-link btn-xs"
+                       title="{% translate "Edit" %}">{% icon "pencil.svg" %}</a>
+                    <label for="fix-check-unit-{{ row.unit.pk }}">
+                      {{ row.unit.translation }}: {{ row.unit.position }}
+                      {% if row.unit.context %}({{ row.unit.context }}){% endif %}
+                    </label>
+                  </td>
+                  <td>{% format_unit_target row.unit value=row.final_target_value diff=row.unit.target %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          {% blocktranslate trimmed count count=candidates.shown|length %}
+            Fix selected ({{ count }})
+          {% plural %}
+            Fix selected ({{ count }})
+          {% endblocktranslate %}
+        </button>
+      {% else %}
+        <p>{% translate "No applicable strings to fix right now." %}</p>
+      {% endif %}
+      <a href="{{ path_object.get_absolute_url }}" class="btn btn-link">{% translate "Cancel" %}</a>
+    </form>
+
+  {% endif %}
+
+{% endblock content %}
