@@ -51,8 +51,8 @@
 
 1. Общая функция разбирает и применяет `{ключ -> explanation}`.
 2. Мастер создания сохраняет исходную загрузку как
-   `LocKitImportDraft` и после `create_translations` вызывает общую функцию
-   автоматически (A').
+   `LocKitImportDraft` и после `create_translations` автоматически
+   резервирует request-free задачу общей функции (A').
 3. Существующий компонент использует ту же функцию внутри единственного
    `loc-kit-strings-update` preview/apply-потока. Отдельного
    explanation-only view не создаётся.
@@ -179,15 +179,30 @@ Explanation + Comment сохраняются в разных полях; две 
   `apply_kit_explanations`;
 - закрепить eligibility, `source.edit`, overwrite и DB-only-инварианты;
 - блокировать исходные юниты в стабильном порядке;
-- confirm существующего компонента всегда ставит coordinator в Celery:
-  `LocKitImportDraft` получает состояния `APPLYING`/`FAILED` и nullable
-  `apply_task_id`; атомарный переход из `PREVIEW_READY`/`FAILED` в
-  `APPLYING` не допускает две задачи;
-- успешная task переводит draft в `CONSUMED`; обработчик ошибки отдельной
-  транзакцией переводит его из `APPLYING` в retryable `FAILED`, сохраняя
-  файл до expiry;
-- task заново читает и валидирует draft/profile/preview, передаёт в сервис
-  `User`, а не request; успешный результат помечает draft consumed;
+- `LocKitImportDraft` получает состояния `APPLYING`/`FAILED`, nullable
+  UUIDField `apply_task_id` и атомарный протокол резерва;
+- confirm существующего компонента внутри `transaction.atomic` берёт draft
+  через `select_for_update`, допускает только `PREVIEW_READY`/retryable
+  `FAILED`, генерирует `task_id = uuid.uuid4()`, одним update сохраняет
+  `state=APPLYING` + `apply_task_id=task_id`, затем регистрирует
+  `transaction.on_commit` с
+  `task.apply_async(..., task_id=str(task_id))`;
+- callback публикации ловит ошибку брокера, отдельной транзакцией делает
+  compare-and-set только для того же
+  `(pk, state=APPLYING, apply_task_id=task_id)` в `FAILED`, оставляет файл
+  и повторно поднимает ошибку в UI; draft не зависает в `APPLYING`;
+- bound task работает с `acks_late=True` и
+  `reject_on_worker_lost=True`, заново читает `User`, component, draft,
+  profile и preview; HTTP request через очередь не передаётся;
+- task внутри одной транзакции берёт draft и component lock, требует
+  `state=APPLYING`, `apply_task_id == self.request.id` и повторно проверяет
+  permission/eligibility; duplicate delivery после `CONSUMED` — no-op,
+  несовпадающий task id никогда не применяет данные;
+- успешная транзакция переводит draft в `CONSUMED`, а удаление файла
+  регистрируется через `transaction.on_commit`; retryable exception
+  оставляет тот же `APPLYING`/task id для Celery retry, окончательная ошибка
+  отдельной транзакцией compare-and-set переводит только свой reservation
+  в retryable `FAILED`;
 - preview показывает число юнитов с актуальным judge-вердиктом, которые
   станут stale; ручной записи `JudgeVerdict`/`Unit.state` нет.
 
@@ -210,33 +225,42 @@ state, flags, labels и файлы неизменны; нет `source.edit` — 
 
 - строковый table-upload сохранять в `LocKitImportDraft`; preview и
   локальная валидация завершаются до создания компонента;
-- не хранить карту в `kit_info` и не полагаться на transient attribute
-  через Celery;
+- до связывания draft проверить
+  `request.user.has_perm("source.edit", project)`;
+  `Unit.update_explanation` сам permission не проверяет;
 - между шагами визарда нести UUID `draft.token`, а не доверенный клиенту
   database id; перед `Component.save` разрешить token через
   owner/session-bound `LocKitImportDraft.get_active` и только затем положить
-  внутренний `loc_kit_draft_id` на instance для явной сериализации в task
-  kwargs;
+  внутренний `loc_kit_draft_id` на instance;
 - читать `loc_kit_draft_id` в `Component.save` и явно передать его через
   eager-вызов `after_save`, `queue_background_task`,
-  `component_after_save` и `Component.after_save`;
-- worker загружает черновик по id, проверяет owner/project/component,
-  expiry, state и `source.edit`;
-- вызвать общую функцию после успешного `create_translations`;
-- если `create_translations` передало загрузку в `perform_load`, отложить
-  применение до появления `source_translation`, не помечать черновик
-  consumed и не терять draft id;
-- только успешное применение помечает draft consumed и удаляет файл;
-- исключение откатывает транзакцию, оставляет draft для безопасного
-  явного повтора до expiry и показывает background-task failure;
+  `component_after_save` и `Component.after_save`; transient attribute без
+  этих kwargs через Celery не проходит;
+- после успешного inline `create_translations` `after_save` вызывает общий
+  scheduler из задачи 2: тот повторно проверяет `source.edit` на созданной
+  source translation, резервирует UUID task id и публикует request-free
+  apply-task строго по протоколу `APPLYING`/`on_commit`/publish-failure;
+- если `create_translations` делегирует загрузку в `perform_load`, draft id
+  и `acting_user_id` явно передаются в kwargs `perform_load`; draft остаётся
+  `PREVIEW_READY`. Только после успешного `create_translations_immediate`
+  `perform_load` вызывает тот же scheduler. Так владелец продолжения —
+  ровно одна завершившая load-задача, а draft id не теряется;
+- apply-task ещё раз загружает actor и проверяет `source.edit` на source
+  translation непосредственно перед `Unit.update_explanation`; потеря права
+  переводит его reservation в `FAILED` без мутаций;
+- только успешная apply-task помечает draft `CONSUMED` и удаляет файл;
+  duplicate delivery видит `CONSUMED` и ничего не применяет;
 - только в этом же cutover перестать направлять explanation-колонку в
   `comments`/`#.`.
 
 **Проверка:** настоящий Celery-путь и eager-путь дают одинаковый результат;
-воркер получает id после повторной загрузки `Component` из БД; при deferred
-load применение происходит ровно один раз; expired/wrong-owner/wrong-project
-draft не применяется; ошибка не удаляет черновик; кит без Explanation
-проходит прежним путём.
+fast worker не стартует до сохранения `apply_task_id`; broker publish failure
+оставляет `FAILED`, не `APPLYING`; duplicate delivery и двойной confirm дают
+одну мутацию; worker получает id после повторной загрузки `Component` из БД;
+deferred `perform_load` сохраняет draft id и ставит apply ровно один раз;
+expired/wrong-owner/wrong-project draft не применяется; потеря `source.edit`
+не меняет Explanation; ошибка не удаляет файл; кит без Explanation проходит
+прежним путём.
 
 ### 4. Существующий компонент: расширить add-strings
 

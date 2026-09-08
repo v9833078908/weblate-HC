@@ -185,14 +185,35 @@ def append_translation_strings(
 Explanation; для новых — Explanation ставится после появления исходного
 юнита. Checkbox «перезаписать непустые пояснения» показывается только при
 `would_overwrite > 0` и `source.edit`.
-Explanation-набор не применяется в HTTP-транзакции: confirm резервирует
-draft, заранее сохраняет `apply_task_id` и ставит coordinator в Celery.
-Задача заново загружает `User`, component, draft, profile и preview;
-выполняет string и Explanation-части в одной транзакции. Состояния draft
-`PREVIEW_READY/FAILED -> APPLYING -> CONSUMED` и task id не допускают
-двойного confirm. После ошибки отдельный failure-handler переводит draft из
-`APPLYING` в `FAILED`, доступный для явного retry до expiry; исходная
-загрузка удаляется только после `CONSUMED`.
+
+Explanation-набор не применяется в HTTP-транзакции. Confirm выполняет
+следующий протокол:
+
+1. В `transaction.atomic` получить draft через `select_for_update`; допустить
+   только owner/session-bound `PREVIEW_READY` или retryable `FAILED`.
+2. Сгенерировать `task_id = uuid.uuid4()` **до публикации** и одним update
+   сохранить `state=APPLYING`, nullable UUIDField
+   `apply_task_id=task_id`.
+3. Зарегистрировать
+   `transaction.on_commit(lambda: task.apply_async(...,`
+   `task_id=str(task_id)))`. `delay()` здесь запрещён: его id возникает после
+   публикации и оставляет fast-worker race.
+4. Если callback не опубликовал сообщение в broker, отдельной транзакцией
+   compare-and-set только для того же
+   `(pk, state=APPLYING, apply_task_id=task_id)` перевести draft в
+   `FAILED`, сохранить файл и показать enqueue failure. Не оставлять
+   reservation в `APPLYING`.
+
+Bound task использует `acks_late=True` и `reject_on_worker_lost=True`, заново
+загружает `User`, component, draft, profile и preview. В одной транзакции он
+берёт draft и component lock, требует `state=APPLYING` и
+`apply_task_id == self.request.id`, затем выполняет string и
+Explanation-части. Успех переводит draft в `CONSUMED`; файл удаляется через
+`transaction.on_commit`. Duplicate delivery после `CONSUMED` — no-op,
+несовпадающий task id никогда не применяет данные. Retryable exception
+сохраняет тот же reservation для Celery retry; окончательная ошибка отдельной
+транзакцией compare-and-set переводит только свой reservation в `FAILED`,
+доступный для явного retry до expiry.
 
 ### 4. Start, preview, confirm
 
@@ -204,8 +225,9 @@ draft, заранее сохраняет `apply_task_id` и ставит coordin
 - `LocKitStringsPreviewView`: вызывает schema v3 infer/parse, строит обе
   классификации и permission matrix, не меняет компонент.
 - `LocKitStringsConfirmView`: заново загружает и проверяет draft,
-  permissions и компонент, отклоняет stale/consumed/expired draft,
-  атомарно резервирует task id и ставит coordinator ровно один раз.
+  permissions и компонент, отклоняет stale/consumed/expired draft и
+  выполняет UUID/reservation/on-commit протокол выше; двойной confirm
+  проигрывает `select_for_update`/state check и не публикует вторую задачу.
 - URL: `loc-kit-strings-update`; отдельного explanation URL нет.
 
 Черновик остаётся owner-, session-, project- и component-bound. Глоссарный
@@ -260,9 +282,15 @@ Weblate contract
   разрешённые Explanation применяются;
 - отсутствующий язык создаётся только при `translation.add`;
 - ERROR блокирует все мутации; partial unavailable — нет;
-- повторный confirm не применяет draft второй раз;
-- повторный confirm не ставит вторую задачу; failed-task допускает явный
-  retry, consumed draft — нет;
+- быстрый worker не может увидеть draft до коммита
+  `APPLYING`/`apply_task_id`;
+- исключение из `apply_async` переводит только свой reservation в `FAILED`
+  и сохраняет файл;
+- двойной confirm публикует одну задачу; duplicate delivery с тем же id
+  применяет один раз; чужой task id не применяет ничего;
+- retryable failure сохраняет `APPLYING`, окончательная ошибка переводит
+  свой reservation в `FAILED`, явный retry получает новый UUID;
+- consumed draft не применяется повторно;
 - coordinator получает `User`, а не HTTP request, и возвращает точные
   counters через task result.
 
