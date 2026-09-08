@@ -42,8 +42,11 @@ it a tier and its fixup is proven to clear every check it touches.
 
 ## Decisions added on revision (2026-09-08)
 
-6. **Ownership rule. This amends user decision 1 and needs the owner's
-   confirmation.** Five checks (`end_ellipsis`, `begin_space`, `end_space`,
+6. **Revised coverage decision - this changes user decision 1 and needs the
+   owner's confirmation.** Decision 1 fixed coverage as the A/B sets, so
+   moving checks out of the safe tier is a coverage change, not merely an
+   implementation rule. Five checks (`end_ellipsis`, `begin_space`,
+   `end_space`,
    `zero-width-space`, `punctuation_spacing`) leave the safe tier because the
    autofix layer already repairs those defects both on write and, over the
    historical corpus, through `reapply_autofixes`. The justification is not
@@ -539,10 +542,17 @@ sibling view module), `weblate/templates/message.html`,
    Mapping in the poller: not ready → running; ready with
    `result["status"] == "completed"` → success text; ready with `"failed"`,
    with a non-dict result, or with a stringified exception → failure text.
-   The API treats any ready task as `completed` and stringifies exceptions, so
-   a retry-exhausted run must still land in that failure branch and never
-   render an empty success. The task therefore wraps its body and writes the
-   failure payload itself before re-raising.
+   **Terminal failure returns, it does not raise.** Celery stores the
+   exception as the task result, which would replace the `result` dict and
+   make `status` unobservable, so the body catches its own errors:
+   `WeblateLockTimeoutError` is re-raised while retries remain, letting
+   `autoretry_for` do its job; once retries are exhausted - detected with the
+   same shape as the existing `commit_lock_retries_exhausted()`
+   (`weblate/trans/tasks.py:69-76`) - and for any other unexpected exception,
+   the task reports the error, **returns** `{"status": "failed", …}` and
+   never re-raises. The non-dict/stringified-exception branch of the mapping
+   above stays as the backstop for a worker that dies outright, so a failed
+   run can never render as an empty success.
 3. Metadata per decision 10: `translation_id` for a translation scope,
    `component_id` for a component scope, and `user_id` alone for a project
    scope. A project-scope task consequently has `component is None` in
@@ -562,26 +572,45 @@ sibling view module), `weblate/templates/message.html`,
    offer no atomic acquire, so two simultaneous submits would both pass a
    read-then-check. Use a cache reservation instead:
    - key `fix-check-lock-{check_id}-{scope_type}-{scope_pk}`;
-   - acquire with `cache.add(key, task_id, timeout=CELERY_TASK_TIME_LIMIT)`,
-     which is atomic and fails when the key exists; a failed acquire returns
-     the "already running" message and queues nothing;
+   - a module-level `FIX_CHECK_LOCK_TTL = 3600` (one hour) as the timeout.
+     There is no `CELERY_TASK_TIME_LIMIT` in this project - no Celery time
+     limit is configured at all - so the TTL is stated here explicitly and is
+     crash recovery only, never the release mechanism. One hour is the same
+     order as `TASK_METADATA_TTL` (`weblate/utils/celery.py:44`) and safely
+     exceeds any realistic project-wide run; a longer run releases its own
+     reservation before the TTL matters;
+   - acquire with `cache.add(key, task_id, timeout=FIX_CHECK_LOCK_TTL)`,
+     which is an atomic set-if-absent and fails when the key exists; a failed
+     acquire returns the "already running" message and queues nothing. A
+     `get`-then-`set` pair is explicitly forbidden: two simultaneous POSTs
+     would both pass it;
    - the id is generated before publication and the reservation is taken
      before `apply_async`, mirroring the reservation discipline already
      accepted in
      `docs/product/plans/2026-08-18-loc-kit-table-add-strings.md`;
-   - release in the task's `finally`, and only when the stored value equals
-     the running task id, so a stale release cannot free a newer run; the TTL
-     is the backstop for a lost worker;
+   - **release only on a terminal outcome**, and only when the stored value
+     equals the running task id, so a stale release cannot free a newer run.
+     A plain `finally` is wrong here: it runs on every attempt, including the
+     one that raises `WeblateLockTimeoutError` for `autoretry_for`, and would
+     free the reservation while the logical run is still queued for retry.
+     The release therefore sits on the two terminal paths only - the returned
+     `{"status": "completed", …}` and the returned `{"status": "failed", …}`
+     of step 2 - and never on the retry path. Because the retry can outlive
+     `FIX_CHECK_LOCK_TTL` after backoff, the retrying attempt refreshes its
+     own reservation (`cache.set` guarded by the same task-id equality) before
+     re-raising;
    - a failed publication releases the reservation in the same request.
 6. The only cancellation is the ordinary **Cancel** link before queueing. Do
    not promise undo, task cancellation or rollback after the task starts.
 
 **Verify:** view and JS tests assert task metadata per scope, the completed
-and failed result payloads and their poller mapping, a duplicate submit for
-the same `(check_id, scope)` being refused while the first run holds the
-reservation, the reservation being released only by its own task id, and the
-ARIA updates; manual smoke in dev shows queued → running → result progress
-with keyboard- and screen reader-visible text.
+and failed result payloads and their poller mapping, that a terminal failure
+is returned rather than raised, a duplicate submit for the same
+`(check_id, scope)` being refused while the first run holds the reservation,
+the reservation surviving a retry and being released only by its own task id
+on a terminal outcome, and the ARIA updates; manual smoke in dev shows
+queued → running → result progress with keyboard- and screen reader-visible
+text.
 
 ## Task 5 - views, URLs, templates
 
