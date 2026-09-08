@@ -608,13 +608,17 @@ sibling view module), `weblate/templates/message.html`,
        with an explicit token.
      Both helpers return a boolean and **the caller must act on it** - a
      token mismatch is a lost lease, never a silent no-op:
-     - refresh returned false: another run owns the reservation. The task
-       stops after the unit in flight, reports the run as
-       `{"status": "failed", …}` with a "another run took over" message, and
-       does **not** attempt a release, because the key is not its own;
-     - release returned false: the lease had already lapsed. The task records
-       it (the run itself still reports its real outcome) and does not retry
-       the release.
+     - refresh returned false: another run owns the reservation, and this is
+       a **terminal** condition. The task finishes the unit already being
+       written (it is inside a per-component transaction), applies **no
+       further units**, does not start another component, returns
+       `{"status": "failed", …}` with an "another run took over" message, and
+       does **not** attempt a release, because the key is not its own. It
+       does not retry either: retrying would re-enter a scope another run is
+       already repairing;
+     - release returned false: the lease had already lapsed, so the run was
+       already terminal by then. The task records it and does not retry the
+       release; the run still reports the outcome it actually produced.
      The worker refreshes on every progress tick of step 1 and releases on
      the two terminal paths of step 2 - never on the retry path, where it
      refreshes instead, because the backoff can exceed the lease. Because
