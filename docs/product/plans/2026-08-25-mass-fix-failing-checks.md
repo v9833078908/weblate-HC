@@ -3,7 +3,8 @@
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
 > implement this plan task-by-task.
 
-**Status:** awaiting approval. No task has been started.
+**Status:** implemented (2026-09-08). Tasks 1-6 complete on branch
+`feat/mass-fix-failing-checks`; not yet deployed to production.
 **Revised 2026-09-08** against
 `docs/product/reviews/2026-09-08-mass-fix-failing-checks-plan-review.md`:
 every finding of that review is folded into the tasks below, every code
