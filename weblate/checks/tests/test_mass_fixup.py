@@ -40,7 +40,9 @@ from weblate.checks.chars import (
     KabyleCharactersCheck,
     KashidaCheck,
     PunctuationSpacingCheck,
+    TerminalEdit,
     ZeroWidthSpaceCheck,
+    terminal_source_edit,
 )
 from weblate.checks.models import CHECKS
 from weblate.checks.source import EllipsisCheck
@@ -676,3 +678,204 @@ class OwnershipBoundaryTest(SimpleTestCase):
                     fixed3, applied3 = fix_target([repaired3], unit3)
                     self.assertEqual(fixed3, [repaired3])
                     self.assertNotIn("Removed final stop", applied3)
+
+
+class TerminalSourcePolicyTest(SimpleTestCase):
+    """
+    `terminal_source_edit()`: the explicit append/replace/remove policy.
+
+    Covers docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md
+    Task A's worked examples plus the guard rails around them. Unlike
+    `TerminalFixupTest` above, this exercises the new function directly,
+    never `get_fixup()`.
+    """
+
+    def _edit(self, check, unit) -> TerminalEdit | None:
+        return terminal_source_edit(check, unit)
+
+    def _apply(self, edit: TerminalEdit | None, target: str) -> str:
+        self.assertIsNotNone(edit)
+        return apply_fixup([edit.fixup], target)
+
+    # -- Worked examples from the plan ----------------------------------
+
+    def test_replace_zh_hans_stop_to_fullwidth_exclamation(self) -> None:
+        # "source ends '!'; zh target '...供工人阅读。' -> '...供工人阅读！'"
+        unit = make_unit(
+            code="zh_Hans",
+            source="Buy some books to read!",
+            target="这个书架空空如也，购买一些书籍供工人阅读。",
+        )
+        edit = self._edit(EndExclamationCheck(), unit)
+        self.assertIsNotNone(edit)
+        self.assertEqual(edit.operation, "replace")
+        self.assertEqual(
+            self._apply(edit, unit.target), "这个书架空空如也，购买一些书籍供工人阅读！"
+        )
+
+    def test_replace_en_question_source_stop_target(self) -> None:
+        unit = make_unit(code="en", source="Save it?", target="Text.")
+        edit = self._edit(EndQuestionCheck(), unit)
+        self.assertEqual(edit.operation, "replace")
+        self.assertEqual(self._apply(edit, unit.target), "Text?")
+
+    def test_replace_ko_stop_source_exclamation_target_stays_ascii(self) -> None:
+        # ko must get ASCII "." here, never fullwidth "。" - the renderer
+        # bug this task also fixes (`_terminal_mark`).
+        unit = make_unit(code="ko", source="Save it.", target="내용!")
+        edit = self._edit(EndStopCheck(), unit)
+        self.assertEqual(edit.operation, "replace")
+        self.assertEqual(self._apply(edit, unit.target), "내용.")
+
+    def test_replace_en_exclamation_source_stop_target_contraction(self) -> None:
+        # "I can't!" -> "I can't.": the trailing apostrophe+letter of a
+        # contraction must not look like a 1-3 letter abbreviation.
+        unit = make_unit(code="en", source="I can't.", target="I can't!")
+        edit = self._edit(EndStopCheck(), unit)
+        self.assertEqual(edit.operation, "replace")
+        self.assertEqual(self._apply(edit, unit.target), "I can't.")
+
+    def test_append_ko_stop_stays_ascii_not_fullwidth(self) -> None:
+        unit = make_unit(code="ko", source="General settings.", target="게임 설정")
+        edit = self._edit(EndStopCheck(), unit)
+        self.assertEqual(edit.operation, "append")
+        fixed = self._apply(edit, unit.target)
+        self.assertEqual(fixed, "게임 설정.")
+        self.assertNotEqual(fixed, "게임 설정。")
+
+    def test_remove_ascii_stop_when_source_has_no_mark(self) -> None:
+        # CoL4/data/fr's dominant shape: pure removal.
+        unit = make_unit(code="fr", source="Enregistrer", target="Enregistrer.")
+        edit = self._edit(EndStopCheck(), unit)
+        self.assertEqual(edit.operation, "remove")
+        self.assertEqual(self._apply(edit, unit.target), "Enregistrer")
+
+    def test_remove_fullwidth_stop_when_source_has_no_mark(self) -> None:
+        unit = make_unit(code="zh_Hans", source="购买一些书籍", target="购买一些书籍。")
+        edit = self._edit(EndStopCheck(), unit)
+        self.assertEqual(edit.operation, "remove")
+        self.assertEqual(self._apply(edit, unit.target), "购买一些书籍")
+
+    def test_remove_ascii_exclamation_when_source_has_no_mark(self) -> None:
+        # Not "Save now!": "now" is exactly 3 letters and the conservative
+        # abbreviation filter deliberately also excludes ordinary short
+        # words (see `_terminal_edit_stem_is_protected`'s docstring).
+        unit = make_unit(code="en", source="Save immediately", target="Save immediately!")
+        edit = self._edit(EndExclamationCheck(), unit)
+        self.assertEqual(edit.operation, "remove")
+        self.assertEqual(self._apply(edit, unit.target), "Save immediately")
+
+    # -- Explicit "do not remove" carve-outs -----------------------------
+
+    def test_question_mark_is_never_removed(self) -> None:
+        unit = make_unit(code="en", source="Can we proceed", target="Can we proceed?")
+        self.assertIsNone(self._edit(EndQuestionCheck(), unit))
+
+    def test_colon_is_never_removed(self) -> None:
+        unit = make_unit(code="en", source="He said", target="He said:")
+        self.assertIsNone(self._edit(EndColonCheck(), unit))
+
+    # -- Exclusions -------------------------------------------------------
+
+    def test_ellipsis_target_is_not_replaced(self) -> None:
+        unit = make_unit(code="en", source="Save it?", target="Loading…")
+        self.assertIsNone(self._edit(EndQuestionCheck(), unit))
+
+    def test_doubled_mark_target_is_not_replaced(self) -> None:
+        # A doubled mark is not a *single* conflicting mark, so this falls
+        # through to the append delegation, which then correctly no-ops on
+        # its own conflict guard - the same contract `get_fixup()` already
+        # has (see `TerminalOverlapTest`): observably unchanged, whether or
+        # not `terminal_source_edit` itself returns an edit.
+        unit = make_unit(code="en", source="Save it?", target="Wait!!")
+        edit = self._edit(EndQuestionCheck(), unit)
+        fixed = apply_fixup([edit.fixup], unit.target) if edit else unit.target
+        self.assertEqual(fixed, "Wait!!")
+
+    def test_interrobang_target_is_not_touched_by_this_policy(self) -> None:
+        unit = make_unit(code="ru", source="Save it.", target="Правда⁉")
+        self.assertIsNone(self._edit(EndStopCheck(), unit))
+
+    def test_source_ending_semicolon_is_out_of_scope(self) -> None:
+        # `get_fixup()` still treats CJK ";" as colon-equivalent for
+        # append (unchanged, see `TerminalFixupTest`); the new policy
+        # refuses the source outright, so it cannot misread it as "no
+        # mark" either and offer to strip an earned target mark.
+        unit = make_unit(code="ja", source="Label;", target="ラベル。")
+        self.assertIsNone(self._edit(EndColonCheck(), unit))
+        self.assertIsNone(self._edit(EndStopCheck(), unit))
+
+    def test_quoted_source_tail_is_excluded_not_unwrapped(self) -> None:
+        # Unlike `RemoveAddedFinalStop`, which unwraps a source closing
+        # quote to still find the mark, this policy simply refuses.
+        unit = make_unit(
+            code="ru", source='с криком "Еретик!"', target="с криком «Еретик»"
+        )
+        self.assertIsNone(self._edit(EndExclamationCheck(), unit))
+
+    def test_abbreviation_stem_is_protected(self) -> None:
+        unit = make_unit(code="en", source="Save now", target="Dr.")
+        self.assertIsNone(self._edit(EndStopCheck(), unit))
+
+    def test_cyrillic_abbreviation_stem_protected_when_source_cyrillic(self) -> None:
+        unit = make_unit(code="ru", source="Заметка", target="др.")
+        self.assertIsNone(self._edit(EndStopCheck(), unit))
+
+    def test_numeric_stem_is_protected(self) -> None:
+        unit = make_unit(code="en", source="Chapter", target="Chapter 2.")
+        self.assertIsNone(self._edit(EndStopCheck(), unit))
+
+    def test_version_like_stem_is_protected(self) -> None:
+        unit = make_unit(code="en", source="Update", target="Update to v1.2.")
+        self.assertIsNone(self._edit(EndStopCheck(), unit))
+
+    def test_url_like_stem_is_protected(self) -> None:
+        unit = make_unit(code="en", source="Visit", target="Visit example.com.")
+        self.assertIsNone(self._edit(EndStopCheck(), unit))
+
+    def test_mark_only_target_is_protected(self) -> None:
+        unit = make_unit(code="en", source="Loading", target=".")
+        self.assertIsNone(self._edit(EndStopCheck(), unit))
+
+    # -- Exotic languages stay append-only, as before ----------------------
+
+    def test_armenian_replace_is_not_offered(self) -> None:
+        unit = make_unit(code="hy", source="Ավարտել։", target="Ավարտի?")
+        self.assertIsNone(self._edit(EndStopCheck(), unit))
+
+    def test_burmese_replace_is_not_offered(self) -> None:
+        unit = make_unit(code="my", source="Save it.", target="သိမ်းမလား?")
+        self.assertIsNone(self._edit(EndStopCheck(), unit))
+
+    # -- Dedup: only the source's own family check proposes an edit -------
+
+    def test_only_source_family_check_proposes_replace(self) -> None:
+        unit = make_unit(code="en", source="Save it.", target="Text!")
+        edit = self._edit(EndStopCheck(), unit)
+        self.assertIsNotNone(edit)
+        self.assertEqual(edit.operation, "replace")
+        self.assertIsNone(self._edit(EndExclamationCheck(), unit))
+        self.assertIsNone(self._edit(EndQuestionCheck(), unit))
+        self.assertIsNone(self._edit(EndColonCheck(), unit))
+
+    def test_end_interrobang_and_end_semicolon_never_offer_an_edit(self) -> None:
+        unit = make_unit(code="en", source="Save it?!", target="Text.")
+        self.assertIsNone(self._edit(EndInterrobangCheck(), unit))
+        unit2 = make_unit(code="en", source="Label;", target="Value.")
+        self.assertIsNone(self._edit(EndSemicolonCheck(), unit2))
+
+    # -- Idempotence --------------------------------------------------------
+
+    def test_replace_is_idempotent(self) -> None:
+        # `terminal_source_edit` does not special-case "already correct" -
+        # same precedent as `get_fixup()` (`TerminalOverlapTest`) - so a
+        # second pass may still return an edit, but applying it must be a
+        # true no-op: the observable contract, not the internal `None`.
+        unit = make_unit(code="en", source="Save it?", target="Text.")
+        edit = self._edit(EndQuestionCheck(), unit)
+        once = self._apply(edit, unit.target)
+        unit.target = once
+        second = self._edit(EndQuestionCheck(), unit)
+        twice = apply_fixup([second.fixup], once) if second else once
+        self.assertEqual(once, twice)
+        self.assertEqual(once, "Text?")

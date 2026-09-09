@@ -10,7 +10,9 @@ Reuses the existing `Check.get_fixup()` contract (`weblate/checks/base.py`):
 "Fix string" button (`weblate/static/editor/full.js`), so preview and apply
 share the exact same computed text as the live editor.
 
-See `docs/product/plans/2026-08-25-mass-fix-failing-checks.md`, Task 2.
+See `docs/product/plans/2026-08-25-mass-fix-failing-checks.md`, Task 2, and
+`docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md`, Tasks
+A-B.
 """
 
 from __future__ import annotations
@@ -30,9 +32,11 @@ from django.db import transaction
 from django.db.models import OuterRef, Prefetch, Subquery
 from redis.lock import Lock as RedisLock
 
+from weblate.checks.chars import terminal_source_edit
 from weblate.checks.models import CHECKS
+from weblate.checks.utils import highlight_string
 from weblate.trans.actions import ActionEvents
-from weblate.trans.autofixes import fix_target
+from weblate.trans.autofixes import AUTOFIXES, fix_target
 from weblate.trans.file_format_params import DOSLineEndings
 from weblate.trans.models import Component, Unit
 from weblate.trans.models.unit import NEWLINES
@@ -46,6 +50,7 @@ if TYPE_CHECKING:
 
     from weblate.auth.models import User
     from weblate.checks.base import BaseCheck, FixupType
+    from weblate.checks.chars import TerminalEdit
     from weblate.trans.models import Project
     from weblate.trans.models.unit import UnitQuerySet
 
@@ -65,6 +70,34 @@ TERMINAL_CHECK_IDS: tuple[str, ...] = (
 PUNCTUATION_SPACING_CHECK_ID = "punctuation_spacing"
 
 
+_JS_REPLACEMENT_TOKEN_RE = re.compile(r"\$(\$|&|\d{1,2})")
+
+
+def _translate_js_replacement(replacement: str) -> str:
+    r"""
+    Translate a JavaScript `String.replace()` replacement pattern into
+    Python `re.sub()` syntax: `$1`..`$99` -> `\1`..`\99` (a *capture group*
+    reference - `PunctuationSpacingCheck.get_fixup`'s French-spacing
+    fixups are the only tiered checks that use one), `$&` -> `\g<0>` (the
+    whole match), `$$` -> a literal `$`. Python's replacement string gives
+    backslash no meaning of its own outside a group escape, so a literal
+    backslash in `replacement` (none of the current fixups emit one, but a
+    future one might) is itself escaped first, rather than risking it
+    forming an accidental group reference.
+    """
+
+    def translate_token(match: re.Match[str]) -> str:
+        token = match.group(1)
+        if token == "$":
+            return "$"
+        if token == "&":
+            return "\\g<0>"
+        return f"\\{token}"
+
+    escaped = replacement.replace("\\", "\\\\")
+    return _JS_REPLACEMENT_TOKEN_RE.sub(translate_token, escaped)
+
+
 def apply_fixup_python(
     fixups: Iterable[FixupType] | None, texts: list[str]
 ) -> list[str]:
@@ -79,8 +112,10 @@ def apply_fixup_python(
     already Unicode-aware) and is ignored. Any other flag raises rather
     than being silently dropped: a flag this function cannot translate
     would make the server-side result diverge from what the editor's
-    `new RegExp(pattern, flags)` computes. Applies every fixup, in order,
-    to every plural form.
+    `new RegExp(pattern, flags)` computes. `replacement` is translated from
+    JavaScript to Python group-reference syntax - see
+    `_translate_js_replacement`. Applies every fixup, in order, to every
+    plural form.
     """
     if not fixups:
         return list(texts)
@@ -101,32 +136,30 @@ def apply_fixup_python(
             raise ValueError(msg)
         count = 0 if "g" in flags else 1
         re_flags = re.IGNORECASE if "i" in flags else 0
+        python_replacement = _translate_js_replacement(replacement)
         result = [
-            re.sub(pattern, replacement, text, count=count, flags=re_flags)
+            re.sub(pattern, python_replacement, text, count=count, flags=re_flags)
             for text in result
         ]
     return result
 
 
-def _compute_final_target(check_obj: BaseCheck, unit: Unit) -> list[str] | None:
+def _finish_final_target(
+    unit: Unit, old_targets: list[str], new_targets: list[str]
+) -> list[str] | None:
     """
-    Compute the final stored target for one candidate.
-
-    Applies the check's fixup, then the same preparation order
-    `Unit.translate()` runs around `fix_target()`
-    (`weblate/trans/models/unit.py:2412-2436`): multivalue empty-entry
-    filtering (or plural-count adjustment otherwise), the fixup's own
-    autofix normalization for a non-template translation, and DOS
-    line-ending conversion - so preview and apply both compute the exact
-    final stored value (Task 2 step 1). Returns `None` when there is no
-    fixup or it produces no change from the unit's current target.
+    Shared tail of the preparation pipeline once a candidate `new_targets`
+    is computed, however it was computed - a `get_fixup()`/
+    `terminal_source_edit()` regex fixup through `apply_fixup_python`
+    (`_prepare_final_target`), or an `AutoFix.fix_target()` direct text
+    transform (Task B's mechanical groups, which are not check fixups at
+    all). Runs every preparation step `Unit.translate()` runs around
+    `fix_target()` (`weblate/trans/models/unit.py:2412-2436`): multivalue
+    empty-entry filtering (or plural-count adjustment otherwise), the
+    fixup's own autofix normalization for a non-template translation, and
+    DOS line-ending conversion. Returns `None` when the result is no
+    change from the unit's current target.
     """
-    fixups = check_obj.get_fixup(unit)
-    if not fixups:
-        return None
-    old_targets = unit.get_target_plurals()
-    new_targets = apply_fixup_python(fixups, old_targets)
-
     component = unit.translation.component
     if component.is_multivalue:
         new_targets = [target for target in new_targets if target]
@@ -144,6 +177,31 @@ def _compute_final_target(check_obj: BaseCheck, unit: Unit) -> list[str] | None:
     if new_targets == old_targets:
         return None
     return new_targets
+
+
+def _prepare_final_target(
+    fixups: Iterable[FixupType] | None, unit: Unit
+) -> list[str] | None:
+    """
+    Apply `fixups` (a `get_fixup()`/`terminal_source_edit()` regex list)
+    and run the shared preparation pipeline - see `_finish_final_target`.
+    Returns `None` when there are no fixups or they produce no change.
+
+    Shared by `_compute_final_target` (`get_fixup()`-based checks, Task 2)
+    and the terminal-source policy's `_classify_terminal_policy`
+    (`terminal_source_edit()`-based, Task A), which computes its fixup
+    outside `get_fixup()` (`weblate/checks/chars.py`).
+    """
+    if not fixups:
+        return None
+    old_targets = unit.get_target_plurals()
+    new_targets = apply_fixup_python(fixups, old_targets)
+    return _finish_final_target(unit, old_targets, new_targets)
+
+
+def _compute_final_target(check_obj: BaseCheck, unit: Unit) -> list[str] | None:
+    """Compute the final stored target for one `get_fixup()`-based candidate (Task 2 step 1)."""
+    return _prepare_final_target(check_obj.get_fixup(unit), unit)
 
 
 def _failing_checks(
@@ -291,6 +349,10 @@ class FixPreviewRow:
 
     unit: Unit
     final_target: list[str]
+    # Which terminal-source operation produced this row - "append" /
+    # "replace" / "remove" - or `None` for the per-check flow, which has
+    # no operation concept (Task A).
+    operation: str | None = None
 
     @property
     def final_target_value(self) -> str:
@@ -391,27 +453,31 @@ class FixResult:
     aborted: bool = False
 
 
-def perform_fix(
+def _perform_fix_over(
     user: User | None,
-    unit_set: UnitQuerySet,
-    project: Project | None,
-    check_obj: BaseCheck,
-    unit_ids: Iterable[int] | None = None,
+    matching: UnitQuerySet,
+    unit_ids: Iterable[int] | None,
+    classify: Callable[[User | None, Unit], tuple[Bucket, list[str] | None]],
     *,
-    progress_callback: Callable[[int, int], bool] | None = None,
-    progress_every: int = 20,
+    progress_callback: Callable[[int, int], bool] | None,
+    progress_every: int,
 ) -> FixResult:
     """
-    Recompute and write every fresh eligible candidate (Task 2 step 6).
+    Shared per-component batched write loop behind `perform_fix` and
+    `perform_terminal_policy_fix` (Task 2 step 6 / Task A).
 
-    `unit_ids=None` means the full current scope (tier `safe`); an explicit
-    id list means only the checked review rows. Explicit ids are
-    intersected with the live active-check query first, so an id that no
-    longer matches (already fixed by another run, dismissed, or otherwise
-    changed since the preview) is counted as `stale_or_no_change`, never
-    submitted. A manual or unresolved row is never submitted either.
+    `matching` is the scope's already-filtered candidate query - one
+    check's rows via `_matching_units`, or the union of four via
+    `_terminal_policy_matching_units`. `unit_ids=None` means the full
+    current scope (tier `safe`); an explicit id list means only the
+    checked review rows. Explicit ids are intersected with the live
+    active-check query first, so an id that no longer matches (already
+    fixed by another run, dismissed, or otherwise changed since the
+    preview) is counted as `stale_or_no_change`, never submitted.
+    `classify` re-derives each unit's bucket and final target fresh, under
+    its row lock, exactly as the caller's own preview classification does;
+    a manual or unresolved row is never submitted either.
     """
-    matching = _matching_units(unit_set, project, check_obj)
     requested_ids: set[int] | None = None
     if unit_ids is not None:
         requested_ids = set(unit_ids)
@@ -457,7 +523,7 @@ def perform_fix(
                 # mirroring the existing propagation precedent at
                 # `weblate/trans/models/unit.py:2314`.
                 unit.translation.component = component
-                bucket, new_targets = _classify(user, check_obj, unit)
+                bucket, new_targets = classify(user, unit)
                 if bucket == "denied":
                     result.denied += 1
                     continue
@@ -498,6 +564,562 @@ def perform_fix(
         result.stale_or_no_change += len(requested_ids - matched_ids)
 
     return result
+
+
+def perform_fix(
+    user: User | None,
+    unit_set: UnitQuerySet,
+    project: Project | None,
+    check_obj: BaseCheck,
+    unit_ids: Iterable[int] | None = None,
+    *,
+    progress_callback: Callable[[int, int], bool] | None = None,
+    progress_every: int = 20,
+) -> FixResult:
+    """
+    Recompute and write every fresh eligible candidate (Task 2 step 6).
+
+    `unit_ids=None` means the full current scope (tier `safe`); an explicit
+    id list means only the checked review rows. See `_perform_fix_over` for
+    the shared write-loop contract.
+    """
+    matching = _matching_units(unit_set, project, check_obj)
+    return _perform_fix_over(
+        user,
+        matching,
+        unit_ids,
+        lambda u, unit: _classify(u, check_obj, unit),
+        progress_callback=progress_callback,
+        progress_every=progress_every,
+    )
+
+
+# --- Terminal-source policy (Task A) ------------------------------------
+#
+# One append/replace/remove policy spanning four terminal checks at once
+# (`weblate/checks/chars.py`'s `terminal_source_edit`), so a unit failing
+# two of them simultaneously - source "." / target "!" fails both
+# `end_stop` and `end_exclamation` - is classified, shown and fixed exactly
+# once, never double-counted
+# (docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md, Task
+# A). `end_interrobang` stays its own, separately reviewed check, entirely
+# outside this policy.
+TERMINAL_SOURCE_POLICY_ID = "terminal-source"
+TERMINAL_SOURCE_POLICY_CHECK_IDS: tuple[str, ...] = (
+    "end_stop",
+    "end_colon",
+    "end_question",
+    "end_exclamation",
+)
+
+
+def _terminal_policy_edit(unit: Unit) -> tuple[str, TerminalEdit] | None:
+    """
+    Try each policy check in turn; by construction at most one proposes an
+    edit - `terminal_source_edit` only ever fires for the check whose
+    family matches the source's own terminal mark (or, for a removal, the
+    mark the target itself carries).
+    """
+    for check_id in TERMINAL_SOURCE_POLICY_CHECK_IDS:
+        edit = terminal_source_edit(CHECKS[check_id], unit)
+        if edit is not None:
+            return check_id, edit
+    return None
+
+
+def _classify_terminal_policy(
+    user: User | None, unit: Unit
+) -> tuple[Bucket, list[str] | None]:
+    """
+    Bucket one candidate unit for the terminal-source policy (Task A).
+
+    Mirrors `_classify`, but resolves the owning check from the unit
+    itself instead of taking one as a parameter, and reuses
+    `_decision_7_holds` with that resolved check as the veto - the same
+    before/after terminal-set/`punctuation_spacing` invariant, just fed a
+    target `terminal_source_edit` computed instead of one `get_fixup()`
+    computed.
+    """
+    if user is not None and not user.has_perm("unit.edit", unit):
+        return "denied", None
+    owner = _terminal_policy_edit(unit)
+    if owner is None:
+        return "no_fixup", None
+    check_id, edit = owner
+    new_targets = _prepare_final_target([edit.fixup], unit)
+    if new_targets is None:
+        return "manual", None
+    sources = unit.get_source_plurals()
+    old_targets = unit.get_target_plurals()
+    if not _decision_7_holds(
+        CHECKS[check_id], unit, sources, old_targets, new_targets
+    ):
+        return "manual", None
+    return "eligible", new_targets
+
+
+def _union_matching_units(
+    unit_set: UnitQuerySet, project: Project | None, check_ids: Iterable[str]
+) -> UnitQuerySet:
+    """
+    Union of active, non-dismissed rows for any of `check_ids` (Task A/B).
+
+    Shared by the terminal-source policy (four checks) and every Task B
+    mechanical group that spans more than one check (edge-space's
+    `begin_space`/`end_space`); a single-check group reuses
+    `_matching_units` instead, which additionally accepts a real
+    `check_obj`.
+    """
+    query = " OR ".join(f"check:={check_id}" for check_id in check_ids)
+    return unit_set.search(query, project=project).exclude(
+        translation__component__is_glossary=True
+    )
+
+
+def _terminal_policy_matching_units(
+    unit_set: UnitQuerySet, project: Project | None
+) -> UnitQuerySet:
+    """Union of active, non-dismissed rows for any policy check (Task A)."""
+    return _union_matching_units(unit_set, project, TERMINAL_SOURCE_POLICY_CHECK_IDS)
+
+
+@dataclass
+class TerminalPolicyCandidates:
+    """Result of `collect_terminal_policy_candidates` (Task A)."""
+
+    shown: list[FixPreviewRow] = field(default_factory=list)
+    total_eligible: int = 0
+    by_operation: dict[str, int] = field(
+        default_factory=lambda: {"append": 0, "replace": 0, "remove": 0}
+    )
+    manual: int = 0
+    manual_no_fixup: int = 0
+    denied: int = 0
+    verdicts_no_longer_current: int = 0
+
+    @property
+    def remaining(self) -> int:
+        return self.total_eligible - len(self.shown)
+
+
+def collect_terminal_policy_candidates(
+    user: User | None,
+    unit_set: UnitQuerySet,
+    project: Project | None,
+    *,
+    preview_limit: int = 250,
+) -> TerminalPolicyCandidates:
+    """
+    Bucket every currently active terminal-policy row (Task A).
+
+    Spans all four policy checks in one pass - see the module comment
+    above `TERMINAL_SOURCE_POLICY_ID`.
+    """
+    matching = (
+        _terminal_policy_matching_units(unit_set, project)
+        .prefetch_related(_newest_verdict_prefetch())
+        .order_by("translation__component_id", "translation_id", "position", "id")
+    )
+    result = TerminalPolicyCandidates()
+    for unit in matching.iterator(chunk_size=200):
+        bucket, new_targets = _classify_terminal_policy(user, unit)
+        if bucket == "denied":
+            result.denied += 1
+        elif bucket in {"manual", "no_fixup"}:
+            result.manual += 1
+            if bucket == "no_fixup":
+                result.manual_no_fixup += 1
+        else:
+            result.total_eligible += 1
+            owner = _terminal_policy_edit(unit)
+            operation = owner[1].operation if owner is not None else None
+            if operation is not None:
+                result.by_operation[operation] += 1
+            if new_targets is not None and _verdict_would_go_stale(unit, new_targets):
+                result.verdicts_no_longer_current += 1
+            if len(result.shown) < preview_limit and new_targets is not None:
+                result.shown.append(
+                    FixPreviewRow(
+                        unit=unit, final_target=new_targets, operation=operation
+                    )
+                )
+    return result
+
+
+def perform_terminal_policy_fix(
+    user: User | None,
+    unit_set: UnitQuerySet,
+    project: Project | None,
+    unit_ids: Iterable[int] | None = None,
+    *,
+    progress_callback: Callable[[int, int], bool] | None = None,
+    progress_every: int = 20,
+) -> FixResult:
+    """Terminal-source policy equivalent of `perform_fix` (Task A)."""
+    matching = _terminal_policy_matching_units(unit_set, project)
+    return _perform_fix_over(
+        user,
+        matching,
+        unit_ids,
+        _classify_terminal_policy,
+        progress_callback=progress_callback,
+        progress_every=progress_every,
+    )
+
+
+# --- Mechanical groups (Task B) ------------------------------------------
+#
+# Six deterministic, non-terminal repairs, each its own named group rather
+# than "run every autofix": double spaces, the two edge-space split
+# policies, `$` line-separator spacing, French punctuation spacing, the
+# trailing-ellipsis form, and a stray zero-width space
+# (docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md, Task
+# B). Every group is independently verified: the check(s) it targets must
+# stop failing, and - unlike `DoubleSpaceCheck.get_fixup` and friends on
+# their own - no `highlight_string`-protected span's own text may change
+# either (`_protected_spans_preserved`). `game-number`, `game-token`,
+# `game-markup`, `game-length`, `cyrillic-leak`, `duplicate`, `reused`,
+# `multiple_capital` and similar semantic/structural checks are
+# deliberately absent: no group here ever claims them.
+
+
+def _protected_spans_preserved(
+    unit: Unit, old_targets: list[str], new_targets: list[str]
+) -> bool:
+    """
+    Whether every `highlight_string`-protected span's own text survived a
+    mechanical edit unchanged (Task B).
+
+    `DoubleSpaceCheck.get_fixup` and its siblings do not skip protected
+    spans themselves, so clearing the targeted check is not proof
+    placeholder/markup content survived - every mechanical candidate is
+    independently verified here, regardless of which check proposed it.
+    Compares the *sequence of highlighted substrings*, not positions -
+    positions shift when whitespace elsewhere changes length, but a
+    genuinely untouched span's own text does not.
+    """
+    if len(old_targets) != len(new_targets):  # pragma: no cover - defensive
+        return False
+    for old_target, new_target in zip(old_targets, new_targets):
+        old_spans = [
+            old_target[highlight.start : highlight.end]
+            for highlight in highlight_string(old_target, unit)
+        ]
+        new_spans = [
+            new_target[highlight.start : highlight.end]
+            for highlight in highlight_string(new_target, unit)
+        ]
+        if old_spans != new_spans:
+            return False
+    return True
+
+
+def _mechanical_edit_holds(
+    check_ids: Iterable[str],
+    unit: Unit,
+    sources: list[str],
+    old_targets: list[str],
+    new_targets: list[str],
+) -> bool:
+    """
+    Veto for a mechanical-group candidate (Task B): every named check must
+    stop failing, and every protected span must survive unchanged.
+
+    Unlike `_decision_7_holds`, mechanical checks are independent of each
+    other - there is no shared "strictly shrinks" terminal-set invariant to
+    honour, only "does not still fail" for each of `check_ids`.
+    """
+    after = _failing_checks(check_ids, unit, sources, new_targets)
+    unit.invalidate_checks_cache()
+    if after:
+        return False
+    return _protected_spans_preserved(unit, old_targets, new_targets)
+
+
+def _classify_mechanical(
+    user: User | None,
+    unit: Unit,
+    check_ids: tuple[str, ...],
+    compute_new_targets: Callable[[Unit], list[str] | None],
+) -> tuple[Bucket, list[str] | None]:
+    """
+    Shared classification shape for every Task B mechanical group.
+
+    `compute_new_targets` returns the group's fully prepared candidate
+    target - already through `_prepare_final_target`/`_finish_final_target`
+    - or `None` when the unit is not eligible for this group at all
+    (`no_fixup`: wrong sub-policy, provider inactive, or nothing to do).
+    `check_ids` names every check the edit must clear; see
+    `_mechanical_edit_holds`.
+    """
+    if user is not None and not user.has_perm("unit.edit", unit):
+        return "denied", None
+    new_targets = compute_new_targets(unit)
+    if new_targets is None:
+        return "no_fixup", None
+    sources = unit.get_source_plurals()
+    old_targets = unit.get_target_plurals()
+    if not _mechanical_edit_holds(check_ids, unit, sources, old_targets, new_targets):
+        return "manual", None
+    return "eligible", new_targets
+
+
+def _double_space_new_targets(unit: Unit) -> list[str] | None:
+    return _prepare_final_target(CHECKS["double_space"].get_fixup(unit), unit)
+
+
+def _edge_space_counts(text: str) -> tuple[int, int]:
+    """(leading, trailing) ASCII-space counts - tabs/newlines never count."""
+    return len(text) - len(text.lstrip(" ")), len(text) - len(text.rstrip(" "))
+
+
+def _edge_space_fixup(unit: Unit, *, source_edge: bool) -> list[FixupType] | None:
+    """
+    Compute the edge-space fixup for one of Task B's two split policies.
+
+    `source_edge=False` ("remove extra edge whitespace"): only an edge
+    where source has zero spaces and target has some. `source_edge=True`
+    ("reproduce source edge whitespace"): only an edge where source has a
+    nonzero count that differs from target's. The two conditions are
+    mutually exclusive per edge - a unit is never claimed by both policies
+    on the same edge - and each edge is evaluated independently, so both
+    may fire together for the same unit (e.g. a leading remove and a
+    trailing source-sync at once). Reuses `BeginSpaceCheck`/
+    `EndSpaceCheck.get_fixup()` verbatim for the actual replacement text -
+    eligibility gating in front of the same `get_fixup`, not a new
+    provider (plan, "Остальные механические правила").
+    """
+    source = unit.source_string
+    target = unit.target
+    source_leading, source_trailing = _edge_space_counts(source)
+    target_leading, target_trailing = _edge_space_counts(target)
+    if source_edge:
+        begin_eligible = source_leading != 0 and target_leading != source_leading
+        end_eligible = source_trailing != 0 and target_trailing != source_trailing
+    else:
+        begin_eligible = source_leading == 0 and target_leading != 0
+        end_eligible = source_trailing == 0 and target_trailing != 0
+    fixups: list[FixupType] = []
+    if begin_eligible:
+        fixups.extend(CHECKS["begin_space"].get_fixup(unit) or [])
+    if end_eligible:
+        fixups.extend(CHECKS["end_space"].get_fixup(unit) or [])
+    return fixups or None
+
+
+def _edge_space_remove_new_targets(unit: Unit) -> list[str] | None:
+    return _prepare_final_target(_edge_space_fixup(unit, source_edge=False), unit)
+
+
+def _edge_space_source_new_targets(unit: Unit) -> list[str] | None:
+    return _prepare_final_target(_edge_space_fixup(unit, source_edge=True), unit)
+
+
+def _autofix_new_targets(fix_id: str, unit: Unit) -> list[str] | None:
+    """
+    Run the active autofix `fix_id`'s own `fix_target()` and finish through
+    the shared preparation pipeline (Task B).
+
+    `AUTOFIXES.get()` never imports `weblate_customization` directly - an
+    optional provider that is not configured simply makes its group
+    unavailable everywhere, never a core import error ("Конкретные
+    providers доступны только через активный AUTOFIXES", plan).
+    """
+    autofix = AUTOFIXES.get(fix_id)
+    if autofix is None:
+        return None
+    old_targets = unit.get_target_plurals()
+    new_targets, changed = autofix.fix_target(old_targets, unit)
+    if not changed:
+        return None
+    return _finish_final_target(unit, old_targets, new_targets)
+
+
+def _line_separator_spacing_new_targets(unit: Unit) -> list[str] | None:
+    return _autofix_new_targets("line-separator-spacing", unit)
+
+
+def _end_ellipsis_new_targets(unit: Unit) -> list[str] | None:
+    return _autofix_new_targets("end-ellipsis", unit)
+
+
+def _zero_width_space_new_targets(unit: Unit) -> list[str] | None:
+    return _autofix_new_targets("zero-width-space", unit)
+
+
+def _punctuation_spacing_new_targets(unit: Unit) -> list[str] | None:
+    """
+    The core `PunctuationSpacing` autofix (fix existing wrong spacing)
+    then, only when the fork's own `AddFrenchPunctuationSpacing` autofix is
+    active, its missing-spacing insertion on top of that result - "combine
+    French wrong/missing spacing into one group only when both allowlisted
+    providers are present; core-only fixing of already-wrong spacing may
+    have its own honestly named group without promising to insert missing
+    ones" (plan).
+
+    Deliberately the two `AutoFix`es, not `PunctuationSpacingCheck.
+    get_fixup()`: unlike them, that check's own fixup already both fixes
+    *and* adds in one pass (it is what the single-unit editor's "Fix
+    string" button uses via `weblate/static/editor/full.js`), so it cannot
+    represent the "core-only" group on its own.
+    """
+    fix_wrong = AUTOFIXES.get("punctuation-spacing")
+    if fix_wrong is None:
+        return None
+    old_targets = unit.get_target_plurals()
+    step1, _changed = fix_wrong.fix_target(old_targets, unit)
+    add_missing = AUTOFIXES.get("french-punctuation-spacing")
+    if add_missing is not None:
+        step2, _changed = add_missing.fix_target(step1, unit)
+    else:
+        step2 = step1
+    if step2 == old_targets:
+        return None
+    return _finish_final_target(unit, old_targets, step2)
+
+
+@dataclass(frozen=True, slots=True)
+class MechanicalGroup:
+    """One Task B mechanical-group definition."""
+
+    check_ids: tuple[str, ...]
+    compute_new_targets: Callable[[Unit], list[str] | None]
+    # Autofixes `compute_new_targets` itself depends on, beyond `check_ids`
+    # (`AUTOFIXES.get()` returning `None` already makes `compute_new_targets`
+    # return `None` for every unit; this only sharpens
+    # `mechanical_group_available`'s cheap, query-free signal to match).
+    required_autofix_ids: tuple[str, ...] = ()
+
+
+def _mechanical_groups() -> dict[str, MechanicalGroup]:
+    """
+    Built per call, not at import time, so `AUTOFIXES`/`CHECKS` availability
+    (`WEBLATE_ADD_CHECK`/`WEBLATE_ADD_AUTOFIX`, test `override_settings`) is
+    always read fresh rather than cached from process start.
+    """
+    return {
+        "double-space": MechanicalGroup(("double_space",), _double_space_new_targets),
+        "edge-space-remove": MechanicalGroup(
+            ("begin_space", "end_space"), _edge_space_remove_new_targets
+        ),
+        "edge-space-source": MechanicalGroup(
+            ("begin_space", "end_space"), _edge_space_source_new_targets
+        ),
+        "line-separator-spacing": MechanicalGroup(
+            ("game-line-break",),
+            _line_separator_spacing_new_targets,
+            required_autofix_ids=("line-separator-spacing",),
+        ),
+        "punctuation-spacing": MechanicalGroup(
+            ("punctuation_spacing",),
+            _punctuation_spacing_new_targets,
+            required_autofix_ids=("punctuation-spacing",),
+        ),
+        "end-ellipsis": MechanicalGroup(
+            ("end_ellipsis",),
+            _end_ellipsis_new_targets,
+            required_autofix_ids=("end-ellipsis",),
+        ),
+        "zero-width-space": MechanicalGroup(
+            ("zero-width-space",),
+            _zero_width_space_new_targets,
+            required_autofix_ids=("zero-width-space",),
+        ),
+    }
+
+
+MECHANICAL_GROUP_IDS: tuple[str, ...] = (
+    "double-space",
+    "edge-space-remove",
+    "edge-space-source",
+    "line-separator-spacing",
+    "punctuation-spacing",
+    "end-ellipsis",
+    "zero-width-space",
+)
+
+
+def mechanical_group_available(group_id: str) -> bool:
+    """
+    Whether `group_id` has every required check/autofix configured right
+    now - a cheap, query-free signal for the entry point (Task D), not a
+    guarantee any row is actually eligible.
+    """
+    group = _mechanical_groups()[group_id]
+    if not all(CHECKS.get(check_id) is not None for check_id in group.check_ids):
+        return False
+    return all(
+        AUTOFIXES.get(fix_id) is not None for fix_id in group.required_autofix_ids
+    )
+
+
+def collect_mechanical_group_candidates(
+    group_id: str,
+    user: User | None,
+    unit_set: UnitQuerySet,
+    project: Project | None,
+    *,
+    preview_limit: int = 250,
+) -> FixCandidates:
+    """Bucket every currently active row for one Task B mechanical group."""
+    if not mechanical_group_available(group_id):
+        return FixCandidates()
+    group = _mechanical_groups()[group_id]
+    if len(group.check_ids) == 1:
+        matching = _matching_units(unit_set, project, CHECKS[group.check_ids[0]])
+    else:
+        matching = _union_matching_units(unit_set, project, group.check_ids)
+    matching = matching.prefetch_related(_newest_verdict_prefetch()).order_by(
+        "translation__component_id", "translation_id", "position", "id"
+    )
+    result = FixCandidates()
+    for unit in matching.iterator(chunk_size=200):
+        bucket, new_targets = _classify_mechanical(
+            user, unit, group.check_ids, group.compute_new_targets
+        )
+        if bucket == "denied":
+            result.denied += 1
+        elif bucket in {"manual", "no_fixup"}:
+            result.manual += 1
+            if bucket == "no_fixup":
+                result.manual_no_fixup += 1
+        else:
+            result.total_eligible += 1
+            if new_targets is not None and _verdict_would_go_stale(unit, new_targets):
+                result.verdicts_no_longer_current += 1
+            if len(result.shown) < preview_limit and new_targets is not None:
+                result.shown.append(FixPreviewRow(unit=unit, final_target=new_targets))
+    return result
+
+
+def perform_mechanical_group_fix(
+    group_id: str,
+    user: User | None,
+    unit_set: UnitQuerySet,
+    project: Project | None,
+    unit_ids: Iterable[int] | None = None,
+    *,
+    progress_callback: Callable[[int, int], bool] | None = None,
+    progress_every: int = 20,
+) -> FixResult:
+    """Recompute and write every fresh eligible candidate for one Task B mechanical group."""
+    if not mechanical_group_available(group_id):
+        return FixResult()
+    group = _mechanical_groups()[group_id]
+    if len(group.check_ids) == 1:
+        matching = _matching_units(unit_set, project, CHECKS[group.check_ids[0]])
+    else:
+        matching = _union_matching_units(unit_set, project, group.check_ids)
+    return _perform_fix_over(
+        user,
+        matching,
+        unit_ids,
+        lambda u, unit: _classify_mechanical(
+            u, unit, group.check_ids, group.compute_new_targets
+        ),
+        progress_callback=progress_callback,
+        progress_every=progress_every,
+    )
 
 
 # Task 4 step 5: an explicit reservation guarding against two simultaneous
