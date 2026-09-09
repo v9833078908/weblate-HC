@@ -254,7 +254,7 @@ class FixFailingChecksTaskTest(ViewTestCase):
         lock_timeout = WeblateLockTimeoutError("locked", lock=self.component.lock)
         with (
             patch("weblate.trans.tasks.current_task", task),
-            patch("weblate.trans.tasks.perform_fix", side_effect=lock_timeout),
+            patch("weblate.trans.fix_check.perform_fix", side_effect=lock_timeout),
             patch("weblate.trans.tasks.refresh_fix_check_lock") as refresh,
             patch("weblate.trans.tasks.release_fix_check_lock") as release,
             self.assertRaises(WeblateLockTimeoutError),
@@ -277,7 +277,7 @@ class FixFailingChecksTaskTest(ViewTestCase):
         lock_timeout = WeblateLockTimeoutError("locked", lock=self.component.lock)
         with (
             patch("weblate.trans.tasks.current_task", task),
-            patch("weblate.trans.tasks.perform_fix", side_effect=lock_timeout),
+            patch("weblate.trans.fix_check.perform_fix", side_effect=lock_timeout),
             patch("weblate.trans.tasks.report_error") as report_error_mock,
         ):
             result = fix_failing_checks.run(
@@ -298,7 +298,9 @@ class FixFailingChecksTaskTest(ViewTestCase):
         )
         with (
             patch("weblate.trans.tasks.current_task", task),
-            patch("weblate.trans.tasks.perform_fix", side_effect=RuntimeError("boom")),
+            patch(
+                "weblate.trans.fix_check.perform_fix", side_effect=RuntimeError("boom")
+            ),
             patch("weblate.trans.tasks.report_error") as report_error_mock,
         ):
             result = fix_failing_checks.run(
@@ -344,7 +346,7 @@ class FixFailingChecksTaskTest(ViewTestCase):
         lock_timeout = WeblateLockTimeoutError("locked", lock=self.component.lock)
         with (
             patch("weblate.trans.tasks.current_task", task),
-            patch("weblate.trans.tasks.perform_fix", side_effect=lock_timeout),
+            patch("weblate.trans.fix_check.perform_fix", side_effect=lock_timeout),
             patch(
                 "weblate.trans.tasks.refresh_fix_check_lock", return_value=False
             ) as refresh,

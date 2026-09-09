@@ -681,18 +681,18 @@
                     {% endif %}
                   </h5>
                   <p class="list-group-item-text check-description">{{ check.get_description }}</p>
-                  {% with fixup=check.get_fixup_json %}
-                    {% if fixup or check.check_obj.mass_fixup %}
+                  {% with fixup=check.get_fixup_json fix_url_name=check.check_obj.check_id|fix_check_policy_id_for %}
+                    {% if fixup or fix_url_name %}
                       <p class="list-group-item-text list-buttons check-fixup">
                         {% if fixup %}
                           <a data-check-fixup="{{ fixup }}"
                              class="btn btn-primary"
                              {% if locked or not user_can_translate %}disabled="disabled"{% endif %}>{% translate "Fix string" %}</a>
                         {% endif %}
-                        {% if check.check_obj.mass_fixup %}
+                        {% if fix_url_name %}
                           {% perm 'unit.bulk_edit' unit.translation as user_can_fix_all %}
                           {% if user_can_fix_all %}
-                            <a href="{% url 'fix-check' name=check.check_obj.check_id path=unit.translation.get_url_path %}"
+                            <a href="{% url 'fix-check' name=fix_url_name path=unit.translation.get_url_path %}"
                                class="btn btn-info">{% translate "Fix all such strings" %}</a>
                           {% endif %}
                         {% endif %}

@@ -45,7 +45,7 @@
           <th>
             <a href="{{ row.row_url }}">{{ row.row_title }}</a>
             {% if show_fix_check_links %}
-              <a href="{% url 'fix-check' name=check.check_id path=row.get_url_path %}"
+              <a href="{% url 'fix-check' name=fix_check_policy_id path=row.get_url_path %}"
                  class="btn-inline">{% translate "Fix" %}</a>
             {% endif %}
           </th>

@@ -1173,6 +1173,14 @@ By default the command reports what would change without writing anything.
 You can either define which project or component to update (for example
 ``weblate/application``), or use ``--all`` to update all existing components.
 
+.. seealso::
+
+   :ref:`mechanical-repair-groups` is the interactive counterpart of this
+   command: the same automatic fixes, applied by a translator from the
+   failing-checks screen over a chosen scope instead of from the command
+   line. Use this command for a backfill after enabling a fix, and the
+   groups for what is currently reported as failing.
+
 audit_glossary
 --------------
 

@@ -137,7 +137,7 @@ class FixCheckViewTest(ViewTestCase):
         self._fail_double_space()
         response = self.client.get(self._url("double_space"))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["check"].check_id, "double_space")
+        self.assertEqual(response.context["check"].id, "double_space")
         self.assertEqual(response.context["candidates"].total_eligible, 1)
 
     def test_safe_tier_post_applies_and_redirects(self) -> None:
@@ -175,7 +175,7 @@ class FixCheckViewTest(ViewTestCase):
 
         response = self.client.get(self._url("end_stop"))
         self.assertEqual(response.context["candidates"].manual_no_fixup, 1)
-        self.assertContains(response, "no fixup for this check")
+        self.assertContains(response, "no fixup for this policy")
         self.assertContains(response, "No applicable strings to fix right now.")
 
         # The fixable direction never triggers the note.
@@ -183,7 +183,7 @@ class FixCheckViewTest(ViewTestCase):
         unit.translate(self.user, "Ahoj svete", STATE_TRANSLATED)
         response = self.client.get(self._url("end_stop"))
         self.assertEqual(response.context["candidates"].manual_no_fixup, 0)
-        self.assertNotContains(response, "no fixup for this check")
+        self.assertNotContains(response, "no fixup for this policy")
 
     def _cohort(self, units, name: str = "end_stop", scope_type: str = "translation"):
         """Sign a preview cohort the way the GET screen renders it."""
@@ -340,7 +340,7 @@ class FixCheckViewTest(ViewTestCase):
             reverse(
                 "fix-check",
                 kwargs={
-                    "name": "double_space",
+                    "name": "double-space",
                     "path": self.translation.get_url_path(),
                 },
             ),
@@ -363,7 +363,7 @@ class FixCheckViewTest(ViewTestCase):
             reverse(
                 "fix-check",
                 kwargs={
-                    "name": "double_space",
+                    "name": "double-space",
                     "path": self.translation.get_url_path(),
                 },
             ),
@@ -373,7 +373,7 @@ class FixCheckViewTest(ViewTestCase):
         self._grant_full_access()
         self._fail_double_space()
         response = self.client.get(reverse("checks", kwargs={"name": "double_space"}))
-        self.assertNotContains(response, "fix-check/double_space/")
+        self.assertNotContains(response, "fix-check/double-space/")
 
     # -- rendered contract -------------------------------------------
 
@@ -456,7 +456,7 @@ class FixCheckViewTest(ViewTestCase):
         )
         self.assertEqual(truncated.remaining, 299)
         with patch(
-            "weblate.trans.views.search.collect_fix_candidates",
+            "weblate.trans.fix_check.collect_fix_candidates",
             return_value=truncated,
         ):
             response = self.client.get(self._url("end_stop"))
@@ -516,3 +516,112 @@ class FixCheckSourceTemplateViewTest(ViewTestCase):
         sibling.refresh_from_db()
         self.assertEqual(sibling.source, "Wait…")
         self.assertEqual(sibling.state, expected_state)
+
+
+class ExplicitPolicyViewTest(ViewTestCase):
+    """
+    End-to-end `fix_check` coverage for the `explicit` tier (Task C/D).
+
+    `terminal-source` and one mechanical group, the all/page choice, and
+    the edge-space cross-link.
+    """
+
+    def _grant_full_access(self, user: User | None = None) -> None:
+        user = user or self.user
+        group = Group.objects.create(
+            name="Explicit policy group", language_selection=SELECTION_ALL
+        )
+        group.roles.add(
+            Role.objects.get(name="Bulk editing"), Role.objects.get(name="Translate")
+        )
+        group.components.add(self.component)
+        user.groups.add(group)
+        user.clear_permissions_cache()
+
+    def _url(self, name: str, path=None) -> str:
+        return reverse(
+            "fix-check",
+            kwargs={"name": name, "path": path or self.translation.get_url_path()},
+        )
+
+    def test_terminal_source_get_shows_subtotals_and_all_button(self) -> None:
+        self._grant_full_access()
+        unit = self.get_unit(source="Thank you for using Weblate.")
+        unit.translate(self.user, "Diky!", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        response = self.client.get(self._url("terminal-source"))
+        self.assertEqual(response.status_code, 200)
+        candidates = response.context["candidates"]
+        self.assertEqual(candidates.total_eligible, 1)
+        self.assertEqual(candidates.by_operation["replace"], 1)
+        content = response.content.decode()
+        self.assertIn("mismatched mark replaced", content)
+        self.assertIn('value="all"', content)
+        self.assertIn("Apply to all 1 matching string", content)
+
+    def test_terminal_source_post_selection_all_applies_full_scope(self) -> None:
+        self._grant_full_access()
+        unit = self.get_unit(source="Thank you for using Weblate.")
+        unit.translate(self.user, "Diky!", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        response = self.client.post(self._url("terminal-source"), {"selection": "all"})
+        self.assertRedirects(response, self.translation.get_absolute_url())
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "Diky.")
+
+    def test_terminal_source_post_selection_page_applies_only_cohort(self) -> None:
+        self._grant_full_access()
+        unit = self.get_unit(source="Thank you for using Weblate.")
+        unit.translate(self.user, "Diky!", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        cohort = dump_fix_check_cohort(
+            [unit.pk],
+            user_id=self.user.id,
+            check_id="terminal-source",
+            scope_type="translation",
+            scope_pk=self.translation.pk,
+        )
+        response = self.client.post(
+            self._url("terminal-source"),
+            {"selection": "page", "unit_ids": [str(unit.pk)], "cohort": cohort},
+        )
+        self.assertRedirects(response, self.translation.get_absolute_url())
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "Diky.")
+
+    def test_explicit_tier_post_without_selection_is_rejected(self) -> None:
+        self._grant_full_access()
+        unit = self.get_unit(source="Thank you for using Weblate.")
+        unit.translate(self.user, "Diky!", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        response = self.client.post(self._url("terminal-source"), {})
+        self.assertRedirects(response, self.translation.get_absolute_url())
+        unit.refresh_from_db()
+        # Neither selection was recognised, so nothing was queued/applied.
+        self.assertEqual(unit.target, "Diky!")
+
+    def test_mechanical_group_post_selection_all_applies_full_scope(self) -> None:
+        self._grant_full_access()
+        unit = self.get_unit(source="Hello, world!\n")
+        unit.translate(self.user, "Ahoj  svete!\n", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        response = self.client.post(self._url("double-space"), {"selection": "all"})
+        self.assertRedirects(response, self.translation.get_absolute_url())
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "Ahoj svete!\n")
+
+    def test_unavailable_mechanical_group_is_404(self) -> None:
+        self._grant_full_access()
+        response = self.client.get(self._url("line-separator-spacing"))
+        self.assertEqual(response.status_code, 404)
+
+    def test_edge_space_policies_cross_link_each_other(self) -> None:
+        self._grant_full_access()
+        remove_response = self.client.get(self._url("edge-space-remove"))
+        self.assertContains(
+            remove_response, self._url("edge-space-source"), status_code=200
+        )
+        source_response = self.client.get(self._url("edge-space-source"))
+        self.assertContains(
+            source_response, self._url("edge-space-remove"), status_code=200
+        )

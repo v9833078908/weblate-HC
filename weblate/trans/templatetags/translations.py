@@ -30,6 +30,7 @@ from weblate.checks.models import CHECKS
 from weblate.checks.utils import highlight_string
 from weblate.lang.models import Language
 from weblate.trans.filter import FILTERS, get_filter_choice
+from weblate.trans.fix_check import fix_check_policy_id_for_check, resolve_fix_policy
 from weblate.trans.forms import FieldDocsMixin
 from weblate.trans.models import (
     Announcement,
@@ -696,6 +697,24 @@ def check_description(check):
         return escape(CHECKS[check].description)
     except KeyError:
         return escape(check)
+
+
+@register.filter
+def fix_check_policy_id_for(check_id: str) -> str:
+    """
+    Return the `fix-check` URL name for `check_id`'s "Fix all such strings" link.
+
+    Or `""` when no `FixPolicy` is actually available. Not merely
+    `check_id` itself: `begin_space`/`end_space` carry no `mass_fixup` of
+    their own (only the mapped `edge-space-remove` mechanical group fixes
+    them), and a mechanical group whose required check/autofix is not
+    configured resolves to nothing at all - "available by supported
+    operation, not merely by `get_fixup` presence" (plan, Task D).
+    """
+    mapped_id = fix_check_policy_id_for_check(check_id)
+    if resolve_fix_policy(mapped_id) is None:
+        return ""
+    return mapped_id
 
 
 @register.simple_tag(takes_context=True)

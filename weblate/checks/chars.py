@@ -7,7 +7,8 @@ from __future__ import annotations
 import re
 import string
 import unicodedata
-from typing import TYPE_CHECKING, ClassVar
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 import regex
 from django.utils.html import format_html
@@ -301,7 +302,7 @@ def _terminal_mark(unit: Unit, base: str) -> str:
     applying it and discards anything that does not actually clear it.
     """
     language = unit.translation.language
-    if language.is_cjk():
+    if language.is_base({"ja", "zh"}):
         return {".": "。", ":": "：", "?": "？", "!": "！"}[base]
     if base == "?":
         if language.is_base({"el"}):
@@ -502,6 +503,238 @@ def _terminal_append_fixup(mark: str, *, strip_prefix: str = "") -> list[FixupTy
     prefix_pattern = f"{re.escape(strip_prefix)}?" if strip_prefix else ""
     pattern = rf"(?<![{_TERMINAL_CONFLICT_CLASS}])(?<=\S){prefix_pattern}\s*$"
     return [("regex", pattern, mark, "u")]
+
+
+# --- Explicit terminal-source policy (append/replace/remove) -----------
+#
+# `get_fixup()` above only ever appends a missing mark, and is shared with
+# two paths outside the new bulk policy: the ordinary per-unit editor "Fix
+# string" button (`weblate/static/editor/full.js`) and the pre-existing
+# review-tier mass fix (`weblate/trans/fix_check.py`, the 2026-08-25 plan).
+# Teaching it to also replace a conflicting mark or remove one the source
+# does not have would put those two other paths in scope by accident -
+# "the old editor append stays review; explicit-policy bulk must not appear
+# during ordinary saving or a crafted review POST"
+# (docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md, Task
+# A). `terminal_source_edit()` below is therefore a *separate* function,
+# called only by the new explicit-policy engine
+# (`weblate/trans/fix_check.py`'s `collect_terminal_policy_candidates()`/
+# `apply_terminal_policy()`); the append direction still delegates to
+# `get_fixup()` itself, so every language branch is defined exactly once.
+
+# Marks eligible for *replacement*: every conflict-guard member except a
+# deliberate ellipsis and the two single-codepoint interrobang forms, which
+# stay their own, separately reviewed checks - "not included in this
+# policy; the existing interrobang review stays separate" (plan, Task A).
+TERMINAL_REPLACEABLE_CHARS = TERMINAL_MARK_CHARS - {"…", "⁈", "⁉"}
+
+# check_id -> the family (source's own terminal mark) that check owns.
+# `end_interrobang` is deliberately absent - append-only via `get_fixup()`,
+# untouched by this policy.
+_TERMINAL_SOURCE_BASE: dict[str, str] = {
+    "end_stop": ".",
+    "end_colon": ":",
+    "end_question": "?",
+    "end_exclamation": "!",
+}
+# Only these two families are ever *removed* outright when the source has
+# no mark at all. A colon or question mark the translation adds on its own
+# is frequently a deliberate choice - direct speech, a rhetorical question
+# the source drops by convention - measured and rejected for the narrower
+# ASCII-only autofix this generalizes
+# (`weblate_customization/src/weblate_customization/autofixes.py:39-43`,
+# `RemoveAddedFinalStop`).
+_TERMINAL_REMOVABLE: dict[str, frozenset[str]] = {
+    ".": frozenset({".", "。"}),
+    "!": frozenset({"!", "！"}),
+}
+
+_TERMINAL_SPACE_CLASS = " \u00a0\u202f\u2009"
+# A closing quote, bracket or tag that might hide a source mark behind it.
+_PROTECTED_TAIL_CHARS = frozenset("»\"'\u2019)]}>")
+_LATIN_WORD_RE = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)*$")
+_CYRILLIC_WORD_RE = re.compile(r"[А-Яа-яЁё]+(?:'[А-Яа-яЁё]+)*$")
+_CYRILLIC_RE = re.compile(r"[А-Яа-яЁё]")
+_NUMERIC_TAIL_RE = re.compile(r"[0-9]$")
+_URL_LIKE_TAIL_RE = re.compile(
+    r"(?:^|[\s(\[{])"
+    r"(?:\w[\w+.-]*://\S+"  # scheme://...
+    r"|www\.\S+"
+    r"|[\w.+-]+@[\w-]+\.\w"  # email
+    r"|/[^\s]*\w"  # /path/like/this
+    r"|\d+\.\d+"  # 1.2, v1.2
+    r"|[\w-]+\.[A-Za-z]{2,4})$",  # host.tld, file.ext
+    re.IGNORECASE,
+)
+
+
+def _source_tail_is_protected(source: str) -> bool:
+    """
+    Whether source's raw ending hides a mark the new policy refuses to look through.
+
+    Unlike `RemoveAddedFinalStop`, which unwraps a source closing quote or
+    tag to still find the mark behind it (see its own docstring), the new
+    explicit policy simply excludes such rows - "wrapped tails are shown as
+    exclusions, not promised in the implementation" (plan, Task A). Treating
+    a hidden mark as "no mark" would misclassify a replace as a remove.
+    """
+    if not source:
+        return False
+    return source[-1].isspace() or source[-1] in _PROTECTED_TAIL_CHARS
+
+
+def _plain_source_mark(source: str, unit: Unit) -> str | None:
+    """
+    Return the terminal mark family the source unambiguously ends with.
+
+    For `terminal_source_edit()` only - never for `get_fixup()`, whose
+    broader per-check predicates (`_stop_source_has_mark` and friends) stay
+    exactly as they are.
+
+    Deliberately narrower than those: languages whose branches accept
+    overlapping character sets across families - Armenian, the Devanagari
+    group, Santali, Burmese - return `None` here. "On locale-predicate
+    ambiguity, refuse, not fall back to ASCII" (plan, Task A). A source
+    ending ``;`` also returns `None` unconditionally - out of scope for this
+    policy even where the CJK branches of `_stop_source_has_mark`/
+    `_colon_source_has_mark` treat it as colon-equivalent for `get_fixup()`.
+    A CJK source ending ``:`` always resolves to the colon family here,
+    mirroring `EndColonCheck`'s own CJK branch: "CJK source `:` does not
+    turn into a stop just because `EndStopCheck` and `EndColonCheck` accept
+    overlapping sets" (plan, Task A).
+    """
+    if not source:
+        return None
+    if source[-1] == ";":
+        return None
+    language = unit.translation.language
+    if language.is_base({"hy", "hi", "bn", "or", "sat", "my"}):
+        return None
+    last = source[-1]
+    if language.is_cjk() and last == ":":
+        return ":"
+    if last in {".", "。", "।", "۔", "։", "·", "෴", "។", "።"}:
+        return "."
+    if last in {":", "：", "៖"}:
+        return ":"
+    if last in {"?", "՞", "؟", "⸮", "？", "፧", "꘏", "⳺"}:
+        return "?"
+    if last in {"!", "！", "՜", "᥄", "႟", "߹"}:
+        return "!"
+    return None
+
+
+def _short_word_len(pattern: re.Pattern[str], stem: str) -> int | None:
+    """Length (apostrophes not counted) of the word `pattern` finds at the end of `stem`, or `None`."""
+    match = pattern.search(stem)
+    if match is None:
+        return None
+    return len(match.group(0).replace("'", ""))
+
+
+def _terminal_edit_stem_is_protected(stem: str, source: str) -> bool:
+    """
+    Whether what a replace/remove would leave behind is unsafe to store.
+
+    In order: blanking the string entirely; a decimal, version, URL,
+    e-mail or path-like tail, where the touched mark is not sentence
+    punctuation at all; and a possible abbreviation - a final word of 1-3
+    Latin letters (apostrophes, as in "can't", do not count against the
+    limit and do not break the word), or, when source itself is Cyrillic,
+    1-3 Cyrillic letters. "A conservative filter, not a linguistic
+    detector: common short words may also be excluded" (plan, Task A) -
+    real coverage loss is an accepted cost of never corrupting "etc." or
+    "v1.2".
+    """
+    if not stem:
+        return True
+    if _NUMERIC_TAIL_RE.search(stem) or _URL_LIKE_TAIL_RE.search(stem):
+        return True
+    latin_len = _short_word_len(_LATIN_WORD_RE, stem)
+    if latin_len is not None and latin_len <= 3:
+        return True
+    if _CYRILLIC_RE.search(source):
+        cyrillic_len = _short_word_len(_CYRILLIC_WORD_RE, stem)
+        if cyrillic_len is not None and cyrillic_len <= 3:
+            return True
+    return False
+
+
+@dataclass(frozen=True, slots=True)
+class TerminalEdit:
+    """One `terminal_source_edit()` proposal: its operation and fixup."""
+
+    operation: Literal["append", "replace", "remove"]
+    fixup: FixupType
+
+
+def terminal_source_edit(check_obj: TargetCheck, unit: Unit) -> TerminalEdit | None:
+    """
+    Compute the explicit terminal-source policy edit that would clear `check_obj`.
+
+    Returns `None` if this check offers none under the new policy - the
+    caller then leaves the row for manual review, exactly like an
+    unresolved `get_fixup()` result does today. See the module comment
+    above `TERMINAL_REPLACEABLE_CHARS` for why this is not `get_fixup()`
+    itself.
+
+    Only `end_stop`, `end_colon`, `end_question` and `end_exclamation`
+    participate (`_TERMINAL_SOURCE_BASE`); `end_interrobang` stays its own,
+    separately reviewed check, append-only via `get_fixup()`, exactly as
+    before.
+    """
+    base = _TERMINAL_SOURCE_BASE.get(check_obj.check_id)
+    if base is None:
+        return None
+    source = unit.source_string
+    target = unit.target
+    if not target or _source_tail_is_protected(source) or source.endswith(";"):
+        # A source ending ";" is out of scope entirely, not merely
+        # unresolved to a family: without this, `_plain_source_mark`
+        # returning `None` for it would make the *remove* branch below
+        # misread "ends `;`, colon-equivalent for CJK `get_fixup()`" as
+        # "has no mark at all" and offer to strip a target mark the source
+        # legitimately earned.
+        return None
+    stripped_target = target.rstrip()
+    if not stripped_target:
+        return None
+    last = stripped_target[-1]
+    single_mark = last in TERMINAL_MARK_CHARS and (
+        len(stripped_target) < 2 or stripped_target[-2] not in TERMINAL_MARK_CHARS
+    )
+    source_family = _plain_source_mark(source, unit)
+
+    if source_family == base:
+        if not single_mark:
+            # No conflicting mark in the way: identical to what
+            # `get_fixup()` already computes for this exact situation, so
+            # reuse it rather than restating every language branch here.
+            fixup = check_obj.get_fixup(unit)
+            if not fixup:
+                return None
+            return TerminalEdit("append", next(iter(fixup)))
+        if last not in TERMINAL_REPLACEABLE_CHARS:
+            return None  # Ellipsis/interrobang tail: not this policy.
+        stem = stripped_target[:-1].rstrip(_TERMINAL_SPACE_CLASS)
+        if _terminal_edit_stem_is_protected(stem, source):
+            return None
+        mark = _terminal_mark(unit, base)
+        pattern = rf"[{_TERMINAL_SPACE_CLASS}]*{re.escape(last)}\s*$"
+        return TerminalEdit("replace", ("regex", pattern, mark, "u"))
+
+    if (
+        source_family is None
+        and single_mark
+        and last in _TERMINAL_REMOVABLE.get(base, frozenset())
+    ):
+        stem = stripped_target[:-1].rstrip(_TERMINAL_SPACE_CLASS)
+        if _terminal_edit_stem_is_protected(stem, source):
+            return None
+        pattern = rf"[{_TERMINAL_SPACE_CLASS}]*{re.escape(last)}\s*$"
+        return TerminalEdit("remove", ("regex", pattern, "", "u"))
+
+    return None
 
 
 class EndStopCheck(TargetCheck):

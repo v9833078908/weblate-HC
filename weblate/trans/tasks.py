@@ -28,7 +28,6 @@ from django.utils.translation import gettext, ngettext, override
 from weblate.accounts.utils import remove_user
 from weblate.addons.events import AddonActivityLogReason, AddonActivityLogStatus
 from weblate.auth.models import AuthenticatedHttpRequest, User, get_anonymous
-from weblate.checks.models import CHECKS
 from weblate.lang.models import Language
 from weblate.logger import LOGGER
 from weblate.trans.actions import ActionEvents
@@ -36,9 +35,9 @@ from weblate.trans.autotranslate import BatchAutoTranslate
 from weblate.trans.component_copy import copy_component_addons
 from weblate.trans.exceptions import FileParseError
 from weblate.trans.fix_check import (
-    perform_fix,
     refresh_fix_check_lock,
     release_fix_check_lock,
+    resolve_fix_policy,
 )
 from weblate.trans.inherited_settings import apply_create_inheritance_defaults
 from weblate.trans.judge import JudgeError
@@ -1314,8 +1313,8 @@ def fix_failing_checks(
         _release_fix_check_lock_reporting(lock_key, token)
         return failed(gettext("Mass fix failed: %s") % error)
 
-    check_obj = CHECKS.get(check_id)
-    if check_obj is None or check_obj.mass_fixup is None:
+    policy = resolve_fix_policy(check_id)
+    if policy is None:
         _release_fix_check_lock_reporting(lock_key, token)
         return failed(gettext("This check is no longer eligible for a mass fix."))
 
@@ -1332,12 +1331,11 @@ def fix_failing_checks(
         return refresh_fix_check_lock(lock_key, token)
 
     try:
-        result = perform_fix(
+        result = policy.perform(
             user,
             unit_set,
             project,
-            check_obj,
-            unit_ids,
+            unit_ids=unit_ids,
             progress_callback=progress_callback,
         )
     except WeblateLockTimeoutError:

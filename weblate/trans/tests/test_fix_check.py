@@ -12,10 +12,18 @@ before/after contract, `collect_fix_candidates`, `perform_fix`, and the
 
 from __future__ import annotations
 
+import importlib.util
+import sys
+from pathlib import Path
+from unittest import SkipTest
 from unittest.mock import patch
+
+from django.conf import settings
+from django.test import SimpleTestCase, override_settings
 
 from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Role, User
+from weblate.checks.base import Highlight
 from weblate.checks.models import CHECKS, Check
 from weblate.lang.models import Language
 from weblate.trans.actions import (
@@ -25,20 +33,50 @@ from weblate.trans.actions import (
     ActionEvents,
 )
 from weblate.trans.fix_check import (
+    MECHANICAL_GROUP_IDS,
     _compute_final_target,
     _decision_7_holds,
+    _line_separator_spacing_new_targets,
+    _protected_spans_preserved,
+    _punctuation_spacing_new_targets,
     apply_fixup_python,
     collect_fix_candidates,
+    collect_mechanical_group_candidates,
+    collect_terminal_policy_candidates,
+    mechanical_group_available,
     perform_fix,
+    perform_mechanical_group_fix,
+    perform_terminal_policy_fix,
 )
 from weblate.trans.models import Change, Component, Unit
 from weblate.trans.models.judge import JudgeVerdict, compute_target_hash
 from weblate.trans.models.pending import PendingUnitChange
 from weblate.trans.models.translation import Translation
 from weblate.trans.models.unit import calculate_hash
+from weblate.trans.tests.factories import make_unit
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.tests.utils import get_optional_path
 from weblate.utils.state import FUZZY_STATES, STATE_TRANSLATED
+
+# See weblate/checks/tests/test_mass_fixup.py for why this is needed: the
+# dev container copies `weblate_customization` onto `sys.path` at
+# `/app/data/python`, but it is not an installed dependency of the root
+# project, so tests exercising it need to add its own source root.
+_CUSTOMIZATION_SRC = str(
+    Path(__file__).resolve().parents[3] / "weblate_customization" / "src"
+)
+if _CUSTOMIZATION_SRC not in sys.path:
+    sys.path.insert(0, _CUSTOMIZATION_SRC)
+
+
+def _require_weblate_customization() -> None:
+    try:
+        spec = importlib.util.find_spec("weblate_customization.autofixes")
+    except ImportError:
+        spec = None
+    if spec is None:  # pragma: no cover - environment guard
+        msg = f"weblate_customization is not importable (tried {_CUSTOMIZATION_SRC})"
+        raise SkipTest(msg)
 
 
 class ApplyFixupPythonTest(ViewTestCase):
@@ -81,6 +119,28 @@ class ApplyFixupPythonTest(ViewTestCase):
             ),
             ["one…", "many…"],
         )
+
+    def test_dollar_group_reference_is_translated_to_python_syntax(self) -> None:
+        # `PunctuationSpacingCheck.get_fixup` (and any future check) writes
+        # replacements in JavaScript `String.replace()` syntax ("$1", "$2")
+        # for `new RegExp(...).replace(...)` on the editor side; Python's
+        # `re.sub` needs "\\1"/"\\2" instead; JS's "$1" bare in Python
+        # would otherwise be copied through as the literal two characters
+        # "$1", not a captured group.
+        fixups = [("regex", r"([ \t])([:!])", "_$2", "gu")]
+        self.assertEqual(apply_fixup_python(fixups, ["a :b"]), ["a_:b"])
+
+    def test_dollar_ampersand_is_translated_to_whole_match(self) -> None:
+        fixups = [("regex", r"\d+", "[$&]", "gu")]
+        self.assertEqual(apply_fixup_python(fixups, ["x12y"]), ["x[12]y"])
+
+    def test_double_dollar_is_a_literal_dollar_sign(self) -> None:
+        fixups = [("regex", r"x", "$$1", "gu")]
+        self.assertEqual(apply_fixup_python(fixups, ["x"]), ["$1"])
+
+    def test_literal_backslash_in_replacement_is_preserved(self) -> None:
+        fixups = [("regex", r"x", "a\\b", "gu")]
+        self.assertEqual(apply_fixup_python(fixups, ["x"]), ["a\\b"])
 
 
 class FixCheckEngineTest(ViewTestCase):
@@ -912,3 +972,480 @@ class CosmeticSourceChangeAnonymousAuthorTest(ViewTestCase):
         self.assertEqual(pending.target, "Ahoj světe!\n")
         self.assertEqual(pending.state, sibling.state)
         self.assertEqual(pending.author, self.user)
+
+
+class TerminalPolicyEngineTest(ViewTestCase):
+    """
+    Engine-level behaviour for the aggregate terminal-source policy (Task A).
+
+    docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md:
+    dedup across checks, permissions, batching, history. The pure
+    per-unit append/replace/remove computation itself is covered by
+    `weblate.checks.tests.test_mass_fixup.TerminalSourcePolicyTest`; this
+    class only exercises the DB-backed engine wrapped around it.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.stop_unit = self.get_unit(source="Thank you for using Weblate.")
+
+    def _scope(self):
+        return Unit.objects.filter(translation__component=self.component)
+
+    def test_replace_dedups_across_two_failing_checks(self) -> None:
+        # source ends "."; target "Diky!" fails both `end_stop` AND
+        # `end_exclamation` simultaneously - must be counted once, as one
+        # "replace", never twice.
+        self.stop_unit.translate(self.user, "Diky!", STATE_TRANSLATED)
+        self.stop_unit.refresh_from_db()
+        failing = set(
+            Check.objects.filter(unit=self.stop_unit, dismissed=False).values_list(
+                "name", flat=True
+            )
+        )
+        self.assertTrue({"end_stop", "end_exclamation"} <= failing)
+
+        result = collect_terminal_policy_candidates(
+            self.user, self._scope(), self.project
+        )
+        self.assertEqual(result.total_eligible, 1)
+        self.assertEqual(result.by_operation["replace"], 1)
+        self.assertEqual(result.by_operation["append"], 0)
+        self.assertEqual(result.by_operation["remove"], 0)
+        self.assertEqual(len(result.shown), 1)
+        self.assertEqual(result.shown[0].unit.pk, self.stop_unit.pk)
+        self.assertEqual(result.shown[0].operation, "replace")
+        self.assertEqual(result.shown[0].final_target, ["Diky."])
+
+    def test_perform_fix_clears_both_checks_from_one_write(self) -> None:
+        self.stop_unit.translate(self.user, "Diky!", STATE_TRANSLATED)
+        self.stop_unit.refresh_from_db()
+        result = perform_terminal_policy_fix(self.user, self._scope(), self.project)
+        self.assertEqual(result.fixed, 1)
+        self.stop_unit.refresh_from_db()
+        self.assertEqual(self.stop_unit.target, "Diky.")
+        self.assertFalse(
+            Check.objects.filter(
+                unit=self.stop_unit,
+                name__in=["end_stop", "end_exclamation"],
+                dismissed=False,
+            ).exists()
+        )
+
+    def test_append_via_aggregate_collector(self) -> None:
+        self.stop_unit.translate(self.user, "Dekuji", STATE_TRANSLATED)
+        self.stop_unit.refresh_from_db()
+        result = collect_terminal_policy_candidates(
+            self.user, self._scope(), self.project
+        )
+        self.assertEqual(result.total_eligible, 1)
+        self.assertEqual(result.by_operation["append"], 1)
+        self.assertEqual(result.shown[0].final_target, ["Dekuji."])
+
+    def test_remove_via_aggregate_collector(self) -> None:
+        unit = self.get_unit(source="Hello, world!\n")
+        unit.source = "Hello world"
+        unit.save(update_fields=["source"])
+        unit.translate(self.user, "Ahoj svete.", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        self.assertTrue(
+            Check.objects.filter(unit=unit, name="end_stop", dismissed=False).exists()
+        )
+        result = collect_terminal_policy_candidates(
+            self.user, self._scope(), self.project
+        )
+        row = next(r for r in result.shown if r.unit.pk == unit.pk)
+        self.assertEqual(row.operation, "remove")
+        self.assertEqual(row.final_target, ["Ahoj svete"])
+
+    def test_denied_without_unit_edit_permission(self) -> None:
+        self.stop_unit.translate(self.user, "Diky!", STATE_TRANSLATED)
+        self.stop_unit.refresh_from_db()
+        limited = User.objects.create_user(
+            "limited-terminal", "limited-terminal@example.com", "x"
+        )
+        limited.groups.clear()
+        limited.clear_permissions_cache()
+        result = collect_terminal_policy_candidates(
+            limited, self._scope(), self.project
+        )
+        self.assertEqual(result.total_eligible, 0)
+        self.assertEqual(result.denied, 1)
+
+    def test_end_interrobang_unit_is_not_captured_by_this_policy(self) -> None:
+        unit = self.get_unit(source="Hello, world!\n")
+        unit.source = "Really?!"
+        unit.save(update_fields=["source"])
+        unit.translate(self.user, "Opravdu", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        self.assertTrue(
+            Check.objects.filter(
+                unit=unit, name="end_interrobang", dismissed=False
+            ).exists()
+        )
+        result = collect_terminal_policy_candidates(
+            self.user, self._scope(), self.project
+        )
+        self.assertNotIn(unit.pk, [row.unit.pk for row in result.shown])
+
+    def test_unit_ids_explicit_selection_only_applies_selected_unit(self) -> None:
+        self.stop_unit.translate(self.user, "Diky!", STATE_TRANSLATED)
+        self.stop_unit.refresh_from_db()
+        other = self.get_unit(source="Hello, world!\n")
+        # Not the fixture's own "Hello, world!\n": its trailing newline
+        # means the raw last character is "\n", not "!", so no terminal
+        # check fires at all - mutate to a clean, unwrapped "!" ending.
+        other.source = "Save it!"
+        other.save(update_fields=["source"])
+        other.translate(self.user, "Ulozit", STATE_TRANSLATED)
+        other.refresh_from_db()
+        self.assertTrue(
+            Check.objects.filter(
+                unit=other, name="end_exclamation", dismissed=False
+            ).exists()
+        )
+        result = perform_terminal_policy_fix(
+            self.user, self._scope(), self.project, unit_ids=[self.stop_unit.pk]
+        )
+        self.assertEqual(result.fixed, 1)
+        self.stop_unit.refresh_from_db()
+        other.refresh_from_db()
+        self.assertEqual(self.stop_unit.target, "Diky.")
+        self.assertEqual(other.target, "Ulozit")  # untouched: outside the selection
+
+    def test_stale_id_after_independent_fix_is_counted_not_reapplied(self) -> None:
+        self.stop_unit.translate(self.user, "Diky!", STATE_TRANSLATED)
+        self.stop_unit.refresh_from_db()
+        perform_terminal_policy_fix(self.user, self._scope(), self.project)
+        result = perform_terminal_policy_fix(
+            self.user, self._scope(), self.project, unit_ids=[self.stop_unit.pk]
+        )
+        self.assertEqual(result.fixed, 0)
+        self.assertEqual(result.stale_or_no_change, 1)
+
+    def test_history_records_fix_failing_check_action(self) -> None:
+        self.stop_unit.translate(self.user, "Diky!", STATE_TRANSLATED)
+        self.stop_unit.refresh_from_db()
+        perform_terminal_policy_fix(self.user, self._scope(), self.project)
+        change = Change.objects.filter(
+            unit=self.stop_unit, action=ActionEvents.FIX_FAILING_CHECK
+        ).first()
+        self.assertIsNotNone(change)
+        self.assertEqual(change.target, "Diky.")
+
+
+class MechanicalGroupEngineTest(ViewTestCase):
+    """
+    Engine-level behaviour for Task B's mechanical groups.
+
+    docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md:
+    eligibility split, dedup, permissions, protected spans.
+    """
+
+    def _scope(self):
+        return Unit.objects.filter(translation__component=self.component)
+
+    def test_double_space_via_mechanical_engine(self) -> None:
+        unit = self.get_unit(source="Hello, world!\n")
+        unit.translate(self.user, "Ahoj  svete!\n", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        self.assertTrue(
+            Check.objects.filter(
+                unit=unit, name="double_space", dismissed=False
+            ).exists()
+        )
+        result = collect_mechanical_group_candidates(
+            "double-space", self.user, self._scope(), self.project
+        )
+        self.assertEqual(result.total_eligible, 1)
+        self.assertEqual(result.shown[0].final_target, ["Ahoj svete!\n"])
+        fix_result = perform_mechanical_group_fix(
+            "double-space", self.user, self._scope(), self.project
+        )
+        self.assertEqual(fix_result.fixed, 1)
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "Ahoj svete!\n")
+
+    @staticmethod
+    def _without_autofix(*excluded_substrings: str):
+        """
+        `override_settings` with core autofixes matching `excluded_substrings` removed.
+
+        `begin_space`/`end_space`/`zero-width-space`/`end_ellipsis` are all
+        owned by a core autofix that runs on *every* `Unit.translate()`
+        call (`SameBookendingWhitespace`/`RemoveZeroSpace`/
+        `ReplaceTrailingDotsWithEllipsis` - see the 2026-08-25 plan's
+        ownership table), so a normal `.translate()` call auto-corrects the
+        defect before any Check row can ever go active. A fixture for one
+        of these checks - mirroring how such a row actually arises in
+        production, from data imported or translated before that autofix
+        existed - has to bypass the owning autofix for the one call that
+        creates it, then let it run normally again afterwards.
+        """
+        return override_settings(
+            AUTOFIX_LIST=[
+                path
+                for path in settings.AUTOFIX_LIST
+                if not any(needle in path for needle in excluded_substrings)
+            ]
+        )
+
+    def test_edge_space_remove_both_edges_at_once(self) -> None:
+        # Source has zero leading/trailing ASCII spaces; a target with
+        # extra spaces on *both* edges must have both removed in one edit.
+        unit = self.get_unit(source="Thank you for using Weblate.")
+        with self._without_autofix("SameBookendingWhitespace"):
+            unit.translate(self.user, " Diky ", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        self.assertTrue(
+            Check.objects.filter(
+                unit=unit, name="begin_space", dismissed=False
+            ).exists()
+        )
+        self.assertTrue(
+            Check.objects.filter(unit=unit, name="end_space", dismissed=False).exists()
+        )
+        result = collect_mechanical_group_candidates(
+            "edge-space-remove", self.user, self._scope(), self.project
+        )
+        self.assertEqual(result.total_eligible, 1)
+        self.assertEqual(result.shown[0].final_target, ["Diky"])
+        fix_result = perform_mechanical_group_fix(
+            "edge-space-remove", self.user, self._scope(), self.project
+        )
+        self.assertEqual(fix_result.fixed, 1)
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "Diky")
+
+    def test_edge_space_source_syncs_to_source_count(self) -> None:
+        unit = self.get_unit(source="Thank you for using Weblate.")
+        unit.source = " Thank you "
+        unit.save(update_fields=["source"])
+        with self._without_autofix("SameBookendingWhitespace"):
+            unit.translate(self.user, "Diky", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        self.assertTrue(
+            Check.objects.filter(
+                unit=unit, name="begin_space", dismissed=False
+            ).exists()
+        )
+        result = collect_mechanical_group_candidates(
+            "edge-space-source", self.user, self._scope(), self.project
+        )
+        self.assertEqual(result.total_eligible, 1)
+        self.assertEqual(result.shown[0].final_target, [" Diky "])
+        # The remove-only policy must not also claim this row: source has
+        # a nonzero count here, so it is out of scope for "remove".
+        remove_result = collect_mechanical_group_candidates(
+            "edge-space-remove", self.user, self._scope(), self.project
+        )
+        self.assertEqual(remove_result.total_eligible, 0)
+
+    def test_edge_space_remove_excludes_source_edge_candidate(self) -> None:
+        # Mirror of the above: a nonzero-source-count row must not be
+        # claimed by "remove", which requires a *zero*-count source edge.
+        unit = self.get_unit(source="Hello, world!\n")
+        with self._without_autofix("SameBookendingWhitespace"):
+            unit.translate(self.user, "  Ahoj svete!\n", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        result = collect_mechanical_group_candidates(
+            "edge-space-remove", self.user, self._scope(), self.project
+        )
+        self.assertEqual(result.total_eligible, 1)
+        self.assertEqual(result.shown[0].final_target, ["Ahoj svete!\n"])
+
+    def test_zero_width_space_removed_when_source_lacks_it(self) -> None:
+        unit = self.get_unit(source="Thank you for using Weblate.")
+        with self._without_autofix("RemoveZeroSpace"):
+            unit.translate(self.user, "Diky\u200b", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        self.assertTrue(
+            Check.objects.filter(
+                unit=unit, name="zero-width-space", dismissed=False
+            ).exists()
+        )
+        result = collect_mechanical_group_candidates(
+            "zero-width-space", self.user, self._scope(), self.project
+        )
+        self.assertEqual(result.total_eligible, 1)
+        self.assertEqual(result.shown[0].final_target, ["Diky"])
+        fix_result = perform_mechanical_group_fix(
+            "zero-width-space", self.user, self._scope(), self.project
+        )
+        self.assertEqual(fix_result.fixed, 1)
+
+    def test_end_ellipsis_replaces_trailing_dots(self) -> None:
+        unit = self.get_unit(source="Hello, world!\n")
+        unit.source = "Loading…"
+        unit.save(update_fields=["source"])
+        with self._without_autofix("ReplaceTrailingDotsWithEllipsis"):
+            unit.translate(self.user, "Nahravani...", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        self.assertTrue(
+            Check.objects.filter(
+                unit=unit, name="end_ellipsis", dismissed=False
+            ).exists()
+        )
+        result = collect_mechanical_group_candidates(
+            "end-ellipsis", self.user, self._scope(), self.project
+        )
+        self.assertEqual(result.total_eligible, 1)
+        self.assertEqual(result.shown[0].final_target, ["Nahravani…"])
+        fix_result = perform_mechanical_group_fix(
+            "end-ellipsis", self.user, self._scope(), self.project
+        )
+        self.assertEqual(fix_result.fixed, 1)
+
+    def test_denied_without_unit_edit_permission(self) -> None:
+        unit = self.get_unit(source="Hello, world!\n")
+        unit.translate(self.user, "Ahoj  svete!\n", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        limited = User.objects.create_user(
+            "limited-mechanical", "limited-mechanical@example.com", "x"
+        )
+        limited.groups.clear()
+        limited.clear_permissions_cache()
+        result = collect_mechanical_group_candidates(
+            "double-space", limited, self._scope(), self.project
+        )
+        self.assertEqual(result.total_eligible, 0)
+        self.assertEqual(result.denied, 1)
+
+    def test_history_records_fix_failing_check_action(self) -> None:
+        unit = self.get_unit(source="Hello, world!\n")
+        unit.translate(self.user, "Ahoj  svete!\n", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        perform_mechanical_group_fix(
+            "double-space", self.user, self._scope(), self.project
+        )
+        change = Change.objects.filter(
+            unit=unit, action=ActionEvents.FIX_FAILING_CHECK
+        ).first()
+        self.assertIsNotNone(change)
+        self.assertEqual(change.target, "Ahoj svete!\n")
+
+    def test_mechanical_group_available_reflects_configuration(self) -> None:
+        self.assertTrue(mechanical_group_available("double-space"))
+        self.assertTrue(mechanical_group_available("edge-space-remove"))
+        self.assertTrue(mechanical_group_available("zero-width-space"))
+        self.assertTrue(mechanical_group_available("end-ellipsis"))
+        self.assertTrue(mechanical_group_available("punctuation-spacing"))
+        # game-line-break is a weblate_customization check, not registered
+        # by default in the test settings.
+        self.assertFalse(mechanical_group_available("line-separator-spacing"))
+
+    def test_every_group_id_is_registered(self) -> None:
+        for group_id in MECHANICAL_GROUP_IDS:
+            with self.subTest(group_id=group_id):
+                # Must not raise, whether available or not.
+                collect_mechanical_group_candidates(
+                    group_id, self.user, self._scope(), self.project
+                )
+
+
+class ProtectedSpanGuardTest(SimpleTestCase):
+    """
+    `_protected_spans_preserved` (Task B): protected span text must never change.
+
+    Even though `DoubleSpaceCheck` and friends do not skip protected
+    spans themselves.
+    """
+
+    def test_edit_outside_highlighted_span_is_preserved(self) -> None:
+        unit = make_unit(code="ru", source="a %d b", target="a  %d  b")
+
+        def fake_highlight(text, _unit):
+            index = text.index("%d")
+            return [Highlight(index, index + 2, "%d", kind="grammar")]
+
+        with patch(
+            "weblate.trans.fix_check.highlight_string", side_effect=fake_highlight
+        ):
+            self.assertTrue(_protected_spans_preserved(unit, ["a  %d  b"], ["a %d b"]))
+
+    def test_edit_inside_highlighted_span_is_rejected(self) -> None:
+        unit = make_unit(code="ru", source="a b", target="<tag  attr>text")
+
+        def fake_highlight(text, _unit):
+            end = text.index(">") + 1
+            return [Highlight(0, end, text[:end], kind="markup")]
+
+        with patch(
+            "weblate.trans.fix_check.highlight_string", side_effect=fake_highlight
+        ):
+            self.assertFalse(
+                _protected_spans_preserved(
+                    unit, ["<tag  attr>text"], ["<tag attr>text"]
+                )
+            )
+
+    def test_identical_targets_are_trivially_preserved(self) -> None:
+        unit = make_unit(code="ru", source="a b", target="a b")
+        with patch("weblate.trans.fix_check.highlight_string", return_value=[]):
+            self.assertTrue(_protected_spans_preserved(unit, ["a b"], ["a b"]))
+
+
+class PunctuationSpacingMechanicalTest(SimpleTestCase):
+    """
+    `_punctuation_spacing_new_targets` (Task B): core-only vs. combined group.
+
+    Core-only wrong-spacing fix versus the combined wrong+missing group,
+    gated on whether the fork's `AddFrenchPunctuationSpacing` autofix is
+    active.
+    """
+
+    def test_core_only_fixes_wrong_spacing_but_never_adds_missing(self) -> None:
+        # Wrong (plain-space) NBSP before ":" is fixed; a *missing* space
+        # before "!" is left alone without the custom autofix active.
+        unit = make_unit(code="fr", source="Options: Save!", target="Options : Save!")
+        self.assertEqual(
+            _punctuation_spacing_new_targets(unit), ["Options\u00a0: Save!"]
+        )
+
+    def test_combined_also_adds_missing_spacing_when_autofix_active(self) -> None:
+        _require_weblate_customization()
+        autofix_path = "weblate_customization.autofixes.AddFrenchPunctuationSpacing"
+        with override_settings(AUTOFIX_LIST=[*settings.AUTOFIX_LIST, autofix_path]):
+            unit = make_unit(
+                code="fr", source="Options: Save!", target="Options : Save!"
+            )
+            self.assertEqual(
+                _punctuation_spacing_new_targets(unit),
+                ["Options\u00a0: Save\u202f!"],
+            )
+
+    def test_already_correct_spacing_is_a_no_op(self) -> None:
+        unit = make_unit(code="fr", source="Options:", target="Options\u00a0:")
+        self.assertIsNone(_punctuation_spacing_new_targets(unit))
+
+
+class LineSeparatorSpacingMechanicalTest(SimpleTestCase):
+    """
+    `_line_separator_spacing_new_targets`/`mechanical_group_available` (Task B).
+
+    Unavailable without the fork's own check and autofix, and the
+    count/order of `$` is never touched, only hugging whitespace.
+    """
+
+    def test_unavailable_without_customization_configured(self) -> None:
+        self.assertFalse(mechanical_group_available("line-separator-spacing"))
+        unit = make_unit(
+            code="ru", source="Line one$Line two", target="Line one $Line two"
+        )
+        self.assertIsNone(_line_separator_spacing_new_targets(unit))
+
+    def test_strips_only_hugging_whitespace_when_configured(self) -> None:
+        _require_weblate_customization()
+        check_path = "weblate_customization.checks.GameLineBreakCheck"
+        autofix_path = "weblate_customization.autofixes.LineSeparatorSpacing"
+        with (
+            override_settings(CHECK_LIST=[*settings.CHECK_LIST, check_path]),
+            override_settings(AUTOFIX_LIST=[*settings.AUTOFIX_LIST, autofix_path]),
+        ):
+            self.assertTrue(mechanical_group_available("line-separator-spacing"))
+            unit = make_unit(
+                code="ru", source="Line one$Line two", target="Line one $Line two"
+            )
+            self.assertEqual(
+                _line_separator_spacing_new_targets(unit), ["Line one$Line two"]
+            )

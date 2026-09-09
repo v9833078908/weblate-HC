@@ -31295,32 +31295,32 @@ msgstr[2] "Исправить выбранные (%(count)s)"
 msgid "No applicable strings to fix right now."
 msgstr "Сейчас нет строк, подходящих для исправления."
 
-#: weblate/templates/fix_check.html:42
+#: weblate/templates/fix_check.html:95
 #, python-format
 msgid ""
-"%(count)s failing string has no fixup for this check and never becomes "
+"%(count)s failing string has no fixup for this policy and never becomes "
 "selectable here: this action only restores a mark the source has and the "
 "translation lost. The opposite direction, a mark the translation added on "
 "its own, is repaired when a string is saved, not from this screen."
 msgid_plural ""
-"%(count)s failing strings have no fixup for this check and never become "
+"%(count)s failing strings have no fixup for this policy and never become "
 "selectable here: this action only restores a mark the source has and the "
 "translation lost. The opposite direction, a mark the translation added on "
 "its own, is repaired when a string is saved, not from this screen."
 msgstr[0] ""
-"%(count)s неудачная строка не имеет исправления для этой проверки и никогда "
+"%(count)s неудачная строка не имеет исправления для этой политики и никогда "
 "не станет доступной для выбора здесь: это действие только возвращает знак, "
 "который есть в источнике и потерян в переводе. Обратное направление - знак, "
 "который перевод добавил сам, - исправляется при сохранении строки, а не с "
 "этого экрана."
 msgstr[1] ""
-"%(count)s неудачные строки не имеют исправления для этой проверки и никогда "
+"%(count)s неудачные строки не имеют исправления для этой политики и никогда "
 "не станут доступными для выбора здесь: это действие только возвращает знак, "
 "который есть в источнике и потерян в переводе. Обратное направление - знак, "
 "который перевод добавил сам, - исправляется при сохранении строки, а не с "
 "этого экрана."
 msgstr[2] ""
-"%(count)s неудачных строк не имеют исправления для этой проверки и никогда "
+"%(count)s неудачных строк не имеют исправления для этой политики и никогда "
 "не станут доступными для выбора здесь: это действие только возвращает знак, "
 "который есть в источнике и потерян в переводе. Обратное направление - знак, "
 "который перевод добавил сам, - исправляется при сохранении строки, а не с "
@@ -31399,3 +31399,140 @@ msgstr ""
 #: weblate/templates/translate.html:696
 msgid "Fix all such strings"
 msgstr "Исправить все такие строки"
+
+#: weblate/templates/fix_check.html:38
+msgid ""
+"Looking for edge whitespace the source has? Reproduce source edge whitespace "
+"instead."
+msgstr "Ищете пробел по краю, который есть в источнике? Вместо этого используйте «Восстановить пробелы по краю источника»."
+
+#: weblate/templates/fix_check.html:44
+msgid ""
+"Looking for edge whitespace the source does not have? Remove extra edge "
+"whitespace instead."
+msgstr "Ищете пробел по краю, которого нет в источнике? Вместо этого используйте «Убрать лишние пробелы по краю»."
+
+#: weblate/templates/fix_check.html:64
+#, python-format
+msgid "%(count)s string gets a missing mark added."
+msgid_plural "%(count)s strings get a missing mark added."
+msgstr[0] "%(count)s строка получает отсутствующий знак."
+msgstr[1] "%(count)s строки получают отсутствующий знак."
+msgstr[2] "%(count)s строк получает отсутствующий знак."
+
+#: weblate/templates/fix_check.html:73
+#, python-format
+msgid "%(count)s string gets a mismatched mark replaced."
+msgid_plural "%(count)s strings get a mismatched mark replaced."
+msgstr[0] "%(count)s строка получает замену несовпадающего знака."
+msgstr[1] "%(count)s строки получают замену несовпадающего знака."
+msgstr[2] "%(count)s строк получает замену несовпадающего знака."
+
+#: weblate/templates/fix_check.html:82
+#, python-format
+msgid "%(count)s string gets an extra mark removed."
+msgid_plural "%(count)s strings get an extra mark removed."
+msgstr[0] "%(count)s строка лишается лишнего знака."
+msgstr[1] "%(count)s строки лишаются лишнего знака."
+msgstr[2] "%(count)s строк лишается лишнего знака."
+
+#: weblate/templates/fix_check.html:109
+#, python-format
+msgid ""
+"%(count)s failing string has no available fix for this operation and never "
+"becomes selectable here."
+msgid_plural ""
+"%(count)s failing strings have no available fix for this operation and never "
+"become selectable here."
+msgstr[0] "%(count)s неудачная строка не имеет доступного исправления для этой операции и никогда не станет доступной для выбора здесь."
+msgstr[1] "%(count)s неудачные строки не имеют доступного исправления для этой операции и никогда не станут доступными для выбора здесь."
+msgstr[2] "%(count)s неудачных строк не имеют доступного исправления для этой операции и никогда не станут доступными для выбора здесь."
+
+#: weblate/templates/fix_check.html:176
+#, python-format
+msgid "Apply to all %(count)s matching string"
+msgid_plural "Apply to all %(count)s matching strings"
+msgstr[0] "Применить ко всем подходящим строкам (%(count)s)"
+msgstr[1] "Применить ко всем подходящим строкам (%(count)s)"
+msgstr[2] "Применить ко всем подходящим строкам (%(count)s)"
+
+#: weblate/templates/fix_check.html:213
+msgid "Operation"
+msgstr "Операция"
+
+#: weblate/trans/fix_check.py:1292
+msgid "Collapse double spaces"
+msgstr "Схлопнуть двойные пробелы"
+
+#: weblate/trans/fix_check.py:1294
+msgid "Consecutive spaces are collapsed into one, matching the source."
+msgstr "Несколько подряд идущих пробелов объединяются в один, как в источнике."
+
+#: weblate/trans/fix_check.py:1298
+msgid "Remove extra edge whitespace"
+msgstr "Убрать лишние пробелы по краю"
+
+#: weblate/trans/fix_check.py:1300
+msgid "Leading or trailing whitespace the source does not have is removed."
+msgstr "Пробел в начале или в конце, которого нет в источнике, удаляется."
+
+#: weblate/trans/fix_check.py:1304
+msgid "Reproduce source edge whitespace"
+msgstr "Восстановить пробелы по краю источника"
+
+#: weblate/trans/fix_check.py:1306
+msgid "Leading or trailing whitespace is synced to the source's own count."
+msgstr "Число пробелов в начале и в конце синхронизируется с источником."
+
+#: weblate/trans/fix_check.py:1310
+msgid "Fix spacing around the $ line separator"
+msgstr "Исправить пробелы вокруг разделителя строк $"
+
+#: weblate/trans/fix_check.py:1312
+msgid ""
+"Whitespace hugging the $ line separator is removed. The number and order of "
+"separators is never changed."
+msgstr "Пробелы, прилегающие к разделителю строк $, удаляются. Число и порядок разделителей никогда не меняются."
+
+#: weblate/trans/fix_check.py:1317
+msgid "Fix French punctuation spacing"
+msgstr "Исправить пробелы перед французской пунктуацией"
+
+#: weblate/trans/fix_check.py:1319
+msgid ""
+"The non-breaking space French double punctuation needs is corrected where "
+"present, and added where missing if the matching provider is configured."
+msgstr "Неразрывный пробел, нужный французской двойной пунктуации, исправляется там, где он есть, и добавляется там, где его нет, если настроен соответствующий провайдер."
+
+#: weblate/trans/fix_check.py:1325
+msgid "Use a single ellipsis character"
+msgstr "Использовать символ многоточия"
+
+#: weblate/trans/fix_check.py:1327
+msgid ""
+"A trailing \"...\" is replaced with a single ellipsis character to match the "
+"source."
+msgstr "Точки «...» в конце заменяются символом многоточия, как в источнике."
+
+#: weblate/trans/fix_check.py:1332
+msgid "Remove stray zero-width spaces"
+msgstr "Убрать лишние пробелы нулевой ширины"
+
+#: weblate/trans/fix_check.py:1333
+msgid "A zero-width space the source does not have is removed."
+msgstr "Пробел нулевой ширины, которого нет в источнике, удаляется."
+
+#: weblate/trans/fix_check.py:1386
+msgid "Normalize terminal marks to source"
+msgstr "Привести конечные знаки к источнику"
+
+#: weblate/trans/fix_check.py:1388
+msgid ""
+"Marks will be brought in line with the source. Meaning and translation "
+"quality are not checked."
+msgstr "Знаки приводятся в соответствие с источником. Смысл и качество перевода не проверяются."
+
+#: weblate/trans/views/search.py:335
+msgid ""
+"Choose whether to apply to all matching strings or only the selected page."
+msgstr "Выберите, применять ли ко всем подходящим строкам или только к выбранной странице."
