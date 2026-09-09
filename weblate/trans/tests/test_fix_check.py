@@ -216,6 +216,39 @@ class FixCheckEngineTest(ViewTestCase):
         self.assertEqual(result.total_eligible, 0)
         self.assertEqual(result.manual, 1)
 
+    def test_added_terminal_mark_has_no_fixup_and_is_counted_apart(self) -> None:
+        # The two directions of one terminal check are owned by different
+        # mechanisms: this feature restores a mark the source has and the
+        # translation lost, while a mark the translation added on its own
+        # belongs to the autofix layer. A whole scope can consist of the
+        # second kind - CoL4/data French is 2093 such rows - so that
+        # direction is counted apart instead of being an unexplained
+        # "needs manual review".
+        self._fail_end_stop()
+        reverse = self.get_unit(source="Hello, world!\n")
+        reverse.source = "Hello world"
+        reverse.save(update_fields=["source"])
+        reverse.translate(self.user, "Ahoj svete.", STATE_TRANSLATED)
+        reverse.refresh_from_db()
+        self.assertTrue(
+            Check.objects.filter(
+                unit=reverse, name="end_stop", dismissed=False
+            ).exists()
+        )
+        self.assertIsNone(self.end_stop_check.get_fixup(reverse))
+
+        result = collect_fix_candidates(
+            self.user,
+            Unit.objects.filter(translation__component=self.component),
+            self.project,
+            self.end_stop_check,
+        )
+        self.assertEqual(result.total_eligible, 1)
+        self.assertEqual(result.manual, 1)
+        self.assertEqual(result.manual_no_fixup, 1)
+        self.assertEqual(len(result.shown), 1)
+        self.assertEqual(result.shown[0].final_target, ["Dekuji."])
+
     def test_conflicting_terminal_mark_is_manual(self) -> None:
         # Source ends "." (stop); target ends "?" (question): the overlap
         # case from Task 1's terminal-mark conflict guard. The fixup

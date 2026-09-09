@@ -200,7 +200,7 @@ def _decision_7_holds(
     )
 
 
-Bucket = str  # "eligible" | "manual" | "denied"
+Bucket = str  # "eligible" | "manual" | "no_fixup" | "denied"
 
 
 def _classify(
@@ -215,13 +215,21 @@ def _classify(
     never substituted, as it protects a different, metadata-only branch of
     `bulk_perform` (`weblate/trans/bulk.py:150-153`), not a
     `Unit.translate()` target edit.
-    `manual`: no fixup, no final target change, an uncleared check, a
-    conflicting terminal mark, or a newly introduced terminal/
-    `punctuation_spacing` failure.
+    `no_fixup`: the check offers this string no fixup at all. For the
+    terminal checks that means the failure is the opposite direction -
+    the translation carries a mark the source does not have - which the
+    autofix layer owns (`RemoveAddedFinalStop`), not this feature. It is
+    reported separately because it is the one manual reason a producer
+    cannot act on from here, and it counts into `manual` as well.
+    `manual`: no final target change, an uncleared check, a conflicting
+    terminal mark, or a newly introduced terminal/`punctuation_spacing`
+    failure.
     `eligible`: a permitted final target that satisfies decision 7 in full.
     """
     if user is not None and not user.has_perm("unit.edit", unit):
         return "denied", None
+    if not check_obj.get_fixup(unit):
+        return "no_fixup", None
     new_targets = _compute_final_target(check_obj, unit)
     if new_targets is None:
         return "manual", None
@@ -297,6 +305,10 @@ class FixCandidates:
     shown: list[FixPreviewRow] = field(default_factory=list)
     total_eligible: int = 0
     manual: int = 0
+    # Subset of `manual`: the check offers those strings no fixup at all
+    # (for a terminal check, the failure is the direction the autofix
+    # layer owns), so no further pass from this screen can ever fix them.
+    manual_no_fixup: int = 0
     denied: int = 0
     verdicts_no_longer_current: int = 0
 
@@ -354,8 +366,10 @@ def collect_fix_candidates(
         bucket, new_targets = _classify(user, check_obj, unit)
         if bucket == "denied":
             result.denied += 1
-        elif bucket == "manual":
+        elif bucket in {"manual", "no_fixup"}:
             result.manual += 1
+            if bucket == "no_fixup":
+                result.manual_no_fixup += 1
         else:
             result.total_eligible += 1
             if new_targets is not None and _verdict_would_go_stale(unit, new_targets):
@@ -447,7 +461,7 @@ def perform_fix(
                 if bucket == "denied":
                     result.denied += 1
                     continue
-                if bucket == "manual":
+                if bucket in {"manual", "no_fixup"}:
                     result.manual += 1
                     continue
                 if new_targets is None:  # pragma: no cover - defensive

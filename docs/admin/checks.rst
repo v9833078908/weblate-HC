@@ -350,6 +350,15 @@ Participating checks fall into two tiers:
   the confirmation refuses a selection that does not match the reviewed
   batch, so a reviewed fix can never be applied to a string nobody saw.
 
+The terminal-punctuation checks are repaired in one direction only. The
+:guilabel:`Fix` button restores a mark the source has and the translation
+lost; a mark the translation added on its own is repaired by the autofix
+layer when a string is saved (and, for strings imported earlier, by
+:wladmin:`reapply_autofixes`). A string failing in that second direction
+is reported on the fix screen as having no fixup and never becomes
+selectable, so a scope can legitimately show thousands of failing strings
+and no applicable ones.
+
 Fixing a source string that only needs cosmetic repair - for example
 normalizing ``...`` to ``…`` - never marks its existing translations
 :guilabel:`Needs editing`. The edit is written straight to the translated

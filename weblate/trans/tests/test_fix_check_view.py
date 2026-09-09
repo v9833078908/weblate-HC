@@ -162,6 +162,29 @@ class FixCheckViewTest(ViewTestCase):
         self.assertEqual(candidates.shown[0].unit.pk, unit.pk)
         self.assertEqual(candidates.shown[0].final_target_value, "Dekuji.")
 
+    def test_unfixable_direction_is_explained_on_the_screen(self) -> None:
+        # A scope where every failure is the direction this feature does
+        # not own must say so, instead of only reporting an unexplained
+        # "needs manual review" with an empty table.
+        self._grant_full_access()
+        unit = self.get_unit(source="Hello, world!\n")
+        unit.source = "Hello world"
+        unit.save(update_fields=["source"])
+        unit.translate(self.user, "Ahoj svete.", STATE_TRANSLATED)
+        unit.refresh_from_db()
+
+        response = self.client.get(self._url("end_stop"))
+        self.assertEqual(response.context["candidates"].manual_no_fixup, 1)
+        self.assertContains(response, "no fixup for this check")
+        self.assertContains(response, "No applicable strings to fix right now.")
+
+        # The fixable direction never triggers the note.
+        self._fail_end_stop()
+        unit.translate(self.user, "Ahoj svete", STATE_TRANSLATED)
+        response = self.client.get(self._url("end_stop"))
+        self.assertEqual(response.context["candidates"].manual_no_fixup, 0)
+        self.assertNotContains(response, "no fixup for this check")
+
     def _cohort(self, units, name: str = "end_stop", scope_type: str = "translation"):
         """Sign a preview cohort the way the GET screen renders it."""
         scope_pk = {
