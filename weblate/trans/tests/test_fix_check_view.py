@@ -517,6 +517,62 @@ class FixCheckSourceTemplateViewTest(ViewTestCase):
         self.assertEqual(sibling.source, "Wait…")
         self.assertEqual(sibling.state, expected_state)
 
+    def test_source_translation_page_offers_no_dead_fix_link(self) -> None:
+        """
+        A source translation can never be mass-fixed, so it gets no link.
+
+        `check_autotranslate` refuses `unit.bulk_edit` on a source
+        translation without an intermediate language before any role or
+        superuser grant, so a rendered link would always answer 403. The
+        component scope above is how this same check is fixed.
+        """
+        response = self.client.get(self.source_translation.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ellipsis")
+        self.assertNotContains(response, "/fix-check/")
+
+        self.assertEqual(
+            self.client.get(
+                reverse(
+                    "fix-check",
+                    kwargs={
+                        "name": "ellipsis",
+                        "path": self.source_translation.get_url_path(),
+                    },
+                )
+            ).status_code,
+            403,
+        )
+
+    def test_check_list_offers_no_dead_fix_link_for_source_row(self) -> None:
+        response = self.client.get(
+            reverse(
+                "checks",
+                kwargs={
+                    "name": "ellipsis",
+                    "path": self.component.get_url_path(),
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        # The row is rendered and the page-level gate is open: only the
+        # per-row permission keeps the link off this source-language row.
+        self.assertTrue(response.context["show_fix_check_links"])
+        self.assertEqual(
+            [row.pk for row in response.context["object_list"]],
+            [self.source_translation.pk],
+        )
+        self.assertNotContains(
+            response,
+            reverse(
+                "fix-check",
+                kwargs={
+                    "name": "ellipsis",
+                    "path": self.source_translation.get_url_path(),
+                },
+            ),
+        )
+
 
 class ExplicitPolicyViewTest(ViewTestCase):
     """

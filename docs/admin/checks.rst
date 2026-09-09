@@ -426,6 +426,12 @@ button is shown. A string with a current judge verdict that the fix would
 make stale is counted and shown before the change is applied; the fix
 does not queue a re-check on its own (see :ref:`llm-judge`).
 
+:guilabel:`Bulk edit strings` never applies to a source language, so a
+source-language page offers no :guilabel:`Fix` button even to an
+administrator. Fix a failing source check from the component or project
+scope instead - for example from :guilabel:`Checks` on the component -
+where the same strings are covered.
+
 Mass-fixing has no undo. Review the preview before confirming, especially
 for a component- or project-wide run.
 

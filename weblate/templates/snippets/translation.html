@@ -1,4 +1,4 @@
-{% load humanize i18n translations %}
+{% load humanize i18n permissions translations %}
 
 {% get_translate_url object as translate_url %}
 {% url 'translate' path=object.get_url_path as edit_url %}
@@ -118,10 +118,21 @@
             `mass_fixup` alone would silently drop a working Fix link
             (docs/product/plans/2026-09-09-producer-bulk-punctuation-
             repair.md, Task D).
+
+            `unit.bulk_edit` is checked here for the very scope the link
+            targets, exactly like `templates/translate.html` does for
+            "Fix all such strings": `check_autotranslate` refuses a
+            source-language translation without an intermediate language
+            outright, before any role or superuser grant is consulted
+            (`weblate/auth/permissions.py`), so on a source-language page
+            an ungated link is always a dead end that answers 403.
           {% endcomment %}
           {% if allow_fix_check and item.fix_url_name and object.pk %}
-            <a class="btn-inline"
-               href="{% url 'fix-check' name=item.fix_url_name path=object.get_url_path %}">{% translate "Fix" %}</a>
+            {% perm 'unit.bulk_edit' object as user_can_fix_all %}
+            {% if user_can_fix_all %}
+              <a class="btn-inline"
+                 href="{% url 'fix-check' name=item.fix_url_name path=object.get_url_path %}">{% translate "Fix" %}</a>
+            {% endif %}
           {% endif %}
         </td>
       </tr>

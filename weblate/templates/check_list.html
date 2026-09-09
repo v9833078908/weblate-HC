@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% load humanize i18n translations %}
+{% load humanize i18n permissions translations %}
 
 {% block breadcrumbs %}
   {% if path_object %}
@@ -45,8 +45,20 @@
           <th>
             <a href="{{ row.row_url }}">{{ row.row_title }}</a>
             {% if show_fix_check_links %}
-              <a href="{% url 'fix-check' name=fix_check_policy_id path=row.get_url_path %}"
-                 class="btn-inline">{% translate "Fix" %}</a>
+              {% comment %}
+                Each row is the scope its own link targets - a Translation
+                on a component page, a Component on a project page - so the
+                permission is checked per row: `check_autotranslate` denies
+                `unit.bulk_edit` on a source-language translation without an
+                intermediate language before any role or superuser grant
+                (`weblate/auth/permissions.py`), and an ungated link there
+                would always answer 403.
+              {% endcomment %}
+              {% perm 'unit.bulk_edit' row as user_can_fix_row %}
+              {% if user_can_fix_row %}
+                <a href="{% url 'fix-check' name=fix_check_policy_id path=row.get_url_path %}"
+                   class="btn-inline">{% translate "Fix" %}</a>
+              {% endif %}
             {% endif %}
           </th>
           <td class="number" data-value="{{ row.check_count }}">
