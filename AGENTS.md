@@ -360,6 +360,26 @@ The repo root is bind-mounted to `/app/src` and Granian reloads on changes under
 `/app/src/weblate`, so Python edits in `weblate/` are live. `dev-docker/data/` is
 mounted at `/app/data`.
 
+Only the web process reloads. The Celery workers inside the same container
+are started once by `supervisord` and keep the code they imported at start,
+so a change to task or engine code - `weblate/trans/tasks.py`,
+`weblate/trans/fix_check.py`, judge or machinery modules - is live in the UI
+and stale in the worker until it is restarted. The symptom is a queued action
+that reports a nonsensical refusal instead of doing the work: a mass fix whose
+task result is `{"status": "failed", "message": "This check is no longer
+eligible for a mass fix."}` while the same policy renders fine on the
+confirmation screen. Restart the workers rather than the stack:
+
+```sh
+docker exec dev-docker-weblate-1 supervisorctl status
+docker exec dev-docker-weblate-1 supervisorctl restart celery-celery
+```
+
+`weblate shell` and `./rundev.sh test` always import current code, so a fresh
+shell resolving what the worker rejects is the confirmation of this skew, not
+evidence against it. Read a queued run's own verdict with
+`app.AsyncResult(task_id).result` instead of guessing from the flash message.
+
 ### Host-side (uv) commands
 
 ```sh
