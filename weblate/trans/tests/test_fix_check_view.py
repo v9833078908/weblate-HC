@@ -175,7 +175,7 @@ class FixCheckViewTest(ViewTestCase):
 
         response = self.client.get(self._url("end_stop"))
         self.assertEqual(response.context["candidates"].manual_no_fixup, 1)
-        self.assertContains(response, "no fixup for this policy")
+        self.assertContains(response, "no fixup for this check")
         self.assertContains(response, "No applicable strings to fix right now.")
 
         # The fixable direction never triggers the note.
@@ -183,7 +183,7 @@ class FixCheckViewTest(ViewTestCase):
         unit.translate(self.user, "Ahoj svete", STATE_TRANSLATED)
         response = self.client.get(self._url("end_stop"))
         self.assertEqual(response.context["candidates"].manual_no_fixup, 0)
-        self.assertNotContains(response, "no fixup for this policy")
+        self.assertNotContains(response, "no fixup for this check")
 
     def _cohort(self, units, name: str = "end_stop", scope_type: str = "translation"):
         """Sign a preview cohort the way the GET screen renders it."""
@@ -634,6 +634,29 @@ class ExplicitPolicyViewTest(ViewTestCase):
         # The review button counts checked rows, and nothing starts checked.
         self.assertIn('<span id="fix-check-selected-count">0</span>', content)
         self.assertNotIn("Fix selected (1)", content)
+
+    def test_held_back_strings_name_the_policy_guards(self) -> None:
+        """
+        A screen with nothing to apply must name the real reason.
+
+        The policy removes an added stop, so "the fix only restores a mark
+        the source lost" is not why these rows are excluded: its own
+        guards are.
+        """
+        self._grant_full_access()
+        unit = self.get_unit(source="Hello, world!\n")
+        unit.source = "Une salle"
+        unit.save(update_fields=["source"])
+        # "Dr" is short enough for the abbreviation guard to refuse.
+        unit.translate(self.user, "Dr.", STATE_TRANSLATED)
+        response = self.client.get(self._url("terminal-source"))
+        candidates = response.context["candidates"]
+        self.assertEqual(candidates.total_eligible, 0)
+        self.assertEqual(candidates.manual_no_fixup, 1)
+        content = response.content.decode()
+        self.assertIn("held back by this policy's own guards", content)
+        self.assertNotIn("no fixup for this check", content)
+        self.assertIn("No applicable strings to fix right now.", content)
 
     def test_terminal_source_post_selection_all_applies_full_scope(self) -> None:
         self._grant_full_access()

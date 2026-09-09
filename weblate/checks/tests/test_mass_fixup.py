@@ -824,6 +824,34 @@ class TerminalSourcePolicyTest(SimpleTestCase):
         unit = make_unit(code="ru", source="Заметка", target="др.")
         self.assertIsNone(self._edit(EndStopCheck(), unit))
 
+    def test_accented_final_word_is_not_read_as_an_abbreviation(self) -> None:
+        # CoL4/data/fr's dominant refusal before the letter classes covered
+        # the accented forms: "pièce" measured as "ce", so a whole French
+        # corpus looked like abbreviations.
+        unit = make_unit(
+            code="fr",
+            source="Le scientifique entre dans la salle",
+            target="Le scientifique entre dans la pièce.",
+        )
+        edit = self._edit(EndStopCheck(), unit)
+        self.assertEqual(edit.operation, "remove")
+        self.assertEqual(
+            self._apply(edit, unit.target), "Le scientifique entre dans la pièce"
+        )
+
+    def test_short_accented_final_word_stays_protected(self) -> None:
+        # "né" is two letters even counting the accent, so the guard holds.
+        unit = make_unit(code="fr", source="Il est ne", target="Il est né.")
+        self.assertIsNone(self._edit(EndStopCheck(), unit))
+
+    def test_ukrainian_final_word_outside_the_russian_alphabet(self) -> None:
+        # "виїхав" ends "їхав"; U+0457 is not in the Russian alphabet, so a
+        # class limited to it measured three letters and refused.
+        unit = make_unit(code="uk", source="Він виїхав", target="Він виїхав.")
+        edit = self._edit(EndStopCheck(), unit)
+        self.assertEqual(edit.operation, "remove")
+        self.assertEqual(self._apply(edit, unit.target), "Він виїхав")
+
     def test_numeric_stem_is_protected(self) -> None:
         unit = make_unit(code="en", source="Chapter", target="Chapter 2.")
         self.assertIsNone(self._edit(EndStopCheck(), unit))

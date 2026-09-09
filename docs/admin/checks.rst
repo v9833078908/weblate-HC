@@ -389,7 +389,12 @@ the policy is applied there.
 A string is left to per-string review, rather than decided, when the
 source's own ending is ambiguous, when the target language does not
 use the mark's family, or when the edit would change a placeholder or
-markup span. The per-check :guilabel:`Fix` button keeps its narrower
+markup span. The policy also refuses what a replace or a remove would
+leave behind when that looks like an abbreviation - a final word of one
+to three letters, accented forms counted - a decimal, a version, a URL
+or a path. Those strings are reported on the confirmation screen as held
+back by the policy's guards, so a scope with nothing to apply says why.
+The per-check :guilabel:`Fix` button keeps its narrower
 behaviour: it only restores a mark the source has and the translation
 lost, and reports the opposite direction as having no fixup.
 

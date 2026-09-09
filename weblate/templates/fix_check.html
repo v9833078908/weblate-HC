@@ -91,15 +91,31 @@
 
   {% if candidates.manual_no_fixup %}
     <p class="text-muted">
-      {% if check.tier == "review" or check.id == "terminal-source" %}
+      {% if check.id == "terminal-source" %}
         {% blocktranslate trimmed count count=candidates.manual_no_fixup %}
-          {{ count }} failing string has no fixup for this policy and never
+          {{ count }} failing string is held back by this policy's own
+          guards and never becomes selectable here: a final word short
+          enough to be an abbreviation, a source ending the policy refuses
+          to read through, or a mark it never removes on its own, such as a
+          question mark or a colon the translation added. Review those
+          strings one by one.
+        {% plural %}
+          {{ count }} failing strings are held back by this policy's own
+          guards and never become selectable here: a final word short
+          enough to be an abbreviation, a source ending the policy refuses
+          to read through, or a mark it never removes on its own, such as a
+          question mark or a colon the translation added. Review those
+          strings one by one.
+        {% endblocktranslate %}
+      {% elif check.tier == "review" %}
+        {% blocktranslate trimmed count count=candidates.manual_no_fixup %}
+          {{ count }} failing string has no fixup for this check and never
           becomes selectable here: this action only restores a mark the
           source has and the translation lost. The opposite direction, a
           mark the translation added on its own, is repaired when a string
           is saved, not from this screen.
         {% plural %}
-          {{ count }} failing strings have no fixup for this policy and
+          {{ count }} failing strings have no fixup for this check and
           never become selectable here: this action only restores a mark
           the source has and the translation lost. The opposite direction,
           a mark the translation added on its own, is repaired when a

@@ -552,9 +552,19 @@ _TERMINAL_REMOVABLE: dict[str, frozenset[str]] = {
 _TERMINAL_SPACE_CLASS = " \u00a0\u202f\u2009"
 # A closing quote, bracket or tag that might hide a source mark behind it.
 _PROTECTED_TAIL_CHARS = frozenset("»\"'\u2019)]}>")
-_LATIN_WORD_RE = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)*$")
-_CYRILLIC_WORD_RE = re.compile(r"[А-Яа-яЁё]+(?:'[А-Яа-яЁё]+)*$")
-_CYRILLIC_RE = re.compile(r"[А-Яа-яЁё]")
+# The final word the abbreviation guard below measures. The letter classes
+# must cover the whole script, not its ASCII core: with `[A-Za-z]` only,
+# "pièce" measures as "ce" and "Propriétés" as "s", so every accented word
+# looks like a 1-3 letter abbreviation and a French, Vietnamese or Polish
+# translation is refused wholesale (measured on CoL4/data/fr: 189 of 386
+# refusals). Latin-1 Supplement through Latin Extended-B and Latin
+# Extended Additional cover the accented forms; the two Latin-1 maths
+# symbols at U+00D7/U+00F7 are excluded on purpose.
+_LATIN_LETTERS = "A-Za-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u024f\u1e00-\u1eff"
+_CYRILLIC_LETTERS = "\u0400-\u04ff\u0500-\u052f"
+_LATIN_WORD_RE = re.compile(rf"[{_LATIN_LETTERS}]+(?:'[{_LATIN_LETTERS}]+)*$")
+_CYRILLIC_WORD_RE = re.compile(rf"[{_CYRILLIC_LETTERS}]+(?:'[{_CYRILLIC_LETTERS}]+)*$")
+_CYRILLIC_RE = re.compile(rf"[{_CYRILLIC_LETTERS}]")
 _NUMERIC_TAIL_RE = re.compile(r"[0-9]$")
 _URL_LIKE_TAIL_RE = re.compile(
     r"(?:^|[\s(\[{])"
@@ -639,12 +649,12 @@ def _terminal_edit_stem_is_protected(stem: str, source: str) -> bool:
     In order: blanking the string entirely; a decimal, version, URL,
     e-mail or path-like tail, where the touched mark is not sentence
     punctuation at all; and a possible abbreviation - a final word of 1-3
-    Latin letters (apostrophes, as in "can't", do not count against the
-    limit and do not break the word), or, when source itself is Cyrillic,
-    1-3 Cyrillic letters. "A conservative filter, not a linguistic
-    detector: common short words may also be excluded" (plan, Task A) -
-    real coverage loss is an accepted cost of never corrupting "etc." or
-    "v1.2".
+    Latin letters, accented forms included, so "pièce" counts five and not
+    two (apostrophes, as in "can't", do not count against the limit and do
+    not break the word), or, when source itself is Cyrillic, 1-3 Cyrillic
+    letters. "A conservative filter, not a linguistic detector: common
+    short words may also be excluded" (plan, Task A) - real coverage loss
+    is an accepted cost of never corrupting "etc." or "v1.2".
     """
     if not stem:
         return True
