@@ -27,7 +27,7 @@ from typing import (  # pylint: disable=unused-import
 from django.core import signing
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import OuterRef, Prefetch, Subquery
 from redis.lock import Lock as RedisLock
 
 from weblate.checks.models import CHECKS
@@ -234,17 +234,28 @@ def _classify(
 
 def _newest_verdict_prefetch() -> Prefetch:
     """
-    Prefetch every unit's verdicts newest-first.
+    Prefetch each unit's newest verdict, and only that one.
 
-    Applied to the candidate queryset so `_verdict_would_go_stale` reads a
-    prefetched list instead of issuing one query per eligible unit
-    (Task 2 step 2 forbids a per-unit query explosion on a project scope).
+    `_verdict_would_go_stale` needs the newest verdict per candidate.
+    Fetching it per unit is one query per eligible unit, which Task 2
+    step 2 forbids on a project scope; prefetching the whole
+    `judge_verdicts` relation would instead pull every historical verdict
+    of every candidate into memory. The correlated `pk` subquery keeps it
+    at one row per unit per prefetch chunk.
     """
     # ruff: ignore[import-outside-top-level]
     from weblate.trans.models.judge import JudgeVerdict
 
+    newest = (
+        JudgeVerdict.objects.filter(unit_id=OuterRef("unit_id"))
+        .order_by("-timestamp")
+        .values("pk")[:1]
+    )
     return Prefetch(
-        "judge_verdicts", queryset=JudgeVerdict.objects.order_by("-timestamp")
+        "judge_verdicts",
+        queryset=JudgeVerdict.objects.filter(pk=Subquery(newest)).order_by(
+            "-timestamp"
+        ),
     )
 
 
