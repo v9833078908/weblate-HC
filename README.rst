@@ -8,6 +8,36 @@ HCGameLoc
 Поддерживается v9833078908 (``origin`` = `v9833078908/weblate-HC
 <https://github.com/v9833078908/weblate-HC>`_).
 
+О проекте
+---------
+
+HCGameLoc — TMS для игровой локализации, в которой машина не только переводит,
+но и **проверяет сама себя**. Студия работает без штата переводчиков, поэтому
+продукт строится вокруг двух вещей: качественного LLM-перевода с игровым
+контекстом и машинного контура валидации, чей результат виден в обычном UI
+Weblate как проверки и отчёты.
+
+Что здесь есть поверх исходного Weblate:
+
+- **LLM-судья** — двухместный (seat 1 / seat 2) контур оценки переводов на
+  отдельном LLM-эндпоинте, с вердиктами, консенсусным реджектом, циклом
+  автопочинки, историей прогонов и отчётами (`LLM-судья`_).
+- **Два маршрутизирующих движка перевода** — OpenRouter и корпоративный
+  LiteLLM-прокси, с выбором модели по целевому языку
+  (`Движки перевода: OpenRouter и LiteLLM`_).
+- **Игровые проверки и автофиксы** — Unity-разметка, движковые токены и
+  плейсхолдеры, разделитель строк ``$``, числа, кириллические утечки, видимая
+  длина (`Игровые проверки и автофиксы`_).
+- **Массовое исправление проваленных проверок** — серверный движок фиксапа,
+  запускаемый из UI (`Массовое исправление проверок`_).
+- **Учёт расходов на LLM** — журнал использования и стоимость по прогонам
+  (`Учёт расходов на LLM`_).
+- **Приём loc-kit** — детерминированный импорт таблиц строк и глоссариев
+  студий (`Приём loc-kit`_).
+
+Роадмап и архитектура: ``docs/product/vision/llm-first-product-architecture.md``.
+Планы, замеры и ревью каждой из этих тем — в ``docs/product/``.
+
 
 .. contents:: Содержание
    :local:
@@ -16,18 +46,24 @@ HCGameLoc
 Свои части репозитория
 ----------------------
 
-Три вещи существуют только здесь и не приходят из исходного Weblate:
+Свои части репозитория, которых нет в исходном Weblate:
 
 ``weblate_customization/``
-    Пакет с кастомной проверкой (см. `Проверка game-markup`_ ниже). Содержит
-    ``GameMarkupCheck`` (id проверки ``game-markup``), который убеждается, что
-    Unity-теги форматирования (``<color=#RRGGBB>``, ``<link>``, ``<size=N>``,
-    ``<b>``) и движковые плейсхолдеры (``{0}``, ``%KEY%``) в переводе совпадают
-    с исходником. Пакет также содержит ``RoutedLLMTranslation`` — движок
-    автоматических предложений **OpenRouter** (слаг сервиса ``openrouter``),
-    который выбирает model ID по целевому языку из JSON-карты ``routing``.
-    Движок подключается через ``WEBLATE_ADD_MACHINERY`` и предвыбран в форме
-    автоперевода (``AutoForm.DEFAULT_ENGINE`` в ``weblate/trans/forms.py``).
+    Пакет с игровыми проверками, автофиксами и движками машинного перевода:
+    ``checks.py`` (``game-markup``, ``game-line-break``, ``game-token``,
+    ``game-number``, ``cyrillic-leak``, ``game-length`` и переопределения
+    штатных ``max-length`` / ``max-length-source``), ``autofixes.py``
+    (``LineSeparatorSpacing``, ``RemoveAddedFinalStop``,
+    ``AddFrenchPunctuationSpacing``) и ``machinery.py``
+    (``RoutedLLMTranslation`` — OpenRouter, ``RoutedLiteLLMTranslation`` —
+    LiteLLM). Подробности — в `Игровые проверки и автофиксы`_ и
+    `Движки перевода: OpenRouter и LiteLLM`_.
+
+``loc_kit_ingest/``
+    Автономный (без Django) детерминированный импортёр loc-kit: чтение
+    CSV/TSV/XLSX, вывод строгого профиля из шапки таблицы, генерация
+    монолингвального PO и билингвального TBX с обратным разбором. См.
+    `Приём loc-kit`_.
 
 ``weblate-mcp/``
     Вендоренный MCP-сервер `@mmntm/weblate-mcp
@@ -48,6 +84,14 @@ HCGameLoc
     Одноразовые скрипты замеров и данные, которые они читают и пишут
     (корпуса, золотые наборы, выводы прогонов). Не документация и не часть
     продукта.
+
+Собственный код есть и внутри ``weblate/``: судья
+(``weblate/trans/judge.py``, ``judge_loop.py``, ``judge_workflow.py``,
+``weblate/trans/models/judge.py``, ``weblate/checks/judge.py``,
+``weblate/trans/views/judge.py``), учёт расходов
+(``weblate/trans/models/llm_usage.py``), массовый фиксап
+(``weblate/trans/fix_check.py``) и Weblate-сторона loc-kit
+(``weblate/trans/loc_kit.py``, ``weblate/trans/models/loc_kit.py``).
 
 Локальные правки ``dev-docker/docker-compose.yml``: PostgreSQL публикуется на
 порту ``5434`` (``5433`` занят другим проектом), а ``WEBLATE_VCS_ALLOW_SCHEMES``
@@ -181,61 +225,190 @@ Dev-инстанс целиком работает в Docker (``dev-docker/``) �
    ./rundev.sh test weblate/checks/tests/test_markup.py # pytest в контейнере
    ./rundev.sh check # django `weblate check`
 
-Проверка game-markup
---------------------
+Игровые проверки и автофиксы
+----------------------------
 
 ``weblate_customization/`` — это пакет ``uv_build``, но dev-контейнер его **не
 устанавливает**. Вместо этого модуль *копируется* в ``sys.path`` контейнера
-через ``/app/data/python``. После правки
-``weblate_customization/src/weblate_customization/checks.py``:
+через ``/app/data/python``. После правки ``checks.py``, ``autofixes.py`` или
+``machinery.py``:
 
 .. code-block:: sh
 
    cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
 
-Проверка импортируема, но **по умолчанию не зарегистрирована**. Чтобы включить
-её, добавьте в окружение сервиса ``weblate`` в
-``dev-docker/docker-compose.yml`` и перезапустите:
+Проверки и автофиксы регистрируются переменными окружения сервиса ``weblate``
+(уже прописаны в ``dev-docker/docker-compose.yml`` и
+``deploy/environment.example``):
 
 .. code-block:: yaml
 
-   WEBLATE_ADD_CHECK: weblate_customization.checks.GameMarkupCheck
+   WEBLATE_ADD_CHECK: weblate_customization.checks.GameMarkupCheck,weblate_customization.checks.GameLineBreakCheck,weblate_customization.checks.CyrillicLeakCheck,weblate_customization.checks.GameNumberCheck,weblate_customization.checks.GameTokenCheck,weblate_customization.checks.GameLengthCheck,weblate_customization.checks.GameMaxLengthCheck,weblate_customization.checks.GameSourceMaxLengthCheck
+   WEBLATE_ADD_AUTOFIX: weblate_customization.autofixes.LineSeparatorSpacing,weblate_customization.autofixes.RemoveAddedFinalStop,weblate_customization.autofixes.AddFrenchPunctuationSpacing
 
-``settings_docker.py`` вкладывает ``WEBLATE_ADD_CHECK`` / ``WEBLATE_REMOVE_CHECK``
-в ``CHECK_LIST`` через ``modify_env_list`` (``weblate/utils/environment.py``).
-Тот же механизм есть для ``WEBLATE_ADD_ADDONS``, ``WEBLATE_ADD_APPS`` и т. д.
+Что проверяется:
 
-Движок OpenRouter
------------------
+``game-markup``
+    Unity-теги форматирования (``<color=#RRGGBB>``, ``<link>``, ``<size=N>``,
+    ``<b>``, ``<sprite name="fire">``) и движковые плейсхолдеры (``{0}``,
+    ``%KEY%``) в переводе совпадают с исходником как мультимножество.
+``game-line-break``
+    Разделитель строк движка Hero Craft ``$`` не потерян и не добавлен, и
+    вокруг него нет пробелов. Флаг ``ignore-game-line-break``.
+``game-token``
+    Идентификатор подстановки перед скобкой (``item_type[|{0}]``,
+    ``skirmish_league_id[gen|в {0}|в любой лиге]``) не переведён: переводится
+    только тело в скобках, сам идентификатор — ключ поиска в движке. Флаг
+    ``ignore-game-token``.
+``game-number``
+    Каждое число из исходника присутствует в переводе после снятия разметки,
+    плейсхолдеров и полных дат и нормализации десятичного разделителя.
+    Проверка асимметрична: добавленное в переводе число допустимо. Флаг
+    ``ignore-game-number``.
+``cyrillic-leak``
+    Кириллица не протекла в перевод на язык, который её не использует.
+``game-length``, ``max-length``, ``max-length-source``
+    Бюджет длины по **видимой** длине: разметка и плейсхолдеры из расчёта
+    исключаются. Последние две переопределяют штатные проверки Weblate.
 
-``RoutedLLMTranslation`` находится в
-``weblate_customization/src/weblate_customization/machinery.py``. После каждой
-правки скопируйте пакет в каталог Python-модулей dev-контейнера:
+Автофиксы применяются до записи перевода: ``LineSeparatorSpacing`` снимает
+пробелы вокруг тесного ``$``, ``RemoveAddedFinalStop`` убирает добавленную
+финальную точку, ``AddFrenchPunctuationSpacing`` ставит французские пробелы
+перед ``: ; ! ?``.
 
-.. code-block:: sh
+``settings_docker.py`` вкладывает ``WEBLATE_ADD_CHECK`` /
+``WEBLATE_REMOVE_CHECK`` в ``CHECK_LIST`` и ``WEBLATE_ADD_AUTOFIX`` /
+``WEBLATE_REMOVE_AUTOFIX`` в ``AUTOFIX_LIST`` через ``modify_env_list``
+(``weblate/utils/environment.py``). Правка блока окружения требует полного
+``./rundev.sh`` (пересборка + запуск), а не рестарта контейнера.
 
-   cp -r weblate_customization/src/weblate_customization dev-docker/data/python/
+Движки перевода: OpenRouter и LiteLLM
+-------------------------------------
 
-Для регистрации движка сервису ``weblate`` нужна переменная:
+``machinery.py`` даёт два движка автоматических предложений с одинаковой
+моделью настроек:
+
+- **OpenRouter** (слаг ``openrouter``, ``RoutedLLMTranslation``);
+- **LiteLLM** (слаг ``litellm``, ``RoutedLiteLLMTranslation``) — тот же движок
+  против корпоративного прокси, base URL по умолчанию
+  ``https://hcbifrost.herocraft.com/litellm/v1``, без OpenRouter-поля
+  ``provider``.
+
+Регистрация:
 
 .. code-block:: yaml
 
-   WEBLATE_ADD_MACHINERY: weblate_customization.machinery.RoutedLLMTranslation
+   WEBLATE_ADD_MACHINERY: weblate_customization.machinery.RoutedLLMTranslation,weblate_customization.machinery.RoutedLiteLLMTranslation
 
 Настройки задаются глобально в ``/manage/machinery/``. Поле ``routing`` — это
 JSON-объект, где ключом служит код целевого языка или ``"*"`` для fallback, а
-значением — OpenRouter model ID. Точное совпадение проверяется до базового кода
-языка и fallback. Карта без ``"*"`` допустима.
+значением — model ID. Точное совпадение проверяется до базового кода языка и
+fallback. Карта без ``"*"`` допустима.
 
-Project-level настройка заменяет весь глобальный конфиг сервиса, поэтому для
-неё нужно повторно задать API key, ``base_url`` и остальные нужные поля.
+Project-level настройка **перекрывает глобальную поле за полем**: проект
+хранит только то, что меняет (persona, style, ``language_instructions``), а
+``key``, ``base_url`` и ``routing`` наследует.
 
-Сервис называется **OpenRouter** (слаг ``openrouter``, выводится из
-``RoutedLLMTranslation.name``). Он предвыбран в форме автоперевода вместе с
-режимом «машинный перевод»: см. ``AutoForm.DEFAULT_ENGINE`` в
-``weblate/trans/forms.py``. Если переименовать движок, надо переименовать и
-запись настроек (``Setting`` с ``category=2``, ``name`` = слаг сервиса),
-иначе конфигурация «потеряется».
+Какой из двух движков использует проект, решают ``ROUTED_ENGINES`` и хелперы
+``configured_routed_engine`` / ``available_routed_engine`` в
+``weblate/trans/forms.py``: побеждает первый движок с пригодной конфигурацией
+проекта (при обеих настроенных — ``openrouter``), причём на весь проект, без
+per-language fallback на второй. Те же хелперы предвыбирают источник в форме
+автоперевода и выбирают движок починки для судьи. Если переименовать движок,
+надо переименовать и запись настроек (``Setting`` с ``category=2``, ``name`` =
+слаг сервиса), иначе конфигурация «потеряется».
+
+LLM-судья
+---------
+
+Судья — отдельный от перевода контур: он берёт уже существующие переводы и
+выносит по ним вердикты, которые попадают в обычные проверки Weblate
+``judge-flag``, ``judge-reject`` и ``judge-note`` (``weblate/checks/judge.py``)
+и в отчёты по прогонам.
+
+Как это устроено:
+
+- **Два места (seats).** Прогон выполняют две модели (``JUDGE_SEATS = (1, 2)``,
+  ``weblate/trans/judge.py``) параллельно, каждая со своим профилем: модель,
+  размер батча, дедлайн, ``reasoning_effort``, ``response_format``,
+  стриминг, температура. При ``WEBLATE_JUDGE_CONSENSUS_REJECT`` реджект
+  требует согласия обоих.
+- **Транспорт.** Единый эндпоинт chat-completions (по умолчанию
+  LiteLLM-прокси), строгая JSON-схема ответа, бюджеты ретраев отдельно для
+  транспортных, протокольных и переходных HTTP-ошибок, per-seat дедлайны,
+  фолбэк-эндпоинт, разрешение алиасов моделей LiteLLM.
+- **Цикл починки.** По вердикту судья формирует машинные инструкции ремонта и
+  запрашивает у движка перевода новый кандидат
+  (``WEBLATE_JUDGE_MAX_REPAIR_ATTEMPTS``); кандидат виден в редакторе строки.
+- **История и отчёты.** ``ProducerRun``, ``JudgeRunUnit``, ``JudgeVerdict``,
+  ``JudgeRequestAttempt``, ``JudgeAdaptiveState``, ``JudgeDeferral``
+  (``weblate/trans/models/judge.py``); страница прогона —
+  ``judge-runs/<uuid>/`` (``weblate/trans/views/judge.py``) с фильтрами по
+  исходу, Pareto-разрезом и оверлеем изменившихся с момента вердикта строк.
+- **Обслуживание.** Management-команды ``judge_backfill_candidates``,
+  ``judge_close_refused_verdicts``, ``judge_release_advisory_holds``,
+  ``check_judge_repair_routes``.
+
+Судья по умолчанию выключен: ``WEBLATE_JUDGE_ENABLED=0``. Полный список
+переменных (ключ, base URL, модели мест, батчи, дедлайны, ретраи,
+``WEBLATE_JUDGE_MAY_APPROVE``) — в ``deploy/environment.example``, разбор
+настроек — в ``weblate/settings_docker.py``.
+
+Замеры прогонов и калибровки лежат в
+``docs/product/measurements/`` (индекс — ``judge-measurements-index.md``),
+планы и ревью — в ``docs/product/plans/`` и ``docs/product/reviews/``.
+
+Учёт расходов на LLM
+--------------------
+
+Каждый вызов LLM (перевод и судья) пишется в ``LLMUsageLog``
+(``weblate/trans/models/llm_usage.py``) с моделью, токенами и стоимостью;
+``RunSpend`` агрегирует расход по прогону, чтобы у прогона был чек. Отчёт из
+консоли:
+
+.. code-block:: sh
+
+   ./rundev.sh exec weblate weblate llm_usage_report
+
+Массовое исправление проверок
+-----------------------------
+
+Детерминированно исправимые проваленные проверки можно починить пачкой, не
+открывая строки по одной: серверный движок фиксапа
+(``weblate/trans/fix_check.py``) и Celery-задача ``fix_failing_checks``
+(``weblate/trans/tasks.py``) доступны из UI по адресу
+``fix-check/<имя проверки>/<путь объекта>/``. Правка исходника при
+косметическом фиксе каскадится на переводы. Документация —
+``docs/admin/checks.rst``.
+
+Приём loc-kit
+-------------
+
+``loc_kit_ingest/`` — детерминированный офлайн-импортёр таблиц строк студий
+(CSV/TSV/XLSX): профиль выводится из шапки самой таблицы, на выходе
+монолингвальный PO или билингвальный TBX с проверкой обратным разбором.
+
+.. code-block:: sh
+
+   python -m loc_kit_ingest --help
+   cd loc_kit_ingest && uv run pytest # автономные тесты, без БД
+
+Форма создания компонента принимает такой файл напрямую (вкладка «Upload
+translation files»), а с галкой «Use as glossary» таблица уходит в
+глоссарный сценарий: выбор листа, детерминированный вывод профиля, опциональный
+LLM-фолбэк, локальная валидация перед публикацией, TBX-компонент. Импорт в
+существующий глоссарий — **только добавление**: совпадение по
+``(context, source)`` не перезаписывается. Site-wide LLM-анализ профиля
+отдельный от машинного перевода и по умолчанию выключен
+(``WEBLATE_LOC_KIT_PROFILE_ANALYSIS_ENABLED``).
+
+Контейнер импортирует пакет из ``/app/data/python``, поэтому после правки:
+
+.. code-block:: sh
+
+   cp loc_kit_ingest/*.py dev-docker/data/python/loc_kit_ingest/
+
+Руководство — ``docs/product/guides/loc-kit-ingest.md``.
 
 MCP-сервер
 ----------
