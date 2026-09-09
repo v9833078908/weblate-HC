@@ -1976,15 +1976,21 @@ class Unit(models.Model, LoggerMixin):
                 and unit.translation.get_filename() is not None
             ):
                 pending_changes = unit.pending_changes.all()
-                if author is not None and pending_changes.exists():
-                    pending_changes.update(
-                        author=author,
-                        target=unit.target,
-                        explanation=unit.explanation,
-                        source_unit_explanation=unit.source_unit.explanation,
-                        state=unit.state,
-                        automatically_translated=unit.automatically_translated,
-                    )
+                if pending_changes.exists():
+                    # Never add a second row for the same unit; an unflushed
+                    # one is updated in place. The author is only overwritten
+                    # when this cascade knows one, so an anonymous cosmetic
+                    # fix does not erase the pending row's original author.
+                    updates = {
+                        "target": unit.target,
+                        "explanation": unit.explanation,
+                        "source_unit_explanation": unit.source_unit.explanation,
+                        "state": unit.state,
+                        "automatically_translated": unit.automatically_translated,
+                    }
+                    if author is not None:
+                        updates["author"] = author
+                    pending_changes.update(**updates)
                 else:
                     PendingUnitChange.store_unit_change(unit=unit, author=author)
             return

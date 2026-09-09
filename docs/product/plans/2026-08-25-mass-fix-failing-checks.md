@@ -3,8 +3,28 @@
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to
 > implement this plan task-by-task.
 
-**Status:** implemented (2026-09-08). Tasks 1-6 complete on branch
-`feat/mass-fix-failing-checks`; not yet deployed to production.
+**Status:** implemented (2026-09-08), code-reviewed and corrected
+(2026-09-09). Tasks 1-6 complete on branch `feat/mass-fix-failing-checks`;
+not yet deployed to production.
+
+**Code review (2026-09-09)** found and fixed, before merge: the generic task
+poller mapped every finished task to success, so a failed run rendered as an
+empty success (Task 4 step 2) - the flash and the persisted user-task entry
+now carry an explicit status contract; a lost lock lease on the retry path
+was ignored and retried (Task 4 step 5); actor/scope resolution ran outside
+the task's own error handling, so it raised instead of returning a failed
+payload; failed payloads omitted the five run counters; the Redis Lua
+scripts were registered on every tick; a cosmetic cascade with no author
+duplicated an unflushed `PendingUnitChange` (Task 3 step 3); the review-tier
+POST accepted unpreviewed ids, which is now refused through a signed,
+actor- and scope-bound cohort; the "select all applicable" control was
+unwired; the review table's first column was not sticky and the screen had
+no heading; the inline Fix action could render on aggregate language pages;
+the judge-verdict lookup was a per-unit query; and the `repeat-drift`
+linearity test never built a repeat group. Remaining known gap: the
+repository has no JavaScript test harness, so the poller mapping and the
+select-all binding are covered by rendered-markup assertions and lint only.
+
 **Revised 2026-09-08** against
 `docs/product/reviews/2026-09-08-mass-fix-failing-checks-plan-review.md`:
 every finding of that review is folded into the tasks below, every code

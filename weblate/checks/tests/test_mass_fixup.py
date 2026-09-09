@@ -470,9 +470,9 @@ class FixupJavaScriptParityTest(SimpleTestCase):
             fixups = check.get_fixup(unit)
             self.assertIsNotNone(fixups, f"{check.check_id} produced no fixup")
             for pattern, replacement, flags in ((p, r, f) for _, p, r, f in fixups):
-                samples = [
-                    f"{prefix}{tail}" for tail in self.SAMPLE_TAILS
-                ] + list(extra_samples)
+                samples = [f"{prefix}{tail}" for tail in self.SAMPLE_TAILS] + list(
+                    extra_samples
+                )
                 fixtures.append(
                     {
                         "pattern": pattern,
@@ -483,6 +483,29 @@ class FixupJavaScriptParityTest(SimpleTestCase):
                 )
 
         add(EllipsisCheck(), make_unit(code="ru", is_source=True, source="Wait...."))
+        # The other two safe-tier checks. Task 1 step 5 wants parity for
+        # every regex fixup a tiered check emits, and `KabyleCharactersCheck`
+        # emits one tuple per confusable (`chars.py:214-218`), so the
+        # samples must actually contain those characters.
+        add(
+            DoubleSpaceCheck(),
+            make_unit(code="cs", source="a b", target="a  b"),
+            extra_samples=("a  b", "a   b", "  lead", "trail  ", "a  b  c"),
+        )
+        kabyle_unit = make_unit(code="kab", source="Iγ", target="Iγ")
+        add(
+            KabyleCharactersCheck(),
+            kabyle_unit,
+            extra_samples=tuple(
+                sample
+                for confusable in KabyleCharactersCheck().confusable_to_standard
+                for sample in (
+                    confusable,
+                    f"a{confusable}b",
+                    f"{confusable}{confusable}",
+                )
+            ),
+        )
         add(EndStopCheck(), make_unit(code="ru", source="Save it.", target="x"))
         add(EndStopCheck(), make_unit(code="ja", source="Save it.", target="x"))
         add(EndColonCheck(), make_unit(code="fr", source="Options:", target="x"))
@@ -625,3 +648,31 @@ class OwnershipBoundaryTest(SimpleTestCase):
             fixed2, applied2 = fix_target([repaired2], unit2)
             self.assertEqual(fixed2, [repaired2])
             self.assertEqual(applied2, [])
+
+            # The remaining three review-tier checks carry the same
+            # guarantee: a repaired target is never re-touched by the
+            # autofix layer, so the two mass-mutation paths cannot fight.
+            for check, unit_kwargs, expected in (
+                (
+                    EndColonCheck(),
+                    {"code": "ru", "source": "Options:", "target": "Параметры"},
+                    "Параметры:",
+                ),
+                (
+                    EndQuestionCheck(),
+                    {"code": "ru", "source": "Save it?", "target": "Сохранить"},
+                    "Сохранить?",
+                ),
+                (
+                    EndInterrobangCheck(),
+                    {"code": "ru", "source": "Really?!", "target": "Правда"},
+                    "Правда?!",
+                ),
+            ):
+                with self.subTest(check=check.check_id):
+                    unit3 = make_unit(**unit_kwargs)
+                    repaired3 = apply_fixup(check.get_fixup(unit3), unit3.target)
+                    self.assertEqual(repaired3, expected)
+                    fixed3, applied3 = fix_target([repaired3], unit3)
+                    self.assertEqual(fixed3, [repaired3])
+                    self.assertNotIn("Removed final stop", applied3)

@@ -788,3 +788,9 @@ msgid ""
 msgstr ""
 "Предпросмотр автоматического перевода недоступен. Запуск всё равно можно "
 "применить."
+
+msgid "%(done)s / %(total)s processed"
+msgstr "Обработано %(done)s из %(total)s"
+
+msgid "The background task failed."
+msgstr "Фоновая задача завершилась с ошибкой."

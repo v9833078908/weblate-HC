@@ -17,10 +17,17 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, cast  # pylint: disable=unused-import
+from typing import (  # pylint: disable=unused-import
+    TYPE_CHECKING,
+    Any,
+    Literal,
+    cast,
+)
 
+from django.core import signing
 from django.core.cache import cache
 from django.db import transaction
+from django.db.models import Prefetch
 from redis.lock import Lock as RedisLock
 
 from weblate.checks.models import CHECKS
@@ -69,7 +76,10 @@ def apply_fixup_python(
     Translates JS flags: `g` -> `count=0` (replace every occurrence),
     otherwise `count=1` (replace only the first); `i` -> `re.IGNORECASE`;
     `u` has no Python equivalent to translate (Python `str` patterns are
-    already Unicode-aware) and is ignored. Applies every fixup, in order,
+    already Unicode-aware) and is ignored. Any other flag raises rather
+    than being silently dropped: a flag this function cannot translate
+    would make the server-side result diverge from what the editor's
+    `new RegExp(pattern, flags)` computes. Applies every fixup, in order,
     to every plural form.
     """
     if not fixups:
@@ -82,6 +92,13 @@ def apply_fixup_python(
             raise ValueError(msg)
         regex_fixup = cast("tuple[Literal['regex'], str, str, str]", fixup)
         _, pattern, replacement, flags = regex_fixup
+        unknown_flags = set(flags) - {"g", "i", "u"}
+        if unknown_flags:
+            msg = (
+                "apply_fixup_python cannot translate the JavaScript regex "
+                f"flags {''.join(sorted(unknown_flags))!r}"
+            )
+            raise ValueError(msg)
         count = 0 if "g" in flags else 1
         re_flags = re.IGNORECASE if "i" in flags else 0
         result = [
@@ -215,6 +232,22 @@ def _classify(
     return "eligible", new_targets
 
 
+def _newest_verdict_prefetch() -> Prefetch:
+    """
+    Prefetch every unit's verdicts newest-first.
+
+    Applied to the candidate queryset so `_verdict_would_go_stale` reads a
+    prefetched list instead of issuing one query per eligible unit
+    (Task 2 step 2 forbids a per-unit query explosion on a project scope).
+    """
+    # ruff: ignore[import-outside-top-level]
+    from weblate.trans.models.judge import JudgeVerdict
+
+    return Prefetch(
+        "judge_verdicts", queryset=JudgeVerdict.objects.order_by("-timestamp")
+    )
+
+
 def _verdict_would_go_stale(unit: Unit, new_targets: list[str]) -> bool:
     """
     Report whether the fix would make the unit's newest verdict stale.
@@ -222,9 +255,10 @@ def _verdict_would_go_stale(unit: Unit, new_targets: list[str]) -> bool:
     True when the unit's newest judge verdict is current for the present
     text and will stop being current after the fix (Task 2 step 4,
     decision 9). No re-check is queued here - this is a reported count
-    only.
+    only. Reads `judge_verdicts` through the newest-first prefetch above,
+    so a prefetched candidate costs no extra query.
     """
-    latest = unit.judge_verdicts.order_by("-timestamp").first()
+    latest = next(iter(unit.judge_verdicts.all()), None)
     if latest is None:
         return False
     if latest.is_stale(unit.get_target_plurals()):
@@ -294,8 +328,15 @@ def collect_fix_candidates(
     calls this with the scope's full query and never renders `.shown`'s
     text, only the aggregate counts.
     """
-    matching = _matching_units(unit_set, project, check_obj).order_by(
-        "translation__component_id", "translation_id", "position", "id"
+    # Only the newest-verdict prefetch is added here: the caller's
+    # `unit_set` already carries the scope's own relation prefetches
+    # (`weblate/utils/views.py:parse_path_units`), and re-applying
+    # `UnitQuerySet.prefetch()` on top of them raises "lookup was already
+    # seen with a different queryset".
+    matching = (
+        _matching_units(unit_set, project, check_obj)
+        .prefetch_related(_newest_verdict_prefetch())
+        .order_by("translation__component_id", "translation_id", "position", "id")
     )
     result = FixCandidates()
     for unit in matching.iterator(chunk_size=200):
@@ -306,9 +347,7 @@ def collect_fix_candidates(
             result.manual += 1
         else:
             result.total_eligible += 1
-            if new_targets is not None and _verdict_would_go_stale(
-                unit, new_targets
-            ):
+            if new_targets is not None and _verdict_would_go_stale(unit, new_targets):
                 result.verdicts_no_longer_current += 1
             if len(result.shown) < preview_limit and new_targets is not None:
                 result.shown.append(FixPreviewRow(unit=unit, final_target=new_targets))
@@ -380,7 +419,10 @@ def perform_fix(
         component.start_batched_checks()
         with transaction.atomic():
             for unit in (
-                Unit.objects.filter(pk__in=ids).prefetch().select_for_update()
+                Unit.objects.filter(pk__in=ids)
+                .prefetch()
+                .prefetch_related(_newest_verdict_prefetch())
+                .select_for_update()
             ):
                 matched_ids.add(unit.pk)
                 # Share this call's single Component instance so every
@@ -451,6 +493,22 @@ def _get_redis_client():
     return cast("RedisCache", cache).client.get_client(write=True)
 
 
+# `register_script()` only computes the script SHA locally, so one
+# registration per source is enough for the process; the client is passed
+# per call so a reconfigured cache (tests override `CACHES`) still talks to
+# its own connection. Task 4 step 5 requires registering once rather than
+# on every refresh/release tick.
+_LUA_SCRIPTS: dict[str, Any] = {}
+
+
+def _lua_script(client, source: str):
+    script = _LUA_SCRIPTS.get(source)
+    if script is None:
+        script = client.register_script(source)
+        _LUA_SCRIPTS[source] = script
+    return script
+
+
 def acquire_fix_check_lock(key: str, token: str) -> bool:
     """
     Atomically reserve `key` for `token` (the queued task id).
@@ -459,9 +517,7 @@ def acquire_fix_check_lock(key: str, token: str) -> bool:
     `cache.add()` elsewhere - so two simultaneous submits cannot both win.
     """
     if is_redis_cache():
-        return bool(
-            _get_redis_client().set(key, token, nx=True, ex=FIX_CHECK_LOCK_TTL)
-        )
+        return bool(_get_redis_client().set(key, token, nx=True, ex=FIX_CHECK_LOCK_TTL))
     return cache.add(key, token, timeout=FIX_CHECK_LOCK_TTL)
 
 
@@ -482,8 +538,10 @@ def refresh_fix_check_lock(key: str, token: str) -> bool:
     if not is_redis_cache():
         return True
     client = _get_redis_client()
-    script = client.register_script(RedisLock.LUA_REACQUIRE_SCRIPT)
-    return bool(script(keys=[key], args=[token, FIX_CHECK_LOCK_TTL * 1000]))
+    script = _lua_script(client, RedisLock.LUA_REACQUIRE_SCRIPT)
+    return bool(
+        script(keys=[key], args=[token, FIX_CHECK_LOCK_TTL * 1000], client=client)
+    )
 
 
 def release_fix_check_lock(key: str, token: str) -> bool:
@@ -500,5 +558,71 @@ def release_fix_check_lock(key: str, token: str) -> bool:
     if not is_redis_cache():
         return True
     client = _get_redis_client()
-    script = client.register_script(RedisLock.LUA_RELEASE_SCRIPT)
-    return bool(script(keys=[key], args=[token]))
+    script = _lua_script(client, RedisLock.LUA_RELEASE_SCRIPT)
+    return bool(script(keys=[key], args=[token], client=client))
+
+
+# Task 5 step 4 / Task 2 step 6: a review-tier submit may only carry rows the
+# actor actually saw with their diff and checkbox. The rendered cohort is
+# handed out as a signed, identity-bound payload and verified on POST, so a
+# crafted request cannot repair review-tier candidates that were never
+# previewed. Liveness is still re-checked at apply time, so a previewed row
+# that went stale degrades to `stale_or_no_change`.
+FIX_CHECK_COHORT_SALT = "weblate.trans.fix_check.cohort"
+
+
+def _cohort_salt(
+    *, user_id: int | None, check_id: str, scope_type: str, scope_pk: int | str
+) -> str:
+    return f"{FIX_CHECK_COHORT_SALT}:{user_id}:{check_id}:{scope_type}:{scope_pk}"
+
+
+def dump_fix_check_cohort(
+    unit_ids: Iterable[int],
+    *,
+    user_id: int | None,
+    check_id: str,
+    scope_type: str,
+    scope_pk: int | str,
+) -> str:
+    """Sign the previewed unit ids for this actor, check and scope."""
+    return signing.dumps(
+        sorted(unit_ids),
+        salt=_cohort_salt(
+            user_id=user_id,
+            check_id=check_id,
+            scope_type=scope_type,
+            scope_pk=scope_pk,
+        ),
+    )
+
+
+def load_fix_check_cohort(
+    payload: str,
+    *,
+    user_id: int | None,
+    check_id: str,
+    scope_type: str,
+    scope_pk: int | str,
+    max_size: int = 250,
+) -> set[int]:
+    """
+    Verify a signed cohort payload and return its unit ids.
+
+    Raises `signing.BadSignature` for a tampered, foreign, expired or
+    oversized payload; the caller turns that into a form error.
+    """
+    unit_ids = signing.loads(
+        payload,
+        salt=_cohort_salt(
+            user_id=user_id,
+            check_id=check_id,
+            scope_type=scope_type,
+            scope_pk=scope_pk,
+        ),
+        max_age=FIX_CHECK_LOCK_TTL,
+    )
+    if not isinstance(unit_ids, list) or len(unit_ids) > max_size:
+        msg = "Invalid mass-fix review cohort payload"
+        raise signing.BadSignature(msg)
+    return {int(unit_id) for unit_id in unit_ids}

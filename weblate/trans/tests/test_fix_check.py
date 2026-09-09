@@ -38,7 +38,7 @@ from weblate.trans.models.translation import Translation
 from weblate.trans.models.unit import calculate_hash
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.trans.tests.utils import get_optional_path
-from weblate.utils.state import STATE_TRANSLATED
+from weblate.utils.state import FUZZY_STATES, STATE_TRANSLATED
 
 
 class ApplyFixupPythonTest(ViewTestCase):
@@ -68,6 +68,20 @@ class ApplyFixupPythonTest(ViewTestCase):
         with self.assertRaises(ValueError):
             apply_fixup_python([("plurals", ["a", "b"])], ["x", "y"])
 
+    def test_untranslatable_flag_raises(self) -> None:
+        """A flag this engine cannot translate must not be dropped silently."""
+        for flags in ("gm", "gs", "y"):
+            with self.subTest(flags=flags), self.assertRaises(ValueError):
+                apply_fixup_python([("regex", "a", "b", flags)], ["aaa"])
+
+    def test_every_plural_form_is_fixed(self) -> None:
+        self.assertEqual(
+            apply_fixup_python(
+                [("regex", r"\.{3,}", "…", "gu")], ["one...", "many...."]
+            ),
+            ["one…", "many…"],
+        )
+
 
 class FixCheckEngineTest(ViewTestCase):
     """Engine-level behaviour: buckets, permissions, batching, history."""
@@ -83,9 +97,7 @@ class FixCheckEngineTest(ViewTestCase):
         unit.translate(self.user, target, STATE_TRANSLATED)
         unit.refresh_from_db()
         self.assertTrue(
-            Check.objects.filter(
-                unit=unit, name="end_stop", dismissed=False
-            ).exists()
+            Check.objects.filter(unit=unit, name="end_stop", dismissed=False).exists()
         )
         return unit
 
@@ -159,7 +171,9 @@ class FixCheckEngineTest(ViewTestCase):
 
     def test_denied_without_unit_edit_permission(self) -> None:
         self._fail_end_stop()
-        limited = User.objects.create_user("limited-fix", "limited-fix@example.com", "x")
+        limited = User.objects.create_user(
+            "limited-fix", "limited-fix@example.com", "x"
+        )
         limited.groups.clear()
         limited.clear_permissions_cache()
         self.assertFalse(limited.has_perm("unit.edit", self.end_stop_unit))
@@ -503,18 +517,57 @@ class FixCheckEngineTest(ViewTestCase):
 class FixCheckRepeatDriftLinearityTest(ViewTestCase):
     """Task 2 step 8: run_checks passes stay linear in the edited group size."""
 
-    def test_run_checks_calls_are_linear(self) -> None:
+    def setUp(self) -> None:
+        super().setUp()
+        # `repeat-drift` is `default_disabled` and `propagates = "repeat"`
+        # (`weblate/checks/consistency.py:299-311`): it is the only check
+        # whose failure on one unit is recomputed for every other member of
+        # its same-source group, which is what could turn a batch of N
+        # edits into N x group_size recheck passes.
+        Component.objects.filter(pk=self.component.pk).update(
+            check_flags="repeat-drift"
+        )
+        self.component = Component.objects.get(pk=self.component.pk)
+        self.translation = self.component.translation_set.get(language__code="cs")
+        self._id_hash = 2000
+
+    def add_repeat_unit(self, context: str, target: str) -> Unit:
+        """Create one member of a same-source repeat group."""
+        self._id_hash += 1
+        source_unit = self.component.source_translation.unit_set.create(
+            id_hash=self._id_hash,
+            position=self._id_hash,
+            context=context,
+            source="Repeated source",
+            target="Repeated source",
+            state=STATE_TRANSLATED,
+        )
+        return self.translation.unit_set.create(
+            id_hash=self._id_hash,
+            position=self._id_hash,
+            source_unit=source_unit,
+            context=context,
+            source="Repeated source",
+            target=target,
+            state=STATE_TRANSLATED,
+        )
+
+    def test_run_checks_calls_are_linear_in_the_repeat_group(self) -> None:
         double_space_check = CHECKS["double_space"]
-        units = []
-        for source in (
-            "Hello, world!\n",
-            "Orangutan has %d banana.\n",
-            "Try Weblate at <https://demo.weblate.org/>!\n",
-        ):
-            unit = self.get_unit(source=source)
-            unit.translate(self.user, "a  b", STATE_TRANSLATED)
-            unit.refresh_from_db()
-            units.append(unit)
+        group_size = 4
+        units = [
+            self.add_repeat_unit(f"repeat_{index}", f"Opakovany  text {index}")
+            for index in range(group_size)
+        ]
+        # The units must really form ONE repeat group, otherwise the
+        # linearity bound below would hold trivially and prove nothing:
+        # `repeat_units` is what `RepeatDriftCheck` propagates over.
+        for unit in units:
+            self.assertEqual(
+                set(unit.repeat_units.values_list("pk", flat=True)),
+                {other.pk for other in units if other.pk != unit.pk},
+            )
+            self.assertIn("repeat-drift", self.component.all_flags)
 
         calls: list[int] = []
         original = Unit.run_checks
@@ -525,20 +578,21 @@ class FixCheckRepeatDriftLinearityTest(ViewTestCase):
 
         Unit.run_checks = counting_run_checks
         try:
-            result = perform_fix(
-                self.user,
-                Unit.objects.filter(translation__component=self.component),
-                self.project,
-                double_space_check,
-            )
+            with self.captureOnCommitCallbacks(execute=True):
+                result = perform_fix(
+                    self.user,
+                    Unit.objects.filter(translation=self.translation),
+                    self.project,
+                    double_space_check,
+                )
         finally:
             Unit.run_checks = original
 
-        self.assertEqual(result.fixed, len(units))
-        # Linear: at most a small constant factor per edited unit, not
-        # quadratic in the number of units (e.g. O(n) run_checks calls per
-        # edit rather than one recheck pass per *other* unit in the group).
-        self.assertLessEqual(len(calls), 3 * len(units))
+        self.assertEqual(result.fixed, group_size)
+        # Linear, not quadratic: a small constant number of passes per
+        # edited unit. Quadratic behaviour would be >= group_size per edit
+        # (16 here) because every neighbour would be rechecked per edit.
+        self.assertLessEqual(len(calls), 3 * group_size)
 
 
 class FixCheckSourceTemplatePermissionTest(ViewTestCase):
@@ -655,7 +709,9 @@ class CosmeticSourceChangeCascadeTest(ViewTestCase):
         self.assertEqual(pending.target, "Ahoj světe!\n")
         self.assertEqual(pending.state, expected_state)
         self.assertTrue(
-            Change.objects.filter(unit=sibling, action=ActionEvents.SOURCE_CHANGE).exists()
+            Change.objects.filter(
+                unit=sibling, action=ActionEvents.SOURCE_CHANGE
+            ).exists()
         )
 
         source.translate(
@@ -759,12 +815,67 @@ class NonTemplateSourceLanguageCascadeTest(ViewTestCase):
         source_translation = self.component.source_translation
         source_unit = source_translation.unit_set.get(source="Hello, world!\n")
         self.assertFalse(source_translation.is_template)
-
         source_unit.translate(
-            self.user, "Hello, world!\n", STATE_TRANSLATED, propagate=False
+            self.user, "Hello, universe!\n", STATE_TRANSLATED, propagate=False
         )
-
+        source_unit.refresh_from_db()
+        self.assertEqual(source_unit.target, "Hello, universe!\n")
         unit.refresh_from_db()
         self.assertEqual(unit.state, expected_state)
         self.assertEqual(unit.previous_source, expected_previous_source)
         self.assertEqual(unit.pending_changes.count(), pending_before)
+
+
+class OrdinarySourceChangeCascadeTest(ViewTestCase):
+    """The cosmetic switch must not leak into normal source editing."""
+
+    def create_component(self) -> Component:
+        return self.create_po_mono()
+
+    def test_default_source_edit_still_fuzzies_siblings(self) -> None:
+        source = self.get_unit("Hello, world!\n", "en")
+        sibling = self.get_unit("Hello, world!\n", "cs")
+        sibling.translate(self.user, "Ahoj světe!\n", STATE_TRANSLATED)
+        sibling.refresh_from_db()
+        self.assertEqual(sibling.state, STATE_TRANSLATED)
+
+        # No `mark_source_change_fuzzy` argument: the default path.
+        source.translate(self.user, "Hello, universe!\n", STATE_TRANSLATED)
+
+        sibling.refresh_from_db()
+        self.assertEqual(sibling.source, "Hello, universe!\n")
+        self.assertIn(sibling.state, FUZZY_STATES)
+        self.assertIn(sibling.original_state, FUZZY_STATES)
+        self.assertEqual(sibling.previous_source, "Hello, world!\n")
+
+
+class CosmeticSourceChangeAnonymousAuthorTest(ViewTestCase):
+    """An unflushed pending row is updated, never duplicated (Task 3 step 3)."""
+
+    def create_component(self) -> Component:
+        return self.create_po_mono()
+
+    def test_existing_pending_row_is_not_duplicated_without_an_author(self) -> None:
+        source = self.get_unit("Hello, world!\n", "en")
+        sibling = self.get_unit("Hello, world!\n", "cs")
+        sibling.translate(self.user, "Ahoj světe!\n", STATE_TRANSLATED)
+        sibling.refresh_from_db()
+        self.assertEqual(sibling.pending_changes.count(), 1)
+
+        # `author` is derived from the acting user, so an anonymous
+        # cosmetic cascade reaches the branch with `author=None`.
+        source.translate(
+            None,
+            "Hello, universe!\n",
+            STATE_TRANSLATED,
+            mark_source_change_fuzzy=False,
+        )
+
+        sibling.refresh_from_db()
+        self.assertEqual(sibling.source, "Hello, universe!\n")
+        # Exactly one row, and it still carries the sibling's own target,
+        # state and original author - not the source unit's.
+        pending = sibling.pending_changes.get()
+        self.assertEqual(pending.target, "Ahoj světe!\n")
+        self.assertEqual(pending.state, sibling.state)
+        self.assertEqual(pending.author, self.user)

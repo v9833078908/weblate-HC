@@ -31340,6 +31340,31 @@ msgstr "Массовое исправление не удалось."
 msgid "Mass fix queued. You can close this page."
 msgstr "Массовое исправление поставлено в очередь. Эту страницу можно закрыть."
 
+#: weblate/templates/fix_check.html:16
+#, python-format
+msgid "Fix: %(check_name)s"
+msgstr "Исправление: %(check_name)s"
+
+#: weblate/trans/views/search.py:369
+msgid ""
+"The list of strings to fix expired or did not match this page. Reload the "
+"page and select the strings again."
+msgstr ""
+"Список строк для исправления устарел или не относится к этой странице. "
+"Обновите страницу и выберите строки заново."
+
+#: weblate/trans/views/search.py:377
+msgid "No strings were selected."
+msgstr "Строки не выбраны."
+
+#: weblate/trans/views/search.py:382
+msgid ""
+"The selection did not match the reviewed strings. Reload the page and select "
+"the strings again."
+msgstr ""
+"Выбор не соответствует просмотренным строкам. Обновите страницу и выберите "
+"строки заново."
+
 #: weblate/templates/translate.html:696
 msgid "Fix all such strings"
 msgstr "Исправить все такие строки"

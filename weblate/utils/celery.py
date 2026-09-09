@@ -94,9 +94,23 @@ def get_user_tasks_key(user_id: int) -> str:
 
 
 def add_user_task(
-    user_id: int, task_id: str | None, *, text: str, label: str, url: str
+    user_id: int,
+    task_id: str | None,
+    *,
+    text: str,
+    label: str,
+    url: str,
+    status_contract: bool = False,
 ) -> None:
-    """Remember a background task started by the user."""
+    """
+    Remember a background task started by the user.
+
+    `status_contract` marks a task whose result is always a dict with an
+    explicit `status` of `completed`/`failed`. The restored flash keeps
+    that flag (`weblate/trans/context_processors.py`) so a failed run is
+    rendered as a failure after a page reload too, not only in the
+    transient flash of the request that queued it.
+    """
     if not task_id:
         return
     key = get_user_tasks_key(user_id)
@@ -108,6 +122,7 @@ def add_user_task(
             "text": str(text),
             "label": str(label),
             "url": url,
+            "status_contract": status_contract,
         }
     )
     cache.set(key, tasks, USER_TASKS_TTL)

@@ -346,6 +346,9 @@ Participating checks fall into two tiers:
   check**; a scope with more matches needs a further pass once the shown
   batch is fixed, since fixed strings stop matching the check and the next
   reload picks up the following batch.
+  Only the strings the displayed batch actually offered can be submitted:
+  the confirmation refuses a selection that does not match the reviewed
+  batch, so a reviewed fix can never be applied to a string nobody saw.
 
 Fixing a source string that only needs cosmetic repair - for example
 normalizing ``...`` to ``…`` - never marks its existing translations

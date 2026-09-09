@@ -1108,6 +1108,12 @@ work but cannot corrupt a target. The action has no undo once queued, the
 same accepted risk as the existing search-and-replace and bulk-edit routes.
 No REST API endpoint is exposed for this feature. *(maintainer)*
 
+A review-tier submission additionally carries the signed, actor- and
+scope-bound list of the strings its preview rendered, and the route refuses
+any selection reaching outside that list, so the per-string review a
+review-tier check requires cannot be skipped by a crafted request.
+*(maintainer)*
+
 Triage dispositions
 -------------------
 

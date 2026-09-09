@@ -4474,12 +4474,16 @@ class FixCheckConfirmForm(forms.Form):
     Confirm a mass-fix run (Task 5 step 4).
 
     Empty for the `safe` tier (a bare count confirmation); the `review`
-    tier's checked preview rows arrive as repeated `unit_ids` checkboxes.
+    tier's checked preview rows arrive as repeated `unit_ids` checkboxes
+    plus `cohort`, the signed list of ids the preview actually rendered.
+    The view refuses a submit carrying an id outside that cohort, so a
+    review-tier fix cannot be applied to a row nobody previewed.
     The template owns the surrounding `<form>`, so `form_tag` stays off.
     See docs/product/plans/2026-08-25-mass-fix-failing-checks.md.
     """
 
     unit_ids = UnitIdsField(required=False, widget=forms.CheckboxSelectMultiple)
+    cohort = forms.CharField(required=False, widget=forms.HiddenInput)
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

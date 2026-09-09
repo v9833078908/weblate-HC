@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core import signing
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Sum
 from django.http import Http404
@@ -24,7 +25,9 @@ from weblate.trans.bulk import bulk_perform
 from weblate.trans.fix_check import (
     acquire_fix_check_lock,
     collect_fix_candidates,
+    dump_fix_check_cohort,
     fix_check_lock_key,
+    load_fix_check_cohort,
     release_fix_check_lock,
 )
 from weblate.trans.forms import (
@@ -302,6 +305,53 @@ def bulk_edit(request: AuthenticatedHttpRequest, path):
     return redirect(obj)
 
 
+def _resolve_fix_check_selection(
+    request: AuthenticatedHttpRequest,
+    form: FixCheckConfirmForm,
+    check_obj,
+    scope_type: str,
+    scope_pk: int,
+) -> list[int] | None:
+    """
+    Resolve which unit ids one mass-fix submit may touch.
+
+    `None` means the whole current scope, which is what the `safe` tier
+    always submits. For the `review` tier only rows this actor actually
+    previewed - with their diff and checkbox - are accepted: the rendered
+    cohort is signed for (actor, check, scope), so a crafted POST cannot
+    reach eligible rows from a later, unreviewed batch (Task 5 step 4).
+    Raises `ValidationError` with a translated message otherwise.
+    """
+    if check_obj.mass_fixup == "safe":
+        return None
+    try:
+        cohort = load_fix_check_cohort(
+            form.cleaned_data["cohort"],
+            user_id=request.user.id,
+            check_id=check_obj.check_id,
+            scope_type=scope_type,
+            scope_pk=scope_pk,
+        )
+    except (signing.BadSignature, ValueError) as error:
+        raise ValidationError(
+            gettext(
+                "The list of strings to fix expired or did not match "
+                "this page. Reload the page and select the strings again."
+            )
+        ) from error
+    selected = set(form.get_unit_ids())
+    if not selected:
+        raise ValidationError(gettext("No strings were selected."))
+    if not selected <= cohort:
+        raise ValidationError(
+            gettext(
+                "The selection did not match the reviewed strings. "
+                "Reload the page and select the strings again."
+            )
+        )
+    return sorted(selected)
+
+
 @login_required
 @never_cache
 def fix_check(request: AuthenticatedHttpRequest, name, path):
@@ -347,7 +397,13 @@ def fix_check(request: AuthenticatedHttpRequest, name, path):
             show_form_errors(request, form)
             return redirect(obj)
 
-        unit_ids = None if check_obj.mass_fixup == "safe" else form.get_unit_ids()
+        try:
+            unit_ids = _resolve_fix_check_selection(
+                request, form, check_obj, scope_type, obj.pk
+            )
+        except ValidationError as error:
+            messages.error(request, str(error.message))
+            return redirect(obj)
 
         task_id = str(uuid4())
         if not acquire_fix_check_lock(lock_key, task_id):
@@ -421,8 +477,14 @@ def fix_check(request: AuthenticatedHttpRequest, name, path):
             text=message,
             label=str(obj),
             url=obj.get_absolute_url(),
+            status_contract=True,
         )
-        messages.success(request, message, f"task:{task.id}")
+        # `task-status` opts this flash into the strict result mapping of
+        # Task 4 step 2: this task always returns a dict with an explicit
+        # `status`, so anything else the poller receives - a stringified
+        # exception, a dead worker - must render as a failure, never as an
+        # empty success.
+        messages.success(request, message, f"task:{task.id} task-status")
         return redirect(obj)
 
     candidates = collect_fix_candidates(request.user, unit_set, project, check_obj)
@@ -430,7 +492,17 @@ def fix_check(request: AuthenticatedHttpRequest, name, path):
         {
             "check": check_obj,
             "candidates": candidates,
-            "form": FixCheckConfirmForm(),
+            "form": FixCheckConfirmForm(
+                initial={
+                    "cohort": dump_fix_check_cohort(
+                        (row.unit.pk for row in candidates.shown),
+                        user_id=request.user.id,
+                        check_id=check_obj.check_id,
+                        scope_type=scope_type,
+                        scope_pk=obj.pk,
+                    )
+                }
+            ),
         }
     )
     return render(request, "fix_check.html", context)

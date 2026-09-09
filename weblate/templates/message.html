@@ -2,7 +2,8 @@
 
 <div class="alert alert-{% block tags %}{% get_message_kind tags %} {{ tags }}{% endblock %} "
      {% if can_delete and announcement %} data-action="{% url 'announcement-delete' pk=announcement.pk %}" {% endif %}
-     {% if task_id %} data-task="{% url 'api:task-detail' pk=task_id %}" {% endif %}>
+     {% if task_id %} data-task="{% url 'api:task-detail' pk=task_id %}" {% endif %}
+     {% if task_status %} data-task-status="1" {% endif %}>
   {% if can_delete and announcement %}
     <button type="button"
             class="btn btn-link btn-red float-end"

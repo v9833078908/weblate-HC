@@ -12,11 +12,20 @@ entry points' checklist/template contract.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from django.urls import reverse
 
 from weblate.auth.data import SELECTION_ALL
 from weblate.auth.models import Group, Role, User
 from weblate.checks.models import CHECKS
+from weblate.trans.fix_check import (
+    FixCandidates,
+    FixPreviewRow,
+    dump_fix_check_cohort,
+    load_fix_check_cohort,
+)
+from weblate.trans.models.judge import JudgeVerdict, compute_target_hash
 from weblate.trans.tests.test_views import ViewTestCase
 from weblate.utils.state import STATE_TRANSLATED
 
@@ -81,9 +90,7 @@ class FixCheckViewTest(ViewTestCase):
             "limited-bulk-only", "limited-bulk-only@example.com", "x"
         )
         limited.groups.clear()
-        group = Group.objects.create(
-            name="Bulk only", language_selection=SELECTION_ALL
-        )
+        group = Group.objects.create(name="Bulk only", language_selection=SELECTION_ALL)
         group.roles.add(Role.objects.get(name="Bulk editing"))
         group.components.add(self.component)
         limited.groups.add(group)
@@ -110,11 +117,18 @@ class FixCheckViewTest(ViewTestCase):
         response = self.client.get(self._url("double_space"))
         self.assertEqual(response.status_code, 404)
 
-    def test_project_language_scope_rejected(self) -> None:
+    def test_aggregate_and_unsupported_scopes_rejected(self) -> None:
+        """Only Translation, Component and Project reach the view body."""
         self._grant_full_access()
-        url = f"/fix-check/double_space/-/{self.project.slug}/cs/"
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, 404)
+        for label, path in (
+            ("project-language", f"-/{self.project.slug}/cs/"),
+            ("language", f"languages/cs/{self.project.slug}/"),
+            ("workspace", "workspaces/1/"),
+            ("category", f"{self.project.slug}/nonexistent-category/"),
+        ):
+            with self.subTest(scope=label):
+                response = self.client.get(f"/fix-check/double_space/{path}")
+                self.assertIn(response.status_code, {403, 404})
 
     # -- safe tier ---------------------------------------------------
 
@@ -148,15 +162,99 @@ class FixCheckViewTest(ViewTestCase):
         self.assertEqual(candidates.shown[0].unit.pk, unit.pk)
         self.assertEqual(candidates.shown[0].final_target_value, "Dekuji.")
 
+    def _cohort(self, units, name: str = "end_stop", scope_type: str = "translation"):
+        """Sign a preview cohort the way the GET screen renders it."""
+        scope_pk = {
+            "translation": self.translation.pk,
+            "component": self.component.pk,
+            "project": self.project.pk,
+        }[scope_type]
+        return dump_fix_check_cohort(
+            [unit.pk for unit in units],
+            user_id=self.user.id,
+            check_id=name,
+            scope_type=scope_type,
+            scope_pk=scope_pk,
+        )
+
     def test_review_tier_post_applies_only_selected(self) -> None:
         self._grant_full_access()
         unit = self._fail_end_stop()
         response = self.client.post(
-            self._url("end_stop"), {"unit_ids": [str(unit.pk)]}
+            self._url("end_stop"),
+            {"unit_ids": [str(unit.pk)], "cohort": self._cohort([unit])},
         )
         self.assertRedirects(response, self.translation.get_absolute_url())
         unit.refresh_from_db()
         self.assertEqual(unit.target, "Dekuji.")
+
+    def test_review_tier_get_renders_the_signed_cohort(self) -> None:
+        self._grant_full_access()
+        unit = self._fail_end_stop()
+        response = self.client.get(self._url("end_stop"))
+        content = response.content.decode()
+        self.assertIn('name="cohort"', content)
+        self.assertIn('type="hidden"', content)
+        # The rendered cohort verifies for this actor, check and scope and
+        # carries exactly the previewed row.
+        cohort = response.context["form"].initial["cohort"]
+        self.assertEqual(
+            load_fix_check_cohort(
+                cohort,
+                user_id=self.user.id,
+                check_id="end_stop",
+                scope_type="translation",
+                scope_pk=self.translation.pk,
+            ),
+            {unit.pk},
+        )
+
+    def test_review_tier_post_refuses_an_id_outside_the_cohort(self) -> None:
+        """A crafted submit cannot repair a row that was never previewed."""
+        self._grant_full_access()
+        unit = self._fail_end_stop()
+        other = self.get_unit(source="Hello, world!\n")
+        other.translate(self.user, "Ahoj svete", STATE_TRANSLATED)
+        other.refresh_from_db()
+        untouched_target = other.target
+        response = self.client.post(
+            self._url("end_stop"),
+            # The cohort covers only `unit`, the submit asks for `other`.
+            {"unit_ids": [str(other.pk)], "cohort": self._cohort([unit])},
+        )
+        self.assertRedirects(response, self.translation.get_absolute_url())
+        other.refresh_from_db()
+        unit.refresh_from_db()
+        self.assertEqual(other.target, untouched_target)
+        self.assertEqual(unit.target, "Dekuji")
+
+    def test_review_tier_post_refuses_a_tampered_or_missing_cohort(self) -> None:
+        self._grant_full_access()
+        unit = self._fail_end_stop()
+        for cohort in ("", "not-a-signed-payload", f"{self._cohort([unit])}x"):
+            with self.subTest(cohort=cohort):
+                response = self.client.post(
+                    self._url("end_stop"),
+                    {"unit_ids": [str(unit.pk)], "cohort": cohort},
+                )
+                self.assertRedirects(response, self.translation.get_absolute_url())
+                unit.refresh_from_db()
+                self.assertEqual(unit.target, "Dekuji")
+
+    def test_review_tier_post_refuses_a_foreign_scope_cohort(self) -> None:
+        """A cohort signed for another scope does not verify here."""
+        self._grant_full_access()
+        unit = self._fail_end_stop()
+        response = self.client.post(
+            self._url("end_stop"),
+            {
+                "unit_ids": [str(unit.pk)],
+                "cohort": self._cohort([unit], scope_type="component"),
+            },
+        )
+        self.assertRedirects(response, self.translation.get_absolute_url())
+        unit.refresh_from_db()
+        self.assertEqual(unit.target, "Dekuji")
 
     def test_review_tier_post_without_selection_is_noop(self) -> None:
         self._grant_full_access()
@@ -251,10 +349,96 @@ class FixCheckViewTest(ViewTestCase):
     def test_check_list_unscoped_page_has_no_fix_link(self) -> None:
         self._grant_full_access()
         self._fail_double_space()
-        response = self.client.get(
-            reverse("checks", kwargs={"name": "double_space"})
-        )
+        response = self.client.get(reverse("checks", kwargs={"name": "double_space"}))
         self.assertNotContains(response, "fix-check/double_space/")
+
+    # -- rendered contract -------------------------------------------
+
+    def test_confirmation_form_is_not_nested(self) -> None:
+        """A nested form would push the submit button outside any form."""
+        self._grant_full_access()
+        self._fail_double_space()
+        self._fail_end_stop()
+        for name in ("double_space", "end_stop"):
+            with self.subTest(check=name):
+                content = self.client.get(self._url(name)).content.decode()
+                # The page's own confirmation form starts after the check
+                # heading; crispy must not open a second one inside it
+                # (AGENTS.md: `form_tag = False` when the template owns
+                # the form).
+                region = content[content.index("<h2>") :]
+                opening = region.index("<form")
+                closing = region.index("</form>", opening)
+                self.assertNotIn("<form", region[opening + len("<form") : closing])
+                self.assertIn("csrfmiddlewaretoken", region[opening:closing])
+                self.assertIn('<button type="submit"', region[opening:closing])
+
+    def test_review_screen_markup_supports_selection_and_sticky_column(
+        self,
+    ) -> None:
+        self._grant_full_access()
+        self._fail_end_stop()
+        response = self.client.get(self._url("end_stop"))
+        content = response.content.decode()
+        # The select-all control and the row class the bootstrap script
+        # binds to (`loader-bootstrap.js`), and the `actions` class the
+        # `.table-scroll` CSS needs to keep the first column sticky.
+        self.assertIn('id="fix-check-select-all"', content)
+        self.assertIn('class="fix-check-row"', content)
+        self.assertIn('<td class="actions">', content)
+        self.assertIn('class="table-scroll"', content)
+        # Rows start unchecked.
+        self.assertNotIn('class="fix-check-row" checked', content)
+
+    def test_heading_names_the_check(self) -> None:
+        self._grant_full_access()
+        self._fail_double_space()
+        response = self.client.get(self._url("double_space"))
+        self.assertContains(response, "<h2>")
+        self.assertContains(response, str(self.double_space_check.name))
+
+    def test_manual_bucket_is_counted_and_offers_browse(self) -> None:
+        self._grant_full_access()
+        unit = self._fail_end_stop()
+        # A target that already ends with a conflicting terminal mark
+        # cannot be repaired by adding the source's mark: `manual`.
+        unit.translate(self.user, "Dekuji?", STATE_TRANSLATED)
+        unit.refresh_from_db()
+        response = self.client.get(self._url("end_stop"))
+        self.assertEqual(response.context["candidates"].manual, 1)
+        self.assertEqual(response.context["candidates"].total_eligible, 0)
+        self.assertContains(response, f"?q={self.end_stop_check.url_id}")
+
+    def test_judge_counter_is_rendered(self) -> None:
+        self._grant_full_access()
+        unit = self._fail_end_stop()
+        JudgeVerdict.objects.create(
+            unit=unit,
+            judge_model="test-model",
+            seat=1,
+            target_hash=compute_target_hash(unit.get_target_plurals()),
+            context_hash="ctx",
+        )
+        response = self.client.get(self._url("end_stop"))
+        self.assertEqual(response.context["candidates"].verdicts_no_longer_current, 1)
+        self.assertContains(response, "no longer be current")
+
+    def test_review_notice_reports_the_batch_boundary(self) -> None:
+        """`remaining > 0` renders the first-N-of-M notice (Task 5 step 4)."""
+        self._grant_full_access()
+        unit = self._fail_end_stop()
+        truncated = FixCandidates(
+            shown=[FixPreviewRow(unit=unit, final_target=["Dekuji."])],
+            total_eligible=300,
+        )
+        self.assertEqual(truncated.remaining, 299)
+        with patch(
+            "weblate.trans.views.search.collect_fix_candidates",
+            return_value=truncated,
+        ):
+            response = self.client.get(self._url("end_stop"))
+        self.assertContains(response, "Showing the first")
+        self.assertContains(response, "300")
 
 
 class FixCheckSourceTemplateViewTest(ViewTestCase):
@@ -299,7 +483,9 @@ class FixCheckSourceTemplateViewTest(ViewTestCase):
         sibling.refresh_from_db()
         expected_state = sibling.state
 
-        response = self.client.post(self._url(), {"unit_ids": [str(self.source_unit.pk)]})
+        response = self.client.post(
+            self._url(), {"unit_ids": [str(self.source_unit.pk)]}
+        )
         self.assertRedirects(response, self.component.get_absolute_url())
 
         self.source_unit.refresh_from_db()

@@ -98,13 +98,22 @@
           {% endif %}
         </td>
         <td class="full-cell">
-          <a href="{{ translate_url }}?q={{ item.query }}" id="check-label-{{ forloop.counter }}">{{ item.name }}</a>
+          <a href="{{ translate_url }}?q={{ item.query }}"
+             id="check-label-{{ forloop.counter }}">{{ item.name }}</a>
         </td>
         <td class="wrap-cell">
           <a class="btn-inline" href="{{ browse_url }}?q={{ item.query }}">{% translate "Browse" %}</a>
           <a class="btn-inline" href="{{ edit_url }}?q={{ item.query }}">{% translate "Translate" %}</a>
           <a class="btn-inline" href="{{ zen_url }}?q={{ item.query }}">{% translate "Zen" %}</a>
-          {% if item.mass_fixup and object.pk %}
+          {% comment %}
+            `allow_fix_check` is set only where `object` is exactly a
+            Translation (`templates/translation.html`). The aggregate
+            language/category pages that include this snippet have no
+            approved blast radius and the `fix-check` route rejects their
+            scopes, so they must render no Fix action at all (Task 5
+            step 3/5).
+          {% endcomment %}
+          {% if allow_fix_check and item.mass_fixup and object.pk %}
             <a class="btn-inline"
                href="{% url 'fix-check' name=item.check_id path=object.get_url_path %}">{% translate "Fix" %}</a>
           {% endif %}

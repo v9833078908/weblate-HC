@@ -1332,7 +1332,8 @@ onReady(() => {
     const query = form.querySelector('[name="q"]');
     const preview = form.querySelector("#id_auto_run_preview");
     const apply = form.querySelector("#id_auto_apply");
-    if (mode === null || query === null || preview === null || apply === null) return;
+    if (mode === null || query === null || preview === null || apply === null)
+      return;
     let timer;
     let controller;
     const showPreview = () => {
@@ -1345,7 +1346,8 @@ onReady(() => {
     };
     const isJudge = () => mode.value === "judge";
     const usesMachineTranslation = () =>
-      isJudge() || form.querySelector('[name="auto_source"]:checked')?.value === "mt";
+      isJudge() ||
+      form.querySelector('[name="auto_source"]:checked')?.value === "mt";
     const updateAutoPreview = () => {
       if (!usesMachineTranslation()) {
         controller?.abort();
@@ -1359,29 +1361,56 @@ onReady(() => {
         controller?.abort();
         controller = new AbortController();
         const params = new URLSearchParams(new FormData(form));
-        fetch(`${form.dataset.autoPreviewUrl}?${params}`, { signal: controller.signal })
+        fetch(`${form.dataset.autoPreviewUrl}?${params}`, {
+          signal: controller.signal,
+        })
           .then((response) => {
             if (response.status === 400) {
               return response.json().then(() => {
-                const error = new Error("Invalid automatic translation preview");
+                const error = new Error(
+                  "Invalid automatic translation preview",
+                );
                 error.invalid = true;
                 throw error;
               });
             }
-            if (!response.ok) throw new Error("Automatic translation preview failed");
+            if (!response.ok)
+              throw new Error("Automatic translation preview failed");
             return response.json();
           })
           .then((data) => {
             const cost = data.pretranslation_cost.available
-              ? interpolate(gettext("Estimated machine translation cost: %(min)s to %(max)s USD."), data.pretranslation_cost, true)
+              ? interpolate(
+                  gettext(
+                    "Estimated machine translation cost: %(min)s to %(max)s USD.",
+                  ),
+                  data.pretranslation_cost,
+                  true,
+                )
               : gettext("Estimated machine translation cost is unavailable.");
             const scope = isJudge()
-              ? interpolate(gettext("%(matched)s matching strings: %(processed)s will be judge-evaluated, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap."), data, true)
-              : interpolate(gettext("%(matched)s matching strings will be considered by the selected machine translation engines."), data, true);
+              ? interpolate(
+                  gettext(
+                    "%(matched)s matching strings: %(processed)s will be judge-evaluated, %(writable)s may be pretranslated, and %(remaining)s remain because of the cap.",
+                  ),
+                  data,
+                  true,
+                )
+              : interpolate(
+                  gettext(
+                    "%(matched)s matching strings will be considered by the selected machine translation engines.",
+                  ),
+                  data,
+                  true,
+                );
             preview.textContent = `${scope} ${cost}`;
             if (isJudge()) {
               const judgeCost = data.judge_cost.available
-                ? interpolate(gettext("Estimated judge cost: %(min)s to %(max)s USD."), data.judge_cost, true)
+                ? interpolate(
+                    gettext("Estimated judge cost: %(min)s to %(max)s USD."),
+                    data.judge_cost,
+                    true,
+                  )
                 : gettext("Estimated judge cost is unavailable.");
               preview.textContent += ` ${judgeCost}`;
             }
@@ -1392,7 +1421,9 @@ onReady(() => {
             if (error.name === "AbortError") return;
             preview.textContent = error.invalid
               ? gettext("Automatic translation preview input is invalid.")
-              : gettext("Automatic translation preview is unavailable. You can still apply this run.");
+              : gettext(
+                  "Automatic translation preview is unavailable. You can still apply this run.",
+                );
             showPreview();
             apply.disabled = Boolean(error.invalid);
           });
@@ -1400,9 +1431,15 @@ onReady(() => {
     };
     mode.addEventListener("change", updateAutoPreview);
     query.addEventListener("input", updateAutoPreview);
-    form.querySelector('[name="overwrite_existing"]')?.addEventListener("change", updateAutoPreview);
-    form.querySelector('[name="engines"]')?.addEventListener("change", updateAutoPreview);
-    form.querySelectorAll('[name="auto_source"]').forEach((input) => input.addEventListener("change", updateAutoPreview));
+    form
+      .querySelector('[name="overwrite_existing"]')
+      ?.addEventListener("change", updateAutoPreview);
+    form
+      .querySelector('[name="engines"]')
+      ?.addEventListener("change", updateAutoPreview);
+    form.querySelectorAll('[name="auto_source"]').forEach((input) => {
+      input.addEventListener("change", updateAutoPreview);
+    });
     updateAutoPreview();
   });
 
@@ -1775,15 +1812,48 @@ onReady(() => {
             bar.style.width = `${data.progress}%`;
             bar.setAttribute("aria-valuenow", `${data.progress}`);
           }
+          const resultObject =
+            typeof data.result === "object" && data.result !== null
+              ? data.result
+              : null;
           if (phase !== null) {
-            phase.textContent = data.completed
-              ? ""
-              : describeJudgePhase(data.result);
+            if (data.completed) {
+              phase.textContent = "";
+            } else if (
+              typeof resultObject?.done === "number" &&
+              typeof resultObject?.total === "number"
+            ) {
+              /* The task publishes an explicit X / Y count, which is far
+               * more useful than a bare percentage. */
+              phase.textContent = interpolate(
+                gettext("%(done)s / %(total)s processed"),
+                { done: resultObject.done, total: resultObject.total },
+                true,
+              );
+            } else {
+              phase.textContent = describeJudgePhase(data.result);
+            }
           }
           if (data.completed) {
             const result = data.result ?? {};
             progressCompleted();
-            if (result.message) {
+            /* A flash marked with data-task-status comes from a task that
+             * always returns {status: "completed"|"failed"}. Anything else -
+             * a stringified exception, a dead worker, a missing status -
+             * is a failure and must never render as an empty success. */
+            if (
+              message.dataset.taskStatus === "1" &&
+              resultObject?.status !== "completed"
+            ) {
+              message.classList.remove("alert-success", "alert-info");
+              message.classList.add("alert-danger");
+              if (messageText !== null) {
+                messageText.textContent =
+                  resultObject?.message ||
+                  (typeof result === "string" && result) ||
+                  gettext("The background task failed.");
+              }
+            } else if (result.message) {
               if (messageText !== null) {
                 messageText.textContent = result.message;
               }
@@ -2113,6 +2183,26 @@ onReady(() => {
       window.location = row.dataset.href;
     });
   });
+
+  /* Mass fix review: select every applicable row rendered on this page */
+  const fixCheckSelectAll = document.getElementById("fix-check-select-all");
+  if (fixCheckSelectAll !== null) {
+    const fixCheckRows = fixCheckSelectAll
+      .closest("form")
+      .querySelectorAll("input.fix-check-row");
+    fixCheckSelectAll.addEventListener("change", () => {
+      fixCheckRows.forEach((row) => {
+        row.checked = fixCheckSelectAll.checked;
+      });
+    });
+    fixCheckRows.forEach((row) => {
+      row.addEventListener("change", () => {
+        fixCheckSelectAll.checked = Array.from(fixCheckRows).every(
+          (candidate) => candidate.checked,
+        );
+      });
+    });
+  }
 
   /* ZIP import - autofill name and slug */
   document
