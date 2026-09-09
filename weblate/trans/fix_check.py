@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from functools import partial
 from typing import (  # pylint: disable=unused-import
     TYPE_CHECKING,
     Any,
@@ -30,6 +31,7 @@ from django.core import signing
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import OuterRef, Prefetch, Subquery
+from django.utils.translation import gettext_lazy
 from redis.lock import Lock as RedisLock
 
 from weblate.checks.chars import terminal_source_edit
@@ -47,6 +49,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
     from django_redis.cache import RedisCache
+    from django_stubs_ext import StrOrPromise
 
     from weblate.auth.models import User
     from weblate.checks.base import BaseCheck, FixupType
@@ -1273,3 +1276,183 @@ def load_fix_check_cohort(
         msg = "Invalid mass-fix review cohort payload"
         raise signing.BadSignature(msg)
     return {int(unit_id) for unit_id in unit_ids}
+
+
+# --- Policy resolution (Task C) -------------------------------------------
+#
+# One identifier space behind `fix_check`: a legacy tiered check
+# (`safe`/`review`, Task 2, unchanged) or one of the new explicit policies
+# (Task A's `terminal-source`, Task B's seven mechanical groups). The two
+# families never collide - every mechanical group id is hyphenated
+# (`edge-space-remove`) while every `CHECKS` id this feature ever tiered is
+# underscored (`double_space`) - so `resolve_fix_policy` can check the new
+# names first and fall through to the registry unchanged.
+_MECHANICAL_GROUP_LABELS: dict[str, tuple[StrOrPromise, StrOrPromise]] = {
+    "double-space": (
+        gettext_lazy("Collapse double spaces"),
+        gettext_lazy(
+            "Consecutive spaces are collapsed into one, matching the source."
+        ),
+    ),
+    "edge-space-remove": (
+        gettext_lazy("Remove extra edge whitespace"),
+        gettext_lazy(
+            "Leading or trailing whitespace the source does not have is removed."
+        ),
+    ),
+    "edge-space-source": (
+        gettext_lazy("Reproduce source edge whitespace"),
+        gettext_lazy(
+            "Leading or trailing whitespace is synced to the source's own count."
+        ),
+    ),
+    "line-separator-spacing": (
+        gettext_lazy("Fix spacing around the $ line separator"),
+        gettext_lazy(
+            "Whitespace hugging the $ line separator is removed. The number "
+            "and order of separators is never changed."
+        ),
+    ),
+    "punctuation-spacing": (
+        gettext_lazy("Fix French punctuation spacing"),
+        gettext_lazy(
+            "The non-breaking space French double punctuation needs is "
+            "corrected where present, and added where missing if the "
+            "matching provider is configured."
+        ),
+    ),
+    "end-ellipsis": (
+        gettext_lazy("Use a single ellipsis character"),
+        gettext_lazy(
+            'A trailing "..." is replaced with a single ellipsis character '
+            "to match the source."
+        ),
+    ),
+    "zero-width-space": (
+        gettext_lazy("Remove stray zero-width spaces"),
+        gettext_lazy("A zero-width space the source does not have is removed."),
+    ),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class FixPolicy:
+    """
+    One resolved, fixable identity behind `fix_check` (Task C).
+
+    Either a single legacy tiered check (`tier` is `safe`/`review`, exactly
+    as Task 2 shipped it) or one of the new explicit policies (`tier` is
+    `explicit`: `terminal-source`, or one of `MECHANICAL_GROUP_IDS`), which
+    - unlike `safe` (always the whole scope) or `review` (always exactly
+    the previewed page) - support choosing between the two: "apply to all
+    N matching strings" or "apply the selected page". `collect`/`perform`
+    are already bound to this policy's own identity, so a caller never
+    branches on which family it is: `policy.collect(user, unit_set,
+    project, preview_limit=…)` and `policy.perform(user, unit_set, project,
+    unit_ids=…, progress_callback=…, progress_every=…)`.
+    """
+
+    id: str
+    name: StrOrPromise
+    description: StrOrPromise
+    tier: Literal["safe", "review", "explicit"]
+    # Every check this policy's edit clears - one for a legacy check, four
+    # for `terminal-source`, one or two for a mechanical group. Drives the
+    # "Browse" search link (`url_id`), never the classification itself.
+    check_ids: tuple[str, ...]
+    collect: Callable[..., FixCandidates | TerminalPolicyCandidates]
+    perform: Callable[..., FixResult]
+
+    @property
+    def url_id(self) -> str:
+        """A `q=` search-filter value matching every row this policy could touch."""
+        return " OR ".join(f"check:{check_id}" for check_id in self.check_ids)
+
+
+def resolve_fix_policy(name: str) -> FixPolicy | None:
+    """
+    Resolve a `fix_check` URL path segment to a `FixPolicy`, or `None` when
+    `name` names neither a mass-fix-tiered check nor a Task A/B policy.
+
+    A mechanical group whose required check/autofix is not configured
+    resolves to `None` too - "the entry point is available by supported
+    operation ... not merely by `get_fixup` presence" cuts both ways: an
+    unsupported operation is not offered at all, rather than offered and
+    then failing (plan, Task D).
+    """
+    if name == TERMINAL_SOURCE_POLICY_ID:
+        return FixPolicy(
+            id=name,
+            name=gettext_lazy("Normalize terminal marks to source"),
+            description=gettext_lazy(
+                "Marks will be brought in line with the source. Meaning and "
+                "translation quality are not checked."
+            ),
+            tier="explicit",
+            check_ids=TERMINAL_SOURCE_POLICY_CHECK_IDS,
+            collect=collect_terminal_policy_candidates,
+            perform=perform_terminal_policy_fix,
+        )
+    if name in MECHANICAL_GROUP_IDS:
+        if not mechanical_group_available(name):
+            return None
+        group_name, group_description = _MECHANICAL_GROUP_LABELS[name]
+        group = _mechanical_groups()[name]
+        return FixPolicy(
+            id=name,
+            name=group_name,
+            description=group_description,
+            tier="explicit",
+            check_ids=group.check_ids,
+            collect=partial(collect_mechanical_group_candidates, name),
+            perform=partial(perform_mechanical_group_fix, name),
+        )
+    check_obj = CHECKS.get(name)
+    if check_obj is not None and check_obj.mass_fixup is not None:
+        return FixPolicy(
+            id=name,
+            name=check_obj.name,
+            description=check_obj.description,
+            tier=check_obj.mass_fixup,
+            check_ids=(check_obj.check_id,),
+            collect=partial(collect_fix_candidates, check_obj=check_obj),
+            perform=partial(perform_fix, check_obj=check_obj),
+        )
+    return None
+
+
+# check_id -> the `FixPolicy` id a "Fix" link for that failing check should
+# point to (Task D). Every terminal check funnels into the one combined
+# `terminal-source` policy - `_terminal_policy_edit`'s own per-unit routing
+# decides append/replace/remove, never this mapping.
+# `begin_space`/`end_space` are genuinely ambiguous per unit - which of the
+# two split edge policies applies depends on that specific unit's own
+# source - so they default to the removal policy, the more common shape
+# measured on Anvil Saga; `fix_check.html` cross-links to the other one
+# from there. Every check Task A/B does not touch (`kabyle-characters`,
+# `ellipsis`, `end_interrobang`, ...) is deliberately absent: it still
+# resolves through its own single-check tier, unchanged.
+CHECK_TO_POLICY_ID: dict[str, str] = {
+    "end_stop": TERMINAL_SOURCE_POLICY_ID,
+    "end_colon": TERMINAL_SOURCE_POLICY_ID,
+    "end_question": TERMINAL_SOURCE_POLICY_ID,
+    "end_exclamation": TERMINAL_SOURCE_POLICY_ID,
+    "double_space": "double-space",
+    "begin_space": "edge-space-remove",
+    "end_space": "edge-space-remove",
+    "game-line-break": "line-separator-spacing",
+    "punctuation_spacing": "punctuation-spacing",
+    "end_ellipsis": "end-ellipsis",
+    "zero-width-space": "zero-width-space",
+}
+
+
+def fix_check_policy_id_for_check(check_id: str) -> str:
+    """
+    Resolve the `FixPolicy` id a "Fix" link for `check_id` should point to.
+
+    Falls back to `check_id` itself unchanged for every check Task A/B
+    does not touch, which still resolves through its own single-check tier
+    via `resolve_fix_policy` exactly as before.
+    """
+    return CHECK_TO_POLICY_ID.get(check_id, check_id)

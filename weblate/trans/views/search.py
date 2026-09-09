@@ -18,17 +18,16 @@ from django.utils.translation import gettext, ngettext
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from weblate.checks.models import CHECKS
 from weblate.lang.models import Language
 from weblate.trans.actions import ActionEvents
 from weblate.trans.bulk import bulk_perform
 from weblate.trans.fix_check import (
     acquire_fix_check_lock,
-    collect_fix_candidates,
     dump_fix_check_cohort,
     fix_check_lock_key,
     load_fix_check_cohort,
     release_fix_check_lock,
+    resolve_fix_policy,
 )
 from weblate.trans.forms import (
     BulkEditForm,
@@ -308,27 +307,42 @@ def bulk_edit(request: AuthenticatedHttpRequest, path):
 def _resolve_fix_check_selection(
     request: AuthenticatedHttpRequest,
     form: FixCheckConfirmForm,
-    check_obj,
+    policy,
     scope_type: str,
     scope_pk: int,
 ) -> list[int] | None:
     """
     Resolve which unit ids one mass-fix submit may touch.
 
-    `None` means the whole current scope, which is what the `safe` tier
-    always submits. For the `review` tier only rows this actor actually
-    previewed - with their diff and checkbox - are accepted: the rendered
-    cohort is signed for (actor, check, scope), so a crafted POST cannot
-    reach eligible rows from a later, unreviewed batch (Task 5 step 4).
-    Raises `ValidationError` with a translated message otherwise.
+    `None` means the whole current scope: always for the `safe` tier, and
+    for an `explicit`-tier policy's "apply to all N matching strings"
+    choice (Task A/B's `terminal-source` and mechanical-group policies,
+    which - unlike the legacy `review` tier - are not capped at one
+    preview page). For `review`, and for `explicit`'s "apply the selected
+    page" choice, only rows this actor actually previewed - with their
+    diff and checkbox - are accepted: the rendered cohort is signed for
+    (actor, policy, scope), so a crafted POST cannot reach eligible rows
+    from a later, unreviewed batch (Task 5 step 4 / Task C). Raises
+    `ValidationError` with a translated message otherwise.
     """
-    if check_obj.mass_fixup == "safe":
+    if policy.tier == "safe":
         return None
+    if policy.tier == "explicit":
+        selection = form.cleaned_data.get("selection")
+        if selection not in {"all", "page"}:
+            raise ValidationError(
+                gettext(
+                    "Choose whether to apply to all matching strings or "
+                    "only the selected page."
+                )
+            )
+        if selection == "all":
+            return None
     try:
         cohort = load_fix_check_cohort(
             form.cleaned_data["cohort"],
             user_id=request.user.id,
-            check_id=check_obj.check_id,
+            check_id=policy.id,
             scope_type=scope_type,
             scope_pk=scope_pk,
         )
@@ -356,12 +370,16 @@ def _resolve_fix_check_selection(
 @never_cache
 def fix_check(request: AuthenticatedHttpRequest, name, path):
     """
-    Mass-fix one failing check over a translation/component/project scope.
+    Mass-fix one failing check, or one Task A/B explicit policy, over a
+    translation/component/project scope.
 
-    GET renders the tier-appropriate confirmation screen (safe: a count;
-    review: a preview with checkboxes); POST re-validates the selection
-    against the live query and queues `fix_failing_checks`
-    (docs/product/plans/2026-08-25-mass-fix-failing-checks.md, Task 5).
+    GET renders the tier-appropriate confirmation screen (`safe`: a count;
+    `review`: a preview with checkboxes; `explicit`: a preview with
+    checkboxes plus an "apply to all N" choice). POST re-validates the
+    selection against the live query and queues `fix_failing_checks`
+    (docs/product/plans/2026-08-25-mass-fix-failing-checks.md, Task 5;
+    docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md,
+    Task C).
     """
     obj, unit_set, context = parse_path_units(
         request, path, (Translation, Component, Project)
@@ -372,8 +390,8 @@ def fix_check(request: AuthenticatedHttpRequest, name, path):
     ):
         raise PermissionDenied
 
-    check_obj = CHECKS.get(name)
-    if check_obj is None or check_obj.mass_fixup is None:
+    policy = resolve_fix_policy(name)
+    if policy is None:
         raise Http404
 
     component = context.get("component")
@@ -388,7 +406,7 @@ def fix_check(request: AuthenticatedHttpRequest, name, path):
         scope_type = "component"
     else:
         scope_type = "project"
-    lock_key = fix_check_lock_key(check_obj.check_id, scope_type, obj.pk)
+    lock_key = fix_check_lock_key(policy.id, scope_type, obj.pk)
 
     if request.method == "POST":
         form = FixCheckConfirmForm(request.POST)
@@ -399,7 +417,7 @@ def fix_check(request: AuthenticatedHttpRequest, name, path):
 
         try:
             unit_ids = _resolve_fix_check_selection(
-                request, form, check_obj, scope_type, obj.pk
+                request, form, policy, scope_type, obj.pk
             )
         except ValidationError as error:
             messages.error(request, str(error.message))
@@ -428,7 +446,7 @@ def fix_check(request: AuthenticatedHttpRequest, name, path):
 
         task_kwargs = {
             "user_id": request.user.id,
-            "check_id": check_obj.check_id,
+            "check_id": policy.id,
             "lock_key": lock_key,
             "unit_ids": unit_ids,
             "translation_id": translation_id,
@@ -487,17 +505,17 @@ def fix_check(request: AuthenticatedHttpRequest, name, path):
         messages.success(request, message, f"task:{task.id} task-status")
         return redirect(obj)
 
-    candidates = collect_fix_candidates(request.user, unit_set, project, check_obj)
+    candidates = policy.collect(request.user, unit_set, project)
     context.update(
         {
-            "check": check_obj,
+            "check": policy,
             "candidates": candidates,
             "form": FixCheckConfirmForm(
                 initial={
                     "cohort": dump_fix_check_cohort(
                         (row.unit.pk for row in candidates.shown),
                         user_id=request.user.id,
-                        check_id=check_obj.check_id,
+                        check_id=policy.id,
                         scope_type=scope_type,
                         scope_pk=obj.pk,
                     )

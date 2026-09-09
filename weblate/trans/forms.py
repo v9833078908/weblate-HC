@@ -4471,19 +4471,29 @@ class UnitIdsField(forms.MultipleChoiceField):
 
 class FixCheckConfirmForm(forms.Form):
     """
-    Confirm a mass-fix run (Task 5 step 4).
+    Confirm a mass-fix run (Task 5 step 4; `selection` added for Task C).
 
-    Empty for the `safe` tier (a bare count confirmation); the `review`
-    tier's checked preview rows arrive as repeated `unit_ids` checkboxes
-    plus `cohort`, the signed list of ids the preview actually rendered.
-    The view refuses a submit carrying an id outside that cohort, so a
-    review-tier fix cannot be applied to a row nobody previewed.
+    Empty for the `safe` tier (a bare count confirmation). The `review`
+    tier's checked preview rows, and an `explicit`-tier policy's (Task A's
+    `terminal-source`, Task B's mechanical groups) "apply the selected
+    page" choice, arrive as repeated `unit_ids` checkboxes plus `cohort`,
+    the signed list of ids the preview actually rendered; the view refuses
+    a submit carrying an id outside that cohort, so a fix cannot be
+    applied to a row nobody previewed. `selection` (`all`/`page`)
+    disambiguates an `explicit`-tier submit only - ignored for `safe` and
+    `review`, which each have exactly one shape.
     The template owns the surrounding `<form>`, so `form_tag` stays off.
-    See docs/product/plans/2026-08-25-mass-fix-failing-checks.md.
+    See docs/product/plans/2026-08-25-mass-fix-failing-checks.md and
+    docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md.
     """
 
     unit_ids = UnitIdsField(required=False, widget=forms.CheckboxSelectMultiple)
     cohort = forms.CharField(required=False, widget=forms.HiddenInput)
+    selection = forms.ChoiceField(
+        required=False,
+        choices=[("all", "all"), ("page", "page")],
+        widget=forms.HiddenInput,
+    )
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -4491,7 +4501,7 @@ class FixCheckConfirmForm(forms.Form):
         self.helper.form_tag = False
 
     def get_unit_ids(self) -> list[int]:
-        """Parse the checked review-tier ids; empty for the safe tier."""
+        """Parse the checked review-tier/explicit-page ids; empty otherwise."""
         return [
             int(value)
             for value in self.cleaned_data.get("unit_ids", [])
