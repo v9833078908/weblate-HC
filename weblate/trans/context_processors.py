@@ -136,7 +136,13 @@ def weblate_context(request: AuthenticatedHttpRequest):
         user_tasks = [
             task
             | {
-                "tags": f"info task:{task['id']}",
+                # A task that always returns an explicit result `status`
+                # keeps the strict poller mapping across a reload, so a
+                # failed run never renders as an empty success.
+                "tags": (
+                    f"info task:{task['id']}"
+                    f"{' task-status' if task.get('status_contract') else ''}"
+                ),
                 "text": format_html(
                     '{}: <a href="{}">{}</a>', task["text"], task["url"], task["label"]
                 ),

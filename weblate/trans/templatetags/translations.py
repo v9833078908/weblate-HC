@@ -745,14 +745,22 @@ def show_message(tags, message):
     tags = tags.split()
     final = []
     task_id = None
+    task_status = False
     for tag in tags:
         if tag.startswith("task:"):
             task_id = tag[5:]
+        elif tag == "task-status":
+            # The task behind this flash returns an explicit
+            # `{"status": "completed"|"failed"}` result, so the poller may
+            # apply the strict mapping instead of treating every finished
+            # task as a success.
+            task_status = True
         else:
             final.append(tag)
     return {
         "tags": " ".join(final),
         "task_id": task_id,
+        "task_status": task_status,
         "message": message,
         "progress": 0,
     }

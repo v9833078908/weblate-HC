@@ -74,36 +74,49 @@
         </th>
       </tr>
     </thead>
-    {% for query, name, count, color, words, characters in object.list_translation_checks %}
-      <tr data-href="{{ translate_url }}?q={{ query }}" class="clickable-row">
+    {% for item in object.list_translation_checks %}
+      <tr data-href="{{ translate_url }}?q={{ item.query }}" class="clickable-row">
         <th class="number split-cell wrap-cell">
-          <span>{{ count|intcomma }}</span>
-          <span>{{ words|intcomma }}</span>
-          <span>{{ characters|intcomma }}</span>
+          <span>{{ item.total|intcomma }}</span>
+          <span>{{ item.words|intcomma }}</span>
+          <span>{{ item.characters|intcomma }}</span>
         </th>
         <td class="legend align-middle">
-          {% if name != "all" %}
+          {% if item.name != "all" %}
             <div class="progress"
                  role="progressbar"
                  aria-valuenow="100"
                  aria-valuemin="0"
                  aria-valuemax="100"
-                 aria-label="{{ name }}"
+                 aria-label="{{ item.name }}"
                  aria-labelledby="check-label-{{ forloop.counter }}">
-              {% if color %}
-                <div class="progress-bar{% if color != "primary" %} progress-bar-{{ color }}{% endif %}"
+              {% if item.color %}
+                <div class="progress-bar{% if item.color != "primary" %} progress-bar-{{ item.color }}{% endif %}"
                      style="width: 100%"></div>
               {% endif %}
             </div>
           {% endif %}
         </td>
         <td class="full-cell">
-          <a href="{{ translate_url }}?q={{ query }}" id="check-label-{{ forloop.counter }}">{{ name }}</a>
+          <a href="{{ translate_url }}?q={{ item.query }}"
+             id="check-label-{{ forloop.counter }}">{{ item.name }}</a>
         </td>
         <td class="wrap-cell">
-          <a class="btn-inline" href="{{ browse_url }}?q={{ query }}">{% translate "Browse" %}</a>
-          <a class="btn-inline" href="{{ edit_url }}?q={{ query }}">{% translate "Translate" %}</a>
-          <a class="btn-inline" href="{{ zen_url }}?q={{ query }}">{% translate "Zen" %}</a>
+          <a class="btn-inline" href="{{ browse_url }}?q={{ item.query }}">{% translate "Browse" %}</a>
+          <a class="btn-inline" href="{{ edit_url }}?q={{ item.query }}">{% translate "Translate" %}</a>
+          <a class="btn-inline" href="{{ zen_url }}?q={{ item.query }}">{% translate "Zen" %}</a>
+          {% comment %}
+            `allow_fix_check` is set only where `object` is exactly a
+            Translation (`templates/translation.html`). The aggregate
+            language/category pages that include this snippet have no
+            approved blast radius and the `fix-check` route rejects their
+            scopes, so they must render no Fix action at all (Task 5
+            step 3/5).
+          {% endcomment %}
+          {% if allow_fix_check and item.mass_fixup and object.pk %}
+            <a class="btn-inline"
+               href="{% url 'fix-check' name=item.check_id path=object.get_url_path %}">{% translate "Fix" %}</a>
+          {% endif %}
         </td>
       </tr>
     {% endfor %}

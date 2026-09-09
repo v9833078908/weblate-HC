@@ -1758,6 +1758,8 @@ class Unit(models.Model, LoggerMixin):
         run_checks: bool = True,
         request=None,
         change_details: dict[str, Any] | None = None,
+        *,
+        mark_source_change_fuzzy: bool = True,
     ) -> bool:
         """
         Store unit to backend.
@@ -1840,7 +1842,12 @@ class Unit(models.Model, LoggerMixin):
 
         # Update related source strings if working on a template
         if self.translation.is_template and self.old_unit["target"] != self.target:
-            self.update_source_units(self.old_unit["target"], user or author, author)
+            self.update_source_units(
+                self.old_unit["target"],
+                user or author,
+                author,
+                mark_source_change_fuzzy=mark_source_change_fuzzy,
+            )
 
         return True
 
@@ -1889,7 +1896,12 @@ class Unit(models.Model, LoggerMixin):
         return change
 
     def update_source_units(
-        self, previous_source: str, user: User | None, author: User | None
+        self,
+        previous_source: str,
+        user: User | None,
+        author: User | None,
+        *,
+        mark_source_change_fuzzy: bool = True,
     ) -> None:
         """
         Update source for units within same component.
@@ -1909,6 +1921,7 @@ class Unit(models.Model, LoggerMixin):
                     previous_source,
                     author,
                     translation_delta_data,
+                    mark_source_change_fuzzy=mark_source_change_fuzzy,
                 ):
                     delta_failed = True
                 # Generate change
@@ -1947,11 +1960,40 @@ class Unit(models.Model, LoggerMixin):
                 transaction.on_commit(update_source_stats_on_commit)
 
     def update_source_unit_state(
-        self, unit, previous_source: str, author: User | None
+        self,
+        unit,
+        previous_source: str,
+        author: User | None,
+        *,
+        mark_source_change_fuzzy: bool = True,
     ) -> None:
         # Update source and number of words
         unit.source = self.target
         unit.num_words = self.num_words
+        if not mark_source_change_fuzzy:
+            if (
+                not unit.translation.is_readonly
+                and unit.translation.get_filename() is not None
+            ):
+                pending_changes = unit.pending_changes.all()
+                if pending_changes.exists():
+                    # Never add a second row for the same unit; an unflushed
+                    # one is updated in place. The author is only overwritten
+                    # when this cascade knows one, so an anonymous cosmetic
+                    # fix does not erase the pending row's original author.
+                    updates = {
+                        "target": unit.target,
+                        "explanation": unit.explanation,
+                        "source_unit_explanation": unit.source_unit.explanation,
+                        "state": unit.state,
+                        "automatically_translated": unit.automatically_translated,
+                    }
+                    if author is not None:
+                        updates["author"] = author
+                    pending_changes.update(**updates)
+                else:
+                    PendingUnitChange.store_unit_change(unit=unit, author=author)
+            return
         # Find reverted units
         if (
             unit.state in FUZZY_STATES
@@ -1986,13 +2028,20 @@ class Unit(models.Model, LoggerMixin):
         previous_source: str,
         author: User | None,
         translation_delta_data: dict[int, TranslationDeltaEntry],
+        *,
+        mark_source_change_fuzzy: bool = True,
     ) -> bool:
         stats = unit.translation.stats
         old_stats_snapshot = (
             stats.capture_unit_snapshot(unit) if stats.can_apply_delta() else None
         )
 
-        self.update_source_unit_state(unit, previous_source, author)
+        self.update_source_unit_state(
+            unit,
+            previous_source,
+            author,
+            mark_source_change_fuzzy=mark_source_change_fuzzy,
+        )
         with unit.translation.suppress_cache_invalidation():
             unit.save()
 
@@ -2391,6 +2440,7 @@ class Unit(models.Model, LoggerMixin):
         add_alternative: bool = False,
         select_for_update: bool = True,
         change_details: dict[str, Any] | None = None,
+        mark_source_change_fuzzy: bool = True,
     ) -> bool:
         """
         Store new translation of a unit.
@@ -2456,6 +2506,7 @@ class Unit(models.Model, LoggerMixin):
             author=author,
             request=request,
             change_details=change_details,
+            mark_source_change_fuzzy=mark_source_change_fuzzy,
         )
 
         # Enforced checks can revert the state to needs editing (fuzzy);

@@ -31202,3 +31202,169 @@ msgstr "Автоматический перевод"
 
 msgid "Automatic suggestion run"
 msgstr "Автоматические предложения"
+
+#: weblate/templates/check_list.html:49 weblate/templates/fix_check.html:10
+#: weblate/templates/fix_check.html:101
+#: weblate/templates/snippets/translation.html:109
+msgid "Fix"
+msgstr "Исправить"
+
+#: weblate/templates/fix_check.html:18
+msgid "Scope: %(scope)s."
+msgstr "Область: %(scope)s."
+
+#: weblate/templates/fix_check.html:24
+#, python-format
+msgid "%(count)s judge verdict will no longer be current after this fix."
+msgid_plural "%(count)s judge verdicts will no longer be current after this fix."
+msgstr[0] "%(count)s вердикт судьи перестанет быть актуальным после этого исправления."
+msgstr[1] "%(count)s вердикта судьи перестанут быть актуальными после этого исправления."
+msgstr[2] "%(count)s вердиктов судьи перестанут быть актуальными после этого исправления."
+
+#: weblate/templates/fix_check.html:32
+msgid "This action has no undo."
+msgstr "Это действие нельзя отменить."
+
+#: weblate/templates/fix_check.html:41
+#, python-format
+msgid "%(count)s string will be fixed."
+msgid_plural "%(count)s strings will be fixed."
+msgstr[0] "%(count)s строка будет исправлена."
+msgstr[1] "%(count)s строки будут исправлены."
+msgstr[2] "%(count)s строк будет исправлено."
+
+#: weblate/templates/fix_check.html:49
+#, python-format
+msgid "Fix %(count)s string"
+msgid_plural "Fix %(count)s strings"
+msgstr[0] "Исправить %(count)s строку"
+msgstr[1] "Исправить %(count)s строки"
+msgstr[2] "Исправить %(count)s строк"
+
+#: weblate/templates/fix_check.html:61
+#, python-format
+msgid "%(count)s string needs manual review and %(denied)s could not be checked due to missing permission; neither is selectable below."
+msgid_plural "%(count)s strings need manual review and %(denied)s could not be checked due to missing permission; none of them is selectable below."
+msgstr[0] "%(count)s строка требует ручной проверки, а %(denied)s не удалось проверить из-за отсутствия прав; ни одна из них не выбирается ниже."
+msgstr[1] "%(count)s строки требуют ручной проверки, а %(denied)s не удалось проверить из-за отсутствия прав; ни одна из них не выбирается ниже."
+msgstr[2] "%(count)s строк требуют ручной проверки, а %(denied)s не удалось проверить из-за отсутствия прав; ни одна из них не выбирается ниже."
+
+#: weblate/templates/fix_check.html:70
+#, python-format
+msgid "Showing the first %(count)s applicable of %(total)s."
+msgid_plural "Showing the first %(count)s applicable of %(total)s."
+msgstr[0] "Показана первая %(count)s применимая строка из %(total)s."
+msgstr[1] "Показаны первые %(count)s применимые строки из %(total)s."
+msgstr[2] "Показаны первые %(count)s применимых строк из %(total)s."
+
+#: weblate/templates/fix_check.html:86
+#, python-format
+msgid "Select all %(count)s applicable on this page"
+msgid_plural "Select all %(count)s applicable on this page"
+msgstr[0] "Выбрать %(count)s применимую строку на этой странице"
+msgstr[1] "Выбрать все %(count)s применимые строки на этой странице"
+msgstr[2] "Выбрать все %(count)s применимых строк на этой странице"
+
+#: weblate/templates/fix_check.html:97
+#: weblate/templates/snippets/list-objects.html:8
+msgid "Scrollable table"
+msgstr "Прокручиваемая таблица"
+
+#: weblate/templates/fix_check.html:102
+msgid "String"
+msgstr "Строка"
+
+#: weblate/templates/fix_check.html:103
+msgid "Fixed target"
+msgstr "Исправленный перевод"
+
+#: weblate/templates/fix_check.html:111
+#, python-format
+msgid "Select %(context)s (%(language)s) for fixing"
+msgstr "Выбрать %(context)s (%(language)s) для исправления"
+
+#: weblate/templates/fix_check.html:138
+#, python-format
+msgid "Fix selected (%(count)s)"
+msgid_plural "Fix selected (%(count)s)"
+msgstr[0] "Исправить выбранные (%(count)s)"
+msgstr[1] "Исправить выбранные (%(count)s)"
+msgstr[2] "Исправить выбранные (%(count)s)"
+
+#: weblate/templates/fix_check.html:145
+msgid "No applicable strings to fix right now."
+msgstr "Сейчас нет строк, подходящих для исправления."
+
+#: weblate/trans/tasks.py:1258
+msgid "This check is no longer eligible for a mass fix."
+msgstr "Эта проверка больше не подходит для массового исправления."
+
+#: weblate/trans/tasks.py:1292
+msgid "Mass fix could not complete: the component stayed locked."
+msgstr "Не удалось завершить массовое исправление: компонент остался заблокированным."
+
+#: weblate/trans/tasks.py:1304
+#, python-format
+msgid "Mass fix failed: %s"
+msgstr "Массовое исправление не удалось: %s"
+
+#: weblate/trans/tasks.py:1320
+msgid "Another run took over this fix."
+msgstr "Другой запуск перехватил это исправление."
+
+#: weblate/trans/tasks.py:1328
+#, python-format
+msgid "Mass fix completed, %d string was fixed."
+msgid_plural "Mass fix completed, %d strings were fixed."
+msgstr[0] "Массовое исправление завершено, исправлена %d строка."
+msgstr[1] "Массовое исправление завершено, исправлены %d строки."
+msgstr[2] "Массовое исправление завершено, исправлено %d строк."
+
+#: weblate/trans/views/search.py:357
+msgid ""
+"This check is already being fixed for this scope; wait for that run to "
+"finish before trying again."
+msgstr ""
+"Эта проверка уже исправляется для этой области; дождитесь завершения "
+"текущего запуска, прежде чем повторить попытку."
+
+#: weblate/trans/views/search.py:400
+msgid "Mass fix completed."
+msgstr "Массовое исправление завершено."
+
+#: weblate/trans/views/search.py:408
+msgid "Mass fix failed."
+msgstr "Массовое исправление не удалось."
+
+#: weblate/trans/views/search.py:417
+msgid "Mass fix queued. You can close this page."
+msgstr "Массовое исправление поставлено в очередь. Эту страницу можно закрыть."
+
+#: weblate/templates/fix_check.html:16
+#, python-format
+msgid "Fix: %(check_name)s"
+msgstr "Исправление: %(check_name)s"
+
+#: weblate/trans/views/search.py:369
+msgid ""
+"The list of strings to fix expired or did not match this page. Reload the "
+"page and select the strings again."
+msgstr ""
+"Список строк для исправления устарел или не относится к этой странице. "
+"Обновите страницу и выберите строки заново."
+
+#: weblate/trans/views/search.py:377
+msgid "No strings were selected."
+msgstr "Строки не выбраны."
+
+#: weblate/trans/views/search.py:382
+msgid ""
+"The selection did not match the reviewed strings. Reload the page and select "
+"the strings again."
+msgstr ""
+"Выбор не соответствует просмотренным строкам. Обновите страницу и выберите "
+"строки заново."
+
+#: weblate/templates/translate.html:696
+msgid "Fix all such strings"
+msgstr "Исправить все такие строки"

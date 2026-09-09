@@ -235,6 +235,11 @@ real_patterns = [
         weblate.trans.views.search.bulk_edit,
         name="bulk-edit",
     ),
+    path(
+        "fix-check/<name:name>/<object_path:path>/",
+        weblate.trans.views.search.fix_check,
+        name="fix-check",
+    ),
     path("credits/", weblate.trans.views.reports.get_credits, name="credits"),
     path("counts/", weblate.trans.views.reports.get_counts, name="counts"),
     path("costs/", weblate.trans.views.reports.get_costs, name="costs"),

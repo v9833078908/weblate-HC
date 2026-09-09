@@ -1087,6 +1087,33 @@ Security Policy is extended only when the setting is configured, and the
 provider never records the content of ``input``, ``select``, or ``textarea``
 fields. *(maintainer)*
 
+Mass-fixing failing checks (see :ref:`mass-fix-failing-checks`) adds a new
+authenticated ``POST`` route that mass-mutates translation content and queues
+background work, the condition named above. Its blast radius is bounded by
+the scope in the URL path - one translation, one component, or one project,
+never a site-wide or cross-project query - and by the check itself, since
+only a check with an explicitly assigned, deterministic, meaning-preserving
+fixup ever executes; a glossary component is rejected before the confirmation
+page renders. The route requires both the :guilabel:`Bulk edit strings`
+permission on the scope object and the ordinary edit permission on every
+individual string, re-checked at apply time rather than trusted from the
+confirmation page, mirroring the existing ``bulk-edit`` route; both routes
+share the same CSRF-protected, session-authenticated POST contract, with no
+new unauthenticated or token-based surface. A same-``(check, scope)``
+concurrency reservation, keyed to the immutable scope identity and never to
+the actor, prevents two simultaneous submits from double-applying; on a
+non-Redis cache the reservation is a bounded lease rather than a strict
+lock, and the engine's own idempotent re-apply means a duplicate run wastes
+work but cannot corrupt a target. The action has no undo once queued, the
+same accepted risk as the existing search-and-replace and bulk-edit routes.
+No REST API endpoint is exposed for this feature. *(maintainer)*
+
+A review-tier submission additionally carries the signed, actor- and
+scope-bound list of the strings its preview rendered, and the route refuses
+any selection reaching outside that list, so the per-string review a
+review-tier check requires cannot be skipped by a crafted request.
+*(maintainer)*
+
 Triage dispositions
 -------------------
 

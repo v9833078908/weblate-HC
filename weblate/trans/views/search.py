@@ -5,29 +5,44 @@ from __future__ import annotations
 
 from itertools import islice
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core import signing
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Sum
+from django.http import Http404
 from django.shortcuts import redirect
 from django.utils.translation import gettext, ngettext
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
+from weblate.checks.models import CHECKS
 from weblate.lang.models import Language
 from weblate.trans.actions import ActionEvents
 from weblate.trans.bulk import bulk_perform
+from weblate.trans.fix_check import (
+    acquire_fix_check_lock,
+    collect_fix_candidates,
+    dump_fix_check_cohort,
+    fix_check_lock_key,
+    load_fix_check_cohort,
+    release_fix_check_lock,
+)
 from weblate.trans.forms import (
     BulkEditForm,
+    FixCheckConfirmForm,
     ReplaceConfirmForm,
     ReplaceForm,
     SearchForm,
 )
 from weblate.trans.models import Category, Component, Project, Translation, Unit
 from weblate.trans.models.unit import fill_in_source_translation
+from weblate.trans.tasks import fix_failing_checks
 from weblate.trans.util import render
 from weblate.utils import messages
+from weblate.utils.celery import add_user_task, store_task_metadata
 from weblate.utils.ratelimit import check_rate_limit
 from weblate.utils.stats import CategoryLanguage, ProjectLanguage
 from weblate.utils.views import (
@@ -288,3 +303,206 @@ def bulk_edit(request: AuthenticatedHttpRequest, path):
     )
 
     return redirect(obj)
+
+
+def _resolve_fix_check_selection(
+    request: AuthenticatedHttpRequest,
+    form: FixCheckConfirmForm,
+    check_obj,
+    scope_type: str,
+    scope_pk: int,
+) -> list[int] | None:
+    """
+    Resolve which unit ids one mass-fix submit may touch.
+
+    `None` means the whole current scope, which is what the `safe` tier
+    always submits. For the `review` tier only rows this actor actually
+    previewed - with their diff and checkbox - are accepted: the rendered
+    cohort is signed for (actor, check, scope), so a crafted POST cannot
+    reach eligible rows from a later, unreviewed batch (Task 5 step 4).
+    Raises `ValidationError` with a translated message otherwise.
+    """
+    if check_obj.mass_fixup == "safe":
+        return None
+    try:
+        cohort = load_fix_check_cohort(
+            form.cleaned_data["cohort"],
+            user_id=request.user.id,
+            check_id=check_obj.check_id,
+            scope_type=scope_type,
+            scope_pk=scope_pk,
+        )
+    except (signing.BadSignature, ValueError) as error:
+        raise ValidationError(
+            gettext(
+                "The list of strings to fix expired or did not match "
+                "this page. Reload the page and select the strings again."
+            )
+        ) from error
+    selected = set(form.get_unit_ids())
+    if not selected:
+        raise ValidationError(gettext("No strings were selected."))
+    if not selected <= cohort:
+        raise ValidationError(
+            gettext(
+                "The selection did not match the reviewed strings. "
+                "Reload the page and select the strings again."
+            )
+        )
+    return sorted(selected)
+
+
+@login_required
+@never_cache
+def fix_check(request: AuthenticatedHttpRequest, name, path):
+    """
+    Mass-fix one failing check over a translation/component/project scope.
+
+    GET renders the tier-appropriate confirmation screen (safe: a count;
+    review: a preview with checkboxes); POST re-validates the selection
+    against the live query and queues `fix_failing_checks`
+    (docs/product/plans/2026-08-25-mass-fix-failing-checks.md, Task 5).
+    """
+    obj, unit_set, context = parse_path_units(
+        request, path, (Translation, Component, Project)
+    )
+
+    if not request.user.has_perm("unit.bulk_edit", obj) or not request.user.has_perm(
+        "unit.edit", obj
+    ):
+        raise PermissionDenied
+
+    check_obj = CHECKS.get(name)
+    if check_obj is None or check_obj.mass_fixup is None:
+        raise Http404
+
+    component = context.get("component")
+    if component is not None and component.is_glossary:
+        raise Http404
+
+    project = context.get("project")
+
+    if isinstance(obj, Translation):
+        scope_type = "translation"
+    elif isinstance(obj, Component):
+        scope_type = "component"
+    else:
+        scope_type = "project"
+    lock_key = fix_check_lock_key(check_obj.check_id, scope_type, obj.pk)
+
+    if request.method == "POST":
+        form = FixCheckConfirmForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, gettext("Could not process form!"))
+            show_form_errors(request, form)
+            return redirect(obj)
+
+        try:
+            unit_ids = _resolve_fix_check_selection(
+                request, form, check_obj, scope_type, obj.pk
+            )
+        except ValidationError as error:
+            messages.error(request, str(error.message))
+            return redirect(obj)
+
+        task_id = str(uuid4())
+        if not acquire_fix_check_lock(lock_key, task_id):
+            messages.error(
+                request,
+                gettext(
+                    "This check is already being fixed for this scope; "
+                    "wait for that run to finish before trying again."
+                ),
+            )
+            return redirect(obj)
+
+        translation_id: int | None = None
+        component_id: int | None = None
+        project_id: int | None = None
+        if isinstance(obj, Translation):
+            translation_id = obj.pk
+        elif isinstance(obj, Component):
+            component_id = obj.pk
+        else:
+            project_id = obj.pk
+
+        task_kwargs = {
+            "user_id": request.user.id,
+            "check_id": check_obj.check_id,
+            "lock_key": lock_key,
+            "unit_ids": unit_ids,
+            "translation_id": translation_id,
+            "component_id": component_id,
+            "project_id": project_id,
+        }
+
+        try:
+            task = fix_failing_checks.apply_async(kwargs=task_kwargs, task_id=task_id)
+        except Exception:
+            release_fix_check_lock(lock_key, task_id)
+            raise
+
+        if task.ready():
+            # Eager execution (CELERY_TASK_ALWAYS_EAGER): the result is
+            # already available, so flash it directly instead of a polling
+            # widget with nothing left to poll.
+            task_result = task.result
+            if (
+                isinstance(task_result, dict)
+                and task_result.get("status") == "completed"
+            ):
+                messages.success(
+                    request,
+                    task_result.get("message") or gettext("Mass fix completed."),
+                )
+            else:
+                message = (
+                    task_result.get("message")
+                    if isinstance(task_result, dict)
+                    else str(task_result)
+                )
+                messages.error(request, message or gettext("Mass fix failed."))
+            return redirect(obj)
+
+        store_task_metadata(
+            task.id,
+            translation_id=translation_id,
+            component_id=component_id,
+            user_id=request.user.id if isinstance(obj, Project) else None,
+        )
+        message = gettext("Mass fix queued. You can close this page.")
+        add_user_task(
+            request.user.id,
+            task.id,
+            text=message,
+            label=str(obj),
+            url=obj.get_absolute_url(),
+            status_contract=True,
+        )
+        # `task-status` opts this flash into the strict result mapping of
+        # Task 4 step 2: this task always returns a dict with an explicit
+        # `status`, so anything else the poller receives - a stringified
+        # exception, a dead worker - must render as a failure, never as an
+        # empty success.
+        messages.success(request, message, f"task:{task.id} task-status")
+        return redirect(obj)
+
+    candidates = collect_fix_candidates(request.user, unit_set, project, check_obj)
+    context.update(
+        {
+            "check": check_obj,
+            "candidates": candidates,
+            "form": FixCheckConfirmForm(
+                initial={
+                    "cohort": dump_fix_check_cohort(
+                        (row.unit.pk for row in candidates.shown),
+                        user_id=request.user.id,
+                        check_id=check_obj.check_id,
+                        scope_type=scope_type,
+                        scope_pk=obj.pk,
+                    )
+                }
+            ),
+        }
+    )
+    return render(request, "fix_check.html", context)

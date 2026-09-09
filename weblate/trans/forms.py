@@ -4454,6 +4454,51 @@ def get_new_unit_form(
     )
 
 
+class UnitIdsField(forms.MultipleChoiceField):
+    """
+    A checkbox list of unit ids.
+
+    Validity is enforced by the mass-fix engine at apply time
+    (`weblate.trans.fix_check.perform_fix`), not by this field: a checked
+    id that stopped matching between preview and submit (already fixed by
+    another run, dismissed, or otherwise changed) must degrade to a
+    per-row `stale_or_no_change` count, never fail the whole submission.
+    """
+
+    def valid_value(self, value) -> bool:
+        return True
+
+
+class FixCheckConfirmForm(forms.Form):
+    """
+    Confirm a mass-fix run (Task 5 step 4).
+
+    Empty for the `safe` tier (a bare count confirmation); the `review`
+    tier's checked preview rows arrive as repeated `unit_ids` checkboxes
+    plus `cohort`, the signed list of ids the preview actually rendered.
+    The view refuses a submit carrying an id outside that cohort, so a
+    review-tier fix cannot be applied to a row nobody previewed.
+    The template owns the surrounding `<form>`, so `form_tag` stays off.
+    See docs/product/plans/2026-08-25-mass-fix-failing-checks.md.
+    """
+
+    unit_ids = UnitIdsField(required=False, widget=forms.CheckboxSelectMultiple)
+    cohort = forms.CharField(required=False, widget=forms.HiddenInput)
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper(self)
+        self.helper.form_tag = False
+
+    def get_unit_ids(self) -> list[int]:
+        """Parse the checked review-tier ids; empty for the safe tier."""
+        return [
+            int(value)
+            for value in self.cleaned_data.get("unit_ids", [])
+            if value.isdigit()
+        ]
+
+
 class BulkEditForm(forms.Form):
     q = QueryField(required=True)
     state = forms.ChoiceField(

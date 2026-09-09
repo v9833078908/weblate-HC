@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 
     from weblate.trans.models import Component, Unit
 
+    from .base import FixupType
+
 # Matches (s) not followed by alphanumeric chars or at the end
 PLURAL_MATCH = re.compile(r"\w\(s\)(\W|\Z)")
 
@@ -50,9 +52,13 @@ class EllipsisCheck(SourceCheck):
     description = gettext_lazy(
         "The string uses three dots ``(...)`` instead of an ellipsis character ``(…)``."
     )
+    mass_fixup = "safe"
 
     def check_source_unit(self, sources: list[str], unit: Unit):
         return "..." in sources[0]
+
+    def get_fixup(self, unit: Unit) -> Iterable[FixupType] | None:
+        return [("regex", r"\.{3,}", "…", "gu")]
 
 
 class SourceMaxLengthCheck(SourceCheck):
