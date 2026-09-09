@@ -615,6 +615,26 @@ class ExplicitPolicyViewTest(ViewTestCase):
         self.assertIn('value="all"', content)
         self.assertIn("Apply to all 1 matching string", content)
 
+    def test_explicit_tier_separates_scope_action_from_page_selection(self) -> None:
+        """
+        The two actions must not read as one.
+
+        The whole-scope button carries the eligible total and says the
+        checkboxes do not feed it; the review button starts at zero
+        instead of promising the rendered page size.
+        """
+        self._grant_full_access()
+        unit = self.get_unit(source="Thank you for using Weblate.")
+        unit.translate(self.user, "Diky!", STATE_TRANSLATED)
+        response = self.client.get(self._url("terminal-source"))
+        self.assertEqual(response.context["candidates"].total_eligible, 1)
+        content = response.content.decode()
+        self.assertIn("Apply to all 1 matching string", content)
+        self.assertIn("the per-string checkboxes do not change what it fixes", content)
+        # The review button counts checked rows, and nothing starts checked.
+        self.assertIn('<span id="fix-check-selected-count">0</span>', content)
+        self.assertNotIn("Fix selected (1)", content)
+
     def test_terminal_source_post_selection_all_applies_full_scope(self) -> None:
         self._grant_full_access()
         unit = self.get_unit(source="Thank you for using Weblate.")

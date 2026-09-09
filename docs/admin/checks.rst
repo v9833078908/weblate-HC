@@ -353,6 +353,9 @@ Participating checks fall into three tiers:
   previews a batch like the review tier, but also offers
   :guilabel:`Apply to all matching strings`, which applies the policy to
   every eligible string in the scope without paging through it. The
+  checkboxes in the preview belong to the :guilabel:`Fix selected`
+  button, which reports how many rows are ticked; they never change what
+  :guilabel:`Apply to all matching strings` covers. The
   policy is named and confirmed on its own screen; strings the policy
   cannot decide stay out of it and remain available for per-string
   review.

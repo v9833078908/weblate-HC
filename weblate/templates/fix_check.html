@@ -171,6 +171,7 @@
           {% plural %}
             {{ count }} strings will be fixed.
           {% endblocktranslate %}
+          {% translate "This covers the whole scope, not the preview below: the per-string checkboxes do not change what it fixes." %}
         </p>
         <button type="submit" class="btn btn-primary">
           {% blocktranslate trimmed count count=candidates.total_eligible %}
@@ -259,11 +260,8 @@
         </div>
 
         <button type="submit" class="btn btn-primary">
-          {% blocktranslate trimmed count count=candidates.shown|length %}
-            Fix selected ({{ count }})
-          {% plural %}
-            Fix selected ({{ count }})
-          {% endblocktranslate %}
+          {% translate "Fix selected" %}
+          (<span id="fix-check-selected-count">0</span>)
         </button>
       {% else %}
         <p>{% translate "No applicable strings to fix right now." %}</p>

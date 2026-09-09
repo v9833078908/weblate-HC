@@ -2184,24 +2184,35 @@ onReady(() => {
     });
   });
 
-  /* Mass fix review: select every applicable row rendered on this page */
+  /* Mass fix review: select every applicable row rendered on this page.
+   * The submit button reports how many rows are actually checked, so it
+   * never promises the page size while nothing is selected - the
+   * whole-scope action above it carries its own, larger count. */
   const fixCheckSelectAll = document.getElementById("fix-check-select-all");
   if (fixCheckSelectAll !== null) {
     const fixCheckRows = fixCheckSelectAll
       .closest("form")
       .querySelectorAll("input.fix-check-row");
+    const fixCheckSelectedCount = document.getElementById(
+      "fix-check-selected-count",
+    );
+    const refreshFixCheckSelection = () => {
+      const checked = Array.from(fixCheckRows).filter((row) => row.checked);
+      fixCheckSelectAll.checked = checked.length === fixCheckRows.length;
+      if (fixCheckSelectedCount !== null) {
+        fixCheckSelectedCount.textContent = checked.length.toString();
+      }
+    };
     fixCheckSelectAll.addEventListener("change", () => {
       fixCheckRows.forEach((row) => {
         row.checked = fixCheckSelectAll.checked;
       });
+      refreshFixCheckSelection();
     });
     fixCheckRows.forEach((row) => {
-      row.addEventListener("change", () => {
-        fixCheckSelectAll.checked = Array.from(fixCheckRows).every(
-          (candidate) => candidate.checked,
-        );
-      });
+      row.addEventListener("change", refreshFixCheckSelection);
     });
+    refreshFixCheckSelection();
   }
 
   /* ZIP import - autofill name and slug */

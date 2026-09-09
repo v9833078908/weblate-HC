@@ -31283,13 +31283,17 @@ msgstr "Исправленный перевод"
 msgid "Select %(context)s (%(language)s) for fixing"
 msgstr "Выбрать %(context)s (%(language)s) для исправления"
 
-#: weblate/templates/fix_check.html:138
-#, python-format
-msgid "Fix selected (%(count)s)"
-msgid_plural "Fix selected (%(count)s)"
-msgstr[0] "Исправить выбранные (%(count)s)"
-msgstr[1] "Исправить выбранные (%(count)s)"
-msgstr[2] "Исправить выбранные (%(count)s)"
+#: weblate/templates/fix_check.html:174
+msgid ""
+"This covers the whole scope, not the preview below: the per-string checkboxes "
+"do not change what it fixes."
+msgstr ""
+"Действие охватывает всю область, а не показанную ниже выборку: отметки у "
+"отдельных строк на результат не влияют."
+
+#: weblate/templates/fix_check.html:263
+msgid "Fix selected"
+msgstr "Исправить выбранные"
 
 #: weblate/templates/fix_check.html:145
 msgid "No applicable strings to fix right now."
