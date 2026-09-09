@@ -78,24 +78,25 @@ _JS_REPLACEMENT_TOKEN_RE = re.compile(r"\$(\$|&|\d{1,2})")
 
 def _translate_js_replacement(replacement: str) -> str:
     r"""
-    Translate a JavaScript `String.replace()` replacement pattern into
-    Python `re.sub()` syntax: `$1`..`$99` -> `\1`..`\99` (a *capture group*
-    reference - `PunctuationSpacingCheck.get_fixup`'s French-spacing
-    fixups are the only tiered checks that use one), `$&` -> `\g<0>` (the
-    whole match), `$$` -> a literal `$`. Python's replacement string gives
-    backslash no meaning of its own outside a group escape, so a literal
-    backslash in `replacement` (none of the current fixups emit one, but a
-    future one might) is itself escaped first, rather than risking it
-    forming an accidental group reference.
+    Translate a JS `String.replace()` pattern into Python `re.sub()` syntax.
+
+    `$1`..`$99` -> `\1`..`\99` (a *capture group* reference -
+    `PunctuationSpacingCheck.get_fixup`'s French-spacing fixups are the
+    only tiered checks that use one), `$&` -> `\g<0>` (the whole match),
+    `$$` -> a literal `$`. Python's replacement string gives backslash no
+    meaning of its own outside a group escape, so a literal backslash in
+    `replacement` (none of the current fixups emit one, but a future one
+    might) is itself escaped first, rather than risking it forming an
+    accidental group reference.
     """
 
     def translate_token(match: re.Match[str]) -> str:
-        token = match.group(1)
-        if token == "$":
+        char = match.group(1)
+        if char == "$":
             return "$"
-        if token == "&":
+        if char == "&":
             return "\\g<0>"
-        return f"\\{token}"
+        return f"\\{char}"
 
     escaped = replacement.replace("\\", "\\\\")
     return _JS_REPLACEMENT_TOKEN_RE.sub(translate_token, escaped)
@@ -151,17 +152,18 @@ def _finish_final_target(
     unit: Unit, old_targets: list[str], new_targets: list[str]
 ) -> list[str] | None:
     """
-    Shared tail of the preparation pipeline once a candidate `new_targets`
-    is computed, however it was computed - a `get_fixup()`/
-    `terminal_source_edit()` regex fixup through `apply_fixup_python`
-    (`_prepare_final_target`), or an `AutoFix.fix_target()` direct text
-    transform (Task B's mechanical groups, which are not check fixups at
-    all). Runs every preparation step `Unit.translate()` runs around
-    `fix_target()` (`weblate/trans/models/unit.py:2412-2436`): multivalue
-    empty-entry filtering (or plural-count adjustment otherwise), the
-    fixup's own autofix normalization for a non-template translation, and
-    DOS line-ending conversion. Returns `None` when the result is no
-    change from the unit's current target.
+    Shared tail of the preparation pipeline once a candidate `new_targets` is computed.
+
+    However it was computed - a `get_fixup()`/`terminal_source_edit()`
+    regex fixup through `apply_fixup_python` (`_prepare_final_target`), or
+    an `AutoFix.fix_target()` direct text transform (Task B's mechanical
+    groups, which are not check fixups at all). Runs every preparation
+    step `Unit.translate()` runs around `fix_target()`
+    (`weblate/trans/models/unit.py:2412-2436`): multivalue empty-entry
+    filtering (or plural-count adjustment otherwise), the fixup's own
+    autofix normalization for a non-template translation, and DOS
+    line-ending conversion. Returns `None` when the result is no change
+    from the unit's current target.
     """
     component = unit.translation.component
     if component.is_multivalue:
@@ -186,9 +188,11 @@ def _prepare_final_target(
     fixups: Iterable[FixupType] | None, unit: Unit
 ) -> list[str] | None:
     """
-    Apply `fixups` (a `get_fixup()`/`terminal_source_edit()` regex list)
-    and run the shared preparation pipeline - see `_finish_final_target`.
-    Returns `None` when there are no fixups or they produce no change.
+    Apply `fixups` and run the shared preparation pipeline.
+
+    `fixups` is a `get_fixup()`/`terminal_source_edit()` regex list; see
+    `_finish_final_target`. Returns `None` when there are no fixups or
+    they produce no change.
 
     Shared by `_compute_final_target` (`get_fixup()`-based checks, Task 2)
     and the terminal-source policy's `_classify_terminal_policy`
@@ -466,20 +470,20 @@ def _perform_fix_over(
     progress_every: int,
 ) -> FixResult:
     """
-    Shared per-component batched write loop behind `perform_fix` and
-    `perform_terminal_policy_fix` (Task 2 step 6 / Task A).
+    Shared batched write loop behind `perform_fix`/`perform_terminal_policy_fix`.
 
-    `matching` is the scope's already-filtered candidate query - one
-    check's rows via `_matching_units`, or the union of four via
-    `_terminal_policy_matching_units`. `unit_ids=None` means the full
-    current scope (tier `safe`); an explicit id list means only the
-    checked review rows. Explicit ids are intersected with the live
-    active-check query first, so an id that no longer matches (already
-    fixed by another run, dismissed, or otherwise changed since the
-    preview) is counted as `stale_or_no_change`, never submitted.
-    `classify` re-derives each unit's bucket and final target fresh, under
-    its row lock, exactly as the caller's own preview classification does;
-    a manual or unresolved row is never submitted either.
+    Task 2 step 6 / Task A. `matching` is the scope's already-filtered
+    candidate query - one check's rows via `_matching_units`, or the
+    union of four via `_terminal_policy_matching_units`. `unit_ids=None`
+    means the full current scope (tier `safe`); an explicit id list means
+    only the checked review rows. Explicit ids are intersected with the
+    live active-check query first, so an id that no longer matches
+    (already fixed by another run, dismissed, or otherwise changed since
+    the preview) is counted as `stale_or_no_change`, never submitted.
+    `classify` re-derives each unit's bucket and final target fresh,
+    under its row lock, exactly as the caller's own preview
+    classification does; a manual or unresolved row is never submitted
+    either.
     """
     requested_ids: set[int] | None = None
     if unit_ids is not None:
@@ -618,10 +622,11 @@ TERMINAL_SOURCE_POLICY_CHECK_IDS: tuple[str, ...] = (
 
 def _terminal_policy_edit(unit: Unit) -> tuple[str, TerminalEdit] | None:
     """
-    Try each policy check in turn; by construction at most one proposes an
-    edit - `terminal_source_edit` only ever fires for the check whose
-    family matches the source's own terminal mark (or, for a removal, the
-    mark the target itself carries).
+    Try each policy check in turn; at most one proposes an edit.
+
+    By construction: `terminal_source_edit` only ever fires for the check
+    whose family matches the source's own terminal mark (or, for a
+    removal, the mark the target itself carries).
     """
     for check_id in TERMINAL_SOURCE_POLICY_CHECK_IDS:
         edit = terminal_source_edit(CHECKS[check_id], unit)
@@ -654,9 +659,7 @@ def _classify_terminal_policy(
         return "manual", None
     sources = unit.get_source_plurals()
     old_targets = unit.get_target_plurals()
-    if not _decision_7_holds(
-        CHECKS[check_id], unit, sources, old_targets, new_targets
-    ):
+    if not _decision_7_holds(CHECKS[check_id], unit, sources, old_targets, new_targets):
         return "manual", None
     return "eligible", new_targets
 
@@ -790,20 +793,20 @@ def _protected_spans_preserved(
     unit: Unit, old_targets: list[str], new_targets: list[str]
 ) -> bool:
     """
-    Whether every `highlight_string`-protected span's own text survived a
-    mechanical edit unchanged (Task B).
+    Whether every protected span's own text survived a mechanical edit unchanged.
 
-    `DoubleSpaceCheck.get_fixup` and its siblings do not skip protected
-    spans themselves, so clearing the targeted check is not proof
-    placeholder/markup content survived - every mechanical candidate is
-    independently verified here, regardless of which check proposed it.
-    Compares the *sequence of highlighted substrings*, not positions -
-    positions shift when whitespace elsewhere changes length, but a
-    genuinely untouched span's own text does not.
+    Spans are those `highlight_string` marks (Task B). `DoubleSpaceCheck.
+    get_fixup` and its siblings do not skip protected spans themselves,
+    so clearing the targeted check is not proof placeholder/markup
+    content survived - every mechanical candidate is independently
+    verified here, regardless of which check proposed it. Compares the
+    *sequence of highlighted substrings*, not positions - positions shift
+    when whitespace elsewhere changes length, but a genuinely untouched
+    span's own text does not.
     """
     if len(old_targets) != len(new_targets):  # pragma: no cover - defensive
         return False
-    for old_target, new_target in zip(old_targets, new_targets):
+    for old_target, new_target in zip(old_targets, new_targets, strict=True):
         old_spans = [
             old_target[highlight.start : highlight.end]
             for highlight in highlight_string(old_target, unit)
@@ -825,11 +828,11 @@ def _mechanical_edit_holds(
     new_targets: list[str],
 ) -> bool:
     """
-    Veto for a mechanical-group candidate (Task B): every named check must
-    stop failing, and every protected span must survive unchanged.
+    Veto for a mechanical-group candidate: every named check must stop failing.
 
-    Unlike `_decision_7_holds`, mechanical checks are independent of each
-    other - there is no shared "strictly shrinks" terminal-set invariant to
+    Task B. Every protected span must also survive unchanged. Unlike
+    `_decision_7_holds`, mechanical checks are independent of each other
+    - there is no shared "strictly shrinks" terminal-set invariant to
     honour, only "does not still fail" for each of `check_ids`.
     """
     after = _failing_checks(check_ids, unit, sources, new_targets)
@@ -897,8 +900,8 @@ def _edge_space_fixup(unit: Unit, *, source_edge: bool) -> list[FixupType] | Non
     source_leading, source_trailing = _edge_space_counts(source)
     target_leading, target_trailing = _edge_space_counts(target)
     if source_edge:
-        begin_eligible = source_leading != 0 and target_leading != source_leading
-        end_eligible = source_trailing != 0 and target_trailing != source_trailing
+        begin_eligible = source_leading not in {0, target_leading}
+        end_eligible = source_trailing not in {0, target_trailing}
     else:
         begin_eligible = source_leading == 0 and target_leading != 0
         end_eligible = source_trailing == 0 and target_trailing != 0
@@ -920,13 +923,13 @@ def _edge_space_source_new_targets(unit: Unit) -> list[str] | None:
 
 def _autofix_new_targets(fix_id: str, unit: Unit) -> list[str] | None:
     """
-    Run the active autofix `fix_id`'s own `fix_target()` and finish through
-    the shared preparation pipeline (Task B).
+    Run autofix `fix_id`'s `fix_target()` and finish through the shared pipeline.
 
-    `AUTOFIXES.get()` never imports `weblate_customization` directly - an
-    optional provider that is not configured simply makes its group
-    unavailable everywhere, never a core import error ("Конкретные
-    providers доступны только через активный AUTOFIXES", plan).
+    Task B. `AUTOFIXES.get()` never imports `weblate_customization`
+    directly - an optional provider that is not configured simply makes
+    its group unavailable everywhere, never a core import error
+    ("Конкретные providers доступны только через активный AUTOFIXES",
+    plan).
     """
     autofix = AUTOFIXES.get(fix_id)
     if autofix is None:
@@ -952,13 +955,15 @@ def _zero_width_space_new_targets(unit: Unit) -> list[str] | None:
 
 def _punctuation_spacing_new_targets(unit: Unit) -> list[str] | None:
     """
-    The core `PunctuationSpacing` autofix (fix existing wrong spacing)
-    then, only when the fork's own `AddFrenchPunctuationSpacing` autofix is
-    active, its missing-spacing insertion on top of that result - "combine
-    French wrong/missing spacing into one group only when both allowlisted
-    providers are present; core-only fixing of already-wrong spacing may
-    have its own honestly named group without promising to insert missing
-    ones" (plan).
+    Fix existing wrong spacing, then add missing spacing when active.
+
+    The core `PunctuationSpacing` autofix fixes existing wrong spacing;
+    only when the fork's own `AddFrenchPunctuationSpacing` autofix is
+    active does its missing-spacing insertion also run on top of that
+    result - "combine French wrong/missing spacing into one group only
+    when both allowlisted providers are present; core-only fixing of
+    already-wrong spacing may have its own honestly named group without
+    promising to insert missing ones" (plan).
 
     Deliberately the two `AutoFix`es, not `PunctuationSpacingCheck.
     get_fixup()`: unlike them, that check's own fixup already both fixes
@@ -996,9 +1001,11 @@ class MechanicalGroup:
 
 def _mechanical_groups() -> dict[str, MechanicalGroup]:
     """
-    Built per call, not at import time, so `AUTOFIXES`/`CHECKS` availability
-    (`WEBLATE_ADD_CHECK`/`WEBLATE_ADD_AUTOFIX`, test `override_settings`) is
-    always read fresh rather than cached from process start.
+    Build the mechanical-group registry fresh on every call.
+
+    Not at import time, so `AUTOFIXES`/`CHECKS` availability
+    (`WEBLATE_ADD_CHECK`/`WEBLATE_ADD_AUTOFIX`, test `override_settings`)
+    is always read fresh rather than cached from process start.
     """
     return {
         "double-space": MechanicalGroup(("double_space",), _double_space_new_targets),
@@ -1044,8 +1051,9 @@ MECHANICAL_GROUP_IDS: tuple[str, ...] = (
 
 def mechanical_group_available(group_id: str) -> bool:
     """
-    Whether `group_id` has every required check/autofix configured right
-    now - a cheap, query-free signal for the entry point (Task D), not a
+    Whether `group_id` has every required check/autofix configured right now.
+
+    A cheap, query-free signal for the entry point (Task D), not a
     guarantee any row is actually eligible.
     """
     group = _mechanical_groups()[group_id]
@@ -1290,9 +1298,7 @@ def load_fix_check_cohort(
 _MECHANICAL_GROUP_LABELS: dict[str, tuple[StrOrPromise, StrOrPromise]] = {
     "double-space": (
         gettext_lazy("Collapse double spaces"),
-        gettext_lazy(
-            "Consecutive spaces are collapsed into one, matching the source."
-        ),
+        gettext_lazy("Consecutive spaces are collapsed into one, matching the source."),
     ),
     "edge-space-remove": (
         gettext_lazy("Remove extra edge whitespace"),
@@ -1371,14 +1377,14 @@ class FixPolicy:
 
 def resolve_fix_policy(name: str) -> FixPolicy | None:
     """
-    Resolve a `fix_check` URL path segment to a `FixPolicy`, or `None` when
-    `name` names neither a mass-fix-tiered check nor a Task A/B policy.
+    Resolve a `fix_check` URL path segment to a `FixPolicy`, or `None`.
 
-    A mechanical group whose required check/autofix is not configured
-    resolves to `None` too - "the entry point is available by supported
-    operation ... not merely by `get_fixup` presence" cuts both ways: an
-    unsupported operation is not offered at all, rather than offered and
-    then failing (plan, Task D).
+    `None` when `name` names neither a mass-fix-tiered check nor a Task
+    A/B policy. A mechanical group whose required check/autofix is not
+    configured resolves to `None` too - "the entry point is available by
+    supported operation ... not merely by `get_fixup` presence" cuts both
+    ways: an unsupported operation is not offered at all, rather than
+    offered and then failing (plan, Task D).
     """
     if name == TERMINAL_SOURCE_POLICY_ID:
         return FixPolicy(

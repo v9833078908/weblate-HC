@@ -336,7 +336,7 @@ instead of opening each string by hand. Only checks with a deterministic,
 meaning-preserving fixup participate; other failing checks have no
 :guilabel:`Fix` button anywhere.
 
-Participating checks fall into two tiers:
+Participating checks fall into three tiers:
 
 * the **safe** tier applies after a single count confirmation - for
   example ``Будет исправлено 12 строк`` - with no per-string preview;
@@ -349,15 +349,67 @@ Participating checks fall into two tiers:
   Only the strings the displayed batch actually offered can be submitted:
   the confirmation refuses a selection that does not match the reviewed
   batch, so a reviewed fix can never be applied to a string nobody saw.
+* the **explicit** tier covers the two aggregate policies below. It
+  previews a batch like the review tier, but also offers
+  :guilabel:`Apply to all matching strings`, which applies the policy to
+  every eligible string in the scope without paging through it. The
+  policy is named and confirmed on its own screen; strings the policy
+  cannot decide stay out of it and remain available for per-string
+  review.
 
-The terminal-punctuation checks are repaired in one direction only. The
-:guilabel:`Fix` button restores a mark the source has and the translation
-lost; a mark the translation added on its own is repaired by the autofix
-layer when a string is saved (and, for strings imported earlier, by
-:wladmin:`reapply_autofixes`). A string failing in that second direction
-is reported on the fix screen as having no fixup and never becomes
-selectable, so a scope can legitimately show thousands of failing strings
-and no applicable ones.
+.. _terminal-source-policy:
+
+Terminal punctuation against the source
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The terminal-punctuation checks
+(:ref:`check-end-stop`, :ref:`check-end-colon`, :ref:`check-end-question`,
+:ref:`check-end-exclamation`) are decided together, in one pass, by taking
+the mark the source ends with as the reference. Three operations follow
+from that:
+
+``append``
+   the source ends with a mark and the translation has none;
+``replace``
+   the translation ends with a different mark than the source;
+``remove``
+   the translation ends with a mark the source does not have.
+
+This is an editorial policy, not a claim about the translation's
+intonation: it makes the terminal mark match the source and says nothing
+about whether the sentence should carry that mark. ``append`` is the
+conservative operation - nothing is overwritten. ``replace`` and
+``remove`` overwrite a mark somebody typed, so a scope whose translations
+are known to be misaligned with their sources should be repaired before
+the policy is applied there.
+
+A string is left to per-string review, rather than decided, when the
+source's own ending is ambiguous, when the target language does not
+use the mark's family, or when the edit would change a placeholder or
+markup span. The per-check :guilabel:`Fix` button keeps its narrower
+behaviour: it only restores a mark the source has and the translation
+lost, and reports the opposite direction as having no fixup.
+
+.. _mechanical-repair-groups:
+
+Mechanical repair groups
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Defects with no editorial content - a doubled space, whitespace hugging a
+line separator, a stray zero-width space, an ellipsis written as three
+dots, whitespace on a string's edge - are grouped by the repair they
+need rather than by the check that reports them, so one confirmation
+covers the whole group. Two groups share the
+:ref:`check-begin-space`/:ref:`check-end-space` pool and are deliberately
+kept apart: one only removes an edge the source does not have, the other
+aligns the edge with the source's own count.
+
+A mechanical group is offered only when both the check that reports the
+defect and the autofix that repairs it are configured on the instance; a
+group whose autofix is missing is absent from the interface rather than
+shown and then failing. Every mechanical edit is verified not to alter
+any placeholder or markup span, independently of the check that proposed
+it.
 
 Fixing a source string that only needs cosmetic repair - for example
 normalizing ``...`` to ``…`` - never marks its existing translations

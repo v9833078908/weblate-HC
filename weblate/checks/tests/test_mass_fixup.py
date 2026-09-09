@@ -700,7 +700,8 @@ class TerminalSourcePolicyTest(SimpleTestCase):
     # -- Worked examples from the plan ----------------------------------
 
     def test_replace_zh_hans_stop_to_fullwidth_exclamation(self) -> None:
-        # "source ends '!'; zh target '...供工人阅读。' -> '...供工人阅读！'"
+        # source ends "!"; zh target's ideographic full stop becomes a
+        # fullwidth exclamation mark
         unit = make_unit(
             code="zh_Hans",
             source="Buy some books to read!",
@@ -760,7 +761,9 @@ class TerminalSourcePolicyTest(SimpleTestCase):
         # Not "Save now!": "now" is exactly 3 letters and the conservative
         # abbreviation filter deliberately also excludes ordinary short
         # words (see `_terminal_edit_stem_is_protected`'s docstring).
-        unit = make_unit(code="en", source="Save immediately", target="Save immediately!")
+        unit = make_unit(
+            code="en", source="Save immediately", target="Save immediately!"
+        )
         edit = self._edit(EndExclamationCheck(), unit)
         self.assertEqual(edit.operation, "remove")
         self.assertEqual(self._apply(edit, unit.target), "Save immediately")

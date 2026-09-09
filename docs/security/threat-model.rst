@@ -1114,6 +1114,26 @@ any selection reaching outside that list, so the per-string review a
 review-tier check requires cannot be skipped by a crafted request.
 *(maintainer)*
 
+An explicit-tier policy (see :ref:`terminal-source-policy` and
+:ref:`mechanical-repair-groups`) additionally offers an apply-to-all
+submission, which deliberately carries no per-string list: it names a policy
+and a scope rather than a reviewed batch, so the signed-cohort argument above
+does not apply to it. Its bound is server-side instead. The set of affected
+strings is re-derived from the live query at apply time, never from anything
+the client sends; every candidate is re-classified under its own row lock,
+and a string the policy cannot decide is skipped rather than written. The
+policy identifier is validated against the registry of configured policies,
+so an unknown or unconfigured name resolves to no operation instead of a
+partially applied one, and a policy whose required check or autofix is absent
+on the instance is not offered at all. Scope, permission, concurrency
+reservation, and the absence of a REST surface are unchanged from the route
+described above. The widened blast radius - a single request can rewrite the
+terminal punctuation of every eligible string in a project - is an accepted,
+explicitly confirmed product decision, bounded by the same
+:guilabel:`Bulk edit strings` permission; the mark it writes is taken from
+each string's own source, and every proposed edit is verified to leave
+placeholder and markup spans unchanged. *(maintainer)*
+
 Triage dispositions
 -------------------
 

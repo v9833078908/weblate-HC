@@ -570,8 +570,7 @@ _URL_LIKE_TAIL_RE = re.compile(
 
 def _source_tail_is_protected(source: str) -> bool:
     """
-    Whether source's raw ending hides a mark the new policy refuses to look
-    through.
+    Whether source's raw ending hides a mark the new policy refuses to look through.
 
     Unlike `RemoveAddedFinalStop`, which unwraps a source closing quote or
     tag to still find the mark behind it (see its own docstring), the new
@@ -586,8 +585,9 @@ def _source_tail_is_protected(source: str) -> bool:
 
 def _plain_source_mark(source: str, unit: Unit) -> str | None:
     """
-    The terminal family (``.``/``:``/``?``/``!``) source unambiguously ends
-    with, for `terminal_source_edit()` only - never for `get_fixup()`, whose
+    Return the terminal mark family the source unambiguously ends with.
+
+    For `terminal_source_edit()` only - never for `get_fixup()`, whose
     broader per-check predicates (`_stop_source_has_mark` and friends) stay
     exactly as they are.
 
@@ -670,9 +670,10 @@ class TerminalEdit:
 
 def terminal_source_edit(check_obj: TargetCheck, unit: Unit) -> TerminalEdit | None:
     """
-    Compute the explicit terminal-source policy edit that would clear
-    `check_obj`, or `None` if this check offers none under the new policy -
-    the caller then leaves the row for manual review, exactly like an
+    Compute the explicit terminal-source policy edit that would clear `check_obj`.
+
+    Returns `None` if this check offers none under the new policy - the
+    caller then leaves the row for manual review, exactly like an
     unresolved `get_fixup()` result does today. See the module comment
     above `TERMINAL_REPLACEABLE_CHARS` for why this is not `get_fixup()`
     itself.

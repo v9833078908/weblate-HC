@@ -14,6 +14,7 @@ from django.views.generic import ListView
 
 from weblate.checks.models import CHECKS, Check
 from weblate.lang.models import Language
+from weblate.trans.fix_check import fix_check_policy_id_for_check, resolve_fix_policy
 from weblate.trans.models import Component, Project, Translation, Unit
 from weblate.utils.random import get_random_identifier
 from weblate.utils.state import STATE_TRANSLATED
@@ -247,13 +248,23 @@ class CheckList(PathViewMixin, ListView):
         context = super().get_context_data(**kwargs)
         context["check"] = self.check_obj
         context["path_object"] = self.path_object
+        context["fix_check_policy_id"] = (
+            fix_check_policy_id_for_check(self.check_obj.check_id)
+            if self.check_obj is not None
+            else None
+        )
         # Task 5 entry point 3 (docs/product/plans/2026-08-25-mass-fix-
-        # failing-checks.md): a short Fix link in each row's header cell,
-        # only for a tiered check scoped to exactly Component or Project -
-        # the only scopes with an approved contextual blast radius.
+        # failing-checks.md), gate widened for Task D (docs/product/plans/
+        # 2026-09-09-producer-bulk-punctuation-repair.md): a short Fix
+        # link in each row's header cell, only when a `FixPolicy` (a
+        # tiered check unchanged, or one of Task A/B's new policies) is
+        # actually available for it - "available by supported operation,
+        # not merely by `get_fixup` presence" - scoped to exactly
+        # Component or Project, the only scopes with an approved
+        # contextual blast radius.
         context["show_fix_check_links"] = (
-            self.check_obj is not None
-            and self.check_obj.mass_fixup is not None
+            context["fix_check_policy_id"] is not None
+            and resolve_fix_policy(context["fix_check_policy_id"]) is not None
             and isinstance(self.path_object, (Component, Project))
         )
         if self.check_obj is None:

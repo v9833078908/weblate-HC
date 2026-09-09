@@ -44,7 +44,16 @@ class TranslationChecklistItem(NamedTuple):
     `check_id`/`mass_fixup` are set only by the per-`CHECKS` loop in
     `list_translation_checks`; every aggregate bucket (`all`, `translated`,
     labels, ...) leaves them `None` (docs/product/plans/
-    2026-08-25-mass-fix-failing-checks.md, Task 5 step 1).
+    2026-08-25-mass-fix-failing-checks.md, Task 5 step 1). `fix_url_name`
+    is the `fix-check` URL name a "Fix" link should use - the policy Task
+    A/B's `CHECK_TO_POLICY_ID` maps this check to, if any, else `check_id`
+    itself - resolved down to `None` when no `FixPolicy` is actually
+    available (docs/product/plans/2026-09-09-producer-bulk-punctuation-
+    repair.md, Task D: "available by supported operation, not merely by
+    `get_fixup` presence"). `begin_space`/`end_space` carry no `mass_fixup`
+    of their own - they are only ever fixable through the mapped
+    `edge-space-remove` mechanical group - so `mass_fixup` alone is not a
+    reliable gate for whether a "Fix" link belongs here; `fix_url_name` is.
     """
 
     query: str
@@ -55,6 +64,7 @@ class TranslationChecklistItem(NamedTuple):
     characters: int
     check_id: str | None = None
     mass_fixup: Literal["safe", "review"] | None = None
+    fix_url_name: str | None = None
 
 
 class TranslationChecklistMixin:
@@ -80,6 +90,15 @@ class TranslationChecklistMixin:
     @cached_property
     def list_translation_checks(self: TranslationProtocol) -> TranslationChecklist:
         """Return list of failing checks on current translation."""
+        # Deferred: `weblate.trans.fix_check` imports `weblate.trans.models`,
+        # which (via `weblate.utils.stats`) imports this module - a
+        # module-level import here would be circular.
+        # ruff: ignore[import-outside-top-level]
+        from weblate.trans.fix_check import (
+            fix_check_policy_id_for_check,
+            resolve_fix_policy,
+        )
+
         result = TranslationChecklist()
 
         # All strings
@@ -129,12 +148,17 @@ class TranslationChecklistMixin:
         # Process specific checks
         for check in CHECKS:
             check_obj = CHECKS[check]
+            mapped_id = fix_check_policy_id_for_check(check_obj.check_id)
+            fix_url_name = (
+                mapped_id if resolve_fix_policy(mapped_id) is not None else None
+            )
             result.add_if(
                 self.stats,
                 check_obj.url_id,
                 "",
                 check_id=check_obj.check_id,
                 mass_fixup=check_obj.mass_fixup,
+                fix_url_name=fix_url_name,
             )
 
         # Grab comments
@@ -167,10 +191,18 @@ class TranslationChecklist(UserList):
         *,
         check_id: str | None = None,
         mass_fixup: Literal["safe", "review"] | None = None,
+        fix_url_name: str | None = None,
     ) -> bool:
         """Add to list if there are matches."""
         if getattr(stats, name) > 0:
-            self.add(stats, name, level, check_id=check_id, mass_fixup=mass_fixup)
+            self.add(
+                stats,
+                name,
+                level,
+                check_id=check_id,
+                mass_fixup=mass_fixup,
+                fix_url_name=fix_url_name,
+            )
             return True
         return False
 
@@ -182,6 +214,7 @@ class TranslationChecklist(UserList):
         *,
         check_id: str | None = None,
         mass_fixup: Literal["safe", "review"] | None = None,
+        fix_url_name: str | None = None,
     ) -> None:
         """Add item to the list."""
         self.append(
@@ -194,6 +227,7 @@ class TranslationChecklist(UserList):
                 characters=getattr(stats, f"{name}_chars"),
                 check_id=check_id,
                 mass_fixup=mass_fixup,
+                fix_url_name=fix_url_name,
             )
         )
 

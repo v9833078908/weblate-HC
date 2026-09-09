@@ -976,9 +976,10 @@ class CosmeticSourceChangeAnonymousAuthorTest(ViewTestCase):
 
 class TerminalPolicyEngineTest(ViewTestCase):
     """
-    Engine-level behaviour for the aggregate terminal-source policy
-    (docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md,
-    Task A): dedup across checks, permissions, batching, history. The pure
+    Engine-level behaviour for the aggregate terminal-source policy (Task A).
+
+    docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md:
+    dedup across checks, permissions, batching, history. The pure
     per-unit append/replace/remove computation itself is covered by
     `weblate.checks.tests.test_mass_fixup.TerminalSourcePolicyTest`; this
     class only exercises the DB-backed engine wrapped around it.
@@ -1135,8 +1136,9 @@ class TerminalPolicyEngineTest(ViewTestCase):
 
 class MechanicalGroupEngineTest(ViewTestCase):
     """
-    Engine-level behaviour for Task B's mechanical groups
-    (docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md):
+    Engine-level behaviour for Task B's mechanical groups.
+
+    docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md:
     eligibility split, dedup, permissions, protected spans.
     """
 
@@ -1167,8 +1169,7 @@ class MechanicalGroupEngineTest(ViewTestCase):
     @staticmethod
     def _without_autofix(*excluded_substrings: str):
         """
-        `override_settings` with any core autofix whose dotted path
-        contains one of `excluded_substrings` removed.
+        `override_settings` with core autofixes matching `excluded_substrings` removed.
 
         `begin_space`/`end_space`/`zero-width-space`/`end_ellipsis` are all
         owned by a core autofix that runs on *every* `Unit.translate()`
@@ -1202,9 +1203,7 @@ class MechanicalGroupEngineTest(ViewTestCase):
             ).exists()
         )
         self.assertTrue(
-            Check.objects.filter(
-                unit=unit, name="end_space", dismissed=False
-            ).exists()
+            Check.objects.filter(unit=unit, name="end_space", dismissed=False).exists()
         )
         result = collect_mechanical_group_candidates(
             "edge-space-remove", self.user, self._scope(), self.project
@@ -1346,9 +1345,10 @@ class MechanicalGroupEngineTest(ViewTestCase):
 
 class ProtectedSpanGuardTest(SimpleTestCase):
     """
-    `_protected_spans_preserved` (Task B): a mechanical edit must never
-    change a highlighted span's own text, even though `DoubleSpaceCheck`
-    and friends do not skip protected spans themselves.
+    `_protected_spans_preserved` (Task B): protected span text must never change.
+
+    Even though `DoubleSpaceCheck` and friends do not skip protected
+    spans themselves.
     """
 
     def test_edit_outside_highlighted_span_is_preserved(self) -> None:
@@ -1361,9 +1361,7 @@ class ProtectedSpanGuardTest(SimpleTestCase):
         with patch(
             "weblate.trans.fix_check.highlight_string", side_effect=fake_highlight
         ):
-            self.assertTrue(
-                _protected_spans_preserved(unit, ["a  %d  b"], ["a %d b"])
-            )
+            self.assertTrue(_protected_spans_preserved(unit, ["a  %d  b"], ["a %d b"]))
 
     def test_edit_inside_highlighted_span_is_rejected(self) -> None:
         unit = make_unit(code="ru", source="a b", target="<tag  attr>text")
@@ -1383,17 +1381,17 @@ class ProtectedSpanGuardTest(SimpleTestCase):
 
     def test_identical_targets_are_trivially_preserved(self) -> None:
         unit = make_unit(code="ru", source="a b", target="a b")
-        with patch(
-            "weblate.trans.fix_check.highlight_string", return_value=[]
-        ):
+        with patch("weblate.trans.fix_check.highlight_string", return_value=[]):
             self.assertTrue(_protected_spans_preserved(unit, ["a b"], ["a b"]))
 
 
 class PunctuationSpacingMechanicalTest(SimpleTestCase):
     """
-    `_punctuation_spacing_new_targets` (Task B): core-only wrong-spacing
-    fix versus the combined wrong+missing group, gated on whether the
-    fork's `AddFrenchPunctuationSpacing` autofix is active.
+    `_punctuation_spacing_new_targets` (Task B): core-only vs. combined group.
+
+    Core-only wrong-spacing fix versus the combined wrong+missing group,
+    gated on whether the fork's `AddFrenchPunctuationSpacing` autofix is
+    active.
     """
 
     def test_core_only_fixes_wrong_spacing_but_never_adds_missing(self) -> None:
@@ -1423,14 +1421,17 @@ class PunctuationSpacingMechanicalTest(SimpleTestCase):
 
 class LineSeparatorSpacingMechanicalTest(SimpleTestCase):
     """
-    `_line_separator_spacing_new_targets`/`mechanical_group_available`
-    (Task B): unavailable without the fork's own check and autofix, and
-    the count/order of `$` is never touched, only hugging whitespace.
+    `_line_separator_spacing_new_targets`/`mechanical_group_available` (Task B).
+
+    Unavailable without the fork's own check and autofix, and the
+    count/order of `$` is never touched, only hugging whitespace.
     """
 
     def test_unavailable_without_customization_configured(self) -> None:
         self.assertFalse(mechanical_group_available("line-separator-spacing"))
-        unit = make_unit(code="ru", source="Line one$Line two", target="Line one $Line two")
+        unit = make_unit(
+            code="ru", source="Line one$Line two", target="Line one $Line two"
+        )
         self.assertIsNone(_line_separator_spacing_new_targets(unit))
 
     def test_strips_only_hugging_whitespace_when_configured(self) -> None:

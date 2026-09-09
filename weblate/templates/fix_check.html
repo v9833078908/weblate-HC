@@ -210,7 +210,9 @@
               <tr>
                 <th>{% translate "Fix" %}</th>
                 <th>{% translate "String" %}</th>
-                {% if candidates.by_operation %}<th>{% translate "Operation" %}</th>{% endif %}
+                {% if candidates.by_operation %}
+                  <th>{% translate "Operation" %}</th>
+                {% endif %}
                 <th>{% translate "Fixed target" %}</th>
               </tr>
             </thead>
@@ -240,9 +242,12 @@
                   </td>
                   {% if candidates.by_operation %}
                     <td>
-                      {% if row.operation == "append" %}{% translate "Add" %}
-                      {% elif row.operation == "replace" %}{% translate "Replace" %}
-                      {% elif row.operation == "remove" %}{% translate "Remove" %}
+                      {% if row.operation == "append" %}
+                        {% translate "Add" %}
+                      {% elif row.operation == "replace" %}
+                        {% translate "Replace" %}
+                      {% elif row.operation == "remove" %}
+                        {% translate "Remove" %}
                       {% endif %}
                     </td>
                   {% endif %}

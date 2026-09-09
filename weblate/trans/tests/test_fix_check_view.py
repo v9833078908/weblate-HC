@@ -340,7 +340,7 @@ class FixCheckViewTest(ViewTestCase):
             reverse(
                 "fix-check",
                 kwargs={
-                    "name": "double_space",
+                    "name": "double-space",
                     "path": self.translation.get_url_path(),
                 },
             ),
@@ -363,7 +363,7 @@ class FixCheckViewTest(ViewTestCase):
             reverse(
                 "fix-check",
                 kwargs={
-                    "name": "double_space",
+                    "name": "double-space",
                     "path": self.translation.get_url_path(),
                 },
             ),
@@ -373,7 +373,7 @@ class FixCheckViewTest(ViewTestCase):
         self._grant_full_access()
         self._fail_double_space()
         response = self.client.get(reverse("checks", kwargs={"name": "double_space"}))
-        self.assertNotContains(response, "fix-check/double_space/")
+        self.assertNotContains(response, "fix-check/double-space/")
 
     # -- rendered contract -------------------------------------------
 
@@ -520,7 +520,8 @@ class FixCheckSourceTemplateViewTest(ViewTestCase):
 
 class ExplicitPolicyViewTest(ViewTestCase):
     """
-    End-to-end `fix_check` coverage for the `explicit` tier (Task C/D):
+    End-to-end `fix_check` coverage for the `explicit` tier (Task C/D).
+
     `terminal-source` and one mechanical group, the all/page choice, and
     the edge-space cross-link.
     """

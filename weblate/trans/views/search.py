@@ -370,13 +370,13 @@ def _resolve_fix_check_selection(
 @never_cache
 def fix_check(request: AuthenticatedHttpRequest, name, path):
     """
-    Mass-fix one failing check, or one Task A/B explicit policy, over a
-    translation/component/project scope.
+    Mass-fix one failing check, or one Task A/B explicit policy, over a scope.
 
-    GET renders the tier-appropriate confirmation screen (`safe`: a count;
-    `review`: a preview with checkboxes; `explicit`: a preview with
-    checkboxes plus an "apply to all N" choice). POST re-validates the
-    selection against the live query and queues `fix_failing_checks`
+    A translation/component/project scope. GET renders the
+    tier-appropriate confirmation screen (`safe`: a count; `review`: a
+    preview with checkboxes; `explicit`: a preview with checkboxes plus
+    an "apply to all N" choice). POST re-validates the selection against
+    the live query and queues `fix_failing_checks`
     (docs/product/plans/2026-08-25-mass-fix-failing-checks.md, Task 5;
     docs/product/plans/2026-09-09-producer-bulk-punctuation-repair.md,
     Task C).
