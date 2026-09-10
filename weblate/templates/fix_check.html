@@ -44,6 +44,13 @@
         {% translate "Looking for edge whitespace the source does not have? Remove extra edge whitespace instead." %}
       </a>
     </p>
+  {% elif check.family == "terminal-source" and check.id != check.family %}
+    <p>
+      {% translate "Only strings failing this check are included." %}
+      <a href="{% url 'fix-check' name=check.family path=path_object.get_url_path %}">
+        {% translate "Normalize every terminal mark at once instead." %}
+      </a>
+    </p>
   {% endif %}
 
   {% if candidates.verdicts_no_longer_current %}
@@ -91,7 +98,7 @@
 
   {% if candidates.manual_no_fixup %}
     <p class="text-muted">
-      {% if check.id == "terminal-source" %}
+      {% if check.family == "terminal-source" %}
         {% blocktranslate trimmed count count=candidates.manual_no_fixup %}
           {{ count }} failing string is held back by this policy's own
           guards and never becomes selectable here: a final word short

@@ -406,7 +406,7 @@ def fix_check(request: AuthenticatedHttpRequest, name, path):
         scope_type = "component"
     else:
         scope_type = "project"
-    lock_key = fix_check_lock_key(policy.id, scope_type, obj.pk)
+    lock_key = fix_check_lock_key(policy.family, scope_type, obj.pk)
 
     if request.method == "POST":
         form = FixCheckConfirmForm(request.POST)

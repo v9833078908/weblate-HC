@@ -618,6 +618,18 @@ TERMINAL_SOURCE_POLICY_CHECK_IDS: tuple[str, ...] = (
     "end_question",
     "end_exclamation",
 )
+# One narrowed entry point per policy check. The "Fix" beside a check's
+# own failing-string count opens the same append/replace/remove engine
+# over exactly the rows that check reports (`check:=<id>`, the query the
+# count itself is built from), so the screen's total is the number that
+# was clicked - never the union's. Which edit a row gets is still decided
+# per unit by `_terminal_policy_edit`; only the pool is narrowed.
+# `terminal-source` itself stays the union and is cross-linked from every
+# narrowed screen.
+TERMINAL_SOURCE_CHECK_POLICY_IDS: dict[str, str] = {
+    f"terminal-source-{check_id.replace('_', '-')}": check_id
+    for check_id in TERMINAL_SOURCE_POLICY_CHECK_IDS
+}
 
 
 def _terminal_policy_edit(unit: Unit) -> tuple[str, TerminalEdit] | None:
@@ -683,10 +695,10 @@ def _union_matching_units(
 
 
 def _terminal_policy_matching_units(
-    unit_set: UnitQuerySet, project: Project | None
+    unit_set: UnitQuerySet, project: Project | None, check_ids: Iterable[str]
 ) -> UnitQuerySet:
-    """Union of active, non-dismissed rows for any policy check (Task A)."""
-    return _union_matching_units(unit_set, project, TERMINAL_SOURCE_POLICY_CHECK_IDS)
+    """Union of active, non-dismissed rows for any of `check_ids` (Task A)."""
+    return _union_matching_units(unit_set, project, check_ids)
 
 
 @dataclass
@@ -713,16 +725,18 @@ def collect_terminal_policy_candidates(
     unit_set: UnitQuerySet,
     project: Project | None,
     *,
+    check_ids: Iterable[str] = TERMINAL_SOURCE_POLICY_CHECK_IDS,
     preview_limit: int = 250,
 ) -> TerminalPolicyCandidates:
     """
     Bucket every currently active terminal-policy row (Task A).
 
-    Spans all four policy checks in one pass - see the module comment
-    above `TERMINAL_SOURCE_POLICY_ID`.
+    `check_ids` picks the pool - all four policy checks for
+    `terminal-source`, one for a narrowed `TERMINAL_SOURCE_CHECK_POLICY_IDS`
+    entry point; see the module comment above `TERMINAL_SOURCE_POLICY_ID`.
     """
     matching = (
-        _terminal_policy_matching_units(unit_set, project)
+        _terminal_policy_matching_units(unit_set, project, check_ids)
         .prefetch_related(_newest_verdict_prefetch())
         .order_by("translation__component_id", "translation_id", "position", "id")
     )
@@ -758,11 +772,12 @@ def perform_terminal_policy_fix(
     project: Project | None,
     unit_ids: Iterable[int] | None = None,
     *,
+    check_ids: Iterable[str] = TERMINAL_SOURCE_POLICY_CHECK_IDS,
     progress_callback: Callable[[int, int], bool] | None = None,
     progress_every: int = 20,
 ) -> FixResult:
     """Terminal-source policy equivalent of `perform_fix` (Task A)."""
-    matching = _terminal_policy_matching_units(unit_set, project)
+    matching = _terminal_policy_matching_units(unit_set, project, check_ids)
     return _perform_fix_over(
         user,
         matching,
@@ -1359,6 +1374,12 @@ class FixPolicy:
     """
 
     id: str
+    # The policy this one shares an engine, an explanation and a
+    # concurrency guard with: `terminal-source` for the union and for every
+    # narrowed `TERMINAL_SOURCE_CHECK_POLICY_IDS` entry point, else `id`
+    # itself. Two runs of one family over one scope would race for the
+    # same rows, so `fix_check` locks on the family, not on `id`.
+    family: str
     name: StrOrPromise
     description: StrOrPromise
     tier: Literal["safe", "review", "explicit"]
@@ -1375,6 +1396,34 @@ class FixPolicy:
         return " OR ".join(f"check:{check_id}" for check_id in self.check_ids)
 
 
+def _terminal_source_policy(name: str) -> FixPolicy:
+    """
+    Build the terminal-source policy over its full pool or narrowed to one check.
+
+    A narrowed policy is titled by the check whose count led here, so the
+    screen reads as a continuation of the row that was clicked.
+    """
+    if name == TERMINAL_SOURCE_POLICY_ID:
+        check_ids = TERMINAL_SOURCE_POLICY_CHECK_IDS
+        policy_name: StrOrPromise = gettext_lazy("Normalize terminal marks to source")
+    else:
+        check_ids = (TERMINAL_SOURCE_CHECK_POLICY_IDS[name],)
+        policy_name = CHECKS[check_ids[0]].name
+    return FixPolicy(
+        id=name,
+        family=TERMINAL_SOURCE_POLICY_ID,
+        name=policy_name,
+        description=gettext_lazy(
+            "Marks will be brought in line with the source. Meaning and "
+            "translation quality are not checked."
+        ),
+        tier="explicit",
+        check_ids=check_ids,
+        collect=partial(collect_terminal_policy_candidates, check_ids=check_ids),
+        perform=partial(perform_terminal_policy_fix, check_ids=check_ids),
+    )
+
+
 def resolve_fix_policy(name: str) -> FixPolicy | None:
     """
     Resolve a `fix_check` URL path segment to a `FixPolicy`, or `None`.
@@ -1386,19 +1435,8 @@ def resolve_fix_policy(name: str) -> FixPolicy | None:
     ways: an unsupported operation is not offered at all, rather than
     offered and then failing (plan, Task D).
     """
-    if name == TERMINAL_SOURCE_POLICY_ID:
-        return FixPolicy(
-            id=name,
-            name=gettext_lazy("Normalize terminal marks to source"),
-            description=gettext_lazy(
-                "Marks will be brought in line with the source. Meaning and "
-                "translation quality are not checked."
-            ),
-            tier="explicit",
-            check_ids=TERMINAL_SOURCE_POLICY_CHECK_IDS,
-            collect=collect_terminal_policy_candidates,
-            perform=perform_terminal_policy_fix,
-        )
+    if name == TERMINAL_SOURCE_POLICY_ID or name in TERMINAL_SOURCE_CHECK_POLICY_IDS:
+        return _terminal_source_policy(name)
     if name in MECHANICAL_GROUP_IDS:
         if not mechanical_group_available(name):
             return None
@@ -1406,6 +1444,7 @@ def resolve_fix_policy(name: str) -> FixPolicy | None:
         group = _mechanical_groups()[name]
         return FixPolicy(
             id=name,
+            family=name,
             name=group_name,
             description=group_description,
             tier="explicit",
@@ -1417,6 +1456,7 @@ def resolve_fix_policy(name: str) -> FixPolicy | None:
     if check_obj is not None and check_obj.mass_fixup is not None:
         return FixPolicy(
             id=name,
+            family=name,
             name=check_obj.name,
             description=check_obj.description,
             tier=check_obj.mass_fixup,
@@ -1428,9 +1468,10 @@ def resolve_fix_policy(name: str) -> FixPolicy | None:
 
 
 # check_id -> the `FixPolicy` id a "Fix" link for that failing check should
-# point to (Task D). Every terminal check funnels into the one combined
-# `terminal-source` policy - `_terminal_policy_edit`'s own per-unit routing
-# decides append/replace/remove, never this mapping.
+# point to (Task D). Every terminal check leads to the terminal-source
+# engine narrowed to that check's own rows, so the confirmation total is
+# the count the link stood beside; `_terminal_policy_edit`'s per-unit
+# routing decides append/replace/remove, never this mapping.
 # `begin_space`/`end_space` are genuinely ambiguous per unit - which of the
 # two split edge policies applies depends on that specific unit's own
 # source - so they default to the removal policy, the more common shape
@@ -1439,10 +1480,10 @@ def resolve_fix_policy(name: str) -> FixPolicy | None:
 # `ellipsis`, `end_interrobang`, ...) is deliberately absent: it still
 # resolves through its own single-check tier, unchanged.
 CHECK_TO_POLICY_ID: dict[str, str] = {
-    "end_stop": TERMINAL_SOURCE_POLICY_ID,
-    "end_colon": TERMINAL_SOURCE_POLICY_ID,
-    "end_question": TERMINAL_SOURCE_POLICY_ID,
-    "end_exclamation": TERMINAL_SOURCE_POLICY_ID,
+    **{
+        check_id: policy_id
+        for policy_id, check_id in TERMINAL_SOURCE_CHECK_POLICY_IDS.items()
+    },
     "double_space": "double-space",
     "begin_space": "edge-space-remove",
     "end_space": "edge-space-remove",

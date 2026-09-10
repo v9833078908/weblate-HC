@@ -394,9 +394,12 @@ leave behind when that looks like an abbreviation - a final word of one
 to three letters, accented forms counted - a decimal, a version, a URL
 or a path. Those strings are reported on the confirmation screen as held
 back by the policy's guards, so a scope with nothing to apply says why.
-The per-check :guilabel:`Fix` button keeps its narrower
-behaviour: it only restores a mark the source has and the translation
-lost, and reports the opposite direction as having no fixup.
+The :guilabel:`Fix` button beside one of these checks opens this policy
+narrowed to the strings that check reports, so the confirmation screen
+counts exactly the strings the button stood beside - a string failing
+both :ref:`check-end-stop` and :ref:`check-end-exclamation` appears
+under either. That screen links to the whole-family screen, where the
+four pools are decided together and a string is counted once.
 
 .. _mechanical-repair-groups:
 

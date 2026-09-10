@@ -31452,6 +31452,14 @@ msgid ""
 "whitespace instead."
 msgstr "Ищете пробел по краю, которого нет в источнике? Вместо этого используйте «Убрать лишние пробелы по краю»."
 
+#: weblate/templates/fix_check.html:49
+msgid "Only strings failing this check are included."
+msgstr "Включены только строки, не прошедшие эту проверку."
+
+#: weblate/templates/fix_check.html:51
+msgid "Normalize every terminal mark at once instead."
+msgstr "Привести все конечные знаки к источнику разом."
+
 #: weblate/templates/fix_check.html:64
 #, python-format
 msgid "%(count)s string gets a missing mark added."

@@ -22,8 +22,11 @@ from weblate.checks.models import CHECKS
 from weblate.trans.fix_check import (
     FixCandidates,
     FixPreviewRow,
+    acquire_fix_check_lock,
     dump_fix_check_cohort,
+    fix_check_lock_key,
     load_fix_check_cohort,
+    release_fix_check_lock,
 )
 from weblate.trans.models.judge import JudgeVerdict, compute_target_hash
 from weblate.trans.tests.test_views import ViewTestCase
@@ -698,6 +701,96 @@ class ExplicitPolicyViewTest(ViewTestCase):
         unit.refresh_from_db()
         # Neither selection was recognised, so nothing was queued/applied.
         self.assertEqual(unit.target, "Diky!")
+
+    # -- narrowed per-check entry points --------------------------------
+
+    def _fail_stop_and_exclamation(self):
+        """`stop` fails end_stop and end_exclamation; `bang` only end_exclamation."""
+        stop = self.get_unit(source="Thank you for using Weblate.")
+        stop.translate(self.user, "Diky!", STATE_TRANSLATED)
+        stop.refresh_from_db()
+        bang = self.get_unit(source="Hello, world!\n")
+        bang.source = "Hello world!"
+        bang.save(update_fields=["source"])
+        bang.translate(self.user, "Ahoj svete", STATE_TRANSLATED)
+        bang.refresh_from_db()
+        return stop, bang
+
+    def test_narrowed_policy_total_equals_the_clicked_check_count(self) -> None:
+        """
+        The "Fix" beside a check's count opens exactly that check's rows.
+
+        The union stays reachable under `terminal-source`, but a producer
+        who clicked "48 strings" must not land on a screen counting 85.
+        """
+        self._grant_full_access()
+        stop, bang = self._fail_stop_and_exclamation()
+        counts = {
+            item.check_id: item.total
+            for item in self.translation.list_translation_checks
+            if item.check_id is not None
+        }
+        for policy_id, check_id, expected in (
+            ("terminal-source-end-stop", "end_stop", [stop.pk]),
+            ("terminal-source-end-exclamation", "end_exclamation", [stop.pk, bang.pk]),
+        ):
+            with self.subTest(policy=policy_id):
+                response = self.client.get(self._url(policy_id))
+                self.assertEqual(response.status_code, 200)
+                candidates = response.context["candidates"]
+                self.assertEqual(
+                    sorted(row.unit.pk for row in candidates.shown), sorted(expected)
+                )
+                self.assertEqual(
+                    candidates.total_eligible + candidates.manual + candidates.denied,
+                    counts[check_id],
+                )
+                self.assertContains(response, self._url("terminal-source"))
+                self.assertContains(response, "Only strings failing this check")
+        union = self.client.get(self._url("terminal-source")).context["candidates"]
+        self.assertEqual(union.total_eligible, 2)
+
+    def test_narrowed_policy_apply_all_leaves_other_checks_rows_alone(self) -> None:
+        self._grant_full_access()
+        stop, bang = self._fail_stop_and_exclamation()
+        response = self.client.post(
+            self._url("terminal-source-end-stop"), {"selection": "all"}
+        )
+        self.assertRedirects(response, self.translation.get_absolute_url())
+        stop.refresh_from_db()
+        bang.refresh_from_db()
+        self.assertEqual(stop.target, "Diky.")
+        self.assertEqual(bang.target, "Ahoj svete")
+
+    def test_check_count_fix_link_points_to_the_narrowed_policy(self) -> None:
+        self._grant_full_access()
+        self._fail_stop_and_exclamation()
+        items = {
+            item.check_id: item
+            for item in self.translation.list_translation_checks
+            if item.check_id is not None
+        }
+        self.assertEqual(items["end_stop"].fix_url_name, "terminal-source-end-stop")
+        self.assertEqual(
+            items["end_exclamation"].fix_url_name, "terminal-source-end-exclamation"
+        )
+        response = self.client.get(self.translation.get_absolute_url())
+        self.assertContains(response, self._url("terminal-source-end-stop"))
+        self.assertNotContains(response, self._url("terminal-source") + '"')
+
+    def test_terminal_family_shares_one_concurrency_guard(self) -> None:
+        """A narrowed run and the union run race for the same rows."""
+        self._grant_full_access()
+        stop, _bang = self._fail_stop_and_exclamation()
+        key = fix_check_lock_key("terminal-source", "translation", self.translation.pk)
+        self.assertTrue(acquire_fix_check_lock(key, "another-run"))
+        self.addCleanup(release_fix_check_lock, key, "another-run")
+        response = self.client.post(
+            self._url("terminal-source-end-stop"), {"selection": "all"}, follow=True
+        )
+        self.assertContains(response, "already being fixed for this scope")
+        stop.refresh_from_db()
+        self.assertEqual(stop.target, "Diky!")
 
     def test_mechanical_group_post_selection_all_applies_full_scope(self) -> None:
         self._grant_full_access()
