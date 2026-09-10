@@ -1,0 +1,705 @@
+{
+ "plan": "2026-09-04-scene-context-for-mt",
+ "corpus": "hub1",
+ "lang": "de",
+ "arm": "P",
+ "repeat": 1,
+ "model": "Kimi K2.7",
+ "batch_size": 10,
+ "scene_cap": 60,
+ "scene_rule": "",
+ "prompt_sha_source": "weblate/machinery/llm.py:PROMPT",
+ "wall_seconds": 76.6,
+ "records": [
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 0,
+   "contexts": [
+    "hub1_teahouse_1_12",
+    "hub1_teahouse_1_19",
+    "hub1_ramen_1_41",
+    "hub1_ramen_1_38",
+    "hub1_ramen_1_13",
+    "hub1_teahouse_1_7",
+    "hub1_ramen_1_39",
+    "hub1_first_1_5",
+    "hub1_ramen_1_29",
+    "hub1_ramen_1_35"
+   ],
+   "string_ids": [
+    "s4747",
+    "s5559",
+    "s4305",
+    "s956b",
+    "s37f4",
+    "s27bf",
+    "s3f71",
+    "s7243",
+    "s4493",
+    "sf140"
+   ],
+   "prompt_chars": 15337,
+   "content_chars": 67000,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 1.81,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 2,
+     "seconds": 2.0,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 3,
+     "seconds": 2.21,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 4,
+     "seconds": 1.55,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    }
+   ],
+   "seconds": 1.55,
+   "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 1,
+   "contexts": [
+    "hub1_teahouse_1_13",
+    "hub1_teahouse_1_6",
+    "hub1_teahouse_1_8",
+    "hub1_ramen_1_16",
+    "hub1_ramen_1_9",
+    "hub1_ramen_1_40",
+    "hub1_ramen_1_14",
+    "hub1_teahouse_1_27",
+    "hub1_ramen_1_15",
+    "hub1_teahouse_1_29"
+   ],
+   "string_ids": [
+    "sd9db",
+    "s237d",
+    "sdf66",
+    "sf892",
+    "sb072",
+    "sd41e",
+    "s2c5f",
+    "sced9",
+    "se8c3",
+    "s663b"
+   ],
+   "prompt_chars": 15337,
+   "content_chars": 66944,
+   "scene_keys": [
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 1.97,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 2,
+     "seconds": 2.91,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 3,
+     "seconds": 1.63,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 4,
+     "seconds": 1.56,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    }
+   ],
+   "seconds": 1.56,
+   "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 2,
+   "contexts": [
+    "hub1_first_1_29",
+    "hub1_ramen_1_45",
+    "hub1_ramen_1_19",
+    "hub1_ramen_1_12",
+    "hub1_ramen_1_28",
+    "hub1_ramen_1_43",
+    "hub1_ramen_1_37",
+    "hub1_teahouse_1_15",
+    "hub1_teahouse_1_17",
+    "hub1_ramen_1_20"
+   ],
+   "string_ids": [
+    "s2290",
+    "s8945",
+    "s59f5",
+    "sf242",
+    "s46c3",
+    "s3f57",
+    "s3045",
+    "s4ddf",
+    "sb88e",
+    "sa512"
+   ],
+   "prompt_chars": 15337,
+   "content_chars": 66938,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 1.75,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 2,
+     "seconds": 1.93,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 3,
+     "seconds": 1.45,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 4,
+     "seconds": 2.43,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    }
+   ],
+   "seconds": 2.43,
+   "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 3,
+   "contexts": [
+    "hub1_first_1_19",
+    "hub1_first_1_15",
+    "hub1_ramen_1_22",
+    "hub1_ramen_1_10",
+    "hub1_teahouse_1_30",
+    "hub1_ramen_1_2",
+    "hub1_teahouse_1_25",
+    "hub1_ramen_1_7",
+    "hub1_ramen_1_44",
+    "hub1_first_1_3"
+   ],
+   "string_ids": [
+    "s7ff8",
+    "s6a78",
+    "s3c92",
+    "sd310",
+    "sf1ed",
+    "s423f",
+    "s8ec7",
+    "s9243",
+    "sa5c3",
+    "s26f1"
+   ],
+   "prompt_chars": 15337,
+   "content_chars": 66895,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 1.94,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 2,
+     "seconds": 1.67,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 3,
+     "seconds": 1.84,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 4,
+     "seconds": 1.6,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    }
+   ],
+   "seconds": 1.6,
+   "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 4,
+   "contexts": [
+    "hub1_ramen_1_23",
+    "hub1_ramen_1_5",
+    "hub1_first_1_1",
+    "hub1_teahouse_1_14",
+    "hub1_first_1_14",
+    "hub1_ramen_1_36",
+    "hub1_ramen_1_34",
+    "hub1_first_1_27",
+    "hub1_ramen_1_30",
+    "hub1_ramen_1_33"
+   ],
+   "string_ids": [
+    "sdf51",
+    "scc3e",
+    "s1859",
+    "s0f1f",
+    "s695f",
+    "s7d01",
+    "sb660",
+    "s5363",
+    "sf980",
+    "sb1a3"
+   ],
+   "prompt_chars": 15337,
+   "content_chars": 67169,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 1.95,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 2,
+     "seconds": 1.67,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 3,
+     "seconds": 1.85,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 4,
+     "seconds": 1.63,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    }
+   ],
+   "seconds": 1.63,
+   "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 5,
+   "contexts": [
+    "hub1_first_1_10",
+    "hub1_ramen_1_6",
+    "hub1_first_1_6",
+    "hub1_teahouse_1_5",
+    "hub1_ramen_1_3",
+    "hub1_teahouse_1_18",
+    "hub1_first_1_12",
+    "hub1_ramen_1_32",
+    "hub1_teahouse_1_16",
+    "hub1_first_1_2"
+   ],
+   "string_ids": [
+    "s16d4",
+    "s0cec",
+    "seb8e",
+    "s9730",
+    "sbbc8",
+    "s8412",
+    "s6c66",
+    "s1df7",
+    "saeb0",
+    "s1e4c"
+   ],
+   "prompt_chars": 15337,
+   "content_chars": 66968,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 1.85,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 2,
+     "seconds": 1.67,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 3,
+     "seconds": 2.55,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 4,
+     "seconds": 1.89,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    }
+   ],
+   "seconds": 1.89,
+   "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 6,
+   "contexts": [
+    "hub1_first_1_21",
+    "hub1_ramen_1_25",
+    "hub1_first_1_13",
+    "hub1_teahouse_1_34",
+    "hub1_teahouse_1_2",
+    "hub1_teahouse_1_20",
+    "hub1_ramen_1_26",
+    "hub1_teahouse_1_11",
+    "hub1_first_1_23",
+    "hub1_teahouse_1_10"
+   ],
+   "string_ids": [
+    "sb684",
+    "s71fb",
+    "saafd",
+    "s22b2",
+    "sfc5c",
+    "s81bc",
+    "s08b7",
+    "s31f9",
+    "s4100",
+    "s01a8"
+   ],
+   "prompt_chars": 15337,
+   "content_chars": 67105,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 1.91,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 2,
+     "seconds": 1.63,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 3,
+     "seconds": 2.0,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 4,
+     "seconds": 1.53,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    }
+   ],
+   "seconds": 1.53,
+   "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 7,
+   "contexts": [
+    "hub1_ramen_1_11",
+    "hub1_teahouse_1_35",
+    "hub1_first_1_20",
+    "hub1_teahouse_1_9",
+    "hub1_first_1_9",
+    "hub1_ramen_1_21",
+    "hub1_first_1_8",
+    "hub1_teahouse_1_21",
+    "hub1_ramen_1_17",
+    "hub1_first_1_16"
+   ],
+   "string_ids": [
+    "s5337",
+    "sa113",
+    "s9875",
+    "s99b7",
+    "s2cbc",
+    "sa58a",
+    "s8888",
+    "s7681",
+    "s3342",
+    "s63c5"
+   ],
+   "prompt_chars": 15337,
+   "content_chars": 67090,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 2.03,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 2,
+     "seconds": 1.63,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 3,
+     "seconds": 1.48,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 4,
+     "seconds": 1.62,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    }
+   ],
+   "seconds": 1.62,
+   "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 8,
+   "contexts": [
+    "hub1_ramen_1_18",
+    "hub1_ramen_1_46",
+    "hub1_first_1_25",
+    "hub1_ramen_1_24",
+    "hub1_teahouse_1_32",
+    "hub1_first_1_26",
+    "hub1_teahouse_1_4",
+    "hub1_first_1_4",
+    "hub1_first_1_17",
+    "hub1_teahouse_1_22"
+   ],
+   "string_ids": [
+    "s6411",
+    "s5709",
+    "s9952",
+    "s42e7",
+    "s5237",
+    "sf28a",
+    "s175a",
+    "s4ade",
+    "s15b8",
+    "s9da9"
+   ],
+   "prompt_chars": 15337,
+   "content_chars": 66957,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 2.47,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 2,
+     "seconds": 3.54,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 3,
+     "seconds": 1.77,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 4,
+     "seconds": 1.71,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    }
+   ],
+   "seconds": 1.71,
+   "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 9,
+   "contexts": [
+    "hub1_ramen_1_27",
+    "hub1_teahouse_1_23",
+    "hub1_teahouse_1_28",
+    "hub1_ramen_1_31",
+    "hub1_teahouse_1_24",
+    "hub1_teahouse_1_26",
+    "hub1_first_1_11",
+    "hub1_first_1_18",
+    "hub1_ramen_1_1",
+    "hub1_first_1_24"
+   ],
+   "string_ids": [
+    "s33a7",
+    "s0087",
+    "s0d88",
+    "sf8fa",
+    "s98aa",
+    "sa8f4",
+    "see2d",
+    "sefba",
+    "scdab",
+    "s3626"
+   ],
+   "prompt_chars": 15337,
+   "content_chars": 67029,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 1.5,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 2,
+     "seconds": 1.46,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 3,
+     "seconds": 1.58,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 4,
+     "seconds": 1.68,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    }
+   ],
+   "seconds": 1.68,
+   "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 10,
+   "contexts": [
+    "hub1_teahouse_1_3",
+    "hub1_teahouse_1_1",
+    "hub1_ramen_1_42",
+    "hub1_first_1_22",
+    "hub1_ramen_1_4",
+    "hub1_teahouse_1_33",
+    "hub1_teahouse_1_31",
+    "hub1_first_1_28",
+    "hub1_first_1_7"
+   ],
+   "string_ids": [
+    "s13cc",
+    "sf648",
+    "sa2b6",
+    "sa461",
+    "s06c7",
+    "s6f32",
+    "sf02e",
+    "sc7a3",
+    "sdeae"
+   ],
+   "prompt_chars": 15337,
+   "content_chars": 66757,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 1.74,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 2,
+     "seconds": 2.03,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 3,
+     "seconds": 1.56,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    },
+    {
+     "attempt": 4,
+     "seconds": 1.46,
+     "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None"
+    }
+   ],
+   "seconds": 1.46,
+   "error": "MachineTranslationError: litellm.BadRequestError: MoonshotException - the message at position 1 with role 'user' must not be empty. Received Model Group=Kimi K2.7\nAvailable Model Group Fallbacks=None",
+   "translations": {},
+   "contract": "transport-failure"
+  }
+ ]
+}
