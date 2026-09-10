@@ -33,7 +33,7 @@ from weblate.trans.protected_tokens import (
     PLACEHOLDER_PATTERN,
     TAG_PATTERN,
     markup_tokens,
-    placeholder_sequence,
+    placeholders_match,
 )
 
 # A number in the source is a fact the player acts on: damage, radius, seconds.
@@ -398,7 +398,7 @@ class GameMarkupCheck(TargetCheck):
         # test is a C-level scan, while the parser is a per-character loop.
         if Counter(markup_tokens(source)) != Counter(markup_tokens(target)):
             return True
-        if placeholder_sequence(source) != placeholder_sequence(target):
+        if not placeholders_match(source, target):
             return True
         if ":cond:" not in source:
             return False

@@ -179,7 +179,9 @@ Repository-specific parts:
   ships `GameMarkupCheck` (`check_id: game-markup`), which asserts that Unity
   rich-text tags (`<color=#RRGGBB>`, `<link>`, `<size=N>`, `<b>`,
   `<sprite name="fire">`) and engine placeholders (`{0}`, `%KEY%`) in the
-  target match the source multiset, and
+  target match the source multiset - a numbered or named placeholder may be
+  reordered, while an anonymous `%s`/`%d`/`{}` conversion keeps its position
+  because the engine fills those by order (`weblate/trans/protected_tokens.py:placeholders_match`) - and
   `GameLineBreakCheck` (`check_id: game-line-break`), which asserts that the
   Hero Craft engine line separator `$` is neither lost nor added, and that no
   whitespace hugs it, whenever the source uses `$` tightly as a separator, and

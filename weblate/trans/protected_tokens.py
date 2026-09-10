@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from collections import Counter
+
 import regex
 
 TAG_PATTERN = regex.compile(
@@ -23,9 +25,30 @@ def protected_tokens(text: str) -> list[str]:
     return [match.group() for match in MARKUP.finditer(text)]
 
 
-def placeholder_sequence(text: str) -> tuple[str, ...]:
-    """Return engine placeholders in their required source order."""
-    return tuple(match.group() for match in PLACEHOLDER_PATTERN.finditer(text))
+# A placeholder the engine resolves by name or index is the same token wherever
+# it stands, so a target may move it: Japanese renders "{0} of {1}" as
+# "{1}の{0}", Hindi as "{1} में से {0}", and Turkish puts the second one first
+# too. Only an anonymous conversion binds to its position - the engine fills
+# "%s %s" left to right - so for those the order *is* the identity.
+ANONYMOUS_PLACEHOLDER = regex.compile(r"\{\s*\}|%[diuoxXfFeEgGaAcsp]")
+
+
+def _placeholders(text: str) -> tuple[Counter[str], tuple[str, ...]]:
+    """Split placeholders into an unordered multiset and a positional sequence."""
+    identified: Counter[str] = Counter()
+    positional: list[str] = []
+    for match in PLACEHOLDER_PATTERN.finditer(text):
+        token = match.group()
+        if ANONYMOUS_PLACEHOLDER.fullmatch(token):
+            positional.append(token)
+        else:
+            identified[token] += 1
+    return identified, tuple(positional)
+
+
+def placeholders_match(source: str, target: str) -> bool:
+    """Whether the target carries the source's placeholders, reordering allowed."""
+    return _placeholders(source) == _placeholders(target)
 
 
 def markup_tokens(text: str) -> list[str]:

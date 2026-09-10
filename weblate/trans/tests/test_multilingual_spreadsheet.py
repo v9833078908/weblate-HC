@@ -76,15 +76,14 @@ class MultilingualSpreadsheetExportTest(ViewTestCase):
             workbook.active.cell(row=2, column=len(expected_headers)).data_type, "s"
         )
 
-    def test_preview_rejects_reordered_placeholders(self) -> None:
-
+    def _preview_with_target(self, source: str, target: str):
         unit = self.translation.unit_set.order_by("pk").first()
         assert unit is not None
         source_unit = unit.source_unit
-        source_unit.source = "{0} {playerName}"
-        source_unit.target = source_unit.source
+        source_unit.source = source
+        source_unit.target = source
         source_unit.save()
-        unit.source = source_unit.source
+        unit.source = source
         unit.save(update_fields=["source"])
 
         parsed = parse_upload(
@@ -94,9 +93,7 @@ class MultilingualSpreadsheetExportTest(ViewTestCase):
             ),
         )
         values = list(parsed.rows[0].values)
-        values[parsed.headers.index(self.translation.language.code)] = (
-            "{playerName} {0}"
-        )
+        values[parsed.headers.index(self.translation.language.code)] = target
         parsed = parsed.__class__(
             parsed.headers,
             (
@@ -104,9 +101,22 @@ class MultilingualSpreadsheetExportTest(ViewTestCase):
                 *parsed.rows[1:],
             ),
         )
+        return build_preview(self.component, parsed)
 
+    def test_preview_accepts_reordered_placeholders(self) -> None:
+        # An upload is held to the same rule as the editor: a numbered or named
+        # placeholder may move, because the engine resolves it by identity.
+        self.assertTrue(
+            self._preview_with_target("{0} {playerName}", "{playerName} {0}").changes
+        )
+
+    def test_preview_rejects_a_lost_placeholder(self) -> None:
         with self.assertRaises(ValidationError):
-            build_preview(self.component, parsed)
+            self._preview_with_target("{0} {playerName}", "{playerName}")
+
+    def test_preview_rejects_swapped_anonymous_conversions(self) -> None:
+        with self.assertRaises(ValidationError):
+            self._preview_with_target("%s: %d", "%d: %s")
 
     def test_preview_accepts_translated_conditional_branches(self) -> None:
 

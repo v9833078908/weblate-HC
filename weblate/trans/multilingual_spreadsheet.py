@@ -21,7 +21,7 @@ from weblate.formats.exporters import CSVExporter
 from weblate.formats.external import CSV_DIALECT
 from weblate.formats.ttkit import CSVUnit
 from weblate.trans.models import Unit
-from weblate.trans.protected_tokens import markup_tokens, placeholder_sequence
+from weblate.trans.protected_tokens import markup_tokens, placeholders_match
 from weblate.utils.validators import validate_translation_upload_size
 from weblate.utils.zip import ZipSafetyError, ZipSafetyLimits, validate_zip_members
 
@@ -61,7 +61,9 @@ def _error(message: str, *, row: int | None = None, column: str | None = None) -
     raise ValidationError(message)
 
 
-def _component_units(component: Component) -> tuple[list[Unit], dict[tuple[int, str], Unit]]:
+def _component_units(
+    component: Component,
+) -> tuple[list[Unit], dict[tuple[int, str], Unit]]:
     source_translation = component.source_translation
     source_units = list(source_translation.unit_set.order_by("pk"))
     source_ids = [unit.pk for unit in source_units]
@@ -97,7 +99,9 @@ def _identity(component: Component, unit: Unit, has_context: bool) -> tuple[str,
     return (key, unit.context) if has_context else (key,)
 
 
-def _validate_identities(component: Component, source_units: list[Unit], has_context: bool) -> None:
+def _validate_identities(
+    component: Component, source_units: list[Unit], has_context: bool
+) -> None:
     seen: set[tuple[str, ...]] = set()
     for row_number, unit in enumerate(source_units, start=2):
         identity = _identity(component, unit, has_context)
@@ -134,7 +138,9 @@ def _serialize_xlsx(rows: list[tuple[str, ...]]) -> bytes:
     return output.getvalue()
 
 
-def export_component(component: Component, format_name: Literal["csv", "xlsx"]) -> bytes:
+def export_component(
+    component: Component, format_name: Literal["csv", "xlsx"]
+) -> bytes:
     source_units, units = _component_units(component)
     schema = _schema(component, source_units)
     _validate_identities(component, source_units, schema.has_context)
@@ -142,10 +148,7 @@ def export_component(component: Component, format_name: Literal["csv", "xlsx"]) 
     languages = schema.headers[1 : -1 if schema.has_context else None]
     for source_unit in source_units:
         values = [*_identity(component, source_unit, schema.has_context)[:1]]
-        values.extend(
-            units[source_unit.pk, language].target
-            for language in languages
-        )
+        values.extend(units[source_unit.pk, language].target for language in languages)
         if schema.has_context:
             values.append(source_unit.context)
         rows.append(tuple(values))
@@ -186,9 +189,7 @@ def _parse_xlsx(component: Component, content: bytes) -> list[list[str]]:
             ),
         )
     try:
-        workbook = load_workbook(
-            BytesIO(content), data_only=False, read_only=True
-        )
+        workbook = load_workbook(BytesIO(content), data_only=False, read_only=True)
     except (
         BadZipFile,
         ZipSafetyError,
@@ -203,9 +204,8 @@ def _parse_xlsx(component: Component, content: bytes) -> list[list[str]]:
         _error("XLSX upload must contain exactly one worksheet.")
     worksheet = workbook.worksheets[0]
     if (
-        (worksheet.max_column is not None and worksheet.max_column > expected_columns)
-        or (worksheet.max_row is not None and worksheet.max_row > expected_rows)
-    ):
+        worksheet.max_column is not None and worksheet.max_column > expected_columns
+    ) or (worksheet.max_row is not None and worksheet.max_row > expected_rows):
         _error("XLSX dimensions exceed the component schema.")
     rows: list[list[str]] = []
     for row_number, row in enumerate(worksheet.iter_rows(), start=1):
@@ -271,8 +271,12 @@ def parse_upload(component: Component, uploaded: UploadedFile) -> ParsedSpreadsh
     return _validate_rows(component, rows)
 
 
-def build_preview(component: Component, parsed: ParsedSpreadsheet) -> SpreadsheetPreview:
-    _validate_rows(component, [list(parsed.headers), *(list(row.values) for row in parsed.rows)])
+def build_preview(
+    component: Component, parsed: ParsedSpreadsheet
+) -> SpreadsheetPreview:
+    _validate_rows(
+        component, [list(parsed.headers), *(list(row.values) for row in parsed.rows)]
+    )
     source_units, _units = _component_units(component)
     schema = _schema(component, source_units)
     source_by_identity = {
@@ -288,10 +292,9 @@ def build_preview(component: Component, parsed: ParsedSpreadsheet) -> Spreadshee
         for column, target in zip(parsed.headers[1:], row.values[1:], strict=True):
             if column == "context" or column == source_code or not target:
                 continue
-            if (
-                Counter(markup_tokens(source)) != Counter(markup_tokens(target))
-                or placeholder_sequence(source) != placeholder_sequence(target)
-            ):
+            if Counter(markup_tokens(source)) != Counter(
+                markup_tokens(target)
+            ) or not placeholders_match(source, target):
                 _error(
                     "Protected tokens do not match the source.",
                     row=row.row_number,

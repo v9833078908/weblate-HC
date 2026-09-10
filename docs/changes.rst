@@ -83,6 +83,7 @@ Weblate 2026.8.1
 * The translation editor now keeps the special-characters toolbar behind one button, reduces the pager to previous / position / next, demotes :guilabel:`Save and stay` to a secondary action, and shows the Glossary and String information cards expanded.
 * Added :kbd:`Ctrl+Alt+A`, :kbd:`Ctrl+Alt+K` and :kbd:`Ctrl+Alt+R` for the LLM-judge triage actions, and a paid-request hint on every button that spends a model call.
 * Added the ``judge_backfill_candidates`` management command.
+* The game markup check no longer requires a numbered or named placeholder to keep its source position: Turkish, Hindi, Japanese, Korean, Chinese and Persian targets legitimately move ``{0}`` and ``{1}`` around, and only their presence is checked now. An anonymous ``%s``, ``%d`` or ``{}`` conversion still has to keep its order, because the engine fills those by position. Spreadsheet imports follow the same rule.
 
 .. rubric:: Bug fixes
 

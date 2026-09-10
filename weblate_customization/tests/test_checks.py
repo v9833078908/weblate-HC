@@ -196,20 +196,32 @@ class GameMarkupCheckTest(CheckTestCase):
         # tag, or every string with a stray bracket becomes a failure.
         self.assertFalse(self.check.check_single("a < b and c > d", "x < y", None))
 
-    def test_placeholder_order_and_printf_tokens_are_preserved(self) -> None:
-        source = "<b>{0} {playerName} %s %KEY%</b>"
+    def test_a_reordered_identified_placeholder_passes(self) -> None:
+        # "{0} of {1}" becomes "{1}の{0}" in Japanese and swaps its two
+        # placeholders in Turkish as well: the engine resolves a numbered or
+        # named placeholder by identity, so its position is the translator's.
+        source = "<b>{0} {playerName} %KEY%</b>"
 
         self.assertFalse(
-            self.check.check_single(source, "<b>{0} {playerName} %s %KEY%</b>", None)
-        )
-        self.assertTrue(
-            self.check.check_single(source, "<b>{playerName} {0} %s %KEY%</b>", None)
-        )
-        self.assertTrue(
             self.check.check_single(source, "<b>{0} {playerName} %KEY%</b>", None)
+        )
+        self.assertFalse(
+            self.check.check_single(source, "<b>%KEY% {playerName} {0}</b>", None)
+        )
+        self.assertTrue(
+            self.check.check_single(source, "<b>{0} {playerName}</b>", None)
         )
         self.assertTrue(self.check.check_single(source, "<b>Value</b>", None))
         self.assertFalse(self.check.check_single(source, "", None))
+
+    def test_anonymous_conversions_keep_their_order(self) -> None:
+        # "%s" and "{}" carry no identity: the engine fills them left to right,
+        # so swapping two of them swaps the values the player reads.
+        self.assertFalse(self.check.check_single("%s: %d", "%s: %d", None))
+        self.assertTrue(self.check.check_single("%s: %d", "%d: %s", None))
+        self.assertTrue(self.check.check_single("{} of {}", "{} of", None))
+        # An indexed conversion states its argument, so it may move.
+        self.assertFalse(self.check.check_single("%1$s of %2$s", "%2$s %1$s", None))
 
     def test_conditional_dsl_highlights_leave_branch_text_translatable(self) -> None:
         unit = make_unit(source=AMOUNT_FORMATTED, code="de")
