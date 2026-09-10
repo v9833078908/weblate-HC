@@ -146,6 +146,7 @@ def run(
             profile_text = profile_path.read_text(encoding="utf-8")
         else:
             inferred: list[dict] = []
+            schema_versions: set[int] = set()
             for stem, sheets in per_kit:
                 document, notes = infer_profile(
                     sheets,
@@ -157,7 +158,11 @@ def run(
                 )
                 inferred.extend(document["components"])
                 inference_notes.extend(notes)
-            merged = {"schema_version": SCHEMA_VERSION, "components": inferred}
+                schema_versions.add(document["schema_version"])
+            merged = {
+                "schema_version": max(schema_versions, default=SCHEMA_VERSION),
+                "components": inferred,
+            }
             profile = parse_profile(merged)
             profile_text = json.dumps(merged, ensure_ascii=False, indent=2) + "\n"
     except ProfileError as exc:

@@ -169,6 +169,29 @@ def test_kit_split_into_sections_by_banner_rows_publishes(tmp_path):
     assert "Юниты" not in po
 
 
+def test_inferred_explanation_column_publishes(tmp_path):
+    """An inferred profile carrying explanation metadata needs schema_version 3."""
+    kit = tmp_path / "Dialogue.csv"
+    kit.write_text(
+        "key;ru;en;explanation;Character\n"
+        "ui_settings_title;Настройки;Settings;Максимум 18 символов.;\n"
+        "quest_leon_greet;Леон, вставай.;Leon, wake up.;Будит Леона.;Асуна\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "out"
+    assert main([str(kit), "--out", str(output)]) == 0
+
+    profile = json.loads(
+        (output / "profile.loc-ingest.json").read_text(encoding="utf-8")
+    )
+    assert profile["schema_version"] == 3
+    assert profile["components"][0]["explanation"]["column"] == 4
+
+    po = (output / "Dialogue" / "ru.po").read_text(encoding="utf-8")
+    assert "#. Асуна" in po
+    assert "Максимум 18 символов." not in po
+
+
 def test_existing_output_is_never_replaced(tmp_path, kit_with_profile):
     kits, profile = kit_with_profile
     temple_csv, terms_csv = kits
