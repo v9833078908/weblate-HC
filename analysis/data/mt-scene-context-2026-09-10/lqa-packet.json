@@ -1,0 +1,1887 @@
+[
+ {
+  "lang": "de",
+  "context": "hub1_first_1_10",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "Я чёт подустал от этих уроков истории.",
+  "production_target": "Ich bin irgendwie müde von diesen Geschichtsstunden.",
+  "variants": {
+   "A": "Ich hab allmählich die Schnauze voll von diesen Geschichtsstunden.",
+   "B": "Ich hab irgendwie die Nase voll von diesen Geschichtsstunden.",
+   "C": "Ich hab so langsam die Schnauze voll von diesen Geschichtsstunden."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_13",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "Скукота.",
+  "production_target": "Langweilig.",
+  "variants": {
+   "A": "Schnarchfest.",
+   "B": "Stinklangweilig.",
+   "C": "Echt öde."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_14",
+  "scene": "hub1_first_1",
+  "speaker": "Ray",
+  "source": "Очень интересно. И спасибо, что подкинули нас.",
+  "production_target": "Sehr interessant. Und danke, dass Sie uns mitgenommen haben.",
+  "variants": {
+   "A": "Sehr interessant. Und danke, dass du uns mitgebracht hast.",
+   "B": "Sehr interessant. Und danke, dass ihr uns mitgenommen habt.",
+   "C": "Sehr interessant. Und danke, dass du uns mitgebracht hast."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_2",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "Хорошо… Давно мы приехали?",
+  "production_target": "Gut… Sind wir schon lange hier?",
+  "variants": {
+   "A": "Gut… Sind wir schon lange hier?",
+   "B": "Schon gut… Sind wir schon lange hier?",
+   "C": "Gut… Wie lange sind wir schon da?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_20",
+  "scene": "hub1_first_1",
+  "speaker": "Joe",
+  "source": "У меня здесь есть свои дела. Встретимся позже",
+  "production_target": "Ich habe hier meine eigenen Angelegenheiten. Wir sehen uns später",
+  "variants": {
+   "A": "Ich habe hier noch eigene Angelegenheiten. Wir sehen uns später",
+   "B": "Ich habe hier meine eigenen Angelegenheiten. Wir sehen uns später",
+   "C": "Ich habe hier meine eigenen Angelegenheiten. Wir sehen uns später"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_22",
+  "scene": "hub1_first_1",
+  "speaker": "Joe",
+  "source": "Я тебя сам найду.",
+  "production_target": "Ich werde dich selbst finden.",
+  "variants": {
+   "A": "Ich werde dich selbst finden.",
+   "B": "Ich finde dich selbst.",
+   "C": "Ich werde dich selbst finden."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_23",
+  "scene": "hub1_first_1",
+  "speaker": "Ray",
+  "source": "У меня от него чешуя дыбом стоит.",
+  "production_target": "Mir stellen sich die Schuppen auf, wenn ich ihn sehe.",
+  "variants": {
+   "A": "Mir stehen von ihm die Schuppen zu Berge.",
+   "B": "Mir stehen davon die Schuppen zu Berge.",
+   "C": "Mir stehen davon die Schuppen zu Berge."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_24",
+  "scene": "hub1_first_1",
+  "speaker": "Ray",
+  "source": "Серьезно, Хадзуо его собрат, но рядом с ним, я не чувствую такого страха.",
+  "production_target": "Im Ernst, Hazuo ist sein Bruder, aber in seiner Nähe verspüre ich keine solche Angst.",
+  "variants": {
+   "A": "Ernsthaft, Hazuo ist sein Bruder, aber in seiner Nähe spüre ich solche Angst nicht.",
+   "B": "Im Ernst, Hazuo ist sein Gefährte, aber in seiner Nähe spüre ich nicht diese Angst.",
+   "C": "Im Ernst, Hazuo ist sein Gefährte, aber in seiner Nähe spüre ich nicht diese Angst."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_25",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "А я думал, вы лучшие подружки.",
+  "production_target": "Ich dachte, ihr wärt beste Freundinnen.",
+  "variants": {
+   "A": "Und ich dachte, ihr seid beste Freundinnen.",
+   "B": "Und ich dachte, ihr seid beste Freundinnen.",
+   "C": "Und ich dachte, ihr seid die besten Freundinnen."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_26",
+  "scene": "hub1_first_1",
+  "speaker": "Ray",
+  "source": "Ха-ха. Что будем дальше делать?",
+  "production_target": "Ha-ha. Was machen wir als Nächstes?",
+  "variants": {
+   "A": "Ha-ha. Was machen wir als Nächstes?",
+   "B": "Ha-ha. Was werden wir als Nächstes tun?",
+   "C": "Ha-ha. Was machen wir jetzt?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_27",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "Кажется, я не ел целую вечность.",
+  "production_target": "Ich glaube, ich habe eine Ewigkeit nichts gegessen.",
+  "variants": {
+   "A": "Ich glaub, ich hab seit einer Ewigkeit nichts mehr gegessen.",
+   "B": "Ich glaub, ich hab seit einer Ewigkeit nichts mehr gegessen.",
+   "C": "Ich glaube, ich hab seit Ewigkeiten nichts mehr gegessen."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_28",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "Может, набьём животы?",
+  "production_target": "Sollen wir uns die Bäuche vollschlagen?",
+  "variants": {
+   "A": "Vielleicht stopfen wir uns die Bäuche voll?",
+   "B": "Vielleicht stopfen wir uns die Bäuche voll?",
+   "C": "Vielleicht stopfen wir uns die Mäuler?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_29",
+  "scene": "hub1_first_1",
+  "speaker": "Ray",
+  "source": "Можно.",
+  "production_target": "Können wir.",
+  "variants": {
+   "A": "Können wir.",
+   "B": "Du darfst.",
+   "C": "Gerne."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_3",
+  "scene": "hub1_first_1",
+  "speaker": "Ray",
+  "source": "Недавно. Ты проспал всю дорогу.",
+  "production_target": "Nicht lange. Du hast die ganze Fahrt verschlafen.",
+  "variants": {
+   "A": "Erst kürzlich. Du hast die ganze Fahrt verschlafen.",
+   "B": "Erst kürzlich. Du hast die ganze Fahrt verschlafen.",
+   "C": "Vor Kurzem. Du hast den ganzen Weg verschlafen."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_4",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "Проспал очередные виды на ебеня?",
+  "production_target": "Hab ich wieder die Aussicht auf die Scheißgegend verpennt?",
+  "variants": {
+   "A": "Wieder mal die Aussicht auf Arsch der Welt verpennt?",
+   "B": "Schon wieder die Aussicht auf Scheiße verpennt?",
+   "C": "Wieder mal die Aussicht auf den Arsch der Welt verschlafen?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_5",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "Даже не знаю, как я это переживу.",
+  "production_target": "Ich weiß nicht mal, wie ich das überleben soll.",
+  "variants": {
+   "A": "Keine Ahnung, wie ich das überleben soll.",
+   "B": "Keine Ahnung, wie ich das überstehen soll.",
+   "C": "Keine Ahnung, wie ich das überleben soll."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_7",
+  "scene": "hub1_first_1",
+  "speaker": "Hazuo",
+  "source": "Ну, или в самую её «лучшую» часть — Рыбный тупик.",
+  "production_target": "Nun, oder in ihrem „besten“ Teil – der Fisch-Sackgasse.",
+  "variants": {
+   "A": "Nun, oder in ihren aller»besten« Teil — die Fisch-Sackgasse.",
+   "B": "Nun, oder in ihren aller„besten“ Teil — die Fisch-Sackgasse.",
+   "C": "Nun, oder in ihrem „besten\" Teil — der Fisch-Sackgasse."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_8",
+  "scene": "hub1_first_1",
+  "speaker": "Hazuo",
+  "source": "Построили недавно, ещё при третьем императоре Акито.",
+  "production_target": "Erst kürzlich erbaut, noch unter dem dritten Kaiser Akito.",
+  "variants": {
+   "A": "Erst kürzlich erbaut, noch unter dem dritten Kaiser Akito.",
+   "B": "Kürzlich erbaut, noch unter dem dritten Kaiser Akito.",
+   "C": "Erst kürzlich erbaut, noch unter dem dritten Kaiser Akito."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_first_1_9",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "Он опять завёл эту шарманку.",
+  "production_target": "Er hat schon wieder diese Leier angefangen.",
+  "variants": {
+   "A": "Der spielt schon wieder die alte Leier.",
+   "B": "Der spinnt schon wieder seine alte Platte.",
+   "C": "Der fängt schon wieder mit seiner Leier an."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_1",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "Это что за фигня?!",
+  "production_target": "Was zum Teufel ist das?!",
+  "variants": {
+   "A": "Was ist das für Scheiß?!",
+   "B": "Was soll der Scheiß?!",
+   "C": "Was ist das für'n Scheiß?!"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_10",
+  "scene": "hub1_ramen_1",
+  "speaker": "Saki",
+  "source": "ЗАТКНИСЬ, СТАРЫЙ! Не приставай к ним!",
+  "production_target": "HALT DIE KLAPPE, ALTER! Belästige sie nicht!",
+  "variants": {
+   "A": "HALT DIE KLAPPE, ALTER! Lass sie in Ruhe!",
+   "B": "HALT DIE FRESSE, ALTER! Hör auf, sie zu belästigen!",
+   "C": "HALT DIE KLAPPE, ALTER! Lass sie in Ruhe!"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_12",
+  "scene": "hub1_ramen_1",
+  "speaker": "Saki",
+  "source": "Вот и не делай!",
+  "production_target": "Dann mach auch nichts!",
+  "variants": {
+   "A": "Dann mach's auch nicht!",
+   "B": "Dann mach's halt nicht!",
+   "C": "Dann lass das!"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_15",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "Я хочу только узнать, кому продали мою сестру!",
+  "production_target": "Ich will nur wissen, an wen meine Schwester verkauft wurde!",
+  "variants": {
+   "A": "Ich will nur rausfinden, an wen sie meine Schwester verkauft haben!",
+   "B": "Ich will nur wissen, wem sie meine Schwester verkauft haben!",
+   "C": "Ich will nur rausfinden, wem sie meine Schwester verkauft haben!"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_16",
+  "scene": "hub1_ramen_1",
+  "speaker": "Ray",
+  "source": "И как ты это сделаешь?",
+  "production_target": "Und wie willst du das anstellen?",
+  "variants": {
+   "A": "Und wie willst du das machen?",
+   "B": "Und wie willst du das anstellen?",
+   "C": "Und wie willst du das anstellen?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_18",
+  "scene": "hub1_ramen_1",
+  "speaker": "Ray",
+  "source": "Нам нужна комната на несколько дней.",
+  "production_target": "Wir brauchen ein Zimmer für ein paar Tage.",
+  "variants": {
+   "A": "Wir brauchen ein Zimmer für ein paar Tage.",
+   "B": "Wir brauchen ein Zimmer für ein paar Tage.",
+   "C": "Wir bräuchten ein Zimmer für ein paar Tage."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_19",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Отлично! А мне нужны постояльцы!",
+  "production_target": "Ausgezeichnet! Und ich brauche Gäste!",
+  "variants": {
+   "A": "Ausgezeichnet! Und ich brauche Gäste!",
+   "B": "Klasse! Und ich brauche Gäste!",
+   "C": "Ausgezeichnet! Und ich brauche Untermieter!"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_2",
+  "scene": "hub1_ramen_1",
+  "speaker": "Ray",
+  "source": "Это рамен. Никогда такого не пробовал что ли?",
+  "production_target": "Das ist Ramen. Hast du so etwas noch nie probiert?",
+  "variants": {
+   "A": "Das ist Ramen. Hast du so was noch nie probiert?",
+   "B": "Das ist Ramen. Hast du so was noch nie probiert oder was?",
+   "C": "Das ist Ramen. Hast du so was noch nie probiert oder was?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_21",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Так я всегда подслушиваю.",
+  "production_target": "Das tue ich immer.",
+  "variants": {
+   "A": "Ich belausche euch doch immer.",
+   "B": "Ich lausche doch immer.",
+   "C": "Ich lausch doch immer."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_23",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Только учтите! Все шиитаке посчитаны.",
+  "production_target": "Aber seid gewarnt! Alle Shiitake sind gezählt.",
+  "variants": {
+   "A": "Aber denkt dran! Alle Shiitake sind gezählt.",
+   "B": "Aber passt auf! Alle Shiitake sind gezählt.",
+   "C": "Nur damit ihr's wisst! Alle Shiitake sind gezählt."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_27",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "А мне и не нужны деньги.",
+  "production_target": "Ich brauche kein Geld.",
+  "variants": {
+   "A": "Ich brauche doch gar kein Geld.",
+   "B": "Ich brauch kein Geld.",
+   "C": "Geld brauche ich nicht."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_28",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Я на вас новые рецепты раменов опробую! По рукам?",
+  "production_target": "Ich werde neue Ramen-Rezepte an euch ausprobieren! Einverstanden?",
+  "variants": {
+   "A": "Ich werde neue Ramen-Rezepte an euch ausprobieren! Abgemacht?",
+   "B": "An euch probier ich meine neuen Ramen-Rezepte aus! Abgemacht?",
+   "C": "Ich probiere an euch neue Ramen-Rezepte aus! Abgemacht?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_3",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "Нет. У нас в деревне такого не готовили.",
+  "production_target": "Nein. In unserem Dorf wurde so etwas nicht gekocht.",
+  "variants": {
+   "A": "Nein. Bei uns im Dorf hat man so was nicht gekocht.",
+   "B": "Nein. Bei uns im Dorf gab's so was nicht.",
+   "C": "Nein. Bei uns im Dorf gab es so was nicht."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_30",
+  "scene": "hub1_ramen_1",
+  "speaker": "Ray",
+  "source": "А нам бы еще какого-нибудь проводника для города…",
+  "production_target": "Wir bräuchten noch einen Führer für die Stadt…",
+  "variants": {
+   "A": "Und wir bräuchten noch einen Führer für die Stadt…",
+   "B": "Wir bräuchten noch jemanden, der uns durch die Stadt führt…",
+   "C": "Und wir bräuchten noch einen Führer für die Stadt…"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_32",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Никто из наших отсюда носа не высунет в Столицу…",
+  "production_target": "Niemand von uns wagt sich von hier in die Hauptstadt…",
+  "variants": {
+   "A": "Niemand von den Unseren wird von hier aus die Nase in die Hauptstadt stecken…",
+   "B": "Keiner von uns hier streckt auch nur die Nase in die Hauptstadt…",
+   "C": "Keiner von uns steckt von hier aus die Nase in die Hauptstadt…"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_33",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Хотя, загляните в чайный домик.",
+  "production_target": "Schaut doch mal im Teehaus vorbei.",
+  "variants": {
+   "A": "Aber schaut doch mal im Teehaus vorbei.",
+   "B": "Schaut allerdings mal im Teehaus vorbei.",
+   "C": "Aber schauen Sie mal im Teehaus vorbei."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_34",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Девочки госпожи Яэко частенько в городе бывают.",
+  "production_target": "Die Mädchen von Lady Yaeko sind oft in der Stadt unterwegs.",
+  "variants": {
+   "A": "Die Mädchen von Frau Yaeko sind oft in der Stadt.",
+   "B": "Die Mädchen von Frau Yaeko sind oft in der Stadt.",
+   "C": "Die Mädchen von Frau Yaeko sind oft in der Stadt unterwegs."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_35",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "Как их найти?",
+  "production_target": "Wie finden wir sie?",
+  "variants": {
+   "A": "Wie finde ich die?",
+   "B": "Wie finde ich sie?",
+   "C": "Wie find ich die?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_36",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Вот тут у нас главное место Рыбного тупика - моя раменная!",
+  "production_target": "Hier ist der wichtigste Ort in der Fisch-Sackgasse – mein Ramen-Laden!",
+  "variants": {
+   "A": "Da haben wir den Hauptplatz der Fisch-Sackgasse – meinen Ramen-Laden!",
+   "B": "Hier haben wir den Hauptort der Fisch-Sackgasse – meinen Ramen-Laden!",
+   "C": "Hier ist der Hauptort der Fisch-Sackgasse – mein Ramen-Laden!"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_37",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Но это вы и так знаете.",
+  "production_target": "Aber das wisst ihr ja schon.",
+  "variants": {
+   "A": "Das wisst ihr aber ohnehin.",
+   "B": "Das wissen Sie aber ohnehin.",
+   "C": "Aber das wisst ihr ja ohnehin."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_38",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Пойдете вот сюда - окажетесь на пристани.",
+  "production_target": "Gehst du hier lang, kommst du zur Anlegestelle.",
+  "variants": {
+   "A": "Geht hier lang – und ihr seid an der Anlegestelle.",
+   "B": "Gehen Sie hier lang – da kommen Sie zur Anlegestelle.",
+   "C": "Gehen Sie hier entlang – und Sie sind an der Anlegestelle."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_39",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Вот на этот корабль лучше не соваться.",
+  "production_target": "Diesem Schiff solltest du besser fernbleiben.",
+  "variants": {
+   "A": "Auf dieses Schiff sollten Sie sich besser nicht begeben.",
+   "B": "Auf dieses Schiff besser nicht gehen.",
+   "C": "Besser, Sie gehen nicht auf dieses Schiff."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_4",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "А потом я ел только… с пола…",
+  "production_target": "Und danach habe ich nur noch… vom Boden gegessen…",
+  "variants": {
+   "A": "Und danach hab ich nur… vom Boden gegessen…",
+   "B": "Und dann hab ich nur… vom Boden gegessen…",
+   "C": "Und danach habe ich nur noch… vom Boden…"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_40",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Если конечно не хотите встретиться с морскими волками.",
+  "production_target": "Es sei denn, du willst den Seewölfen begegnen.",
+  "variants": {
+   "A": "Es sei denn, ihr wollt den Seewölfen begegnen.",
+   "B": "Es sei denn, Sie wollen den Seewölfen begegnen.",
+   "C": "Falls ihr natürlich nicht den Seewölfen begegnen wollt."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_41",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Свернете сюда и окажетесь в банях, шикарное место для отдыха.",
+  "production_target": "Biegst du hier ab, kommst du zu den Bädern, ein schicker Ort zum Entspannen.",
+  "variants": {
+   "A": "Biegen Sie hier ab und Sie gelangen zu den Bädern, ein großartiger Ort zum Entspannen.",
+   "B": "Biegt hier ab und ihr landet in den Bädern, ein schicker Ort zum Ausruhen.",
+   "C": "Biegen Sie hier ab und Sie sind in den Bädern – ein schicker Ort zum Ausruhen."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_42",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Тут будет лавка травника,",
+  "production_target": "Hier ist der Kräuterladen,",
+  "variants": {
+   "A": "Hier kommt der Kräuterladen hin,",
+   "B": "Hier wird die Kräuterbude sein,",
+   "C": "Hier wird ein Kräuterladen sein,"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_43",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "а тут барахолка.",
+  "production_target": "und hier der Trödelladen.",
+  "variants": {
+   "A": "und hier der Trödelmarkt.",
+   "B": "und hier ist die Trödelbude.",
+   "C": "und hier ist der Ramschladen."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_44",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "А прямо над нами находится чайный домик.",
+  "production_target": "Und direkt über uns ist das Teehaus.",
+  "variants": {
+   "A": "Und direkt über uns liegt das Teehaus.",
+   "B": "Und direkt über uns befindet sich das Teehaus.",
+   "C": "Und direkt über uns ist das Teehaus."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_45",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Если запутаетесь, изучите нашу карту.",
+  "production_target": "Wenn du dich verirrst, schau auf unsere Karte.",
+  "variants": {
+   "A": "Wenn ihr euch verlaufen habt, schaut auf unsere Karte.",
+   "B": "Wenn ihr euch verirrt, schaut euch unsere Karte an.",
+   "C": "Wenn du dich verirrst, schau dir unsere Karte an."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_5",
+  "scene": "hub1_ramen_1",
+  "speaker": "Ray",
+  "source": "Ясно.",
+  "production_target": "Verstehe.",
+  "variants": {
+   "A": "Verstehe.",
+   "B": "Verstanden.",
+   "C": "Verstanden."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_6",
+  "scene": "hub1_ramen_1",
+  "speaker": "Ray",
+  "source": "Попробуй скорее. Тебе понравится.",
+  "production_target": "Probier es schnell. Es wird dir schmecken.",
+  "variants": {
+   "A": "Probier's schnell. Es wird dir schmecken.",
+   "B": "Probier es schnell. Es wird dir schmecken.",
+   "C": "Probier schnell. Es wird dir schmecken."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_7",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "ЕБАТЬ. КАК. ВКУСНО.",
+  "production_target": "VERDAMMT. IST. DAS. LECKER.",
+  "variants": {
+   "A": "SCHEISSE. WIE. LECKER.",
+   "B": "SCHEIßE. WIE. LECKER.",
+   "C": "FICK. WIE. LECKER."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_ramen_1_9",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Я всегда говорю. Ешь рамен - БУДЕШЬ КАК КАМЕНЬ!",
+  "production_target": "Ich sage immer: Iss Ramen – DANN BIST DU HART WIE EIN STEIN!",
+  "variants": {
+   "A": "Ich sag immer. Iss Ramen – WIRST WIE STEIN!",
+   "B": "Ich sag immer: Iss Ramen - WIRST WIE EIN STEIN!",
+   "C": "Ich sag immer. Iss Ramen – WIRST WIE STEIN!"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_1",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Ну и кто это у нас?",
+  "production_target": "Na, wen haben wir denn da?",
+  "variants": {
+   "A": "Na, wen haben wir denn hier?",
+   "B": "Nun, wen haben wir denn da?",
+   "C": "Nun, wen haben wir denn hier?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_10",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Мальчик, половина Империи захочет сдать за награду раньше…",
+  "production_target": "Junge, die halbe Imperium wird dich für eine Belohnung ausliefern, bevor…",
+  "variants": {
+   "A": "Junge, das halbe Imperium wird dich für die Belohnung ausliefern wollen, bevor…",
+   "B": "Junge, die Hälfte des Imperiums wird dich für die Belohnung abliefern, bevor…",
+   "C": "Junge, das halbe Imperium wird dich für die Belohnung ausliefern wollen, bevor…"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_11",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Чем ты дойдёшь до соседней улицы.",
+  "production_target": "Du die nächste Straße erreichst.",
+  "variants": {
+   "A": "Womit du gerade mal bis zur nächsten Straße kommst.",
+   "B": "Womit du bis zur nächsten Straße kommst.",
+   "C": "Bevor du auch nur die nächste Straße erreichst."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_12",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Leon",
+  "source": "Да понял я уже, хватит ржать.",
+  "production_target": "Ich hab's kapiert, hör auf zu lachen.",
+  "variants": {
+   "A": "Ja, ich hab's schon kapiert, hört auf zu lachen.",
+   "B": "Ja, ich hab's schon kapiert, hör auf zu lachen.",
+   "C": "Ja, schon kapiert, hört auf zu gackern."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_14",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Ray",
+  "source": "Вообще… нам нужна информация о дзинко. Документы, отчеты…",
+  "production_target": "Nun ja… wir brauchen Informationen über Jinko. Dokumente, Berichte…",
+  "variants": {
+   "A": "Nun… wir brauchen Informationen über Jinko. Dokumente, Berichte…",
+   "B": "Nun… wir brauchen Informationen über Jinko. Dokumente, Berichte…",
+   "C": "Nun… wir brauchen Informationen über die Jinko. Dokumente, Berichte…"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_15",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Ray",
+  "source": "Может подскажите, где ее можно найти?",
+  "production_target": "Könnten Sie uns vielleicht sagen, wo wir sie finden können?",
+  "variants": {
+   "A": "Könntet ihr uns vielleicht sagen, wo man sie finden kann?",
+   "B": "Könntest du mir vielleicht sagen, wo man sie finden kann?",
+   "C": "Könntet ihr uns vielleicht sagen, wo man sie finden kann?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_18",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Leon",
+  "source": "И как туда попасть?",
+  "production_target": "Und wie kommt man da rein?",
+  "variants": {
+   "A": "Und wie kommen wir da hin?",
+   "B": "Und wie komm ich da hin?",
+   "C": "Und wie kommen wir da hin?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_19",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Какое совпадение.",
+  "production_target": "Was für ein Zufall.",
+  "variants": {
+   "A": "Welch Zufall.",
+   "B": "Welch Zufall.",
+   "C": "Was für ein Zufall."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_2",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Tsuru",
+  "source": "О-о-о… какой милый лисёнок.",
+  "production_target": "O-o-oh… was für ein süßes Füchslein.",
+  "variants": {
+   "A": "O-o-oh… was für ein süßes Füchslein.",
+   "B": "O-o-o… was für ein süßes Füchslein.",
+   "C": "O-o-oh… was für ein süßes Füchslein."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_21",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Доставь это послание нашему человеку в Нижнем Городе…",
+  "production_target": "Überbringen Sie diese Nachricht unserem Mann in der Unterstadt…",
+  "variants": {
+   "A": "Bring diese Nachricht zu unserem Mann in der Unterstadt…",
+   "B": "Bring diese Nachricht unserem Mann in der Unterstadt…",
+   "C": "Bringe diese Botschaft unserem Mann in der Unterstadt…"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_23",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Там можно попасть в Архив.",
+  "production_target": "Dort kommst du ins Archiv.",
+  "variants": {
+   "A": "Dort kommt man in die Archive.",
+   "B": "Dort gelangt man in die Archive.",
+   "C": "Dort kommt man in die Archive."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_24",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Сделка?",
+  "production_target": "Ein Geschäft?",
+  "variants": {
+   "A": "Abgemacht?",
+   "B": "Einverstanden?",
+   "C": "Ein Handel?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_29",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Momo",
+  "source": "Мне нравится.",
+  "production_target": "Das gefällt mir.",
+  "variants": {
+   "A": "Das gefällt mir.",
+   "B": "Gefällt mir.",
+   "C": "Das gefällt mir."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_31",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Я думаю у барахольщика Хадзуо ты найдешь что-нибудь…",
+  "production_target": "Ich glaube, beim Trödler Hazuo findest du etwas …",
+  "variants": {
+   "A": "Ich denke, bei dem Trödler Hazuo wirst du etwas finden…",
+   "B": "Ich denke, beim Trödler Hazuo wirst du etwas finden…",
+   "C": "Ich denke, beim Trödler Hazuo wirst du etwas finden…"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_32",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Что поможет тебе в этом пути.",
+  "production_target": "Was dir auf diesem Weg helfen wird.",
+  "variants": {
+   "A": "Das dir auf diesem Weg helfen wird.",
+   "B": "Das dir auf diesem Weg hilft.",
+   "C": "Was dir auf diesem Weg helfen wird."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_34",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Он же барахольщик. Какое-нибудь барахло.",
+  "production_target": "Er ist ein Trödler. Irgendein Trödel.",
+  "variants": {
+   "A": "Er ist doch ein Trödler. Irgendwelcher Trödel.",
+   "B": "Er ist doch ein Trödler. Irgendwelcher Ramsch.",
+   "C": "Er ist ein Trödler. Irgendwelcher Trödel."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_35",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Leon",
+  "source": "Ладно, я загляну к нему.",
+  "production_target": "Na gut, ich schau mal bei ihm vorbei.",
+  "variants": {
+   "A": "Gut, ich schau bei ihm vorbei.",
+   "B": "Gut, ich schau bei ihm vorbei.",
+   "C": "Gut, ich schau bei ihm rein."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_5",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Tsuru",
+  "source": "А зачем тогда пришли?",
+  "production_target": "Warum seid ihr dann hier?",
+  "variants": {
+   "A": "Und wozu seid ihr dann gekommen?",
+   "B": "Und wozu seid ihr dann gekommen?",
+   "C": "Wozu seid ihr dann überhaupt gekommen?"
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_6",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Tsuru",
+  "source": "Чайный домик — не приют для бездомных.",
+  "production_target": "Ein Teehaus ist kein Obdachlosenheim.",
+  "variants": {
+   "A": "Das Teehaus ist kein Obdachlosenasyl.",
+   "B": "Ein Teehaus ist kein Obdachlosenasyl.",
+   "C": "Das Teehaus ist kein Obdachlosenheim."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_7",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Leon",
+  "source": "Мне нужен сопровождающий в город.",
+  "production_target": "Ich brauche eine Begleitung in die Stadt.",
+  "variants": {
+   "A": "Ich brauche einen Begleiter in die Stadt.",
+   "B": "Ich brauch jemanden, der mich in die Stadt begleitet.",
+   "C": "Ich brauch einen Begleiter in die Stadt."
+  }
+ },
+ {
+  "lang": "de",
+  "context": "hub1_teahouse_1_8",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Momo",
+  "source": "ТЕБЕ?!",
+  "production_target": "DU?!",
+  "variants": {
+   "A": "DIR?!",
+   "B": "DIR?!",
+   "C": "DU?!"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_11",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "Все пауки такие?",
+  "production_target": "Tous les araignées sont comme ça ?",
+  "variants": {
+   "A": "Tous les araignées sont comme ça ?",
+   "B": "Toutes les araignées sont comme ça ?",
+   "C": "Tous les araignées sont comme ça ?"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_12",
+  "scene": "hub1_first_1",
+  "speaker": "Joe",
+  "source": "Хранители знаний, да",
+  "production_target": "Gardiens du savoir, oui",
+  "variants": {
+   "A": "Gardiens du savoir, en effet",
+   "B": "Gardiens du savoir, oui",
+   "C": "Les gardiens du savoir, oui"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_13",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "Скукота.",
+  "production_target": "Ennuyeux",
+  "variants": {
+   "A": "Chiant.",
+   "B": "Ça craint.",
+   "C": "Chiant."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_14",
+  "scene": "hub1_first_1",
+  "speaker": "Ray",
+  "source": "Очень интересно. И спасибо, что подкинули нас.",
+  "production_target": "Très intéressant. Et merci de nous avoir déposés.",
+  "variants": {
+   "A": "Très intéressant. Et merci de nous avoir déposés.",
+   "B": "C'est très intéressant. Et merci de nous avoir déposés.",
+   "C": "Très intéressant. Et merci de nous avoir déposés."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_16",
+  "scene": "hub1_first_1",
+  "speaker": "Hazuo",
+  "source": "Не мог пройти мимо вас, тем более напоминаете мне племянников.",
+  "production_target": "Je ne pouvais pas vous laisser, d’autant plus que vous me rappelez mes neveux",
+  "variants": {
+   "A": "Je ne pouvais passer à côté de vous, d'autant plus que vous me rappelez mes neveux.",
+   "B": "Je ne pouvais pas passer à côté de vous, d'autant plus que vous me rappelez mes neveux.",
+   "C": "Je ne pouvais pas passer à côté de vous, d'autant plus que vous me rappelez mes neveux."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_17",
+  "scene": "hub1_first_1",
+  "speaker": "Hazuo",
+  "source": "Только… с чешуей и шерстью.",
+  "production_target": "Seulement… avec des écailles et de la fourrure.",
+  "variants": {
+   "A": "Seulement… avec des écailles et des poils.",
+   "B": "Seulement… avec des écailles et des poils.",
+   "C": "Seulement… avec des écailles et de la fourrure."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_18",
+  "scene": "hub1_first_1",
+  "speaker": "Hazuo",
+  "source": "Заглядывайте ко мне в «Тысячу мелочей»!",
+  "production_target": "Passez me voir à la « Mille et une babioles » !",
+  "variants": {
+   "A": "Passez me voir à « Mille et une babioles » !",
+   "B": "Passez me voir à « Mille et une babioles » !",
+   "C": "Passez me voir à « Mille et une babioles » !"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_19",
+  "scene": "hub1_first_1",
+  "speaker": "Ray",
+  "source": "Хорошо, спасибо!",
+  "production_target": "D’accord, merci !",
+  "variants": {
+   "A": "Très bien, merci !",
+   "B": "Bien, merci !",
+   "C": "Bien, merci !"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_20",
+  "scene": "hub1_first_1",
+  "speaker": "Joe",
+  "source": "У меня здесь есть свои дела. Встретимся позже",
+  "production_target": "J’ai mes propres affaires ici. On se voit plus tard",
+  "variants": {
+   "A": "J'ai mes propres affaires ici. On se voit plus tard",
+   "B": "J'ai mes propres affaires ici. On se retrouve plus tard",
+   "C": "J'ai mes propres affaires ici. Nous nous retrouverons plus tard"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_23",
+  "scene": "hub1_first_1",
+  "speaker": "Ray",
+  "source": "У меня от него чешуя дыбом стоит.",
+  "production_target": "Il me donne la chair de poule.",
+  "variants": {
+   "A": "Il me donne la chair de poule.",
+   "B": "Rien que d'y penser, ça me hérisse les écailles.",
+   "C": "Il me fait dresser les écailles."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_24",
+  "scene": "hub1_first_1",
+  "speaker": "Ray",
+  "source": "Серьезно, Хадзуо его собрат, но рядом с ним, я не чувствую такого страха.",
+  "production_target": "Sérieusement, Hazuo est son frère, mais à côté de lui, je ne ressens pas une telle peur.",
+  "variants": {
+   "A": "Sérieusement, Hazuo est son semblable, mais près de lui, je ne ressens pas une telle peur.",
+   "B": "Sérieusement, Hazuo est son semblable, mais à ses côtés, je ne ressens pas une telle peur.",
+   "C": "Sérieusement, Hazuo est son semblable, mais à côté de lui, je ne ressens pas une telle peur."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_25",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "А я думал, вы лучшие подружки.",
+  "production_target": "Et moi qui pensais que vous étiez les meilleures amies du monde.",
+  "variants": {
+   "A": "Et moi qui pensais que vous étiez les meilleures amies.",
+   "B": "Et moi qui croyais que vous étiez les meilleures copines.",
+   "C": "Moi qui croyais que vous étiez les meilleures copines."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_26",
+  "scene": "hub1_first_1",
+  "speaker": "Ray",
+  "source": "Ха-ха. Что будем дальше делать?",
+  "production_target": "Ha-ha. Qu'est-ce qu'on fait maintenant ?",
+  "variants": {
+   "A": "Haha. Que faisons-nous ensuite ?",
+   "B": "Haha. Que faisons-nous ensuite ?",
+   "C": "Haha. Qu'est-ce qu'on fait maintenant ?"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_27",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "Кажется, я не ел целую вечность.",
+  "production_target": "J'ai l'impression de n'avoir pas mangé depuis une éternité.",
+  "variants": {
+   "A": "On dirait que j'ai pas bouffé depuis une éternité.",
+   "B": "On dirait que j'ai pas bouffé depuis une éternité.",
+   "C": "On dirait que j'ai pas mangé depuis une éternité."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_28",
+  "scene": "hub1_first_1",
+  "speaker": "Leon",
+  "source": "Может, набьём животы?",
+  "production_target": "Et si on se remplissait la panse ?",
+  "variants": {
+   "A": "On se remplit la panse ?",
+   "B": "On se bourre la dalle ?",
+   "C": "On se bourre la dalle ?"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_first_1_29",
+  "scene": "hub1_first_1",
+  "speaker": "Ray",
+  "source": "Можно.",
+  "production_target": "On peut.",
+  "variants": {
+   "A": "On peut.",
+   "B": "D'accord.",
+   "C": "Oui."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_10",
+  "scene": "hub1_ramen_1",
+  "speaker": "Saki",
+  "source": "ЗАТКНИСЬ, СТАРЫЙ! Не приставай к ним!",
+  "production_target": "TAIS-TOI, VIEUX ! Ne les embête pas",
+  "variants": {
+   "A": "FERME-LA, VIEUX ! Laisse-les tranquilles !",
+   "B": "FERME-LA, VIEUX ! Laisse-les tranquilles !",
+   "C": "LA FERME, LE VIEUX ! Laisse-les tranquilles !"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_11",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Да я ничего не делал!",
+  "production_target": "Mais je n'ai rien fait",
+  "variants": {
+   "A": "Mais j'ai rien fait !",
+   "B": "Mais j'ai rien fait !",
+   "C": "Mais je n'ai rien fait !"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_12",
+  "scene": "hub1_ramen_1",
+  "speaker": "Saki",
+  "source": "Вот и не делай!",
+  "production_target": "Alors ne fais rien",
+  "variants": {
+   "A": "Alors ne le fais pas !",
+   "B": "Eh ben fais pas ça !",
+   "C": "Eh bien, ne le fais pas !"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_13",
+  "scene": "hub1_ramen_1",
+  "speaker": "Ray",
+  "source": "Нам нужно где-то остановиться.",
+  "production_target": "Nous devons nous arrêter quelque part",
+  "variants": {
+   "A": "Il nous faut un endroit où nous loger.",
+   "B": "Il nous faut un endroit où nous poser.",
+   "C": "Il nous faut un endroit où séjourner."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_14",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "Мне все равно!",
+  "production_target": "Je m'en fous",
+  "variants": {
+   "A": "J'en ai rien à faire !",
+   "B": "Je m'en fous !",
+   "C": "J'm'en fous !"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_15",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "Я хочу только узнать, кому продали мою сестру!",
+  "production_target": "Je veux juste savoir à qui ma sœur a été vendue !",
+  "variants": {
+   "A": "Je veux juste savoir à qui on a vendu ma sœur !",
+   "B": "Je veux juste savoir à qui on a vendu ma sœur !",
+   "C": "Je veux juste savoir à qui ils ont vendu ma sœur !"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_16",
+  "scene": "hub1_ramen_1",
+  "speaker": "Ray",
+  "source": "И как ты это сделаешь?",
+  "production_target": "Et comment vas-tu faire ça ?",
+  "variants": {
+   "A": "Et comment comptes-tu faire ?",
+   "B": "Et comment vas-tu faire ?",
+   "C": "Et comment vas-tu faire ?"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_19",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Отлично! А мне нужны постояльцы!",
+  "production_target": "Parfait ! Et moi, j’ai besoin de clients !",
+  "variants": {
+   "A": "Parfait ! Et moi il me faut des clients !",
+   "B": "Parfait ! Et moi j'ai besoin de clients !",
+   "C": "Parfait ! Et moi j'ai besoin de clients !"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_2",
+  "scene": "hub1_ramen_1",
+  "speaker": "Ray",
+  "source": "Это рамен. Никогда такого не пробовал что ли?",
+  "production_target": "C'est du ramen. Tu n'en as jamais goûté, c'est ça ?",
+  "variants": {
+   "A": "C'est du ramen. T'as jamais goûté ça ou quoi ?",
+   "B": "C'est du ramen. Tu n'en as jamais goûté ?",
+   "C": "C'est du ramen. Tu n'en as jamais goûté ?"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_21",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Так я всегда подслушиваю.",
+  "production_target": "J’écoute toujours aux portes.",
+  "variants": {
+   "A": "J'écoute toujours aux portes, moi.",
+   "B": "C'est que j'écoute toujours aux portes.",
+   "C": "Moi, j'écoute toujours aux portes."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_22",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Вы можете спать в подсобке за раменной.",
+  "production_target": "Vous pouvez dormir dans l’arrière-boutique, derrière le ramen-ya",
+  "variants": {
+   "A": "Vous pouvez dormir dans la réserve derrière le Ramen-ya.",
+   "B": "Vous pouvez dormir dans l'arrière-boutique du Ramen-ya.",
+   "C": "Vous pouvez dormir dans la réserve derrière le ramen-ya."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_23",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Только учтите! Все шиитаке посчитаны.",
+  "production_target": "Mais attention ! Tous les shiitake sont comptés.",
+  "variants": {
+   "A": "Mais attention ! Tous les shiitake sont comptés.",
+   "B": "Mais attention ! J'ai compté tous les shiitake.",
+   "C": "Mais sachez-le ! Tous les shiitake sont comptés."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_24",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "… что за нахрен шиитаке…",
+  "production_target": "… c’est quoi, ces putains de shiitake…",
+  "variants": {
+   "A": "… putain, c'est quoi les shiitake…",
+   "B": "… c'est quoi ce putain de shiitake…",
+   "C": "… c'est quoi ce bordel les shiitake…"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_25",
+  "scene": "hub1_ramen_1",
+  "speaker": "Ray",
+  "source": "Мы бы с радостью у вас остановились.",
+  "production_target": "Nous serions ravis de rester chez vous",
+  "variants": {
+   "A": "Nous serions ravis de loger chez toi.",
+   "B": "Nous serions ravis de rester chez vous.",
+   "C": "Nous serions ravis de séjourner chez vous."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_27",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "А мне и не нужны деньги.",
+  "production_target": "Je n’ai pas besoin d’argent.",
+  "variants": {
+   "A": "Moi, j'ai pas besoin d'argent.",
+   "B": "Et je n'ai pas besoin d'argent.",
+   "C": "Et j'ai pas besoin de thune."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_28",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Я на вас новые рецепты раменов опробую! По рукам?",
+  "production_target": "Je vais tester de nouvelles recettes de ramen sur vous ! Marché conclu ?",
+  "variants": {
+   "A": "Je testerai sur vous mes nouvelles recettes de ramen ! Ça vous dit ?",
+   "B": "Je testerai mes nouvelles recettes de ramen sur vous ! Marché conclu ?",
+   "C": "Je vais tester sur vous de nouvelles recettes de ramen ! Marché conclu ?"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_3",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "Нет. У нас в деревне такого не готовили.",
+  "production_target": "Non. Dans notre village, on ne préparait pas ça.",
+  "variants": {
+   "A": "Non. Dans mon village, on préparait pas ça.",
+   "B": "Non. On ne cuisinait pas ça dans notre village.",
+   "C": "Non. On ne préparait pas ça dans notre village."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_30",
+  "scene": "hub1_ramen_1",
+  "speaker": "Ray",
+  "source": "А нам бы еще какого-нибудь проводника для города…",
+  "production_target": "Il nous faudrait aussi un guide pour la ville…",
+  "variants": {
+   "A": "Et il nous faudrait aussi un guide pour la ville…",
+   "B": "Il nous faudrait aussi un guide pour la ville…",
+   "C": "Et il nous faudrait encore un guide pour la ville…"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_31",
+  "scene": "hub1_ramen_1",
+  "speaker": "Ray",
+  "source": "Мы тут совсем не ориентируемся…",
+  "production_target": "Nous ne nous y retrouvons pas du tout…",
+  "variants": {
+   "A": "On ne s'y retrouve pas du tout ici…",
+   "B": "Nous ne nous repérons pas du tout ici…",
+   "C": "Nous ne nous repérons pas du tout ici…"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_32",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Никто из наших отсюда носа не высунет в Столицу…",
+  "production_target": "Aucun des nôtres ne mettra le nez dehors dans la Capitale…",
+  "variants": {
+   "A": "Aucun des nôtres ne pointera le bout de son nez en dehors d'ici vers la Capitale…",
+   "B": "Aucun des nôtres ne mettra les pieds à la Capitale…",
+   "C": "Personne d'ici ne mettra les pieds à la Capitale…"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_33",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Хотя, загляните в чайный домик.",
+  "production_target": "Cependant, passez au salon de thé.",
+  "variants": {
+   "A": "Par contre, jetez un œil à la maison de thé.",
+   "B": "Par contre, jetez un œil à la maison de thé.",
+   "C": "Cependant, jetez un œil à la maison de thé."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_36",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Вот тут у нас главное место Рыбного тупика - моя раменная!",
+  "production_target": "Ici, c'est le cœur du Cul-de-sac des Poissons, mon Ramen-ya !",
+  "variants": {
+   "A": "Ici, c'est le cœur du Cul-de-sac des Poissons — mon Ramen-ya !",
+   "B": "Voici l'endroit principal du Cul-de-sac des Poissons — mon Ramen-ya !",
+   "C": "Voici l'endroit principal du Cul-de-sac des Poissons — mon Ramen-ya !"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_37",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Но это вы и так знаете.",
+  "production_target": "Mais ça, vous le savez déjà.",
+  "variants": {
+   "A": "Mais ça, vous le savez déjà.",
+   "B": "Mais vous le savez déjà.",
+   "C": "Mais ça, vous le savez déjà."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_38",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Пойдете вот сюда - окажетесь на пристани.",
+  "production_target": "Si vous allez par là, vous arriverez au quai.",
+  "variants": {
+   "A": "Allez par ici, et vous vous retrouverez sur le Quai.",
+   "B": "Allez par ici et vous vous retrouverez au Quai.",
+   "C": "Allez par là — vous tomberez sur le Quai."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_39",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Вот на этот корабль лучше не соваться.",
+  "production_target": "Mieux vaut ne pas s’aventurer sur ce bateau",
+  "variants": {
+   "A": "Ce bateau-là, mieux vaut ne pas y monter.",
+   "B": "Mieux vaut pas s'aventurer sur ce navire.",
+   "C": "Sur ce navire, mieux vaut ne pas monter."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_4",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "А потом я ел только… с пола…",
+  "production_target": "Et après, je n'ai mangé que… par terre…",
+  "variants": {
+   "A": "Et après je mangeais seulement… par terre…",
+   "B": "Et après je mangeais que… par terre…",
+   "C": "Et après je mangeais que… par terre…"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_40",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Если конечно не хотите встретиться с морскими волками.",
+  "production_target": "À moins que vous ne vouliez rencontrer les loups de mer",
+  "variants": {
+   "A": "À moins bien sûr que vous vouliez rencontrer les loups de mer.",
+   "B": "À moins bien sûr que vous ne vouliez rencontrer les loups de mer.",
+   "C": "À moins que vous ne vouliez rencontrer les loups de mer."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_41",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Свернете сюда и окажетесь в банях, шикарное место для отдыха.",
+  "production_target": "Tournez ici et vous serez aux bains, un endroit magnifique pour se détendre.",
+  "variants": {
+   "A": "Tournez par ici et vous serez aux bains, un endroit parfait pour se détendre.",
+   "B": "Tournez par ici et vous arriverez aux bains, un endroit chic pour se reposer.",
+   "C": "Tournez ici et vous arriverez aux bains, un endroit chic pour se détendre."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_42",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Тут будет лавка травника,",
+  "production_target": "Ici, il y aura la boutique de l’herboriste,",
+  "variants": {
+   "A": "Ici, ce sera la boutique de l'herboriste,",
+   "B": "Ici, ce sera la boutique de l'herboriste,",
+   "C": "Là, ce sera la boutique de l'herboriste,"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_43",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "а тут барахолка.",
+  "production_target": "et là, le marché aux puces",
+  "variants": {
+   "A": "et là, la brocante.",
+   "B": "et ici, c'est la baraque à fringues.",
+   "C": "et là, la brocante."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_46",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "Ясно, погнали.",
+  "production_target": "Clair, allons-y",
+  "variants": {
+   "A": "Compris, on y va.",
+   "B": "Compris, on se casse.",
+   "C": "Compris, on y va."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_7",
+  "scene": "hub1_ramen_1",
+  "speaker": "Leon",
+  "source": "ЕБАТЬ. КАК. ВКУСНО.",
+  "production_target": "PUTAIN. QUE. C'EST. BON.",
+  "variants": {
+   "A": "PUTAIN. C'EST. BON.",
+   "B": "PUTAIN. C'EST. BON.",
+   "C": "PUTAIN. TROP. BON."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_ramen_1_9",
+  "scene": "hub1_ramen_1",
+  "speaker": "Motoki",
+  "source": "Я всегда говорю. Ешь рамен - БУДЕШЬ КАК КАМЕНЬ!",
+  "production_target": "Je dis toujours. Mange du ramen — TU SERAS SOLIDE COMME UN ROC !",
+  "variants": {
+   "A": "Je le dis toujours. Mange du ramen — TU SERAS COMME UN ROC !",
+   "B": "Je le dis toujours. Mange du ramen - TU SERAS COMME UN ROC !",
+   "C": "Je le dis toujours. Mange du ramen — TU SERAS COMME UN ROCHER !"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_10",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Мальчик, половина Империи захочет сдать за награду раньше…",
+  "production_target": "Mon garçon, la moitié de l’Empire voudra te livrer pour la récompense avant…",
+  "variants": {
+   "A": "Petit garçon, la moitié de l'Empire voudra vous livrer pour la récompense avant…",
+   "B": "Petit garçon, la moitié de l'Empire voudra te livrer pour la prime avant…",
+   "C": "Petit, la moitié de l'Empire voudra te livrer pour la récompense avant…"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_11",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Чем ты дойдёшь до соседней улицы.",
+  "production_target": "Que tu n’atteignes la rue d’à côté.",
+  "variants": {
+   "A": "Avec ça, tu n'iras même pas jusqu'à la rue d'à côté.",
+   "B": "Avant que tu n'atteignes la rue voisine.",
+   "C": "À ce que tu puisses atteindre la rue d'à côté."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_12",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Leon",
+  "source": "Да понял я уже, хватит ржать.",
+  "production_target": "J'ai compris, arrête de te marrer.",
+  "variants": {
+   "A": "J'ai pigé, bordel, arrêtez de vous foutre de ma gueule.",
+   "B": "Ouais, j'ai capté, arrêtez de vous marrer.",
+   "C": "J'ai pigé, arrête de te marrer."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_13",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Tsuru",
+  "source": "А куда тебе вообще надо?",
+  "production_target": "Mais où tu dois aller, au juste ?",
+  "variants": {
+   "A": "T'as besoin d'aller où, déjà ?",
+   "B": "Et où tu dois aller au juste ?",
+   "C": "Et où tu dois aller, au juste ?"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_14",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Ray",
+  "source": "Вообще… нам нужна информация о дзинко. Документы, отчеты…",
+  "production_target": "En fait… nous cherchons des informations sur les Jinko. Des documents, des rapports…",
+  "variants": {
+   "A": "En fait… il nous faut des informations sur les Jinko. Des documents, des rapports…",
+   "B": "En fait… il nous faut des informations sur les Jinko. Des documents, des rapports…",
+   "C": "En fait… nous aurions besoin d'informations sur les Jinko. Des documents, des rapports…"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_15",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Ray",
+  "source": "Может подскажите, где ее можно найти?",
+  "production_target": "Pourriez-vous nous dire où les trouver ?",
+  "variants": {
+   "A": "Pourrais-tu nous indiquer où la trouver ?",
+   "B": "Pourriez-vous m'indiquer où la trouver ?",
+   "C": "Pourriez-vous nous indiquer où les trouver ?"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_16",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Вам нужно в Архивы.",
+  "production_target": "Vous devez aller aux Archives.",
+  "variants": {
+   "A": "Vous devez aller aux Archives.",
+   "B": "Vous devez aller aux Archives.",
+   "C": "Il vous faut les Archives."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_17",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Там хранятся все старые документы Империи.",
+  "production_target": "Tous les anciens documents de l'Empire y sont conservés.",
+  "variants": {
+   "A": "On y conserve tous les anciens documents de l'Empire.",
+   "B": "C'est là que sont conservés tous les vieux documents de l'Empire.",
+   "C": "C'est là que sont conservés tous les anciens documents de l'Empire."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_21",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Доставь это послание нашему человеку в Нижнем Городе…",
+  "production_target": "Remets ce message à notre contact dans la Ville Basse…",
+  "variants": {
+   "A": "Livrez ce message à notre contact dans la Ville Basse…",
+   "B": "Livre ce message à notre contact dans la Ville Basse…",
+   "C": "Livrez ce message à notre contact dans la Ville Basse…"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_22",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "И он даст тебе ключ от туннелей под городом.",
+  "production_target": "Et il te donnera la clé des tunnels sous la ville.",
+  "variants": {
+   "A": "Il te donnera la clé des tunnels sous la ville.",
+   "B": "Et il te donnera la clé des tunnels sous la ville.",
+   "C": "Et il te donnera la clé des tunnels sous la ville."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_23",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Там можно попасть в Архив.",
+  "production_target": "Tu pourras y accéder aux Archives.",
+  "variants": {
+   "A": "Là-bas, on peut accéder aux Archives.",
+   "B": "Là, tu pourras accéder aux Archives.",
+   "C": "De là, on peut accéder aux Archives."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_24",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Сделка?",
+  "production_target": "Marché conclu ?",
+  "variants": {
+   "A": "Un marché ?",
+   "B": "Marché ?",
+   "C": "Marché conclu ?"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_25",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Leon",
+  "source": "Уговор.",
+  "production_target": "Marché conclu.",
+  "variants": {
+   "A": "Marché.",
+   "B": "Marché conclu.",
+   "C": "Le marché."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_26",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Ray",
+  "source": "Леон, ты с ума сошел? Как ты проберешься через Нижний город?",
+  "production_target": "Leon, tu es fou ? Comment vas-tu traverser la Ville Basse ?",
+  "variants": {
+   "A": "Leon, tu es fou ? Comment tu vas traverser la Ville Basse ?",
+   "B": "Leon, tu es fou ? Comment vas-tu traverser la Ville Basse ?",
+   "C": "Leon, tu es fou ? Comment vas-tu traverser la Ville Basse ?"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_28",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Tsuru",
+  "source": "Ой, какой самоуверенный.",
+  "production_target": "Oh, comme il est sûr de lui.",
+  "variants": {
+   "A": "Oh, le prétentieux.",
+   "B": "Oh, quel prétentieux.",
+   "C": "Oh, le prétentieux."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_29",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Momo",
+  "source": "Мне нравится.",
+  "production_target": "J'aime bien.",
+  "variants": {
+   "A": "Ça me plaît.",
+   "B": "J'aime bien.",
+   "C": "J'aime bien."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_32",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Что поможет тебе в этом пути.",
+  "production_target": "Ce qui t'aidera sur ce chemin.",
+  "variants": {
+   "A": "Ce qui t'aidera dans ce chemin.",
+   "B": "Qui t'aidera sur ce chemin.",
+   "C": "Qui t'aidera en chemin."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_34",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Yaeko",
+  "source": "Он же барахольщик. Какое-нибудь барахло.",
+  "production_target": "C'est un brocanteur. N'importe quelle babiole.",
+  "variants": {
+   "A": "C'est un brocanteur. Du bric-à-brac.",
+   "B": "C'est un brocanteur. De la brocante.",
+   "C": "C'est un brocanteur. Des babioles, sans doute."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_35",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Leon",
+  "source": "Ладно, я загляну к нему.",
+  "production_target": "D'accord, j'irai le voir.",
+  "variants": {
+   "A": "Bon, j'irai faire un tour chez lui.",
+   "B": "Bon, j'irai lui faire un saut.",
+   "C": "Bon, je passerai le voir."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_4",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Leon",
+  "source": "Даже не начинайте.",
+  "production_target": "Ne commencez même pas.",
+  "variants": {
+   "A": "Y pensez même pas.",
+   "B": "Ne commence même pas.",
+   "C": "Commencez même pas."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_5",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Tsuru",
+  "source": "А зачем тогда пришли?",
+  "production_target": "Alors pourquoi êtes-vous venu ?",
+  "variants": {
+   "A": "Et pourquoi vous êtes venus, alors ?",
+   "B": "Alors pourquoi t'es venu ?",
+   "C": "Alors, pourquoi vous êtes venus ?"
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_7",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Leon",
+  "source": "Мне нужен сопровождающий в город.",
+  "production_target": "J’ai besoin d’un guide pour la ville.",
+  "variants": {
+   "A": "Il me faut un guide pour la ville.",
+   "B": "Il me faut un guide en ville.",
+   "C": "Il me faut un guide pour la ville."
+  }
+ },
+ {
+  "lang": "fr",
+  "context": "hub1_teahouse_1_9",
+  "scene": "hub1_teahouse_1",
+  "speaker": "Tsuru",
+  "source": "Сопровождающий для дзинко?!",
+  "production_target": "Un guide pour un Jinko ?!",
+  "variants": {
+   "A": "Un guide pour un Jinko ?!",
+   "B": "Un accompagnateur pour un Jinko ?!",
+   "C": "Un guide pour un Jinko ?!"
+  }
+ }
+]

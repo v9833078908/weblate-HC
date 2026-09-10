@@ -1,0 +1,218 @@
+{
+ "hub1_first_1_1": {
+  "expected": "sg",
+  "speaker": "Ray",
+  "source": "Леон, вставай. Мы уже приехали.",
+  "position": 1
+ },
+ "hub1_first_1_3": {
+  "expected": "sg",
+  "speaker": "Ray",
+  "source": "Недавно. Ты проспал всю дорогу.",
+  "position": 3
+ },
+ "hub1_first_1_16": {
+  "expected": "pl",
+  "speaker": "Hazuo",
+  "source": "Не мог пройти мимо вас, тем более напоминаете мне племянников.",
+  "position": 16
+ },
+ "hub1_first_1_18": {
+  "expected": "pl",
+  "speaker": "Hazuo",
+  "source": "Заглядывайте ко мне в «Тысячу мелочей»!",
+  "position": 18
+ },
+ "hub1_first_1_21": {
+  "expected": "sg",
+  "speaker": "Leon",
+  "source": "А как мне тебя найти?",
+  "position": 21
+ },
+ "hub1_first_1_22": {
+  "expected": "sg",
+  "speaker": "Joe",
+  "source": "Я тебя сам найду.",
+  "position": 22
+ },
+ "hub1_first_1_25": {
+  "expected": "pl",
+  "speaker": "Leon",
+  "source": "А я думал, вы лучшие подружки.",
+  "position": 25
+ },
+ "hub1_ramen_1_2": {
+  "expected": "sg",
+  "speaker": "Ray",
+  "source": "Это рамен. Никогда такого не пробовал что ли?",
+  "position": 36
+ },
+ "hub1_ramen_1_6": {
+  "expected": "sg",
+  "speaker": "Ray",
+  "source": "Попробуй скорее. Тебе понравится.",
+  "position": 40
+ },
+ "hub1_ramen_1_9": {
+  "expected": "sg",
+  "speaker": "Motoki",
+  "source": "Я всегда говорю. Ешь рамен - БУДЕШЬ КАК КАМЕНЬ!",
+  "position": 42
+ },
+ "hub1_ramen_1_10": {
+  "expected": "sg",
+  "speaker": "Saki",
+  "source": "ЗАТКНИСЬ, СТАРЫЙ! Не приставай к ним!",
+  "position": 43
+ },
+ "hub1_ramen_1_12": {
+  "expected": "sg",
+  "speaker": "Saki",
+  "source": "Вот и не делай!",
+  "position": 45
+ },
+ "hub1_ramen_1_16": {
+  "expected": "sg",
+  "speaker": "Ray",
+  "source": "И как ты это сделаешь?",
+  "position": 49
+ },
+ "hub1_ramen_1_20": {
+  "expected": "sg",
+  "speaker": "Leon",
+  "source": "Ты подслушивал?",
+  "position": 53
+ },
+ "hub1_ramen_1_22": {
+  "expected": "pl",
+  "speaker": "Motoki",
+  "source": "Вы можете спать в подсобке за раменной.",
+  "position": 55
+ },
+ "hub1_ramen_1_23": {
+  "expected": "pl",
+  "speaker": "Motoki",
+  "source": "Только учтите! Все шиитаке посчитаны.",
+  "position": 56
+ },
+ "hub1_ramen_1_25": {
+  "expected": "sg",
+  "speaker": "Ray",
+  "source": "Мы бы с радостью у вас остановились.",
+  "position": 58
+ },
+ "hub1_ramen_1_28": {
+  "expected": "pl",
+  "speaker": "Motoki",
+  "source": "Я на вас новые рецепты раменов опробую! По рукам?",
+  "position": 61
+ },
+ "hub1_ramen_1_33": {
+  "expected": "pl",
+  "speaker": "Motoki",
+  "source": "Хотя, загляните в чайный домик.",
+  "position": 66
+ },
+ "hub1_ramen_1_37": {
+  "expected": "pl",
+  "speaker": "Motoki",
+  "source": "Но это вы и так знаете.",
+  "position": 70
+ },
+ "hub1_ramen_1_38": {
+  "expected": "pl",
+  "speaker": "Motoki",
+  "source": "Пойдете вот сюда - окажетесь на пристани.",
+  "position": 71
+ },
+ "hub1_ramen_1_40": {
+  "expected": "pl",
+  "speaker": "Motoki",
+  "source": "Если конечно не хотите встретиться с морскими волками.",
+  "position": 73
+ },
+ "hub1_ramen_1_41": {
+  "expected": "pl",
+  "speaker": "Motoki",
+  "source": "Свернете сюда и окажетесь в банях, шикарное место для отдыха.",
+  "position": 74
+ },
+ "hub1_ramen_1_45": {
+  "expected": "pl",
+  "speaker": "Motoki",
+  "source": "Если запутаетесь, изучите нашу карту.",
+  "position": 78
+ },
+ "hub1_teahouse_1_4": {
+  "expected": "pl",
+  "speaker": "Leon",
+  "source": "Даже не начинайте.",
+  "position": 93
+ },
+ "hub1_teahouse_1_5": {
+  "expected": "pl",
+  "speaker": "Tsuru",
+  "source": "А зачем тогда пришли?",
+  "position": 94
+ },
+ "hub1_teahouse_1_8": {
+  "expected": "sg",
+  "speaker": "Momo",
+  "source": "ТЕБЕ?!",
+  "position": 97
+ },
+ "hub1_teahouse_1_11": {
+  "expected": "sg",
+  "speaker": "Yaeko",
+  "source": "Чем ты дойдёшь до соседней улицы.",
+  "position": 100
+ },
+ "hub1_teahouse_1_13": {
+  "expected": "sg",
+  "speaker": "Tsuru",
+  "source": "А куда тебе вообще надо?",
+  "position": 102
+ },
+ "hub1_teahouse_1_15": {
+  "expected": "any",
+  "speaker": "Ray",
+  "source": "Может подскажите, где ее можно найти?",
+  "position": 104
+ },
+ "hub1_teahouse_1_16": {
+  "expected": "pl",
+  "speaker": "Yaeko",
+  "source": "Вам нужно в Архивы.",
+  "position": 105
+ },
+ "hub1_teahouse_1_21": {
+  "expected": "sg",
+  "speaker": "Yaeko",
+  "source": "Доставь это послание нашему человеку в Нижнем Городе…",
+  "position": 110
+ },
+ "hub1_teahouse_1_22": {
+  "expected": "sg",
+  "speaker": "Yaeko",
+  "source": "И он даст тебе ключ от туннелей под городом.",
+  "position": 111
+ },
+ "hub1_teahouse_1_26": {
+  "expected": "sg",
+  "speaker": "Ray",
+  "source": "Леон, ты с ума сошел? Как ты проберешься через Нижний город?",
+  "position": 115
+ },
+ "hub1_teahouse_1_31": {
+  "expected": "sg",
+  "speaker": "Yaeko",
+  "source": "Я думаю у барахольщика Хадзуо ты найдешь что-нибудь…",
+  "position": 120
+ },
+ "hub1_teahouse_1_32": {
+  "expected": "sg",
+  "speaker": "Yaeko",
+  "source": "Что поможет тебе в этом пути.",
+  "position": 121
+ }
+}

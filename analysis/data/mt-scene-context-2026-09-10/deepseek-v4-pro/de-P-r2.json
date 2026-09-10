@@ -1,0 +1,693 @@
+{
+ "plan": "2026-09-04-scene-context-for-mt",
+ "corpus": "hub1",
+ "lang": "de",
+ "arm": "P",
+ "repeat": 2,
+ "model": "deepseek-v4-pro",
+ "batch_size": 10,
+ "scene_cap": 60,
+ "scene_rule": "",
+ "prompt_sha_source": "weblate/machinery/llm.py:PROMPT",
+ "wall_seconds": 160.7,
+ "records": [
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 2,
+   "batch": 0,
+   "contexts": [
+    "hub1_teahouse_1_12",
+    "hub1_teahouse_1_19",
+    "hub1_ramen_1_41",
+    "hub1_ramen_1_38",
+    "hub1_ramen_1_13",
+    "hub1_teahouse_1_7",
+    "hub1_ramen_1_39",
+    "hub1_first_1_5",
+    "hub1_ramen_1_29",
+    "hub1_ramen_1_35"
+   ],
+   "string_ids": [
+    "s05b2",
+    "s1492",
+    "s1a35",
+    "se785",
+    "se1c4",
+    "s2eb2",
+    "sfdb1",
+    "s4897",
+    "s4636",
+    "s2b5c"
+   ],
+   "prompt_chars": 15072,
+   "content_chars": 67000,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "seconds": 26.28,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 10,
+    "prompt_tokens": 26826,
+    "completion_tokens": 1942,
+    "total_tokens": 28768,
+    "reasoning_tokens": 1573,
+    "cost": "None"
+   },
+   "raw_chars": 985,
+   "translations": {
+    "hub1_teahouse_1_12": "Ja, hab's kapiert, hör auf zu lachen.",
+    "hub1_teahouse_1_19": "Was für ein Zufall.",
+    "hub1_ramen_1_41": "Biegen Sie hier ab und Sie kommen zu den Bädern, ein herrlicher Ort der Erholung.",
+    "hub1_ramen_1_38": "Gehen Sie hier entlang, dann sind Sie an der Anlegestelle.",
+    "hub1_ramen_1_13": "Wir müssen irgendwo unterkommen.",
+    "hub1_teahouse_1_7": "Ich brauch 'nen Begleiter in die Stadt.",
+    "hub1_ramen_1_39": "An dieses Schiff sollte man sich besser nicht heranwagen.",
+    "hub1_first_1_5": "Keine Ahnung, wie ich das überstehen soll.",
+    "hub1_ramen_1_29": "Deal!",
+    "hub1_ramen_1_35": "Wie find ich die?"
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 2,
+   "batch": 1,
+   "contexts": [
+    "hub1_teahouse_1_13",
+    "hub1_teahouse_1_6",
+    "hub1_teahouse_1_8",
+    "hub1_ramen_1_16",
+    "hub1_ramen_1_9",
+    "hub1_ramen_1_40",
+    "hub1_ramen_1_14",
+    "hub1_teahouse_1_27",
+    "hub1_ramen_1_15",
+    "hub1_teahouse_1_29"
+   ],
+   "string_ids": [
+    "s8ef2",
+    "s89fb",
+    "sf130",
+    "s209b",
+    "s7682",
+    "s2afb",
+    "s33b4",
+    "s73cb",
+    "s2e7a",
+    "s9e9d"
+   ],
+   "prompt_chars": 15072,
+   "content_chars": 66944,
+   "scene_keys": [
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "seconds": 39.09,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 10,
+    "prompt_tokens": 26821,
+    "completion_tokens": 2795,
+    "total_tokens": 29616,
+    "reasoning_tokens": 2311,
+    "cost": "None"
+   },
+   "raw_chars": 1607,
+   "translations": {
+    "hub1_teahouse_1_13": "Und wohin musst du überhaupt?",
+    "hub1_teahouse_1_6": "Das Teehaus ist kein Obdachlosenasyl.",
+    "hub1_teahouse_1_8": "DIR?!",
+    "hub1_ramen_1_16": "Und wie willst du das schaffen?",
+    "hub1_ramen_1_9": "Ich sage immer: Essen Sie Ramen – SIE WERDEN WIE STEIN!",
+    "hub1_ramen_1_40": "Wenn Sie natürlich nicht den Seewölfen begegnen wollen.",
+    "hub1_ramen_1_14": "Mir doch egal!",
+    "hub1_teahouse_1_27": "Über die Dächer.",
+    "hub1_ramen_1_15": "Ich will nur wissen, an wen sie meine Schwester verkauft haben!",
+    "hub1_teahouse_1_29": "Das gefällt mir."
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 2,
+   "batch": 2,
+   "contexts": [
+    "hub1_first_1_29",
+    "hub1_ramen_1_45",
+    "hub1_ramen_1_19",
+    "hub1_ramen_1_12",
+    "hub1_ramen_1_28",
+    "hub1_ramen_1_43",
+    "hub1_ramen_1_37",
+    "hub1_teahouse_1_15",
+    "hub1_teahouse_1_17",
+    "hub1_ramen_1_20"
+   ],
+   "string_ids": [
+    "see7b",
+    "sf3a1",
+    "sde38",
+    "s618c",
+    "sea76",
+    "s9ae9",
+    "se829",
+    "s9df8",
+    "s9f19",
+    "s251e"
+   ],
+   "prompt_chars": 15072,
+   "content_chars": 66938,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "seconds": 42.99,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 10,
+    "prompt_tokens": 26807,
+    "completion_tokens": 3250,
+    "total_tokens": 30057,
+    "reasoning_tokens": 2749,
+    "cost": "None"
+   },
+   "raw_chars": 1744,
+   "translations": {
+    "hub1_first_1_29": "Gerne.",
+    "hub1_ramen_1_45": "Wenn Sie sich nicht zurechtfinden, schauen Sie auf unsere Karte.",
+    "hub1_ramen_1_19": "Ausgezeichnet! Und ich brauche Gäste!",
+    "hub1_ramen_1_12": "Dann mach's nicht!",
+    "hub1_ramen_1_28": "Ich werde neue Ramen-Rezepte an Ihnen ausprobieren! Abgemacht?",
+    "hub1_ramen_1_43": "und hier ist der Trödelladen.",
+    "hub1_ramen_1_37": "Aber das wissen Sie ja schon.",
+    "hub1_teahouse_1_15": "Könnten Sie mir vielleicht sagen, wo ich sie finden kann?",
+    "hub1_teahouse_1_17": "Dort werden alle alten Dokumente des Imperiums aufbewahrt.",
+    "hub1_ramen_1_20": "Hast du gelauscht?"
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 2,
+   "batch": 3,
+   "contexts": [
+    "hub1_first_1_19",
+    "hub1_first_1_15",
+    "hub1_ramen_1_22",
+    "hub1_ramen_1_10",
+    "hub1_teahouse_1_30",
+    "hub1_ramen_1_2",
+    "hub1_teahouse_1_25",
+    "hub1_ramen_1_7",
+    "hub1_ramen_1_44",
+    "hub1_first_1_3"
+   ],
+   "string_ids": [
+    "s1b16",
+    "s9871",
+    "sf549",
+    "s85be",
+    "sdf1d",
+    "s9748",
+    "sadaa",
+    "sdad9",
+    "sc751",
+    "s6810"
+   ],
+   "prompt_chars": 15072,
+   "content_chars": 66895,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "seconds": 43.1,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 10,
+    "prompt_tokens": 26810,
+    "completion_tokens": 3275,
+    "total_tokens": 30085,
+    "reasoning_tokens": 2797,
+    "cost": "None"
+   },
+   "raw_chars": 1610,
+   "translations": {
+    "hub1_first_1_19": "In Ordnung, danke!",
+    "hub1_first_1_15": "Keine Ursache.",
+    "hub1_ramen_1_22": "Sie können in der Abstellkammer hinter dem Ramen-Laden schlafen.",
+    "hub1_ramen_1_10": "HALT DEN MUND, ALTER! Lass sie in Ruhe!",
+    "hub1_teahouse_1_30": "Mir ebenfalls.",
+    "hub1_ramen_1_2": "Das ist Ramen. Hast du das etwa noch nie probiert?",
+    "hub1_teahouse_1_25": "Abgemacht.",
+    "hub1_ramen_1_7": "SCHEISSE. WIE. LECKER.",
+    "hub1_ramen_1_44": "Und direkt über uns befindet sich das Teehaus.",
+    "hub1_first_1_3": "Vor Kurzem. Du hast den ganzen Weg verschlafen."
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 2,
+   "batch": 4,
+   "contexts": [
+    "hub1_ramen_1_23",
+    "hub1_ramen_1_5",
+    "hub1_first_1_1",
+    "hub1_teahouse_1_14",
+    "hub1_first_1_14",
+    "hub1_ramen_1_36",
+    "hub1_ramen_1_34",
+    "hub1_first_1_27",
+    "hub1_ramen_1_30",
+    "hub1_ramen_1_33"
+   ],
+   "string_ids": [
+    "s63ee",
+    "scaba",
+    "saf67",
+    "s51e3",
+    "s04d7",
+    "sb8c4",
+    "sa54d",
+    "s4d67",
+    "se9ff",
+    "sfd6b"
+   ],
+   "prompt_chars": 15072,
+   "content_chars": 67169,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "seconds": 36.13,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 10,
+    "prompt_tokens": 26889,
+    "completion_tokens": 2644,
+    "total_tokens": 29533,
+    "reasoning_tokens": 2125,
+    "cost": "None"
+   },
+   "raw_chars": 1789,
+   "translations": {
+    "hub1_ramen_1_23": "Aber bedenken Sie! Alle Shiitake sind gezählt.",
+    "hub1_ramen_1_5": "Verstanden.",
+    "hub1_first_1_1": "Leon, steh auf. Wir sind schon angekommen.",
+    "hub1_teahouse_1_14": "Eigentlich … brauchen wir Informationen über Jinko. Dokumente, Berichte …",
+    "hub1_first_1_14": "Sehr interessant. Und danke, dass ihr uns mitgenommen habt.",
+    "hub1_ramen_1_36": "Hier ist der wichtigste Ort der Fisch-Sackgasse – mein Ramen-Laden!",
+    "hub1_ramen_1_34": "Die Mädchen von Frau Yaeko sind häufig in der Stadt unterwegs.",
+    "hub1_first_1_27": "Glaub, ich hab seit Ewigkeiten nichts mehr gegessen.",
+    "hub1_ramen_1_30": "Und wir bräuchten auch noch einen Stadtführer …",
+    "hub1_ramen_1_33": "Aber schauen Sie doch mal im Teehaus vorbei."
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 2,
+   "batch": 5,
+   "contexts": [
+    "hub1_first_1_10",
+    "hub1_ramen_1_6",
+    "hub1_first_1_6",
+    "hub1_teahouse_1_5",
+    "hub1_ramen_1_3",
+    "hub1_teahouse_1_18",
+    "hub1_first_1_12",
+    "hub1_ramen_1_32",
+    "hub1_teahouse_1_16",
+    "hub1_first_1_2"
+   ],
+   "string_ids": [
+    "s297f",
+    "s6859",
+    "safdb",
+    "s8727",
+    "s061c",
+    "s135b",
+    "s8820",
+    "s8265",
+    "s1166",
+    "sf4f3"
+   ],
+   "prompt_chars": 15072,
+   "content_chars": 66968,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "seconds": 47.79,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 10,
+    "prompt_tokens": 26815,
+    "completion_tokens": 3444,
+    "total_tokens": 30259,
+    "reasoning_tokens": 2958,
+    "cost": "None"
+   },
+   "raw_chars": 1675,
+   "translations": {
+    "hub1_first_1_10": "Ich hab langsam die Nase voll von diesen Geschichtsstunden.",
+    "hub1_ramen_1_6": "Probier schnell, es wird dir schmecken.",
+    "hub1_first_1_6": "Willkommen in der Hauptstadt.",
+    "hub1_teahouse_1_5": "Und warum seid ihr dann gekommen?",
+    "hub1_ramen_1_3": "Nein. Bei uns im Dorf wurde so was nicht gekocht.",
+    "hub1_teahouse_1_18": "Und wie kommen wir da hin?",
+    "hub1_first_1_12": "Hüter des Wissens, ja.",
+    "hub1_ramen_1_32": "Keiner von uns würde hier seine Nase in die Hauptstadt hinausstecken …",
+    "hub1_teahouse_1_16": "Ihr müsst in die Archive.",
+    "hub1_first_1_2": "Okay … Wie lange sind wir schon hier?"
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 2,
+   "batch": 6,
+   "contexts": [
+    "hub1_first_1_21",
+    "hub1_ramen_1_25",
+    "hub1_first_1_13",
+    "hub1_teahouse_1_34",
+    "hub1_teahouse_1_2",
+    "hub1_teahouse_1_20",
+    "hub1_ramen_1_26",
+    "hub1_teahouse_1_11",
+    "hub1_first_1_23",
+    "hub1_teahouse_1_10"
+   ],
+   "string_ids": [
+    "sda16",
+    "s260c",
+    "sd625",
+    "s111c",
+    "s957d",
+    "sfe6f",
+    "s916f",
+    "s0ce4",
+    "s5507",
+    "sb325"
+   ],
+   "prompt_chars": 15072,
+   "content_chars": 67105,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "seconds": 45.3,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 10,
+    "prompt_tokens": 26863,
+    "completion_tokens": 3345,
+    "total_tokens": 30208,
+    "reasoning_tokens": 2829,
+    "cost": "None"
+   },
+   "raw_chars": 1770,
+   "translations": {
+    "hub1_first_1_21": "Und wie finde ich dich?",
+    "hub1_ramen_1_25": "Wir würden gerne bei euch bleiben.",
+    "hub1_first_1_13": "Öde.",
+    "hub1_teahouse_1_34": "Er ist doch Trödler. Irgendwelcher Trödel.",
+    "hub1_teahouse_1_2": "Oooh, was für ein süßes Füchslein.",
+    "hub1_teahouse_1_20": "Ich habe ein Angebot, das für uns beide vorteilhaft ist, junger Mann.",
+    "hub1_ramen_1_26": "Aber wir haben nur sehr wenig Geld.",
+    "hub1_teahouse_1_11": "als du die nächste Straße erreichst.",
+    "hub1_first_1_23": "Mir sträuben sich die Schuppen bei ihm.",
+    "hub1_teahouse_1_10": "Junge, die halbe Imperium wird dich für die Belohnung ausliefern wollen, ehe …"
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 2,
+   "batch": 7,
+   "contexts": [
+    "hub1_ramen_1_11",
+    "hub1_teahouse_1_35",
+    "hub1_first_1_20",
+    "hub1_teahouse_1_9",
+    "hub1_first_1_9",
+    "hub1_ramen_1_21",
+    "hub1_first_1_8",
+    "hub1_teahouse_1_21",
+    "hub1_ramen_1_17",
+    "hub1_first_1_16"
+   ],
+   "string_ids": [
+    "sab45",
+    "s32f5",
+    "s048e",
+    "se8fb",
+    "s77b1",
+    "sfb68",
+    "sb397",
+    "s3320",
+    "see96",
+    "s5931"
+   ],
+   "prompt_chars": 15072,
+   "content_chars": 67090,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "seconds": 52.47,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 10,
+    "prompt_tokens": 26849,
+    "completion_tokens": 4029,
+    "total_tokens": 30878,
+    "reasoning_tokens": 3525,
+    "cost": "None"
+   },
+   "raw_chars": 1746,
+   "translations": {
+    "hub1_ramen_1_11": "Aber ich habe nichts getan!",
+    "hub1_teahouse_1_35": "Okay, ich schau mal bei ihm vorbei.",
+    "hub1_first_1_20": "Ich habe hier noch eigene Angelegenheiten. Wir sehen uns später",
+    "hub1_teahouse_1_9": "Ein Begleiter für einen Jinko?!",
+    "hub1_first_1_9": "Er fängt wieder mit der alten Leier an.",
+    "hub1_ramen_1_21": "Nun, ich lausche eben immer.",
+    "hub1_first_1_8": "Sie wurden vor nicht allzu langer Zeit erbaut, noch unter dem dritten Kaiser Akito.",
+    "hub1_teahouse_1_21": "Überbringe diese Botschaft an unseren Mann in der Unterstadt…",
+    "hub1_ramen_1_17": "Keine Ahnung.",
+    "hub1_first_1_16": "Ich konnte nicht an Ihnen vorübergehen, zumal Sie mich an meine Neffen erinnern."
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 2,
+   "batch": 8,
+   "contexts": [
+    "hub1_ramen_1_18",
+    "hub1_ramen_1_46",
+    "hub1_first_1_25",
+    "hub1_ramen_1_24",
+    "hub1_teahouse_1_32",
+    "hub1_first_1_26",
+    "hub1_teahouse_1_4",
+    "hub1_first_1_4",
+    "hub1_first_1_17",
+    "hub1_teahouse_1_22"
+   ],
+   "string_ids": [
+    "se2cb",
+    "s9071",
+    "s6153",
+    "sc2f8",
+    "scff4",
+    "sa2ae",
+    "sff54",
+    "sc869",
+    "s4b95",
+    "s9ae5"
+   ],
+   "prompt_chars": 15072,
+   "content_chars": 66957,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "seconds": 49.22,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 10,
+    "prompt_tokens": 26802,
+    "completion_tokens": 3537,
+    "total_tokens": 30339,
+    "reasoning_tokens": 3052,
+    "cost": "None"
+   },
+   "raw_chars": 1661,
+   "translations": {
+    "hub1_ramen_1_18": "Wir brauchen ein Zimmer für ein paar Tage.",
+    "hub1_ramen_1_46": "Alles klar, los geht's.",
+    "hub1_first_1_25": "Und ich dachte, ihr seid beste Freundinnen.",
+    "hub1_ramen_1_24": "… was zum Scheiß ist Shiitake…",
+    "hub1_teahouse_1_32": "Das wird dir auf diesem Weg helfen.",
+    "hub1_first_1_26": "Haha. Was machen wir als Nächstes?",
+    "hub1_teahouse_1_4": "Fangt gar nicht erst an.",
+    "hub1_first_1_4": "Schon wieder die Aussicht auf den Scheiß verpennt?",
+    "hub1_first_1_17": "Nur… mit Schuppen und Fell.",
+    "hub1_teahouse_1_22": "Und er wird dir den Schlüssel zu den Tunneln unter der Stadt geben."
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 2,
+   "batch": 9,
+   "contexts": [
+    "hub1_ramen_1_27",
+    "hub1_teahouse_1_23",
+    "hub1_teahouse_1_28",
+    "hub1_ramen_1_31",
+    "hub1_teahouse_1_24",
+    "hub1_teahouse_1_26",
+    "hub1_first_1_11",
+    "hub1_first_1_18",
+    "hub1_ramen_1_1",
+    "hub1_first_1_24"
+   ],
+   "string_ids": [
+    "s2d0a",
+    "sfcd2",
+    "s9266",
+    "s254a",
+    "s3f4d",
+    "sa619",
+    "s0214",
+    "sf9ce",
+    "sb1e2",
+    "s4f36"
+   ],
+   "prompt_chars": 15072,
+   "content_chars": 67029,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "seconds": 45.97,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 10,
+    "prompt_tokens": 26838,
+    "completion_tokens": 3432,
+    "total_tokens": 30270,
+    "reasoning_tokens": 2940,
+    "cost": "None"
+   },
+   "raw_chars": 1679,
+   "translations": {
+    "hub1_ramen_1_27": "Und ich brauche auch kein Geld.",
+    "hub1_teahouse_1_23": "Dort gelangt man ins Archiv.",
+    "hub1_teahouse_1_28": "Oh, wie selbstsicher.",
+    "hub1_ramen_1_31": "Wir finden uns hier überhaupt nicht zurecht …",
+    "hub1_teahouse_1_24": "Ein Handel?",
+    "hub1_teahouse_1_26": "Leon, bist du verrückt geworden? Wie willst du durch die Unterstadt gelangen?",
+    "hub1_first_1_11": "Sind alle Spinnen so?",
+    "hub1_first_1_18": "Schauen Sie bei mir in „Tausend Kleinigkeiten“ vorbei!",
+    "hub1_ramen_1_1": "Was ist das für ein Scheiß?!",
+    "hub1_first_1_24": "Ernsthaft, Hazuo ist sein Bruder, aber neben ihm habe ich nicht solche Angst."
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "P",
+   "lang": "de",
+   "repeat": 2,
+   "batch": 10,
+   "contexts": [
+    "hub1_teahouse_1_3",
+    "hub1_teahouse_1_1",
+    "hub1_ramen_1_42",
+    "hub1_first_1_22",
+    "hub1_ramen_1_4",
+    "hub1_teahouse_1_33",
+    "hub1_teahouse_1_31",
+    "hub1_first_1_28",
+    "hub1_first_1_7"
+   ],
+   "string_ids": [
+    "s0566",
+    "s828d",
+    "sb951",
+    "sdadf",
+    "s5ed2",
+    "sa46f",
+    "safc1",
+    "s0f46",
+    "s8780"
+   ],
+   "prompt_chars": 15072,
+   "content_chars": 66757,
+   "scene_keys": [
+    "hub1_first_1",
+    "hub1_ramen_1",
+    "hub1_teahouse_1"
+   ],
+   "seconds": 28.03,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 9,
+    "prompt_tokens": 26752,
+    "completion_tokens": 2024,
+    "total_tokens": 28776,
+    "reasoning_tokens": 1585,
+    "cost": "None"
+   },
+   "raw_chars": 1484,
+   "translations": {
+    "hub1_teahouse_1_3": "Und ein sympathischer Naga …",
+    "hub1_teahouse_1_1": "Na, wen haben wir denn da?",
+    "hub1_ramen_1_42": "Hier wird der Kräuterladen sein,",
+    "hub1_first_1_22": "Ich finde dich schon selbst.",
+    "hub1_ramen_1_4": "Und dann hab ich nur noch … vom Boden gegessen …",
+    "hub1_teahouse_1_33": "Was genau?",
+    "hub1_teahouse_1_31": "Ich denke, beim Trödler Hazuo wirst du etwas finden …",
+    "hub1_first_1_28": "Vielleicht stopfen wir uns die Bäuche voll?",
+    "hub1_first_1_7": "Nun, oder in seinen ›besten‹ Teil — die Fisch-Sackgasse."
+   },
+   "contract": "ok",
+   "parsed_strings": 9
+  }
+ ]
+}

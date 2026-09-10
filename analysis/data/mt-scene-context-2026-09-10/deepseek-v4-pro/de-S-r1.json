@@ -1,0 +1,498 @@
+{
+ "plan": "2026-09-04-scene-context-for-mt",
+ "corpus": "hub1",
+ "lang": "de",
+ "arm": "S",
+ "repeat": 1,
+ "model": "deepseek-v4-pro",
+ "batch_size": 10,
+ "scene_cap": 60,
+ "scene_rule": "29. The \"scene\" object, when present, is the dialogue scene the strings of this batch belong to, in engine order: each line carries its number, its speaker and its source, and \"translation\" when that line was already translated outside this batch. It is reference material for who is addressing whom, how many people are addressed, which register and politeness form the scene uses, and for staying consistent with the translations already made in it. Do not translate it, do not copy or quote it, and do not emit any of its content that is not in the strings you were asked to translate.",
+ "prompt_sha_source": "weblate/machinery/llm.py:PROMPT",
+ "wall_seconds": 267.1,
+ "records": [
+  {
+   "arm": "S",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 0,
+   "contexts": [
+    "hub1_first_1_1",
+    "hub1_first_1_2",
+    "hub1_first_1_3",
+    "hub1_first_1_4",
+    "hub1_first_1_5",
+    "hub1_first_1_6",
+    "hub1_first_1_7",
+    "hub1_first_1_8",
+    "hub1_first_1_9",
+    "hub1_first_1_10"
+   ],
+   "string_ids": [
+    "s8482",
+    "s20ff",
+    "sfc0a",
+    "s642d",
+    "s5d1d",
+    "s0c88",
+    "s0b43",
+    "s807b",
+    "s622f",
+    "s4acf"
+   ],
+   "prompt_chars": 15662,
+   "content_chars": 69884,
+   "scene_keys": [
+    "hub1_first_1"
+   ],
+   "seconds": 55.7,
+   "error": "ReadTimeout: The read operation timed out",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "S",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 1,
+   "contexts": [
+    "hub1_first_1_11",
+    "hub1_first_1_12",
+    "hub1_first_1_13",
+    "hub1_first_1_14",
+    "hub1_first_1_15",
+    "hub1_first_1_16",
+    "hub1_first_1_17",
+    "hub1_first_1_18",
+    "hub1_first_1_19",
+    "hub1_first_1_20"
+   ],
+   "string_ids": [
+    "sf771",
+    "sa6d6",
+    "s4810",
+    "sbe0b",
+    "s7d0a",
+    "se61a",
+    "se573",
+    "s3e50",
+    "s62a1",
+    "s2851"
+   ],
+   "prompt_chars": 15662,
+   "content_chars": 69780,
+   "scene_keys": [
+    "hub1_first_1"
+   ],
+   "seconds": 37.98,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 10,
+    "prompt_tokens": 27980,
+    "completion_tokens": 2157,
+    "total_tokens": 30137,
+    "reasoning_tokens": 1669,
+    "cost": "None"
+   },
+   "raw_chars": 1651,
+   "translations": {
+    "hub1_first_1_11": "Sind alle Spinnen so?",
+    "hub1_first_1_12": "Hüter des Wissens, ja",
+    "hub1_first_1_13": "Langweilig.",
+    "hub1_first_1_14": "Sehr interessant. Und danke, dass Sie uns mitgenommen haben.",
+    "hub1_first_1_15": "Kein Problem.",
+    "hub1_first_1_16": "Ich konnte nicht an Ihnen vorbeigehen, zumal Sie mich an meine Neffen erinnern.",
+    "hub1_first_1_17": "Nur … mit Schuppen und Fell.",
+    "hub1_first_1_18": "Schauen Sie bei mir in „Tausend Kleinigkeiten“ vorbei!",
+    "hub1_first_1_19": "Gut, danke!",
+    "hub1_first_1_20": "Ich habe hier meine eigenen Angelegenheiten. Wir treffen uns später"
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "S",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 2,
+   "contexts": [
+    "hub1_first_1_21",
+    "hub1_first_1_22",
+    "hub1_first_1_23",
+    "hub1_first_1_24",
+    "hub1_first_1_25",
+    "hub1_first_1_26",
+    "hub1_first_1_27",
+    "hub1_first_1_28",
+    "hub1_first_1_29"
+   ],
+   "string_ids": [
+    "s2f04",
+    "s8ed4",
+    "s01f4",
+    "s4259",
+    "s8c30",
+    "s0f5a",
+    "s1265",
+    "s6000",
+    "sa1ef"
+   ],
+   "prompt_chars": 15662,
+   "content_chars": 69952,
+   "scene_keys": [
+    "hub1_first_1"
+   ],
+   "seconds": 55.39,
+   "error": "ReadTimeout: The read operation timed out",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "S",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 3,
+   "contexts": [
+    "hub1_ramen_1_1",
+    "hub1_ramen_1_2",
+    "hub1_ramen_1_3",
+    "hub1_ramen_1_4",
+    "hub1_ramen_1_5",
+    "hub1_ramen_1_6",
+    "hub1_ramen_1_7",
+    "hub1_ramen_1_9",
+    "hub1_ramen_1_10",
+    "hub1_ramen_1_11"
+   ],
+   "string_ids": [
+    "s69dd",
+    "s00bf",
+    "s05a8",
+    "sb1cf",
+    "sf43f",
+    "sf844",
+    "s1156",
+    "s0553",
+    "sfb3a",
+    "s4384"
+   ],
+   "prompt_chars": 15662,
+   "content_chars": 71374,
+   "scene_keys": [
+    "hub1_ramen_1"
+   ],
+   "seconds": 55.7,
+   "error": "ReadTimeout: The read operation timed out",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "S",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 4,
+   "contexts": [
+    "hub1_ramen_1_12",
+    "hub1_ramen_1_13",
+    "hub1_ramen_1_14",
+    "hub1_ramen_1_15",
+    "hub1_ramen_1_16",
+    "hub1_ramen_1_17",
+    "hub1_ramen_1_18",
+    "hub1_ramen_1_19",
+    "hub1_ramen_1_20",
+    "hub1_ramen_1_21"
+   ],
+   "string_ids": [
+    "se2b0",
+    "s31e0",
+    "s1ded",
+    "se0e3",
+    "see9a",
+    "s1a86",
+    "s4a8f",
+    "s5862",
+    "s8e04",
+    "s595a"
+   ],
+   "prompt_chars": 15662,
+   "content_chars": 71290,
+   "scene_keys": [
+    "hub1_ramen_1"
+   ],
+   "seconds": 55.5,
+   "error": "ReadTimeout: The read operation timed out",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "S",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 5,
+   "contexts": [
+    "hub1_ramen_1_22",
+    "hub1_ramen_1_23",
+    "hub1_ramen_1_24",
+    "hub1_ramen_1_25",
+    "hub1_ramen_1_26",
+    "hub1_ramen_1_27",
+    "hub1_ramen_1_28",
+    "hub1_ramen_1_29",
+    "hub1_ramen_1_30",
+    "hub1_ramen_1_31"
+   ],
+   "string_ids": [
+    "sc970",
+    "s14a6",
+    "s9bae",
+    "s9142",
+    "s1af0",
+    "s1742",
+    "s33d2",
+    "se851",
+    "sfb94",
+    "sc576"
+   ],
+   "prompt_chars": 15662,
+   "content_chars": 71455,
+   "scene_keys": [
+    "hub1_ramen_1"
+   ],
+   "seconds": 55.51,
+   "error": "ReadTimeout: The read operation timed out",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "S",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 6,
+   "contexts": [
+    "hub1_ramen_1_32",
+    "hub1_ramen_1_33",
+    "hub1_ramen_1_34",
+    "hub1_ramen_1_35",
+    "hub1_ramen_1_36",
+    "hub1_ramen_1_37",
+    "hub1_ramen_1_38",
+    "hub1_ramen_1_39",
+    "hub1_ramen_1_40",
+    "hub1_ramen_1_41"
+   ],
+   "string_ids": [
+    "s167b",
+    "s1dc9",
+    "sd4ab",
+    "se93a",
+    "sd3ed",
+    "s324a",
+    "seb23",
+    "s7f43",
+    "s5755",
+    "s58c0"
+   ],
+   "prompt_chars": 15662,
+   "content_chars": 71641,
+   "scene_keys": [
+    "hub1_ramen_1"
+   ],
+   "seconds": 55.52,
+   "error": "ReadTimeout: The read operation timed out",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "S",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 7,
+   "contexts": [
+    "hub1_ramen_1_42",
+    "hub1_ramen_1_43",
+    "hub1_ramen_1_44",
+    "hub1_ramen_1_45",
+    "hub1_ramen_1_46"
+   ],
+   "string_ids": [
+    "s3973",
+    "sc1fe",
+    "s4fe9",
+    "s7878",
+    "sbe44"
+   ],
+   "prompt_chars": 15662,
+   "content_chars": 70497,
+   "scene_keys": [
+    "hub1_ramen_1"
+   ],
+   "seconds": 44.83,
+   "usage": {
+    "model": "deepseek-v4-pro",
+    "batch_size": 5,
+    "prompt_tokens": 28195,
+    "completion_tokens": 1854,
+    "total_tokens": 30049,
+    "reasoning_tokens": 1607,
+    "cost": "None"
+   },
+   "raw_chars": 837,
+   "translations": {
+    "hub1_ramen_1_42": "Hier wird der Kräuterladen sein,",
+    "hub1_ramen_1_43": "und hier ist der Trödelladen.",
+    "hub1_ramen_1_44": "Und direkt über uns befindet sich das Teehaus.",
+    "hub1_ramen_1_45": "Wenn Sie sich verirren, studieren Sie unsere Karte.",
+    "hub1_ramen_1_46": "Alles klar, los geht's."
+   },
+   "contract": "ok",
+   "parsed_strings": 5
+  },
+  {
+   "arm": "S",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 8,
+   "contexts": [
+    "hub1_teahouse_1_1",
+    "hub1_teahouse_1_2",
+    "hub1_teahouse_1_3",
+    "hub1_teahouse_1_4",
+    "hub1_teahouse_1_5",
+    "hub1_teahouse_1_6",
+    "hub1_teahouse_1_7",
+    "hub1_teahouse_1_8",
+    "hub1_teahouse_1_9",
+    "hub1_teahouse_1_10"
+   ],
+   "string_ids": [
+    "sc69e",
+    "s3e70",
+    "s935c",
+    "s688c",
+    "s16cf",
+    "s3cee",
+    "sa58c",
+    "sa072",
+    "scd53",
+    "s7bad"
+   ],
+   "prompt_chars": 15662,
+   "content_chars": 70322,
+   "scene_keys": [
+    "hub1_teahouse_1"
+   ],
+   "seconds": 55.72,
+   "error": "ReadTimeout: The read operation timed out",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "S",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 9,
+   "contexts": [
+    "hub1_teahouse_1_11",
+    "hub1_teahouse_1_12",
+    "hub1_teahouse_1_13",
+    "hub1_teahouse_1_14",
+    "hub1_teahouse_1_15",
+    "hub1_teahouse_1_16",
+    "hub1_teahouse_1_17",
+    "hub1_teahouse_1_18",
+    "hub1_teahouse_1_19",
+    "hub1_teahouse_1_20"
+   ],
+   "string_ids": [
+    "sa9cf",
+    "s7577",
+    "sc03d",
+    "s0fe1",
+    "sd4ad",
+    "s30bf",
+    "s8abd",
+    "s1f2a",
+    "s865e",
+    "s03bd"
+   ],
+   "prompt_chars": 15662,
+   "content_chars": 70491,
+   "scene_keys": [
+    "hub1_teahouse_1"
+   ],
+   "seconds": 55.5,
+   "error": "ReadTimeout: The read operation timed out",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "S",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 10,
+   "contexts": [
+    "hub1_teahouse_1_21",
+    "hub1_teahouse_1_22",
+    "hub1_teahouse_1_23",
+    "hub1_teahouse_1_24",
+    "hub1_teahouse_1_25",
+    "hub1_teahouse_1_26",
+    "hub1_teahouse_1_27",
+    "hub1_teahouse_1_28",
+    "hub1_teahouse_1_29",
+    "hub1_teahouse_1_30"
+   ],
+   "string_ids": [
+    "se6bd",
+    "s11f8",
+    "sf341",
+    "s4ce7",
+    "s49de",
+    "s929a",
+    "sccf9",
+    "s0b3d",
+    "s2ef2",
+    "s88f6"
+   ],
+   "prompt_chars": 15662,
+   "content_chars": 70306,
+   "scene_keys": [
+    "hub1_teahouse_1"
+   ],
+   "seconds": 55.5,
+   "error": "ReadTimeout: The read operation timed out",
+   "translations": {},
+   "contract": "transport-failure"
+  },
+  {
+   "arm": "S",
+   "lang": "de",
+   "repeat": 1,
+   "batch": 11,
+   "contexts": [
+    "hub1_teahouse_1_31",
+    "hub1_teahouse_1_32",
+    "hub1_teahouse_1_33",
+    "hub1_teahouse_1_34",
+    "hub1_teahouse_1_35"
+   ],
+   "string_ids": [
+    "s82ab",
+    "s587e",
+    "sad47",
+    "s8517",
+    "sfb12"
+   ],
+   "prompt_chars": 15662,
+   "content_chars": 69525,
+   "scene_keys": [
+    "hub1_teahouse_1"
+   ],
+   "seconds": 55.48,
+   "error": "ReadTimeout: The read operation timed out",
+   "translations": {},
+   "contract": "transport-failure"
+  }
+ ]
+}

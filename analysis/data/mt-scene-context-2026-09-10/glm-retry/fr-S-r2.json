@@ -1,0 +1,838 @@
+{
+ "plan": "2026-09-04-scene-context-for-mt",
+ "corpus": "hub1",
+ "lang": "fr",
+ "arm": "S",
+ "repeat": 2,
+ "model": "atlas_glm-5.1",
+ "batch_size": 10,
+ "scene_cap": 60,
+ "scene_rule": "29. The \"scene\" object, when present, is the dialogue scene the strings of this batch belong to, in engine order: each line carries its number, its speaker and its source, and \"translation\" when that line was already translated outside this batch. It is reference material for who is addressing whom, how many people are addressed, which register and politeness form the scene uses, and for staying consistent with the translations already made in it. Do not translate it, do not copy or quote it, and do not emit any of its content that is not in the strings you were asked to translate.",
+ "prompt_sha_source": "weblate/machinery/llm.py:PROMPT",
+ "wall_seconds": 705.1,
+ "records": [
+  {
+   "arm": "S",
+   "lang": "fr",
+   "repeat": 2,
+   "batch": 0,
+   "contexts": [
+    "hub1_first_1_1",
+    "hub1_first_1_2",
+    "hub1_first_1_3",
+    "hub1_first_1_4",
+    "hub1_first_1_5",
+    "hub1_first_1_6",
+    "hub1_first_1_7",
+    "hub1_first_1_8",
+    "hub1_first_1_9",
+    "hub1_first_1_10"
+   ],
+   "string_ids": [
+    "s38e4",
+    "s7a44",
+    "s7690",
+    "s167a",
+    "sd30f",
+    "sdcd0",
+    "s67f6",
+    "sfef3",
+    "s240d",
+    "s4167"
+   ],
+   "prompt_chars": 15727,
+   "content_chars": 69944,
+   "scene_keys": [
+    "hub1_first_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 55.61,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 2,
+     "seconds": 55.7,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 3,
+     "seconds": 55.44,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 4,
+     "seconds": 55.69,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 5,
+     "seconds": 55.49,
+     "error": "ReadTimeout: The read operation timed out"
+    }
+   ],
+   "seconds": 55.49,
+   "error": "ReadTimeout: The read operation timed out",
+   "translations": {},
+   "contract": "transport-failure",
+   "repaired": true
+  },
+  {
+   "arm": "S",
+   "lang": "fr",
+   "repeat": 2,
+   "batch": 1,
+   "contexts": [
+    "hub1_first_1_11",
+    "hub1_first_1_12",
+    "hub1_first_1_13",
+    "hub1_first_1_14",
+    "hub1_first_1_15",
+    "hub1_first_1_16",
+    "hub1_first_1_17",
+    "hub1_first_1_18",
+    "hub1_first_1_19",
+    "hub1_first_1_20"
+   ],
+   "string_ids": [
+    "sa906",
+    "s9d8f",
+    "s13c8",
+    "sf019",
+    "s90c4",
+    "s4772",
+    "s34c4",
+    "s61e5",
+    "sec24",
+    "sd741"
+   ],
+   "prompt_chars": 15727,
+   "content_chars": 69840,
+   "scene_keys": [
+    "hub1_first_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 55.57,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 2,
+     "seconds": 43.52
+    }
+   ],
+   "seconds": 43.52,
+   "translations": {
+    "hub1_first_1_11": "Toutes les araignées sont comme ça ?",
+    "hub1_first_1_12": "Gardiens du savoir, oui",
+    "hub1_first_1_13": "Ça craint.",
+    "hub1_first_1_14": "C'est très intéressant. Et merci de nous avoir déposés.",
+    "hub1_first_1_15": "Aucun problème.",
+    "hub1_first_1_16": "Je ne pouvais pas passer mon chemin, d'autant que vous me rappelez mes neveux.",
+    "hub1_first_1_17": "Sauf… avec des écailles et du pelage.",
+    "hub1_first_1_18": "Passez me voir à « Mille et une babioles » !",
+    "hub1_first_1_19": "Bien, merci !",
+    "hub1_first_1_20": "J'ai mes propres affaires ici. Nous nous retrouverons plus tard"
+   },
+   "contract": "ok",
+   "usage": {
+    "model": "atlas_glm-5.1",
+    "batch_size": 10,
+    "prompt_tokens": 26283,
+    "completion_tokens": 2698,
+    "total_tokens": 28981,
+    "reasoning_tokens": 2412,
+    "cost": "None"
+   },
+   "raw_chars": 902,
+   "parsed_strings": 10
+  },
+  {
+   "arm": "S",
+   "lang": "fr",
+   "repeat": 2,
+   "batch": 2,
+   "contexts": [
+    "hub1_first_1_21",
+    "hub1_first_1_22",
+    "hub1_first_1_23",
+    "hub1_first_1_24",
+    "hub1_first_1_25",
+    "hub1_first_1_26",
+    "hub1_first_1_27",
+    "hub1_first_1_28",
+    "hub1_first_1_29"
+   ],
+   "string_ids": [
+    "s89ce",
+    "sb1f0",
+    "sc710",
+    "sc7e8",
+    "sfb6b",
+    "s9e6d",
+    "s77f3",
+    "s5922",
+    "sc52d"
+   ],
+   "prompt_chars": 15727,
+   "content_chars": 70021,
+   "scene_keys": [
+    "hub1_first_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 34.07
+    }
+   ],
+   "seconds": 34.07,
+   "usage": {
+    "model": "atlas_glm-5.1",
+    "batch_size": 9,
+    "prompt_tokens": 26339,
+    "completion_tokens": 2234,
+    "total_tokens": 28573,
+    "reasoning_tokens": 1974,
+    "cost": "None"
+   },
+   "raw_chars": 823,
+   "translations": {
+    "hub1_first_1_21": "Et comment je te trouve ?",
+    "hub1_first_1_22": "Je te retrouverai moi-même.",
+    "hub1_first_1_23": "Il me fait dresser les écailles.",
+    "hub1_first_1_24": "Sérieusement, Hazuo est son semblable, mais près de lui, je ne ressens pas une telle peur.",
+    "hub1_first_1_25": "Et moi qui croyais qu'vous étiez les meilleures copines.",
+    "hub1_first_1_26": "Haha. Que faisons-nous maintenant ?",
+    "hub1_first_1_27": "J'crois que j'ai pas bouffé depuis une éternité.",
+    "hub1_first_1_28": "On se remplit la panse ?",
+    "hub1_first_1_29": "D'accord."
+   },
+   "contract": "ok",
+   "parsed_strings": 9
+  },
+  {
+   "arm": "S",
+   "lang": "fr",
+   "repeat": 2,
+   "batch": 3,
+   "contexts": [
+    "hub1_ramen_1_1",
+    "hub1_ramen_1_2",
+    "hub1_ramen_1_3",
+    "hub1_ramen_1_4",
+    "hub1_ramen_1_5",
+    "hub1_ramen_1_6",
+    "hub1_ramen_1_7",
+    "hub1_ramen_1_9",
+    "hub1_ramen_1_10",
+    "hub1_ramen_1_11"
+   ],
+   "string_ids": [
+    "s1453",
+    "saf45",
+    "sa673",
+    "sb685",
+    "sd383",
+    "s076f",
+    "sb6e7",
+    "s2fa7",
+    "s5f22",
+    "s231e"
+   ],
+   "prompt_chars": 15727,
+   "content_chars": 71434,
+   "scene_keys": [
+    "hub1_ramen_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 55.51,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 2,
+     "seconds": 55.72,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 3,
+     "seconds": 31.22
+    }
+   ],
+   "seconds": 31.22,
+   "translations": {
+    "hub1_ramen_1_1": "C'est quoi ce bordel ?!",
+    "hub1_ramen_1_2": "C'est du ramen. Tu n'en as jamais goûté ?",
+    "hub1_ramen_1_3": "Non. On ne préparait pas ça dans notre village.",
+    "hub1_ramen_1_4": "Et après je mangeais seulement… par terre…",
+    "hub1_ramen_1_5": "Je vois.",
+    "hub1_ramen_1_6": "Goûte vite. Ça va te plaire.",
+    "hub1_ramen_1_7": "PUTAIN. SI. BON.",
+    "hub1_ramen_1_9": "J'ai toujours dit. Mange du ramen - TU SERAS COMME UN ROCHER !",
+    "hub1_ramen_1_10": "FERME-LA, VIEUX ! Laisse-les tranquilles !",
+    "hub1_ramen_1_11": "Mais j'ai rien fait !"
+   },
+   "contract": "ok",
+   "usage": {
+    "model": "atlas_glm-5.1",
+    "batch_size": 10,
+    "prompt_tokens": 26847,
+    "completion_tokens": 1909,
+    "total_tokens": 28756,
+    "reasoning_tokens": 1622,
+    "cost": "None"
+   },
+   "raw_chars": 858,
+   "parsed_strings": 10
+  },
+  {
+   "arm": "S",
+   "lang": "fr",
+   "repeat": 2,
+   "batch": 4,
+   "contexts": [
+    "hub1_ramen_1_12",
+    "hub1_ramen_1_13",
+    "hub1_ramen_1_14",
+    "hub1_ramen_1_15",
+    "hub1_ramen_1_16",
+    "hub1_ramen_1_17",
+    "hub1_ramen_1_18",
+    "hub1_ramen_1_19",
+    "hub1_ramen_1_20",
+    "hub1_ramen_1_21"
+   ],
+   "string_ids": [
+    "sb96a",
+    "sfd8e",
+    "s01cc",
+    "s151a",
+    "s12c8",
+    "saf6d",
+    "s5161",
+    "s260f",
+    "sa2af",
+    "sc7e7"
+   ],
+   "prompt_chars": 15727,
+   "content_chars": 71660,
+   "scene_keys": [
+    "hub1_ramen_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 51.48
+    }
+   ],
+   "seconds": 51.48,
+   "usage": {
+    "model": "atlas_glm-5.1",
+    "batch_size": 10,
+    "prompt_tokens": 26875,
+    "completion_tokens": 3205,
+    "total_tokens": 30080,
+    "reasoning_tokens": 2880,
+    "cost": "None"
+   },
+   "raw_chars": 917,
+   "translations": {
+    "hub1_ramen_1_12": "Alors ne le fais pas !",
+    "hub1_ramen_1_13": "Nous devons trouver un endroit où loger.",
+    "hub1_ramen_1_14": "J'm'en fous !",
+    "hub1_ramen_1_15": "Je veux juste savoir à qui ils ont vendu ma sœur !",
+    "hub1_ramen_1_16": "Et comment comptes-tu faire ?",
+    "hub1_ramen_1_17": "Aucune idée.",
+    "hub1_ramen_1_18": "Nous aurions besoin d'une chambre pour quelques jours.",
+    "hub1_ramen_1_19": "Parfait ! Et moi j'ai besoin de clients !",
+    "hub1_ramen_1_20": "Tu écoutais aux portes ?",
+    "hub1_ramen_1_21": "Moi, j'écoute toujours aux portes."
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "S",
+   "lang": "fr",
+   "repeat": 2,
+   "batch": 5,
+   "contexts": [
+    "hub1_ramen_1_22",
+    "hub1_ramen_1_23",
+    "hub1_ramen_1_24",
+    "hub1_ramen_1_25",
+    "hub1_ramen_1_26",
+    "hub1_ramen_1_27",
+    "hub1_ramen_1_28",
+    "hub1_ramen_1_29",
+    "hub1_ramen_1_30",
+    "hub1_ramen_1_31"
+   ],
+   "string_ids": [
+    "s0fab",
+    "s6ce1",
+    "sdbb5",
+    "s81de",
+    "s29c0",
+    "s3174",
+    "se281",
+    "s13b1",
+    "s6e76",
+    "sae09"
+   ],
+   "prompt_chars": 15727,
+   "content_chars": 72124,
+   "scene_keys": [
+    "hub1_ramen_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 55.69,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 2,
+     "seconds": 51.98
+    }
+   ],
+   "seconds": 51.98,
+   "translations": {
+    "hub1_ramen_1_22": "Vous pouvez dormir dans l'arrière-boutique du Ramen-ya.",
+    "hub1_ramen_1_23": "Sachez-le ! Tous les shiitake sont comptés.",
+    "hub1_ramen_1_24": "… c'est quoi putain les shiitake…",
+    "hub1_ramen_1_25": "Nous serions ravis de loger chez toi.",
+    "hub1_ramen_1_26": "Mais nous avons très peu d'argent.",
+    "hub1_ramen_1_27": "Moi, j'ai pas besoin d'argent.",
+    "hub1_ramen_1_28": "Je vais tester de nouvelles recettes de ramen sur vous ! Tope là ?",
+    "hub1_ramen_1_29": "Tope là !",
+    "hub1_ramen_1_30": "Nous aurions aussi besoin d'un guide pour la ville…",
+    "hub1_ramen_1_31": "Nous ne nous repérons pas du tout ici…"
+   },
+   "contract": "ok",
+   "usage": {
+    "model": "atlas_glm-5.1",
+    "batch_size": 10,
+    "prompt_tokens": 27024,
+    "completion_tokens": 3630,
+    "total_tokens": 30654,
+    "reasoning_tokens": 3333,
+    "cost": "None"
+   },
+   "raw_chars": 924,
+   "parsed_strings": 10,
+   "repaired": true
+  },
+  {
+   "arm": "S",
+   "lang": "fr",
+   "repeat": 2,
+   "batch": 6,
+   "contexts": [
+    "hub1_ramen_1_32",
+    "hub1_ramen_1_33",
+    "hub1_ramen_1_34",
+    "hub1_ramen_1_35",
+    "hub1_ramen_1_36",
+    "hub1_ramen_1_37",
+    "hub1_ramen_1_38",
+    "hub1_ramen_1_39",
+    "hub1_ramen_1_40",
+    "hub1_ramen_1_41"
+   ],
+   "string_ids": [
+    "sfa9a",
+    "s8c0b",
+    "s1757",
+    "s4349",
+    "s608a",
+    "s8ed1",
+    "s68dd",
+    "sc320",
+    "s156d",
+    "s42d8"
+   ],
+   "prompt_chars": 15727,
+   "content_chars": 72686,
+   "scene_keys": [
+    "hub1_ramen_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 55.57,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 2,
+     "seconds": 55.5,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 3,
+     "seconds": 55.87,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 4,
+     "seconds": 55.7,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 5,
+     "seconds": 51.07
+    }
+   ],
+   "seconds": 51.07,
+   "translations": {
+    "hub1_ramen_1_32": "Personne d'entre nous d'ici ne mettra les pieds dans la Capitale…",
+    "hub1_ramen_1_33": "Par contre, faites un tour à la maison de thé.",
+    "hub1_ramen_1_34": "Les filles de madame Yaeko sont souvent en ville.",
+    "hub1_ramen_1_35": "Comment on les trouve ?",
+    "hub1_ramen_1_36": "Là, c'est l'endroit principal du Cul-de-sac des Poissons - mon Ramen-ya !",
+    "hub1_ramen_1_37": "Mais ça, vous le savez déjà.",
+    "hub1_ramen_1_38": "Si vous allez par là, vous arriverez au quai.",
+    "hub1_ramen_1_39": "Ce bateau-là, vaut mieux pas y monter.",
+    "hub1_ramen_1_40": "À moins bien sûr que vous vouliez rencontrer les loups de mer.",
+    "hub1_ramen_1_41": "Tournez par ici et vous arriverez aux bains, un endroit chic pour se détendre."
+   },
+   "contract": "ok",
+   "usage": {
+    "model": "atlas_glm-5.1",
+    "batch_size": 10,
+    "prompt_tokens": 27198,
+    "completion_tokens": 3712,
+    "total_tokens": 30910,
+    "reasoning_tokens": 3391,
+    "cost": "None"
+   },
+   "raw_chars": 1035,
+   "parsed_strings": 10,
+   "repaired": true
+  },
+  {
+   "arm": "S",
+   "lang": "fr",
+   "repeat": 2,
+   "batch": 7,
+   "contexts": [
+    "hub1_ramen_1_42",
+    "hub1_ramen_1_43",
+    "hub1_ramen_1_44",
+    "hub1_ramen_1_45",
+    "hub1_ramen_1_46"
+   ],
+   "string_ids": [
+    "s8046",
+    "sf2c6",
+    "s5a9d",
+    "s26d7",
+    "s74e3"
+   ],
+   "prompt_chars": 15727,
+   "content_chars": 71166,
+   "scene_keys": [
+    "hub1_ramen_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 35.83
+    }
+   ],
+   "seconds": 35.83,
+   "usage": {
+    "model": "atlas_glm-5.1",
+    "batch_size": 5,
+    "prompt_tokens": 26671,
+    "completion_tokens": 2671,
+    "total_tokens": 29342,
+    "reasoning_tokens": 2524,
+    "cost": "None"
+   },
+   "raw_chars": 446,
+   "translations": {
+    "hub1_ramen_1_42": "Ici, ce sera la boutique de l'herboriste,",
+    "hub1_ramen_1_43": "et là, la brocante.",
+    "hub1_ramen_1_44": "Et juste au-dessus de nous se trouve la maison de thé.",
+    "hub1_ramen_1_45": "Si vous vous perdez, regardez notre carte.",
+    "hub1_ramen_1_46": "Compris, on y va."
+   },
+   "contract": "ok",
+   "parsed_strings": 5
+  },
+  {
+   "arm": "S",
+   "lang": "fr",
+   "repeat": 2,
+   "batch": 8,
+   "contexts": [
+    "hub1_teahouse_1_1",
+    "hub1_teahouse_1_2",
+    "hub1_teahouse_1_3",
+    "hub1_teahouse_1_4",
+    "hub1_teahouse_1_5",
+    "hub1_teahouse_1_6",
+    "hub1_teahouse_1_7",
+    "hub1_teahouse_1_8",
+    "hub1_teahouse_1_9",
+    "hub1_teahouse_1_10"
+   ],
+   "string_ids": [
+    "s05f8",
+    "s5003",
+    "s8fb2",
+    "sf291",
+    "s3a4d",
+    "s0ebe",
+    "s17ac",
+    "s28a8",
+    "sb12e",
+    "sa434"
+   ],
+   "prompt_chars": 15727,
+   "content_chars": 70382,
+   "scene_keys": [
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 55.56,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 2,
+     "seconds": 55.34,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 3,
+     "seconds": 42.84
+    }
+   ],
+   "seconds": 42.84,
+   "translations": {
+    "hub1_teahouse_1_1": "Eh bien, qui voilà ?",
+    "hub1_teahouse_1_2": "Oooh… quel adorable petit renard.",
+    "hub1_teahouse_1_3": "Et un joli naga…",
+    "hub1_teahouse_1_4": "Commencez même pas.",
+    "hub1_teahouse_1_5": "Et pourquoi vous êtes venus, alors ?",
+    "hub1_teahouse_1_6": "La maison de thé n'est pas un refuge pour sans-abri.",
+    "hub1_teahouse_1_7": "Il me faut un guide pour la ville.",
+    "hub1_teahouse_1_8": "TOI ?!",
+    "hub1_teahouse_1_9": "Un guide pour un Jinko ?!",
+    "hub1_teahouse_1_10": "Petit, la moitié de l'Empire voudra te livrer pour la récompense avant…"
+   },
+   "contract": "ok",
+   "usage": {
+    "model": "atlas_glm-5.1",
+    "batch_size": 10,
+    "prompt_tokens": 26494,
+    "completion_tokens": 2481,
+    "total_tokens": 28975,
+    "reasoning_tokens": 2205,
+    "cost": "None"
+   },
+   "raw_chars": 840,
+   "parsed_strings": 10,
+   "repaired": true
+  },
+  {
+   "arm": "S",
+   "lang": "fr",
+   "repeat": 2,
+   "batch": 9,
+   "contexts": [
+    "hub1_teahouse_1_11",
+    "hub1_teahouse_1_12",
+    "hub1_teahouse_1_13",
+    "hub1_teahouse_1_14",
+    "hub1_teahouse_1_15",
+    "hub1_teahouse_1_16",
+    "hub1_teahouse_1_17",
+    "hub1_teahouse_1_18",
+    "hub1_teahouse_1_19",
+    "hub1_teahouse_1_20"
+   ],
+   "string_ids": [
+    "se4a8",
+    "see76",
+    "sda97",
+    "sa254",
+    "s939d",
+    "s4a06",
+    "s3df3",
+    "s5e1d",
+    "s3945",
+    "scab0"
+   ],
+   "prompt_chars": 15727,
+   "content_chars": 70551,
+   "scene_keys": [
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 45.88
+    }
+   ],
+   "seconds": 45.88,
+   "usage": {
+    "model": "atlas_glm-5.1",
+    "batch_size": 10,
+    "prompt_tokens": 26506,
+    "completion_tokens": 3360,
+    "total_tokens": 29866,
+    "reasoning_tokens": 3063,
+    "cost": "None"
+   },
+   "raw_chars": 961,
+   "translations": {
+    "hub1_teahouse_1_11": "Avant que tu n'atteignes la rue voisine.",
+    "hub1_teahouse_1_12": "Ouais, j'ai pigé, arrêtez de vous marrer.",
+    "hub1_teahouse_1_13": "Où tu dois aller au juste ?",
+    "hub1_teahouse_1_14": "En fait… nous aurions besoin d'informations sur les Jinko. Des documents, des rapports…",
+    "hub1_teahouse_1_15": "Pourrais-tu nous indiquer où la trouver ?",
+    "hub1_teahouse_1_16": "Vous devez aller aux Archives.",
+    "hub1_teahouse_1_17": "On y conserve tous les anciens documents de l'Empire.",
+    "hub1_teahouse_1_18": "Et comment on y va ?",
+    "hub1_teahouse_1_19": "Quelle coïncidence.",
+    "hub1_teahouse_1_20": "J'ai une proposition qui nous sera profitable à tous les deux, jeune homme."
+   },
+   "contract": "ok",
+   "parsed_strings": 10
+  },
+  {
+   "arm": "S",
+   "lang": "fr",
+   "repeat": 2,
+   "batch": 10,
+   "contexts": [
+    "hub1_teahouse_1_21",
+    "hub1_teahouse_1_22",
+    "hub1_teahouse_1_23",
+    "hub1_teahouse_1_24",
+    "hub1_teahouse_1_25",
+    "hub1_teahouse_1_26",
+    "hub1_teahouse_1_27",
+    "hub1_teahouse_1_28",
+    "hub1_teahouse_1_29",
+    "hub1_teahouse_1_30"
+   ],
+   "string_ids": [
+    "s5457",
+    "sec53",
+    "s3b2a",
+    "s5fa9",
+    "s6c2d",
+    "s1558",
+    "sba0b",
+    "sc0f6",
+    "s8a48",
+    "sf0de"
+   ],
+   "prompt_chars": 15727,
+   "content_chars": 70779,
+   "scene_keys": [
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 55.41,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 2,
+     "seconds": 55.35,
+     "error": "ReadTimeout: The read operation timed out"
+    },
+    {
+     "attempt": 3,
+     "seconds": 53.59
+    }
+   ],
+   "seconds": 53.59,
+   "translations": {
+    "hub1_teahouse_1_21": "Livre ce message à notre contact dans la Ville Basse…",
+    "hub1_teahouse_1_22": "Et il te donnera la clé des tunnels sous la ville.",
+    "hub1_teahouse_1_23": "Là, tu pourras accéder aux Archives.",
+    "hub1_teahouse_1_24": "Marché ?",
+    "hub1_teahouse_1_25": "Fait.",
+    "hub1_teahouse_1_26": "Leon, tu as perdu la tête ? Comment vas-tu te faufiler dans la Ville Basse ?",
+    "hub1_teahouse_1_27": "Par les toits.",
+    "hub1_teahouse_1_28": "Oh, quel prétentieux.",
+    "hub1_teahouse_1_29": "Ça me plaît.",
+    "hub1_teahouse_1_30": "Moi aussi."
+   },
+   "contract": "ok",
+   "usage": {
+    "model": "atlas_glm-5.1",
+    "batch_size": 10,
+    "prompt_tokens": 26590,
+    "completion_tokens": 3734,
+    "total_tokens": 30324,
+    "reasoning_tokens": 3470,
+    "cost": "None"
+   },
+   "raw_chars": 813,
+   "parsed_strings": 10
+  },
+  {
+   "arm": "S",
+   "lang": "fr",
+   "repeat": 2,
+   "batch": 11,
+   "contexts": [
+    "hub1_teahouse_1_31",
+    "hub1_teahouse_1_32",
+    "hub1_teahouse_1_33",
+    "hub1_teahouse_1_34",
+    "hub1_teahouse_1_35"
+   ],
+   "string_ids": [
+    "secfe",
+    "s97e5",
+    "s5e2a",
+    "s4471",
+    "s50ae"
+   ],
+   "prompt_chars": 15727,
+   "content_chars": 70263,
+   "scene_keys": [
+    "hub1_teahouse_1"
+   ],
+   "attempts": [
+    {
+     "attempt": 1,
+     "seconds": 45.18
+    }
+   ],
+   "seconds": 45.18,
+   "usage": {
+    "model": "atlas_glm-5.1",
+    "batch_size": 5,
+    "prompt_tokens": 26376,
+    "completion_tokens": 2985,
+    "total_tokens": 29361,
+    "reasoning_tokens": 2843,
+    "cost": "None"
+   },
+   "raw_chars": 443,
+   "translations": {
+    "hub1_teahouse_1_31": "Je pense que tu trouveras quelque chose chez le brocanteur Hazuo…",
+    "hub1_teahouse_1_32": "Qui t'aidera sur ce chemin.",
+    "hub1_teahouse_1_33": "Quoi exactement ?",
+    "hub1_teahouse_1_34": "C'est un brocanteur. De la camelote.",
+    "hub1_teahouse_1_35": "Bon, je passerai le voir."
+   },
+   "contract": "ok",
+   "parsed_strings": 5
+  }
+ ]
+}

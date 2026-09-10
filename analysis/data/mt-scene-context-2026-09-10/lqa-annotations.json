@@ -1,0 +1,315 @@
+{
+ "de|hub1_first_1_10|A": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "'подустал' (a bit tired) intensified to 'die Schnauze voll' (fed up)"
+  }
+ ],
+ "de|hub1_first_1_10|C": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "same intensification as A"
+  }
+ ],
+ "de|hub1_first_1_23|B": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "'от него' (from him) flattened to 'davon'"
+  }
+ ],
+ "de|hub1_first_1_23|C": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "'от него' flattened to 'davon'"
+  }
+ ],
+ "de|hub1_first_1_24|A": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "'собрат' (kin/fellow spider) rendered as 'Bruder'"
+  }
+ ],
+ "de|hub1_first_1_29|B": [
+  {
+   "category": "accuracy",
+   "severity": "major",
+   "note": "elliptic 'Можно.' (fine by me) read as permission 'Du darfst.'"
+  }
+ ],
+ "de|hub1_first_1_4|B": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "'ебеня' (middle of nowhere) lost, only 'Scheiße'"
+  }
+ ],
+ "de|hub1_first_1_9|B": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "garbled idiom 'spinnt ... seine alte Platte'"
+  }
+ ],
+ "de|hub1_ramen_1_21|A": [
+  {
+   "category": "omission_addition",
+   "severity": "minor",
+   "note": "adds an object 'euch' the source has not"
+  }
+ ],
+ "de|hub1_ramen_1_33|C": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'schauen Sie' - formal singular to a pair; de instruction says du/ihr"
+  }
+ ],
+ "de|hub1_ramen_1_37|B": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'wissen Sie' - formal singular to a pair"
+  }
+ ],
+ "de|hub1_ramen_1_38|B": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'Gehen Sie' - formal singular to a pair"
+  }
+ ],
+ "de|hub1_ramen_1_38|C": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'Gehen Sie' - formal singular to a pair"
+  }
+ ],
+ "de|hub1_ramen_1_39|A": [
+  {
+   "category": "register",
+   "severity": "major",
+   "note": "introduces formal 'Sie' against the de instruction 'Durchgehend du'"
+  }
+ ],
+ "de|hub1_ramen_1_39|C": [
+  {
+   "category": "register",
+   "severity": "major",
+   "note": "introduces formal 'Sie' against the de instruction"
+  }
+ ],
+ "de|hub1_ramen_1_40|B": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'Sie wollen' - formal singular to a pair"
+  }
+ ],
+ "de|hub1_ramen_1_41|A": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'Biegen Sie' - formal singular to a pair"
+  }
+ ],
+ "de|hub1_ramen_1_41|C": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'Biegen Sie' - formal singular to a pair"
+  }
+ ],
+ "de|hub1_ramen_1_45|C": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'du dich verirrst' - singular to a pair"
+  }
+ ],
+ "de|hub1_ramen_1_7|B": [
+  {
+   "category": "grammar_agreement",
+   "severity": "minor",
+   "note": "'SCHEIßE' - uppercase sharp s is not German orthography"
+  }
+ ],
+ "de|hub1_ramen_1_7|C": [
+  {
+   "category": "register",
+   "severity": "minor",
+   "note": "'FICK. WIE. LECKER.' is not idiomatic German swearing"
+  }
+ ],
+ "de|hub1_teahouse_1_12|B": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'hör auf' - singular, but Tsuru and Momo are both laughing"
+  }
+ ],
+ "de|hub1_teahouse_1_15|B": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'Könntest du' - singular to the teahouse women"
+  },
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "'нам' (us) rendered as 'mir' (me)"
+  }
+ ],
+ "de|hub1_teahouse_1_8|C": [
+  {
+   "category": "grammar_agreement",
+   "severity": "minor",
+   "note": "'DU?!' nominative for dative 'ТЕБЕ?!'"
+  }
+ ],
+ "fr|hub1_first_1_11|A": [
+  {
+   "category": "grammar_agreement",
+   "severity": "minor",
+   "note": "'Tous les araignées' - araignée is feminine"
+  }
+ ],
+ "fr|hub1_first_1_11|C": [
+  {
+   "category": "grammar_agreement",
+   "severity": "minor",
+   "note": "'Tous les araignées' - araignée is feminine"
+  }
+ ],
+ "fr|hub1_first_1_23|A": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "naga scales imagery replaced by generic 'chair de poule'"
+  }
+ ],
+ "fr|hub1_first_1_23|B": [
+  {
+   "category": "omission_addition",
+   "severity": "minor",
+   "note": "adds 'rien que d'y penser', absent from the source"
+  }
+ ],
+ "fr|hub1_ramen_1_19|A": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "'постояльцы' (lodgers) rendered as 'clients'"
+  }
+ ],
+ "fr|hub1_ramen_1_19|B": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "'постояльцы' (lodgers) rendered as 'clients'"
+  }
+ ],
+ "fr|hub1_ramen_1_19|C": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "'постояльцы' (lodgers) rendered as 'clients'"
+  }
+ ],
+ "fr|hub1_ramen_1_25|B": [
+  {
+   "category": "register",
+   "severity": "major",
+   "note": "'chez vous' - vouvoiement, forbidden by the fr instruction"
+  }
+ ],
+ "fr|hub1_ramen_1_25|C": [
+  {
+   "category": "register",
+   "severity": "major",
+   "note": "'chez vous' - vouvoiement, forbidden by the fr instruction"
+  }
+ ],
+ "fr|hub1_ramen_1_3|A": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "'у нас в деревне' (our village) becomes 'mon village'"
+  }
+ ],
+ "fr|hub1_ramen_1_43|B": [
+  {
+   "category": "accuracy",
+   "severity": "major",
+   "note": "'барахолка' (flea market) becomes 'baraque à fringues' (clothes stall) on a map instruction"
+  }
+ ],
+ "fr|hub1_teahouse_1_10|A": [
+  {
+   "category": "register",
+   "severity": "major",
+   "note": "'vous livrer' - vouvoiement to Leon, against the fr instruction and the scene's tu"
+  }
+ ],
+ "fr|hub1_teahouse_1_12|C": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'arrête de te marrer' - singular, but Tsuru and Momo are both laughing"
+  }
+ ],
+ "fr|hub1_teahouse_1_15|A": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'Pourrais-tu' - singular to the teahouse women"
+  }
+ ],
+ "fr|hub1_teahouse_1_15|B": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "'нам' (us) rendered as 'm'' (me)"
+  }
+ ],
+ "fr|hub1_teahouse_1_15|C": [
+  {
+   "category": "accuracy",
+   "severity": "minor",
+   "note": "'её' (the information) rendered as plural 'les'"
+  }
+ ],
+ "fr|hub1_teahouse_1_21|A": [
+  {
+   "category": "register",
+   "severity": "major",
+   "note": "'Livrez' - vouvoiement from Yaeko to Leon against the fr instruction"
+  }
+ ],
+ "fr|hub1_teahouse_1_21|C": [
+  {
+   "category": "register",
+   "severity": "major",
+   "note": "'Livrez' - vouvoiement from Yaeko to Leon against the fr instruction"
+  }
+ ],
+ "fr|hub1_teahouse_1_4|B": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'Ne commence' - singular to Tsuru and Momo"
+  }
+ ],
+ "fr|hub1_teahouse_1_5|B": [
+  {
+   "category": "grammar_agreement",
+   "severity": "major",
+   "note": "'t'es venu' - singular to the pair"
+  }
+ ]
+}
