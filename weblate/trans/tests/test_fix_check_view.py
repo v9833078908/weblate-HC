@@ -741,10 +741,15 @@ class ExplicitPolicyViewTest(ViewTestCase):
                 self.assertEqual(
                     sorted(row.unit.pk for row in candidates.shown), sorted(expected)
                 )
-                self.assertEqual(
-                    candidates.total_eligible + candidates.manual + candidates.denied,
-                    counts[check_id],
+                self.assertEqual(candidates.total, counts[check_id])
+                # The screen opens with the number the producer clicked, so
+                # "36 will be fixed" under a "48" count reads as a split,
+                # not a contradiction.
+                self.assertContains(
+                    response,
+                    f"{counts[check_id]} string{'s' if counts[check_id] != 1 else ''} fail",
                 )
+                self.assertNotContains(response, "outside your permissions")
                 self.assertContains(response, self._url("terminal-source"))
                 self.assertContains(response, "Only strings failing this check")
         union = self.client.get(self._url("terminal-source")).context["candidates"]

@@ -64,6 +64,33 @@
 
   <p class="text-muted">{% translate "This action has no undo." %}</p>
 
+  <p>
+    <strong>
+      {% blocktranslate trimmed count count=candidates.total %}
+        {{ count }} string fails this check in this scope.
+      {% plural %}
+        {{ count }} strings fail this check in this scope.
+      {% endblocktranslate %}
+    </strong>
+    {% blocktranslate trimmed count count=candidates.total_eligible %}
+      {{ count }} of them is fixed here,
+    {% plural %}
+      {{ count }} of them are fixed here,
+    {% endblocktranslate %}
+    {% if candidates.denied %}
+      {% blocktranslate trimmed count count=candidates.denied %}
+        {{ count }} is outside your permissions,
+      {% plural %}
+        {{ count }} are outside your permissions,
+      {% endblocktranslate %}
+    {% endif %}
+    {% blocktranslate trimmed count count=candidates.manual %}
+      {{ count }} stays for per-string review.
+    {% plural %}
+      {{ count }} stay for per-string review.
+    {% endblocktranslate %}
+  </p>
+
   {% if candidates.by_operation %}
     <ul>
       {% if candidates.by_operation.append %}

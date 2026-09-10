@@ -385,6 +385,11 @@ class FixCandidates:
     def remaining(self) -> int:
         return self.total_eligible - len(self.shown)
 
+    @property
+    def total(self) -> int:
+        """Every failing string this screen accounts for, fixable or not."""
+        return self.total_eligible + self.manual + self.denied
+
 
 def _matching_units(
     unit_set: UnitQuerySet, project: Project | None, check_obj: BaseCheck
@@ -718,6 +723,11 @@ class TerminalPolicyCandidates:
     @property
     def remaining(self) -> int:
         return self.total_eligible - len(self.shown)
+
+    @property
+    def total(self) -> int:
+        """Every failing string this screen accounts for, fixable or not."""
+        return self.total_eligible + self.manual + self.denied
 
 
 def collect_terminal_policy_candidates(

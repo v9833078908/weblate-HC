@@ -31460,6 +31460,38 @@ msgstr "Включены только строки, не прошедшие эт
 msgid "Normalize every terminal mark at once instead."
 msgstr "Привести все конечные знаки к источнику разом."
 
+#: weblate/templates/fix_check.html:69
+#, python-format
+msgid "%(count)s string fails this check in this scope."
+msgid_plural "%(count)s strings fail this check in this scope."
+msgstr[0] "%(count)s строка в этой области не проходит проверку."
+msgstr[1] "%(count)s строки в этой области не проходят проверку."
+msgstr[2] "%(count)s строк в этой области не проходят проверку."
+
+#: weblate/templates/fix_check.html:75
+#, python-format
+msgid "%(count)s of them is fixed here,"
+msgid_plural "%(count)s of them are fixed here,"
+msgstr[0] "%(count)s из них исправляется здесь,"
+msgstr[1] "%(count)s из них исправляются здесь,"
+msgstr[2] "%(count)s из них исправляются здесь,"
+
+#: weblate/templates/fix_check.html:81
+#, python-format
+msgid "%(count)s is outside your permissions,"
+msgid_plural "%(count)s are outside your permissions,"
+msgstr[0] "%(count)s недоступна вам по правам,"
+msgstr[1] "%(count)s недоступны вам по правам,"
+msgstr[2] "%(count)s недоступны вам по правам,"
+
+#: weblate/templates/fix_check.html:87
+#, python-format
+msgid "%(count)s stays for per-string review."
+msgid_plural "%(count)s stay for per-string review."
+msgstr[0] "%(count)s остаётся на построчный разбор."
+msgstr[1] "%(count)s остаются на построчный разбор."
+msgstr[2] "%(count)s остаются на построчный разбор."
+
 #: weblate/templates/fix_check.html:64
 #, python-format
 msgid "%(count)s string gets a missing mark added."
