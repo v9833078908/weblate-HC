@@ -1,4 +1,4 @@
-# Prod Weblate machinery settings (l10n.herocraft.com, pulled 2026-09-04)
+# Prod Weblate machinery settings (l10n.herocraft.com, pulled 2026-09-04; heart-abyss persona Motoki/Hazuo lines updated on prod 2026-09-10)
 
 
 ## PROJECT: col4
@@ -125,8 +125,8 @@ street-spoken: no contractions, no eye-dialect. She talks down to Leon,
 addressing him as "molodoy chelovek" and "malchik" while using informal address,
 and she is sharp with her own staff ("ty melkaya dryan"). Render polished,
 slightly condescending courtesy.
-Motoki - never uses informal address at all; consistently formal with everyone.
-Hazuo - verbose, old-fashioned, formal address, no obscenity.
+Motoki - ramen cook. His Russian "vy" is plural, not polite: he is talking to Leon and Ray together ("rebyata", "molodezh"), so render it as the informal plural of the target language (de ihr/euch, never Sie), and address a single person informally.
+Hazuo - verbose, old-fashioned, no obscenity. Like Motoki, his "vy" to the pair is plural, not polite: informal plural (de ihr/euch), one person informally.
 Unagi - fisherman and self-declared drunkard; coarse and slovenly, not obscene.
 Asuna, Ichiro, Tsuru, Boy Haru, Joe, Momo, Saki, Pirate, guard - neutral to
 lightly informal, no obscenity unless the source has it.
