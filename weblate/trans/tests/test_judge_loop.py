@@ -16,6 +16,7 @@ from django.db import connections
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
 
 from weblate.auth.models import Group, setup_project_groups
+from weblate.checks.models import Check
 from weblate.machinery.base import (
     MACHINERY_DEFAULT_THRESHOLD,
     MachineTranslationError,
@@ -44,8 +45,8 @@ from weblate.trans.judge_loop import (
 from weblate.trans.models.judge import (
     JudgeDeferral,
     JudgeRequestAttempt,
-    ProducerRun,
     JudgeVerdict,
+    ProducerRun,
     compute_context_hash,
     compute_target_hash,
     compute_target_storage_hash,
@@ -1804,6 +1805,17 @@ class JudgeLoopTest(ViewTestCase):
         unit.clear_checks_cache()
         self.assertIn("judge-flag", unit.all_checks_names)
         self.assertNotIn("judge-flag", build_request(unit).failing_checks)
+
+    def test_repeat_drift_is_not_sent_back_as_evidence(self) -> None:
+        # repeat-drift fires on every member of a same-source group, including
+        # the correct one; every entry in `failing_checks` is framed to the
+        # judge as "code has proven this", so a leaked row would suppress a
+        # real finding the seat cannot see (mirrors llm.py's MT/repair drop).
+        unit = self.get_unit()
+        Check.objects.create(unit=unit, name="repeat-drift")
+        unit.clear_checks_cache()
+        self.assertIn("repeat-drift", unit.all_checks_names)
+        self.assertNotIn("repeat-drift", build_request(unit).failing_checks)
 
 
 @override_settings(

@@ -34,6 +34,7 @@ from django.db.models import Max, Q
 from django.utils import timezone
 from django.utils.translation import gettext
 
+from weblate.checks.consistency import REPEAT_DRIFT_CHECK_ID
 from weblate.checks.judge import JUDGE_CHECKS
 from weblate.glossary.models import get_matched_glossary_prompt_entries
 from weblate.machinery.base import MACHINERY_DEFAULT_THRESHOLD, MachineTranslationError
@@ -124,8 +125,14 @@ def build_request(unit: Unit) -> JudgeRequest:
         glossary_terms=get_matched_glossary_prompt_entries(unit),
         # The judge's own projection is not evidence: a judge-* row is the
         # previous round's opinion, and feeding it back lets a seat cite
-        # itself as proof ("the judge-flag check indicates ...").
-        failing_checks=sorted(unit.all_checks_names - JUDGE_CHECKS),
+        # itself as proof ("the judge-flag check indicates ..."). repeat-drift
+        # is likewise opaque: it fires on every member of a same-source group,
+        # including the correct one, so telling a seat "code has proven this"
+        # would suppress a real finding it cannot see (llm.py drops the same
+        # check from the MT/repair prompt for the same reason).
+        failing_checks=sorted(
+            unit.all_checks_names - JUDGE_CHECKS - {REPEAT_DRIFT_CHECK_ID}
+        ),
         target_plurals=unit.get_target_plurals(),
     )
 

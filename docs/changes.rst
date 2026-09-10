@@ -87,6 +87,7 @@ Weblate 2026.8.1
 
 .. rubric:: Bug fixes
 
+* The ``repeat-drift`` check no longer reaches the LLM judge prompt, where its presence on every member of a same-source group (including the correct translation) told the judge that a defect it could not see had been proven and could suppress a real finding; the judge now drops it exactly as machine-translation repair already did.
 * A string explanation set through the REST API is now written to the translation file on commit, mirrored to the other languages of the string, and recorded in its history, so glossary notes no longer disappear from exports.
 * French punctuation spacing and automatic translation no longer modify syntax in Hero Craft conditional game placeholders.
 * Large language model machine translation services no longer fail when the optional persona and style settings are absent from the stored configuration, as happens when the service is installed through the REST API.
