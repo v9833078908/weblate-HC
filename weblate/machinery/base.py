@@ -134,6 +134,15 @@ class BatchMachineTranslation(DocVersionsMixin):
     # caller turns such a failure into a service-wide stop that silently drops
     # every string left in a batch run.
     retry_statuses: ClassVar[frozenset[int]] = frozenset({429, 503})
+    # A request the service accepted but did not answer within the timeout is
+    # repeated the same way: translation is idempotent, and a proxy under load
+    # answers a second attempt more often than not. Connection errors are not
+    # retried; a dead host does not recover within one request's lifetime.
+    retry_exceptions: ClassVar[tuple[type[Exception], ...]] = (
+        httpx2.ReadTimeout,
+        httpx2.WriteTimeout,
+        httpx2.PoolTimeout,
+    )
     retry_attempts = 3
     max_retry_delay = 30
     # How long a service that kept refusing is left alone afterwards. A spent
@@ -360,45 +369,63 @@ class BatchMachineTranslation(DocVersionsMixin):
             and response.status_code in self.retry_statuses
         )
 
-    def get_retry_delay(self, response: httpx2.Response, attempt: int) -> float:
+    def should_retry_exception(self, error: Exception, attempt: int) -> bool:
+        return attempt < self.retry_attempts and isinstance(
+            error, self.retry_exceptions
+        )
+
+    def get_retry_delay(self, response: httpx2.Response | None, attempt: int) -> float:
         """Wait as long as the service asks, or back off exponentially."""
-        retry_after = response.headers.get("Retry-After", "").strip()
+        retry_after = (
+            response.headers.get("Retry-After", "").strip() if response else ""
+        )
         delay = float(retry_after) if retry_after.isdigit() else 2.0**attempt
         # Concurrent requests are answered at slightly different times, but a
         # shared Retry-After would align their retries into a new burst.
         # ruff: ignore[suspicious-non-cryptographic-random-usage]
         return min(delay, self.max_retry_delay) * random.uniform(0.8, 1.3)
 
+    def _accept_or_retry(self, response: httpx2.Response, attempt: int) -> bool:
+        """Whether a delivered answer is final; raises when it is refused for good."""
+        try:
+            self.check_failure(response)
+        except Exception:
+            if not self.should_retry(response, attempt):
+                raise
+            return False
+        return True
+
     def request(self, method, url, skip_auth=False, **kwargs):
         """Perform JSON request, repeating it while the service asks to wait."""
         attempt = 0
         while True:
             request_kwargs = self._prepare_request_kwargs(skip_auth, kwargs)
+            delayed_by: httpx2.Response | None = None
             # Fire request
-            if self.allow_private_targets:
-                response = fetch_url(
-                    method,
-                    url,
-                    **request_kwargs,
-                )
-            else:
-                response = fetch_validated_url(
-                    method,
-                    url,
-                    allow_private_targets=False,
-                    private_allowlist=settings.ALLOWED_MACHINERY_DOMAINS,
-                    **request_kwargs,
-                )
-
             try:
-                self.check_failure(response)
-            except Exception:
-                if not self.should_retry(response, attempt):
+                if self.allow_private_targets:
+                    response = fetch_url(
+                        method,
+                        url,
+                        **request_kwargs,
+                    )
+                else:
+                    response = fetch_validated_url(
+                        method,
+                        url,
+                        allow_private_targets=False,
+                        private_allowlist=settings.ALLOWED_MACHINERY_DOMAINS,
+                        **request_kwargs,
+                    )
+            except Exception as error:
+                if not self.should_retry_exception(error, attempt):
                     raise
             else:
-                return response
+                if self._accept_or_retry(response, attempt):
+                    return response
+                delayed_by = response
 
-            time.sleep(self.get_retry_delay(response, attempt))
+            time.sleep(self.get_retry_delay(delayed_by, attempt))
             attempt += 1
 
     async def arequest(self, method, url, skip_auth=False, **kwargs):
@@ -408,26 +435,27 @@ class BatchMachineTranslation(DocVersionsMixin):
             request_kwargs = await sync_to_async(self._prepare_request_kwargs)(
                 skip_auth, kwargs
             )
-            if self.allow_private_targets:
-                response = await async_fetch_url(method, url, **request_kwargs)
-            else:
-                response = await async_fetch_validated_url(
-                    method,
-                    url,
-                    allow_private_targets=False,
-                    private_allowlist=settings.ALLOWED_MACHINERY_DOMAINS,
-                    **request_kwargs,
-                )
-
+            delayed_by: httpx2.Response | None = None
             try:
-                self.check_failure(response)
-            except Exception:
-                if not self.should_retry(response, attempt):
+                if self.allow_private_targets:
+                    response = await async_fetch_url(method, url, **request_kwargs)
+                else:
+                    response = await async_fetch_validated_url(
+                        method,
+                        url,
+                        allow_private_targets=False,
+                        private_allowlist=settings.ALLOWED_MACHINERY_DOMAINS,
+                        **request_kwargs,
+                    )
+            except Exception as error:
+                if not self.should_retry_exception(error, attempt):
                     raise
             else:
-                return response
+                if self._accept_or_retry(response, attempt):
+                    return response
+                delayed_by = response
 
-            await asyncio.sleep(self.get_retry_delay(response, attempt))
+            await asyncio.sleep(self.get_retry_delay(delayed_by, attempt))
             attempt += 1
 
     def download_languages(self):

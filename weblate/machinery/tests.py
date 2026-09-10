@@ -11282,6 +11282,46 @@ class RequestRetryTest(SimpleTestCase):
 
         http_mock.assert_call_count(self.URL, 1)
 
+    @http_mock.activate
+    def test_retries_read_timeout(self) -> None:
+        # The proxy accepted the request and never answered in time; the
+        # translation is idempotent, so asking once more is safe.
+        http_mock.register_exception(
+            "GET", self.URL, httpx2.ReadTimeout("slow upstream")
+        )
+        http_mock.register("GET", self.URL, text="{}")
+        service = DummyTranslation({})
+        service.max_retry_delay = 0
+
+        response = service.request("GET", self.URL)
+
+        self.assertEqual(response.status_code, 200)
+        http_mock.assert_call_count(self.URL, 2)
+
+    @http_mock.activate
+    def test_gives_up_on_persistent_timeout(self) -> None:
+        http_mock.register_exception(
+            "GET", self.URL, httpx2.ReadTimeout("slow upstream")
+        )
+        service = DummyTranslation({})
+        service.max_retry_delay = 0
+
+        with self.assertRaises(httpx2.ReadTimeout):
+            service.request("GET", self.URL)
+
+        http_mock.assert_call_count(self.URL, service.retry_attempts + 1)
+
+    @http_mock.activate
+    def test_does_not_retry_connect_errors(self) -> None:
+        # Nothing reached the service, and a dead host does not recover
+        # within a request's lifetime.
+        http_mock.register_exception("GET", self.URL, httpx2.ConnectError("refused"))
+
+        with self.assertRaises(httpx2.ConnectError):
+            DummyTranslation({}).request("GET", self.URL)
+
+        http_mock.assert_call_count(self.URL, 1)
+
     def test_retry_delay_honours_retry_after(self) -> None:
         service = DummyTranslation({})
         response = httpx2.Response(429, headers={"Retry-After": "5"})
