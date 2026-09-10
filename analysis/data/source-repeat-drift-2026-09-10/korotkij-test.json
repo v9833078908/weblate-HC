@@ -1,0 +1,70 @@
+{
+  "project": "korotkij-test",
+  "api": "https://l10n.herocraft.com/api",
+  "captured_at": "2026-09-10",
+  "components": [],
+  "glossary_components": [],
+  "languages": [],
+  "units_fetched": 0,
+  "target_units_compared": 0,
+  "repeated_source_groups": 0,
+  "folds": {
+    "strict": {
+      "diverging_groups": 0,
+      "distinct_sources": 0,
+      "per_language": {},
+      "scope": {
+        "intra_component": 0,
+        "cross_component_only": 0
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 0,
+        "regular_only": 0
+      }
+    },
+    "ignore-case": {
+      "diverging_groups": 0,
+      "distinct_sources": 0,
+      "per_language": {},
+      "scope": {
+        "intra_component": 0,
+        "cross_component_only": 0
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 0,
+        "regular_only": 0
+      }
+    },
+    "ignore-whitespace": {
+      "diverging_groups": 0,
+      "distinct_sources": 0,
+      "per_language": {},
+      "scope": {
+        "intra_component": 0,
+        "cross_component_only": 0
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 0,
+        "regular_only": 0
+      }
+    },
+    "ignore-punctuation": {
+      "diverging_groups": 0,
+      "distinct_sources": 0,
+      "per_language": {},
+      "scope": {
+        "intra_component": 0,
+        "cross_component_only": 0
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 0,
+        "regular_only": 0
+      }
+    }
+  },
+  "fixtures_ignore_punctuation": []
+}

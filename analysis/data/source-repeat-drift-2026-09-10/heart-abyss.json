@@ -1,0 +1,579 @@
+{
+  "project": "heart-abyss",
+  "api": "https://l10n.herocraft.com/api",
+  "captured_at": "2026-09-10",
+  "components": [
+    "temple",
+    "all-glossary",
+    "hub-1"
+  ],
+  "glossary_components": [
+    "all-glossary"
+  ],
+  "languages": [
+    "zh_Hans",
+    "zh_Hant",
+    "en",
+    "fr",
+    "de",
+    "it",
+    "ja",
+    "ko",
+    "pt_PT",
+    "ru",
+    "es"
+  ],
+  "units_fetched": 8455,
+  "target_units_compared": 7083,
+  "repeated_source_groups": 257,
+  "folds": {
+    "strict": {
+      "diverging_groups": 126,
+      "distinct_sources": 33,
+      "per_language": {
+        "fr": 23,
+        "ja": 19,
+        "ko": 17,
+        "zh_Hans": 16,
+        "zh_Hant": 15,
+        "en": 12,
+        "de": 11,
+        "es": 9,
+        "it": 4
+      },
+      "scope": {
+        "intra_component": 125,
+        "cross_component_only": 1
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 0,
+        "regular_only": 126
+      }
+    },
+    "ignore-case": {
+      "diverging_groups": 126,
+      "distinct_sources": 33,
+      "per_language": {
+        "fr": 23,
+        "ja": 19,
+        "ko": 17,
+        "zh_Hans": 16,
+        "zh_Hant": 15,
+        "en": 12,
+        "de": 11,
+        "es": 9,
+        "it": 4
+      },
+      "scope": {
+        "intra_component": 125,
+        "cross_component_only": 1
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 0,
+        "regular_only": 126
+      }
+    },
+    "ignore-whitespace": {
+      "diverging_groups": 126,
+      "distinct_sources": 33,
+      "per_language": {
+        "fr": 23,
+        "ja": 19,
+        "ko": 17,
+        "zh_Hans": 16,
+        "zh_Hant": 15,
+        "en": 12,
+        "de": 11,
+        "es": 9,
+        "it": 4
+      },
+      "scope": {
+        "intra_component": 125,
+        "cross_component_only": 1
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 0,
+        "regular_only": 126
+      }
+    },
+    "ignore-punctuation": {
+      "diverging_groups": 117,
+      "distinct_sources": 31,
+      "per_language": {
+        "ja": 19,
+        "fr": 18,
+        "ko": 17,
+        "zh_Hans": 16,
+        "zh_Hant": 15,
+        "en": 12,
+        "de": 8,
+        "es": 8,
+        "it": 4
+      },
+      "scope": {
+        "intra_component": 116,
+        "cross_component_only": 1
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 0,
+        "regular_only": 117
+      }
+    }
+  },
+  "fixtures_ignore_punctuation": [
+    {
+      "language": "de",
+      "source": "А это — маска актёра.",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_13",
+          "target": "Und das hier ist die Maske eines Schauspielers.",
+          "unit": 370154
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_12",
+          "target": "Und das ist die Maske eines Schauspielers.",
+          "unit": 370289
+        }
+      ]
+    },
+    {
+      "language": "de",
+      "source": "В поисках знаний, или вас привела нужда?",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_2",
+          "target": "Auf der Suche nach Wissen, oder hat euch die Not hierhergeführt?",
+          "unit": 370143
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_2",
+          "target": "Auf der Suche nach Wissen, oder hat euch die Not hierhergetrieben?",
+          "unit": 370279
+        }
+      ]
+    },
+    {
+      "language": "de",
+      "source": "ВСЁ, ХВАТИТ! Мне не нужна коллекция пиздежа!",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_15",
+          "target": "ALLES KLAR, GENUG! Ich brauche keine Scheiß-Sammlung!",
+          "unit": 370156
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_14",
+          "target": "ALLES KLAR, GENUG! Ich brauche keine Sammlung von Scheiße!",
+          "unit": 370291
+        }
+      ]
+    },
+    {
+      "language": "de",
+      "source": "Знаете ли вы, что его войска…",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_6",
+          "target": "Wisst ihr, dass seine Truppen …",
+          "unit": 370147
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_6",
+          "target": "Wisst ihr, seine Truppen …",
+          "unit": 370283
+        }
+      ]
+    },
+    {
+      "language": "de",
+      "source": "История всегда знает, когда подоспеть.",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_20",
+          "target": "Die Geschichte weiß immer, wann sie eingreifen muss.",
+          "unit": 370161
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_19",
+          "target": "Die Geschichte weiß immer, wann sie kommen muss.",
+          "unit": 370296
+        }
+      ]
+    },
+    {
+      "language": "de",
+      "source": "Леон, ты с ума сошел? Как ты проберешься через Нижний город?",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_1_26",
+          "target": "Leon, bist du verrückt geworden? Wie willst du durch die Unterstadt kommen?",
+          "unit": 370132
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_2_35",
+          "target": "Leon, bist du verrückt? Wie willst du durch die Unterstadt kommen?",
+          "unit": 370271
+        }
+      ]
+    },
+    {
+      "language": "de",
+      "source": "Там можно попасть в Архив.",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_1_23",
+          "target": "Dort kommst du ins Archiv.",
+          "unit": 370129
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_2_32",
+          "target": "Dort gelangt man ins Archiv.",
+          "unit": 370268
+        }
+      ]
+    },
+    {
+      "language": "de",
+      "source": "У тебя найдется?",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_asuna_archive_1_22",
+          "target": "Hast du das?",
+          "unit": 370227
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_asuna_archive_1_23",
+          "target": "Hast du etwas?",
+          "unit": 370228
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Без понятия.",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_ramen_1_17",
+          "target": "No idea.",
+          "unit": 343225
+        },
+        {
+          "component": "temple",
+          "context": "belltrail_2_9",
+          "target": "I have no idea.",
+          "unit": 22999
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "В поисках знаний, или вас привела нужда?",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_2",
+          "target": "Seekin' knowledge, or has necessity brought ya?",
+          "unit": 343301
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_2",
+          "target": "Seekin' knowledge, or has need brought ya here?",
+          "unit": 343437
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "ВСЁ, ХВАТИТ! Мне не нужна коллекция пиздежа!",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_15",
+          "target": "THAT'S ENOUGH! I don't need a collection of bullshit!",
+          "unit": 343314
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_14",
+          "target": "ALRIGHT, ENOUGH! I don't need a collection of bullshit!",
+          "unit": 343449
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Вот, к примеру, веер придворной дамы.",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_8",
+          "target": "Here, for example, is a court lady's fan.",
+          "unit": 343307
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_8",
+          "target": "Here, for example, a court lady's fan.",
+          "unit": 343443
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Здесь и должен быть проход дальше.",
+      "members": [
+        {
+          "component": "temple",
+          "context": "final_tengu_6_13",
+          "target": "This is where the passage should continue.",
+          "unit": 22959
+        },
+        {
+          "component": "temple",
+          "context": "final_tengu_6_14",
+          "target": "The passage forward should be here.",
+          "unit": 22960
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Знаете ли вы, что его войска…",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_6",
+          "target": "Do you know that his troops…",
+          "unit": 343305
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_6",
+          "target": "Did you know his troops…",
+          "unit": 343441
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Когда она убегала к любовнику, этот звук маскировал её шаги…",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_9",
+          "target": "When she ran off to her lover, the sound of it masked her footsteps…",
+          "unit": 343308
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_9",
+          "target": "When she ran off to her lover, this sound masked her footsteps…",
+          "unit": 343444
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Наконец-то. Хоть раз твой мусор оказался в тему.",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_18",
+          "target": "Finally. For once your junk came in handy.",
+          "unit": 343317
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_17",
+          "target": "Finally. For once your junk's actually useful.",
+          "unit": 343452
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Он же барахольщик. Какое-нибудь барахло.",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_1_34",
+          "target": "He's a junk dealer. Some junk or other.",
+          "unit": 343298
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_2_40",
+          "target": "He's a junk dealer. Some junk.",
+          "unit": 343434
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "По крышам, говорите…",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_4",
+          "target": "Across the rooftops, you say…",
+          "unit": 343303
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_4",
+          "target": "Rooftops, you say…",
+          "unit": 343439
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Так будет лучше для всех.",
+      "members": [
+        {
+          "component": "temple",
+          "context": "final_choice_1_4",
+          "target": "That will be best for everyone.",
+          "unit": 23018
+        },
+        {
+          "component": "temple",
+          "context": "flashback_3_35",
+          "target": "It will be better for everyone.",
+          "unit": 23067
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Там можно попасть в Архив.",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_1_23",
+          "target": "You can get to the Archives there.",
+          "unit": 343287
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_2_32",
+          "target": "You can get to the Archives from there.",
+          "unit": 343426
+        }
+      ]
+    },
+    {
+      "language": "es",
+      "source": "ВСЁ, ХВАТИТ! Мне не нужна коллекция пиздежа!",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_15",
+          "target": "¡YA, BASTA! ¡No necesito una colección de gilipolleces!",
+          "unit": 346401
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_14",
+          "target": "¡YA BASTA! ¡No quiero una colección de gilipolleces!",
+          "unit": 346536
+        }
+      ]
+    },
+    {
+      "language": "es",
+      "source": "Ладно, я загляну к нему.",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_1_35",
+          "target": "De acuerdo, iré a verle.",
+          "unit": 346386
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_2_41",
+          "target": "Vale, iré a verle.",
+          "unit": 346522
+        }
+      ]
+    },
+    {
+      "language": "es",
+      "source": "Наконец-то. Хоть раз твой мусор оказался в тему.",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_1_18",
+          "target": "Por fin. Al menos una vez tu basura ha sido útil.",
+          "unit": 346404
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_scrappy_2_17",
+          "target": "Por fin. Por una vez, tu basura ha sido útil.",
+          "unit": 346539
+        }
+      ]
+    },
+    {
+      "language": "es",
+      "source": "Он же барахольщик. Какое-нибудь барахло.",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_1_34",
+          "target": "Es un chatarrero. Alguna baratija.",
+          "unit": 346385
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_2_40",
+          "target": "Es un chatarrero. Algún trasto.",
+          "unit": 346521
+        }
+      ]
+    },
+    {
+      "language": "es",
+      "source": "Там можно попасть в Архив.",
+      "members": [
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_1_23",
+          "target": "Allí podrás acceder a los Archivos.",
+          "unit": 346374
+        },
+        {
+          "component": "hub-1",
+          "context": "hub1_teahouse_2_32",
+          "target": "Allí puedes acceder a los Archivos.",
+          "unit": 346513
+        }
+      ]
+    }
+  ]
+}

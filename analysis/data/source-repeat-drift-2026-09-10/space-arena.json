@@ -1,0 +1,1010 @@
+{
+  "project": "space-arena",
+  "api": "https://l10n.herocraft.com/api",
+  "captured_at": "2026-09-10",
+  "components": [
+    "lockit",
+    "glossary"
+  ],
+  "glossary_components": [
+    "glossary"
+  ],
+  "languages": [
+    "zh_Hans",
+    "en",
+    "fr",
+    "de",
+    "hi",
+    "id",
+    "ja",
+    "ko",
+    "fa",
+    "pt_BR",
+    "ru",
+    "es",
+    "th",
+    "tr",
+    "vi"
+  ],
+  "units_fetched": 78060,
+  "target_units_compared": 65791,
+  "repeated_source_groups": 7612,
+  "folds": {
+    "strict": {
+      "diverging_groups": 1421,
+      "distinct_sources": 455,
+      "per_language": {
+        "vi": 285,
+        "th": 280,
+        "id": 263,
+        "hi": 243,
+        "ru": 45,
+        "tr": 45,
+        "ja": 38,
+        "zh_Hans": 37,
+        "ko": 37,
+        "pt_BR": 34,
+        "fr": 30,
+        "fa": 30,
+        "es": 30,
+        "de": 24
+      },
+      "scope": {
+        "intra_component": 694,
+        "cross_component_only": 727
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 869,
+        "regular_only": 552
+      }
+    },
+    "ignore-case": {
+      "diverging_groups": 1306,
+      "distinct_sources": 450,
+      "per_language": {
+        "th": 280,
+        "vi": 265,
+        "hi": 243,
+        "id": 180,
+        "ru": 44,
+        "tr": 43,
+        "ja": 38,
+        "zh_Hans": 37,
+        "ko": 37,
+        "pt_BR": 31,
+        "fa": 30,
+        "fr": 29,
+        "es": 27,
+        "de": 22
+      },
+      "scope": {
+        "intra_component": 677,
+        "cross_component_only": 629
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 767,
+        "regular_only": 539
+      }
+    },
+    "ignore-whitespace": {
+      "diverging_groups": 1305,
+      "distinct_sources": 450,
+      "per_language": {
+        "th": 279,
+        "vi": 265,
+        "hi": 243,
+        "id": 180,
+        "ru": 44,
+        "tr": 43,
+        "ja": 38,
+        "zh_Hans": 37,
+        "ko": 37,
+        "pt_BR": 31,
+        "fa": 30,
+        "fr": 29,
+        "es": 27,
+        "de": 22
+      },
+      "scope": {
+        "intra_component": 676,
+        "cross_component_only": 629
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 767,
+        "regular_only": 538
+      }
+    },
+    "ignore-punctuation": {
+      "diverging_groups": 1298,
+      "distinct_sources": 450,
+      "per_language": {
+        "th": 278,
+        "vi": 265,
+        "hi": 243,
+        "id": 180,
+        "ru": 44,
+        "tr": 42,
+        "ja": 37,
+        "ko": 37,
+        "zh_Hans": 36,
+        "fa": 30,
+        "pt_BR": 30,
+        "fr": 28,
+        "es": 26,
+        "de": 22
+      },
+      "scope": {
+        "intra_component": 672,
+        "cross_component_only": 626
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 764,
+        "regular_only": 534
+      }
+    }
+  },
+  "fixtures_ignore_punctuation": [
+    {
+      "language": "th",
+      "source": "The coordinates of the galaxy. You can find useful items by exploring the coordinates.",
+      "members": [
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_ALPHA_TOOLTIP%",
+          "target": "พิกัดของกาแล็กซี คุณสามารถค้นพบไอเท็มที่มีประโยชน์ได้โดยการสำรวจตามพิกัดเหล่านี้",
+          "unit": 317069
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_BETA_SPECIAL_TOOLTIP%",
+          "target": "พิกัดของกาแล็กซี คุณสามารถค้นพบไอเทมที่มีประโยชน์ได้โดยการสำรวจพิกัดเหล่านี้",
+          "unit": 317076
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_BETA_TOOLTIP%",
+          "target": "พิกัดของกาแล็กซี่ คุณสามารถค้นหาสิ่งของที่มีประโยชน์ได้โดยการสำรวจพิกัดเหล่านี้",
+          "unit": 317075
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_DELTA_TOOLTIP%",
+          "target": "พิกัดของกาแล็กซี่ คุณสามารถค้นหาของมีประโยชน์ได้โดยการสำรวจที่พิกัดเหล่านี้",
+          "unit": 317077
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_ELEGANCE_TOOLTIP%",
+          "target": "พิกัดของกาแล็กซี่ คุณสามารถค้นหาของใช้ที่มีประโยชน์ได้โดยการสำรวจพิกัดเหล่านี้",
+          "unit": 317082
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_EPSILON_TOOLTIP%",
+          "target": "พิกัดของกาแลคซี คุณสามารถค้นหาของใช้ที่มีประโยชน์ได้โดยการสำรวจพิกัดเหล่านี้",
+          "unit": 317070
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_IOTA_TOOLTIP%",
+          "target": "พิกัดของกาแลคซี คุณสามารถหาของมีประโยชน์ได้โดยการสำรวจพิกัดเหล่านี้",
+          "unit": 317072
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_IOTA_X_TOOLTIP%",
+          "target": "พิกัดของกาแลคซี คุณสามารถหาของมีประโยชน์ได้โดยการสำรวจพิกัดเหล่านี้",
+          "unit": 317084
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_OMEGA_TOOLTIP%",
+          "target": "พิกัดของกาแลคซี คุณสามารถหาของมีประโยชน์ได้โดยการสำรวจพิกัดเหล่านี้",
+          "unit": 317071
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_THETA_TOOLTIP%",
+          "target": "พิกัดของกาแล็กซี คุณสามารถพบไอเท็มมีประโยชน์ได้จากการสำรวจพิกัดเหล่านี้",
+          "unit": 317078
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_ZETA_TOOLTIP%",
+          "target": "พิกัดของกาแล็กซี คุณสามารถหาของมีประโยชน์ได้โดยการสำรวจพิกัดเหล่านี้",
+          "unit": 317073
+        },
+        {
+          "component": "lockit",
+          "context": "%ENTITY_GALAXY_COORDINATES_DESCRIPTION%",
+          "target": "พิกัดของกาแล็กซี่ คุณสามารถค้นหาของใช้ที่เป็นประโยชน์ได้โดยการสำรวจพิกัดเหล่านี้",
+          "unit": 319626
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "The coordinates of the galaxy. You can find useful items by exploring the coordinates.",
+      "members": [
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_ALPHA_TOOLTIP%",
+          "target": "गैलेक्सी के निर्देशांक। निर्देशांकों का अन्वेषण करके आप उपयोगी वस्तुएं पा सकते हैं।",
+          "unit": 287903
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_BETA_SPECIAL_TOOLTIP%",
+          "target": "गैलेक्सी के निर्देशांक। निर्देशांकों की खोज करके उपयोगी वस्तुएँ प्राप्त कर सकते हैं।",
+          "unit": 287910
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_BETA_TOOLTIP%",
+          "target": "गैलेक्सी के निर्देशांक। आप निर्देशांकों की खोज करके उपयोगी वस्तुएं पा सकते हैं।",
+          "unit": 287909
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_DELTA_TOOLTIP%",
+          "target": "गैलेक्सी के निर्देशांक। निर्देशांकों की खोज करके आप उपयोगी वस्तुएं प्राप्त कर सकते हैं।",
+          "unit": 287911
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_ELEGANCE_TOOLTIP%",
+          "target": "गैलेक्सी के निर्देशांक। आप निर्देशांकों का अन्वेषण करके उपयोगी वस्तुएँ पा सकते हैं।",
+          "unit": 287916
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_EPSILON_TOOLTIP%",
+          "target": "आकाशगंगा के निर्देशांक। निर्देशांक की खोज करके आप उपयोगी वस्तुएं पा सकते हैं।",
+          "unit": 287904
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_IOTA_TOOLTIP%",
+          "target": "गैलेक्सी के निर्देशांक। इन निर्देशांकों की खोज करके आप उपयोगी वस्तुएं पा सकते हैं।",
+          "unit": 287906
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_IOTA_X_TOOLTIP%",
+          "target": "गैलेक्सी के निर्देशांक। इन निर्देशांकों की खोज करके आप उपयोगी वस्तुएं पा सकते हैं।",
+          "unit": 287918
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_OMEGA_TOOLTIP%",
+          "target": "गैलेक्सी के निर्देशांक। इन निर्देशांकों की खोज करके आप उपयोगी वस्तुएं पा सकते हैं।",
+          "unit": 287905
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_THETA_TOOLTIP%",
+          "target": "गैलेक्सी के निर्देशांक। इन निर्देशांकों की खोज करके आप उपयोगी वस्तुएं प्राप्त कर सकते हैं।",
+          "unit": 287912
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_ZETA_TOOLTIP%",
+          "target": "गैलेक्सी के निर्देशांक। निर्देशांकों की खोज करके आप उपयोगी वस्तुएं प्राप्त कर सकते हैं।",
+          "unit": 287907
+        },
+        {
+          "component": "lockit",
+          "context": "%ENTITY_GALAXY_COORDINATES_DESCRIPTION%",
+          "target": "गैलेक्सी के निर्देशांक। इन निर्देशांकों की तलाश में आप उपयोगी वस्तुएँ प्राप्त कर सकते हैं।",
+          "unit": 290460
+        }
+      ]
+    },
+    {
+      "language": "vi",
+      "source": "The coordinates of the galaxy. You can find useful items by exploring the coordinates.",
+      "members": [
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_ALPHA_TOOLTIP%",
+          "target": "Tọa độ của thiên hà. Bạn có thể tìm thấy các vật phẩm hữu ích khi khám phá các tọa độ này.",
+          "unit": 326791
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_BETA_SPECIAL_TOOLTIP%",
+          "target": "Tọa độ của dải ngân hà. Bạn có thể tìm thấy các vật phẩm hữu ích bằng cách khám phá tọa độ này.",
+          "unit": 326798
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_BETA_TOOLTIP%",
+          "target": "Tọa độ của thiên hà. Bạn có thể tìm thấy những vật phẩm hữu ích bằng cách khám phá các tọa độ này.",
+          "unit": 326797
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_DELTA_TOOLTIP%",
+          "target": "Tọa độ của ngân hà. Bạn có thể tìm thấy các vật phẩm hữu ích bằng cách khám phá các tọa độ này.",
+          "unit": 326799
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_ELEGANCE_TOOLTIP%",
+          "target": "Tọa độ của thiên hà. Bạn có thể tìm thấy các vật phẩm hữu ích khi khám phá các tọa độ này.",
+          "unit": 326804
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_EPSILON_TOOLTIP%",
+          "target": "Tọa độ của thiên hà. Bạn có thể tìm thấy các vật phẩm hữu ích khi khám phá các tọa độ này.",
+          "unit": 326792
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_IOTA_TOOLTIP%",
+          "target": "Tọa độ của dải ngân hà. Bạn có thể tìm thấy các vật phẩm hữu ích khi khám phá các tọa độ này.",
+          "unit": 326794
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_IOTA_X_TOOLTIP%",
+          "target": "Tọa độ của dải ngân hà. Bạn có thể tìm thấy các vật phẩm hữu ích khi khám phá các tọa độ này.",
+          "unit": 326806
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_OMEGA_TOOLTIP%",
+          "target": "Tọa độ của dải ngân hà. Bạn có thể tìm thấy các vật phẩm hữu ích khi khám phá các tọa độ này.",
+          "unit": 326793
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_THETA_TOOLTIP%",
+          "target": "Tọa độ của thiên hà. Bạn có thể tìm thấy các vật phẩm hữu ích bằng cách khám phá các tọa độ này.",
+          "unit": 326800
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_ZETA_TOOLTIP%",
+          "target": "Tọa độ của thiên hà. Bạn có thể tìm thấy các vật phẩm hữu ích bằng cách khám phá tọa độ này.",
+          "unit": 326795
+        },
+        {
+          "component": "lockit",
+          "context": "%ENTITY_GALAXY_COORDINATES_DESCRIPTION%",
+          "target": "Tọa độ của thiên hà. Bạn có thể tìm thấy những vật phẩm hữu ích khi khám phá các tọa độ này.",
+          "unit": 329348
+        }
+      ]
+    },
+    {
+      "language": "id",
+      "source": "Armor",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Armor\"]",
+          "target": "Lapis baja",
+          "unit": 332179
+        },
+        {
+          "component": "lockit",
+          "context": "%ARMOR%",
+          "target": "Armor",
+          "unit": 292649
+        },
+        {
+          "component": "lockit",
+          "context": "%CATEGORY_ARMOR%",
+          "target": "Zirah",
+          "unit": 292038
+        },
+        {
+          "component": "lockit",
+          "context": "%MODULE_KIND_ARMOR%",
+          "target": "Baju Zirah",
+          "unit": 291324
+        }
+      ]
+    },
+    {
+      "language": "th",
+      "source": "Balance",
+      "members": [
+        {
+          "component": "lockit",
+          "context": "%HEAVY_FIGHTER_BALANCE%",
+          "target": "สมดุล",
+          "unit": 315918
+        },
+        {
+          "component": "lockit",
+          "context": "%LIGHTNING_BALANCE%",
+          "target": "สมดุล",
+          "unit": 315920
+        },
+        {
+          "component": "lockit",
+          "context": "%MIRAN_MK2_BALANCE%",
+          "target": "สมดุลย์",
+          "unit": 315972
+        },
+        {
+          "component": "lockit",
+          "context": "%RADIANTX_BALANCE%",
+          "target": "ยอดคงเหลือ",
+          "unit": 316077
+        },
+        {
+          "component": "lockit",
+          "context": "%VULTURE_BALANCE%",
+          "target": "ความสมดุล",
+          "unit": 316003
+        }
+      ]
+    },
+    {
+      "language": "th",
+      "source": "Fleet Arena",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Fleet Arena\"]",
+          "target": "ฟลีท อารีน่า",
+          "unit": 333847
+        },
+        {
+          "component": "lockit",
+          "context": "%FEATURE_FFA_NAME%",
+          "target": "เวทีรบยานรบ",
+          "unit": 320337
+        },
+        {
+          "component": "lockit",
+          "context": "%FEATURE_FFA_TITLE%",
+          "target": "เวทีรบยานรบ",
+          "unit": 320338
+        },
+        {
+          "component": "lockit",
+          "context": "%FFA_ARENA%",
+          "target": "สมรภูมิเรือรบ",
+          "unit": 316360
+        },
+        {
+          "component": "lockit",
+          "context": "%MAP_GAME_MODE_FFA%",
+          "target": "เวทีเรือรบ",
+          "unit": 319104
+        }
+      ]
+    },
+    {
+      "language": "tr",
+      "source": "Battle",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Battle\"]",
+          "target": "Dövüşü",
+          "unit": 334191
+        },
+        {
+          "component": "lockit",
+          "context": "%BATTLE%",
+          "target": "Dövüşü",
+          "unit": 322854
+        },
+        {
+          "component": "lockit",
+          "context": "%BATTLE_BUTTON%",
+          "target": "savaşa",
+          "unit": 321886
+        },
+        {
+          "component": "lockit",
+          "context": "%FFA_COMBAT%",
+          "target": "Savaş",
+          "unit": 321225
+        },
+        {
+          "component": "lockit",
+          "context": "%FFA_MESSAGE_ENGAGE%",
+          "target": "Savaş",
+          "unit": 321235
+        },
+        {
+          "component": "lockit",
+          "context": "%HANGAR_FIGHT%",
+          "target": "Savaş",
+          "unit": 324478
+        },
+        {
+          "component": "lockit",
+          "context": "%REROLL_FIGHT%",
+          "target": "Muharebe",
+          "unit": 321022
+        }
+      ]
+    },
+    {
+      "language": "vi",
+      "source": "Anomalies",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Anomalies\"]",
+          "target": "Sự bất thường",
+          "unit": 334521
+        },
+        {
+          "component": "lockit",
+          "context": "%ANOMALIES_DESC%",
+          "target": "Hiện tượng dị thường",
+          "unit": 327702
+        },
+        {
+          "component": "lockit",
+          "context": "%ANOMALIES_NAME%",
+          "target": "Di vật dị thường",
+          "unit": 327701
+        },
+        {
+          "component": "lockit",
+          "context": "%RAID_TAB_ANOMALIES%",
+          "target": "Các Hiện Tượng Bất Thường",
+          "unit": 329461
+        }
+      ]
+    },
+    {
+      "language": "de",
+      "source": "Support",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Support\"]",
+          "target": "Unterstützen",
+          "unit": 330662
+        },
+        {
+          "component": "lockit",
+          "context": "%CATEGORY_SUPPORT%",
+          "target": "Beistand",
+          "unit": 267741
+        },
+        {
+          "component": "lockit",
+          "context": "%MODULE_KIND_SUPPORT_SYSTEM%",
+          "target": "Unterstützung",
+          "unit": 267021
+        }
+      ]
+    },
+    {
+      "language": "fa",
+      "source": "Credits",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Credits\"]",
+          "target": "اعتبار",
+          "unit": 331266
+        },
+        {
+          "component": "lockit",
+          "context": "%EXCHANGE_BUTTON%",
+          "target": "انجام",
+          "unit": 278146
+        },
+        {
+          "component": "lockit",
+          "context": "%GAME_RESOURCE_CREDITS%",
+          "target": "اعتبار",
+          "unit": 278755
+        },
+        {
+          "component": "lockit",
+          "context": "%OPTION_CREDITS%",
+          "target": "عوامل سازنده",
+          "unit": 277666
+        },
+        {
+          "component": "lockit",
+          "context": "%RESOURCE_CREDITS%",
+          "target": "اعتبار",
+          "unit": 278263
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "Anomalies",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Anomalies\"]",
+          "target": "अनोमालियां",
+          "unit": 331817
+        },
+        {
+          "component": "lockit",
+          "context": "%ANOMALIES_DESC%",
+          "target": "विचित्रताएँ",
+          "unit": 288814
+        },
+        {
+          "component": "lockit",
+          "context": "%ANOMALIES_NAME%",
+          "target": "असामान्यताएँ",
+          "unit": 288813
+        },
+        {
+          "component": "lockit",
+          "context": "%RAID_TAB_ANOMALIES%",
+          "target": "असामान्यताएँ",
+          "unit": 290573
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "Armor",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Armor\"]",
+          "target": "आर्मर",
+          "unit": 331841
+        },
+        {
+          "component": "lockit",
+          "context": "%ARMOR%",
+          "target": "कवच",
+          "unit": 287788
+        },
+        {
+          "component": "lockit",
+          "context": "%CATEGORY_ARMOR%",
+          "target": "बंधक",
+          "unit": 287177
+        },
+        {
+          "component": "lockit",
+          "context": "%MODULE_KIND_ARMOR%",
+          "target": "कवच",
+          "unit": 286463
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "BATTLES LIMIT: 100",
+      "members": [
+        {
+          "component": "lockit",
+          "context": "%BANNER_STARKILLER_BATTLES%",
+          "target": "युद्ध संख्या सीमा: 100",
+          "unit": 286710
+        },
+        {
+          "component": "lockit",
+          "context": "%BANNER_STORMOON_BATTLES%",
+          "target": "युद्ध सीमा: 100",
+          "unit": 286712
+        },
+        {
+          "component": "lockit",
+          "context": "%BANNER_WAYFARER_BATTLES%",
+          "target": "युद्ध की सीमा: 100",
+          "unit": 286715
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "Battleship",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Battleship\"]",
+          "target": "संकटपोत",
+          "unit": 331961
+        },
+        {
+          "component": "lockit",
+          "context": "%CLASS_BATTLESHIP%",
+          "target": "मुख्य युद्धक जहाज",
+          "unit": 287016
+        },
+        {
+          "component": "lockit",
+          "context": "%CLASS_BATTLESHIP_SHORT%",
+          "target": "झड़प जहाज",
+          "unit": 287017
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "Black Market",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Black Market\"]",
+          "target": "काला बाज़ार",
+          "unit": 332117
+        },
+        {
+          "component": "lockit",
+          "context": "%BLACK_MARKET_ENTER%",
+          "target": "गुप्त बाज़ार",
+          "unit": 287477
+        },
+        {
+          "component": "lockit",
+          "context": "%FEATURE_BM_NAME%",
+          "target": "गुप्त बाज़ार",
+          "unit": 291135
+        },
+        {
+          "component": "lockit",
+          "context": "%FEATURE_BM_TOOLTIP_TITLE%",
+          "target": "गुप्त बाज़ार",
+          "unit": 291136
+        },
+        {
+          "component": "lockit",
+          "context": "%LEVEL_UP_UNLOCKED_BLACKMARKET%",
+          "target": "काला बाजार",
+          "unit": 288125
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "Defender",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Defender\"]",
+          "target": "रक्षक - उस क्लान का सदस्य जिसे क्लान युद्ध के दौरान अपनी जहाजों को रक्षा हेतु तैनात करने का अधिकार प्राप्त होता है।",
+          "unit": 331889
+        },
+        {
+          "component": "lockit",
+          "context": "%CLAN_ROLE_DEFENDER%",
+          "target": "प्रतिरक्षक",
+          "unit": 289589
+        },
+        {
+          "component": "lockit",
+          "context": "%HAWK_DEFENDER%",
+          "target": "रक्षक",
+          "unit": 286832
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "Efforts group of people are needed to obtain coordinates of this galaxy. You can't get to it alone.",
+      "members": [
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_KAPPA_TOOLTIP%",
+          "target": "इस आकाशगंगा के निर्देशांक प्राप्त करने के लिए प्रयासों में कई लोगों का समूह आवश्यक है। आप इसे अकेले हासिल नहीं कर सकते।",
+          "unit": 287913
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_MU_TOOLTIP%",
+          "target": "इस आकाशगंगा के निर्देशांक प्राप्त करने के लिए कई लोगों का प्रयास आवश्यक है। आप इसे अकेले नहीं पा सकते।",
+          "unit": 287914
+        },
+        {
+          "component": "lockit",
+          "context": "%COORDINATES_OMICRON_TOOLTIP%",
+          "target": "इस आकाशगंगा के निर्देशांक प्राप्त करने के लिए प्रयासों वाले लोगों का समूह चाहिए। आप इसे अकेले प्राप्त नहीं कर सकते।",
+          "unit": 287915
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "Mine Disruption Chance",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Mine Disruption Chance\"]",
+          "target": "माइन व्यवधान की संभावना",
+          "unit": 332120
+        },
+        {
+          "component": "lockit",
+          "context": "%POINT_MINE%",
+          "target": "खनन व्यवधान संभावना",
+          "unit": 287810
+        },
+        {
+          "component": "lockit",
+          "context": "%SYSTEM_MINE_CHANCE%",
+          "target": "खनन बाधित होने की संभावना",
+          "unit": 288317
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "POSSIBLE REWARDS:",
+      "members": [
+        {
+          "component": "lockit",
+          "context": "%BATTLE_MODE_INFO_POPUP_REWARDS_TITLE%",
+          "target": "संभावित पुरस्कार:",
+          "unit": 290469
+        },
+        {
+          "component": "lockit",
+          "context": "%BATTLE_MODE_REWARDS_TITLE%",
+          "target": "संभव इनाम:",
+          "unit": 290457
+        },
+        {
+          "component": "lockit",
+          "context": "%SQUADRONS_INFO_POPUP_REWARD_TITLE%",
+          "target": "संभावित इनाम:",
+          "unit": 291212
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "Rank",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Rank\"]",
+          "target": "पदवी",
+          "unit": 332046
+        },
+        {
+          "component": "lockit",
+          "context": "%LEADERBOARD_RANK%",
+          "target": "रैंक",
+          "unit": 287051
+        },
+        {
+          "component": "lockit",
+          "context": "%RANK%",
+          "target": "पद",
+          "unit": 290664
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "Ranked battle",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Ranked battle\"]",
+          "target": "रैंक वाली लड़ाई",
+          "unit": 332051
+        },
+        {
+          "component": "lockit",
+          "context": "%ARENA_BATTLE_MODE_TITLE%",
+          "target": "रैंक की हुई लड़ाई",
+          "unit": 290454
+        },
+        {
+          "component": "lockit",
+          "context": "%MAP_GAME_MODE_ARENA%",
+          "target": "रैंक्ड मुकाबला",
+          "unit": 289927
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "Rocket Disruption Chance",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Rocket Disruption Chance\"]",
+          "target": "रॉकेट विघटन संभावना",
+          "unit": 332121
+        },
+        {
+          "component": "lockit",
+          "context": "%POINT_ROCKET%",
+          "target": "रॉकेट विघटन की संभावना",
+          "unit": 287808
+        },
+        {
+          "component": "lockit",
+          "context": "%SYSTEM_MISSILE_CHANCE%",
+          "target": "रॉकेट बाधा की संभावना",
+          "unit": 288315
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "Supercarrier",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Supercarrier\"]",
+          "target": "सुपरकैरियर",
+          "unit": 332082
+        },
+        {
+          "component": "lockit",
+          "context": "%CLASS_SUPERCARRIER%",
+          "target": "सुपरकैरीयर",
+          "unit": 287020
+        },
+        {
+          "component": "lockit",
+          "context": "%CLASS_SUPERCARRIER_SHORT%",
+          "target": "सुपरकैरिकर",
+          "unit": 287021
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "Torpedo Disruption Chance",
+      "members": [
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Torpedo Disruption Chance\"]",
+          "target": "टॉरपीडो विघटन संभावना",
+          "unit": 332122
+        },
+        {
+          "component": "lockit",
+          "context": "%POINT_TORPEDO%",
+          "target": "टारपीडो बाधा की संभावना",
+          "unit": 287809
+        },
+        {
+          "component": "lockit",
+          "context": "%SYSTEM_TORPEDO_CHANCE%",
+          "target": "टॉरपेडो बाधा संभावना",
+          "unit": 288316
+        }
+      ]
+    },
+    {
+      "language": "hi",
+      "source": "You don't have enough energy. But don’t worry! It can be fully restored ",
+      "members": [
+        {
+          "component": "lockit",
+          "context": "%AI_COMPETITION_ENERGY_EMPTY%",
+          "target": "आपके पास पर्याप्त ऊर्जा नहीं है। लेकिन चिंता मत कीजिए! इसे पूरी तरह से बहाल किया जा सकता है। ",
+          "unit": 289848
+        },
+        {
+          "component": "lockit",
+          "context": "%PERSONAL_EVENTS_ENERGY_EMPTY%",
+          "target": "आपके पास पर्याप्त ऊर्जा नहीं है। लेकिन चिंता मत करें! इसे पूरी तरह से पुनः प्राप्त किया जा सकता है। ",
+          "unit": 289817
+        },
+        {
+          "component": "lockit",
+          "context": "%TOURNAMENT_EVENT_ENERGY_EMPTY%",
+          "target": "आपके पास पर्याप्त ऊर्जा नहीं है। लेकिन चिंता मत करें! इसे पूरी तरह से फिर से भराया जा सकता है। ",
+          "unit": 289814
+        }
+      ]
+    }
+  ]
+}

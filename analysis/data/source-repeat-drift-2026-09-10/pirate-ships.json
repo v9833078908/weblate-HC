@@ -1,0 +1,889 @@
+{
+  "project": "pirate-ships",
+  "api": "https://l10n.herocraft.com/api",
+  "captured_at": "2026-09-10",
+  "components": [
+    "localization-json",
+    "glossary-ru"
+  ],
+  "glossary_components": [
+    "glossary-ru"
+  ],
+  "languages": [
+    "zh_Hans",
+    "nl",
+    "en",
+    "fr",
+    "de",
+    "id",
+    "it",
+    "ja",
+    "ko",
+    "pl",
+    "pt_BR",
+    "ru",
+    "es",
+    "th",
+    "tr",
+    "vi"
+  ],
+  "units_fetched": 64512,
+  "target_units_compared": 60305,
+  "repeated_source_groups": 6352,
+  "folds": {
+    "strict": {
+      "diverging_groups": 833,
+      "distinct_sources": 143,
+      "per_language": {
+        "tr": 70,
+        "th": 68,
+        "id": 67,
+        "ja": 67,
+        "vi": 64,
+        "zh_Hans": 62,
+        "ko": 60,
+        "pl": 57,
+        "nl": 55,
+        "it": 55,
+        "de": 48,
+        "pt_BR": 43,
+        "en": 42,
+        "fr": 38,
+        "es": 37
+      },
+      "scope": {
+        "intra_component": 813,
+        "cross_component_only": 20
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 71,
+        "regular_only": 762
+      }
+    },
+    "ignore-case": {
+      "diverging_groups": 806,
+      "distinct_sources": 142,
+      "per_language": {
+        "th": 68,
+        "ja": 67,
+        "tr": 64,
+        "zh_Hans": 62,
+        "id": 62,
+        "vi": 62,
+        "ko": 60,
+        "pl": 56,
+        "nl": 53,
+        "it": 52,
+        "de": 47,
+        "pt_BR": 42,
+        "en": 39,
+        "fr": 37,
+        "es": 35
+      },
+      "scope": {
+        "intra_component": 786,
+        "cross_component_only": 20
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 68,
+        "regular_only": 738
+      }
+    },
+    "ignore-whitespace": {
+      "diverging_groups": 806,
+      "distinct_sources": 142,
+      "per_language": {
+        "th": 68,
+        "ja": 67,
+        "tr": 64,
+        "zh_Hans": 62,
+        "id": 62,
+        "vi": 62,
+        "ko": 60,
+        "pl": 56,
+        "nl": 53,
+        "it": 52,
+        "de": 47,
+        "pt_BR": 42,
+        "en": 39,
+        "fr": 37,
+        "es": 35
+      },
+      "scope": {
+        "intra_component": 786,
+        "cross_component_only": 20
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 68,
+        "regular_only": 738
+      }
+    },
+    "ignore-punctuation": {
+      "diverging_groups": 797,
+      "distinct_sources": 140,
+      "per_language": {
+        "th": 68,
+        "ja": 64,
+        "tr": 64,
+        "zh_Hans": 62,
+        "id": 62,
+        "vi": 62,
+        "ko": 60,
+        "pl": 55,
+        "nl": 53,
+        "it": 51,
+        "de": 44,
+        "pt_BR": 42,
+        "en": 38,
+        "fr": 37,
+        "es": 35
+      },
+      "scope": {
+        "intra_component": 777,
+        "cross_component_only": 20
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 68,
+        "regular_only": 729
+      }
+    }
+  },
+  "fixtures_ignore_punctuation": [
+    {
+      "language": "de",
+      "source": "Заверши все ежедневные задания",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "32_complete_daily_tasks",
+          "target": "Schließe alle täglichen Missionen ab",
+          "unit": 102696
+        },
+        {
+          "component": "localization-json",
+          "context": "daily7_description - disabled",
+          "target": "Schließen Sie alle täglichen Quests ab",
+          "unit": 101123
+        },
+        {
+          "component": "localization-json",
+          "context": "mission_descr_complete_daily_task",
+          "target": "Schließe alle täglichen missionen ab",
+          "unit": 100902
+        },
+        {
+          "component": "localization-json",
+          "context": "mission_descr_complete_daily_tasks_continual",
+          "target": "Schließe alle täglichen missionen ab",
+          "unit": 100904
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Заверши все ежедневные задания",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "32_complete_daily_tasks",
+          "target": "Complete all daily missions",
+          "unit": 106431
+        },
+        {
+          "component": "localization-json",
+          "context": "daily7_description - disabled",
+          "target": "Complete all daily quests",
+          "unit": 104858
+        },
+        {
+          "component": "localization-json",
+          "context": "mission_descr_complete_daily_task",
+          "target": "Complete all daily missions",
+          "unit": 104637
+        },
+        {
+          "component": "localization-json",
+          "context": "mission_descr_complete_daily_tasks_continual",
+          "target": "Complete all Daily missions",
+          "unit": 104639
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Задание завершено",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "notification_type_battle_pass_task_complete",
+          "target": "Mission completed",
+          "unit": 106436
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_daily_task_complete",
+          "target": "Mission Complete",
+          "unit": 104596
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_mission_complete",
+          "target": "Quest completed",
+          "unit": 104594
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_short_event_mission_complete",
+          "target": "Quest completed",
+          "unit": 106223
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_task_event_mission_complete",
+          "target": "Quest completed",
+          "unit": 106131
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Игнорирование защиты от ядов",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore",
+          "target": "Ignores toxic Resist",
+          "unit": 106080
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore_full",
+          "target": "Toxic Armor Penetration",
+          "unit": 103954
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_poison_resist_ignore_full",
+          "target": "Poison Armor Penetration",
+          "unit": 103955
+        }
+      ]
+    },
+    {
+      "language": "es",
+      "source": "Игнорирование защиты от ядов",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore",
+          "target": "Ignora la resistencia al tóxico",
+          "unit": 109815
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore_full",
+          "target": "Penetración de armadura tóxica",
+          "unit": 107689
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_poison_resist_ignore_full",
+          "target": "Penetración de armadura de veneno",
+          "unit": 107690
+        }
+      ]
+    },
+    {
+      "language": "fr",
+      "source": "Заверши все ежедневные задания",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "32_complete_daily_tasks",
+          "target": "Terminez toutes les missions quotidiennes",
+          "unit": 113901
+        },
+        {
+          "component": "localization-json",
+          "context": "daily7_description - disabled",
+          "target": "Accomplir toutes les quêtes quotidiennes",
+          "unit": 112328
+        },
+        {
+          "component": "localization-json",
+          "context": "mission_descr_complete_daily_task",
+          "target": "Terminer toutes les missions quotidiennes",
+          "unit": 112107
+        },
+        {
+          "component": "localization-json",
+          "context": "mission_descr_complete_daily_tasks_continual",
+          "target": "Terminer toutes les missions quotidiennes",
+          "unit": 112109
+        }
+      ]
+    },
+    {
+      "language": "fr",
+      "source": "Задание завершено",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "notification_type_battle_pass_task_complete",
+          "target": "Mission accomplie",
+          "unit": 113906
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_daily_task_complete",
+          "target": "Mission Accomplie",
+          "unit": 112066
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_mission_complete",
+          "target": "Quête terminée",
+          "unit": 112064
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_short_event_mission_complete",
+          "target": "Quête terminée",
+          "unit": 113693
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_task_event_mission_complete",
+          "target": "Quête terminée",
+          "unit": 113601
+        }
+      ]
+    },
+    {
+      "language": "fr",
+      "source": "Игнорирование защиты от ядов",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore",
+          "target": "Ignore la résistance toxique",
+          "unit": 113550
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore_full",
+          "target": "Pénétration d'armure toxique",
+          "unit": 111424
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_poison_resist_ignore_full",
+          "target": "Pénétration d'armure de poison",
+          "unit": 111425
+        }
+      ]
+    },
+    {
+      "language": "fr",
+      "source": "Нажми, чтобы закрыть",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "dialog_name_kraken_hunt_rules_exit",
+          "target": "Appuyez pour fermer",
+          "unit": 114095
+        },
+        {
+          "component": "localization-json",
+          "context": "dialog_name_raid_rules_exit",
+          "target": "Appuie pour fermer",
+          "unit": 114035
+        },
+        {
+          "component": "localization-json",
+          "context": "dialog_name_tournament_rules_exit",
+          "target": "Cliquez pour fermer",
+          "unit": 113787
+        }
+      ]
+    },
+    {
+      "language": "id",
+      "source": "Задание завершено",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "notification_type_battle_pass_task_complete",
+          "target": "Misi selesai",
+          "unit": 117641
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_daily_task_complete",
+          "target": "Misi Selesai",
+          "unit": 115801
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_mission_complete",
+          "target": "Quest selesai",
+          "unit": 115799
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_short_event_mission_complete",
+          "target": "Quest selesai",
+          "unit": 117428
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_task_event_mission_complete",
+          "target": "Quest selesai",
+          "unit": 117336
+        }
+      ]
+    },
+    {
+      "language": "id",
+      "source": "Игнорирование защиты от ядов",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore",
+          "target": "Mengabaikan Resistensi racun",
+          "unit": 117285
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore_full",
+          "target": "Penetrasi armor beracun",
+          "unit": 115159
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_poison_resist_ignore_full",
+          "target": "Penetrasi armor racun",
+          "unit": 115160
+        }
+      ]
+    },
+    {
+      "language": "it",
+      "source": "Игнорирование защиты от ядов",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore",
+          "target": "Ignora la resistenza al tossico",
+          "unit": 121020
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore_full",
+          "target": "Penetrazione armatura tossica",
+          "unit": 118894
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_poison_resist_ignore_full",
+          "target": "Penetrazione armatura veleno",
+          "unit": 118895
+        }
+      ]
+    },
+    {
+      "language": "ja",
+      "source": "Друзья",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "friend_status_button_not_friend",
+          "target": "フレンド",
+          "unit": 125931
+        },
+        {
+          "component": "localization-json",
+          "context": "friends_dialog_tab_friends_list",
+          "target": "私の友達",
+          "unit": 125150
+        },
+        {
+          "component": "localization-json",
+          "context": "hint_popup_friends_button",
+          "target": "友達",
+          "unit": 125176
+        },
+        {
+          "component": "localization-json",
+          "context": "main_menu_button_friends",
+          "target": "友達",
+          "unit": 125145
+        },
+        {
+          "component": "localization-json",
+          "context": "visual_unlock_header_friends",
+          "target": "友達",
+          "unit": 125180
+        }
+      ]
+    },
+    {
+      "language": "ja",
+      "source": "Заверши все ежедневные задания",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "32_complete_daily_tasks",
+          "target": "毎日のミッションをすべて完了する",
+          "unit": 125106
+        },
+        {
+          "component": "localization-json",
+          "context": "daily7_description - disabled",
+          "target": "すべてのデイリークエストを完了してください",
+          "unit": 123533
+        },
+        {
+          "component": "localization-json",
+          "context": "mission_descr_complete_daily_task",
+          "target": "すべてのデイリーミッションを完了する",
+          "unit": 123312
+        },
+        {
+          "component": "localization-json",
+          "context": "mission_descr_complete_daily_tasks_continual",
+          "target": "すべてのデイリーミッションを完了する",
+          "unit": 123314
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Вступить",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "choose_faction_start_button",
+          "target": "참여",
+          "unit": 128233
+        },
+        {
+          "component": "localization-json",
+          "context": "clan_join_button",
+          "target": "가입",
+          "unit": 129558
+        },
+        {
+          "component": "localization-json",
+          "context": "shop_promo_button_join_text",
+          "target": "참가",
+          "unit": 128786
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Заверши все ежедневные задания",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "32_complete_daily_tasks",
+          "target": "모든 일일 임무 완료",
+          "unit": 128841
+        },
+        {
+          "component": "localization-json",
+          "context": "daily7_description - disabled",
+          "target": "모든 일일 퀘스트를 완료하세요",
+          "unit": 127268
+        },
+        {
+          "component": "localization-json",
+          "context": "mission_descr_complete_daily_task",
+          "target": "모든 일일 미션 완료",
+          "unit": 127047
+        },
+        {
+          "component": "localization-json",
+          "context": "mission_descr_complete_daily_tasks_continual",
+          "target": "모든 일일 미션 완료",
+          "unit": 127049
+        }
+      ]
+    },
+    {
+      "language": "ko",
+      "source": "Нажми, чтобы закрыть",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "dialog_name_kraken_hunt_rules_exit",
+          "target": "닫으려면 탭하세요",
+          "unit": 129035
+        },
+        {
+          "component": "localization-json",
+          "context": "dialog_name_raid_rules_exit",
+          "target": "탭하여 닫기",
+          "unit": 128975
+        },
+        {
+          "component": "localization-json",
+          "context": "dialog_name_tournament_rules_exit",
+          "target": "닫으려면 클릭하세요",
+          "unit": 128727
+        }
+      ]
+    },
+    {
+      "language": "nl",
+      "source": "Заверши все ежедневные задания",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "32_complete_daily_tasks",
+          "target": "Voltooi alle dagelijkse missies",
+          "unit": 132576
+        },
+        {
+          "component": "localization-json",
+          "context": "daily7_description - disabled",
+          "target": "Voltooi alle dagelijkse opdrachten",
+          "unit": 131003
+        },
+        {
+          "component": "localization-json",
+          "context": "mission_descr_complete_daily_task",
+          "target": "Voltooi alle Dagelijkse Missies",
+          "unit": 130782
+        },
+        {
+          "component": "localization-json",
+          "context": "mission_descr_complete_daily_tasks_continual",
+          "target": "Voltooi alle Dagelijkse Missies",
+          "unit": 130784
+        }
+      ]
+    },
+    {
+      "language": "nl",
+      "source": "Задание завершено",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "notification_type_battle_pass_task_complete",
+          "target": "Missie voltooid",
+          "unit": 132581
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_daily_task_complete",
+          "target": "Missie Voltooid",
+          "unit": 130741
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_mission_complete",
+          "target": "Opdracht voltooid",
+          "unit": 130739
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_short_event_mission_complete",
+          "target": "Opdracht voltooid",
+          "unit": 132368
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_task_event_mission_complete",
+          "target": "Opdracht voltooid",
+          "unit": 132276
+        }
+      ]
+    },
+    {
+      "language": "nl",
+      "source": "Игнорирование защиты от ядов",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore",
+          "target": "Negeert toxische Weerstand",
+          "unit": 132225
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore_full",
+          "target": "Giftigpantserdoorbraak",
+          "unit": 130099
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_poison_resist_ignore_full",
+          "target": "Gifpantserdoorbraak",
+          "unit": 130100
+        }
+      ]
+    },
+    {
+      "language": "nl",
+      "source": "Отправить",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "chat_message_send",
+          "target": "Verzenden",
+          "unit": 132999
+        },
+        {
+          "component": "localization-json",
+          "context": "feedback_send",
+          "target": "Verzenden",
+          "unit": 131024
+        },
+        {
+          "component": "localization-json",
+          "context": "friends_button_request_friendship",
+          "target": "Verzoek",
+          "unit": 132623
+        },
+        {
+          "component": "localization-json",
+          "context": "territorial_wars_squad_side_panel_send",
+          "target": "Versturen",
+          "unit": 416801
+        }
+      ]
+    },
+    {
+      "language": "pl",
+      "source": "Друзья",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "friend_status_button_not_friend",
+          "target": "Znajomi",
+          "unit": 137136
+        },
+        {
+          "component": "localization-json",
+          "context": "friends_dialog_tab_friends_list",
+          "target": "Moi przyjaciele",
+          "unit": 136355
+        },
+        {
+          "component": "localization-json",
+          "context": "hint_popup_friends_button",
+          "target": "Przyjaciele",
+          "unit": 136381
+        },
+        {
+          "component": "localization-json",
+          "context": "main_menu_button_friends",
+          "target": "Przyjaciele",
+          "unit": 136350
+        },
+        {
+          "component": "localization-json",
+          "context": "visual_unlock_header_friends",
+          "target": "Przyjaciele",
+          "unit": 136385
+        }
+      ]
+    },
+    {
+      "language": "pl",
+      "source": "Задание завершено",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "notification_type_battle_pass_task_complete",
+          "target": "Misja zakończona",
+          "unit": 136316
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_daily_task_complete",
+          "target": "Misja Wykonana",
+          "unit": 134476
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_mission_complete",
+          "target": "Zadanie ukończone",
+          "unit": 134474
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_short_event_mission_complete",
+          "target": "Zadanie ukończone",
+          "unit": 136103
+        },
+        {
+          "component": "localization-json",
+          "context": "notification_type_task_event_mission_complete",
+          "target": "Zadanie ukończone",
+          "unit": 136011
+        }
+      ]
+    },
+    {
+      "language": "pl",
+      "source": "Игнорирование защиты от ядов",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore",
+          "target": "Ignoruje odporność na toksyny",
+          "unit": 135960
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_decay_resist_ignore_full",
+          "target": "Przebicie pancerza toksycznego",
+          "unit": 133834
+        },
+        {
+          "component": "localization-json",
+          "context": "item_info_poison_resist_ignore_full",
+          "target": "Przebicie pancerza trucizny",
+          "unit": 133835
+        }
+      ]
+    },
+    {
+      "language": "pl",
+      "source": "Осталось:",
+      "members": [
+        {
+          "component": "localization-json",
+          "context": "battle_pass_time_left",
+          "target": "Czas pozostały:",
+          "unit": 135293
+        },
+        {
+          "component": "localization-json",
+          "context": "dialog_cumulative_offer_timer_label",
+          "target": "Pozostały czas:",
+          "unit": 136466
+        },
+        {
+          "component": "localization-json",
+          "context": "ship_repair_time_left",
+          "target": "Pozostały czas:",
+          "unit": 134780
+        },
+        {
+          "component": "localization-json",
+          "context": "shop_free_product_daily_timer_prefix",
+          "target": "Pozostało:",
+          "unit": 134024
+        }
+      ]
+    }
+  ]
+}

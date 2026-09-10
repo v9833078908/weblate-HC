@@ -40,6 +40,7 @@ import json
 import os
 import sys
 import unicodedata
+import urllib.error
 import urllib.request
 from collections import defaultdict
 from operator import itemgetter
@@ -63,6 +64,11 @@ PUNCTUATION_CATEGORIES = {"Pd", "Pe", "Pf", "Pi", "Po", "Ps", "Sm"}
 
 
 def get(url: str, api: str) -> dict | list:
+    # Pagination `next` links come back with the http:// scheme when the
+    # instance sits behind a TLS-terminating proxy; normalize to the api base
+    # scheme before the host check.
+    if url.startswith("http://") and api.startswith("https://"):
+        url = "https://" + url[len("http://") :]
     if not url.startswith(api):
         msg = f"refusing to fetch outside {api}: {url}"
         raise ValueError(msg)
@@ -159,9 +165,17 @@ def main() -> None:
     fetched = 0
     for slug in components:
         for code in languages:
-            units = paginate(
-                f"{api}/translations/{project}/{slug}/{code}/units/?page_size=1000", api
-            )
+            try:
+                units = paginate(
+                    f"{api}/translations/{project}/{slug}/{code}/units/?page_size=1000",
+                    api,
+                )
+            except urllib.error.HTTPError as error:
+                if error.code == 404:
+                    # A component does not have every project language enabled;
+                    # a missing translation simply has no units to compare.
+                    continue
+                raise
             fetched += len(units)
             if code == source_languages[slug]:
                 for unit in units:

@@ -1,0 +1,583 @@
+{
+  "project": "victory-banner",
+  "api": "https://l10n.herocraft.com/api",
+  "captured_at": "2026-09-10",
+  "components": [
+    "glossary",
+    "common"
+  ],
+  "glossary_components": [
+    "glossary"
+  ],
+  "languages": [
+    "zh_Hans",
+    "en",
+    "fr",
+    "de",
+    "pl",
+    "pt",
+    "ru",
+    "es"
+  ],
+  "units_fetched": 3856,
+  "target_units_compared": 2364,
+  "repeated_source_groups": 422,
+  "folds": {
+    "strict": {
+      "diverging_groups": 45,
+      "distinct_sources": 44,
+      "per_language": {
+        "en": 42,
+        "de": 3
+      },
+      "scope": {
+        "intra_component": 6,
+        "cross_component_only": 39
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 44,
+        "regular_only": 1
+      }
+    },
+    "ignore-case": {
+      "diverging_groups": 45,
+      "distinct_sources": 44,
+      "per_language": {
+        "en": 42,
+        "de": 3
+      },
+      "scope": {
+        "intra_component": 5,
+        "cross_component_only": 40
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 44,
+        "regular_only": 1
+      }
+    },
+    "ignore-whitespace": {
+      "diverging_groups": 45,
+      "distinct_sources": 44,
+      "per_language": {
+        "en": 42,
+        "de": 3
+      },
+      "scope": {
+        "intra_component": 5,
+        "cross_component_only": 40
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 44,
+        "regular_only": 1
+      }
+    },
+    "ignore-punctuation": {
+      "diverging_groups": 45,
+      "distinct_sources": 44,
+      "per_language": {
+        "en": 42,
+        "de": 3
+      },
+      "scope": {
+        "intra_component": 5,
+        "cross_component_only": 40
+      },
+      "glossary": {
+        "glossary_only": 0,
+        "glossary_and_regular": 44,
+        "regular_only": 1
+      }
+    }
+  },
+  "fixtures_ignore_punctuation": [
+    {
+      "language": "en",
+      "source": "Автоматчики",
+      "members": [
+        {
+          "component": "common",
+          "context": "Squad_RKKAMachineGuns",
+          "target": "Machine gunners",
+          "unit": 344621
+        },
+        {
+          "component": "common",
+          "context": "Squad_VermahtMachineGuns",
+          "target": "Machine Gunners",
+          "unit": 344636
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Автоматчики\"]",
+          "target": "Submachine gunners",
+          "unit": 336035
+        }
+      ]
+    },
+    {
+      "language": "de",
+      "source": "ПТ М24",
+      "members": [
+        {
+          "component": "common",
+          "context": "Item_M24Tank",
+          "target": "Panzer-M24",
+          "unit": 345028
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"ПТ М24\"]",
+          "target": "AT M24",
+          "unit": 336955
+        }
+      ]
+    },
+    {
+      "language": "de",
+      "source": "ПТ РГД-33",
+      "members": [
+        {
+          "component": "common",
+          "context": "Item_RGD33Tank",
+          "target": "Panzer-RGD-33",
+          "unit": 345042
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"ПТ РГД-33\"]",
+          "target": "AT RGD-33",
+          "unit": 336845
+        }
+      ]
+    },
+    {
+      "language": "de",
+      "source": "ПТ мина ТМ-35",
+      "members": [
+        {
+          "component": "common",
+          "context": "Item_TM35",
+          "target": "Panzerabwehrmine TM-35",
+          "unit": 345047
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"ПТ мина ТМ-35\"]",
+          "target": "AT-Mine TM-35",
+          "unit": 336617
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Автоматчик",
+      "members": [
+        {
+          "component": "common",
+          "context": "Unit_GunnerRKKA",
+          "target": "Gunner",
+          "unit": 344655
+        },
+        {
+          "component": "common",
+          "context": "Unit_GunnerVermaht",
+          "target": "Gunner",
+          "unit": 344666
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Автоматчик\"]",
+          "target": "Submachine gunner",
+          "unit": 336063
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Аптечка",
+      "members": [
+        {
+          "component": "common",
+          "context": "ButtonMedKit",
+          "target": "Medkit",
+          "unit": 344544
+        },
+        {
+          "component": "common",
+          "context": "Item_MedKitRKKA",
+          "target": "First aid",
+          "unit": 344583
+        },
+        {
+          "component": "common",
+          "context": "Item_MedKitVermaht",
+          "target": "First aid",
+          "unit": 344584
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Аптечка\"]",
+          "target": "First aid",
+          "unit": 336001
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Вильгельм",
+      "members": [
+        {
+          "component": "common",
+          "context": "Name_Vilhelm",
+          "target": "Vilhelm",
+          "unit": 344711
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Вильгельм\"]",
+          "target": "Wilhelm",
+          "unit": 336096
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Винтовочные патроны",
+      "members": [
+        {
+          "component": "common",
+          "context": "Item_AmmoRifle",
+          "target": "Ammo 7x62",
+          "unit": 344603
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Винтовочные патроны\"]",
+          "target": "Rifle ammunition",
+          "unit": 336018
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "ГАЗ-АА инж.",
+      "members": [
+        {
+          "component": "common",
+          "context": "Squad_RKKAGasAABuild",
+          "target": "GAZ-AA Enineer",
+          "unit": 344630
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"ГАЗ-АА инж.\"]",
+          "target": "GAZ-AA Engineering",
+          "unit": 336044
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Генрих",
+      "members": [
+        {
+          "component": "common",
+          "context": "Name_Genrih",
+          "target": "Genrih",
+          "unit": 344712
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Генрих\"]",
+          "target": "Heinrich",
+          "unit": 336097
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Германн",
+      "members": [
+        {
+          "component": "common",
+          "context": "Name_Germann",
+          "target": "Germann",
+          "unit": 344713
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Германн\"]",
+          "target": "Hermann",
+          "unit": 336098
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Главная цель",
+      "members": [
+        {
+          "component": "common",
+          "context": "Flag_MainTarget",
+          "target": "on",
+          "unit": 344857
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Главная цель\"]",
+          "target": "Main objective",
+          "unit": 336158
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "До атаки врага",
+      "members": [
+        {
+          "component": "common",
+          "context": "BattleDialog_Preparation",
+          "target": "Preparation",
+          "unit": 344567
+        },
+        {
+          "component": "common",
+          "context": "Deffence_Preparation",
+          "target": "To enemy attack",
+          "unit": 344802
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Зигмунд",
+      "members": [
+        {
+          "component": "common",
+          "context": "Name_Zigmund",
+          "target": "Zigmund",
+          "unit": 344714
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Зигмунд\"]",
+          "target": "Sigmund",
+          "unit": 336099
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Карабин Мосина",
+      "members": [
+        {
+          "component": "common",
+          "context": "Item_MosinKarabine",
+          "target": "Mosin karabine",
+          "unit": 344588
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Карабин Мосина\"]",
+          "target": "Mosin carbine",
+          "unit": 336004
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Краузе",
+      "members": [
+        {
+          "component": "common",
+          "context": "LastName_Krauze",
+          "target": "Krauze",
+          "unit": 344758
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Краузе\"]",
+          "target": "Krause",
+          "unit": 336143
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Кубельваген с пулемётом",
+      "members": [
+        {
+          "component": "common",
+          "context": "Unit_KubelwagenMachineGun",
+          "target": "Kubelwagen with MachineGun",
+          "unit": 344680
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Кубельваген с пулемётом\"]",
+          "target": "Kubelwagen with machine gun",
+          "unit": 336074
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Маузер 98К",
+      "members": [
+        {
+          "component": "common",
+          "context": "Item_Mauser98K",
+          "target": "Mauser 98K",
+          "unit": 344581
+        },
+        {
+          "component": "common",
+          "context": "Item_Mauser98KSniper",
+          "target": "Medic",
+          "unit": 344582
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Маузер 98К\"]",
+          "target": "Mauser 98K",
+          "unit": 336000
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Нейтрально",
+      "members": [
+        {
+          "component": "common",
+          "context": "Flag_Neutral",
+          "target": "on",
+          "unit": 344863
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Нейтрально\"]",
+          "target": "Neutral",
+          "unit": 336164
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "ПП патроны",
+      "members": [
+        {
+          "component": "common",
+          "context": "Item_AmmoPP",
+          "target": "Ammo 7x62",
+          "unit": 344605
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"ПП патроны\"]",
+          "target": "SMG ammunition",
+          "unit": 336020
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "ПТ мина TMine-35",
+      "members": [
+        {
+          "component": "common",
+          "context": "Item_TMine35",
+          "target": "PP mine TMine-35",
+          "unit": 344600
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"ПТ мина TMine-35\"]",
+          "target": "Anti-tank mine TMine-35",
+          "unit": 336015
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "ПТ мина ТМ-35",
+      "members": [
+        {
+          "component": "common",
+          "context": "Item_TM35",
+          "target": "PP mine TM-35",
+          "unit": 344599
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"ПТ мина ТМ-35\"]",
+          "target": "Anti-tank mine TM-35",
+          "unit": 336014
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "ПТ-стрелок",
+      "members": [
+        {
+          "component": "common",
+          "context": "Unit_AntiTankRKKA",
+          "target": "AntiTank",
+          "unit": 344684
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"ПТ-стрелок\"]",
+          "target": "Anti-tank rifleman",
+          "unit": 336075
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Пак 36",
+      "members": [
+        {
+          "component": "common",
+          "context": "Squad_VermahtPack36",
+          "target": "Pack 36",
+          "unit": 344644
+        },
+        {
+          "component": "common",
+          "context": "Unit_TurretPack36",
+          "target": "Pack 36",
+          "unit": 344686
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Пак 36\"]",
+          "target": "Pak 36",
+          "unit": 336055
+        }
+      ]
+    },
+    {
+      "language": "en",
+      "source": "Пистолетные патроны",
+      "members": [
+        {
+          "component": "common",
+          "context": "Item_AmmoPistolet",
+          "target": "Ammo 7x62",
+          "unit": 344604
+        },
+        {
+          "component": "glossary",
+          "context": "[\"\",\"Пистолетные патроны\"]",
+          "target": "Pistol ammunition",
+          "unit": 336019
+        }
+      ]
+    }
+  ]
+}
