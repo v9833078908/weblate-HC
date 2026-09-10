@@ -30,7 +30,6 @@ from weblate.glossary.models import (
     fetch_glossary_terms,
     get_glossary_terms,
     glossary_selection_is_cached,
-    prepare_glossary_units,
 )
 from weblate.lang.models import Language, PluralMapper
 from weblate.logger import LOGGER
@@ -289,10 +288,12 @@ LLM_JSON_OBJECT_VALUE_STRING_TERMINATORS = frozenset({",", "}", "]"})
 # bounds how many times one batch may be continued before falling back to
 # halving, so a model that answers one string at a time cannot fan out.
 LLM_PREFIX_RESCUE_LIMIT = 2
-# Below this many terms the whole glossary travels with every batch instead of
-# being matched against the source, which no longer loses inflected terms and
-# keeps the request prefix identical across batches.
-LLM_FULL_GLOSSARY_LIMIT = 300
+# The glossary sent with a batch is the matcher's selection over the batch's
+# sources: exact whole-word hits plus Snowball stem hits for allowlisted
+# source languages. Sending the whole term base instead was measured on
+# heart-abyss at ~16k prompt tokens per ten-string batch against ~200 for
+# the matched terms, see
+# docs/product/measurements/2026-09-10-mt-glossary-selection-projection.md.
 # The reply must echo the id of the string it translates, so alignment is
 # checked instead of assumed. The id is random rather than the batch position,
 # because a model can emit 0..n-1 without reading the input and a positional id
@@ -700,37 +701,10 @@ class BaseLLMTranslation(BatchMachineTranslation):
             return text
         return ""
 
-    def _get_full_glossary(self, unit: Unit) -> list[Unit] | None:
-        """
-        Return the whole term base, when it is small enough to always send.
-
-        Matching is exact, so an inflected term is invisible to it and the
-        model never learns the term exists. Below the limit the entire
-        glossary is cheaper than that loss, and being identical in every
-        request it also extends the cacheable prefix of the prompt.
-        """
-        translation = getattr(unit, "translation", None)
-        component = getattr(translation, "component", None)
-        if component is None:
-            return None
-        terms = list(
-            prepare_glossary_units(
-                component.project, component.source_language, translation.language
-            ).filter(state__gte=STATE_TRANSLATED)[: LLM_FULL_GLOSSARY_LIMIT + 1]
-        )
-        # Above the limit, or with nothing visible to read, leave it to the
-        # matcher rather than sending an empty glossary.
-        if not terms or len(terms) > LLM_FULL_GLOSSARY_LIMIT:
-            return None
-        return terms
-
     def _get_batch_glossary(self, units: list[Unit]) -> list[GlossaryPromptEntry]:
         """Glossary sent with a batch, and the one its cache key must match."""
         if not units:
             return []
-        full = self._get_full_glossary(units[0])
-        if full is not None:
-            return build_glossary_prompt_entries(full)
         missing = [
             unit
             for unit in units

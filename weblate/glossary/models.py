@@ -724,12 +724,9 @@ def glossary_matcher_fingerprint(
 
     Historical measurements are comparable only when every field here
     matches: a change to the Snowball version, either language's algorithm,
-    an allowlist, ``LLM_FULL_GLOSSARY_LIMIT``, or the glossary content
-    itself can change which terms reach the prompt or fire the check.
+    an allowlist, or the glossary content itself can change which terms
+    reach the prompt or fire the check.
     """
-    # ruff: ignore[import-outside-top-level]
-    from weblate.machinery.llm import LLM_FULL_GLOSSARY_LIMIT
-
     units = list(prepare_glossary_units(project, source_language, language, full=True))
     exact_only_count = 0
     not_applicable_count = 0
@@ -758,7 +755,6 @@ def glossary_matcher_fingerprint(
         "target_algorithm": get_algorithm(language.code),
         "source_stem_allowlist": sorted(SOURCE_STEM_LANGUAGES),
         "target_morphology_allowlist": sorted(MORPHOLOGY_LANGUAGES),
-        "llm_full_glossary_limit": LLM_FULL_GLOSSARY_LIMIT,
         "exact_only_term_count": exact_only_count,
         "not_applicable_term_count": not_applicable_count,
         "glossary_term_count": len(units),

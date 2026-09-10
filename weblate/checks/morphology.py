@@ -21,9 +21,12 @@ WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 
 # Closed language allowlist: a language joins only after a corpus measurement,
 # see docs/product/measurements/2026-08-11-glossary-enforcement-analysis.md. Indonesian is
-# deliberately absent (Snowball conflates distinct words there).
+# deliberately absent (Snowball conflates distinct words there). English
+# joined after the Space Arena projection in
+# docs/product/measurements/2026-09-10-mt-glossary-selection-projection.md.
 MORPHOLOGY_LANGUAGES: dict[str, str] = {
     "ru": "russian",
+    "en": "english",
     "de": "german",
     "tr": "turkish",
     "fr": "french",
@@ -33,10 +36,13 @@ MORPHOLOGY_LANGUAGES: dict[str, str] = {
     "fa": "persian",
 }
 
-# Source-side stem matching is enabled only for Russian: measured +140%
-# recovered lines on COL4. English is excluded because its false matches
-# concentrate on homographs, see spec item 7.
-SOURCE_STEM_LANGUAGES: frozenset[str] = frozenset({"ru"})
+# Source-side stem matching: Russian measured +140% recovered lines on COL4.
+# English was first excluded because its false matches concentrate on
+# homographs (spec item 7); the Space Arena projection measured the price of
+# exclusion at 1 217 missed plural occurrences over 4 865 strings against
+# ~60 derivational over-matches (power/powerful, engine/engineering), which
+# only add a term to a prompt.
+SOURCE_STEM_LANGUAGES: frozenset[str] = frozenset({"ru", "en"})
 
 _STEMMERS: dict[str, tuple[str, snowballstemmer.SnowballProgram]] = {}
 _STEMMERS_LOCK = Lock()

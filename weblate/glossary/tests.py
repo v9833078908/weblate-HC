@@ -1554,7 +1554,6 @@ class GlossaryStemMatcherTest(ViewTestCase):
                 "target_algorithm",
                 "source_stem_allowlist",
                 "target_morphology_allowlist",
-                "llm_full_glossary_limit",
                 "exact_only_term_count",
                 "not_applicable_term_count",
                 "glossary_term_count",
@@ -1564,12 +1563,11 @@ class GlossaryStemMatcherTest(ViewTestCase):
         self.assertIsInstance(fingerprint["snowball_version"], str)
         self.assertIsInstance(fingerprint["source_stem_allowlist"], list)
         self.assertIsInstance(fingerprint["target_morphology_allowlist"], list)
-        self.assertIsInstance(fingerprint["llm_full_glossary_limit"], int)
         # A sha256 hex digest, so a probe can compare runs by string equality
         self.assertRegex(str(fingerprint["glossary_hash"]), r"\A[0-9a-f]{64}\Z")
 
-    def test_stem_fallback_disabled_for_non_stem_source_language(self) -> None:
-        """English source is not in SOURCE_STEM_LANGUAGES: no stem recovery."""
+    def test_stem_fallback_recovers_english_plural(self) -> None:
+        """English source is in SOURCE_STEM_LANGUAGES: "ships" recovers "ship"."""
         en_project = self.create_project(name="En Source", slug="en-source")
         en_component = self.create_po(project=en_project)
         en_glossary_component = en_project.glossaries[0]
@@ -1606,7 +1604,7 @@ class GlossaryStemMatcherTest(ViewTestCase):
             state=STATE_EMPTY,
         )
         fetch_glossary_terms([unit])
-        self.assertEqual({term.source for term in unit.glossary_terms}, set())
+        self.assertEqual({term.source for term in unit.glossary_terms}, {"ship"})
 
 
 class GlossarySelectionCacheTest(ViewTestCase):

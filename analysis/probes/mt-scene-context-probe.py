@@ -136,9 +136,10 @@ def fetch_glossary(lang: str, cache: pathlib.Path) -> list[dict]:
     """
     Mirror the entries production sends with every batch of this project.
 
-    The term base holds 221 pairs, below ``LLM_FULL_GLOSSARY_LIMIT``, so
-    production sends all of them; ``build_glossary_prompt_entry`` shape is
-    reproduced from the API (source, target, source explanation, flags).
+    The term base holds 221 pairs; at measurement time production sent all of
+    them (the full-glossary rule removed on 2026-09-10), so this reproduces
+    that payload. ``build_glossary_prompt_entry`` shape is reproduced from
+    the API (source, target, source explanation, flags).
     """
     if cache.exists():
         return json.loads(cache.read_text())

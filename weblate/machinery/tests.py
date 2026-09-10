@@ -4885,36 +4885,16 @@ class OpenAITranslationTest(BaseMachineTranslationTest):
 
         fetch_terms.assert_called_once_with([unit], include_variants=False)
 
-    def test_batch_glossary_full_payload_independent_of_matcher(self) -> None:
-        """Задача 2: below the limit the whole glossary is sent, matcher unused."""
-        machine = self.get_machine()
-        unit = make_unit(code="fr", source="Nothing relevant here.")
-        full_term = make_unit(
-            code="fr", source="Unrelated term", target="Terme sans rapport"
-        )
-        with (
-            patch.object(machine, "_get_full_glossary", return_value=[full_term]),
-            patch("weblate.machinery.llm.fetch_glossary_terms") as fetch_terms,
-            patch("weblate.machinery.llm.get_glossary_terms") as get_terms,
-        ):
-            # ruff: ignore[private-member-access]
-            entries = machine._get_batch_glossary([cast("Unit", unit)])
-        fetch_terms.assert_not_called()
-        get_terms.assert_not_called()
-        self.assertEqual(
-            entries,
-            [{"source": "Unrelated term", "target": "Terme sans rapport"}],
-        )
-
-    def test_batch_glossary_fallback_uses_matched_terms(self) -> None:
-        """Задача 2: above the limit, the batch glossary follows the matcher."""
+    def test_batch_glossary_uses_matched_terms(self) -> None:
+        """The batch glossary is the matcher's selection, never the term base."""
         machine = self.get_machine()
         unit = make_unit(code="ru", source="ликвидаторов было много")
         inflected_term = make_unit(code="ru", source="ликвидатор", target="ликвидатор")
         unit.glossary_terms = [inflected_term]
-        with patch.object(machine, "_get_full_glossary", return_value=None):
+        with patch("weblate.machinery.llm.fetch_glossary_terms") as fetch_terms:
             # ruff: ignore[private-member-access]
             entries = machine._get_batch_glossary([cast("Unit", unit)])
+        fetch_terms.assert_not_called()
         self.assertEqual(entries, [{"source": "ликвидатор", "target": "ликвидатор"}])
 
     def test_glossary_entry_includes_exact_and_forbidden_flags(self) -> None:
