@@ -128,6 +128,7 @@ from weblate.trans.validators import (
 )
 from weblate.utils import messages
 from weblate.utils.celery import (
+    INTERACTIVE_TASK_PRIORITY,
     delete_task_metadata,
     get_task_progress,
     store_task_metadata,
@@ -296,6 +297,7 @@ class CommitTaskPayload(TypedDict):
     user_id: int | None
     force_scan: bool
     previous_head: str | None
+    user_waiting: bool
 
 
 def prefetch_tasks(components):
@@ -1385,6 +1387,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
                 acting_user_id=acting_user_id,
                 loc_kit_exact=getattr(self, "loc_kit_exact", False),
                 loc_kit_explanations=getattr(self, "loc_kit_explanations", None),
+                user_waiting=acting_user_id is not None,
             )
 
         if (
@@ -1880,9 +1883,22 @@ class Component(  # ruff: ignore[too-many-public-methods]
         cache.set(self.update_key, task.id, BACKGROUND_TASK_TTL)
         store_task_metadata(task.id, component_id=self.pk)
 
-    def queue_background_task(self, task, /, *args, **kwargs) -> None:
+    def queue_background_task(
+        self, task, /, *args, user_waiting: bool = False, **kwargs
+    ) -> None:
+        """
+        Publish a component task after the current transaction commits.
+
+        Priority belongs to the publication, not to the task class: only a
+        callsite that knows a human is watching the progress bar may pass
+        ``user_waiting=True``; everything else keeps the default background
+        priority (CELERY_TASK_DEFAULT_PRIORITY).
+        """
+        options = {"priority": INTERACTIVE_TASK_PRIORITY} if user_waiting else {}
         transaction.on_commit(
-            lambda: self.store_background_task(task.delay(*args, **kwargs))
+            lambda: self.store_background_task(
+                task.apply_async(args=args, kwargs=kwargs, **options)
+            )
         )
 
     @staticmethod
@@ -1922,6 +1938,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
         force_scan: bool = False,
         previous_head: str | None = None,
         deduplicate: bool = True,
+        user_waiting: bool = False,
     ) -> None:
         # ruff: ignore[import-outside-top-level]
         from weblate.trans.tasks import perform_commit
@@ -1932,6 +1949,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
                 "user_id": user_id,
                 "force_scan": force_scan,
                 "previous_head": previous_head,
+                "user_waiting": user_waiting,
             }
             task_kwargs = {
                 "user_id": user_id,
@@ -1961,11 +1979,13 @@ class Component(  # ruff: ignore[too-many-public-methods]
 
             self.log_info("scheduling commit")
             store_task_metadata(task_id, component_id=self.pk)
+            options = {"priority": INTERACTIVE_TASK_PRIORITY} if user_waiting else {}
             try:
                 perform_commit.apply_async(
                     args=(self.pk, reason),
                     kwargs=task_kwargs,
                     task_id=task_id,
+                    **options,
                 )
             except Exception:
                 self.delete_commit_task()
@@ -4560,6 +4580,7 @@ class Component(  # ruff: ignore[too-many-public-methods]
             preserve_pending_units=preserve_pending_units,
             loc_kit_explanations=loc_kit_explanations,
             user_id=load_user.id if load_user is not None else None,
+            user_waiting=load_user is not None,
         )
         return False
 

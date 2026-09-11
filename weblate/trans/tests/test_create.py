@@ -4,6 +4,7 @@
 
 """Test for creating projects and models."""
 
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest.mock import patch
 
@@ -29,6 +30,7 @@ from weblate.trans.views.create import (
     CreateComponent,
     CreateComponentSelection,
 )
+from weblate.utils.celery import INTERACTIVE_TASK_PRIORITY
 from weblate.utils.views import get_form_data
 from weblate.vcs.base import RepositoryLock
 from weblate.vcs.git import GitRepository
@@ -331,6 +333,26 @@ class CreateTest(ViewTestCase):
 
         component = Component.objects.get(slug="create-component")
         self.assertTrue(component.is_repo_link)
+
+    def test_warn_outdated_publishes_linked_update_interactively(self) -> None:
+        form = SimpleNamespace(
+            instance=SimpleNamespace(linked_component=self.component)
+        )
+        view = CreateComponent()
+
+        with (
+            patch.object(self.component, "repo_needs_merge", return_value=False),
+            patch(
+                "weblate.trans.views.create.perform_update.apply_async"
+            ) as apply_async,
+        ):
+            view.warn_outdated(form)
+
+        apply_async.assert_called_once_with(
+            args=("Component", self.component.pk),
+            kwargs={"auto": True},
+            priority=INTERACTIVE_TASK_PRIORITY,
+        )
 
     @modify_settings(INSTALLED_APPS={"remove": "weblate.billing"})
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)

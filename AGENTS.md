@@ -382,6 +382,16 @@ shell resolving what the worker rejects is the confirmation of this skew, not
 evidence against it. Read a queued run's own verdict with
 `app.AsyncResult(task_id).result` instead of guessing from the flash message.
 
+The `celery` worker uses Redis delivery priorities: an explicit interactive
+publication is priority `0`, while every unmarked background publication uses
+the default `3`. Priority belongs to the callsite, not the Celery task class:
+a service `user_id` alone never promotes a hook, add-on, or management task.
+Redis stores priority `3` work in the normal list
+`$'celery\x06\x163'`; it is not malformed queue state. Parent-statistics
+scheduling records `pending`/`running`/`dirty` state for a 600-second lease to
+coalesce saves. Lease expiry is only a fail-open escape from a stuck
+reservation: it never retries or enqueues a task by itself; the next save does.
+
 ### Host-side (uv) commands
 
 ```sh

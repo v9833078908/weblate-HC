@@ -90,6 +90,8 @@ def schedule_deferred_commit(component: Component) -> None:
             user_id=followup["user_id"],
             force_scan=followup["force_scan"],
             previous_head=followup["previous_head"],
+            # A payload stored before this field existed stays background.
+            user_waiting=followup.get("user_waiting", False),
         )
 
 

@@ -25,6 +25,7 @@ Weblate 2026.8.1
 
 .. rubric:: Improvements
 
+* Component operations watched through a progress bar now overtake queued parent-statistics housekeeping, while repeated parent-statistics updates are coalesced into one pending calculation and at most one sequential follow-up.
 * An LLM-judge critical now holds a string only when both seats grade it critical; a critical from one seat that the other grades lower ships as a major with both opinions attached. Administrators can restore the original site-wide policy where either critical holds through :setting:`JUDGE_CONSENSUS_REJECT`, see :ref:`llm-judge`.
 * Project-level OpenRouter settings no longer display an API key input while preserving the configured credential.
 * The component :guilabel:`Files` menu can now download all translations as monolingual JSON files in a ZIP archive, for components with a template.

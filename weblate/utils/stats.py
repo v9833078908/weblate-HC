@@ -9,8 +9,9 @@ from collections import deque
 from datetime import datetime, timedelta
 from itertools import batched, chain
 from types import GeneratorType
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
+from celery import uuid
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
@@ -39,7 +40,7 @@ from weblate.utils.state import (
 from weblate.utils.tracing import start_span
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable
+    from collections.abc import Callable, Generator, Iterable
 
     from django.db.models import Model
 
@@ -625,8 +626,9 @@ class TranslationStats(BaseStats):
             if settings.CELERY_TASK_ALWAYS_EAGER:
                 transaction.on_commit(self.update_parents)
             else:
-                pk = self._object.pk
-                update_translation_stats_parents.delay_on_commit(pk)
+                schedule_parents_update(
+                    update_translation_stats_parents, self._object.pk
+                )
 
     def get_update_objects(self, *, full: bool = True) -> Generator[BaseStats]:
         translation = self._object
@@ -1220,8 +1222,7 @@ class ComponentStats(AggregatingStats):
         if settings.CELERY_TASK_ALWAYS_EAGER:
             transaction.on_commit(self.update_language_stats_parents)
         else:
-            pk = self._object.pk
-            update_language_stats_parents.delay_on_commit(pk)
+            schedule_parents_update(update_language_stats_parents, self._object.pk)
 
     def get_language_stats(self):
         return (
@@ -1842,6 +1843,186 @@ def update_stats_objects(stats_objects: Iterable[BaseStats]) -> None:
         unique.setdefault(stats.cache_key, stats)
     for stats in sorted(unique.values(), key=_stats_update_priority):
         stats.update_stats()
+
+
+# --- Parent-stats scheduling -------------------------------------------
+#
+# Both update_*_stats_parents tasks are coalesced per (task, object): at most
+# one queued ("pending") publication covers every save made before the task
+# starts, and saves arriving while a task is running ("dirty") are released as
+# exactly one follow-up publication after it finishes. The transitions are
+# serialized by a short lock; STATS_PARENTS_STATE_TTL is only a lease that
+# protects against a task dying forever while holding a reservation - the
+# expiry itself enqueues nothing, and recovery is the next save publishing a
+# fresh task.
+
+STATS_PARENTS_STATE_TTL = 600
+STATS_PARENTS_FOLLOWUP_COUNTDOWN = 1
+
+
+def _parents_state_key(task_name: str, pk: int) -> str:
+    return f"stats-parents-schedule:{task_name}:{pk}"
+
+
+def _parents_schedule_lock(task_name: str, pk: int) -> WeblateLock:
+    key = _parents_state_key(task_name, pk)
+    return WeblateLock(
+        scope="stats-parents-schedule",
+        key=key,
+        slug=key,
+        timeout=5,
+        expiry_timeout=60,
+        origin=key,
+    )
+
+
+class _ParentsUpdateState(TypedDict):
+    phase: Literal["pending", "running", "dirty"]
+    token: str | None
+
+
+def _get_parents_state(task_name: str, pk: int) -> _ParentsUpdateState | None:
+    state = cache.get(_parents_state_key(task_name, pk))
+    if isinstance(state, dict):
+        return cast("_ParentsUpdateState", state)
+    return None
+
+
+def _set_parents_state(task_name: str, pk: int, phase: str, token: str | None) -> None:
+    cache.set(
+        _parents_state_key(task_name, pk),
+        {"phase": phase, "token": token},
+        STATS_PARENTS_STATE_TTL,
+    )
+
+
+def _publish_parents_update(
+    task, pk: int, token: str, *, countdown: int | None = None
+) -> None:
+    """
+    Publish a scheduled parents update outside the scheduler lock.
+
+    If the broker refuses the message, the reservation is released only when
+    it still carries this publication's token, so a newer reservation by
+    another publisher survives and the next save can publish again.
+    """
+    options: dict[str, Any] = {"args": (pk,), "task_id": token}
+    if countdown is not None:
+        options["countdown"] = countdown
+    try:
+        task.apply_async(**options)
+    except Exception:
+        with _parents_schedule_lock(task.name, pk):
+            state = _get_parents_state(task.name, pk)
+            if state is not None and state["token"] == token:
+                cache.delete(_parents_state_key(task.name, pk))
+        raise
+
+
+def schedule_parents_update(task, pk: int) -> None:
+    """
+    Request a parents-stats update, coalescing repeats onto one task.
+
+    Called instead of task.delay_on_commit: saves made while nothing is
+    scheduled publish a single task, saves while a task is pending or dirty
+    are already covered, and saves while a task is running mark it dirty so
+    its finish publishes exactly one follow-up.
+    """
+
+    def schedule() -> None:
+        with _parents_schedule_lock(task.name, pk):
+            state = _get_parents_state(task.name, pk)
+            if state is not None:
+                if state["phase"] == "running":
+                    _set_parents_state(task.name, pk, "dirty", state["token"])
+                # pending/dirty: an already reserved publication will
+                # recalculate from the freshest child stats.
+                return
+            token = uuid()
+            _set_parents_state(task.name, pk, "pending", token)
+        _publish_parents_update(task, pk, token)
+
+    transaction.on_commit(schedule)
+
+
+def begin_parents_update(task_name: str, pk: int, token: str | None) -> bool:
+    """
+    Take ownership of a scheduled parents update, or skip a stale delivery.
+
+    Returns True when the caller should recalculate: it either flipped its
+    own pending reservation to running, or no reservation exists at all (a
+    direct synchronous invocation, or a lease that expired mid-flight).
+    Returns False for a delivery whose token no longer owns the record.
+    """
+    if token is None:
+        # Direct invocation without worker context: legacy synchronous
+        # semantics, one calculation, no reservation created.
+        return True
+    with _parents_schedule_lock(task_name, pk):
+        state = _get_parents_state(task_name, pk)
+        if state is None:
+            # Expired lease: compute, but claim nothing.
+            return True
+        if state["phase"] != "pending" or state["token"] != token:
+            return False
+        _set_parents_state(task_name, pk, "running", token)
+        return True
+
+
+def finish_parents_update(task_name: str, pk: int, token: str | None) -> str | None:
+    """
+    Release the reservation after a finished calculation.
+
+    Returns the token of the one follow-up publication to make when saves
+    arrived while this task was running (dirty), else None. The follow-up is
+    published by the caller after the calculation is complete, so it never
+    runs in parallel with its predecessor.
+    """
+    if token is None:
+        return None
+    with _parents_schedule_lock(task_name, pk):
+        state = _get_parents_state(task_name, pk)
+        if state is None or state["token"] != token:
+            return None
+        if state["phase"] == "dirty":
+            followup_token = uuid()
+            _set_parents_state(task_name, pk, "pending", followup_token)
+            return followup_token
+        cache.delete(_parents_state_key(task_name, pk))
+        return None
+
+
+def fail_parents_update(task_name: str, pk: int, token: str | None) -> None:
+    """Release only the reservation owned by this token; keep others intact."""
+    if token is None:
+        return
+    with _parents_schedule_lock(task_name, pk):
+        state = _get_parents_state(task_name, pk)
+        if state is not None and state["token"] == token:
+            cache.delete(_parents_state_key(task_name, pk))
+
+
+def run_parents_update(task, pk: int, calculate: Callable[[], None]) -> None:
+    """
+    Shared lifecycle for the coalesced parents-stats tasks.
+
+    A stale or duplicate delivery returns without a second calculation; an
+    error releases the failed task's own reservation and propagates.
+    """
+    task_name = task.name
+    token = task.request.id
+    if not begin_parents_update(task_name, pk, token):
+        return
+    try:
+        calculate()
+    except Exception:
+        fail_parents_update(task_name, pk, token)
+        raise
+    followup_token = finish_parents_update(task_name, pk, token)
+    if followup_token is not None:
+        _publish_parents_update(
+            task, pk, followup_token, countdown=STATS_PARENTS_FOLLOWUP_COUNTDOWN
+        )
 
 
 class GhostStats(BaseStats):

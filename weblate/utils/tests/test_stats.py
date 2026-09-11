@@ -4,9 +4,11 @@
 
 
 import uuid
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase, override_settings
+from django.core.cache import cache
+from django.test import SimpleTestCase, TransactionTestCase, override_settings
 
 from weblate.trans.models.judge import (
     JudgeVerdict,
@@ -22,10 +24,16 @@ from weblate.utils.state import (
     STATE_TRANSLATED,
 )
 from weblate.utils.stats import (
+    STATS_PARENTS_STATE_TTL,
     STATS_PREFETCH_CHUNK_SIZE,
     BaseStats,
     TranslationStats,
+    _get_parents_state,
+    _parents_state_key,
+    fail_parents_update,
     prefetch_stats,
+    run_parents_update,
+    schedule_parents_update,
 )
 
 
@@ -125,6 +133,98 @@ class StatsPrefetchTest(SimpleTestCase):
                 )
 
         self.assertEqual(covered, TranslationStats.UNIT_DELTA_KEYS)
+
+
+class ParentsUpdateSchedulerTest(TransactionTestCase):
+    def setUp(self) -> None:
+        self.pk = 1
+        self.task = SimpleNamespace(
+            name=f"weblate.utils.tests.parents.{uuid.uuid4().hex}",
+            request=SimpleNamespace(id=None),
+            apply_async=Mock(),
+        )
+
+    def get_state(self):
+        return _get_parents_state(self.task.name, self.pk)
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_pending_and_dirty_saves_publish_one_task_each(self) -> None:
+        for _ in range(100):
+            schedule_parents_update(self.task, self.pk)
+
+        self.task.apply_async.assert_called_once()
+        first_token = self.task.apply_async.call_args.kwargs["task_id"]
+        self.assertEqual(self.get_state(), {"phase": "pending", "token": first_token})
+
+        self.task.request.id = first_token
+        run_parents_update(
+            self.task,
+            self.pk,
+            lambda: [schedule_parents_update(self.task, self.pk) for _ in range(100)],
+        )
+
+        self.assertEqual(self.task.apply_async.call_count, 2)
+        followup = self.task.apply_async.call_args.kwargs
+        self.assertNotEqual(followup["task_id"], first_token)
+        self.assertEqual(followup["countdown"], 1)
+        self.assertEqual(
+            self.get_state(), {"phase": "pending", "token": followup["task_id"]}
+        )
+
+    def test_stale_delivery_does_not_recalculate_current_reservation(self) -> None:
+        schedule_parents_update(self.task, self.pk)
+        active_token = self.task.apply_async.call_args.kwargs["task_id"]
+        calculate = Mock()
+        self.task.request.id = "stale-task-id"
+
+        run_parents_update(self.task, self.pk, calculate)
+
+        calculate.assert_not_called()
+        self.assertEqual(self.get_state(), {"phase": "pending", "token": active_token})
+        self.task.apply_async.assert_called_once()
+
+    def test_failed_owner_keeps_newer_reservation(self) -> None:
+        cache.set(
+            _parents_state_key(self.task.name, self.pk),
+            {"phase": "pending", "token": "newer-task-id"},
+            STATS_PARENTS_STATE_TTL,
+        )
+
+        fail_parents_update(self.task.name, self.pk, "failed-task-id")
+
+        self.assertEqual(
+            self.get_state(), {"phase": "pending", "token": "newer-task-id"}
+        )
+
+    def test_calculation_error_releases_its_own_reservation(self) -> None:
+        schedule_parents_update(self.task, self.pk)
+        self.task.request.id = self.task.apply_async.call_args.kwargs["task_id"]
+
+        with self.assertRaisesRegex(RuntimeError, "stats failed"):
+            run_parents_update(
+                self.task,
+                self.pk,
+                lambda: (_ for _ in ()).throw(RuntimeError("stats failed")),
+            )
+
+        self.assertIsNone(self.get_state())
+
+    def test_translation_and_language_parent_tasks_coalesce_independently(
+        self,
+    ) -> None:
+        language_task = SimpleNamespace(
+            name="weblate.utils.tasks.update_language_stats_parents",
+            request=SimpleNamespace(id=None),
+            apply_async=Mock(),
+        )
+        self.task.name = "weblate.utils.tasks.update_translation_stats_parents"
+
+        for _ in range(100):
+            schedule_parents_update(self.task, self.pk)
+            schedule_parents_update(language_task, self.pk)
+
+        self.task.apply_async.assert_called_once()
+        language_task.apply_async.assert_called_once()
 
 
 class JudgeStatsTest(ViewTestCase):

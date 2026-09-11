@@ -1432,10 +1432,19 @@ CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 # Long-running auto_translate tasks hold their message unacked for hours
 # (acks_late). Redis must not make them visible to another worker meanwhile.
 CELERY_VISIBILITY_TIMEOUT = get_env_int("WEBLATE_CELERY_VISIBILITY_TIMEOUT", 4 * 3600)
-CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": CELERY_VISIBILITY_TIMEOUT}
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    "visibility_timeout": CELERY_VISIBILITY_TIMEOUT,
+    # Kombu's Redis transport spreads priorities over four lists
+    # (priority_steps 0/3/6/9); the worker drains them highest first, so an
+    # explicitly interactive publication overtakes queued housekeeping.
+    "queue_order_strategy": "priority",
+}
 CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = CELERY_BROKER_TRANSPORT_OPTIONS
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_BROKER_CONNECTION_RETRY = True
+# Everything not explicitly marked interactive by its callsite is
+# housekeeping; see INTERACTIVE_TASK_PRIORITY in weblate/utils/celery.py.
+CELERY_TASK_DEFAULT_PRIORITY = 3
 
 # Celery settings, it is not recommended to change these
 CELERY_WORKER_MAX_MEMORY_PER_CHILD = 450000 if DEBUG else 250000

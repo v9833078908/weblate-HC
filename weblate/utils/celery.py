@@ -42,6 +42,10 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
 
 TASK_METADATA_TTL = 6 * 3600
+# Redis priority 0 is the highest Kombu slot (priority_steps 0/3/6/9). Only a
+# publication whose callsite knows a human is watching a progress bar uses it;
+# everything else stays on CELERY_TASK_DEFAULT_PRIORITY (3, background).
+INTERACTIVE_TASK_PRIORITY = 0
 
 
 def get_task_metadata_key(task_id: str) -> str:
