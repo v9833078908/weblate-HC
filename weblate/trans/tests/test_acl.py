@@ -730,6 +730,31 @@ class ACLTest(FixtureTestCase, RegistrationTestMixin):
         self.add_user()
         self.remove_user()
 
+    def test_add_team_watches_project(self) -> None:
+        """Granting project access through a team also watches the project."""
+        # The set-groups path (manual group assignment) is the one that used
+        # to leave watched empty; add_team now covers every path.
+        self.add_user()
+        self.client.post(
+            reverse("set-groups", kwargs=self.kw_project),
+            {
+                "user": self.second_user.username,
+                "groups": [self.translate_group.pk],
+            },
+        )
+        self.assertTrue(
+            self.second_user.profile.watched.filter(pk=self.project.pk).exists()
+        )
+
+        # Watching is idempotent and bots never watch.
+        bot = User.objects.create_user(
+            "acl-bot", "noreply-bot@example.org", "testpassword"
+        )
+        bot.is_bot = True
+        bot.save(update_fields=["is_bot"])
+        bot.add_team(None, self.translate_group)
+        self.assertFalse(bot.profile.watched.filter(pk=self.project.pk).exists())
+
     def test_add_owner(self) -> None:
         """Adding and removing owners from the ACL project."""
         self.add_user()

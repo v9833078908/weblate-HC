@@ -923,7 +923,6 @@ class Project(models.Model, PathMixin, CacheKeyMixin, LockMixin):
                 raise
         for team in group_objs:
             user.add_team(None, team)
-        user.profile.watched.add(self)
 
     def remove_user(self, user: User) -> None:
         """Add user based on username or email address."""

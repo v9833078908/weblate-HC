@@ -1536,6 +1536,10 @@ class User(AbstractBaseUser):
             cache.pop("team_memberships", None)
         if created:
             self._audit_team_change(request, team, activity="team-add", actor=user)
+            # Granting access to a project also makes it watched, so it is
+            # visible on the user's dashboard (watched translations tab).
+            if team.defining_project and not self.is_bot:
+                self.profile.watched.add(team.defining_project)
 
     def remove_team(
         self, request: AuthenticatedHttpRequest | None, team: Group
@@ -2085,9 +2089,6 @@ class Invitation(models.Model):
             actor=self.author,
             audit=had_membership,
         )
-
-        if self.group.defining_project:
-            user.profile.watched.add(self.group.defining_project)
 
         self.delete()
 
