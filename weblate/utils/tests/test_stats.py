@@ -30,7 +30,9 @@ from weblate.utils.stats import (
     TranslationStats,
     _get_parents_state,
     _parents_state_key,
+    begin_parents_update,
     fail_parents_update,
+    finish_parents_update,
     prefetch_stats,
     run_parents_update,
     schedule_parents_update,
@@ -225,6 +227,76 @@ class ParentsUpdateSchedulerTest(TransactionTestCase):
 
         self.task.apply_async.assert_called_once()
         language_task.apply_async.assert_called_once()
+
+    def test_successful_calculation_releases_reservation(self) -> None:
+        schedule_parents_update(self.task, self.pk)
+        self.task.request.id = self.task.apply_async.call_args.kwargs["task_id"]
+        calculate = Mock()
+
+        run_parents_update(self.task, self.pk, calculate)
+
+        calculate.assert_called_once()
+        self.assertIsNone(self.get_state())
+
+    def test_followup_publishes_only_after_calculation_returns(self) -> None:
+        events: list[str] = []
+
+        def publish(**kwargs) -> None:
+            if "countdown" in kwargs:
+                self.assertEqual(events, ["calculate", "returned"])
+
+        self.task.apply_async.side_effect = publish
+        schedule_parents_update(self.task, self.pk)
+        self.task.request.id = self.task.apply_async.call_args.kwargs["task_id"]
+
+        def calculate() -> None:
+            events.append("calculate")
+            schedule_parents_update(self.task, self.pk)
+            events.append("returned")
+
+        run_parents_update(self.task, self.pk, calculate)
+
+        self.assertEqual(self.task.apply_async.call_count, 2)
+        self.assertEqual(self.task.apply_async.call_args.kwargs["countdown"], 1)
+
+    def test_save_after_finish_publishes_fresh_reservation(self) -> None:
+        schedule_parents_update(self.task, self.pk)
+        token = self.task.apply_async.call_args.kwargs["task_id"]
+        self.assertTrue(begin_parents_update(self.task.name, self.pk, token))
+        self.assertIsNone(finish_parents_update(self.task.name, self.pk, token))
+
+        schedule_parents_update(self.task, self.pk)
+
+        self.assertEqual(self.task.apply_async.call_count, 2)
+        self.assertNotEqual(
+            self.task.apply_async.call_args.kwargs["task_id"],
+            token,
+        )
+
+    def test_publication_failure_releases_only_failed_reservation(self) -> None:
+        self.task.apply_async.side_effect = OSError("broker unavailable")
+
+        with self.assertRaisesRegex(OSError, "broker unavailable"):
+            schedule_parents_update(self.task, self.pk)
+
+        self.assertIsNone(self.get_state())
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_translation_stats_save_without_parent_update_does_not_schedule(
+        self,
+    ) -> None:
+        stats = TranslationStats(
+            SimpleNamespace(
+                pk=self.pk,
+                cache_key=f"parents-update-{uuid.uuid4().hex}",
+                is_source=False,
+            )
+        )
+
+        with patch("weblate.utils.stats.schedule_parents_update") as schedule:
+            stats.save(update_parents=False)
+
+        schedule.assert_not_called()
 
 
 class JudgeStatsTest(ViewTestCase):

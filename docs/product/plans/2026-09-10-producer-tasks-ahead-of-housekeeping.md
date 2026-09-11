@@ -8,9 +8,9 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Цель, решения и статус
 
-**Дата:** 2026-09-10. **Статус:** план доработан 2026-09-11 после ревью,
-требует повторного согласования; реализация не начата, деплой на прод не
-одобрен (нужно отдельное `DEPLOY-OK`).
+**Дата:** 2026-09-10. **Статус:** реализовано 2026-09-11 в
+`38bc7e8` (`feat(tasks): prioritize producer component work`); verification
+recorded below. Деплой на прод не одобрен (нужно отдельное `DEPLOY-OK`).
 
 **Казус.** 2026-09-10 продюсер импортировал лок-кит на 963 строки × 9 языков в
 `dead-shell/localization` на `l10n.herocraft.com`, увидел прогресс-бар
@@ -151,14 +151,14 @@ delivery option только из подтверждённого пользов�
 
 **Действия.**
 
-- [ ] Добавить настройки Redis priority и константу interactive priority.
-- [ ] Перевести `queue_background_task` на `apply_async`, добавить
+- [x] Добавить настройки Redis priority и константу interactive priority.
+- [x] Перевести `queue_background_task` на `apply_async`, добавить
       `user_waiting` и мигрировать все его callsites без изменения аргументов
       тел задач.
-- [ ] Пронести `user_waiting` через `queue_commit_pending` и deferred commit.
-- [ ] Разметить перечисленные пользовательские и фоновые callsites; не
+- [x] Пронести `user_waiting` через `queue_commit_pending` и deferred commit.
+- [x] Разметить перечисленные пользовательские и фоновые callsites; не
       выводить приоритет из `user_id`.
-- [ ] Обновить существующие mock-ожидания `.delay`/`.apply_async` в
+- [x] Обновить существующие mock-ожидания `.delay`/`.apply_async` в
       `weblate/trans/tests/test_component.py`,
       `weblate/trans/tests/test_newlang.py`, API и loc-kit contract tests.
 
@@ -272,11 +272,11 @@ delivery option только из подтверждённого пользов�
 
 **Действия.**
 
-- [ ] Реализовать key builder, lock builder и переходы
+- [x] Реализовать key builder, lock builder и переходы
       `schedule/begin/finish/fail` в `weblate/utils/stats.py`.
-- [ ] Перевести оба non-eager вызова родительских stats-задач на scheduler.
-- [ ] Обернуть оба тела в единый lifecycle без копирования строковых ключей.
-- [ ] Не добавлять новую модель, миграцию, периодическую задачу или изменение
+- [x] Перевести оба non-eager вызова родительских stats-задач на scheduler.
+- [x] Обернуть оба тела в единый lifecycle без копирования строковых ключей.
+- [x] Не добавлять новую модель, миграцию, периодическую задачу или изменение
       формул статистики.
 
 **Регрессионные проверки.**
@@ -328,18 +328,39 @@ delivery contract, priority-списки и границы восстановл�
 
 **Действия.**
 
-- [ ] `docs/changes.rst`, верхняя неизданная секция: операции над компонентом,
+- [x] `docs/changes.rst`, верхняя неизданная секция: операции над компонентом,
       за которыми пользователь следит по прогресс-бару, получают приоритет над
       фоновыми пересчётами; повторные запросы родительской статистики
       склеиваются. Не утверждать, что все вызовы четырёх task-классов имеют
       высокий приоритет.
-- [ ] `AGENTS.md`, раздел «Development environment»:
+- [x] `AGENTS.md`, раздел «Development environment»:
       - 0 — явная interactive delivery, 3 — default background;
       - сервисный `user_id` сам по себе не меняет приоритет;
       - `$'celery\x06\x163'` — нормальный Redis-список;
       - TTL scheduler-состояния не является автоматическим retry.
-- [ ] Этот план после реализации: SHA, целевые тесты, оба смоука, число
+- [x] Этот план после реализации: SHA, целевые тесты, оба смоука, число
       stats-задач до/после, статус деплоя.
+
+**Реализация и проверка (2026-09-11).**
+
+- Код: `38bc7e8`. Тесты: `88 passed, 7 subtests passed` —
+  `weblate/utils/tests/test_stats.py`, `weblate/trans/tests/test_tasks.py`,
+  `ComponentErrorTest` и изменённые API/create/new-language/git-view cases.
+- Scoped hooks: `prek run ruff-check ruff-format doccmd rst-double-space
+  --files …` — зелёный. Полный `prek` остаётся красным на существующих
+  `reuse` (`.omp/lsp.json`) и `typos` diagnostics в `analysis/data/`, не
+  затронутых этой веткой.
+- Изолированный Docker smoke: при остановленном `celery-celery` 300 прямых
+  `update_translation_stats_parents` с priority 3 дали
+  `LLEN celery = 1`, `LLEN $'celery\x06\x163' = 300` после одной priority-0
+  `component_after_save`; первой принятой worker-задачей стала
+  `component_after_save`. Сто реальных вызовов
+  `schedule_parents_update(update_translation_stats_parents, -2)` дали
+  ровно одну ожидающую priority-3 задачу (`LLEN = 1`).
+- Отклонение smoke: изолированный stack создавался без project/loc kit, поэтому
+  UI upload и glossary-import с проверкой итоговых parent totals заменены
+  broker/cache эквивалентом выше и регрессиями; production не трогался.
+- Прод-деплой: не выполнен, отдельный `DEPLOY-OK` по-прежнему требуется.
 
 ## Зависимости и порядок
 
