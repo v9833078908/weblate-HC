@@ -1,128 +1,266 @@
+<!--
+Copyright © HCGameLoc
+
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 # Продюсерские задачи переживают перезапуск сервиса
 
-Статус: предложен, ожидает утверждения.
-Повод: `docs/operations/reports/2026-09-11-anvil-saga-fr-autotranslate-stall.md`
-(автоперевод anvil-saga/fr убит деплоем в 10:21 UTC, висит «73 %» до ~14:23 UTC).
+**Дата:** 2026-09-11. **Статус:** план доработан после проверки риска на
+измерении; требует согласования, реализация не начата, деплой не одобрен.
 
-Три независимых дефекта, каждый чинится отдельно и проверяется отдельно.
-Порядок задач = порядок ценности: 1 убирает четырёхчасовую дыру, 2 убирает
-ложный экран, 3 убирает сам обрыв.
+**Повод.** `docs/operations/reports/2026-09-11-anvil-saga-fr-autotranslate-stall.md`:
+деплой в 10:21 UTC пересоздал контейнер и убил `auto_translate`
+anvil-saga/fr. Сообщение осталось в Redis `unacked`, вернулось бы в очередь
+только к 14:23 UTC, а страница прогресса показывала «73 %» без ошибки и без
+срока. Хотфикс 11.09 (возврат сообщения вручную, раздел «Что уже сделано»)
+снял конкретный инцидент и не меняет поведение системы.
 
-## Задача 1. Прерванная задача возвращается в очередь сразу, а не через 4 часа
+**Связь с параллельной работой.** `docs/product/plans/2026-09-10-producer-tasks-ahead-of-housekeeping.md`
+решает соседнюю задачу — пользовательская постановка не должна стоять за
+фоновой уборкой. Пересечения зафиксированы в разделе «Координация с планом
+приоритетов»; оба плана трогают Celery-контракт и один и тот же блок настроек.
 
-Сейчас: SIGTERM → celery начинает **тёплое** завершение и ждёт задачу (часы) →
-через 10 с supervisor шлёт SIGKILL → интерпретатор умирает без финализаторов →
-сообщение остаётся в Redis `unacked`, и его вернёт только сканер по
-`visibility_timeout` = 4 ч (`weblate/settings_docker.py:1434`).
+## Факты, проверенные измерением
 
-Механизм решения (проверен в установленных celery 5.6.3 / kombu 5.6.2, не по памяти):
+Проба `analysis/probes/celery_shutdown_requeue.py` поднимает отдельный воркер
+на изолированной очереди и БД Redis (celery 5.6.3, kombu 5.6.2 — те же версии,
+что в проде) и останавливает его разными способами. Результат прогона в
+dev-контейнере 2026-09-11:
 
-- `REMAP_SIGTERM=SIGQUIT` (`billiard/common.py:34-41`) переводит SIGTERM на
-  обработчик **холодного** завершения (`celery/apps/worker.py:411`).
-- Холодное завершение зовёт `consumer.cancel_active_requests()`
-  (`celery/apps/worker.py:359`), а для `acks_late`-задачи это `Request.cancel`
-  → `mark_as_retry` **без** `acknowledge()` (`celery/worker/request.py:439-455`).
-- Чистый выход процесса срабатывает финализатор
-  `QoS._on_collect = Finalize(self, self.restore_unacked_once)`
-  (`kombu/transport/virtual/base.py:193`), который возвращает неподтверждённое
-  сообщение в очередь немедленно.
-- `CELERY_WORKER_SOFT_SHUTDOWN_TIMEOUT` (celery ≥ 5.5,
-  `celery/worker/worker.py:412-435`) даёт короткой задаче шанс доработать до
-  отмены.
+|Сценарий|`unacked` во время работы|После остановки|Состояние задачи|
+|---|---|---|---|
+|`acks_late` + SIGTERM, SIGKILL через `stopwaitsecs` (сегодня)|1|`unacked=1`, очередь пуста|висит `PROGRESS`|
+|`acks_late` + SIGQUIT (предлагается)|1|**очередь = 1**, `unacked=0`, в логе `Restoring`, выход 0|`PENDING`, переисполнится|
+|Длинная задача без `acks_late` + SIGQUIT|**0**|потеряна|`RETRY`, но никто не переставит|
+|Короткая задача (3 с) без `acks_late` + SIGQUIT|0|**успела доработать**|`SUCCESS`|
 
-Изменения:
+Из этого следуют четыре вывода, на которых держится план.
 
-1. `deploy/environment.example` и `deploy/docker-compose.yml`,
-   `dev-docker/docker-compose.yml`: `REMAP_SIGTERM: SIGQUIT` в окружении
-   сервиса `weblate`.
-2. `weblate/settings_docker.py`: `CELERY_WORKER_SOFT_SHUTDOWN_TIMEOUT =
-   get_env_int("WEBLATE_CELERY_SOFT_SHUTDOWN_TIMEOUT", 20)` рядом с
-   существующим блоком celery (строка 1426+).
-3. `deploy/Dockerfile`: дописать `stopwaitsecs` и `stopasgroup`/`killasgroup`
-   в `/etc/supervisor/conf.d/celery-*.conf` (файлы приходят из upstream-образа,
-   правим `sed`-ом в слое сборки, значение > soft timeout, например 60).
-4. `deploy/docker-compose.yml` и `dev-docker/docker-compose.yml`:
-   `stop_grace_period: 90s` у сервиса `weblate`, иначе docker убьёт контейнер
-   раньше, чем supervisor дождётся воркеров.
+1. Сообщение возвращает не сигнал, а **чистый выход процесса**: финализатор
+   `QoS._on_collect = Finalize(self, self.restore_unacked_once)`
+   (`kombu/transport/virtual/base.py:193`). SIGKILL его не выполняет — отсюда
+   четырёхчасовая дыра.
+2. SIGQUIT — штатный вход в холодное завершение
+   (`celery/apps/worker.py:445`, `_shutdown_handler(sig='SIGQUIT', how='Cold',
+   callback=on_cold_shutdown)`), никакой `REMAP_SIGTERM` не нужен. Холодное
+   завершение ждёт `worker_soft_shutdown_timeout`
+   (`celery/worker/worker.py:412`), затем снимает потребитель и вызывает
+   `consumer.cancel_active_requests()`.
+3. Для `acks_late`-задачи отмена не делает `acknowledge()`
+   (`celery/worker/request.py:439-455`), поэтому сообщение остаётся
+   неподтверждённым и уходит обратно в очередь при выходе. Для задачи без
+   `acks_late` сообщение подтверждено ещё при доставке — в пробе `unacked=0`
+   уже во время работы, — поэтому терять его нечего: оно потеряно при **любом**
+   прерывании, и сегодня тоже.
+4. Приоритет при возврате сохраняется: `_do_restore_message` кладёт сообщение
+   в список своего приоритета (`kombu/transport/redis.py:804-809`,
+   `_get_message_priority` → `_q_for_pri`). Возврат при выходе — в хвост
+   (`rpush`), `reject(requeue=True)` — в голову (`lpush`).
 
-Почему это безопасно: сообщение возвращает умирающий воркер, `visibility_timeout`
-остаётся 4 ч, второго экземпляра не появляется. Повторный прогон идемпотентен
-по построению: `q=state:empty`, `overwrite_existing=False` — уже переведённые
-строки в выборку не попадают (в инциденте: 4530 записано, 4952 осталось).
+Инвентаризация задач на проде (`app.loader.import_default_modules()`,
+87 задач): `acks_late=True` только у трёх —
+`weblate.trans.tasks.auto_translate`, `auto_translate_component`,
+`fix_failing_checks`. Остальные 84 подтверждаются при доставке.
 
-Проверка: в dev-стеке запустить автоперевод компонента, дождаться прогресса,
-`docker compose restart weblate`; ожидание — в логах воркера `Initiating Soft
-Shutdown`, затем `Restoring N unacknowledged message(s)`, задача **с тем же
-task id** снова уходит в работу в пределах минуты, `zrange unacked_index` пуст.
-Контрольный замер до фикса — те же шаги на текущем коде: задача не возвращается.
+**Вердикт по риску, который надо было проверить.** Холодное завершение не
+вводит новой потери данных: 84 задачи без `acks_late` не переживают прерывания
+и сегодня. Оно меняет только длительность окна — сегодня это тёплое ожидание
+до `SIGKILL` от supervisor (`stopwaitsecs`, по умолчанию 10 с), после правки —
+`worker_soft_shutdown_timeout`. При значении не меньше нынешних 10 с регрессии
+нет, а короткая задача успевает доработать (четвёртая строка таблицы).
+Тем не менее менять семантику всех воркеров незачем: холодное завершение
+нужно ровно тому воркеру, который исполняет `acks_late`-задачи, поэтому план
+включает его **только для `celery-translate`** через `stopsignal` его
+supervisor-программы, а не глобально через `REMAP_SIGTERM`.
+
+## Задача 1. Долгая продюсерская задача возвращается в очередь за секунды
+
+**Результат.** Перезапуск сервиса не стоит продюсеру ни потерянного прогона,
+ни четырёх часов ожидания: задача возвращается в очередь при остановке и
+подхватывается тем же `task id` после старта. Поведение остальных воркеров не
+меняется.
+
+**Файлы и интерфейсы.**
+
+- `weblate/settings_docker.py`, блок Celery (строки 1426+):
+  `CELERY_WORKER_SOFT_SHUTDOWN_TIMEOUT =
+  get_env_int("WEBLATE_CELERY_SOFT_SHUTDOWN_TIMEOUT", 20)`. Настройка
+  используется только на пути холодного завершения
+  (`celery/apps/worker.py:416`), поэтому для воркеров, получающих SIGTERM, она
+  no-op. Ожидания при простое нет: `wait_for_soft_shutdown` спит только при
+  наличии активных запросов.
+- `weblate/settings_docker.py`, `CELERY_TASK_ROUTES`: добавить
+  `"weblate.trans.tasks.fix_failing_checks": {"queue": "translate"}`. Это
+  третья `acks_late`-задача; сейчас она идёт в общий `celery` и не получит
+  защиту. Заодно массовое исправление перестаёт стоять за уборкой.
+- `deploy/Dockerfile`: в слое сборки дописать в
+  `/etc/supervisor/conf.d/celery-translate.conf` строки `stopsignal=QUIT` и
+  `stopwaitsecs=60` (файл приходит из upstream-образа; правим `sed`-ом по
+  секции `[program:celery-translate]`, не заменяя `command`). Остальные
+  `celery-*` программы не трогаем.
+- `deploy/docker-compose.yml` и `dev-docker/docker-compose.yml`:
+  `stop_grace_period: 90s` у сервиса `weblate`, иначе docker убьёт контейнер
+  раньше, чем supervisor дождётся воркера (сейчас 10 с по умолчанию, и это
+  вторая половина причины инцидента).
+- `deploy/environment.example`: задокументировать
+  `WEBLATE_CELERY_SOFT_SHUTDOWN_TIMEOUT`.
+
+**Действия.**
+
+- [ ] Добавить настройку soft shutdown и маршрут `fix_failing_checks`.
+- [ ] Добавить `stopsignal`/`stopwaitsecs` для `celery-translate` в образ.
+- [ ] Поднять `stop_grace_period` в обоих compose-файлах.
+- [ ] Проверить, что `weblate/settings_test.py` не наследует маршрут в
+      несуществующую очередь (eager-режим маршруты игнорирует).
+
+**Регрессионные проверки.**
+
+- Тест на маршрутизацию: `app.conf.task_routes` направляет
+  `fix_failing_checks` в `translate`, а не в `celery`; тест смотрит на
+  наблюдаемый маршрут, а не на текст настройки.
+- Повторный прогон `analysis/probes/celery_shutdown_requeue.py` как
+  контрольного измерения: строки 1 и 2 таблицы не должны сойтись.
+
+**Смоук на dev.**
+
+1. `WEBLATE_PORT=3001 ./rundev.sh` (настройки воркеров читаются при старте).
+2. Запустить автоперевод компонента, дождаться ненулевого прогресса.
+3. `docker compose -f dev-docker/docker-compose.yml restart weblate`.
+4. Ожидание: в логе `celery-translate` — `Restoring 1 unacknowledged
+   message(s)`, `redis-cli -n 1 hlen unacked` → 0, после старта в
+   `inspect().active()` тот же `task id` с `delivery_info.redelivered = true`,
+   перевод продолжается с оставшихся строк.
+5. Контроль до правки: те же шаги на текущем коде оставляют `unacked=1` и
+   пустую очередь.
 
 ## Задача 2. Экран прогресса отличает «идёт» от «оборвано» и считает строки
 
-Сейчас `TasksViewSet.retrieve` (`weblate/api/views.py:4955-4967`) отдаёт только
-`completed`/`progress`/`result`/`log`, а `get_task_progress`
-(`weblate/utils/celery.py:252`) возвращает последний сохранённый процент. У
-задачи, чей воркер мёртв, состояние навсегда `PROGRESS`, и
-`loader-bootstrap.js:1798` честно рисует замороженный бар без срока и без ошибки.
+**Результат.** Продюсер видит, что происходит, даже когда воркера, который вёл
+задачу, больше нет.
 
-Изменения:
+Проба даёт и здесь точный ориентир: после холодного завершения состояние
+`acks_late`-задачи становится `PENDING` (переисполнение будет), а задачи без
+`acks_late` — `RETRY` (переисполнения не будет). Ни одно из них нельзя
+использовать как признак живости, поэтому признаком служит пульс.
 
-1. Пульс: `AutoTranslate.set_progress` (`weblate/trans/autotranslate.py:272`) и
-   `progress_callback` массового исправления (`weblate/trans/tasks.py:1321`)
-   пишут `cache.set(f"task-heartbeat-{task_id}", {"time": …, "hostname": …})`
-   с TTL уровня `TASK_METADATA_TTL`.
-2. API: `TaskSerializer` (`weblate/api/serializers.py:4150`) получает поля
-   `state`, `stale`, `done`, `total`; `retrieve` считает
-   `stale = not completed and heartbeat is not None and now - heartbeat > 180`,
-   а при `state == "RETRY"` отдаёт `stale=False` с пометкой перезапуска.
-3. Фронт: `weblate/static/loader-bootstrap.js` (блок с `data-task`) при `stale`
-   красит плашку в `alert-warning`, пишет «Выполнение прервано перезапуском
-   сервиса; задача возобновится автоматически» и показывает кнопку повторного
-   запуска; при `RETRY` — «Перезапускается». Требования `ACCESSIBILITY.md`
-   соблюдаются: текстовая формулировка, не только цвет, `aria-live` уже есть.
-4. Строки вместо голого процента: `set_progress` кладёт в meta `done`/`total`
-   единиц, шаблон `weblate/templates/message.html` показывает «4530 из 9482».
-   В инциденте бар показывал 73 % при фактических 47,8 %.
+**Файлы и интерфейсы.**
 
-Проверка: юнит-тест на `retrieve` с подделанным heartbeat (свежий → `stale`
-false, просроченный → true) и на пересчёт `done/total`; вручную — dev-стек,
-убить воркер `supervisorctl stop celery-translate`, убедиться, что плашка в
-течение трёх минут переходит в предупреждение, а не висит.
+- Пульс: `AutoTranslate.set_progress` (`weblate/trans/autotranslate.py:272`) и
+  `progress_callback` массового исправления (`weblate/trans/tasks.py:1321`)
+  пишут `cache.set(f"task-heartbeat-{task_id}", {"time": …, "hostname": …})`
+  с TTL уровня `TASK_METADATA_TTL`.
+- API: `TaskSerializer` (`weblate/api/serializers.py:4150`) получает `state`,
+  `stale`, `done`, `total`; `TasksViewSet.retrieve`
+  (`weblate/api/views.py:4955`) считает
+  `stale = not completed and (heartbeat is None or now - heartbeat > 180)`
+  только для задач, у которых пульс когда-либо был.
+- Фронт: `weblate/static/loader-bootstrap.js`, блок `data-task` (строка 1798):
+  при `stale` — `alert-warning`, текст «Выполнение прервано перезапуском
+  сервиса; задача возобновится автоматически» и кнопка повторного запуска.
+  Требования `ACCESSIBILITY.md` соблюдаются: состояние передаётся текстом, а
+  не только цветом; `aria-live` уже есть.
+- Строки вместо голого процента: `set_progress` кладёт в meta `done`/`total`
+  единиц, `weblate/templates/message.html` показывает «4530 из 9482». В
+  инциденте бар показывал 73 % при фактических 47,8 % — это разные
+  знаменатели, а не погрешность.
+
+**Регрессионные проверки.**
+
+- `retrieve` со свежим пульсом → `stale=false`; с просроченным → `stale=true`;
+  завершённая задача никогда не `stale`.
+- `done`/`total` соответствуют числу единиц, а не шагов движка.
+- Ручная проверка на dev: `supervisorctl stop celery-translate` во время
+  автоперевода — плашка переходит в предупреждение за три минуты.
 
 ## Задача 3. Деплой не запускается молча поверх работающей задачи
 
-Изменения:
+**Результат.** Деплой либо не стартует поверх продюсерской задачи, либо
+явно сообщает, что именно он прервал и что вернулось в очередь.
 
-1. Новая management-команда `weblate/utils/management/commands/running_tasks.py`
-   (рядом с существующей `celery_queues.py`): печатает JSON активных задач —
-   имя, id, возраст, инициатор, scope — по `app.control.inspect().active()`.
-2. `deploy/vps.sh`, `deploy_stack()` перед `docker compose up`: вызывает её
-   через `docker exec`, и если в очереди `translate` есть активная задача,
-   печатает список и требует подтверждения либо `--force`; по умолчанию деплой
-   не стартует.
-3. В конце деплоя выводит те же задачи с пометкой «возобновлены» — после
-   задачи 1 это проверяемое утверждение, а не обещание.
+**Файлы и интерфейсы.**
 
-Проверка: на dev-стеке `deploy`-путь не воспроизводится, поэтому проверяем
-саму команду (`weblate running_tasks --json` при запущенном автопереводе
-возвращает непустой список) и shellcheck-прогон `deploy/vps.sh`.
+- Новая команда `weblate/utils/management/commands/running_tasks.py` рядом с
+  `celery_queues.py`: JSON активных задач (имя, id, возраст, очередь).
+- `deploy/vps.sh`, `deploy_stack()`: перед `docker compose up` вызывает её
+  через `docker exec`; при активной задаче в очереди `translate` печатает
+  список и отказывается деплоить без `--force`.
+- После успешного деплоя печатает те же задачи с отметкой, вернулись ли они в
+  очередь (`LLEN translate`, `HLEN unacked`). После Задачи 1 это проверяемое
+  утверждение.
+
+**Проверка.** `weblate running_tasks --json` при запущенном автопереводе
+возвращает непустой список; `shellcheck` на `deploy/vps.sh` зелёный.
+
+## Координация с планом приоритетов
+
+`docs/product/plans/2026-09-10-producer-tasks-ahead-of-housekeeping.md` идёт
+параллельно. Точки соприкосновения:
+
+- **Один блок настроек.** Тот план добавляет `queue_order_strategy` и
+  `CELERY_TASK_DEFAULT_PRIORITY` в `weblate/settings_docker.py:1426-1444`, этот
+  — `CELERY_WORKER_SOFT_SHUTDOWN_TIMEOUT` и маршрут `fix_failing_checks` туда
+  же. Конфликт текстовый, не смысловой; кто вливается вторым, тот и переносит.
+- **Приоритет и возврат сообщения совместимы.** Возврат сохраняет приоритет
+  (`_do_restore_message` → `_q_for_pri`), поэтому interactive-постановка после
+  перезапуска остаётся в списке приоритета 0. Факт проверен в установленном
+  kombu и годится обоим планам.
+- **Возврат кладёт сообщение в хвост своего приоритетного списка**, а не в
+  голову. Для приёмки того плана это означает: после перезапуска порядок
+  внутри приоритета не сохраняется.
+- **`fix_failing_checks` уезжает из очереди `celery`.** Это снимает её с
+  общего воркера, которого касается план приоритетов; тамошние сценарии с
+  `$'celery\x06\x163'` от этого не зависят, но факт нужно учесть при сверке
+  очередей.
+- **Порядок.** Планы независимы и могут выполняться параллельно в разных
+  ветках; общий смоук после слияния — один перезапуск стека, в котором
+  проверяются оба свойства: interactive-задача принята раньше фоновой и
+  прерванная продюсерская вернулась в очередь.
 
 ## Вне объёма
 
-- Вынос Celery в отдельный контейнер. Правильно, но это отдельная работа по
-  инфраструктуре; задачи 1-3 дают нужный результат в текущей однокотейнерной
-  схеме.
-- Постоянная история запусков автоперевода (страница вида judge-run).
-  Восстановление плашки на любой странице уже работает через `add_user_task`
-  (`weblate/utils/celery.py:96`), отдельная история — следующий шаг.
-- Снижение `visibility_timeout`: опасно, именно оно защищает от дублей.
+- Вынос Celery в отдельный контейнер.
+- Перевод остальных 84 задач на `acks_late` — это отдельная работа с ревизией
+  идемпотентности каждой.
+- Постоянная история запусков автоперевода (плашка восстанавливается через
+  `add_user_task`, `weblate/utils/celery.py:96`).
+- Снижение `visibility_timeout`: именно он защищает от дублей.
 
 ## Риски
 
-- `REMAP_SIGTERM=SIGQUIT` меняет поведение **всех** воркеров: длинные задачи
-  теперь отменяются через soft timeout вместо ожидания. Для задач без
-  `acks_late` отмена означает потерю; проверить список долгих задач
-  (`weblate/trans/tasks.py`: автоперевод, массовое исправление, judge — все
-  `acks_late=True, reject_on_worker_lost=True`).
-- Увеличенный `stop_grace_period` удлиняет деплой на время soft timeout.
-- Поднятый `stopwaitsecs` требует, чтобы в образе не осталось программ,
-  которые не умирают по SIGTERM, иначе каждый рестарт станет на минуту дольше.
+- Холодное завершение снимает задачи без `acks_late` по истечении soft
+  timeout. На `celery-translate` таких задач нет (очередь `translate` несёт
+  только `auto_translate*` и, после Задачи 1, `fix_failing_checks`), поэтому
+  риск ограничен этим воркером и этим списком.
+- Выход при холодном завершении — код 1 (`EX_FAILURE`). При ручном
+  `supervisorctl signal QUIT` supervisor с `autorestart=true` перезапустит
+  воркер; при остановке контейнера это не имеет значения, но в логах деплоя
+  строка «exited with code 1» ожидаема и не является ошибкой.
+- Деплой удлиняется на soft timeout, только если в момент остановки реально
+  идёт продюсерская задача.
+- Переисполнение автоперевода безопасно по построению (`q=state:empty`,
+  `overwrite_existing=False`), но прогресс начинается заново: продюсер увидит
+  сброс процента. Задача 2 обязана это объяснять текстом.
+- `stop_grace_period: 90s` применяется ко всему контейнеру: аварийная
+  остановка зависшего стека станет длиннее на это время.
+
+## Что уже сделано (хотфикс 11.09, вне плана)
+
+Прерванная задача `4a6744e9-4cfe-4aad-ac4a-2a8c00a0b508` возвращена в очередь
+вручную, чтобы перевод anvil-saga/fr завершился сегодня:
+
+```python
+from types import SimpleNamespace
+from weblate.utils.celery import app
+
+# ВАЖНО: ключ в `unacked` - это delivery tag, а не task id.
+TAG = "c0e6c39c-788e-4e20-b491-9a26c038a0dc"
+with app.connection_for_write() as conn:
+    channel = conn.default_channel
+    channel._restore(SimpleNamespace(delivery_tag=TAG), leftmost=True)
+    channel.client.zrem("unacked_index", TAG)
+```
+
+Результат: воркер принял сообщение сразу, `delivery_info.redelivered = true`,
+тот же `task id`, за 2,5 минуты непереведённых строк стало 4412 вместо 4952.
+Это разовое действие, а не замена Задаче 1.
