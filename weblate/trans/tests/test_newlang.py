@@ -310,6 +310,7 @@ class AppStoreNewLangTest(NewLangTest):
         self.assertEqual(
             queue_task.call_args.kwargs["langs"], [translation.language_code]
         )
+        self.assertTrue(queue_task.call_args.kwargs["user_waiting"])
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
     def test_add_languages_to_component_queues_only_added_languages(self) -> None:
@@ -342,6 +343,7 @@ class AppStoreNewLangTest(NewLangTest):
             sorted(queue_task.call_args.kwargs["langs"]),
             sorted(added_codes),
         )
+        self.assertTrue(queue_task.call_args.kwargs["user_waiting"])
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
     def test_add_languages_to_component_deduplicates_scan_languages(self) -> None:
@@ -362,3 +364,4 @@ class AppStoreNewLangTest(NewLangTest):
         self.assertEqual(queue_task.call_args.kwargs["pk"], self.component.pk)
         self.assertTrue(queue_task.call_args.kwargs["force_scan"])
         self.assertEqual(queue_task.call_args.kwargs["langs"], ["af"])
+        self.assertTrue(queue_task.call_args.kwargs["user_waiting"])

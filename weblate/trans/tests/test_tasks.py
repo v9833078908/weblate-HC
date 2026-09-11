@@ -47,6 +47,7 @@ from weblate.trans.tasks import (
     update_remotes,
 )
 from weblate.trans.tests.test_views import ComponentTestCase
+from weblate.utils.celery import INTERACTIVE_TASK_PRIORITY
 from weblate.utils.files import remove_tree
 from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.state import STATE_FUZZY, STATE_TRANSLATED
@@ -284,6 +285,7 @@ class TasksTest(ComponentTestCase):
                 "user_id": self.user.id,
                 "force_scan": False,
                 "previous_head": None,
+                "user_waiting": True,
             },
         )
         lock_timeout = WeblateLockTimeoutError("locked", lock=self.component.lock)
@@ -311,6 +313,7 @@ class TasksTest(ComponentTestCase):
                 "previous_head": None,
             },
             task_id="next-task-id",
+            priority=INTERACTIVE_TASK_PRIORITY,
         )
         self.assertEqual(cache.get(self.component.commit_task_key), "next-task-id")
         self.assertIsNone(cache.get(self.component.commit_task_reschedule_key))

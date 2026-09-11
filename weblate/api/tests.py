@@ -88,8 +88,8 @@ from weblate.trans.models import (
 )
 from weblate.trans.models.component import ComponentQuerySet
 from weblate.trans.models.judge import (
-    ProducerRun,
     JudgeVerdict,
+    ProducerRun,
     compute_context_hash,
     compute_target_hash,
     compute_target_storage_hash,
@@ -8165,9 +8165,9 @@ class ComponentAPITest(APIBaseTest):
     def test_create_component_from_component_queues_seed(self) -> None:
         with (
             patch(
-                "weblate.trans.tasks.component_after_save.delay",
+                "weblate.trans.tasks.component_after_save.apply_async",
                 return_value=SimpleNamespace(id="component-task"),
-            ) as delay,
+            ) as apply_async,
             patch(
                 "weblate.trans.models.component.AsyncResult",
                 return_value=SimpleNamespace(id="component-task", ready=lambda: False),
@@ -8188,19 +8188,19 @@ class ComponentAPITest(APIBaseTest):
                 },
             )
 
-        self.assertEqual(delay.call_count, 1)
+        self.assertEqual(apply_async.call_count, 1)
         self.assertEqual(
-            delay.call_args.args[0],
-            Component.objects.get(slug="api-copy-async").pk,
+            apply_async.call_args.kwargs["args"],
+            (Component.objects.get(slug="api-copy-async").pk,),
         )
-        self.assertEqual(
-            delay.call_args.kwargs["seed_source_component_id"], self.component.pk
-        )
-        self.assertTrue(delay.call_args.kwargs["copy_seed_addons"])
-        self.assertEqual(
-            delay.call_args.kwargs["seed_author"], self.user.get_author_name()
-        )
-        self.assertTrue(delay.call_args.kwargs["skip_push"])
+        # This serializer does not set Component.acting_user; request identity
+        # alone must not turn an automatic dispatch interactive.
+        self.assertNotIn("priority", apply_async.call_args.kwargs)
+        task_kwargs = apply_async.call_args.kwargs["kwargs"]
+        self.assertEqual(task_kwargs["seed_source_component_id"], self.component.pk)
+        self.assertTrue(task_kwargs["copy_seed_addons"])
+        self.assertEqual(task_kwargs["seed_author"], self.user.get_author_name())
+        self.assertTrue(task_kwargs["skip_push"])
 
     def test_create_component_from_component_seed_uses_skip_push(self) -> None:
         duplicate = Component.objects.create(
@@ -13447,7 +13447,9 @@ class SuggestionAPITest(APIBaseTest):
         unit.refresh_from_db()
         self.assertEqual(unit.state, STATE_FUZZY)
         self.assertFalse(Suggestion.objects.filter(pk=candidate.pk).exists())
-        self.assertEqual(ProducerRun.objects.filter(requested_mode="recheck").count(), 1)
+        self.assertEqual(
+            ProducerRun.objects.filter(requested_mode="recheck").count(), 1
+        )
 
     @override_settings(
         JUDGE_ENABLED=True,

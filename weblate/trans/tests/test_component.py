@@ -21,7 +21,7 @@ from django.test.utils import override_settings
 from django.utils import timezone
 from translate.storage.base import ParseError
 
-from weblate.auth.models import setup_project_groups
+from weblate.auth.models import User, setup_project_groups
 from weblate.checks.models import Check
 from weblate.lang.models import Language
 from weblate.trans.actions import ActionEvents
@@ -41,6 +41,7 @@ from weblate.trans.tests.test_views import (
     FixtureTestCase,
     ViewTestCase,
 )
+from weblate.utils.celery import INTERACTIVE_TASK_PRIORITY
 from weblate.utils.files import remove_tree
 from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.state import (
@@ -1967,6 +1968,54 @@ class ComponentErrorTest(RepoTestCase):
         with self.assertRaises(ValidationError):
             self.component.clean()
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_queue_background_task_uses_interactive_delivery_only_when_requested(
+        self,
+    ) -> None:
+        interactive = Mock()
+        interactive.apply_async.return_value = SimpleNamespace(id="interactive")
+        background = Mock()
+        background.apply_async.return_value = SimpleNamespace(id="background")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.component.queue_background_task(
+                interactive, self.component.pk, user_waiting=True
+            )
+            self.component.queue_background_task(background, self.component.pk)
+
+        interactive.apply_async.assert_called_once_with(
+            args=(self.component.pk,),
+            kwargs={},
+            priority=INTERACTIVE_TASK_PRIORITY,
+        )
+        background.apply_async.assert_called_once_with(
+            args=(self.component.pk,),
+            kwargs={},
+        )
+
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=False)
+    def test_component_save_prioritizes_only_explicit_acting_user(self) -> None:
+        actor = User.objects.create(username="interactive-actor")
+        with (
+            patch(
+                "weblate.trans.tasks.component_after_save.apply_async",
+                return_value=SimpleNamespace(id="component-task"),
+            ) as apply_async,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.component.acting_user = actor
+            self.component.name = "Interactive component"
+            self.component.save()
+            self.component.acting_user = None
+            self.component.name = "Background component"
+            self.component.save()
+
+        self.assertEqual(
+            apply_async.call_args_list[0].kwargs["priority"],
+            INTERACTIVE_TASK_PRIORITY,
+        )
+        self.assertNotIn("priority", apply_async.call_args_list[1].kwargs)
+
     def test_create_translations_queues_outside_celery_task(self) -> None:
         with (
             override_settings(CELERY_TASK_ALWAYS_EAGER=False),
@@ -1978,6 +2027,7 @@ class ComponentErrorTest(RepoTestCase):
 
         immediate.assert_not_called()
         queue_task.assert_called_once()
+        self.assertFalse(queue_task.call_args.kwargs["user_waiting"])
 
     def test_create_translations_runs_immediately_inside_celery_task(self) -> None:
         task = SimpleNamespace(request=SimpleNamespace(id="task-id"))
@@ -1989,7 +2039,7 @@ class ComponentErrorTest(RepoTestCase):
             patch.object(
                 self.component, "create_translations_immediate", return_value=True
             ) as immediate,
-            patch.object(self.component, "queue_background_task") as queue_task,
+            patch.object(self.component, "queue_background_task"),
         ):
             self.assertTrue(
                 self.component.create_translations(force=True, request=request)
@@ -2005,8 +2055,8 @@ class ComponentErrorTest(RepoTestCase):
             from_link=False,
             change=None,
             preserve_pending_units=False,
+            loc_kit_explanations=None,
         )
-        queue_task.assert_not_called()
 
     def test_create_translations_queues_after_celery_lock_timeout(self) -> None:
         task = SimpleNamespace(request=SimpleNamespace(id="task-id"))
@@ -2056,6 +2106,7 @@ class ComponentErrorTest(RepoTestCase):
                 "user_id": None,
                 "force_scan": False,
                 "previous_head": None,
+                "user_waiting": False,
             },
         )
         self.component.delete_commit_task()

@@ -61,7 +61,9 @@ class GitNoChangeProjectTest(ViewTestCase):
             self.assertGreaterEqual(queue_commit.call_count, 1)
             for call in queue_commit.call_args_list:
                 self.assertEqual(call.args[1], "commit")
-                self.assertEqual(call.kwargs, {"user_id": self.user.id})
+                self.assertEqual(
+                    call.kwargs, {"user_id": self.user.id, "user_waiting": True}
+                )
 
     def test_update(self) -> None:
         response = self.client.post(self.get_test_url("update"))

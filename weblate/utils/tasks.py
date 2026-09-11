@@ -32,6 +32,7 @@ from weblate.utils.commands import get_clean_env
 from weblate.utils.data import data_dir
 from weblate.utils.errors import add_breadcrumb, report_error
 from weblate.utils.lock import WeblateLockTimeoutError
+from weblate.utils.stats import run_parents_update
 from weblate.vcs.models import VCS_REGISTRY
 
 from .const import HEARTBEAT_FREQUENCY
@@ -86,22 +87,28 @@ def settings_backup() -> None:
     run_settings_backup()
 
 
-@app.task(trail=False)
-def update_translation_stats_parents(pk: int) -> None:
-    try:
-        translation = Translation.objects.get(pk=pk)
-    except Translation.DoesNotExist:
-        return
-    translation.stats.update_parents()
+@app.task(trail=False, bind=True)
+def update_translation_stats_parents(self, pk: int) -> None:
+    def calculate() -> None:
+        try:
+            translation = Translation.objects.get(pk=pk)
+        except Translation.DoesNotExist:
+            return
+        translation.stats.update_parents()
+
+    run_parents_update(self, pk, calculate)
 
 
-@app.task(trail=False)
-def update_language_stats_parents(pk: int) -> None:
-    try:
-        component = Component.objects.get(pk=pk)
-    except Component.DoesNotExist:
-        return
-    component.stats.update_language_stats_parents()
+@app.task(trail=False, bind=True)
+def update_language_stats_parents(self, pk: int) -> None:
+    def calculate() -> None:
+        try:
+            component = Component.objects.get(pk=pk)
+        except Component.DoesNotExist:
+            return
+        component.stats.update_language_stats_parents()
+
+    run_parents_update(self, pk, calculate)
 
 
 @app.task(trail=False)

@@ -75,7 +75,7 @@ from weblate.trans.models import Category, Component, Project
 from weblate.trans.models.loc_kit import LocKitImportDraft
 from weblate.trans.tasks import import_project_backup, perform_update
 from weblate.utils import messages
-from weblate.utils.celery import store_task_metadata
+from weblate.utils.celery import INTERACTIVE_TASK_PRIORITY, store_task_metadata
 from weblate.utils.licenses import LICENSE_URLS, detect_license
 from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.ratelimit import check_rate_limit, session_ratelimit_post
@@ -396,7 +396,13 @@ class CreateComponent(BaseCreateView):
     def warn_outdated(self, form) -> None:
         linked = form.instance.linked_component
         if linked:
-            perform_update.delay("Component", linked.pk, auto=True)
+            # The component-creation wizard waits on this update behind a
+            # progress bar, so it is published as interactive work.
+            perform_update.apply_async(
+                args=("Component", linked.pk),
+                kwargs={"auto": True},
+                priority=INTERACTIVE_TASK_PRIORITY,
+            )
             if linked.repo_needs_merge():
                 messages.warning(
                     self.request,

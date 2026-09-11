@@ -80,15 +80,17 @@ def execute_locked(
 def queue_commit(request: AuthenticatedHttpRequest, obj) -> bool:
     """Queue commit operation for browser requests."""
     user_id = request.user.id
+    # A browser commit is watched by a progress bar: it must not wait behind
+    # queued background housekeeping.
     if isinstance(obj, Project):
         for component in obj.all_repo_components:
-            component.queue_commit_pending("commit", user_id=user_id)
+            component.queue_commit_pending("commit", user_id=user_id, user_waiting=True)
     elif isinstance(obj, Translation):
         if not obj.needs_commit():
             return False
-        obj.component.queue_commit_pending("commit", user_id=user_id)
+        obj.component.queue_commit_pending("commit", user_id=user_id, user_waiting=True)
     else:
-        obj.queue_commit_pending("commit", user_id=user_id)
+        obj.queue_commit_pending("commit", user_id=user_id, user_waiting=True)
     return True
 
 
