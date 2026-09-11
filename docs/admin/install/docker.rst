@@ -934,6 +934,19 @@ Generic settings
         environment:
           WEBLATE_REQUIRE_LOGIN: 1
 
+.. envvar:: WEBLATE_REDIRECT_SINGLE_PROJECT_USER
+
+    Enables :setting:`REDIRECT_SINGLE_PROJECT_USER`, sending an
+    authenticated user with exactly one accessible project straight to
+    that project after sign in instead of showing the dashboard.
+
+    **Example:**
+
+    .. code-block:: yaml
+
+        environment:
+          WEBLATE_REDIRECT_SINGLE_PROJECT_USER: 1
+
 .. envvar:: WEBLATE_LEGAL_INTEGRATION
 
     Enables the :ref:`legal` module in Docker deployments.

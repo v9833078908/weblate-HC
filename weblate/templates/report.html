@@ -10,7 +10,7 @@
     </li>
   {% else %}
     <li class="breadcrumb-item">
-      <a href="{% url 'home' %}#reports">{% translate "Translation reports" %}</a>
+      <a href="{% url 'dashboard' %}#reports">{% translate "Translation reports" %}</a>
     </li>
   {% endif %}
   <li class="breadcrumb-item">{{ report.get_kind_display }}</li>

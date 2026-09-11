@@ -3190,6 +3190,30 @@ Example:
 
     SINGLE_PROJECT = "test"
 
+.. setting:: REDIRECT_SINGLE_PROJECT_USER
+
+REDIRECT_SINGLE_PROJECT_USER
+----------------------------
+
+.. versionadded:: 2026.8.1
+
+Redirects an authenticated user with exactly one accessible project
+directly to that project after sign in, instead of showing the
+dashboard. The check is based on the projects the user can access
+through the ACL: public, protected and explicitly granted private
+projects. Users with no or several accessible projects, and anonymous
+users, still get the dashboard.
+
+``SINGLE_PROJECT`` takes precedence over this setting, and
+``/dashboard/`` always renders the dashboard without applying the
+redirect.
+
+Example:
+
+.. code-block:: python
+
+    REDIRECT_SINGLE_PROJECT_USER = True
+
 .. setting:: SSH_EXTRA_ARGS
 
 SSH_EXTRA_ARGS

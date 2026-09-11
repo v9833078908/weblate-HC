@@ -8,6 +8,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 
 from weblate.accounts.models import Profile
+from weblate.auth.models import setup_project_groups
 from weblate.lang.models import Language
 from weblate.trans.models import Announcement, ComponentList, Project
 from weblate.trans.models.component import translation_prefetch_tasks
@@ -257,3 +258,96 @@ class DashboardTest(FixtureTestCase):
         self.client.logout()
         response = self.client.get(reverse("home"))
         self.assertRedirects(response, "/accounts/login/?next=/projects/test/")
+
+    @override_settings(REDIRECT_SINGLE_PROJECT_USER=True)
+    def test_single_allowed_project_redirect(self) -> None:
+        # The fixture user has exactly one accessible (public) project
+        response = self.client.get(reverse("home"))
+        self.assertRedirects(response, self.project.get_absolute_url())
+
+    @override_settings(REDIRECT_SINGLE_PROJECT_USER=True)
+    def test_single_allowed_project_anonymous(self) -> None:
+        # The rule only applies to authenticated users; anonymous still
+        # gets the anonymous dashboard, not a redirect or an error.
+        self.client.logout()
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, "Browse 1 project")
+
+    @override_settings(SINGLE_PROJECT=True, REDIRECT_SINGLE_PROJECT_USER=True)
+    def test_single_project_takes_precedence(self) -> None:
+        # SINGLE_PROJECT redirects straight to the component; the newer
+        # per-user rule must not override that target.
+        response = self.client.get(reverse("home"))
+        self.assertRedirects(response, self.component.get_absolute_url())
+
+    @override_settings(REDIRECT_SINGLE_PROJECT_USER=True)
+    def test_single_allowed_project_two_projects(self) -> None:
+        # The fixture project becomes private with granted access
+        self.project.access_control = Project.ACCESS_PRIVATE
+        self.project.save()
+        setup_project_groups(Project, self.project, created=False)
+        self.project.add_user(self.user, "Translate")
+        # A second private project with a real granted role
+        second_project = Project.objects.create(
+            name="Second", slug="second", access_control=Project.ACCESS_PRIVATE
+        )
+        setup_project_groups(Project, second_project, created=False)
+        second_project.add_user(self.user, "Translate")
+        self.user.clear_permissions_cache()
+
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "No projects available")
+
+    @override_settings(REDIRECT_SINGLE_PROJECT_USER=True)
+    def test_single_allowed_project_none(self) -> None:
+        # The only project becomes private, user has no role in it
+        self.project.access_control = Project.ACCESS_PRIVATE
+        self.project.save()
+        setup_project_groups(Project, self.project, created=False)
+        self.user.clear_permissions_cache()
+
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No projects available")
+        self.assertNotContains(
+            response, "Choose what languages you want in the preferences"
+        )
+
+    @override_settings(REDIRECT_SINGLE_PROJECT_USER=True)
+    def test_single_allowed_project_superuser(self) -> None:
+        # A superuser with two projects stays on the dashboard
+        Project.objects.create(name="Second", slug="second")
+        self.user.is_superuser = True
+        self.user.save()
+        self.user.clear_permissions_cache()
+
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+
+    @override_settings(REDIRECT_SINGLE_PROJECT_USER=True)
+    def test_dashboard_never_redirects(self) -> None:
+        # The single-project rule applies to /, not to /dashboard/
+        response = self.client.get(reverse("home"))
+        self.assertRedirects(response, self.project.get_absolute_url())
+
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("dashboard"))
+
+    @override_settings(REDIRECT_SINGLE_PROJECT_USER=True)
+    def test_login_lands_on_single_project(self) -> None:
+        self.client.logout()
+        response = self.client.post(
+            reverse("login"),
+            {"username": "testuser", "password": "testpassword"},
+            follow=True,
+        )
+        self.assertEqual(
+            response.redirect_chain,
+            [
+                (reverse("home"), 302),
+                (self.project.get_absolute_url(), 302),
+            ],
+        )
+        self.assertEqual(response.status_code, 200)

@@ -849,6 +849,12 @@ REQUIRE_LOGIN = get_env_bool(
     "WEBLATE_REQUIRE_LOGIN", trans_defaults.DEFAULT_REQUIRE_LOGIN
 )
 
+# Redirect authenticated users with exactly one accessible project to it
+REDIRECT_SINGLE_PROJECT_USER = get_env_bool(
+    "WEBLATE_REDIRECT_SINGLE_PROJECT_USER",
+    trans_defaults.DEFAULT_REDIRECT_SINGLE_PROJECT_USER,
+)
+
 PUBLIC_ENGAGE = get_env_bool(
     "WEBLATE_PUBLIC_ENGAGE", trans_defaults.DEFAULT_PUBLIC_ENGAGE
 )

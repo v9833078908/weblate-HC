@@ -40,6 +40,9 @@ WEBLATE_ADMIN_EMAIL=loc@herocraft.example
 WEBLATE_ADMIN_PASSWORD=CHANGE-ME
 WEBLATE_REGISTRATION_OPEN=0
 WEBLATE_REQUIRE_LOGIN=1
+# Send a user with exactly one accessible project straight to that project
+# after login or on logo click; the dashboard stays at /dashboard/.
+WEBLATE_REDIRECT_SINGLE_PROJECT_USER=1
 # New projects start as Private: access must be granted explicitly under
 # Manage → Access control. 100 = Project.ACCESS_PRIVATE.
 WEBLATE_DEFAULT_ACCESS_CONTROL=100

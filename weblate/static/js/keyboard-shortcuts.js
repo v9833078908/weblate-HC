@@ -28,6 +28,61 @@
     showShortcutsModal();
   });
 
+  // Match the "/" character directly rather than binding via hotkeys-js
+  document.addEventListener("keydown", (event) => {
+    if (
+      event.key !== "/" ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.shiftKey ||
+      event.defaultPrevented
+    ) {
+      return;
+    }
+    const target = event.target || event.srcElement;
+    const tagName = target.tagName.toLowerCase();
+    if (
+      tagName === "input" ||
+      tagName === "textarea" ||
+      tagName === "select" ||
+      target.isContentEditable
+    ) {
+      return;
+    }
+    event.preventDefault();
+
+    // Open the existing search tab in the current scope
+    const searchTab = document.querySelector('a[data-bs-target="#search"]');
+    const searchPane =
+      searchTab !== null
+        ? document.querySelector(searchTab.dataset.bsTarget)
+        : null;
+    const searchInput =
+      searchPane !== null ? searchPane.querySelector('[name="q"]') : null;
+    if (
+      searchTab !== null &&
+      searchTab.offsetParent !== null &&
+      searchInput !== null
+    ) {
+      if (searchTab.classList.contains("active")) {
+        searchInput.focus();
+      } else {
+        searchTab.addEventListener("shown.bs.tab", () => searchInput.focus(), {
+          once: true,
+        });
+        bootstrap.Tab.getOrCreateInstance(searchTab).show();
+      }
+      return;
+    }
+
+    // Fall back to the global string search
+    const stringSearchUrl = document.body.dataset.stringSearchUrl;
+    if (stringSearchUrl) {
+      window.location.href = stringSearchUrl;
+    }
+  });
+
   document
     .getElementById("shortcuts-btn")
     ?.addEventListener("click", showShortcutsModal);

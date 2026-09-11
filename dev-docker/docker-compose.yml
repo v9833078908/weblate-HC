@@ -136,6 +136,8 @@ services:
       WEBLATE_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_1: ''
       WEBLATE_JUDGE_FALLBACK_RESPONSE_FORMAT_SEAT_2: ''
       WEBLATE_LLM_USAGE_LOG_RETENTION_DAYS: 90
+      # Send a user with exactly one accessible project straight to it
+      WEBLATE_REDIRECT_SINGLE_PROJECT_USER: 1
     env_file:
     - ./environment
     ports:

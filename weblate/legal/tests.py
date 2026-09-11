@@ -208,6 +208,8 @@ class LegalTest(TestCase, RegistrationTestMixin):
         request = HttpRequest()
         request.META["REMOTE_ADDR"] = "127.0.0.1"
         user.agreement.make_current(request)
-        # Homepage now should work
+        # Homepage now should work; this test user has no accessible
+        # project, so the dashboard shows the empty state rather than
+        # tabs like "Suggested translations".
         response = self.client.get(reverse("home"), follow=True)
-        self.assertContains(response, "Suggested translations")
+        self.assertContains(response, "No projects available")

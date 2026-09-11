@@ -88,6 +88,7 @@ if URL_PREFIX:
 
 real_patterns = [
     path("", weblate.trans.views.dashboard.home, name="home"),
+    path("dashboard/", weblate.trans.views.dashboard.dashboard, name="dashboard"),
     path("projects/", weblate.trans.views.basic.list_projects, name="projects"),
     path(
         "workspaces/",

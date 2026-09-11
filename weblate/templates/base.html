@@ -80,7 +80,8 @@
 
   </head>
 
-  <body {% if LANGUAGE_BIDI %}class="dir-rtl"{% endif %}>
+  <body {% if LANGUAGE_BIDI %}class="dir-rtl"{% endif %}
+        data-string-search-url="{% url 'search' %}">
     <div id="popup-toasts" class="toast-container"></div>
     <header>
       <nav class="navbar navbar-expand-lg bg-dark" role="navigation">
@@ -101,7 +102,7 @@
           <div class="collapse navbar-collapse" id="wl-navbar-main">
             <ul class="navbar-nav">
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'home' %}">{% translate "Dashboard" %}</a>
+                <a class="nav-link" href="{% url 'dashboard' %}">{% translate "Dashboard" %}</a>
               </li>
               <li class="nav-item dropdown">
                 <a class="nav-link dropdown-toggle"
@@ -219,31 +220,6 @@
               {% endwith %}
             </ul>
             <ul class="navbar-nav ms-auto">
-
-              {# Jump-to box: navigates to objects and opens string search #}
-              <li class="nav-item d-lg-none" id="sitewide-search-item">
-                <form class="navbar-form" id="sitewide-search-form" role="search">
-                  <label class="visually-hidden" for="sitewide-search">{% translate "Jump to a project or component" %}</label>
-                  <input type="search"
-                         class="form-control"
-                         id="sitewide-search"
-                         autocomplete="off"
-                         placeholder="{% translate "Jump to a project or component" %}"
-                         data-search-url="{% if component %}{% url 'search' path=component.get_url_path %}{% elif project %}{% url 'search' path=project.get_url_path %}{% else %}{% url 'search' %}{% endif %}">
-                </form>
-              </li>
-              <li class="nav-item d-none d-lg-block">
-                <a class="nav-link button"
-                   href="#"
-                   role="button"
-                   id="sitewide-search-toggle"
-                   aria-expanded="false"
-                   aria-controls="sitewide-search"
-                   title="{% translate "Jump to a project or component" %}">
-                  {% icon "magnify.svg" %}
-                  <span class="visually-hidden">{% translate "Jump to a project or component" %}</span>
-                </a>
-              </li>
 
               {# Superuser link to admin #}
               {% if user %}
@@ -464,7 +440,7 @@
             <li class="bread-icon">{% icon bread_image|default:"error.svg" %}</li>
             {% block breadcrumbs %}
               <li class="breadcrumb-item">
-                <a href="{% url 'home' %}">{% translate "Dashboard" %}</a>
+                <a href="{% url 'dashboard' %}">{% translate "Dashboard" %}</a>
               </li>
             {% endblock breadcrumbs %}
 
