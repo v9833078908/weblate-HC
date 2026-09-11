@@ -6,13 +6,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Продюсерские задачи переживают перезапуск сервиса
 
-**Дата:** 2026-09-11. **Статус:** реализован в ветке
-`feat/producer-tasks-survive-deploy` (worktree
-`.worktrees/producer-tasks-survive-deploy`); не смержен в `main`, деплой не
-одобрен. См. «Результаты реализации» перед «Риски и восстановление»: один
-критерий проверки Задачи 1 (реальный `docker compose restart weblate`
-integration-smoke) остаётся не выполнен и требует отдельного одобрения на
-перезапуск общего dev-стека.
+**Дата:** 2026-09-11. **Статус:** реализован и смержен в `main`
+(`9574d9e`, merge `2d03c67`); интеграционный smoke Задачи 1 выполнен на живом
+dev-стеке (см. проверку 3 ниже: `Restoring 1 unacknowledged message(s)`,
+повторная доставка того же task id, `attempt: 2`, ноль перезаписанных строк).
+Деплой в production не производился и требует отдельного `DEPLOY-OK`.
+Открытыми остаются два уточняющих критерия: mass-fix-половина проверки 3
+(прогон короче сигнала на текущей фикстуре) и Selenium-тест liveness
+(в окружении нет браузерного бинарника).
 
 ## Цель и выбранные решения
 
@@ -183,18 +184,37 @@ upstream-файл `/etc/supervisor/conf.d/celery-translate.conf` имеет от
    `readlink -f` на симлинках в `/run/supervisor.conf.d/` резолвится в эти же
    файлы — эффективный конфиг совпадает. Throwaway-образ удалён после
    проверки (`docker rmi`).
-3. [ ] **Не выполнено.** Реальный
-   `docker compose -f dev-docker/docker-compose.yml restart weblate` требует
-   перезапуска общего dev-стека, что по `AGENTS.md` («Never deploy without
-   explicit approval» → «rebuilding or restarting the shared dev-docker stack
-   through `./rundev.sh`») требует отдельного одобрения. Кроме того, текущий
-   контейнер `dev-docker-weblate-1` монтирует `/app/src` из главного checkout,
-   а не из этого worktree — интеграционный smoke там проверил бы старый код,
-   не эту реализацию; перед выполнением проверки 3 нужен либо мерж в `main` и
-   пересборка стека, либо отдельный стек, смонтированный на этот worktree.
-   Пункты 1 и 2 подтверждают механизм (redelivery на обеих очередях, effective
-   config); пункт 3 подтверждает end-to-end поведение реальной задачи и
-   остаётся открытым критерием приёмки.
+3. [x] **Выполнено 2026-09-11 на живом dev-стеке** (после мержа в `main`,
+   `WEBLATE_PORT=3001 ./rundev.sh`, код этой реализации в контейнере).
+   Эффективный конфиг работающего контейнера:
+   `/run/supervisor.conf.d/celery-{translate,celery}.conf` содержат
+   `stopsignal=QUIT`/`stopwaitsecs=60`, остальные программы — нет;
+   `settings.CELERY_WORKER_SOFT_SHUTDOWN_TIMEOUT == 20`.
+   Интеграционный smoke `auto_translate` (translation 124,
+   space-arena/game-strings/it, 4826 строк `state:empty`, `auto_source=mt`
+   через локальный `weblate-translation-memory`): задача опубликована как в
+   view (metadata + liveness + `apply_async(task_id=..., priority=0)`),
+   прервана реальным `docker compose -f dev-docker/docker-compose.yml
+   restart weblate` в момент работы. Результат в логах: `worker: Cold
+   shutdown` → `Restoring 1 unacknowledged message(s)` (16:06:00), тот же
+   task id получен **дважды** — 16:05:31 и 16:07:22 после подъёма нового
+   воркера; `LLEN translate == 0`, `HLEN unacked == 0`. Liveness-запись
+   показала `attempt: 2` c обновлённым heartbeat. Задача завершилась
+   `SUCCESS` («2595 строк были обновлены» во второй попытке). Ключевая
+   проверка неперезаписи: 4053 `Change(action=AUTO)` с момента публикации на
+   4053 **различных** юнита — ни одна уже сохранённая строка не записана
+   повторно, оставшиеся обработаны.
+   Частично: mass-fix-половина пункта не поддалась прерыванию на этой
+   фикстуре. Реальные прогоны `fix_failing_checks` (project scope,
+   `end_stop`: space-arena 990, col4 404, pirate-ships 2091) укладываются в
+   ~4 с и завершались раньше, чем до них доходил сигнал; после них
+   `lock_key` корректно освобождён (`cache.get(lock_key) is None`), payload
+   `{"status": "completed", "fixed": 145, "manual": 1946}`, дублирующих
+   изменений нет. Механизм redelivery для очереди `celery` при этом
+   подтверждён отдельно сценарием `quit_late_celery` пробы; специфичное для
+   mass fix поведение при redelivery (владение `lock_key` второй доставкой)
+   остаётся непроверенным вживую — нужна фикстура с прогоном длиннее
+   ~30 с.
 
 ## Задача 2. Сделать статус и счётчик пользовательской задачи правдивыми
 
@@ -329,10 +349,11 @@ Queued сообщения `translate` только отображаются: Red
   temp git checkout, git/gateway/ssh полностью застаблены). 8/8 assertions
   passed.
 - [x] `shellcheck deploy/vps.sh` зелёный (0 findings).
-- [ ] **Не выполнено.** Dev smoke с активным `auto_translate` против реального
-  общего dev-стека — тот же блокер, что и Задача 1 проверка 3: требует
-  одобренного перезапуска общего `dev-docker` стека и/или отдельного стека,
-  смонтированного на этот worktree.
+- [ ] Частично. Полный dev smoke именно через `./deploy/vps.sh` не проводился:
+  скрипт ходит на production-VPS через VPN-шлюз, а его локальный аналог —
+  fixture-тест выше. Половина, которую этот smoke должен был доказать
+  (перезапуск контейнера восстанавливает активную задачу без ручного Redis
+  restore), подтверждена напрямую в Задаче 1, проверке 3 на живом dev-стеке.
 
 ## Задача 4. Документация и совместная приёмка
 
@@ -367,22 +388,37 @@ Queued сообщения `translate` только отображаются: Red
 
 ## Результаты реализации
 
-Реализовано полностью, кроме двух связанных пунктов, требующих одобренного
-перезапуска общего `dev-docker` стека (или отдельного стека, смонтированного
-на этот worktree): Задача 1 проверка 3 (реальный `docker compose restart
-weblate` integration-smoke) и производный от неё Задача 3/4 dev smoke.
-Селениум-тест `test_task_liveness_renders_as_aria_live_text` написан по
-принятому паттерну, синтаксически и через `ruff` проверен, но не выполнен —
-в этом окружении нет браузерного бинарника ни на хосте, ни в контейнере.
-`docs/specs/openapi.yaml` перегенерирован (`make -C docs update-openapi`
-эквивалент) и включает новое поле `TaskSerializer.liveness`; заодно
-синхронизирован предсуществующий дрейф (action-коды 105/106, `SITE_TITLE`),
-не связанный с этим изменением, но необходимый для точного соответствия
-CI-проверке `git diff --exit-code`.
+Реализовано и смержено в `main`: implementation commit `9574d9e`, merge
+`2d03c67` (работа велась в worktree `.worktrees/producer-tasks-survive-deploy`,
+ветка `feat/producer-tasks-survive-deploy`, после мержа удалена).
 
-Реализация выполнена в отдельном worktree
-(`.worktrees/producer-tasks-survive-deploy`, ветка
-`feat/producer-tasks-survive-deploy`); commit `9574d9e`.
+Подтверждено на живом dev-стеке 2026-09-11 (см. Задача 1, проверка 3):
+cold shutdown восстанавливает неподтверждённое сообщение
+(`Restoring 1 unacknowledged message(s)`), тот же task id доставляется
+повторно, liveness-запись переходит в `attempt: 2`, и ни одна уже
+сохранённая строка не переписывается (4053 изменения на 4053 различных
+юнита). Эффективный supervisor-конфиг работающего контейнера содержит
+`stopsignal=QUIT`/`stopwaitsecs=60` ровно на `celery-translate` и
+`celery-celery`.
+
+Остаются непроверенными вживую два уточняющих пункта:
+
+- mass-fix-половина проверки 3: `fix_failing_checks` на текущей dev-фикстуре
+  отрабатывает за ~4 с и успевает завершиться раньше сигнала, поэтому
+  поведение его `lock_key` при redelivery не наблюдалось. Нормальный путь
+  проверен (145 исправлений, lock освобождён, дублей нет), а redelivery для
+  очереди `celery` — сценарием `quit_late_celery` транспортной пробы;
+- Selenium-тест `test_task_liveness_renders_as_aria_live_text` написан по
+  принятому паттерну и проходит `ruff`, но не выполнен: в окружении нет
+  браузерного бинарника ни на хосте, ни в контейнере.
+
+`docs/specs/openapi.yaml` перегенерирован (эквивалент
+`make -C docs update-openapi`) и включает новое поле
+`TaskSerializer.liveness`; заодно синхронизирован предсуществующий дрейф
+(action-коды 105/106, `SITE_TITLE`), необходимый для CI-проверки
+`git diff --exit-code`.
+
+Production-деплой не производился и требует отдельного `DEPLOY-OK`.
 
 `docs/security/threat-model.rst` в этой версии не меняется: новый публичный
 endpoint, permission или mutation не добавляется. Любое возвращение replay
