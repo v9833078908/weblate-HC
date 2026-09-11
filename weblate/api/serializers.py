@@ -3085,6 +3085,30 @@ class StatisticsSerializer(ReadOnlySerializer):
         return result
 
 
+class CheckCountSerializer(ReadOnlySerializer):
+    check = serializers.CharField(help_text="Check identifier.")
+    name = serializers.CharField(help_text="Human readable check name.")
+    advisory = serializers.BooleanField(
+        help_text="Whether the check is advisory (reported, but not a defect on its own)."
+    )
+    strings = serializers.IntegerField()
+    words = serializers.IntegerField()
+    chars = serializers.IntegerField()
+
+
+class ChecksSummarySerializer(ReadOnlySerializer):
+    failing = serializers.IntegerField(
+        help_text="Strings with at least one active check."
+    )
+    failing_blocking = serializers.IntegerField(
+        help_text="Strings with at least one active non-advisory check."
+    )
+    failing_advisory = serializers.IntegerField(
+        help_text="Strings whose active checks are all advisory."
+    )
+    checks = CheckCountSerializer(many=True)
+
+
 class UserStatisticsSerializer(ReadOnlySerializer):
     translated = serializers.IntegerField()
     suggested = serializers.IntegerField()
@@ -3422,6 +3446,12 @@ class UnitSerializer(serializers.ModelSerializer[Unit]):
     last_updated = serializers.DateTimeField(read_only=True)
     pending = serializers.BooleanField(source="has_pending_changes", read_only=True)
     labels = UnitLabelsSerializer(many=True)
+    checks = serializers.ListField(
+        source="failing_check_names",
+        child=serializers.CharField(),
+        read_only=True,
+        help_text="Identifiers of the active (not dismissed) failing checks.",
+    )
 
     class Meta:
         model = Unit
@@ -3446,6 +3476,7 @@ class UnitSerializer(serializers.ModelSerializer[Unit]):
             "has_suggestion",
             "has_comment",
             "has_failing_check",
+            "checks",
             "num_words",
             "source_unit",
             "priority",

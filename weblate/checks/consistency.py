@@ -309,6 +309,12 @@ class RepeatDriftCheck(TargetCheck, BatchCheckMixin):
     batch_project_wide = True
     skip_suggestions = True
     batch_limit = 200
+    # Fires on every member of a repeat group, including the correct one, so
+    # a drifting pair always reports at least one false positive by design.
+    # Already excluded from the MT prompt (weblate/machinery/llm.py) and from
+    # the judge evidence (weblate/trans/judge_loop.py); the same reasoning
+    # keeps it out of the blocking failing count.
+    advisory = True
 
     def get_repeat_members(self, units: Iterable[Unit]) -> list[Unit]:
         """Exclude only members which explicitly ignore the check."""

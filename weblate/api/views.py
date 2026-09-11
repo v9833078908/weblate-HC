@@ -76,6 +76,7 @@ from weblate.api.serializers import (
     BooleanResultSerializer,
     CategorySerializer,
     ChangeSerializer,
+    ChecksSummarySerializer,
     CommentSerializer,
     ComponentLinkRequestSerializer,
     ComponentListSerializer,
@@ -135,6 +136,7 @@ from weblate.auth.models import Group, Role, TeamMembership, User
 from weblate.auth.results import PermissionResult
 from weblate.auth.utils import validate_team_assignable_user
 from weblate.checks.flags import GLOSSARY_LANGUAGE_SCOPED_FLAGS, Flags
+from weblate.checks.models import checks_summary
 from weblate.configuration.models import Setting, SettingCategory
 from weblate.formats.models import EXPORTERS
 from weblate.lang.forms import validate_language_code
@@ -2047,6 +2049,27 @@ class ProjectViewSet(
         return Response(serializer.data)
 
     @extend_schema(
+        description="Return failing checks of the project broken down by "
+        "check, split into blocking and advisory tiers.",
+        methods=["get"],
+        tags=["projects", "statistics"],
+        responses=ChecksSummarySerializer,
+    )
+    @action(detail=True, methods=["get"])
+    def checks(self, request: Request, **kwargs):
+        obj = self.get_object()
+
+        serializer = ChecksSummarySerializer(
+            checks_summary(
+                obj.stats,
+                Unit.objects.filter(translation__component__project=obj),
+            ),
+            context={"request": request},
+        )
+
+        return Response(serializer.data)
+
+    @extend_schema(
         description="Return translation metrics for a project.",
         methods=["get"],
         tags=["projects", "metrics"],
@@ -2904,6 +2927,24 @@ class ComponentViewSet(
         return self.get_paginated_response(serializer.data)
 
     @extend_schema(
+        description="Return failing checks of the component broken down by "
+        "check, split into blocking and advisory tiers.",
+        methods=["get"],
+        tags=["components", "statistics"],
+        responses=ChecksSummarySerializer,
+    )
+    @action(detail=True, methods=["get"])
+    def checks(self, request: Request, **kwargs):
+        obj = self.get_object()
+
+        serializer = ChecksSummarySerializer(
+            checks_summary(obj.stats, Unit.objects.filter(translation__component=obj)),
+            context={"request": request},
+        )
+
+        return Response(serializer.data)
+
+    @extend_schema(
         description="Return a list of component changes.",
         methods=["get"],
         responses=ChangeSerializer(many=True),
@@ -3499,6 +3540,24 @@ class TranslationViewSet(MultipleFieldViewSet, DestroyModelMixin, AnnouncementsM
         obj = self.get_object()
 
         serializer = StatisticsSerializer(obj, context={"request": request})
+
+        return Response(serializer.data)
+
+    @extend_schema(
+        description="Return failing checks broken down by check, split into "
+        "blocking and advisory tiers.",
+        methods=["get"],
+        tags=["translations", "statistics"],
+        responses=ChecksSummarySerializer,
+    )
+    @action(detail=True, methods=["get"])
+    def checks(self, request: Request, **kwargs):
+        obj = self.get_object()
+
+        serializer = ChecksSummarySerializer(
+            checks_summary(obj.stats, obj.unit_set.all()),
+            context={"request": request},
+        )
 
         return Response(serializer.data)
 

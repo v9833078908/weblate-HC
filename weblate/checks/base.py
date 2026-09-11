@@ -73,6 +73,9 @@ class BaseCheck(ClassLoaderProtocol, DocVersionsMixin):
     default_disabled = False
     propagates: Literal["source", "target", "repeat"] | None = None
     param_type: Callable[[tuple[str, ...]], Any] | None = None
+    # A parametrized check whose parameter is optional: the bare enable flag
+    # turns the check on with its own defaults, a value overrides them.
+    param_optional = False
     always_display = False
     batch_project_wide = False
     skip_suggestions = False
@@ -80,6 +83,12 @@ class BaseCheck(ClassLoaderProtocol, DocVersionsMixin):
     # Mass-fix tier (docs/product/plans/2026-08-25-mass-fix-failing-checks.md).
     # Set explicitly on concrete classes; never inferred from get_fixup.
     mass_fixup: Literal["safe", "review"] | None = None
+    # Severity tier. An advisory check reports something worth a look that is
+    # not by itself a defect - typically a check with group-wide semantics,
+    # which fires on every member of a group including the correct one. Such
+    # a check dominates the raw failing count and buries blocking findings,
+    # so counts are reported split by this attribute.
+    advisory = False
 
     def get_identifier(self) -> str:
         return self.check_id

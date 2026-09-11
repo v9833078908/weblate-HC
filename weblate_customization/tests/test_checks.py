@@ -784,6 +784,28 @@ class GameLengthCheckTest(CheckTestCase):
     def test_an_empty_target_passes(self) -> None:
         self.assertFalse(self.check.check_single("Claim reward", "", None))
 
+    def test_is_opt_in(self) -> None:
+        # Without the flag the check never runs: on a dialogue-heavy
+        # component a character-count proxy reports mostly ordinary text.
+        overflowing = make_unit(
+            source="Claim reward",
+            target="Reclamar recompensa garantizada ahora mismo",
+        )
+        self.assertTrue(self.check.should_skip(overflowing))
+        enabled = make_unit(
+            source="Claim reward",
+            target="Reclamar recompensa garantizada ahora mismo",
+            flags="game-length",
+        )
+        self.assertFalse(self.check.should_skip(enabled))
+        self.assertFalse(self.check.should_skip(make_unit(flags="game-length:120")))
+
+    def test_budget_parameter_is_optional(self) -> None:
+        # The bare flag has to pass Flags.validate() in the component
+        # settings form; a parametrized check whose parameter is mandatory
+        # is rejected there, which would make the check unreachable.
+        self.assertTrue(self.check.param_optional)
+
     def test_stated_budget_is_relative_to_each_source(self) -> None:
         # One flag value, a different character budget per string: 110% of a
         # 9-character source is 9.9, of a 19-character one 20.9.

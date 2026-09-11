@@ -2,12 +2,16 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+from unittest import mock
+
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 from django.utils.translation import override
 from lxml import etree
 
+from weblate.checks import flags as flags_module
 from weblate.checks.flags import (
+    OPTIONAL_VALUE_FLAGS,
     TYPED_FLAGS,
     TYPED_FLAGS_ARGS,
     Flags,
@@ -15,6 +19,7 @@ from weblate.checks.flags import (
     get_auto_flag_names,
     get_flag_choices,
 )
+from weblate.checks.parser import single_value_flag
 from weblate.formats.helpers import NamedBytesIO
 from weblate.formats.ttkit import PoFormat
 from weblate.trans.defines import VARIANT_KEY_LENGTH
@@ -165,6 +170,29 @@ class FlagTest(SimpleTestCase):
         with self.assertRaises(ValidationError):
             Flags("invalid-check-name:1").validate()
         Flags("ignore-max-length").validate()
+
+    def test_validate_optional_value(self) -> None:
+        # A check whose parameter is optional accepts the bare enable flag;
+        # without that, an opt-in parametrized check cannot be turned on at
+        # all, because the form rejects the flag with no value.
+        name = "optional-budget"
+        with (
+            mock.patch.dict(TYPED_FLAGS, {name: "Optional budget"}),
+            mock.patch.dict(TYPED_FLAGS_ARGS, {name: single_value_flag(int)}),
+            mock.patch.object(
+                flags_module, "OPTIONAL_VALUE_FLAGS", {*OPTIONAL_VALUE_FLAGS, name}
+            ),
+        ):
+            Flags(name).validate()
+            Flags(f"{name}:120").validate()
+            with self.assertRaises(ValidationError):
+                Flags(f"{name}:abc").validate()
+        with (
+            mock.patch.dict(TYPED_FLAGS, {name: "Optional budget"}),
+            mock.patch.dict(TYPED_FLAGS_ARGS, {name: single_value_flag(int)}),
+            self.assertRaises(ValidationError),
+        ):
+            Flags(name).validate()
 
     def test_typed(self) -> None:
         self.assertEqual(TYPED_FLAGS.keys(), TYPED_FLAGS_ARGS.keys())

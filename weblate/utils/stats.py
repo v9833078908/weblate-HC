@@ -1059,6 +1059,29 @@ class AggregatingStats(BaseStats):
             )
         ]
 
+    def calculate_by_name(self, name: str) -> None:
+        super().calculate_by_name(name)
+        if name.startswith("check:"):
+            self.calculate_checks()
+
+    def aggregate_stats(self, keys: Iterable[str]) -> None:
+        self.ensure_loaded()
+        all_stats: list[BaseStats] = self.aggregated_stats
+        suffixes: tuple[str, ...] = ("", "_words", "_chars")
+        for key in keys:
+            for suffix in suffixes:
+                name = f"{key}{suffix}"
+                # The attribute might be missing in some corner cases such as
+                # when component is shared in different project and calculating
+                # label stats.
+                values = (getattr(stats_obj, name, 0) for stats_obj in all_stats)
+                self.store(name, sum(values))
+        self.save()
+
+    def calculate_checks(self) -> None:
+        """Prefetch check stats."""
+        self.aggregate_stats(check.url_id for check in CHECKS.values())
+
     def _calculate_basic(self) -> None:
         stats = zero_stats(self.basic_keys)
         all_stats: list[BaseStats] = self.aggregated_stats
@@ -1396,28 +1419,8 @@ class ProjectLanguage(BaseURLMixin, TranslationChecklistMixin):
 class ChecklistStats(SingleLanguageStats):
     def calculate_by_name(self, name: str) -> None:
         super().calculate_by_name(name)
-        if name.startswith("check:"):
-            self.calculate_checks()
-        elif name.startswith("label:"):
+        if name.startswith("label:"):
             self.calculate_labels()
-
-    def aggregate_stats(self, keys: Iterable[str]) -> None:
-        self.ensure_loaded()
-        all_stats: list[BaseStats] = self.aggregated_stats
-        suffixes: tuple[str, ...] = ("", "_words", "_chars")
-        for key in keys:
-            for suffix in suffixes:
-                name = f"{key}{suffix}"
-                # The attribute might be missing in some corner cases such as
-                # when component is shared in different project and calculating
-                # label stats.
-                values = (getattr(stats_obj, name, 0) for stats_obj in all_stats)
-                self.store(name, sum(values))
-        self.save()
-
-    def calculate_checks(self) -> None:
-        """Prefetch check stats."""
-        self.aggregate_stats(check.url_id for check in CHECKS.values())
 
     def calculate_labels(self) -> None:
         """Prefetch check stats."""

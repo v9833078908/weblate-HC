@@ -37,9 +37,16 @@ FRENCH_PUNCTUATION_FIXUP_RE_NBSP = (
 FRENCH_PUNCTUATION_FIXUP_RE_NNBSP = (
     f"([ \xa0\u2009])([{''.join(FRENCH_PUNCTUATION_NNBSP)}])"
 )
-FRENCH_PUNCTUATION_MISSING_RE_NBSP = f"([^\xa0])([{''.join(FRENCH_PUNCTUATION_NBSP)}])"
+# The fixups insert the space in front of a run, never inside it: a character
+# of the run itself is excluded from the "what precedes" class, so "Quoi?!"
+# becomes "Quoi\u202f?!" and not "Quoi\u202f?\u202f!".
+FRENCH_PUNCTUATION_MISSING_RE_NBSP = (
+    f"([^\xa0{''.join(sorted(FRENCH_PUNCTUATION))}])"
+    f"([{''.join(FRENCH_PUNCTUATION_NBSP)}])"
+)
 FRENCH_PUNCTUATION_MISSING_RE_NNBSP = (
-    f"([^\u202f])([{''.join(FRENCH_PUNCTUATION_NNBSP)}])"
+    f"([^\u202f{''.join(sorted(FRENCH_PUNCTUATION))}])"
+    f"([{''.join(FRENCH_PUNCTUATION_NNBSP)}])"
 )
 MARKDOWN_IMAGE_MARKER = re.compile(r"!\[")
 MY_QUESTION_MARK = "\u1038\u104b"
@@ -1190,24 +1197,32 @@ class PunctuationSpacingCheck(TargetCheck):
             if current_range is not None and current_range[0] <= i < current_range[1]:
                 continue
             if char in FRENCH_PUNCTUATION:
+                # A run of double punctuation ("?!", "!!") takes the space in
+                # front of the whole run, so the run is evaluated as one unit:
+                # spacing is required before its first character, and what
+                # follows is looked up after its last one. Evaluating each
+                # character on its own silently accepted "Quoi?!", because the
+                # "?" is not followed by a space and the "!" is preceded by
+                # punctuation.
+                if i > 0 and target[i - 1] in FRENCH_PUNCTUATION:
+                    continue
                 if i == 0:
                     # Trigger if punctuation at beginning of the string
                     if char not in punctuation:
                         punctuation.append(char)
                     continue
+                end = i
+                while end + 1 < total and target[end + 1] in FRENCH_PUNCTUATION:
+                    end += 1
                 if (
-                    i + 1 < total
-                    and unicodedata.category(target[i + 1])
+                    end + 1 < total
+                    and unicodedata.category(target[end + 1])
                     not in FRENCH_PUNCTUATION_SPACING
                 ):
                     # Ignore when not followed by space or open/close bracket
                     continue
                 prev_char = target[i - 1]
-                if (
-                    prev_char not in whitespace
-                    and prev_char not in FRENCH_PUNCTUATION
-                    and char not in punctuation
-                ):
+                if prev_char not in whitespace and char not in punctuation:
                     punctuation.append(char)
         return punctuation
 

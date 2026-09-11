@@ -100,6 +100,10 @@
         <td class="full-cell">
           <a href="{{ translate_url }}?q={{ item.query }}"
              id="check-label-{{ forloop.counter }}">{{ item.name }}</a>
+          {% if item.advisory %}
+            <span class="badge"
+                  title="{% translate "Reported for information: this check also fires on correct strings, so it is not counted as a defect." %}">{% translate "Advisory" %}</span>
+          {% endif %}
         </td>
         <td class="wrap-cell">
           <a class="btn-inline" href="{{ browse_url }}?q={{ item.query }}">{% translate "Browse" %}</a>

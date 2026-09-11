@@ -90,9 +90,13 @@ Weblate 2026.8.1
 * Added :kbd:`Ctrl+Alt+A`, :kbd:`Ctrl+Alt+K` and :kbd:`Ctrl+Alt+R` for the LLM-judge triage actions, and a paid-request hint on every button that spends a model call.
 * Added the ``judge_backfill_candidates`` management command.
 * The game markup check no longer requires a numbered or named placeholder to keep its source position: Turkish, Hindi, Japanese, Korean, Chinese and Persian targets legitimately move ``{0}`` and ``{1}`` around, and only their presence is checked now. An anonymous ``%s``, ``%d`` or ``{}`` conversion still has to keep its order, because the engine fills those by position. Spreadsheet imports follow the same rule.
+* Failing checks are now reported per check through the REST API: every unit lists its active check identifiers in ``checks``, and projects, components and translations answer a ``/checks/`` endpoint with the count of each failing check. External quality tooling no longer has to guess a list of check identifiers and silently miss whole checks.
+* Checks that fire on every member of a group, including the correct string, are now marked advisory and counted separately. The ``/checks/`` endpoint reports ``failing_blocking`` and ``failing_advisory``, and the strings-status table labels an advisory row, so a single blocking defect is no longer buried under hundreds of advisory ones. ``repeat-drift`` is the first such check.
+* The ``game-length`` check is now opt-in: enable it with the ``game-length`` flag on the components whose slots are actually constrained. A character-count proxy cannot tell a clipped button from an ordinary long sentence, so on a dialogue-heavy component it reported mostly ordinary text.
 
 .. rubric:: Bug fixes
 
+* The French :ref:`check-punctuation-spacing` check now sees a run of double punctuation: ``Quoi?!`` is reported and repaired by inserting one narrow no-break space in front of the run, where previously each mark excused the other and the string passed. The repair never inserts a space inside the run.
 * The ``repeat-drift`` check no longer reaches the LLM judge prompt, where its presence on every member of a same-source group (including the correct translation) told the judge that a defect it could not see had been proven and could suppress a real finding; the judge now drops it exactly as machine-translation repair already did.
 * A string explanation set through the REST API is now written to the translation file on commit, mirrored to the other languages of the string, and recorded in its history, so glossary notes no longer disappear from exports.
 * French punctuation spacing and automatic translation no longer modify syntax in Hero Craft conditional game placeholders.

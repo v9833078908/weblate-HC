@@ -48,6 +48,14 @@ class ChecksLoader(ClassLoader[BaseCheck]):
     def glossary(self):
         return {k: v for k, v in self.items() if v.glossary}
 
+    @cached_property
+    def advisory(self) -> dict[str, BaseCheck]:
+        return {k: v for k, v in self.items() if v.advisory}
+
+    @cached_property
+    def blocking(self) -> dict[str, BaseCheck]:
+        return {k: v for k, v in self.items() if not v.advisory}
+
 
 # Initialize checks list
 CHECKS = ChecksLoader()
@@ -172,3 +180,47 @@ def get_display_checks(unit: Unit) -> Generator[Check]:
                 yield check_objects[check]
             except KeyError:
                 yield Check(unit=unit, dismissed=False, name=check)
+
+
+def checks_summary(stats, units) -> dict:
+    """
+    Breakdown of the active checks of a scope, split by severity tier.
+
+    ``stats`` supplies the per-check counts that are already cached and
+    aggregated (``check:<id>`` keys); ``units`` is the unit queryset of the
+    same scope and is only queried for the blocking unit count, which the
+    per-check counts cannot give (one unit may fail several checks).
+    """
+    rows = []
+    for check_id, check_obj in CHECKS.items():
+        strings = getattr(stats, check_obj.url_id)
+        if not strings:
+            continue
+        rows.append(
+            {
+                "check": check_id,
+                "name": check_obj.name,
+                "advisory": check_obj.advisory,
+                "strings": strings,
+                "words": getattr(stats, f"{check_obj.url_id}_words"),
+                "chars": getattr(stats, f"{check_obj.url_id}_chars"),
+            }
+        )
+    rows.sort(key=lambda row: (-row["strings"], row["check"]))
+    failing = stats.allchecks
+    if any(not row["advisory"] for row in rows):
+        blocking = (
+            units.filter(check__dismissed=False, check__name__in=list(CHECKS.blocking))
+            .distinct()
+            .count()
+        )
+    else:
+        blocking = 0
+    return {
+        "failing": failing,
+        "failing_blocking": blocking,
+        # Units whose every active check is advisory. Disjoint from
+        # failing_blocking, so the two always sum to failing.
+        "failing_advisory": failing - blocking,
+        "checks": rows,
+    }

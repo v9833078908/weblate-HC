@@ -31,6 +31,7 @@ from weblate.checks.chars import (
     ZeroWidthSpaceCheck,
 )
 from weblate.checks.tests.test_checks import CheckTestCase
+from weblate.trans.fix_check import apply_fixup_python
 from weblate.trans.tests.factories import make_check, make_unit
 
 
@@ -631,6 +632,22 @@ class PunctuationSpacingCheckTest(CheckTestCase):
             ),
             "fr",
         )
+
+    def test_double_punctuation_run(self) -> None:
+        # The space belongs in front of the whole run; evaluating "?" and "!"
+        # separately used to accept a run with no space at all.
+        self.do_test(True, ("string", "Quoi...?!", ""), "fr")
+        self.do_test(False, ("string", "Quoi...\u202f?!", ""), "fr")
+        self.do_test(False, ("string", "Quoi ?! Encore", ""), "fr")
+        self.do_test(True, ("string", "Quoi?! Encore", ""), "fr")
+
+    def test_fixup_spaces_the_run_once(self) -> None:
+        unit = make_unit(code="fr", source="What?!", target="Quoi?!")
+        fixups = self.check.get_fixup(unit)
+        self.assertIsNotNone(fixups)
+        fixed = apply_fixup_python(fixups, [unit.target])[0]
+        self.assertEqual(fixed, "Quoi\u202f?!")
+        self.assertFalse(self.check.check_single(unit.source, fixed, unit))
 
     def test_markdown_image(self) -> None:
         self.do_test(

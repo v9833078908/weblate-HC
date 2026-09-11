@@ -322,7 +322,7 @@ class UnitQuerySet(models.QuerySet["Unit", "Unit"]):
             "labels",
             models.Prefetch(
                 "check_set",
-                queryset=Check.objects.filter(dismissed=False).only("unit_id"),
+                queryset=Check.objects.filter(dismissed=False).only("unit_id", "name"),
                 to_attr="api_failing_checks",
             ),
             models.Prefetch(
@@ -1041,6 +1041,15 @@ class Unit(models.Model, LoggerMixin):
         if "api_failing_checks" in self.__dict__:
             return bool(self.__dict__["api_failing_checks"])
         return bool(self.active_checks)
+
+    @property
+    def failing_check_names(self) -> list[str]:
+        """Identifiers of the active (not dismissed) checks, sorted."""
+        if "api_failing_checks" in self.__dict__:
+            checks = self.__dict__["api_failing_checks"]
+        else:
+            checks = self.active_checks
+        return sorted(check.name for check in checks)
 
     @property
     def has_comment(self) -> bool:

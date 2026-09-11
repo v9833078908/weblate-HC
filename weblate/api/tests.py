@@ -60,6 +60,7 @@ from weblate.auth.models import (
     User,
     UserBlock,
 )
+from weblate.checks.models import Check
 from weblate.configuration.models import Setting, SettingCategory
 from weblate.lang.models import Language
 from weblate.memory.models import Memory, MemoryScope
@@ -6886,6 +6887,25 @@ class ComponentAPITest(APIBaseTest):
         for item in data:
             self.assertIsInstance(item, dict)
 
+    def test_checks_endpoint_aggregates_translations(self) -> None:
+        Check.objects.filter(unit__translation__component=self.component).delete()
+        unit = Unit.objects.filter(
+            translation__component=self.component, translation__language_code="cs"
+        ).first()
+        Check.objects.create(unit=unit, name="same")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.component.invalidate_cache()
+
+        response = self.do_request("api:component-checks", self.component_kwargs)
+
+        self.assertEqual(response.data["failing"], 1)
+        self.assertEqual(response.data["failing_blocking"], 1)
+        self.assertEqual(response.data["failing_advisory"], 0)
+        self.assertEqual(
+            [row["check"] for row in response.data["checks"]],
+            ["same"],
+        )
+
     def test_new_template_404(self) -> None:
         self.do_request("api:component-new-template", self.component_kwargs, code=404)
 
@@ -11250,6 +11270,32 @@ class TranslationAPITest(APIBaseTest):
             skip={"last_change"},
         )
 
+    def test_checks_endpoint_splits_advisory_from_blocking(self) -> None:
+        translation = Translation.objects.get(
+            component__slug="test", component__project__slug="test", language_code="cs"
+        )
+        units = list(translation.unit_set.order_by("id")[:3])
+        Check.objects.filter(unit__translation=translation).delete()
+        # One unit fails only an advisory check, one fails both, one only a
+        # blocking check: the split must count units, not check hits.
+        Check.objects.create(unit=units[0], name="repeat-drift")
+        Check.objects.create(unit=units[1], name="repeat-drift")
+        Check.objects.create(unit=units[1], name="same")
+        Check.objects.create(unit=units[2], name="same")
+        with self.captureOnCommitCallbacks(execute=True):
+            translation.invalidate_cache()
+
+        response = self.do_request("api:translation-checks", self.translation_kwargs)
+
+        self.assertEqual(response.data["failing"], 3)
+        self.assertEqual(response.data["failing_blocking"], 2)
+        self.assertEqual(response.data["failing_advisory"], 1)
+        rows = {row["check"]: row for row in response.data["checks"]}
+        self.assertEqual(rows["repeat-drift"]["strings"], 2)
+        self.assertTrue(rows["repeat-drift"]["advisory"])
+        self.assertEqual(rows["same"]["strings"], 2)
+        self.assertFalse(rows["same"]["advisory"])
+
     def test_changes(self) -> None:
         request = self.do_request("api:translation-changes", self.translation_kwargs)
         self.assertEqual(request.data["count"], 5)
@@ -11871,6 +11917,16 @@ class UnitAPITest(APIBaseTest):
         self.assertIn("translation", response.data)
         self.assertIn("language_code", response.data)
         self.assertEqual(response.data["source"], ["Hello, world!\n"])
+
+    def test_get_unit_reports_failing_checks(self) -> None:
+        unit = Unit.objects.get(
+            translation__language_code="cs", source="Hello, world!\n"
+        )
+        Check.objects.create(unit=unit, name="same", dismissed=False)
+        Check.objects.create(unit=unit, name="end_stop", dismissed=True)
+        response = self.client.get(reverse("api:unit-detail", kwargs={"pk": unit.pk}))
+        self.assertEqual(response.data["checks"], ["same"])
+        self.assertTrue(response.data["has_failing_check"])
 
     def test_get_plural_unit(self) -> None:
         unit = Unit.objects.get(

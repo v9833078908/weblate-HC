@@ -65,6 +65,9 @@ class TranslationChecklistItem(NamedTuple):
     check_id: str | None = None
     mass_fixup: Literal["safe", "review"] | None = None
     fix_url_name: str | None = None
+    # Mirrors BaseCheck.advisory: reported for information, not a defect on
+    # its own. Only the per-CHECKS rows ever set it.
+    advisory: bool = False
 
 
 class TranslationChecklistMixin:
@@ -159,6 +162,7 @@ class TranslationChecklistMixin:
                 check_id=check_obj.check_id,
                 mass_fixup=check_obj.mass_fixup,
                 fix_url_name=fix_url_name,
+                advisory=check_obj.advisory,
             )
 
         # Grab comments
@@ -192,6 +196,7 @@ class TranslationChecklist(UserList):
         check_id: str | None = None,
         mass_fixup: Literal["safe", "review"] | None = None,
         fix_url_name: str | None = None,
+        advisory: bool = False,
     ) -> bool:
         """Add to list if there are matches."""
         if getattr(stats, name) > 0:
@@ -202,6 +207,7 @@ class TranslationChecklist(UserList):
                 check_id=check_id,
                 mass_fixup=mass_fixup,
                 fix_url_name=fix_url_name,
+                advisory=advisory,
             )
             return True
         return False
@@ -215,6 +221,7 @@ class TranslationChecklist(UserList):
         check_id: str | None = None,
         mass_fixup: Literal["safe", "review"] | None = None,
         fix_url_name: str | None = None,
+        advisory: bool = False,
     ) -> None:
         """Add item to the list."""
         self.append(
@@ -228,6 +235,7 @@ class TranslationChecklist(UserList):
                 check_id=check_id,
                 mass_fixup=mass_fixup,
                 fix_url_name=fix_url_name,
+                advisory=advisory,
             )
         )
 

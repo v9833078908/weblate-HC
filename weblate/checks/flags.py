@@ -113,6 +113,13 @@ TYPED_FLAGS_ARGS: dict[str, FlagValueParser] = {
     for check in CHECKS.values()
     if check.param_type
 }
+# Typed flags whose parameter may be omitted: the bare flag enables the check
+# with its own defaults (see BaseCheck.param_optional).
+OPTIONAL_VALUE_FLAGS: set[str] = {
+    check.enable_string
+    for check in CHECKS.values()
+    if check.param_type and check.param_optional
+}
 
 PLAIN_FLAGS["rst-text"] = gettext_lazy("RST text")
 PLAIN_FLAGS["md-text"] = gettext_lazy("Markdown text")
@@ -429,7 +436,7 @@ class Flags:
                     raise ValidationError(
                         gettext('Wrong parameters for translation flag: "%s"') % name
                     ) from error
-            elif is_typed:
+            elif is_typed and name not in OPTIONAL_VALUE_FLAGS:
                 raise ValidationError(
                     gettext('Missing parameters for translation flag: "%s"') % name
                 )

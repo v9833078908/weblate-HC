@@ -2584,6 +2584,27 @@ Translations
 
        Returned attributes are described in :ref:`api-statistics`.
 
+.. http:get:: /api/translations/(string:project)/(string:component)/(string:language)/checks/
+
+    .. versionadded:: 2026.8.1
+
+    Returns the failing checks of the translation broken down by check.
+
+    :param project: Project URL slug
+    :type project: string
+    :param component: Component URL slug
+    :type component: string
+    :param language: Translation language code
+    :type language: string
+    :>json int failing: strings with at least one active check
+    :>json int failing_blocking: strings with at least one active non-advisory check
+    :>json int failing_advisory: strings whose active checks are all advisory
+    :>json array checks: per-check rows with ``check``, ``name``, ``advisory``, ``strings``, ``words`` and ``chars``
+
+    The same breakdown is available for a whole component at
+    :http:get:`/api/components/(string:project)/(string:component)/checks/`
+    and for a project at :http:get:`/api/projects/(string:project)/checks/`.
+
 .. http:get:: /api/translations/(string:project)/(string:component)/(string:language)/announcements/
 
    .. versionadded:: 5.17
@@ -2729,6 +2750,7 @@ and XLIFF.
     :>json boolean has_suggestion: whether the unit has suggestions
     :>json boolean has_comment: whether the unit has comments
     :>json boolean has_failing_check: whether the unit has failing checks
+    :>json array checks: identifiers of the active (not dismissed) failing checks
     :>json int num_words: number of source words
     :>json int priority: translation priority; 100 is default
     :>json int id: unit identifier

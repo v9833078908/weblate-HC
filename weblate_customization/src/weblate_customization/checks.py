@@ -849,11 +849,21 @@ class GameLengthCheck(TargetCheck):
     name = gettext_lazy("Game length")
     description = gettext_lazy(
         "The translation is much longer than the source and likely overflows "
-        "its UI slot. Ignore with the ignore-game-length flag when the space "
-        "is known to fit."
+        "its UI slot. Enable it per component with the game-length flag; "
+        "ignore a single string with ignore-game-length when the space is "
+        "known to fit."
     )
-    # Always on: an overflowing label clips in the running game.
-    default_disabled = False
+    # Opt-in. A character-count proxy cannot tell a clipped button from an
+    # ordinary long sentence: on a dialogue-heavy component it fires on every
+    # naturally expanding line (measured: 414 hits on anvil-saga French, 14 of
+    # them real overflow risks) and buries the blocking findings. Enable it on
+    # the components whose slots are actually constrained by adding the
+    # ``game-length`` flag, optionally with a measured budget
+    # (``game-length:120``).
+    # The budget is optional: the bare `game-length` flag enables the check
+    # with the default tiers, `game-length:120` states a measured budget.
+    param_optional = True
+    default_disabled = True
 
     # An explicit percentage of the source replaces the tiers and their floors
     # for the strings that carry it, so the stated budget means what it says.
