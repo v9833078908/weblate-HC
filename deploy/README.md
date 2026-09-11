@@ -189,6 +189,9 @@ account:
   a token. An anonymous visitor only ever sees the sign-in page.
 - `WEBLATE_REGISTRATION_OPEN=0` - accounts are created by an administrator in
   `/manage/users/`; nobody can sign themselves up.
+- `WEBLATE_DEFAULT_ACCESS_CONTROL=100` - every new project starts as private, so
+  its content is visible only to users explicitly granted access under
+  `Manage → Access control`.
 - `WEBLATE_PRIVATE_COMMIT_EMAIL_OPT_IN=0` and
   `WEBLATE_PRIVATE_COMMIT_NAME_OPT_IN=0` - translations are committed to the
   game repositories as `Hero Craft Localization user <id>
