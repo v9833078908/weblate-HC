@@ -1448,6 +1448,19 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = CELERY_BROKER_TRANSPORT_OPTIONS
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_BROKER_CONNECTION_RETRY = True
+
+# Celery cold shutdown: on SIGQUIT a worker waits this many seconds for a
+# running acks_late task (auto_translate*, fix_failing_checks) before
+# cancelling it and restoring the unacknowledged message to its queue, so a
+# routine `docker compose up -d --build weblate` redelivers the task instead
+# of losing it to the 4 h visibility timeout. No-op for workers still stopped
+# with SIGTERM. Must stay ordered against supervisor's stopwaitsecs and the
+# container stop_grace_period:
+#   soft shutdown timeout < stopwaitsecs < stop_grace_period
+# (deploy/Dockerfile, dev-docker/weblate-dev/Dockerfile, docker-compose.yml).
+CELERY_WORKER_SOFT_SHUTDOWN_TIMEOUT = get_env_int(
+    "WEBLATE_CELERY_SOFT_SHUTDOWN_TIMEOUT", 20
+)
 # Everything not explicitly marked interactive by its callsite is
 # housekeeping; see INTERACTIVE_TASK_PRIORITY in weblate/utils/celery.py.
 CELERY_TASK_DEFAULT_PRIORITY = 3

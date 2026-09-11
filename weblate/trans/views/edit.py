@@ -9,6 +9,7 @@ import time
 from decimal import Decimal
 from math import ceil
 from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, TypedDict, cast
+from uuid import uuid4
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -109,7 +110,15 @@ from weblate.trans.util import redirect_next, render
 from weblate.trans.validators import SUGGESTION_REJECTION_REASON_LENGTH
 from weblate.utils import messages
 from weblate.utils.antispam import is_spam
-from weblate.utils.celery import add_user_task, get_queue_length, store_task_metadata
+from weblate.utils.celery import (
+    INTERACTIVE_TASK_PRIORITY,
+    add_user_task,
+    delete_task_liveness,
+    delete_task_metadata,
+    get_queue_length,
+    register_task_liveness,
+    store_task_metadata,
+)
 from weblate.utils.hash import hash_to_checksum
 from weblate.utils.html import format_html_join_comma, list_to_tuples
 from weblate.utils.lock import WeblateLockTimeoutError
@@ -1836,28 +1845,46 @@ def auto_translation(request: AuthenticatedHttpRequest, path):
         for warning in result.get("warnings", []):
             messages.warning(request, warning)
     else:
-        task = auto_translate.delay(
-            translation_id=translation_id,
-            component_id=component_id,
-            category_id=category_id,
-            project_id=project_id,
-            language_id=language_id,
-            workspace_id=workspace_id,
-            user_id=request.user.id,
-            mode=autoform.cleaned_data["mode"],
-            q=autoform.cleaned_data["q"],
-            auto_source=autoform.cleaned_data["auto_source"],
-            source_component_id=autoform.cleaned_data["component"],
-            engines=autoform.cleaned_data["engines"],
-            threshold=autoform.cleaned_data["threshold"],
-            overwrite_existing=autoform.cleaned_data.get("overwrite_existing", False),
-        )
+        # The task id is allocated and registered (metadata + liveness)
+        # before publication: a fast worker can start - and heartbeat - the
+        # task before this view finishes, so the records must already exist
+        # when the first poll arrives. A publish failure removes both, so a
+        # dead task never sits in the user list.
+        task_id = str(uuid4())
         store_task_metadata(
-            task.id,
+            task_id,
             component_id=component_id,
             translation_id=translation_id,
             user_id=request.user.id,
         )
+        register_task_liveness(task_id)
+        try:
+            task = auto_translate.apply_async(
+                kwargs={
+                    "translation_id": translation_id,
+                    "component_id": component_id,
+                    "category_id": category_id,
+                    "project_id": project_id,
+                    "language_id": language_id,
+                    "workspace_id": workspace_id,
+                    "user_id": request.user.id,
+                    "mode": autoform.cleaned_data["mode"],
+                    "q": autoform.cleaned_data["q"],
+                    "auto_source": autoform.cleaned_data["auto_source"],
+                    "source_component_id": autoform.cleaned_data["component"],
+                    "engines": autoform.cleaned_data["engines"],
+                    "threshold": autoform.cleaned_data["threshold"],
+                    "overwrite_existing": autoform.cleaned_data.get(
+                        "overwrite_existing", False
+                    ),
+                },
+                task_id=task_id,
+                priority=INTERACTIVE_TASK_PRIORITY,
+            )
+        except Exception:
+            delete_task_metadata(task_id)
+            delete_task_liveness(task_id)
+            raise
         try:
             queued_ahead = get_queue_length("translate")
         except Exception:

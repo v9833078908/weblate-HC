@@ -149,6 +149,10 @@ services:
     - /tmp:uid=$USER_ID,gid=$GROUP_ID,exec
     - /run:uid=$USER_ID,gid=$GROUP_ID
     userns_mode: host
+    # Celery cold shutdown: supervisor gets 60 s (stopwaitsecs) to finish the
+    # QUIT handshake for acks_late producer tasks before Docker SIGKILLs the
+    # container; see dev-docker/weblate-dev/Dockerfile.
+    stop_grace_period: 90s
 volumes:
   weblate-data: {}
   postgres-data: {}

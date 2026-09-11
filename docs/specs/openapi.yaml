@@ -31623,6 +31623,8 @@ components:
       - 102
       - 103
       - 104
+      - 105
+      - 106
       type: integer
       description: |-
         * `0` - **Resource updated:** A translation file was synchronized with its repository.
@@ -31724,6 +31726,8 @@ components:
         * `102` - **Remote repository update failed:** Updating a remote repository failed.
         * `103` - **Alert dismissed:** A component alert was dismissed.
         * `104` - **Alert reopened:** A component alert was reopened after its context changed.
+        * `105` - **Judge verdict resolved:** A producer recorded a decision on a judge verdict.
+        * `106` - **Check fixed automatically:** A failing check was fixed automatically.
     Addon:
       type: object
       properties:
@@ -34106,6 +34110,16 @@ components:
         * `` - None
         * `totp` - TOTP
         * `webauthn` - WebAuthn
+    LivenessEnum:
+      enum:
+      - queued
+      - running
+      - no-update
+      type: string
+      description: |-
+        * `queued` - queued
+        * `running` - running
+        * `no-update` - no-update
     Lock:
       type: object
       properties:
@@ -38236,6 +38250,8 @@ components:
           - type: 'null'
         log:
           type: string
+        liveness:
+          $ref: '#/components/schemas/LivenessEnum'
       required:
       - completed
       - log
@@ -38832,7 +38848,7 @@ components:
         project. These tokens have the `wlp_` prefix.\n        "
 servers:
 - url: 'http:'
-  description: Weblate
+  description: HCGameLoc
 tags:
 - name: root
   description: The API root entry point.

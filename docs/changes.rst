@@ -27,6 +27,7 @@ Weblate 2026.8.1
 
 .. rubric:: Improvements
 
+* A user-started automatic translation now resumes after a routine service restart instead of being silently lost: its progress bar reports whether it is waiting for a worker, actively updating, or has shown no update for 10 minutes, and its counter now tracks strings actually written rather than technical progress steps. Redelivery after a restart is at-least-once, not exactly-once; already-written strings are not overwritten.
 * Component operations watched through a progress bar now overtake queued parent-statistics housekeeping, while repeated parent-statistics updates are coalesced into one pending calculation and at most one sequential follow-up.
 * An LLM-judge critical now holds a string only when both seats grade it critical; a critical from one seat that the other grades lower ships as a major with both opinions attached. Administrators can restore the original site-wide policy where either critical holds through :setting:`JUDGE_CONSENSUS_REJECT`, see :ref:`llm-judge`.
 * Project-level OpenRouter settings no longer display an API key input while preserving the configured credential.

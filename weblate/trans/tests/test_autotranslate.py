@@ -47,8 +47,8 @@ from weblate.trans.machinery import fetch_machinery_matches
 from weblate.trans.models import (
     Change,
     Component,
-    ProducerRun,
     PendingUnitChange,
+    ProducerRun,
     Project,
     Translation,
     Unit,
@@ -60,9 +60,13 @@ from weblate.trans.util import split_plural
 from weblate.utils.celery import (
     PENDING_TASK_MAX_AGE,
     add_user_task,
+    delete_task_liveness,
+    get_task_liveness,
+    get_task_liveness_key,
     get_task_metadata,
     get_user_tasks,
     get_user_tasks_key,
+    register_task_liveness,
 )
 from weblate.utils.state import (
     STATE_APPROVED,
@@ -595,6 +599,52 @@ class AutoTranslationTest(ViewTestCase):
         self.assertEqual(progress_values, sorted(progress_values))
         self.assertEqual(progress_values[-1], 100)
         self.assertGreaterEqual(min(progress_values), 0)
+
+    def test_attempt_counter_reports_batch_done_total(self) -> None:
+        """The progress meta carries the attempt-local updated/eligible."""
+        # Two languages get a source to copy from the first component.
+        self.make_different()
+        self.make_different("de")
+        task = SimpleNamespace(
+            request=SimpleNamespace(id="task-counter"), update_state=Mock()
+        )
+        auto = BatchAutoTranslate(
+            self.component2,
+            user=self.user,
+            q="state:<translated",
+            mode="translate",
+        )
+        self.assertGreater(len(auto.translations), 1)
+
+        with (
+            patch("weblate.trans.autotranslate.current_task", task),
+            patch("weblate.trans.autotranslate.touch_task_liveness"),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            auto.perform(
+                auto_source="others",
+                engines=[],
+                threshold=100,
+                source_component_ids=[self.component.id],
+            )
+
+        metas = [call.kwargs["meta"] for call in task.update_state.call_args_list]
+        with_totals = [meta for meta in metas if "total" in meta]
+        self.assertTrue(with_totals)
+        # The denominator is one snapshot for the whole batch: the units of
+        # every translation, not of the one currently being processed.
+        self.assertEqual(len({meta["total"] for meta in with_totals}), 1)
+        total = with_totals[0]["total"]
+        # Both untranslated translations of the batch are in the snapshot,
+        # not just the one being processed.
+        self.assertGreater(total, auto.translations[0].unit_set.count())
+        # The numerator only grows, never resets per translation, and never
+        # exceeds the snapshot: `done` counts stored units, which can be
+        # fewer than `eligible` when a source is missing.
+        dones = [meta["done"] for meta in with_totals]
+        self.assertEqual(dones, sorted(dones))
+        self.assertEqual(dones[-1], auto.updated)
+        self.assertLessEqual(dones[-1], total)
 
     def test_autotranslate_project_language_limited_membership(self) -> None:
         czech = Language.objects.get(code="cs")
@@ -1427,7 +1477,6 @@ class AutoTranslationMtTest(ViewTestCase):
         self.assertEqual(translation.stats.translated, 0)
 
 
-
 class ProducerRunCreationTest(ViewTestCase):
     def _perform(
         self,
@@ -1506,7 +1555,9 @@ class ProducerRunCreationTest(ViewTestCase):
                 BatchAutoTranslate, "_can_process_translation", return_value=True
             ),
             mock.patch.object(
-                BatchAutoTranslate, "_finish_translation", side_effect=ValueError("boom")
+                BatchAutoTranslate,
+                "_finish_translation",
+                side_effect=ValueError("boom"),
             ),
             self.assertRaises(ValueError),
         ):
@@ -1792,8 +1843,12 @@ class PersistentTaskProgressTest(ViewTestCase):
     def start_auto_translation(self, path: list[str]):
         with (
             override_settings(CELERY_TASK_ALWAYS_EAGER=False),
+            # The view now generates its own task id before publication;
+            # pin it to `self.task_id` so the rest of this test class keeps
+            # treating that constant as the real, stored task id.
+            patch("weblate.trans.views.edit.uuid4", return_value=self.task_id),
             patch(
-                "weblate.trans.views.edit.auto_translate.delay",
+                "weblate.trans.views.edit.auto_translate.apply_async",
                 return_value=SimpleNamespace(id=self.task_id),
             ),
         ):
@@ -1900,6 +1955,95 @@ class PersistentTaskProgressTest(ViewTestCase):
             cache.set(key, tasks, 60)
 
             self.assertEqual(get_user_tasks(self.user.id), [])
+
+    def test_liveness_task_survives_stale_pending_pruning(self) -> None:
+        # A liveness-enabled task whose delivery may be waiting for
+        # redelivery stays in the user list past PENDING_TASK_MAX_AGE...
+        register_task_liveness(self.task_id)
+        add_user_task(self.user.id, self.task_id, text="Work", label="Here", url="/")
+        pending = SimpleNamespace(ready=lambda: False, state="PENDING")
+        with patch("weblate.utils.celery.AsyncResult", return_value=pending):
+            key = get_user_tasks_key(self.user.id)
+            tasks = cache.get(key)
+            tasks[0]["started"] -= PENDING_TASK_MAX_AGE + 1
+            cache.set(key, tasks, 60)
+
+            self.assertEqual(len(get_user_tasks(self.user.id)), 1)
+            self.assertEqual(get_task_liveness(self.task_id), "queued")
+
+            # ...while an ordinary task without a record is still pruned
+            # (the contract of test_lost_task_is_forgotten_once_stale).
+            delete_task_liveness(self.task_id)
+            self.assertEqual(get_user_tasks(self.user.id), [])
+
+    def test_publish_failure_removes_registration(self) -> None:
+        # The view registers metadata + liveness before apply_async; a
+        # publish failure must remove both and leave no task in user list.
+        captured: dict[str, str] = {}
+
+        def failing_apply_async(*args, **kwargs):
+            captured["task_id"] = kwargs["task_id"]
+            msg = "broker down"
+            raise OSError(msg)
+
+        with (
+            override_settings(CELERY_TASK_ALWAYS_EAGER=False),
+            patch(
+                "weblate.trans.views.edit.auto_translate.apply_async",
+                side_effect=failing_apply_async,
+            ),
+            self.assertRaises(OSError),
+        ):
+            self.client.post(
+                reverse(
+                    "auto_translation",
+                    kwargs={"path": self.translation.get_url_path()},
+                ),
+                {
+                    "auto_source": "others",
+                    "threshold": "100",
+                    "q": "state:<translated",
+                    "mode": "translate",
+                },
+            )
+
+        self.assertEqual(get_user_tasks(self.user.id), [])
+        self.assertIsNone(cache.get(get_user_tasks_key(self.user.id)))
+        # The pre-registered records of the very task id that failed to
+        # publish are gone: metadata, liveness, and with them any poll.
+        self.assertIsNone(get_task_metadata(captured["task_id"]))
+        self.assertIsNone(cache.get(get_task_liveness_key(captured["task_id"])))
+
+    def test_registration_precedes_publication(self) -> None:
+        seen: dict[str, bool] = {}
+
+        def fake_apply_async(*args, **kwargs):
+            # At publication time the liveness record must already exist.
+            seen["liveness_at_publish"] = get_task_liveness(kwargs["task_id"])
+            return SimpleNamespace(id=kwargs["task_id"])
+
+        with (
+            override_settings(CELERY_TASK_ALWAYS_EAGER=False),
+            patch(
+                "weblate.trans.views.edit.auto_translate.apply_async",
+                side_effect=fake_apply_async,
+            ),
+        ):
+            self.client.post(
+                reverse(
+                    "auto_translation",
+                    kwargs={"path": self.translation.get_url_path()},
+                ),
+                {
+                    "auto_source": "others",
+                    "threshold": "100",
+                    "q": "state:<translated",
+                    "mode": "translate",
+                },
+                follow=True,
+            )
+
+        self.assertEqual(seen["liveness_at_publish"], "queued")
 
 
 def max_form_depth(html: str) -> int:

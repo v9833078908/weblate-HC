@@ -42,7 +42,13 @@ from weblate.trans.models.unit import fill_in_source_translation
 from weblate.trans.tasks import fix_failing_checks
 from weblate.trans.util import render
 from weblate.utils import messages
-from weblate.utils.celery import add_user_task, store_task_metadata
+from weblate.utils.celery import (
+    add_user_task,
+    delete_task_liveness,
+    delete_task_metadata,
+    register_task_liveness,
+    store_task_metadata,
+)
 from weblate.utils.ratelimit import check_rate_limit
 from weblate.utils.stats import CategoryLanguage, ProjectLanguage
 from weblate.utils.views import (
@@ -458,10 +464,22 @@ def fix_check(request: AuthenticatedHttpRequest, name, path):
             "project_id": project_id,
         }
 
+        # Metadata and liveness are registered before publication so the
+        # first poll can never race a missing record; a publish failure
+        # releases the reservation and removes both records.
+        store_task_metadata(
+            task_id,
+            translation_id=translation_id,
+            component_id=component_id,
+            user_id=request.user.id if isinstance(obj, Project) else None,
+        )
+        register_task_liveness(task_id)
         try:
             task = fix_failing_checks.apply_async(kwargs=task_kwargs, task_id=task_id)
         except Exception:
             release_fix_check_lock(lock_key, task_id)
+            delete_task_metadata(task_id)
+            delete_task_liveness(task_id)
             raise
 
         if task.ready():
@@ -486,12 +504,6 @@ def fix_check(request: AuthenticatedHttpRequest, name, path):
                 messages.error(request, message or gettext("Mass fix failed."))
             return redirect(obj)
 
-        store_task_metadata(
-            task.id,
-            translation_id=translation_id,
-            component_id=component_id,
-            user_id=request.user.id if isinstance(obj, Project) else None,
-        )
         message = gettext("Mass fix queued. You can close this page.")
         add_user_task(
             request.user.id,

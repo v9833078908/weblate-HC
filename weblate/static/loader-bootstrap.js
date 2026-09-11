@@ -1774,6 +1774,8 @@ onReady(() => {
     const warnings = message.querySelector(".task-warnings");
     const phase = message.querySelector(".task-phase");
     const actions = message.querySelector(".task-actions");
+    const baseMessageText = messageText !== null ? messageText.textContent : "";
+    let lastLiveness = "";
     if (bar !== null) {
       bar.setAttribute("data-completed", "0");
     }
@@ -1808,6 +1810,28 @@ onReady(() => {
             return;
           }
           const data = await response.json();
+          /* Liveness copy is appended to the base text inside the
+           * aria-live region; "running" restores the base text and is
+           * skipped when nothing changed, so screen readers are not
+           * re-announced on every tick. */
+          if (
+            !data.completed &&
+            messageText !== null &&
+            data.liveness !== lastLiveness
+          ) {
+            lastLiveness = data.liveness;
+            if (data.liveness === "running" || !data.liveness) {
+              messageText.textContent = baseMessageText;
+            } else if (data.liveness === "queued") {
+              messageText.textContent = `${baseMessageText} ${gettext(
+                "Waiting for a worker to pick up the task…",
+              )}`;
+            } else if (data.liveness === "no-update") {
+              messageText.textContent = `${baseMessageText} ${gettext(
+                "No updates for 10 minutes; the task might still be running. If the status does not change, contact the administrator.",
+              )}`;
+            }
+          }
           if (bar !== null) {
             bar.style.width = `${data.progress}%`;
             bar.setAttribute("aria-valuenow", `${data.progress}`);
@@ -1892,6 +1916,12 @@ onReady(() => {
       1000 * Math.max(progressBars.length / 5, 1),
     );
   });
+
+  /* Server-computed liveness of a user task (queued/running/no-update),
+   * rendered as translated copy appended inside the existing aria-live
+   * region (text, never a colour-only change). The "running" state keeps
+   * the screen exactly as it is. Handled inside the poller below, which is
+   * the only writer. */
 
   /* Disable invalid file format choices */
   document.querySelectorAll(".invalid-format").forEach((element) => {

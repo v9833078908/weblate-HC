@@ -33,7 +33,12 @@ from weblate.trans.fix_check import (
 from weblate.trans.tasks import _release_fix_check_lock_reporting, fix_failing_checks
 from weblate.trans.templatetags.translations import show_message
 from weblate.trans.tests.test_views import ViewTestCase
-from weblate.utils.celery import add_user_task, get_user_tasks_key
+from weblate.utils.celery import (
+    add_user_task,
+    get_task_liveness_key,
+    get_user_tasks_key,
+    register_task_liveness,
+)
 from weblate.utils.lock import WeblateLockTimeoutError
 from weblate.utils.state import STATE_TRANSLATED
 
@@ -164,6 +169,23 @@ class FixFailingChecksTaskTest(ViewTestCase):
         self.assertEqual(self.end_stop_unit.target, "Dekuji.")
         # A completed run releases its own reservation.
         release_mock.assert_called_once_with(self.lock_key, "")
+
+    def test_task_touches_liveness_heartbeat(self) -> None:
+        """fix_failing_checks heartbeats its liveness record (Task 2)."""
+        register_task_liveness("fix-task-liveness")
+        task = SimpleNamespace(request=SimpleNamespace(id="fix-task-liveness"))
+        with patch("weblate.trans.tasks.current_task", task):
+            fix_failing_checks.run(
+                user_id=self.user.id,
+                check_id="end_stop",
+                lock_key=self.lock_key,
+                translation_id=self.translation.pk,
+            )
+        record = cache.get(get_task_liveness_key("fix-task-liveness"))
+        self.assertIsNotNone(record)
+        self.assertEqual(record["attempt"], 1)
+        self.assertIsNotNone(record["heartbeat_at"])
+        cache.delete(get_task_liveness_key("fix-task-liveness"))
 
     def test_component_scope_resolves_metadata(self) -> None:
         key = fix_check_lock_key("end_stop", "component", self.component.pk)

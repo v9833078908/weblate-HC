@@ -65,6 +65,10 @@ services:
     - /app/cache:exec,uid=1000,gid=1000
     - /tmp:uid=1000,gid=1000,exec
     - /run:uid=1000,gid=1000
+    # Celery cold shutdown: supervisor gets 60 s (stopwaitsecs) to finish the
+    # QUIT handshake for acks_late producer tasks before Docker SIGKILLs the
+    # container; see deploy/Dockerfile.
+    stop_grace_period: 90s
 
   # Optional: only started with `docker compose --profile caddy up -d`.
   # Not used when a reverse proxy already owns port 80 on the host.

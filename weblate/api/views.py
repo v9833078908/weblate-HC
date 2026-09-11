@@ -181,6 +181,7 @@ from weblate.trans.util import get_upload_error_message
 from weblate.trans.views.files import download_multi
 from weblate.trans.views.reports import get_report_scope_values, render_report_data
 from weblate.utils.celery import (
+    get_task_liveness,
     get_task_metadata,
     get_task_progress,
     store_task_metadata,
@@ -4957,14 +4958,19 @@ class TasksViewSet(ViewSet):
         result = task.result
         if task.ready():
             self.store_completion_message(request, task)
-        serializer = self.serializer_class(
-            {
-                "completed": task.ready(),
-                "progress": get_task_progress(task),
-                "result": str(result) if isinstance(result, Exception) else result,
-                "log": "\n".join(cache.get(f"task-log-{task.id}", [])),
-            }
-        )
+        data = {
+            "completed": task.ready(),
+            "progress": get_task_progress(task),
+            "result": str(result) if isinstance(result, Exception) else result,
+            "log": "\n".join(cache.get(f"task-log-{task.id}", [])),
+        }
+        if not data["completed"]:
+            # Server-side liveness enum; `completed=True` always overrides it
+            # and the field is simply absent for tasks without a record.
+            liveness = get_task_liveness(task.id)
+            if liveness is not None:
+                data["liveness"] = liveness
+        serializer = self.serializer_class(data)
         return Response(serializer.data)
 
     @extend_schema(description="Cancel a running task.", methods=["delete"])

@@ -58,4 +58,21 @@ RUN set -eux; \
 ARG GIT_SHA=unknown
 LABEL org.opencontainers.image.revision="${GIT_SHA}"
 
+# Celery cold shutdown for producer tasks: auto_translate* (queue "translate")
+# and fix_failing_checks (queue "celery") are acks_late, so a worker stopped
+# with SIGTERM that gets SIGKILLed before its kombu finalizer runs leaves the
+# message unacknowledged for the whole 4 h visibility timeout. With
+# stopsignal=QUIT the worker performs a cold shutdown: it waits
+# CELERY_WORKER_SOFT_SHUTDOWN_TIMEOUT for the running task, then cancels it
+# and restores the unacknowledged message to its original queue
+# (at-least-once delivery). stopwaitsecs must exceed the soft shutdown
+# timeout and stay below the container stop_grace_period (90 s), so
+# supervisor can finish the QUIT handshake before Docker SIGKILLs everything.
+# Only these two programs serve user-facing acks_late tasks; the remaining
+# celery-*.conf programs keep the default SIGTERM behaviour.
+RUN printf '%s\n' 'stopsignal=QUIT' 'stopwaitsecs=60' \
+    >> /etc/supervisor/conf.d/celery-translate.conf \
+    && printf '%s\n' 'stopsignal=QUIT' 'stopwaitsecs=60' \
+    >> /etc/supervisor/conf.d/celery-celery.conf
+
 USER 1000
