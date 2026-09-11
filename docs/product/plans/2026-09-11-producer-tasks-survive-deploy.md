@@ -6,261 +6,344 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Продюсерские задачи переживают перезапуск сервиса
 
-**Дата:** 2026-09-11. **Статус:** план доработан после проверки риска на
-измерении; требует согласования, реализация не начата, деплой не одобрен.
+**Дата:** 2026-09-11. **Статус:** переработан после ревью
+`docs/product/reviews/2026-09-11-producer-tasks-survive-deploy-plan-review.md`;
+готов к согласованию, реализация не начата, деплой не одобрен.
 
-**Повод.** `docs/operations/reports/2026-09-11-anvil-saga-fr-autotranslate-stall.md`:
-деплой в 10:21 UTC пересоздал контейнер и убил `auto_translate`
-anvil-saga/fr. Сообщение осталось в Redis `unacked`, вернулось бы в очередь
-только к 14:23 UTC, а страница прогресса показывала «73 %» без ошибки и без
-срока. Хотфикс 11.09 (возврат сообщения вручную, раздел «Что уже сделано»)
-снял конкретный инцидент и не меняет поведение системы.
+## Цель и выбранные решения
 
-**Связь с параллельной работой.** `docs/product/plans/2026-09-10-producer-tasks-ahead-of-housekeeping.md`
-решает соседнюю задачу — пользовательская постановка не должна стоять за
-фоновой уборкой. Пересечения зафиксированы в разделе «Координация с планом
-приоритетов»; оба плана трогают Celery-контракт и один и тот же блок настроек.
+**Повод.** Деплой 11.09 пересоздал контейнер во время `auto_translate`
+anvil-saga/fr. Из-за `acks_late=True` сообщение осталось в Redis `unacked`, но
+SIGTERM воркера сменился на SIGKILL до kombu finalizer; оно стало видимым лишь
+после `visibility_timeout` в четыре часа. Экран оставался на 73 % без
+объяснения. Разовый возврат delivery tag снял инцидент; он описан в
+`docs/operations/reports/2026-09-11-anvil-saga-fr-autotranslate-stall.md` и не
+является продуктовым исправлением.
 
-## Факты, проверенные измерением
+**Цель.** При обычном пересоздании сервиса активный пользовательский
+автоперевод или массовое исправление возвращается из `unacked` в Redis до
+окончания Docker grace period; страница продюсера показывает очередь, работу
+или отсутствие обновлений правдиво, а deploy предупреждает об активной
+автопереводной задаче *до* push и изменения checkout на VPS.
 
-Проба `analysis/probes/celery_shutdown_requeue.py` поднимает отдельный воркер
-на изолированной очереди и БД Redis (celery 5.6.3, kombu 5.6.2 — те же версии,
-что в проде) и останавливает его разными способами. Результат прогона в
-dev-контейнере 2026-09-11:
+**Выбранные решения.**
 
-|Сценарий|`unacked` во время работы|После остановки|Состояние задачи|
-|---|---|---|---|
-|`acks_late` + SIGTERM, SIGKILL через `stopwaitsecs` (сегодня)|1|`unacked=1`, очередь пуста|висит `PROGRESS`|
-|`acks_late` + SIGQUIT (предлагается)|1|**очередь = 1**, `unacked=0`, в логе `Restoring`, выход 0|`PENDING`, переисполнится|
-|Длинная задача без `acks_late` + SIGQUIT|**0**|потеряна|`RETRY`, но никто не переставит|
-|Короткая задача (3 с) без `acks_late` + SIGQUIT|0|**успела доработать**|`SUCCESS`|
+1. Cold shutdown получает не только `celery-translate`, но и
+   `celery-celery`. Там исполняются соответственно `auto_translate*` и
+   остающийся в своей очереди `fix_failing_checks`; маршрутизация mass fix не
+   меняется. Это сохраняет его SLA и priority-policy очереди `celery` из
+   `docs/product/plans/2026-09-10-producer-tasks-ahead-of-housekeeping.md`.
+2. Жизненность пользовательской задачи — закрытая cache-запись, а не вывод из
+   `AsyncResult.state`: `PENDING` означает и «ещё стоит в очереди», и
+   «запущенная доставка была восстановлена». UI показывает только `queued`,
+   `running` или `no-update`, никогда не угадывает «деплой оборвал задачу».
+3. `no-update` наступает не раньше 600 с с последнего heartbeat. Это больше
+   четырёх попыток обычного LLM request по 120 с и трёх backoff до 30 с
+   (`weblate/machinery/base.py:366-386`), поэтому нормальный retry не выглядит
+   оборванной задачей. Текст этого статуса: «Нет обновлений уже 10 минут;
+   задача могла продолжаться. Если состояние не изменится, обратитесь к
+   администратору». Он не обещает автоматическое восстановление и не является
+   ошибкой задачи.
+4. Кнопки replay нет. Существующий `/api/tasks/<id>/` допускает только GET и
+   DELETE; повторная публикация того же task id во время Redis redelivery дала
+   бы дубликат. Автоматическое восстановление после штатного деплоя —
+   единственный механизм повторного запуска в этом изменении.
+5. Счётчик автоперевода — `updated / eligible` текущей delivery attempt:
+   числитель увеличивается только после сохранения Unit, знаменатель — snapshot
+   units, подходящих под запрос в начале попытки. На восстановленной delivery
+   запускается новая попытка над оставшимися `state:empty`; UI сообщает, что
+   запуск возобновлён, и не суммирует несопоставимые snapshots. Процент остаётся
+   техническим progress по шагам движка, счётчик — пользовательским числом
+   записанных строк.
+6. `fix_failing_checks` уже публикует свой точный `done/total` в result meta и
+   UI уже отображает его. Этот контракт не расширяется.
 
-Из этого следуют четыре вывода, на которых держится план.
+**Явные не-цели.** Отдельный Celery-контейнер; новые queue/worker для mass
+fix; изменение priority очереди `translate`; перевод остальных задач на
+`acks_late`; снижение `visibility_timeout`; ручной replay endpoint; постоянная
+модель истории запусков.
 
-1. Сообщение возвращает не сигнал, а **чистый выход процесса**: финализатор
-   `QoS._on_collect = Finalize(self, self.restore_unacked_once)`
-   (`kombu/transport/virtual/base.py:193`). SIGKILL его не выполняет — отсюда
-   четырёхчасовая дыра.
-2. SIGQUIT — штатный вход в холодное завершение
-   (`celery/apps/worker.py:445`, `_shutdown_handler(sig='SIGQUIT', how='Cold',
-   callback=on_cold_shutdown)`), никакой `REMAP_SIGTERM` не нужен. Холодное
-   завершение ждёт `worker_soft_shutdown_timeout`
-   (`celery/worker/worker.py:412`), затем снимает потребитель и вызывает
-   `consumer.cancel_active_requests()`.
-3. Для `acks_late`-задачи отмена не делает `acknowledge()`
-   (`celery/worker/request.py:439-455`), поэтому сообщение остаётся
-   неподтверждённым и уходит обратно в очередь при выходе. Для задачи без
-   `acks_late` сообщение подтверждено ещё при доставке — в пробе `unacked=0`
-   уже во время работы, — поэтому терять его нечего: оно потеряно при **любом**
-   прерывании, и сегодня тоже.
-4. Приоритет при возврате сохраняется: `_do_restore_message` кладёт сообщение
-   в список своего приоритета (`kombu/transport/redis.py:804-809`,
-   `_get_message_priority` → `_q_for_pri`). Возврат при выходе — в хвост
-   (`rpush`), `reject(requeue=True)` — в голову (`lpush`).
+## Наблюдаемые факты
 
-Инвентаризация задач на проде (`app.loader.import_default_modules()`,
-87 задач): `acks_late=True` только у трёх —
-`weblate.trans.tasks.auto_translate`, `auto_translate_component`,
-`fix_failing_checks`. Остальные 84 подтверждаются при доставке.
+Проба `analysis/probes/celery_shutdown_requeue.py` запускалась с установленными
+celery 5.6.3/kombu 5.6.2 на изолированных Redis db/queue:
 
-**Вердикт по риску, который надо было проверить.** Холодное завершение не
-вводит новой потери данных: 84 задачи без `acks_late` не переживают прерывания
-и сегодня. Оно меняет только длительность окна — сегодня это тёплое ожидание
-до `SIGKILL` от supervisor (`stopwaitsecs`, по умолчанию 10 с), после правки —
-`worker_soft_shutdown_timeout`. При значении не меньше нынешних 10 с регрессии
-нет, а короткая задача успевает доработать (четвёртая строка таблицы).
-Тем не менее менять семантику всех воркеров незачем: холодное завершение
-нужно ровно тому воркеру, который исполняет `acks_late`-задачи, поэтому план
-включает его **только для `celery-translate`** через `stopsignal` его
-supervisor-программы, а не глобально через `REMAP_SIGTERM`.
+| Сценарий | После остановки | Результат |
+| --- | --- | --- |
+| `acks_late` + SIGTERM, затем SIGKILL | `unacked=1`, очередь пуста | задача ждёт visibility timeout |
+| `acks_late` + SIGQUIT | очередь = 1, `unacked=0`, есть `Restoring` | сообщение переисполняется с тем же task id |
+| Длинная задача без `acks_late` + SIGQUIT | очередь = 0 | delivery уже подтверждена и не восстанавливается |
+| Короткая (3 с) задача без `acks_late` + SIGQUIT | задача `SUCCESS` | успевает завершиться |
 
-## Задача 1. Долгая продюсерская задача возвращается в очередь за секунды
+Census текущих задач даёт три `acks_late=True`: `auto_translate`,
+`auto_translate_component`, `fix_failing_checks`
+(`weblate/trans/tasks.py:992-999,1130-1137,1256-1263`). Первые две уже идут в
+`translate`; mass fix остаётся на `celery` (`weblate/settings_docker.py:1444-1454`).
 
-**Результат.** Перезапуск сервиса не стоит продюсеру ни потерянного прогона,
-ни четырёх часов ожидания: задача возвращается в очередь при остановке и
-подхватывается тем же `task id` после старта. Поведение остальных воркеров не
-меняется.
+Supervisor останавливает программу её `config.stopsignal`; проверенный
+upstream-файл `/etc/supervisor/conf.d/celery-translate.conf` имеет отдельную
+секцию `[program:celery-translate]`. Значит `stopsignal=QUIT` в этом файле —
+точечный, поддерживаемый способ включить Celery cold shutdown. Границы
+`20 < 60 < 90` означают: Celery ждёт 20 с до cancel, supervisor ждёт программу
+до 60 с, Docker держит контейнер до 90 с.
+
+## Общий контракт liveness
+
+Новый cache record `task-liveness-<task_id>` создаётся **до публикации**
+пользовательской задачи и хранится те же шесть часов, что
+`task-meta`/`user-tasks`:
+
+Запись содержит `enabled=True`, `started_at`, nullable `heartbeat_at` и
+счётчик `attempt`.
+
+- `auto_translation` (`weblate/trans/views/edit.py`) заранее выделяет UUID,
+  сохраняет scope metadata и liveness record, затем публикует через
+  `apply_async(task_id=...)` вместо `delay()`. При publish failure удаляет обе
+  предварительные cache-записи. Это закрывает гонку, где быстрый worker начал
+  task до регистрации на странице.
+- Mass-fix view (`weblate/trans/views/search.py`) уже выделяет `task_id` до
+  `apply_async`; он переносит `store_task_metadata`/liveness registration до
+  публикации и в существующей exception-ветке освобождает lock **и** удаляет
+  предварительные записи.
+- `add_user_task` только добавляет текстовую запись в user list и подтверждает
+  `enabled=True`; liveness record уже существует. Фоновый callsite не создаёт
+  этот record.
+- В начале `auto_translate` и `fix_failing_checks` helper атомарно увеличивает
+  `attempt` и обновляет `heartbeat_at`. Их current progress paths вызывают
+  helper вместе с `current_task.update_state`, поэтому активная работа имеет
+  fresh heartbeat.
+- `TasksViewSet.retrieve` читает record после обычной authorization
+  `get_task()`, вычисляет `liveness` (`queued`, `running`, `no-update`) на
+  сервере и возвращает его как optional поле. `completed=True` всегда
+  перекрывает liveness. Сырые timestamps не выходят через API.
+- `get_user_tasks` больше не выкидывает liveness-enabled task только потому,
+  что Celery говорит `PENDING` старше `PENDING_TASK_MAX_AGE`; обычные старые
+  записи без liveness сохраняют сегодняшний pruning-contract.
+- `loader-bootstrap.js` отображает fixed translated copy для `queued` и
+  `no-update`; при `running` сохраняет существующий экран. Он не добавляет
+  кнопку, меняет `aria-live` текстом, а не только цветом.
+
+## Задача 1. Восстановить acks-late задачи при штатной остановке
+
+**Результат.** `auto_translate*` и `fix_failing_checks`, реально работавшие в
+момент `docker compose up -d --build weblate`/`restart weblate`, возвращаются
+в свою неизменённую Redis queue без четырёхчасового ожидания. Очереди и
+приоритеты задач не меняются.
 
 **Файлы и интерфейсы.**
 
-- `weblate/settings_docker.py`, блок Celery (строки 1426+):
-  `CELERY_WORKER_SOFT_SHUTDOWN_TIMEOUT =
-  get_env_int("WEBLATE_CELERY_SOFT_SHUTDOWN_TIMEOUT", 20)`. Настройка
-  используется только на пути холодного завершения
-  (`celery/apps/worker.py:416`), поэтому для воркеров, получающих SIGTERM, она
-  no-op. Ожидания при простое нет: `wait_for_soft_shutdown` спит только при
-  наличии активных запросов.
-- `weblate/settings_docker.py`, `CELERY_TASK_ROUTES`: добавить
-  `"weblate.trans.tasks.fix_failing_checks": {"queue": "translate"}`. Это
-  третья `acks_late`-задача; сейчас она идёт в общий `celery` и не получит
-  защиту. Заодно массовое исправление перестаёт стоять за уборкой.
-- `deploy/Dockerfile`: в слое сборки дописать в
-  `/etc/supervisor/conf.d/celery-translate.conf` строки `stopsignal=QUIT` и
-  `stopwaitsecs=60` (файл приходит из upstream-образа; правим `sed`-ом по
-  секции `[program:celery-translate]`, не заменяя `command`). Остальные
-  `celery-*` программы не трогаем.
-- `deploy/docker-compose.yml` и `dev-docker/docker-compose.yml`:
-  `stop_grace_period: 90s` у сервиса `weblate`, иначе docker убьёт контейнер
-  раньше, чем supervisor дождётся воркера (сейчас 10 с по умолчанию, и это
-  вторая половина причины инцидента).
-- `deploy/environment.example`: задокументировать
-  `WEBLATE_CELERY_SOFT_SHUTDOWN_TIMEOUT`.
+- `weblate/settings_docker.py`: добавить
+  `CELERY_WORKER_SOFT_SHUTDOWN_TIMEOUT = get_env_int(
+  "WEBLATE_CELERY_SOFT_SHUTDOWN_TIMEOUT", 20)` рядом с текущими настройками
+  broker. Для worker, которые всё ещё получают SIGTERM, это no-op.
+- `deploy/Dockerfile`: пока образ выполняется как root, append
+  `stopsignal=QUIT` и `stopwaitsecs=60` в **каждый отдельный** upstream config
+  `/etc/supervisor/conf.d/celery-translate.conf` и
+  `/etc/supervisor/conf.d/celery-celery.conf`. Не заменять `command`, не
+  применять ко всем `celery-*.conf` и не использовать `REMAP_SIGTERM`.
+- `deploy/docker-compose.yml` и `dev-docker/docker-compose.yml`: добавить
+  `stop_grace_period: 90s` только service `weblate`.
+- `deploy/environment.example`: объяснить
+  `WEBLATE_CELERY_SOFT_SHUTDOWN_TIMEOUT=20` и инвариант
+  `timeout < stopwaitsecs < stop_grace_period`.
+- `weblate/settings_docker.py`, `CELERY_TASK_ROUTES`: **не менять**.
+  `fix_failing_checks` продолжает обслуживаться `celery-celery`.
 
 **Действия.**
 
-- [ ] Добавить настройку soft shutdown и маршрут `fix_failing_checks`.
-- [ ] Добавить `stopsignal`/`stopwaitsecs` для `celery-translate` в образ.
-- [ ] Поднять `stop_grace_period` в обоих compose-файлах.
-- [ ] Проверить, что `weblate/settings_test.py` не наследует маршрут в
-      несуществующую очередь (eager-режим маршруты игнорирует).
+- [ ] Добавить timeout и окружение.
+- [ ] Настроить SIGQUIT/60 с на двух названных supervisor-программах.
+- [ ] Выставить Docker grace в обоих compose.
+- [ ] Дополнить пробу проверкой обоих имён очереди: `translate` и `celery`.
+  Она должна подтвердить `acks_late` redelivery и сохранить отдельный случай
+  delivery без `acks_late` как границу гарантии.
 
-**Регрессионные проверки.**
+**Проверка.**
 
-- Тест на маршрутизацию: `app.conf.task_routes` направляет
-  `fix_failing_checks` в `translate`, а не в `celery`; тест смотрит на
-  наблюдаемый маршрут, а не на текст настройки.
-- Повторный прогон `analysis/probes/celery_shutdown_requeue.py` как
-  контрольного измерения: строки 1 и 2 таблицы не должны сойтись.
+1. Запустить `analysis/probes/celery_shutdown_requeue.py`: SIGQUIT даёт
+   `Restoring`, одну запись в исходной queue и пустые `unacked`/
+   `unacked_index`; SIGTERM+SIGKILL остаётся control.
+2. Собрать dev image, выполнить `WEBLATE_PORT=3001 ./rundev.sh`, затем
+   проверить `supervisorctl status` и effective config обоих workers:
+   `celery-translate`/`celery-celery` получают QUIT при остановке, остальные
+   программы — прежний SIGTERM.
+3. Интеграционный smoke через реальный
+   `docker compose -f dev-docker/docker-compose.yml restart weblate`: запустить
+   на локальном fixture `auto_translate` с `auto_source=others`, остановить
+   после первой сохранённой строки, дождаться новой delivery того же task id и
+   сравнить конечные target/state/history с непрерванным fixture. Уже
+   сохранённая строка не перезаписывается (`q=state:empty`), оставшиеся
+   обрабатываются. Повторить аналогично с одним actual mass-fix policy и его
+   `lock_key`: не появляется второе изменение и не освобождается чужой lease.
 
-**Смоук на dev.**
+## Задача 2. Сделать статус и счётчик пользовательской задачи правдивыми
 
-1. `WEBLATE_PORT=3001 ./rundev.sh` (настройки воркеров читаются при старте).
-2. Запустить автоперевод компонента, дождаться ненулевого прогресса.
-3. `docker compose -f dev-docker/docker-compose.yml restart weblate`.
-4. Ожидание: в логе `celery-translate` — `Restoring 1 unacknowledged
-   message(s)`, `redis-cli -n 1 hlen unacked` → 0, после старта в
-   `inspect().active()` тот же `task id` с `delivery_info.redelivered = true`,
-   перевод продолжается с оставшихся строк.
-5. Контроль до правки: те же шаги на текущем коде оставляют `unacked=1` и
-   пустую очередь.
-
-## Задача 2. Экран прогресса отличает «идёт» от «оборвано» и считает строки
-
-**Результат.** Продюсер видит, что происходит, даже когда воркера, который вёл
-задачу, больше нет.
-
-Проба даёт и здесь точный ориентир: после холодного завершения состояние
-`acks_late`-задачи становится `PENDING` (переисполнение будет), а задачи без
-`acks_late` — `RETRY` (переисполнения не будет). Ни одно из них нельзя
-использовать как признак живости, поэтому признаком служит пульс.
+**Результат.** Автопереводная плашка честно различает «ожидает worker»,
+«обновляется», «нет обновлений 10 минут»; её счётчик показывает записи,
+а не сетевые шаги. Mass fix сохраняет уже работающий `done/total`.
 
 **Файлы и интерфейсы.**
 
-- Пульс: `AutoTranslate.set_progress` (`weblate/trans/autotranslate.py:272`) и
-  `progress_callback` массового исправления (`weblate/trans/tasks.py:1321`)
-  пишут `cache.set(f"task-heartbeat-{task_id}", {"time": …, "hostname": …})`
-  с TTL уровня `TASK_METADATA_TTL`.
-- API: `TaskSerializer` (`weblate/api/serializers.py:4150`) получает `state`,
-  `stale`, `done`, `total`; `TasksViewSet.retrieve`
-  (`weblate/api/views.py:4955`) считает
-  `stale = not completed and (heartbeat is None or now - heartbeat > 180)`
-  только для задач, у которых пульс когда-либо был.
-- Фронт: `weblate/static/loader-bootstrap.js`, блок `data-task` (строка 1798):
-  при `stale` — `alert-warning`, текст «Выполнение прервано перезапуском
-  сервиса; задача возобновится автоматически» и кнопка повторного запуска.
-  Требования `ACCESSIBILITY.md` соблюдаются: состояние передаётся текстом, а
-  не только цветом; `aria-live` уже есть.
-- Строки вместо голого процента: `set_progress` кладёт в meta `done`/`total`
-  единиц, `weblate/templates/message.html` показывает «4530 из 9482». В
-  инциденте бар показывал 73 % при фактических 47,8 % — это разные
-  знаменатели, а не погрешность.
+- `weblate/utils/celery.py`: key builders, pre-publication registration,
+  cleanup и heartbeat helpers рядом с `get_task_metadata_key`/`add_user_task`;
+  `get_user_tasks` сохраняет liveness-enabled PENDING tasks до обычного
+  metadata TTL.
+- `weblate/trans/views/edit.py` и `weblate/trans/views/search.py`: сначала
+  выделить/зарегистрировать task id, затем `apply_async`; publish failure
+  удаляет registration вместе с уже существующим cleanup lock.
+- `weblate/trans/tasks.py`: в начале `auto_translate` и
+  `fix_failing_checks`, а также в их существующих progress paths, touch record.
+- `weblate/trans/autotranslate.py`: один attempt-local accumulator,
+  принадлежащий `BatchAutoTranslate` и разделяемый дочерними
+  `AutoTranslate`. До первой мутации он строит complete permission-filtered
+  `eligible` snapshot; после `AutoTranslate.update()` добавляет один `updated`.
+  `get_task_meta()` всех вложенных progress updates использует один accumulator,
+  поэтому outer progress не затирает `done/total` переводом одного языка.
+  Redelivery создаёт новую попытку и snapshot только оставшихся единиц.
+- `weblate/api/serializers.py`/`weblate/api/views.py`: `TaskSerializer`
+  получает optional `liveness`; `retrieve()` вычисляет enum на сервере после
+  `get_task()` и оставляет `result` совместимым. Для счётчика serializer не
+  расширяется: существующий `result.done/result.total` — единый контракт UI.
+- `weblate/static/loader-bootstrap.js`: обрабатывает новый enum; готовый
+  `done/total` renderer остаётся. `weblate/templates/message.html` остаётся
+  semantic live region; при необходимости copy меняется через её
+  `.task-message`, не `innerHTML`.
+- Тесты: `weblate/api/tests.py`,
+  `weblate/trans/tests/test_autotranslate.py`,
+  `weblate/trans/tests/test_fix_check_task.py` и точечный JS test по принятому
+  frontend-паттерну.
+
+**Действия.**
+
+- [ ] Ввести pre-publication record, cleanup при publish failure, server-side
+      enum и pruning-exception без изменения authorization: project-language
+      task продолжает быть доступен только по `user_id` в `task-meta`.
+- [ ] Перевести auto-translation с `delay()` на `apply_async(task_id=...)`,
+      чтобы heartbeat при старте никогда не обгонял регистрацию.
+- [ ] Вызвать heartbeat при старте и current progress, не добавляя global
+      `task_prerun` signal для всех Celery-задач.
+- [ ] Добавить attempt-local aggregate `updated/eligible` только в automatic
+      translation; не переиспользовать `progress_steps`, потому что judge
+      измеряет worst-case calls, а не строки.
+- [ ] Отобразить enum текстом и сохранить existing error/result rendering.
+- [ ] Не добавлять POST/replay action.
 
 **Регрессионные проверки.**
 
-- `retrieve` со свежим пульсом → `stale=false`; с просроченным → `stale=true`;
-  завершённая задача никогда не `stale`.
-- `done`/`total` соответствуют числу единиц, а не шагов движка.
-- Ручная проверка на dev: `supervisorctl stop celery-translate` во время
-  автоперевода — плашка переходит в предупреждение за три минуты.
+- UUID, metadata и liveness record существуют до `apply_async`; simulated
+  publish failure удаляет их и не оставляет task в user list. Первый heartbeat
+  сразу после publish даёт `running`, а не теряется гонкой.
+- Новая зарегистрированная задача без heartbeat и спустя 30+ минут остаётся в
+  user task list с `liveness=queued`; старая обычная PENDING task по-прежнему
+  удаляется после `PENDING_TASK_MAX_AGE`.
+- Первый heartbeat даёт `running`; heartbeat старше 600 с даёт `no-update`;
+  `completed=True` не даёт ни один из трёх running status.
+- Один artificial LLM retry дольше 180 с, но короче 600 с, остаётся `running`.
+- Auto-translation из нескольких translations показывает суммарные
+  `updated/eligible`; judge с большим числом сетевых calls не меняет
+  denominator; delivery после restart начинает новый count только для
+  оставшихся `state:empty` units.
+- API access к чужой project-language task остаётся 404; liveness record не
+  расширяет область видимости. UI assertion проверяет текст и `aria-live`, а
+  не класс цвета.
 
-## Задача 3. Деплой не запускается молча поверх работающей задачи
+## Задача 3. Остановить deploy до того, как он прервёт активную задачу
 
-**Результат.** Деплой либо не стартует поверх продюсерской задачи, либо
-явно сообщает, что именно он прервал и что вернулось в очередь.
+**Результат.** По умолчанию `./deploy/vps.sh deploy` отказывается до `git push`
+и remote `git reset`, если `celery-translate` исполняет `auto_translate*`.
+`--force` — явный, документированный обход с выводом task id/name/возраста.
+Queued сообщения `translate` только отображаются: Redis переживает контейнер,
+и они не являются прерываемыми active tasks.
 
 **Файлы и интерфейсы.**
 
-- Новая команда `weblate/utils/management/commands/running_tasks.py` рядом с
-  `celery_queues.py`: JSON активных задач (имя, id, возраст, очередь).
-- `deploy/vps.sh`, `deploy_stack()`: перед `docker compose up` вызывает её
-  через `docker exec`; при активной задаче в очереди `translate` печатает
-  список и отказывается деплоить без `--force`.
-- После успешного деплоя печатает те же задачи с отметкой, вернулись ли они в
-  очередь (`LLEN translate`, `HLEN unacked`). После Задачи 1 это проверяемое
-  утверждение.
+- `deploy/vps.sh`: полноценный parser только для `--build` и `--force`,
+  неизвестный флаг — usage/exit 2. `--force` не означает build.
+- `deploy/vps.sh`: до `git push` выполнить через уже работающий
+  `docker exec … weblate shell` read-only inspection `app.control.inspect()`.
+  Отобрать `weblate.trans.tasks.auto_translate` и
+  `auto_translate_component` из active task records и вывести id, name,
+  `time_start`; broker `LLEN translate` вывести отдельной предупреждающей
+  строкой. Не полагаться на новую management command: её ещё нет в running
+  image до первого deploy.
+- После deploy выводить только честные факты: health/login/revision и число
+  queued messages. Скрипт не заявляет, что конкретный task id восстановился:
+  он мог уже быть принят новым worker. Задача и UI из Task 2 — место для
+  наблюдения redelivery.
 
-**Проверка.** `weblate running_tasks --json` при запущенном автопереводе
-возвращает непустой список; `shellcheck` на `deploy/vps.sh` зелёный.
+**Действия.**
 
-## Координация с планом приоритетов
+- [ ] Разобрать аргументы до расчёта target; `--build` сохраняет сегодняшний
+      выбор action, `--force` только снимает preflight refusal.
+- [ ] Выполнить preflight после VPN/SSH readiness, но до push/reset.
+- [ ] При active auto-translation завершить с non-zero и дать оператору два
+      точных варианта: дождаться completion или повторить с `--force`.
+- [ ] При `--force` записать в deploy log, какие task id могли быть
+      восстановлены; не манипулировать Redis вручную.
 
-`docs/product/plans/2026-09-10-producer-tasks-ahead-of-housekeeping.md` идёт
-параллельно. Точки соприкосновения:
+**Проверка.**
 
-- **Один блок настроек.** Тот план добавляет `queue_order_strategy` и
-  `CELERY_TASK_DEFAULT_PRIORITY` в `weblate/settings_docker.py:1426-1444`, этот
-  — `CELERY_WORKER_SOFT_SHUTDOWN_TIMEOUT` и маршрут `fix_failing_checks` туда
-  же. Конфликт текстовый, не смысловой; кто вливается вторым, тот и переносит.
-- **Приоритет и возврат сообщения совместимы.** Возврат сохраняет приоритет
-  (`_do_restore_message` → `_q_for_pri`), поэтому interactive-постановка после
-  перезапуска остаётся в списке приоритета 0. Факт проверен в установленном
-  kombu и годится обоим планам.
-- **Возврат кладёт сообщение в хвост своего приоритетного списка**, а не в
-  голову. Для приёмки того плана это означает: после перезапуска порядок
-  внутри приоритета не сохраняется.
-- **`fix_failing_checks` уезжает из очереди `celery`.** Это снимает её с
-  общего воркера, которого касается план приоритетов; тамошние сценарии с
-  `$'celery\x06\x163'` от этого не зависят, но факт нужно учесть при сверке
-  очередей.
-- **Порядок.** Планы независимы и могут выполняться параллельно в разных
-  ветках; общий смоук после слияния — один перезапуск стека, в котором
-  проверяются оба свойства: interactive-задача принята раньше фоновой и
-  прерванная продюсерская вернулась в очередь.
+- Fixture shell/command test подменяет inspection: active auto-translation
+  блокирует без `--force`, queued-only не блокирует, `--force` продолжает,
+  неизвестный флаг не запускает `git push`.
+- `shellcheck deploy/vps.sh` зелёный.
+- Dev smoke с активным `auto_translate`: normal deploy command прекращается
+  до remote action; force path фиксирует предупреждение, перезапускает
+  контейнер и Task 1/2 показывают восстановление без ручного Redis restore.
 
-## Вне объёма
+## Задача 4. Документация и совместная приёмка
 
-- Вынос Celery в отдельный контейнер.
-- Перевод остальных 84 задач на `acks_late` — это отдельная работа с ревизией
-  идемпотентности каждой.
-- Постоянная история запусков автоперевода (плашка восстанавливается через
-  `add_user_task`, `weblate/utils/celery.py:96`).
-- Снижение `visibility_timeout`: именно он защищает от дублей.
+**Результат.** Эксплуатационный и пользовательский контракт не остаётся только
+в исходниках, а оба Celery-плана проверяются вместе.
 
-## Риски
+**Действия и проверка.**
 
-- Холодное завершение снимает задачи без `acks_late` по истечении soft
-  timeout. На `celery-translate` таких задач нет (очередь `translate` несёт
-  только `auto_translate*` и, после Задачи 1, `fix_failing_checks`), поэтому
-  риск ограничен этим воркером и этим списком.
-- Выход при холодном завершении — код 1 (`EX_FAILURE`). При ручном
-  `supervisorctl signal QUIT` supervisor с `autorestart=true` перезапустит
-  воркер; при остановке контейнера это не имеет значения, но в логах деплоя
-  строка «exited with code 1» ожидаема и не является ошибкой.
-- Деплой удлиняется на soft timeout, только если в момент остановки реально
-  идёт продюсерская задача.
-- Переисполнение автоперевода безопасно по построению (`q=state:empty`,
-  `overwrite_existing=False`), но прогресс начинается заново: продюсер увидит
-  сброс процента. Задача 2 обязана это объяснять текстом.
-- `stop_grace_period: 90s` применяется ко всему контейнеру: аварийная
-  остановка зависшего стека станет длиннее на это время.
+- [ ] `docs/changes.rst`, верхняя unreleased-секция: пользовательская
+      автопереводная задача восстанавливается после штатного перезапуска;
+      плашка показывает очередь/отсутствие обновлений и число записанных
+      строк. Не обещать exactly-once delivery.
+- [ ] `AGENTS.md`, Development environment: worker reload distinction,
+      `acks_late` recovery через QUIT, timeout ordering и правило не делать
+      Redis restore вручную, пока доступен штатный deploy recovery.
+- [ ] Обновить этот план после реализации: commit SHA, целевые тесты,
+      результаты транспортной и Docker-smoke проб, deploy status.
+- [ ] Единый dev smoke после слияния с
+      `docs/product/plans/2026-09-10-producer-tasks-ahead-of-housekeeping.md`:
+      priority-0 interactive task на `celery` опережает background priority-3;
+      активный auto-translation восстанавливается; `fix_failing_checks` всё
+      ещё в `celery` и не занимает worker `translate`.
+- [ ] `uv run prek run --files` на изменённых файлах, целевые pytest и
+      `shellcheck deploy/vps.sh` зелёные.
 
-## Что уже сделано (хотфикс 11.09, вне плана)
+`docs/security/threat-model.rst` в этой версии не меняется: новый публичный
+endpoint, permission или mutation не добавляется. Любое возвращение replay
+POST немедленно делает threat-model review частью его отдельного изменения.
 
-Прерванная задача `4a6744e9-4cfe-4aad-ac4a-2a8c00a0b508` возвращена в очередь
-вручную, чтобы перевод anvil-saga/fr завершился сегодня:
+## Риски и восстановление
 
-```python
-from types import SimpleNamespace
-from weblate.utils.celery import app
+- Cold shutdown меняет окно для задач без `acks_late` в `celery-celery`, но не
+  даёт им новую гарантию доставки: подтверждённое сообщение не может вернуться
+  в очередь. Их контрольный случай остаётся в пробе; короткая задача получает
+  больше шансов завершиться, чем при сегодняшнем SIGKILL.
+- `fix_failing_checks` после restart может быть redelivered с тем же id. Его
+  existing `lock_key` должен остаться собственностью этой доставки; partial
+  mutation smoke обязателен до деплоя.
+- `no-update` — признак отсутствия update, не падения. Это сознательно
+  консервативнее ложного «прервано» при медленном LLM.
+- При `--force` активная задача прекращается сознательно; recovery гарантирует
+  at-least-once delivery, не exactly-once. Автоперевод безопасен для уже
+  записанных строк благодаря `q=state:empty` и
+  `overwrite_existing=False`.
+- `stop_grace_period: 90s` удлиняет аварийную остановку контейнера максимум на
+  это время.
 
-# ВАЖНО: ключ в `unacked` - это delivery tag, а не task id.
-TAG = "c0e6c39c-788e-4e20-b491-9a26c038a0dc"
-with app.connection_for_write() as conn:
-    channel = conn.default_channel
-    channel._restore(SimpleNamespace(delivery_tag=TAG), leftmost=True)
-    channel.client.zrem("unacked_index", TAG)
-```
+## Зависимости и порядок
 
-Результат: воркер принял сообщение сразу, `delivery_info.redelivered = true`,
-тот же `task id`, за 2,5 минуты непереведённых строк стало 4412 вместо 4952.
-Это разовое действие, а не замена Задаче 1.
+Задача 1 первой: она меняет delivery contract. Задача 2 зависит от неё только
+в redelivery-smoke, но её code contract независим; после фикса общего
+liveness интерфейса может идти параллельно. Задача 3 зависит от решения
+Задачи 1, потому что force-copy должна обещать только подтверждённое recovery
+поведение. Задача 4 последняя.
+
+Реализация требует отдельного согласования этого плана. Любой production
+deploy требует отдельного `DEPLOY-OK`.
