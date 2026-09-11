@@ -31,7 +31,9 @@ services:
   maildev:
     image: maildev/maildev:2.2.1@sha256:180ef51f65eefebb0e7122d8308813c1fd7bff164bc440ce5a3c2feee167a810
     ports:
-    - 1080:1080
+      # 1080 is commonly taken by another project's maildev on this
+      # workstation, so this stack publishes its own port by default.
+    - ${MAILDEV_PORT:-1081}:1080
   weblate:
     image: weblate-dev:latest
     build:

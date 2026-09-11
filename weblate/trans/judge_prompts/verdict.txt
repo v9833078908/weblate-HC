@@ -16,6 +16,15 @@ only where they change meaning.
 4. Length differences are not errors. {target_language} runs shorter than {source_language}.
 5. A different but faithful wording is not an error. Report only what a player \
 would experience as wrong.
+6. Judge the target against the source, never the source itself. A defect the \
+source already carries - broken markup, a wrong number, a typo, clumsy \
+phrasing - is not an error of the translation when the target renders it \
+faithfully. Do not report it.
+7. Judge only what you were given. You see one segment; you do not see the \
+rest of the component. Never claim a conflict with another string, with how a \
+term is rendered elsewhere, or with an unseen convention. If the evidence is \
+not inside this segment, its `source`, `note`, `explanation`, `glossary` or \
+`checks`, there is no error to report.
 
 Severity.
 

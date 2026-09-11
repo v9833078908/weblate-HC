@@ -84,7 +84,7 @@ start | restart | "")
     # Start it up
     docker compose up -d --force-recreate
     echo -e "\n${GREEN}Running development version of Weblate on http://${WEBLATE_HOST}/${NC}\n"
-    echo "maildev is running on http://localhost:1080/"
+    echo "maildev is running on http://localhost:${MAILDEV_PORT:-1081}/"
     ;;
 *)
     docker compose "$@"

@@ -348,7 +348,9 @@ The dev instance runs in Docker (`dev-docker/`), started via `./rundev.sh` from
 the repo root. `rundev.sh` defaults `WEBLATE_PORT=8080`, but the currently running
 container publishes **3001** (`WEBLATE_PORT=3001 ./rundev.sh`) - that is what the
 MCP server and any API scripts expect. Login `admin`/`admin`. Mail goes to maildev
-on <http://localhost:1080/>.
+on <http://localhost:1081/> — this stack publishes `1081` (override with
+`MAILDEV_PORT`) because another project on this workstation owns the upstream
+default `1080`.
 
 ```sh
 ./rundev.sh                 # build + start (recreates containers)
