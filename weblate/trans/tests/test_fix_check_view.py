@@ -520,26 +520,59 @@ class FixCheckSourceTemplateViewTest(ViewTestCase):
         self.assertEqual(sibling.source, "Wait…")
         self.assertEqual(sibling.state, expected_state)
 
-    def test_source_translation_page_offers_no_dead_fix_link(self) -> None:
+    def _source_url(self) -> str:
+        return reverse(
+            "fix-check",
+            kwargs={
+                "name": "ellipsis",
+                "path": self.source_translation.get_url_path(),
+            },
+        )
+
+    def test_source_translation_page_offers_fix_link_for_source_check(self) -> None:
         """
-        A source translation can never be mass-fixed, so it gets no link.
+        A source check is fixed from the source translation page itself.
 
         `check_autotranslate` refuses `unit.bulk_edit` on a source
-        translation without an intermediate language before any role or
-        superuser grant, so a rendered link would always answer 403. The
-        component scope above is how this same check is fixed.
+        translation without an intermediate language, but a source check
+        only ever edits the source strings, so its gate is the component
+        (`fix_check_permission_object`): the link renders next to the
+        count, and the translation scope answers with the candidate.
         """
         response = self.client.get(self.source_translation.get_absolute_url())
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "ellipsis")
-        self.assertNotContains(response, "/fix-check/")
+        self.assertContains(response, self._source_url())
 
+        response = self.client.get(self._source_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["candidates"].total_eligible, 1)
+
+    def test_source_translation_scope_applies_source_fix(self) -> None:
+        response = self.client.post(
+            self._source_url(), {"unit_ids": [str(self.source_unit.pk)]}
+        )
+        self.assertRedirects(response, self.source_translation.get_absolute_url())
+        self.source_unit.refresh_from_db()
+        self.assertEqual(self.source_unit.target, "Wait…")
+
+    def test_source_translation_scope_keeps_target_check_gate(self) -> None:
+        """Only a source check is let through; a target check on a source page is still a dead end."""
+        self.assertNotContains(
+            self.client.get(self.source_translation.get_absolute_url()),
+            reverse(
+                "fix-check",
+                kwargs={
+                    "name": "end_stop",
+                    "path": self.source_translation.get_url_path(),
+                },
+            ),
+        )
         self.assertEqual(
             self.client.get(
                 reverse(
                     "fix-check",
                     kwargs={
-                        "name": "ellipsis",
+                        "name": "double-space",
                         "path": self.source_translation.get_url_path(),
                     },
                 )
@@ -547,7 +580,7 @@ class FixCheckSourceTemplateViewTest(ViewTestCase):
             403,
         )
 
-    def test_check_list_offers_no_dead_fix_link_for_source_row(self) -> None:
+    def test_check_list_offers_fix_link_for_source_row(self) -> None:
         response = self.client.get(
             reverse(
                 "checks",
@@ -558,23 +591,12 @@ class FixCheckSourceTemplateViewTest(ViewTestCase):
             )
         )
         self.assertEqual(response.status_code, 200)
-        # The row is rendered and the page-level gate is open: only the
-        # per-row permission keeps the link off this source-language row.
         self.assertTrue(response.context["show_fix_check_links"])
         self.assertEqual(
             [row.pk for row in response.context["object_list"]],
             [self.source_translation.pk],
         )
-        self.assertNotContains(
-            response,
-            reverse(
-                "fix-check",
-                kwargs={
-                    "name": "ellipsis",
-                    "path": self.source_translation.get_url_path(),
-                },
-            ),
-        )
+        self.assertContains(response, self._source_url())
 
 
 class ExplicitPolicyViewTest(ViewTestCase):

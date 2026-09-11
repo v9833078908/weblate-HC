@@ -30,7 +30,11 @@ from weblate.checks.models import CHECKS
 from weblate.checks.utils import highlight_string
 from weblate.lang.models import Language
 from weblate.trans.filter import FILTERS, get_filter_choice
-from weblate.trans.fix_check import fix_check_policy_id_for_check, resolve_fix_policy
+from weblate.trans.fix_check import (
+    fix_check_permission_object,
+    fix_check_policy_id_for_check,
+    resolve_fix_policy,
+)
 from weblate.trans.forms import FieldDocsMixin
 from weblate.trans.models import (
     Announcement,
@@ -715,6 +719,12 @@ def fix_check_policy_id_for(check_id: str) -> str:
     if resolve_fix_policy(mapped_id) is None:
         return ""
     return mapped_id
+
+
+@register.filter
+def fix_check_perm_object(obj, policy_id: str):
+    """Return the object a "Fix" link's `unit.bulk_edit` gate is checked against."""
+    return fix_check_permission_object(policy_id, obj)
 
 
 @register.simple_tag(takes_context=True)

@@ -25,6 +25,7 @@ from weblate.trans.fix_check import (
     acquire_fix_check_lock,
     dump_fix_check_cohort,
     fix_check_lock_key,
+    fix_check_permission_object,
     load_fix_check_cohort,
     release_fix_check_lock,
     resolve_fix_policy,
@@ -385,14 +386,17 @@ def fix_check(request: AuthenticatedHttpRequest, name, path):
         request, path, (Translation, Component, Project)
     )
 
-    if not request.user.has_perm("unit.bulk_edit", obj) or not request.user.has_perm(
-        "unit.edit", obj
-    ):
-        raise PermissionDenied
-
     policy = resolve_fix_policy(name)
     if policy is None:
         raise Http404
+
+    # A source check over a source translation is permitted through the
+    # component, see `fix_check_permission_object`.
+    permission_object = fix_check_permission_object(name, obj)
+    if not request.user.has_perm(
+        "unit.bulk_edit", permission_object
+    ) or not request.user.has_perm("unit.edit", permission_object):
+        raise PermissionDenied
 
     component = context.get("component")
     if component is not None and component.is_glossary:

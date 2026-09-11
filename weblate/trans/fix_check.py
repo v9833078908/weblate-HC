@@ -40,7 +40,7 @@ from weblate.checks.utils import highlight_string
 from weblate.trans.actions import ActionEvents
 from weblate.trans.autofixes import AUTOFIXES, fix_target
 from weblate.trans.file_format_params import DOSLineEndings
-from weblate.trans.models import Component, Unit
+from weblate.trans.models import Component, Translation, Unit
 from weblate.trans.models.unit import NEWLINES
 from weblate.trans.util import join_plural
 from weblate.utils.cache import is_redis_cache
@@ -1513,3 +1513,33 @@ def fix_check_policy_id_for_check(check_id: str) -> str:
     via `resolve_fix_policy` exactly as before.
     """
     return CHECK_TO_POLICY_ID.get(check_id, check_id)
+
+
+def fix_check_permission_object(
+    name: str, obj: Translation | Component | Project
+) -> Translation | Component | Project:
+    """
+    Return the object `unit.bulk_edit` is checked against for a `fix-check` scope.
+
+    `check_autotranslate` (`weblate/auth/permissions.py`) refuses
+    `unit.bulk_edit` outright on a source translation without an
+    intermediate language, because bulk *translation* of a source makes
+    no sense. A source check (`ellipsis`, ...) is the opposite case: its
+    failing rows are exactly the source strings, and the only edit the
+    policy performs is to those strings. For that pairing the scope's
+    permission is measured on the component - the same object a "Fix"
+    link from the component's check list is gated on - so the link
+    appears where the failing count is shown, instead of only one page
+    up. Every other pairing keeps `obj` itself.
+    """
+    if not isinstance(obj, Translation) or not obj.is_source:
+        return obj
+    policy = resolve_fix_policy(name)
+    if policy is None:
+        return obj
+    if all(
+        (check := CHECKS.get(check_id)) is not None and check.source
+        for check_id in policy.check_ids
+    ):
+        return obj.component
+    return obj

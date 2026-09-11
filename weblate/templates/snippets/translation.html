@@ -125,10 +125,13 @@
             source-language translation without an intermediate language
             outright, before any role or superuser grant is consulted
             (`weblate/auth/permissions.py`), so on a source-language page
-            an ungated link is always a dead end that answers 403.
+            an ungated link is always a dead end that answers 403. The
+            one exception is a source check (`ellipsis`) on that very
+            page: its rows are the source strings, so the gate is the
+            component (`fix_check_permission_object`).
           {% endcomment %}
           {% if allow_fix_check and item.fix_url_name and object.pk %}
-            {% perm 'unit.bulk_edit' object as user_can_fix_all %}
+            {% perm 'unit.bulk_edit' object|fix_check_perm_object:item.fix_url_name as user_can_fix_all %}
             {% if user_can_fix_all %}
               <a class="btn-inline"
                  href="{% url 'fix-check' name=item.fix_url_name path=object.get_url_path %}">{% translate "Fix" %}</a>

@@ -54,7 +54,7 @@
                 (`weblate/auth/permissions.py`), and an ungated link there
                 would always answer 403.
               {% endcomment %}
-              {% perm 'unit.bulk_edit' row as user_can_fix_row %}
+              {% perm 'unit.bulk_edit' row|fix_check_perm_object:fix_check_policy_id as user_can_fix_row %}
               {% if user_can_fix_row %}
                 <a href="{% url 'fix-check' name=fix_check_policy_id path=row.get_url_path %}"
                    class="btn-inline">{% translate "Fix" %}</a>

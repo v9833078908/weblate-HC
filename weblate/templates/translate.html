@@ -690,7 +690,7 @@
                              {% if locked or not user_can_translate %}disabled="disabled"{% endif %}>{% translate "Fix string" %}</a>
                         {% endif %}
                         {% if fix_url_name %}
-                          {% perm 'unit.bulk_edit' unit.translation as user_can_fix_all %}
+                          {% perm 'unit.bulk_edit' unit.translation|fix_check_perm_object:fix_url_name as user_can_fix_all %}
                           {% if user_can_fix_all %}
                             <a href="{% url 'fix-check' name=fix_url_name path=unit.translation.get_url_path %}"
                                class="btn btn-info">{% translate "Fix all such strings" %}</a>
