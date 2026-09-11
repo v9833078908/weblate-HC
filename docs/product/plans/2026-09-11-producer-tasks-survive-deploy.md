@@ -382,8 +382,7 @@ CI-проверке `git diff --exit-code`.
 
 Реализация выполнена в отдельном worktree
 (`.worktrees/producer-tasks-survive-deploy`, ветка
-`feat/producer-tasks-survive-deploy`); commit SHA будет вписан сюда после
-коммита.
+`feat/producer-tasks-survive-deploy`); commit `9574d9e`.
 
 `docs/security/threat-model.rst` в этой версии не меняется: новый публичный
 endpoint, permission или mutation не добавляется. Любое возвращение replay
