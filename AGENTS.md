@@ -382,6 +382,29 @@ shell resolving what the worker rejects is the confirmation of this skew, not
 evidence against it. Read a queued run's own verdict with
 `app.AsyncResult(task_id).result` instead of guessing from the flash message.
 
+`celery-translate` (`auto_translate*`) and `celery-celery` (`fix_failing_checks`,
+among other tasks) are the only two Celery programs whose `supervisor`
+`stopsignal` is `QUIT` instead of the default `TERM` (`deploy/Dockerfile`,
+`dev-docker/weblate-dev/Dockerfile`): on a routine `docker compose up -d
+--build weblate` restart, `stopsignal=QUIT` makes the worker cold-shut-down
+instead of racing a `SIGKILL`. It waits
+`WEBLATE_CELERY_SOFT_SHUTDOWN_TIMEOUT` (default `20` s) for the running
+`acks_late` task, then cancels it and restores its unacknowledged message to
+its own queue - `translate` or `celery` - instead of leaving it invisible in
+Redis `unacked` for the four-hour `WEBLATE_CELERY_VISIBILITY_TIMEOUT`. The
+three timeouts are strictly ordered:
+`WEBLATE_CELERY_SOFT_SHUTDOWN_TIMEOUT` (20 s) `<` supervisor `stopwaitsecs`
+(60 s) `<` Docker `stop_grace_period` (90 s); narrowing any one of them
+narrows all three together. Never restore a stuck `unacked` message by hand
+(`HDEL`/`LPUSH` against the broker) while this recovery path is available -
+it is the mechanism this ordering exists for. A user-facing automatic
+translation task also carries a closed liveness cache record
+(`weblate/utils/celery.py`) so its progress bar can say `queued`/`running`/
+`no-update` truthfully across a redelivery instead of guessing from
+`AsyncResult.state` alone, which answers `PENDING` for both "never started"
+and "redelivered." See
+`docs/product/plans/2026-09-11-producer-tasks-survive-deploy.md`.
+
 The `celery` worker uses Redis delivery priorities: an explicit interactive
 publication is priority `0`, while every unmarked background publication uses
 the default `3`. Priority belongs to the callsite, not the Celery task class:

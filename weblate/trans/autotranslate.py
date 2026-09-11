@@ -43,9 +43,9 @@ from weblate.trans.models import (
     Unit,
 )
 from weblate.trans.models.judge import (
-    ProducerRun,
     JudgeRunUnit,
     JudgeVerdict,
+    ProducerRun,
     compute_context_hash,
     compute_target_hash,
     current_verdict,
@@ -53,6 +53,7 @@ from weblate.trans.models.judge import (
     state_for_verdict,
 )
 from weblate.trans.util import is_plural, split_plural
+from weblate.utils.celery import touch_task_liveness
 from weblate.utils.state import (
     STATE_APPROVED,
     STATE_FUZZY,
@@ -85,11 +86,13 @@ class JudgeScopePreview:
     initial_calls: int
     worst_case_calls: int
 
+
 @dataclass(frozen=True, slots=True)
 class MTScopePreview:
     matched: int
     writable: int
     per_translation: list[tuple[Translation, int]]
+
 
 @dataclass(frozen=True, slots=True)
 class JudgeSummary:
@@ -214,12 +217,32 @@ def check_auto_translate_permission(
     return user.has_perm("meta:unit.direct_edit", translation)
 
 
+class _AttemptCounter:
+    """Attempt-local `updated / eligible` counter shared by a whole batch."""
+
+    __slots__ = ("eligible", "snapshot_taken", "updated")
+
+    def __init__(self) -> None:
+        self.updated = 0
+        self.eligible: int | None = None
+        self.snapshot_taken = False
+
+
 class BaseAutoTranslate:
     updated: int = 0
     progress_steps: int = 0
     # Slice of the overall task progress this instance reports into. A batch
     # gives each translation its own slice so the percentage never goes back.
     progress_range: tuple[int, int] = (0, 100)
+    # Attempt-local user-facing counter (plan 2026-09-11, Task 2): `updated`
+    # counts units whose translation was actually stored; `eligible` is the
+    # permission-filtered snapshot taken before the first mutation of this
+    # delivery attempt. Both live on the BatchAutoTranslate and are shared
+    # with the child AutoTranslate instances (assigned directly, like
+    # `progress_range` below) so a redelivered task starts a new snapshot
+    # over the remaining `state:empty` units instead of summing incomparable
+    # snapshots.
+    batch_counter: _AttemptCounter | None = None
 
     def __init__(
         self,
@@ -277,11 +300,20 @@ class BaseAutoTranslate:
         phase_current: int | None = None,
         phase_total: int | None = None,
     ) -> None:
-        if current_task and current_task.request.id and self.progress_steps:
+        if current_task and current_task.request.id:
+            # Every progress write is also a liveness heartbeat, so an
+            # actively working task is never reported as `no-update`.
+            touch_task_liveness(current_task.request.id)
             low, high = self.progress_range
-            meta = self.get_task_meta() | {
-                "progress": low + (high - low) * current // self.progress_steps,
-            }
+            # Never mutate the shared meta dict: Celery's AsyncResult keeps
+            # a reference to the first meta it sees per state, and a test's
+            # recorded call list would otherwise replay the last values.
+            meta = dict(self.get_task_meta())
+            if self.batch_counter is not None:
+                counter = self.batch_counter
+                meta["done"] = counter.updated
+                meta["total"] = counter.eligible or counter.updated
+            meta["progress"] = low + (high - low) * current // self.progress_steps
             if phase is not None:
                 meta["phase"] = phase
                 meta["phase_current"] = phase_current
@@ -374,6 +406,7 @@ class AutoTranslate(BaseAutoTranslate):
             )
             if result == SuggestionAddResult.CREATED:
                 self.updated += 1
+                self._count_attempt_update()
         else:
             if (
                 state == STATE_APPROVED
@@ -393,6 +426,12 @@ class AutoTranslate(BaseAutoTranslate):
                 select_for_update=self.mode == "judge",
             )
             self.updated += 1
+            self._count_attempt_update()
+
+    def _count_attempt_update(self) -> None:
+        """Add one stored unit to the attempt-local counter."""
+        if self.batch_counter is not None:
+            self.batch_counter.updated += 1
 
     def post_process(self) -> None:
         if self.updated > 0:
@@ -1061,6 +1100,11 @@ class BatchAutoTranslate(BaseAutoTranslate):
         self.judge_mutating_repairs = judge_mutating_repairs
         self.judge_candidate_severities = judge_candidate_severities
         self.judge_scope = obj
+        # Attempt-local counter for the user-facing `done/total`; created in
+        # _perform so every delivery attempt (including a redelivered one)
+        # starts from a fresh snapshot of the remaining units.
+        self._attempt_counter = _AttemptCounter()
+        self.batch_counter = self._attempt_counter
         self.active_producer_run: ProducerRun | None = None
 
         match obj:
@@ -1221,6 +1265,30 @@ class BatchAutoTranslate(BaseAutoTranslate):
             translation.__dict__["workflow_settings"] = project_languages[
                 translation.component.project_id
             ][translation.language_id].workflow_settings
+
+    def _count_eligible_units(self) -> int:
+        """Total units matching the run's permission-filtered query."""
+        total = 0
+        for translation in self.translations:
+            if not self._can_process_translation(translation):
+                continue
+            total += (
+                AutoTranslate(
+                    user=self.user,
+                    translation=translation,
+                    q=self.q,
+                    mode=self.mode,
+                    component_wide=self.component_wide,
+                    unit_ids=self.unit_ids,
+                    allow_non_shared_tm_source_components=(
+                        self.allow_non_shared_tm_source_components
+                    ),
+                    overwrite_existing=self.overwrite_existing,
+                )
+                .get_units()
+                .count()
+            )
+        return total
 
     def _adopt_producer_run(self) -> ProducerRun:
         """
@@ -1478,6 +1546,9 @@ class BatchAutoTranslate(BaseAutoTranslate):
                 judge_mutating_repairs=self.judge_mutating_repairs,
                 judge_candidate_severities=self.judge_candidate_severities,
             )
+            # Share the attempt-local counter so every nested progress write
+            # reports the batch-wide `done/total`, not one translation's.
+            auto_translate.batch_counter = self._attempt_counter
             if not self._can_process_translation(translation):
                 if self.mode == "judge" and producer_run is not None:
                     self._record_skipped_judge_units(
@@ -1487,6 +1558,16 @@ class BatchAutoTranslate(BaseAutoTranslate):
                     )
                 self.set_progress(pos)
                 continue
+            if not self._attempt_counter.snapshot_taken:
+                # Attempt-local eligible snapshot (Task 2): the complete
+                # permission-filtered unit count over the whole scope,
+                # taken before the first mutation of this delivery attempt.
+                # A redelivered task re-runs this after the stored units
+                # left the `q` filter, so the new attempt counts only the
+                # remaining ones. No progress write here: the batch's own
+                # set_progress(pos) below publishes the snapshot.
+                self._attempt_counter.eligible = self._count_eligible_units()
+                self._attempt_counter.snapshot_taken = True
             if self.mode == "judge" and producer_run is not None:
                 matched_units = list(
                     auto_translate.get_units().order_by("position", "pk")

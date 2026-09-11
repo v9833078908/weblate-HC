@@ -1489,7 +1489,7 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
                 JUDGE_MODEL_SEAT_2="vendor-b/model",
             ),
             patch(
-                "weblate.trans.views.edit.auto_translate.delay",
+                "weblate.trans.views.edit.auto_translate.apply_async",
                 return_value=SimpleNamespace(id=task_id),
             ),
             patch("weblate.api.views.AsyncResult", side_effect=fake_async_result),
@@ -1601,7 +1601,7 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
         with (
             override_settings(CELERY_TASK_ALWAYS_EAGER=False),
             patch(
-                "weblate.trans.views.edit.auto_translate.delay",
+                "weblate.trans.views.edit.auto_translate.apply_async",
                 return_value=SimpleNamespace(id=task_id),
             ),
             patch("weblate.api.views.AsyncResult", side_effect=fake_async_result),
@@ -1632,6 +1632,137 @@ class SeleniumTests(BaseLiveServerTestCase, RegistrationTestMixin, TempDirMixin)
 
         self.assertEqual(seen_phases, {""})
         self.assertEqual(final_width, 100)
+
+    def test_task_liveness_renders_as_aria_live_text(self) -> None:
+        """
+        Task 2 (producer tasks survive deploy): renders liveness truthfully.
+
+        Liveness is rendered as translated text inside the existing
+        aria-live region, never as a colour-only change, and `running`
+        restores the message exactly as it was before the redelivery.
+        """
+        task_id = "liveness-smoke-task"
+        states = [
+            ("PENDING", None, "queued"),
+            ("PENDING", None, "queued"),
+            ("PENDING", None, "no-update"),
+            ("PENDING", None, "no-update"),
+            ("PROGRESS", {"progress": 50}, "running"),
+            ("PROGRESS", {"progress": 75}, "running"),
+            ("PROGRESS", {"progress": 90}, "running"),
+        ]
+        completed_result = {
+            "message": "3 strings were updated.",
+            "warnings": [],
+            "url": None,
+        }
+        calls = 0
+
+        def fake_async_result(pk: str) -> SimpleNamespace:
+            nonlocal calls
+            index = min(calls, len(states))
+            calls += 1
+            if index >= len(states):
+                return SimpleNamespace(
+                    id=task_id,
+                    ready=lambda: True,
+                    state="SUCCESS",
+                    result=completed_result,
+                )
+            state, result = states[index][0], states[index][1]
+            return SimpleNamespace(
+                id=task_id, ready=lambda: False, state=state, result=result
+            )
+
+        def fake_liveness(_task_id: str) -> str | None:
+            index = min(calls - 1, len(states) - 1)
+            if calls - 1 >= len(states):
+                # Production `retrieve()` never asks once `completed` is
+                # True; this branch existing would be the bug under test.
+                return None
+            return states[index][2]
+
+        self.do_login(superuser=True)
+        self.clear_persisted_form_state()
+        project = self.create_component()
+        component = project.component_set.get(slug="django")
+
+        def message_state() -> dict:
+            return self.driver.execute_script(
+                """
+                const message = document.querySelector(
+                    "[data-task] .task-message"
+                );
+                return {
+                    text: message ? message.textContent : null,
+                    ariaLive: message ? message.getAttribute("aria-live") : null,
+                };
+                """
+            )
+
+        def wait_for_text_containing(fragment: str, timeout: float = 20) -> dict:
+            box: dict = {}
+
+            def check(_driver: object) -> bool:
+                state = message_state()
+                if state["text"] and fragment in state["text"]:
+                    box["state"] = state
+                    return True
+                return False
+
+            WebDriverWait(self.driver, timeout).until(check)
+            return box["state"]
+
+        def wait_for_text_equal(expected: str, timeout: float = 20) -> dict:
+            box: dict = {}
+
+            def check(_driver: object) -> bool:
+                state = message_state()
+                if state["text"] == expected:
+                    box["state"] = state
+                    return True
+                return False
+
+            WebDriverWait(self.driver, timeout).until(check)
+            return box["state"]
+
+        with (
+            override_settings(CELERY_TASK_ALWAYS_EAGER=False),
+            patch(
+                "weblate.trans.views.edit.auto_translate.apply_async",
+                return_value=SimpleNamespace(id=task_id),
+            ),
+            patch("weblate.api.views.AsyncResult", side_effect=fake_async_result),
+            patch("weblate.api.views.get_task_liveness", side_effect=fake_liveness),
+        ):
+            self.open_component(component=component, project=project)
+            self.click("Operations")
+            self.click("Batch automatic translation")
+            with self.wait_for_page_load():
+                self.click(htmlid="id_auto_apply")
+
+            WebDriverWait(self.driver, 20).until(
+                presence_of_element_located(
+                    (By.CSS_SELECTOR, "[data-task] .task-message")
+                )
+            )
+            base_state = message_state()
+
+            queued_state = wait_for_text_containing(
+                "Waiting for a worker to pick up the task"
+            )
+            no_update_state = wait_for_text_containing("No updates for 10 minutes")
+            running_state = wait_for_text_equal(base_state["text"])
+            completed_state = wait_for_text_containing("3 strings were updated.")
+
+        self.assertEqual(base_state["ariaLive"], "polite")
+        self.assertEqual(queued_state["ariaLive"], "polite")
+        self.assertEqual(no_update_state["ariaLive"], "polite")
+        self.assertEqual(running_state["ariaLive"], "polite")
+        self.assertEqual(completed_state["ariaLive"], "polite")
+        self.assertEqual(running_state["text"], base_state["text"])
+        self.assertNotEqual(queued_state["text"], base_state["text"])
+        self.assertNotEqual(no_update_state["text"], base_state["text"])
 
     def test_judge_preview_estimate_is_actually_visible(self) -> None:
         """

@@ -54,6 +54,19 @@ RUN apt-get update && apt-get install -y \
 # List should match weblate/weblate
 RUN chown -R "${USER_ID}:${GROUP_ID}" /etc/nginx/sites-available/ /var/log/nginx/ /var/lib/nginx /app/data /app/cache /run /home/weblate /etc/localtime /etc/supervisor/conf.d /tmp /home
 
+# Celery cold shutdown for producer tasks (acks_late auto_translate* on the
+# "translate" queue and fix_failing_checks on "celery"): stopsignal=QUIT makes
+# the worker wait CELERY_WORKER_SOFT_SHUTDOWN_TIMEOUT, then cancel the running
+# task and restore the unacknowledged message to its queue instead of losing
+# it to the 4 h visibility timeout on a stack restart. stopwaitsecs=60 stays
+# between the soft shutdown timeout (20 s) and the container stop_grace_period
+# (90 s). Mirrors deploy/Dockerfile; the other celery-*.conf programs keep
+# SIGTERM.
+RUN printf '%s\n' 'stopsignal=QUIT' 'stopwaitsecs=60' \
+    >> /etc/supervisor/conf.d/celery-translate.conf \
+    && printf '%s\n' 'stopsignal=QUIT' 'stopwaitsecs=60' \
+    >> /etc/supervisor/conf.d/celery-celery.conf
+
 # Start with fresh venv
 # Using the original would work, but chown on it is super slow, see https://github.com/docker/for-linux/issues/388
 RUN rm -rf /app/venv && mkdir /app/venv && chown "${USER_ID}:${GROUP_ID}" /app/venv

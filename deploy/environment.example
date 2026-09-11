@@ -81,6 +81,13 @@ REDIS_PORT=6379
 # Judge runs can hold an unacknowledged task for hours. Keep the Redis message
 # invisible until the worker completes or dies to avoid duplicate execution.
 WEBLATE_CELERY_VISIBILITY_TIMEOUT=14400
+# Celery cold shutdown: on SIGQUIT (supervisor stopsignal for celery-translate
+# and celery-celery) a worker waits this many seconds for a running acks_late
+# producer task before cancelling it and restoring the unacknowledged message
+# to its queue. Invariant: this timeout < supervisor stopwaitsecs (60) <
+# container stop_grace_period (90 s). Lower it only together with the other
+# two, keeping the strict ordering.
+WEBLATE_CELERY_SOFT_SHUTDOWN_TIMEOUT=20
 
 # --- Mail ---------------------------------------------------------------
 # Outgoing mail goes through Yandex 360 for herocraft.com: implicit SSL on

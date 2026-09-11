@@ -84,6 +84,131 @@ def delete_task_metadata(task_id: str | None) -> None:
     cache.delete(get_task_metadata_key(task_id))
 
 
+# --- Task liveness -------------------------------------------------------
+#
+# A closed cache record decides whether a user-facing background task is
+# alive, not `AsyncResult.state`: Celery answers PENDING both for "still
+# waiting for a worker" and for "the unacknowledged delivery was lost", so
+# the state alone cannot tell them apart. `auto_translate*` and
+# `fix_failing_checks` are acks_late; on a routine service restart the cold
+# shutdown (Task 1) restores such a message to its queue, and this record is
+# what lets the producer screen say queued/running truthfully across that
+# redelivery. See docs/product/plans/2026-09-11-producer-tasks-survive-deploy.md.
+
+
+LIVENESS_TASKS = frozenset(
+    {
+        "weblate.trans.tasks.auto_translate",
+        "weblate.trans.tasks.auto_translate_component",
+        "weblate.trans.tasks.fix_failing_checks",
+    }
+)
+
+
+def get_task_liveness_key(task_id: str) -> str:
+    return f"task-liveness-{task_id}"
+
+
+def register_task_liveness(task_id: str | None) -> None:
+    """
+    Create the liveness record before the task is published.
+
+    Must run strictly before `apply_async(task_id=...)`: a fast worker can
+    start (and heartbeat) the task before the view finishes, and a missing
+    record would make the first `retrieve` answer `queued` with no
+    heartbeat, or drop the task from the user list altogether. The record
+    lives as long as `task-meta`/`user-tasks`.
+    """
+    if not task_id:
+        return
+    cache.set(
+        get_task_liveness_key(task_id),
+        {
+            "enabled": True,
+            "started_at": time.time(),
+            "heartbeat_at": None,
+            "attempt": 0,
+        },
+        TASK_METADATA_TTL,
+    )
+
+
+def delete_task_liveness(task_id: str | None) -> None:
+    """Drop the liveness record (publish failure, task cleanup)."""
+    if not task_id:
+        return
+    cache.delete(get_task_liveness_key(task_id))
+
+
+def heartbeat_task(task_id: str | None) -> None:
+    """
+    Mark a delivery attempt as started/active.
+
+    Bumps `attempt` and refreshes `heartbeat_at` atomically, so a redelivered
+    task is observable as a new attempt over the remaining units instead of
+    a continuation of the lost one. Keeping the same TTL refreshes the whole
+    record; a task whose record already expired (worker outlived the cache
+    entry) simply recreates it.
+    """
+    if not task_id:
+        return
+    key = get_task_liveness_key(task_id)
+    record = cache.get(key)
+    if record is None:
+        record = {"enabled": True, "started_at": time.time(), "attempt": 0}
+    record["heartbeat_at"] = time.time()
+    record["attempt"] = int(record.get("attempt", 0)) + 1
+    cache.set(key, record, TASK_METADATA_TTL)
+
+
+def touch_task_liveness(task_id: str | None) -> None:
+    """Refresh `heartbeat_at` without starting a new attempt (progress)."""
+    if not task_id:
+        return
+    key = get_task_liveness_key(task_id)
+    record = cache.get(key)
+    if record is None:
+        # The task is still running after its record expired; recreate it
+        # rather than reporting an unknown task as fresh.
+        record = {"enabled": True, "started_at": time.time(), "attempt": 1}
+    record["heartbeat_at"] = time.time()
+    cache.set(key, record, TASK_METADATA_TTL)
+
+
+# The `no-update` threshold. Celery retries a failing LLM request four times
+# for up to 120 s each plus three backoffs up to 30 s
+# (weblate/machinery/base.py), so a normal retry loop stays well under this
+# and must not look like an interrupted task.
+NO_UPDATE_AFTER = 600
+
+
+def get_task_liveness(task_id: str | None) -> str | None:
+    """
+    Compute the user-facing liveness status of a task.
+
+    Returns ``None`` for tasks without a liveness record (everything else
+    keeps today's rendering), otherwise one of:
+
+    * ``queued`` - published, no worker heartbeat yet (or an old one: the
+      delivery may be waiting for redelivery after a restart);
+    * ``running`` - heartbeated within :data:`NO_UPDATE_AFTER`;
+    * ``no-update`` - the last heartbeat is older than that. This is not an
+      error and promises no recovery; the copy says the task *may* still be
+      continuing.
+    """
+    if not task_id:
+        return None
+    record = cache.get(get_task_liveness_key(task_id))
+    if not record or not record.get("enabled"):
+        return None
+    heartbeat_at = record.get("heartbeat_at")
+    if heartbeat_at is None:
+        return "queued"
+    if time.time() - float(heartbeat_at) > NO_UPDATE_AFTER:
+        return "no-update"
+    return "running"
+
+
 # Tasks the user started are kept for as long as their metadata, so a progress
 # bar can be restored on any page the user opens afterwards.
 USER_TASKS_TTL = TASK_METADATA_TTL
@@ -148,7 +273,15 @@ def get_user_tasks(user_id: int) -> list[dict[str, Any]]:
         result: AsyncResult = AsyncResult(task["id"])
         if result.ready():
             continue
-        if result.state == "PENDING" and now - task["started"] > PENDING_TASK_MAX_AGE:
+        if (
+            result.state == "PENDING"
+            and now - task["started"] > PENDING_TASK_MAX_AGE
+            # A liveness-enabled task stays listed until its cache records
+            # expire: its delivery may still be waiting for redelivery after
+            # a service restart (cold shutdown, Task 1), and dropping it
+            # here would remove the only honest progress surface the user has.
+            and get_task_liveness(task["id"]) is None
+        ):
             continue
         running.append(task)
     if len(running) != len(tasks):

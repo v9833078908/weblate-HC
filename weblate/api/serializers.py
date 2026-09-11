@@ -4183,6 +4183,12 @@ class TaskSerializer(ReadOnlySerializer):
     progress = serializers.IntegerField(min_value=0, max_value=100)
     result = TaskResultField()
     log = serializers.CharField(allow_blank=True)
+    # Server-computed liveness of a user-facing background task
+    # (queued/running/no-update); absent for tasks without a liveness record.
+    # `completed` always wins over this field.
+    liveness = serializers.ChoiceField(
+        choices=["queued", "running", "no-update"], required=False
+    )
 
 
 @extend_schema_serializer(

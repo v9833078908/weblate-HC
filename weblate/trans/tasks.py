@@ -55,7 +55,7 @@ from weblate.trans.models import (
     Unit,
 )
 from weblate.trans.removal import RemovalBatch, removal_batch_context
-from weblate.utils.celery import app
+from weblate.utils.celery import app, heartbeat_task, touch_task_liveness
 from weblate.utils.data import data_dir
 from weblate.utils.errors import report_error
 from weblate.utils.files import VCS_METADATA_DIRS, remove_tree
@@ -1027,6 +1027,7 @@ def auto_translate(
     judge_candidate_severities: tuple[str, ...] = ("critical", "major"),
 ) -> dict[str, Any]:
     result: dict[str, Any] = {"warnings": []}
+    heartbeat_task(current_task.request.id if current_task else None)
     user = User.objects.get(pk=user_id) if user_id else None
     with override(user.profile.language if user else "en"):
         try:
@@ -1151,6 +1152,7 @@ def auto_translate_component(
     enforce_permissions: bool = True,
     overwrite_existing: bool = False,
 ) -> dict[str, Any]:
+    heartbeat_task(current_task.request.id if current_task else None)
     component_obj = Component.objects.get(pk=component_id)
     user = User.objects.get(pk=user_id) if user_id else None
     auto = BatchAutoTranslate(
@@ -1291,6 +1293,7 @@ def fix_failing_checks(
     reports a lost lease, which is terminal and is never retried.
     """
     token: str = (current_task.request.id if current_task else None) or ""
+    heartbeat_task(current_task.request.id if current_task else None)
     project = None
     zero_counts: dict[str, Any] = {
         "fixed": 0,
@@ -1321,6 +1324,7 @@ def fix_failing_checks(
         return failed(gettext("This check is no longer eligible for a mass fix."))
 
     def progress_callback(done: int, total: int) -> bool:
+        touch_task_liveness(current_task.request.id if current_task else None)
         if current_task and current_task.request.id:
             current_task.update_state(
                 state="PROGRESS",

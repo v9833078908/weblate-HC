@@ -13,15 +13,22 @@ production)?
 Each scenario starts a fresh worker on an isolated queue and Redis database,
 so nothing in the instance is touched:
 
-``term_kill``
+``term_kill_translate``
     Today's production behaviour: SIGTERM (warm shutdown, the worker waits for
-    the task) followed by SIGKILL after the supervisor's ``stopwaitsecs``.
-``quit_late``
+    the task) followed by SIGKILL after the supervisor's ``stopwaitsecs``,
+    published on the ``translate`` queue.
+``quit_late_translate``
     Proposed behaviour for the worker that runs the producer's long tasks:
-    SIGQUIT (cold shutdown) with ``worker_soft_shutdown_timeout``.
+    SIGQUIT (cold shutdown) with ``worker_soft_shutdown_timeout`` on the
+    ``translate`` queue (``auto_translate*``).
+``quit_late_celery``
+    The same acks_late + SIGQUIT contract on the ``celery`` queue, which
+    serves ``fix_failing_checks``: redelivery must restore the message to the
+    queue it was consumed from, whichever name that is.
 ``quit_early``
     The risk case of the same proposal: a long task **without** ``acks_late``
-    receiving the same SIGQUIT.
+    receiving the same SIGQUIT. The guarantee boundary: an acknowledged
+    message never comes back.
 ``quit_short_early``
     The bound of that risk: a short task without ``acks_late`` still finishes
     inside the soft-shutdown window instead of being cancelled.
@@ -46,14 +53,16 @@ from celery import Celery
 from kombu import Connection
 
 BROKER = os.environ.get("PROBE_BROKER", "redis://cache:6379/9")
-QUEUE = "probe"
+# Queue names mirror the real routing: "translate" serves auto_translate*,
+# "celery" serves fix_failing_checks. Both must redeliver an acks_late
+# message to the queue it was consumed from.
+QUEUES = ("translate", "celery")
 SOFT_SHUTDOWN_TIMEOUT = float(os.environ.get("PROBE_SOFT_SHUTDOWN", "10"))
 # What the supervisor does after `stopwaitsecs` when the worker is still alive.
 KILL_AFTER = float(os.environ.get("PROBE_KILL_AFTER", "20"))
 
 app = Celery("probe", broker=BROKER, backend=BROKER)
 app.conf.update(
-    task_default_queue=QUEUE,
     broker_transport_options={"visibility_timeout": 4 * 3600},
     result_backend_transport_options={"visibility_timeout": 4 * 3600},
     worker_prefetch_multiplier=1,
@@ -96,21 +105,21 @@ def _client():
     return conn, conn.default_channel.client
 
 
-def _reset(client) -> None:
-    client.delete(QUEUE, "unacked", "unacked_index")
+def _reset(client, queue: str) -> None:
+    client.delete(queue, "unacked", "unacked_index")
     for key in client.keys("probe:started:*"):
         client.delete(key)
 
 
-def _state(client) -> dict[str, int]:
+def _state(client, queue: str) -> dict[str, int]:
     return {
-        "queue": client.llen(QUEUE),
+        "queue": client.llen(queue),
         "unacked": client.hlen("unacked"),
         "unacked_index": client.zcard("unacked_index"),
     }
 
 
-def _start_worker() -> subprocess.Popen:
+def _start_worker(queue: str, suffix: str) -> subprocess.Popen:
     return subprocess.Popen(
         [
             sys.executable,
@@ -122,13 +131,13 @@ def _start_worker() -> subprocess.Popen:
             "celery_shutdown_requeue",
             "worker",
             "--queues",
-            QUEUE,
+            queue,
             "--concurrency",
             "1",
             "--pool",
             "prefork",
             "--hostname",
-            "probe@%h",
+            f"probe-{suffix}@%h",
             "--loglevel",
             "info",
         ],
@@ -147,18 +156,18 @@ def _wait_started(client, name: str, timeout: float = 60) -> bool:
     return False
 
 
-def run_scenario(name: str, *, task, stop_signal: int) -> dict[str, Any]:
+def run_scenario(name: str, *, task, stop_signal: int, queue: str) -> dict[str, Any]:
     conn, client = _client()
     try:
-        _reset(client)
-        worker = _start_worker()
-        result = task.apply_async()
+        _reset(client, queue)
+        worker = _start_worker(queue, queue)
+        result = task.apply_async(queue=queue)
         if not _wait_started(client, MARKERS[task]):
             worker.kill()
             worker.communicate(timeout=30)
             msg = f"{name}: task never started"
             raise RuntimeError(msg)
-        running = _state(client)
+        running = _state(client, queue)
 
         signalled = time.monotonic()
         worker.send_signal(stop_signal)
@@ -176,8 +185,9 @@ def run_scenario(name: str, *, task, stop_signal: int) -> dict[str, Any]:
         time.sleep(1)
         return {
             "scenario": name,
+            "queue": queue,
             "while_running": running,
-            "after_stop": _state(client),
+            "after_stop": _state(client, queue),
             "task_state": result.state,
             "sigkill_needed": killed,
             "stop_seconds": stop_seconds,
@@ -186,31 +196,41 @@ def run_scenario(name: str, *, task, stop_signal: int) -> dict[str, Any]:
             "soft_shutdown_log": "Soft Shutdown" in output,
         }
     finally:
-        _reset(client)
+        _reset(client, queue)
         conn.release()
 
 
 def main() -> None:
     results = [
         run_scenario(
-            "term_kill (today: acks_late + SIGTERM, SIGKILL after stopwaitsecs)",
+            "term_kill_translate (today: acks_late + SIGTERM, SIGKILL after stopwaitsecs)",
             task=late_task,
             stop_signal=signal.SIGTERM,
+            queue="translate",
         ),
         run_scenario(
-            "quit_late (proposed: acks_late + SIGQUIT)",
+            "quit_late_translate (proposed: acks_late + SIGQUIT)",
             task=late_task,
             stop_signal=signal.SIGQUIT,
+            queue="translate",
+        ),
+        run_scenario(
+            "quit_late_celery (proposed: acks_late + SIGQUIT on the celery queue)",
+            task=late_task,
+            stop_signal=signal.SIGQUIT,
+            queue="celery",
         ),
         run_scenario(
             "quit_early (risk: long task without acks_late + SIGQUIT)",
             task=early_task,
             stop_signal=signal.SIGQUIT,
+            queue="translate",
         ),
         run_scenario(
             "quit_short_early (bound: 3 s task without acks_late + SIGQUIT)",
             task=short_task,
             stop_signal=signal.SIGQUIT,
+            queue="translate",
         ),
     ]
     print(json.dumps(results, indent=2, sort_keys=True))

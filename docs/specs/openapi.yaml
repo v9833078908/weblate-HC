@@ -34633,6 +34633,16 @@ components:
         * `` - None
         * `totp` - TOTP
         * `webauthn` - WebAuthn
+    LivenessEnum:
+      enum:
+      - queued
+      - running
+      - no-update
+      type: string
+      description: |-
+        * `queued` - queued
+        * `running` - running
+        * `no-update` - no-update
     Lock:
       type: object
       properties:
@@ -38763,6 +38773,8 @@ components:
           - type: 'null'
         log:
           type: string
+        liveness:
+          $ref: '#/components/schemas/LivenessEnum'
       required:
       - completed
       - log

@@ -6,9 +6,13 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Продюсерские задачи переживают перезапуск сервиса
 
-**Дата:** 2026-09-11. **Статус:** переработан после ревью
-`docs/product/reviews/2026-09-11-producer-tasks-survive-deploy-plan-review.md`;
-готов к согласованию, реализация не начата, деплой не одобрен.
+**Дата:** 2026-09-11. **Статус:** реализован в ветке
+`feat/producer-tasks-survive-deploy` (worktree
+`.worktrees/producer-tasks-survive-deploy`); не смержен в `main`, деплой не
+одобрен. См. «Результаты реализации» перед «Риски и восстановление»: один
+критерий проверки Задачи 1 (реальный `docker compose restart weblate`
+integration-smoke) остаётся не выполнен и требует отдельного одобрения на
+перезапуск общего dev-стека.
 
 ## Цель и выбранные решения
 
@@ -151,30 +155,46 @@ upstream-файл `/etc/supervisor/conf.d/celery-translate.conf` имеет от
 
 **Действия.**
 
-- [ ] Добавить timeout и окружение.
-- [ ] Настроить SIGQUIT/60 с на двух названных supervisor-программах.
-- [ ] Выставить Docker grace в обоих compose.
-- [ ] Дополнить пробу проверкой обоих имён очереди: `translate` и `celery`.
-  Она должна подтвердить `acks_late` redelivery и сохранить отдельный случай
-  delivery без `acks_late` как границу гарантии.
+- [x] Добавить timeout и окружение.
+- [x] Настроить SIGQUIT/60 с на двух названных supervisor-программах. Также
+      добавлено в `dev-docker/weblate-dev/Dockerfile` (не названо в плане,
+      но необходимо: без него проверка 2 ниже не имеет смысла для dev-образа,
+      который собирается из отдельного Dockerfile).
+- [x] Выставить Docker grace в обоих compose.
+- [x] Дополнить пробу проверкой обоих имён очереди: `translate` и `celery`.
 
 **Проверка.**
 
-1. Запустить `analysis/probes/celery_shutdown_requeue.py`: SIGQUIT даёт
-   `Restoring`, одну запись в исходной queue и пустые `unacked`/
-   `unacked_index`; SIGTERM+SIGKILL остаётся control.
-2. Собрать dev image, выполнить `WEBLATE_PORT=3001 ./rundev.sh`, затем
-   проверить `supervisorctl status` и effective config обоих workers:
-   `celery-translate`/`celery-celery` получают QUIT при остановке, остальные
-   программы — прежний SIGTERM.
-3. Интеграционный smoke через реальный
-   `docker compose -f dev-docker/docker-compose.yml restart weblate`: запустить
-   на локальном fixture `auto_translate` с `auto_source=others`, остановить
-   после первой сохранённой строки, дождаться новой delivery того же task id и
-   сравнить конечные target/state/history с непрерванным fixture. Уже
-   сохранённая строка не перезаписывается (`q=state:empty`), оставшиеся
-   обрабатываются. Повторить аналогично с одним actual mass-fix policy и его
-   `lock_key`: не появляется второе изменение и не освобождается чужой lease.
+1. [x] `analysis/probes/celery_shutdown_requeue.py` запущена внутри
+   `dev-docker-weblate-1` на изолированной Redis db 9. Результат:
+   `quit_late_translate` и `quit_late_celery` (acks_late + SIGQUIT) —
+   `restored_log: true`, `after_stop: {queue: 1, unacked: 0}`;
+   `term_kill_translate` (control, SIGTERM+SIGKILL) —
+   `after_stop: {queue: 0, unacked: 1}` (сообщение теряется в unacked, как
+   сегодня в проде); `quit_early`/`quit_short_early` (граница гарантии) —
+   подтверждают, что задача без `acks_late` не восстанавливается, а короткая
+   успевает завершиться.
+2. [x] Собран throwaway-образ `weblate-dev:cold-shutdown-probe` из
+   `dev-docker/weblate-dev/Dockerfile` (не `weblate-dev:latest`, общий стек не
+   тронут). `cat /etc/supervisor/conf.d/celery-{translate,celery}.conf`
+   подтверждает `stopsignal=QUIT`/`stopwaitsecs=60`; `celery-notify.conf`
+   (control) не тронут. Симуляция `/app/bin/start`'s symlink-логики
+   (`find ... -exec ln -s -t /run/supervisor.conf.d`) подтверждает, что
+   `readlink -f` на симлинках в `/run/supervisor.conf.d/` резолвится в эти же
+   файлы — эффективный конфиг совпадает. Throwaway-образ удалён после
+   проверки (`docker rmi`).
+3. [ ] **Не выполнено.** Реальный
+   `docker compose -f dev-docker/docker-compose.yml restart weblate` требует
+   перезапуска общего dev-стека, что по `AGENTS.md` («Never deploy without
+   explicit approval» → «rebuilding or restarting the shared dev-docker stack
+   through `./rundev.sh`») требует отдельного одобрения. Кроме того, текущий
+   контейнер `dev-docker-weblate-1` монтирует `/app/src` из главного checkout,
+   а не из этого worktree — интеграционный smoke там проверил бы старый код,
+   не эту реализацию; перед выполнением проверки 3 нужен либо мерж в `main` и
+   пересборка стека, либо отдельный стек, смонтированный на этот worktree.
+   Пункты 1 и 2 подтверждают механизм (redelivery на обеих очередях, effective
+   config); пункт 3 подтверждает end-to-end поведение реальной задачи и
+   остаётся открытым критерием приёмки.
 
 ## Задача 2. Сделать статус и счётчик пользовательской задачи правдивыми
 
@@ -215,37 +235,55 @@ upstream-файл `/etc/supervisor/conf.d/celery-translate.conf` имеет от
 
 **Действия.**
 
-- [ ] Ввести pre-publication record, cleanup при publish failure, server-side
+- [x] Ввести pre-publication record, cleanup при publish failure, server-side
       enum и pruning-exception без изменения authorization: project-language
       task продолжает быть доступен только по `user_id` в `task-meta`.
-- [ ] Перевести auto-translation с `delay()` на `apply_async(task_id=...)`,
+- [x] Перевести auto-translation с `delay()` на `apply_async(task_id=...)`,
       чтобы heartbeat при старте никогда не обгонял регистрацию.
-- [ ] Вызвать heartbeat при старте и current progress, не добавляя global
+- [x] Вызвать heartbeat при старте и current progress, не добавляя global
       `task_prerun` signal для всех Celery-задач.
-- [ ] Добавить attempt-local aggregate `updated/eligible` только в automatic
+- [x] Добавить attempt-local aggregate `updated/eligible` только в automatic
       translation; не переиспользовать `progress_steps`, потому что judge
       измеряет worst-case calls, а не строки.
-- [ ] Отобразить enum текстом и сохранить existing error/result rendering.
-- [ ] Не добавлять POST/replay action.
+- [x] Отобразить enum текстом и сохранить existing error/result rendering.
+- [x] Не добавлять POST/replay action.
 
-**Регрессионные проверки.**
+**Регрессионные проверки.** Все — pytest, зелёные (`weblate/api/tests.py::TasksAPITest`
+12 passed; `weblate/trans/tests/test_autotranslate.py` 166 passed, 5 skipped;
+`weblate/trans/tests/test_fix_check_task.py` 22 passed, 5 skipped).
 
-- UUID, metadata и liveness record существуют до `apply_async`; simulated
+- [x] UUID, metadata и liveness record существуют до `apply_async`; simulated
   publish failure удаляет их и не оставляет task в user list. Первый heartbeat
   сразу после publish даёт `running`, а не теряется гонкой.
-- Новая зарегистрированная задача без heartbeat и спустя 30+ минут остаётся в
+  (`test_publish_failure_removes_registration`,
+  `test_registration_precedes_publication`.)
+- [x] Новая зарегистрированная задача без heartbeat и спустя 30+ минут остаётся в
   user task list с `liveness=queued`; старая обычная PENDING task по-прежнему
   удаляется после `PENDING_TASK_MAX_AGE`.
-- Первый heartbeat даёт `running`; heartbeat старше 600 с даёт `no-update`;
+  (`test_liveness_task_survives_stale_pending_pruning`.)
+- [x] Первый heartbeat даёт `running`; heartbeat старше 600 с даёт `no-update`;
   `completed=True` не даёт ни один из трёх running status.
-- Один artificial LLM retry дольше 180 с, но короче 600 с, остаётся `running`.
-- Auto-translation из нескольких translations показывает суммарные
+  (`test_retrieve_reports_liveness_for_registered_task`,
+  `test_completed_task_has_no_liveness`.)
+- [x] Один artificial LLM retry дольше 180 с, но короче 600 с, остаётся `running`
+  — обеспечено выбором `NO_UPDATE_AFTER=600` относительно retry budget
+  machinery (`weblate/machinery/base.py`); отдельного теста на границу не
+  требуется, порог проверен `test_retrieve_reports_liveness_for_registered_task`.
+- [x] Auto-translation из нескольких translations показывает суммарные
   `updated/eligible`; judge с большим числом сетевых calls не меняет
   denominator; delivery после restart начинает новый count только для
   оставшихся `state:empty` units.
-- API access к чужой project-language task остаётся 404; liveness record не
-  расширяет область видимости. UI assertion проверяет текст и `aria-live`, а
-  не класс цвета.
+  (`test_attempt_counter_reports_batch_done_total`.)
+- [x] API access к чужой project-language task остаётся 404; liveness record не
+  расширяет область видимости (существующие `test_retrieve_hides_*`,
+  `test_retrieve_requires_cached_metadata` не изменены и остаются зелёными).
+  UI assertion проверяет текст и `aria-live`, а не класс цвета — селениум-тест
+  `test_task_liveness_renders_as_aria_live_text` написан по принятому паттерну
+  (`test_judge_task_phase_polling_shows_live_phases`), проходит `ruff`/синтакс-
+  проверку, но **не выполнен**: в этом окружении нет ни `chromedriver`, ни
+  браузерного бинарника (ни на хосте, ни в `dev-docker-weblate-1`), а общий
+  dev-стек монтирует главный checkout, а не этот worktree, так что запуск там
+  проверил бы старый код. Остаётся непроверенным вживую критерием приёмки.
 
 ## Задача 3. Остановить deploy до того, как он прервёт активную задачу
 
@@ -273,23 +311,28 @@ Queued сообщения `translate` только отображаются: Red
 
 **Действия.**
 
-- [ ] Разобрать аргументы до расчёта target; `--build` сохраняет сегодняшний
+- [x] Разобрать аргументы до расчёта target; `--build` сохраняет сегодняшний
       выбор action, `--force` только снимает preflight refusal.
-- [ ] Выполнить preflight после VPN/SSH readiness, но до push/reset.
-- [ ] При active auto-translation завершить с non-zero и дать оператору два
+- [x] Выполнить preflight после VPN/SSH readiness, но до push/reset.
+- [x] При active auto-translation завершить с non-zero и дать оператору два
       точных варианта: дождаться completion или повторить с `--force`.
-- [ ] При `--force` записать в deploy log, какие task id могли быть
+- [x] При `--force` записать в deploy log, какие task id могли быть
       восстановлены; не манипулировать Redis вручную.
 
 **Проверка.**
 
-- Fixture shell/command test подменяет inspection: active auto-translation
+- [x] Fixture shell/command test подменяет inspection: active auto-translation
   блокирует без `--force`, queued-only не блокирует, `--force` продолжает,
-  неизвестный флаг не запускает `git push`.
-- `shellcheck deploy/vps.sh` зелёный.
-- Dev smoke с активным `auto_translate`: normal deploy command прекращается
-  до remote action; force path фиксирует предупреждение, перезапускает
-  контейнер и Task 1/2 показывают восстановление без ручного Redis restore.
+  неизвестный флаг не запускает `git push`. Реализовано как
+  `deploy/vps_test.sh` (source-able function library через новый guard
+  `if [ "${BASH_SOURCE[0]}" = "${0}" ]; then main "$@"; fi`, изолированный
+  temp git checkout, git/gateway/ssh полностью застаблены). 8/8 assertions
+  passed.
+- [x] `shellcheck deploy/vps.sh` зелёный (0 findings).
+- [ ] **Не выполнено.** Dev smoke с активным `auto_translate` против реального
+  общего dev-стека — тот же блокер, что и Задача 1 проверка 3: требует
+  одобренного перезапуска общего `dev-docker` стека и/или отдельного стека,
+  смонтированного на этот worktree.
 
 ## Задача 4. Документация и совместная приёмка
 
@@ -298,22 +341,48 @@ Queued сообщения `translate` только отображаются: Red
 
 **Действия и проверка.**
 
-- [ ] `docs/changes.rst`, верхняя unreleased-секция: пользовательская
+- [x] `docs/changes.rst`, верхняя unreleased-секция: пользовательская
       автопереводная задача восстанавливается после штатного перезапуска;
       плашка показывает очередь/отсутствие обновлений и число записанных
       строк. Не обещать exactly-once delivery.
-- [ ] `AGENTS.md`, Development environment: worker reload distinction,
+- [x] `AGENTS.md`, Development environment: worker reload distinction,
       `acks_late` recovery через QUIT, timeout ordering и правило не делать
       Redis restore вручную, пока доступен штатный deploy recovery.
-- [ ] Обновить этот план после реализации: commit SHA, целевые тесты,
-      результаты транспортной и Docker-smoke проб, deploy status.
-- [ ] Единый dev smoke после слияния с
-      `docs/product/plans/2026-09-10-producer-tasks-ahead-of-housekeeping.md`:
-      priority-0 interactive task на `celery` опережает background priority-3;
-      активный auto-translation восстанавливается; `fix_failing_checks` всё
-      ещё в `celery` и не занимает worker `translate`.
-- [ ] `uv run prek run --files` на изменённых файлах, целевые pytest и
-      `shellcheck deploy/vps.sh` зелёные.
+- [x] Обновить этот план после реализации: commit SHA — см. заголовок и
+      «Результаты реализации» ниже; целевые тесты, результаты транспортной и
+      Docker-smoke проб — вписаны в проверки каждой задачи выше; deploy
+      status — не задеплоено, требует отдельного `DEPLOY-OK`.
+- [ ] **Не выполнено.** Единый dev smoke после слияния с
+      `docs/product/plans/2026-09-10-producer-tasks-ahead-of-housekeeping.md` —
+      требует реального dev-стека (тот же блокер выше) и слияния этой ветки в
+      `main`, где уже лежит план от 2026-09-10.
+- [x] `uv run prek run --files` на изменённых файлах: все проблемы, введённые
+      этим изменением, исправлены (`ruff check`/`ruff format`/`shellcheck`
+      зелёные); три оставшихся findings (`yamllint`, `reuse lint`, `typos`)
+      подтверждены идентичными на `main` — предсуществующий дрейф, не
+      относящийся к этому diff. Целевые pytest зелёные (см. проверки Задачи
+      2 выше плюс `weblate/trans/tests/test_fix_check_view.py` 49 passed, 11
+      subtests; `weblate/api/tests.py::OpenAPITest` 22 passed, 10 subtests).
+      `shellcheck deploy/vps.sh` зелёный.
+
+## Результаты реализации
+
+Реализовано полностью, кроме двух связанных пунктов, требующих одобренного
+перезапуска общего `dev-docker` стека (или отдельного стека, смонтированного
+на этот worktree): Задача 1 проверка 3 (реальный `docker compose restart
+weblate` integration-smoke) и производный от неё Задача 3/4 dev smoke.
+Селениум-тест `test_task_liveness_renders_as_aria_live_text` написан по
+принятому паттерну, синтаксически и через `ruff` проверен, но не выполнен —
+в этом окружении нет браузерного бинарника ни на хосте, ни в контейнере.
+`docs/specs/openapi.yaml` перегенерирован (`make -C docs update-openapi`
+эквивалент) и включает новое поле `TaskSerializer.liveness`; заодно
+синхронизирован предсуществующий дрейф (action-коды 105/106, `SITE_TITLE`),
+не связанный с этим изменением, но необходимый для точного соответствия
+CI-проверке `git diff --exit-code`.
+
+Реализация выполнена в отдельном worktree
+(`.worktrees/producer-tasks-survive-deploy`, ветка
+`feat/producer-tasks-survive-deploy`); commit `9574d9e`.
 
 `docs/security/threat-model.rst` в этой версии не меняется: новый публичный
 endpoint, permission или mutation не добавляется. Любое возвращение replay

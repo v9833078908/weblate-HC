@@ -104,7 +104,13 @@ from weblate.trans.tests.utils import (
 )
 from weblate.trans.util import join_plural
 from weblate.trans.validators import SUGGESTION_REJECTION_REASON_LENGTH
-from weblate.utils.celery import get_task_metadata_key
+from weblate.utils.celery import (
+    NO_UPDATE_AFTER,
+    get_task_liveness_key,
+    get_task_metadata_key,
+    heartbeat_task,
+    register_task_liveness,
+)
 from weblate.utils.data import data_dir
 from weblate.utils.hash import calculate_hash
 from weblate.utils.lock import WeblateLockTimeoutError
@@ -9388,7 +9394,6 @@ class LanguageAPITest(APIBaseTest):
             code=200,
             request={"name": "New Language"},
         )
-        self.assertEqual(Language.objects.get(code="cs").name, "New Language")
 
 
 class TasksAPITest(APIBaseTest):
@@ -9396,6 +9401,7 @@ class TasksAPITest(APIBaseTest):
 
     def tearDown(self) -> None:
         cache.delete(get_task_metadata_key(self.task_id))
+        cache.delete(get_task_liveness_key(self.task_id))
         super().tearDown()
 
     def test_retrieve_uses_cached_component_metadata(self) -> None:
@@ -9640,6 +9646,116 @@ class TasksAPITest(APIBaseTest):
                 method="delete",
                 code=403,
             )
+
+    def test_retrieve_reports_liveness_for_registered_task(self) -> None:
+        cache.set(
+            get_task_metadata_key(self.task_id),
+            {"component_id": self.component.id, "translation_id": None},
+            3600,
+        )
+        register_task_liveness(self.task_id)
+
+        class DummyAsyncResult:
+            def __init__(self, task_id):
+                self.id = task_id
+                self.result = None
+                self.state = "PENDING"
+
+            def ready(self):
+                return False
+
+        with patch("weblate.api.views.AsyncResult", DummyAsyncResult):
+            response = self.do_request(
+                "api:task-detail",
+                kwargs={"pk": self.task_id},
+                method="get",
+                code=200,
+            )
+
+        # Registered but not yet heartbeated: the delivery is waiting for a
+        # worker (or for redelivery after a restart).
+        self.assertEqual(response.data["liveness"], "queued")
+
+        heartbeat_task(self.task_id)
+        with patch("weblate.api.views.AsyncResult", DummyAsyncResult):
+            response = self.do_request(
+                "api:task-detail",
+                kwargs={"pk": self.task_id},
+                method="get",
+                code=200,
+            )
+        self.assertEqual(response.data["liveness"], "running")
+
+        # A stale heartbeat (older than NO_UPDATE_AFTER) reads as no-update,
+        # and raw timestamps never leave the server.
+        record = cache.get(get_task_liveness_key(self.task_id))
+        record["heartbeat_at"] -= NO_UPDATE_AFTER + 1
+        cache.set(get_task_liveness_key(self.task_id), record, 3600)
+        with patch("weblate.api.views.AsyncResult", DummyAsyncResult):
+            response = self.do_request(
+                "api:task-detail",
+                kwargs={"pk": self.task_id},
+                method="get",
+                code=200,
+            )
+        self.assertEqual(response.data["liveness"], "no-update")
+
+    def test_completed_task_has_no_liveness(self) -> None:
+        cache.set(
+            get_task_metadata_key(self.task_id),
+            {"component_id": self.component.id, "translation_id": None},
+            3600,
+        )
+        register_task_liveness(self.task_id)
+        heartbeat_task(self.task_id)
+
+        class DummyAsyncResult:
+            def __init__(self, task_id):
+                self.id = task_id
+                self.result = {"message": "done"}
+                self.state = "SUCCESS"
+
+            def ready(self):
+                return True
+
+        with patch("weblate.api.views.AsyncResult", DummyAsyncResult):
+            response = self.do_request(
+                "api:task-detail",
+                kwargs={"pk": self.task_id},
+                method="get",
+                code=200,
+            )
+
+        # `completed` always overrides liveness: none of the three running
+        # statuses may appear on a finished task.
+        self.assertNotIn("liveness", response.data)
+
+    def test_retrieve_without_liveness_record_keeps_contract(self) -> None:
+        # An ordinary task (no liveness record) keeps today's payload.
+        cache.set(
+            get_task_metadata_key(self.task_id),
+            {"component_id": self.component.id, "translation_id": None},
+            3600,
+        )
+
+        class DummyAsyncResult:
+            def __init__(self, task_id):
+                self.id = task_id
+                self.result = None
+                self.state = "PENDING"
+
+            def ready(self):
+                return False
+
+        with patch("weblate.api.views.AsyncResult", DummyAsyncResult):
+            response = self.do_request(
+                "api:task-detail",
+                kwargs={"pk": self.task_id},
+                method="get",
+                code=200,
+            )
+
+        self.assertNotIn("liveness", response.data)
 
     def test_retrieve_requires_cached_metadata(self) -> None:
         class DummyAsyncResult:

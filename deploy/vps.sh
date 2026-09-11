@@ -12,6 +12,7 @@
 #
 #   ./deploy/vps.sh deploy           # push HEAD and roll it out (see below)
 #   ./deploy/vps.sh deploy --build   # same, but always rebuild the image
+#   ./deploy/vps.sh deploy --force   # deploy even if an auto-translate task runs
 #   ./deploy/vps.sh up               # build and start the gateway container
 #   ./deploy/vps.sh status           # gateway state and SSH reachability
 #   ./deploy/vps.sh survey           # OS/CPU/RAM/disk/docker state of the VPS
@@ -30,7 +31,7 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")"
+cd "$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck disable=SC1091
 . ./.env.local
 
@@ -185,9 +186,117 @@ EOS
     rm -f "$tmp"
 }
 
+# --- Deploy preflight (Task 3) -------------------------------------------
+#
+# Read-only inspection of the running container through the already working
+# `docker exec ... weblate shell` path: no new management command is invoked,
+# because the running image does not have one until this deploy lands.
+#
+# Output contract (one line per record):
+#   TASK <id> <name> since <age>s   - an active auto_translate* Celery task
+#   QUEUED <n>                      - current length of the translate queue
+#   PREFLIGHT-ERROR <message>       - inspection itself failed
+
+# Runs the inspection payload as root on the VPS (needs docker access),
+# driving the running container's own `weblate shell`.
+auto_translate_preflight_report() {
+    local tmp
+    tmp=$(mktemp)
+    cat > "$tmp" << 'PYEOF'
+import json, subprocess, sys, time
+
+try:
+    out = subprocess.run(
+        ["docker", "exec", "hcgameloc-weblate-1", "/app/venv/bin/weblate", "shell", "-c",
+         "import json;"
+         "from weblate.utils.celery import app, get_queue_length;"
+         "print(json.dumps({"
+         "'active': app.control.inspect().active() or {},"
+         "'queued': get_queue_length('translate'),"
+         "}))"],
+        capture_output=True, text=True, timeout=60,
+    )
+except subprocess.TimeoutExpired:
+    print("PREFLIGHT-ERROR inspect timeout")
+    sys.exit(0)
+if out.returncode != 0:
+    message = (out.stderr or "inspect failed").strip().splitlines()
+    print("PREFLIGHT-ERROR " + (message[-1] if message else "inspect failed"))
+    sys.exit(0)
+try:
+    payload = json.loads(out.stdout.strip().splitlines()[-1])
+except (ValueError, IndexError):
+    print("PREFLIGHT-ERROR unparsable inspect output")
+    sys.exit(0)
+now = time.time()
+for _worker, tasks in (payload.get("active") or {}).items():
+    for task in tasks or []:
+        name = task.get("name", "")
+        if "auto_translate" in name:
+            started = task.get("time_start") or 0
+            age = int(now - started) if started else -1
+            print(f"TASK {task.get('id')} {name} since {age}s")
+print(f"QUEUED {payload.get('queued', '?')}")
+PYEOF
+    run_root_script "$tmp"
+    rm -f "$tmp"
+}
+
+# Succeeds (0) when no active auto_translate* task runs; fails otherwise.
+# Queued messages in the translate queue never block a deploy: Redis survives
+# the container restart and they are not interruptible active tasks - they
+# are only reported, as a warning line, for operator awareness.
+preflight_no_active_auto_translate() {
+    local report tasks queued
+    report=$(auto_translate_preflight_report) || report=""
+    case $report in
+    *PREFLIGHT-ERROR*)
+        # An inspection failure must not block a deploy on a guess.
+        >&2 echo "warning: could not inspect active tasks:"
+        >&2 printf '%s\n' "$report"
+        return 0
+        ;;
+    esac
+    tasks=$(printf '%s\n' "$report" | grep '^TASK ' || true)
+    queued=$(printf '%s\n' "$report" | grep '^QUEUED ' | cut -d' ' -f2)
+    if [ -n "$queued" ] && [ "$queued" != 0 ]; then
+        >&2 echo "warning: $queued message(s) queued on the translate queue (not blocking; survives the restart)"
+    fi
+    if [ -n "$tasks" ]; then
+        >&2 echo "Active automatic translation task(s):"
+        >&2 printf '  %s\n' "$tasks"
+        return 1
+    fi
+    return 0
+}
+
+# Always succeeds; prints whatever is running (used with --force for the log).
+preflight_report_active_auto_translates() {
+    local report
+    report=$(auto_translate_preflight_report) || report=""
+    if [ -n "$report" ]; then
+        printf '  %s\n' "$report"
+    else
+        echo "  no inspection output"
+    fi
+}
+
 deploy_stack() {
-    local force=0
-    [ "${1:-}" = "--build" ] && force=1
+    # Argument parsing happens before anything else: an unknown flag must
+    # fail with usage instead of running part of a deploy. `--force` only
+    # lifts the preflight refusal; it never implies a build.
+    local build=0 force=0
+    while [ $# -gt 0 ]; do
+        case $1 in
+        --build) build=1 ;;
+        --force) force=1 ;;
+        *)
+            >&2 echo "usage: $0 deploy [--build] [--force]"
+            return 2
+            ;;
+        esac
+        shift
+    done
 
     local root
     root=$(cd .. && pwd)
@@ -200,13 +309,28 @@ deploy_stack() {
 
     local target
     target=$(git -C "$root" rev-parse HEAD)
+
+    # Preflight: an active user-facing auto-translation would be interrupted
+    # by the restart. Cold shutdown (Task 1) redelivers it, but the producer
+    # still loses time and money. Refuse before push/reset unless --force.
+    # Runs after gateway readiness but before any remote mutation.
+    require_gateway
+    if [ "$force" = 0 ]; then
+        if ! preflight_no_active_auto_translate; then
+            >&2 echo "Refusing to deploy: an automatic translation task is running."
+            >&2 echo "Options: wait for it to finish, or retry with: ./deploy/vps.sh deploy --force"
+            return 1
+        fi
+    else
+        echo "--force given; recording active tasks that may be redelivered:"
+        preflight_report_active_auto_translates || true
+    fi
+
     echo "Pushing $(git -C "$root" rev-parse --short HEAD) to origin/main..."
     git -C "$root" push -q origin "HEAD:main"
 
-    require_gateway
     local deployed
     deployed=$(ssh_retry "git -C $REPO_DIR rev-parse HEAD")
-
     # The server can be ahead of what this checkout knows about when someone
     # else deployed in between; fetch before diffing against it.
     if ! git -C "$root" cat-file -e "${deployed}^{commit}" 2> /dev/null; then
@@ -219,17 +343,17 @@ deploy_stack() {
     else
         echo "Server commit $deployed is unknown here; rebuilding to be safe."
         changed=""
-        force=1
+        build=1
     fi
 
-    if [ "$force" = 1 ] || printf '%s\n' "$changed" | grep -qE "$IMAGE_PATHS"; then
+    if [ "$build" = 1 ] || printf '%s\n' "$changed" | grep -qE "$IMAGE_PATHS"; then
         action=build
     elif printf '%s\n' "$changed" | grep -qx 'deploy/docker-compose.yml'; then
         action=compose
     fi
     printf '%s\n' "$changed" | grep -qx 'deploy/nginx-l10n.conf' && nginx=1
 
-    if [ "$deployed" = "$target" ] && [ "$force" = 0 ]; then
+    if [ "$deployed" = "$target" ] && [ "$build" = 0 ]; then
         echo "Server is already on $(git -C "$root" rev-parse --short "$target"); nothing to deploy."
         return 0
     fi
@@ -282,6 +406,11 @@ for _ in \$(seq 1 24); do
     sleep 5
 done
 echo "login page: \$login"
+queued=\$(docker exec $WEBLATE_CONTAINER /app/venv/bin/weblate shell -c "from weblate.utils.celery import get_queue_length; print(get_queue_length('translate'))" 2>/dev/null || echo "?")
+echo "queued (translate): \$queued"
+# Only the redelivery mechanism itself (Task 1) recovers an interrupted
+# task; this script never claims a specific task id came back, because it
+# may already have been picked up by a fresh worker by the time this runs.
 if [ "\$health" = healthy ] && [ "\$login" = 200 ] && [ "\$stale" = 0 ]; then
     echo DEPLOY-OK
 else
@@ -298,37 +427,38 @@ EOS
     return "$verdict"
 }
 
-case ${1:-status} in
-deploy)
-    shift
-    deploy_stack "$@"
-    ;;
-up)
-    gateway_up
-    ;;
-down)
-    docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
-    rm -rf "$SECRETS_DIR"
-    echo "Gateway stopped."
-    ;;
-status)
-    if gateway_running; then
-        mtu=$(docker exec "$CONTAINER" cat /sys/class/net/tun0/mtu 2> /dev/null || echo "?")
-        echo "Gateway: running (SOCKS5 127.0.0.1:$SOCKS_PORT, tun0 MTU $mtu)"
-        if nc -X 5 -x "127.0.0.1:$SOCKS_PORT" -z -w 5 "$VPS_HOST" "$VPS_SSH_PORT" > /dev/null 2>&1; then
-            echo "VPS: $VPS_HOST:$VPS_SSH_PORT reachable through the tunnel"
+main() {
+    case ${1:-status} in
+    deploy)
+        shift
+        deploy_stack "$@"
+        ;;
+    up)
+        gateway_up
+        ;;
+    down)
+        docker rm -f "$CONTAINER" > /dev/null 2>&1 || true
+        rm -rf "$SECRETS_DIR"
+        echo "Gateway stopped."
+        ;;
+    status)
+        if gateway_running; then
+            mtu=$(docker exec "$CONTAINER" cat /sys/class/net/tun0/mtu 2> /dev/null || echo "?")
+            echo "Gateway: running (SOCKS5 127.0.0.1:$SOCKS_PORT, tun0 MTU $mtu)"
+            if nc -X 5 -x "127.0.0.1:$SOCKS_PORT" -z -w 5 "$VPS_HOST" "$VPS_SSH_PORT" > /dev/null 2>&1; then
+                echo "VPS: $VPS_HOST:$VPS_SSH_PORT reachable through the tunnel"
+            else
+                echo "VPS: $VPS_HOST:$VPS_SSH_PORT NOT reachable through the tunnel"
+            fi
         else
-            echo "VPS: $VPS_HOST:$VPS_SSH_PORT NOT reachable through the tunnel"
+            echo "Gateway: stopped"
         fi
-    else
-        echo "Gateway: stopped"
-    fi
-    # shellcheck disable=SC2016 # expanded on the VPS, not locally
-    run_ssh 'echo "SSH: $(whoami)@$(hostname) up $(uptime -p)"'
-    ;;
-survey)
-    tmp=$(mktemp)
-    cat > "$tmp" << 'EOS'
+        # shellcheck disable=SC2016 # expanded on the VPS, not locally
+        run_ssh 'echo "SSH: $(whoami)@$(hostname) up $(uptime -p)"'
+        ;;
+    survey)
+        tmp=$(mktemp)
+        cat > "$tmp" << 'EOS'
 echo "== os"; . /etc/os-release; echo "$PRETTY_NAME"; uname -srm
 echo "== cpu"; nproc
 echo "== memory"; free -m
@@ -339,30 +469,37 @@ echo "== container-memory"; docker stats --no-stream --format "{{.Name}}|{{.MemU
 echo "== listeners"; ss -lntp | grep LISTEN
 echo "== nginx"; ls -1 /etc/nginx/sites-enabled/ 2>/dev/null
 EOS
-    run_root_script "$tmp"
-    rm -f "$tmp"
-    ;;
-ssh)
-    shift
-    run_ssh "$@"
-    ;;
-root)
-    shift
-    run_root_script "$1"
-    ;;
-shell)
-    require_gateway
-    exec sshpass -p "$VPS_PASSWORD" ssh "${ssh_opts[@]}" -t "$VPS_USER@$VPS_HOST"
-    ;;
-forward)
-    require_gateway
-    port=${2:?"usage: $0 forward <port>"}
-    echo "Forwarding 127.0.0.1:$port -> $VPS_HOST:$port (Ctrl-C to stop)"
-    exec sshpass -p "$VPS_PASSWORD" ssh "${ssh_opts[@]}" -N \
-        -L "127.0.0.1:$port:127.0.0.1:$port" "$VPS_USER@$VPS_HOST"
-    ;;
-*)
-    >&2 echo "usage: $0 {deploy [--build]|up|down|status|survey|ssh <cmd>|root <script>|shell|forward <port>}"
-    exit 2
-    ;;
-esac
+        run_root_script "$tmp"
+        rm -f "$tmp"
+        ;;
+    ssh)
+        shift
+        run_ssh "$@"
+        ;;
+    root)
+        shift
+        run_root_script "$1"
+        ;;
+    shell)
+        require_gateway
+        exec sshpass -p "$VPS_PASSWORD" ssh "${ssh_opts[@]}" -t "$VPS_USER@$VPS_HOST"
+        ;;
+    forward)
+        require_gateway
+        port=${2:?"usage: $0 forward <port>"}
+        echo "Forwarding 127.0.0.1:$port -> $VPS_HOST:$port (Ctrl-C to stop)"
+        exec sshpass -p "$VPS_PASSWORD" ssh "${ssh_opts[@]}" -N \
+            -L "127.0.0.1:$port:127.0.0.1:$port" "$VPS_USER@$VPS_HOST"
+        ;;
+    *)
+        >&2 echo "usage: $0 {deploy [--build] [--force]|up|down|status|survey|ssh <cmd>|root <script>|shell|forward <port>}"
+        exit 2
+        ;;
+    esac
+}
+
+# Guarded so the function library can be `source`d by a test harness
+# (deploy/vps_test.sh) without dispatching a real action.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi
