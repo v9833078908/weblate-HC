@@ -266,6 +266,21 @@ class DashboardTest(FixtureTestCase):
         self.assertRedirects(response, self.project.get_absolute_url())
 
     @override_settings(REDIRECT_SINGLE_PROJECT_USER=True)
+    def test_single_allowed_project_anonymous(self) -> None:
+        # The rule only applies to authenticated users; anonymous still
+        # gets the anonymous dashboard, not a redirect or an error.
+        self.client.logout()
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, "Browse 1 project")
+
+    @override_settings(SINGLE_PROJECT=True, REDIRECT_SINGLE_PROJECT_USER=True)
+    def test_single_project_takes_precedence(self) -> None:
+        # SINGLE_PROJECT redirects straight to the component; the newer
+        # per-user rule must not override that target.
+        response = self.client.get(reverse("home"))
+        self.assertRedirects(response, self.component.get_absolute_url())
+
+    @override_settings(REDIRECT_SINGLE_PROJECT_USER=True)
     def test_single_allowed_project_two_projects(self) -> None:
         # The fixture project becomes private with granted access
         self.project.access_control = Project.ACCESS_PRIVATE
