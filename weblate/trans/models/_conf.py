@@ -240,6 +240,10 @@ class WeblateConf(AppConf):
     BACKGROUND_TASKS = defaults.DEFAULT_BACKGROUND_TASKS
 
     SINGLE_PROJECT = defaults.DEFAULT_SINGLE_PROJECT
+
+    # Redirect authenticated users with exactly one accessible project to it
+    REDIRECT_SINGLE_PROJECT_USER = defaults.DEFAULT_REDIRECT_SINGLE_PROJECT_USER
+
     LICENSE_EXTRA: ClassVar[list] = list(defaults.DEFAULT_LICENSE_EXTRA)
     LICENSE_FILTER = defaults.DEFAULT_LICENSE_FILTER
     LICENSE_REQUIRED = defaults.DEFAULT_LICENSE_REQUIRED

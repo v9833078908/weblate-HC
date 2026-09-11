@@ -19,7 +19,7 @@
       <a href="{% url 'login' %}{% if login_redirect_url %}?next={{ login_redirect_url|urlencode }}{% endif %}"
          class="btn btn-primary">{% translate "Sign in" %}</a>
     {% endif %}
-    <a href="{% url 'home' %}" class="btn btn-primary">{% translate "Dashboard" %}</a>
+    <a href="{% url 'dashboard' %}" class="btn btn-primary">{% translate "Dashboard" %}</a>
     <a href="{% url 'projects' %}" class="btn btn-primary">{% translate "Browse all projects" %}</a>
 
   </div>

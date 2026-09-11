@@ -163,6 +163,14 @@ def redirect_single_project(user: User) -> HttpResponse:
     return redirect(target)
 
 
+def get_single_allowed_project(user: User) -> Project | None:
+    """Return the only project the user can access, if it is exactly one."""
+    allowed = list(user.allowed_projects[:2])
+    if len(allowed) != 1:
+        return None
+    return allowed[0]
+
+
 @never_cache
 def home(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Home page handler serving different views based on user."""
@@ -205,9 +213,20 @@ def home(request: AuthenticatedHttpRequest) -> HttpResponse:
     if settings.SINGLE_PROJECT:
         return redirect_single_project(user)
 
-    if not user.is_authenticated:
-        return dashboard_anonymous(request)
+    # Send a user with exactly one accessible project straight to it
+    if settings.REDIRECT_SINGLE_PROJECT_USER and user.is_authenticated:
+        single_project = get_single_allowed_project(user)
+        if single_project is not None:
+            return redirect(single_project)
 
+    return dashboard(request)
+
+
+@never_cache
+def dashboard(request: AuthenticatedHttpRequest) -> HttpResponse:
+    """Dashboard page handler serving different views based on user."""
+    if not request.user.is_authenticated:
+        return dashboard_anonymous(request)
     return dashboard_user(request)
 
 
@@ -340,6 +359,7 @@ def dashboard_user(request: AuthenticatedHttpRequest) -> HttpResponse:
             **get_reports_context(request, None),
             "all_owned_projects": owned,
             "owned_projects": prefetch_project_flags(prefetch_stats(owned[:10])),
+            "has_allowed_projects": user.allowed_projects.exists(),
         },
     )
 

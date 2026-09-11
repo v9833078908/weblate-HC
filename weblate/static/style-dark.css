@@ -661,10 +661,6 @@ a.red:hover path {
     brightness(108%) contrast(102%);
 }
 
-.navbar-form .form-control {
-  color: #d9d3cc;
-}
-
 .state-icon path {
   fill: #bfc3c7;
 }

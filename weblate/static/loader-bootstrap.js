@@ -2495,56 +2495,6 @@ onReady(() => {
       });
     });
 
-  /* Site-wide search */
-  const siteSearch = new autoComplete({
-    /*name: "sitewide-search",*/
-    selector: "#sitewide-search",
-    debounce: 300,
-    resultsList: {
-      class: "autoComplete dropdown-menu shadow",
-    },
-    resultItem: {
-      class: "autoComplete_result",
-      element: (item, data) => {
-        item.textContent = "";
-        const child = document.createElement("a");
-        child.setAttribute("href", data.value.url);
-        child.textContent = `${data.value.name} `;
-        child.classList.add("dropdown-item");
-        const category = document.createElement("span");
-        category.setAttribute("class", "badge");
-        category.classList.add("text-bg-secondary");
-        category.textContent = data.value.category;
-        child.appendChild(category);
-        item.appendChild(child);
-      },
-      selected: "autoComplete_selected",
-    },
-    data: {
-      keys: ["name"],
-      src: async (query) => {
-        try {
-          const source = await fetch(
-            `/api/search/?q=${encodeURIComponent(query)}`,
-          );
-          const data = await source.json();
-          return data;
-        } catch (error) {
-          return error;
-        }
-      },
-    },
-    events: {
-      input: {
-        focus() {
-          if (siteSearch.input.value.length > 0) {
-            siteSearch.start();
-          }
-        },
-      },
-    },
-  });
-
   /* Workflow customization form */
   document.querySelectorAll("#id_workflow-enable").forEach((enableInput) => {
     const updateWorkflowVisibility = () => {
