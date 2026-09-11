@@ -2722,6 +2722,16 @@ table.table-simple tbody#glossary-terms .alert-info {
   color: #555555;
 }
 
+#sitewide-search-item .navbar-form {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+#sitewide-search {
+  width: clamp(12rem, 20vw, 18rem);
+  max-width: 100%;
+}
+
 .text-warning {
   font-size: 14px;
   margin: 5px 5px 0px;

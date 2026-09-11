@@ -2495,55 +2495,132 @@ onReady(() => {
       });
     });
 
-  /* Site-wide search */
-  const siteSearch = new autoComplete({
-    /*name: "sitewide-search",*/
-    selector: "#sitewide-search",
-    debounce: 300,
-    resultsList: {
-      class: "autoComplete dropdown-menu shadow",
-    },
-    resultItem: {
-      class: "autoComplete_result",
-      element: (item, data) => {
-        item.textContent = "";
-        const child = document.createElement("a");
-        child.setAttribute("href", data.value.url);
-        child.textContent = `${data.value.name} `;
-        child.classList.add("dropdown-item");
-        const category = document.createElement("span");
-        category.setAttribute("class", "badge");
-        category.classList.add("text-bg-secondary");
-        category.textContent = data.value.category;
-        child.appendChild(category);
-        item.appendChild(child);
+  /* Site-wide jump-to box */
+  const siteSearchInput = document.getElementById("sitewide-search");
+  if (siteSearchInput !== null) {
+    const siteSearchItem = document.getElementById("sitewide-search-item");
+    const siteSearchToggle = document.getElementById("sitewide-search-toggle");
+    const stringSearchUrl = (query) =>
+      `${siteSearchInput.dataset.searchUrl}?q=${encodeURIComponent(query)}`;
+    const siteSearch = new autoComplete({
+      selector: "#sitewide-search",
+      debounce: 300,
+      /* Results are already filtered by the server */
+      searchEngine: (_query, record) => record,
+      resultsList: {
+        class: "autoComplete dropdown-menu shadow",
+        maxResults: 6,
       },
-      selected: "autoComplete_selected",
-    },
-    data: {
-      keys: ["name"],
-      src: async (query) => {
-        try {
-          const source = await fetch(
-            `/api/search/?q=${encodeURIComponent(query)}`,
-          );
-          const data = await source.json();
-          return data;
-        } catch (error) {
-          return error;
-        }
+      resultItem: {
+        class: "autoComplete_result",
+        element: (item, data) => {
+          item.textContent = "";
+          const child = document.createElement("a");
+          child.setAttribute("href", data.value.url);
+          child.textContent = `${data.value.name} `;
+          child.classList.add("dropdown-item");
+          const category = document.createElement("span");
+          category.setAttribute("class", "badge");
+          category.classList.add("text-bg-secondary");
+          category.textContent = data.value.category;
+          child.appendChild(category);
+          item.appendChild(child);
+        },
+        selected: "autoComplete_selected",
       },
-    },
-    events: {
-      input: {
-        focus() {
-          if (siteSearch.input.value.length > 0) {
-            siteSearch.start();
+      data: {
+        keys: ["name"],
+        src: async (query) => {
+          /* Searching strings is what most people expect here, offer it first */
+          const results = [
+            {
+              url: stringSearchUrl(query),
+              name: query,
+              category: gettext("Search strings"),
+            },
+          ];
+          try {
+            const source = await fetch(
+              `/api/search/?q=${encodeURIComponent(query)}`,
+            );
+            results.push(...(await source.json()));
+          } catch (error) {
+            console.log(error);
           }
+          return results;
         },
       },
-    },
-  });
+      events: {
+        input: {
+          focus() {
+            if (siteSearch.input.value.length > 0) {
+              siteSearch.start();
+            }
+          },
+          selection(event) {
+            window.location.href = event.detail.selection.value.url;
+          },
+        },
+      },
+    });
+
+    const showSiteSearch = () => {
+      siteSearchItem?.classList.remove("d-lg-none");
+      siteSearchToggle?.setAttribute("aria-expanded", "true");
+      siteSearchInput.focus();
+    };
+    const hideSiteSearch = () => {
+      siteSearchItem?.classList.add("d-lg-none");
+      siteSearchToggle?.setAttribute("aria-expanded", "false");
+    };
+
+    document
+      .getElementById("sitewide-search-form")
+      ?.addEventListener("submit", (event) => {
+        event.preventDefault();
+      });
+    siteSearchInput.addEventListener("keydown", (event) => {
+      /* Enter without a highlighted result goes to the string search */
+      if (
+        event.key === "Enter" &&
+        siteSearch.cursor < 0 &&
+        siteSearchInput.value !== ""
+      ) {
+        window.location.href = stringSearchUrl(siteSearchInput.value);
+      }
+    });
+    siteSearchInput.addEventListener("keyup", (event) => {
+      if (event.key === "Escape" && siteSearchInput.value === "") {
+        hideSiteSearch();
+        siteSearchToggle?.focus();
+      }
+    });
+    siteSearchToggle?.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (siteSearchToggle.getAttribute("aria-expanded") === "true") {
+        hideSiteSearch();
+      } else {
+        showSiteSearch();
+      }
+    });
+    /* Match the "/" character directly rather than binding via hotkeys-js */
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+      const target = event.target;
+      const tagName = (target.tagName || "").toLowerCase();
+      if (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      event.preventDefault();
+      showSiteSearch();
+    });
+  }
 
   /* Workflow customization form */
   document.querySelectorAll("#id_workflow-enable").forEach((enableInput) => {

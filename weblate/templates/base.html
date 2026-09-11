@@ -99,14 +99,6 @@
 
           <!-- Collect the nav links, forms, and other content for toggling -->
           <div class="collapse navbar-collapse" id="wl-navbar-main">
-            <form class="navbar-form">
-              <div class="form-group">
-                <input type="text"
-                       class="form-control"
-                       id="sitewide-search"
-                       placeholder="{% translate "Search" %}">
-              </div>
-            </form>
             <ul class="navbar-nav">
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'home' %}">{% translate "Dashboard" %}</a>
@@ -227,6 +219,31 @@
               {% endwith %}
             </ul>
             <ul class="navbar-nav ms-auto">
+
+              {# Jump-to box: navigates to objects and opens string search #}
+              <li class="nav-item d-lg-none" id="sitewide-search-item">
+                <form class="navbar-form" id="sitewide-search-form" role="search">
+                  <label class="visually-hidden" for="sitewide-search">{% translate "Jump to a project or component" %}</label>
+                  <input type="search"
+                         class="form-control"
+                         id="sitewide-search"
+                         autocomplete="off"
+                         placeholder="{% translate "Jump to a project or component" %}"
+                         data-search-url="{% if component %}{% url 'search' path=component.get_url_path %}{% elif project %}{% url 'search' path=project.get_url_path %}{% else %}{% url 'search' %}{% endif %}">
+                </form>
+              </li>
+              <li class="nav-item d-none d-lg-block">
+                <a class="nav-link button"
+                   href="#"
+                   role="button"
+                   id="sitewide-search-toggle"
+                   aria-expanded="false"
+                   aria-controls="sitewide-search"
+                   title="{% translate "Jump to a project or component" %}">
+                  {% icon "magnify.svg" %}
+                  <span class="visually-hidden">{% translate "Jump to a project or component" %}</span>
+                </a>
+              </li>
 
               {# Superuser link to admin #}
               {% if user %}
