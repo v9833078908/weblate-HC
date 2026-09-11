@@ -3670,6 +3670,30 @@ class ProjectAPITest(APIBaseTest):
         request = self.do_request("api:project-statistics", self.project_kwargs)
         self.assertEqual(request.data["total"], 16)
 
+    def test_checks_endpoint_counts_shared_components(self) -> None:
+        # The per-check counts come from ProjectStats, which aggregates
+        # components shared into the project as well; the blocking unit
+        # count has to be scoped to that same set or the tiers stop summing.
+        other = Project.objects.create(name="Shared", slug="shared")
+        shared = Component.objects.get(slug="test", project__slug="test")
+        shared.links.add(other)
+        own_unit = Unit.objects.filter(
+            translation__component__project__slug="test"
+        ).first()
+        Check.objects.filter(unit__translation__component=shared).delete()
+        Check.objects.create(unit=own_unit, name="same")
+        with self.captureOnCommitCallbacks(execute=True):
+            shared.invalidate_cache()
+
+        response = self.do_request("api:project-checks", kwargs={"slug": "shared"})
+
+        self.assertEqual(response.data["failing"], 1)
+        self.assertEqual(response.data["failing_blocking"], 1)
+        self.assertEqual(
+            response.data["failing_blocking"] + response.data["failing_advisory"],
+            response.data["failing"],
+        )
+
     def test_metrics(self) -> None:
         response = self.do_request("api:project-metrics", self.project_kwargs)
 

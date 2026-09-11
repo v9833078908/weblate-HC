@@ -2062,7 +2062,14 @@ class ProjectViewSet(
         serializer = ChecksSummarySerializer(
             checks_summary(
                 obj.stats,
-                Unit.objects.filter(translation__component__project=obj),
+                # The same component set the cached per-check counts are
+                # aggregated over (ProjectStats.get_child_objects), which
+                # includes components shared into this project. Filtering
+                # by translation__component__project alone would leave those
+                # out of the blocking count while the totals include them.
+                Unit.objects.filter(
+                    translation__component__in=obj.stats.get_child_objects()
+                ),
             ),
             context={"request": request},
         )
