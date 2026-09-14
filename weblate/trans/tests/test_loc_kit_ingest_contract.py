@@ -3991,6 +3991,7 @@ class LocKitStringsUpdateViewTest(ViewTestCase):
             apply_loc_kit_string_update_draft.apply(
                 kwargs={"draft_id": draft.pk},
                 task_id=str(draft.apply_task_id),
+                retries=8,
             )
         draft.refresh_from_db()
         old_task_id = draft.apply_task_id
