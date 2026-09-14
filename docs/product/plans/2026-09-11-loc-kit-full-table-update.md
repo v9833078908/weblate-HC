@@ -7,7 +7,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 # Полная loc-kit таблица: обновление существующего компонента
 
 Дата: 2026-09-11.
-Статус: план на согласование; написание разрешено, реализация и деплой не разрешены.
+Статус: план на согласование; уточнён после технического ревью 2026-09-14. Написание разрешено, реализация и деплой не разрешены.
 
 ## Цель и основания
 
@@ -28,10 +28,9 @@ source/targets/flags, отсутствие удаления по отсутст�
 - `AGENTS.md` — правила репозитория, отдельные разрешения на реализацию и деплой.
 - `docs/product/guides/loc-kit-ingest.md` — действующий контракт импорта.
 - `docs/product/plans/2026-09-10-producer-tasks-ahead-of-housekeeping.md` —
-  обязательная зависимость по interactive delivery и склейке статистики.
-  По сообщению пользователя 2026-09-11 этот план **уже реализуется в ворктри**;
-  его строка «реализация не начата» в main устарела. Не менять чужую ветку
-  или её статус в рамках написания этого плана.
+  реализованная зависимость по interactive delivery и склейке статистики
+  (`38bc7e8`). Переиспользовать её текущие интерфейсы; не воспроизводить
+  приоритеты, scheduler или спор с уже интегрированными изменениями.
 - `docs/product/plans/2026-08-18-loc-kit-table-add-strings.md` — существующая
   точка входа; раздел статуса описывает сознательный синхронный вариант.
 - `docs/product/plans/2026-08-28-kit-explanation-on-string-import.md` —
@@ -99,10 +98,10 @@ Celery; HTTP сохраняет файл или подтверждение и в
 | `weblate/trans/forms.py:LocKitStringsUpdateForm`, `LocKitStringsConfirmForm` | Размер/расширение файла, overwrite. Сохранить `helper.form_tag=False`. |
 | `weblate/trans/views/create.py:LocKitStringsUpdateStartView`, `LocKitStringsPreviewView` | Сейчас parse и apply в HTTP; заменить на stage/reserve/status. |
 | `weblate/trans/views/create.py:_string_unit_to_json`, `_string_units_from_json` | Существующий формат `{key,values,comments,references,row,explanation,flags}`; перенести обе функции в request-free `weblate/trans/loc_kit.py`, обновить все callers, без aliases. |
-| `weblate/trans/models/loc_kit.py:LocKitImportDraft` | Уже есть APPLYING, FAILED, CONSUMED и apply_task_id; расширить состояние только для существующего строкового update. |
-| `weblate/trans/loc_kit.py` | Общая классификация preview, применение порции, неизменяемый вход; убрать публичный отказ по 5 000 cells после перехода callers. |
-| `weblate/trans/tasks.py` | Новые задачи подготовки и применения; изменить cleanup только для активных строковых update. |
-| `weblate/trans/models/translation.py`, `pending.py` | Долговечное сохранение source comments/references и штатный audit/pending lifecycle новых строк. |
+| `weblate/trans/models/loc_kit.py:LocKitImportDraft` | Уже есть APPLYING, FAILED, CONSUMED и apply_task_id; расширить состояние только для существующего строкового update, private canonical payload и ownership pending changes. |
+| `weblate/trans/loc_kit.py` | Общая классификация preview, подготовка/чтение canonical payload и применение порции; убрать публичный отказ по 5 000 cells после перехода callers. |
+| `weblate/trans/tasks.py` | Новые задачи подготовки, применения и finalizing; изменить cleanup только для активных строковых update. |
+| `weblate/trans/models/translation.py`, `pending.py` | Долговечное сохранение source comments/references, batch-safe pending/audit lifecycle новых строк и точный набор pending changes одного draft. |
 | `weblate/formats/base.py`, `ttkit.py` | Минимальный интерфейс сохранения source notes только в поддерживающих descriptions форматах; не использовать exporter как writer runtime-файла. |
 | `weblate/templates/trans/loc_kit_strings_update.html`, `loc_kit_strings_preview.html` | Загрузка, подготовка, preview, выполнение, частичный/полный итог, повтор. Существующие URL сохраняются. |
 | `weblate/templates/component.html` | Ссылка владельцу на незавершённый/недавно завершённый импорт, чтобы результат можно было снова найти. |
@@ -121,12 +120,20 @@ registry и вызовы cleanup. `LocKitImportDraft` используется �
 Расширить `LocKitImportDraft` полями: `prepare_task_id`, `confirmed_options`
 (JSON), `progress` (JSON: phase, processed_rows, total_rows, counters),
 `next_row` (целочисленный курсор), `error_code`, `error_details` (без traceback
-и секретов), `retry_phase`, `last_activity_at`, `finished_at`, `baseline_json`.
-Использовать существующий `apply_task_id`, не дублировать его.
-После подготовки `preview_json` содержит неизменяемый полный массив строк;
-`profile_json` и `sheet` сохраняются. Progress/counters не переписывают input.
-`baseline_json` хранит preview source/Explanation по ключу для проверки
-конкурентных изменений; это отдельные данные, не изменение входных строк.
+и секретов), `retry_phase`, `last_activity_at`, `finished_at`,
+`prepared_payload`, `payload_checksum`, `payload_size` и
+`pending_change_ids` (JSON). Использовать существующий `apply_task_id`, не
+дублировать его.
+
+После подготовки versioned canonical packet
+`{version, rows, baseline}` лежит только в private `prepared_payload`.
+`rows` — неизменяемый полный массив для worker, `baseline` — preview
+source/Explanation по ключу для проверки конкурентных изменений. До публикации
+ограничить размер **сериализованного** packet тем же configured byte limit,
+включая JSON-structure overhead; это отдельный ресурсный предел, не лимит числа
+строк. `preview_json` хранит только counters, classifications и bounded samples
+для UI. Он, status GET и component link никогда не читают canonical packet.
+Progress/counters не переписывают input.
 
 Добавить состояния PREPARING и COMPLETED; не переиспользовать CONSUMED как
 видимый результат: `get_active` сейчас скрывает CONSUMED. Состояния:
@@ -152,13 +159,18 @@ Payload в брокере содержит только draft PK; UUID пере�
 Предлагаемые задачи в `weblate/trans/tasks.py`:
 
 ```text
-prepare_loc_kit_string_update(*, draft_id: int) -> None
-apply_loc_kit_string_update_draft(*, draft_id: int) -> None
+@app.task(bind=True, acks_late=True)
+def prepare_loc_kit_string_update(self, *, draft_id: int) -> None: ...
+
+@app.task(bind=True, acks_late=True)
+def apply_loc_kit_string_update_draft(self, *, draft_id: int) -> None: ...
 ```
 
-Task id берётся из Celery request. Вызов из shell без совпавшей reservation
-не применяет данные. Общий синхронный service остаётся request-free внутренним
-механизмом порции, не альтернативным публичным неограниченным импортом.
+Задачи `bind=True` и используют `self.request.id` как заранее зарезервированный
+UUID; они включают позднее подтверждение сообщений. Вызов из shell без
+совпавшей reservation не применяет данные. Общий синхронный service остаётся
+request-free внутренним механизмом порции, не альтернативным публичным
+неограниченным импортом.
 
 ### Публикация и повтор
 
@@ -205,17 +217,21 @@ status GET не берёт write locks.
 3. Новый ключ: штатное создание source/языковых units, targets, контекст,
    flags после targets, permitted Explanation. Старый ключ: никогда не менять
    source/targets/flags/note/location; только разрешённый Explanation.
-   Targets писать через `Unit.translate(..., propagate=False, author=user)`
-   с `is_batch_update=True`: текущий `.save(..., same_content=True)` в
-   append не создаёт target pending/audit, а translate с default propagation
-   может изменить соседние компоненты. Сохранение через translate не должно
-   менять ни одного существующего unit вне списка новых ключей этого импорта.
-4. Сохранить Change/PendingUnitChange через `store_update_changes()` **тех же
-   экземпляров Translation**, на которых накоплены pending_unit_changes и
-   update_changes. Затем завершить batch checks и инвалидировать кеши один раз
-   на порцию, не на ячейку; stats scheduler используется как есть. После
-   rollback использовать новые экземпляры, не переиспользовать stale caches.
-5. В той же транзакции записать counters, next_row и heartbeat.
+   `Translation.add_unit(..., is_batch_update=True)` обязан отложить также
+   initial source `PendingUnitChange` (`save=False`) в список именно этого
+   экземпляра Translation. Для каждого свежепрочитанного target unit до
+   `Unit.translate(..., propagate=False, author=user)` установить атрибут
+   `unit.is_batch_update = True`: у `translate` нет параметра с таким именем.
+   Сохранение через translate не должно менять ни одного существующего unit вне
+   списка новых ключей этого импорта.
+4. До persistence пометить каждый созданный PendingUnitChange metadata
+   `loc_kit_draft_id=<draft token>`. `store_update_changes()` вызвать на
+   **тех же экземплярах Translation**, где накоплены pending_unit_changes и
+   update_changes; затем сохранить exact присвоенные PK в `pending_change_ids`
+   той же DB-транзакцией, что counters, cursor и heartbeat. Только после этого
+   завершить batch checks и инвалидировать кеши один раз на порцию, не на
+   ячейку; stats scheduler используется как есть. После rollback использовать
+   новые экземпляры, не переиспользовать stale caches.
 
 После rollback повтор создаёт всю незафиксированную порцию заново. После commit
 повтор начинает со следующей порции: изменение пользователем уже обработанного
@@ -223,9 +239,11 @@ status GET не берёт write locks.
 порции остаются, UI честно показывает частичное выполнение.
 
 Создание отсутствующего языка отделить от row cursor: файл/git/scan не
-откатываются общей DB-транзакцией. До row batches, под repository lock:
-`component.commit_pending("loc-kit add language", None)`, затем
-`component.add_new_language(language, None, create_translations=False,
+откатываются общей DB-транзакцией. До row batches, под repository lock,
+проверить отсутствие foreign PendingUnitChange. Если он есть, не вызывать
+`component.commit_pending()` от имени loc-kit: показать retryable
+`pending-flush-needed` и ждать штатного flush. Когда pending-набора нет,
+вызвать `component.add_new_language(language, None, create_translations=False,
 show_messages=False)` и `component.create_translations_immediate(
 force_scan=True, langs=[translation.language_code], user=draft.owner)`.
 При повторе согласовать уже созданные файл/Translation и завершить scan.
@@ -238,13 +256,18 @@ background perform_load. Не ждать дочернюю задачу чере�
 FAILED. Старые строки в новом языке не заполняются из старых строк таблицы.
 
 Не выполнять commit/push внешнего репозитория внутри row transaction.
-После применения строк нужна отдельная retryable фаза finalizing: через
-штатный commit_pending довести pending до файлов и проверить завершение.
-Она не повторяет row writes; при deferred commit остаётся незавершённой,
-повторная постановка использует `user_waiting=True` зависимости очереди.
-Только после подтверждённого flush выставлять COMPLETED. Сбой сохраняет
-cursor и все pending; UI различает «строки сохранены, запись файлов ожидается»
-и «полностью завершено». Проверить reload файла после finalizing.
+После применения строк нужна отдельная retryable фаза finalizing. Перед каждым
+вызовом она заново выбирает из durable `pending_change_ids` только ещё
+существующие PendingUnitChange с metadata этого draft: после crash между subset
+commit и terminal state уже удалённые PK — успешный previous flush, не ошибка.
+Непустой fresh set передать в `component.commit_pending_subset(...)`, никогда
+общий `commit_pending()`. Перед COMPLETED заново проверить, что не осталось
+никакого owned pending; чужие pending изменения не являются ни частью
+результата, ни условием его завершения. Фаза не повторяет row writes; при её
+сбое cursor и набор сохраняются. Повторная постановка использует
+`user_waiting=True` зависимости очереди. UI различает «строки сохранены,
+запись файлов ожидается» и «полностью завершено». Проверить reload файла после
+finalizing.
 
 ### Контекст, файлы и расхождения
 
@@ -291,8 +314,10 @@ cursor и все pending; UI различает «строки сохранен�
 Ограничить фактически читаемые rows/cells/текст также для CSV/TSV и неверных XLSX
 worksheet dimensions: бюджет суммарного UTF-8 текста и количества cells от того
 же настроенного byte limit (каждая ячейка стоит минимум 1); это техническая
-защита ресурсов, не число записей в БД. Завершать чтение при превышении, а не
-после материализации всей таблицы. Никакого Django import в loc_kit_ingest.
+защита ресурсов, не число записей в БД. Перед записью canonical packet повторно
+проверять его фактический serialized size: входной лимит сам по себе не
+ограничивает JSON overhead. Завершать чтение при превышении, а не после
+материализации всей таблицы. Никакого Django import в loc_kit_ingest.
 Формулы не вычислять и не использовать cache как достоверный текст: сообщать
 координату формулы; не ломать обычный строковый текст, начинающийся с `=`.
 
@@ -306,11 +331,12 @@ Cleanup использует построчный `select_for_update(skip_locked
 Отдельный абсолютный срок для активного update — 24 часа; после него остановка
 между порциями с частичным отчётом, затем час retention. Эти изменения отразить
 в threat model: текущее «все drafts максимум час» иначе станет ложным.
-После успешной подготовки и сохранения payload исходный upload удалить:
-apply/retry читает preview_json. Failed prepare хранит файл до expiry для retry.
-Скачивание исходного файла публично не добавляется; progress/result также
-owner+session bound и требуют текущего доступа к компоненту. Потеря прав не
-должна открывать metadata через task polling.
+После успешной подготовки и checksum canonical packet удалить исходный upload:
+apply/retry читает только `prepared_payload`. Failed prepare хранит файл до
+expiry для retry. Payload не выдаётся как download; status/result owner- и
+session-bound, требуют текущего доступа к компоненту и не делают deferred
+payload доступным polling view. Потеря прав не должна открывать metadata через
+task polling.
 
 ## Задачи реализации
 
@@ -325,24 +351,30 @@ StartView и PreviewView, prepare task; контракт состояния вы
 **Actions:**
 
 - [ ] Перенести сериализацию в request-free слой и обновить все references.
-- [ ] Добавить поля и миграцию; изолировать новую lifecycle-семантику от glossary
-  и component-creation consumers.
+- [ ] Добавить поля и миграцию; хранить canonical packet в private storage,
+  а DB preview — только как bounded summary; изолировать lifecycle-семантику
+  от glossary и component-creation consumers.
 - [ ] Сохранять файл потоково в private storage, резервировать prepare после
   проверки upload permission и дешёвых лимитов, публиковать после commit.
 - [ ] В prepare выполнить bounded parse, source/schema/language/duplicate
-  validation, сохранить полный payload и preview; учитывать разрешённые оси,
-  source drift, пустые/редкие языки и unsupported context.
+  validation, записать checksum-verified canonical payload и bounded preview;
+  учитывать разрешённые оси, source drift, пустые/редкие языки и unsupported
+  context.
 - [ ] Убрать 5 000-cell rejection на upload; apply guard убрать в задаче 2.
 - [ ] Вывести подготовку/ошибку/preview в существующем template с escaped
-  значениями и номером строки; не выполнять тяжёлый diff на каждом polling GET.
+  значениями и номером строки. Status/component polling читает только
+  `progress`/summary через `only`/`defer`, без diff, canonical packet или
+  полной таблицы.
 
 **Verification:** `test_loc_kit_ingest_contract.py`, `test_loc_kit_drafts.py`,
 standalone `loc_kit_ingest/tests/`. Маленький синтетический XLSX с title row,
 новым ключом, Explanation, Character, редким и полностью пустым target language;
 отдельно regression >5 000 cells. До изменения valid full file отвергается;
 после PREVIEW_READY, zero Unit/Change writes до confirm. Duplicate key в конце,
-ошибочный source language, zip bomb, огромные dimensions и формула дают
-диагностику до apply; wrong owner/session и glossary token не доступны.
+ошибочный source language, zip bomb, огромные dimensions, формула и canonical
+payload больше configured limit дают диагностику до apply. Status GET на
+предельном payload не читает его storage/rows и возвращает только summary;
+wrong owner/session и glossary token не доступны.
 
 ### 2. Фоновое применение порциями без потери контекста
 
@@ -357,9 +389,12 @@ format/pending tests; использовать protocol и lock ordering выш�
 
 **Actions:**
 
-- [ ] Перед row batches подготовить языки с повторяемым согласованием файла/DB.
+- [ ] Перед row batches подготовить языки с повторяемым согласованием файла/DB;
+  foreign pending до создания языка не коммитить этим import, а вернуть в
+  retryable `pending-flush-needed`.
 - [ ] Сделать атомарную порцию source + targets + context + flags + Explanation
-  вместе с pending/audit и cursor; не обновлять targets через обход штатного
+  вместе с deferred pending/audit, durable ownership pending PK и cursor; target
+  писать через batch-marked `Unit.translate`, не через обход штатного
   сохранения, теряющий pending, проверки или attribution.
 - [ ] Подключить source notes/references к pending создания и runtime PO writer.
   Изменения interface проверять LSP references во всех форматах.
@@ -367,8 +402,9 @@ format/pending tests; использовать protocol и lock ordering выш�
   повторные permission checks, per-language/axis unavailable outcomes.
 - [ ] Удалить obsolete `validate_loc_kit_string_update_size` и constant,
   мигрировать прямых callers/tests, не оставлять обходной HTTP apply.
-- [ ] После каждого commit сообщать фактический progress; завершить итогом,
-  включая skipped/conflicts/unavailable, а не одним boolean success.
+- [ ] После каждого commit сообщать фактический progress; finalizing вызывает
+  только `commit_pending_subset` с owned PK и завершает итогом skipped/conflicts/
+  unavailable, а не одним boolean success.
 
 **Verification:** существующие `LocKitStringsUpdateServiceTest`,
 `LocKitStringsUpdateViewTest` в `test_loc_kit_ingest_contract.py`; релевантные
@@ -376,9 +412,11 @@ format/pending tests; использовать protocol и lock ordering выш�
 existing target отличается от файла, existing flag read-only, blank target,
 новые флаги read-only, отсутствие одного права, source drift, новая language,
 совпадающий/непустой/пустой/конкурентно изменённый Explanation. Проверить
-сохранность **после pending flush и reload** PO: translated targets, Character
-в source note, Explanation только в БД, audit без дублей. JSON без Character
-остаётся рабочим; неподдерживаемый контекст даёт ошибку до мутаций.
+сохранность **после subset pending flush и reload** PO: translated targets,
+Character в source note, Explanation только в БД, audit без дублей. До
+`store_update_changes()` target pending/audit не сохранены. Finalizing draft A
+не коммитит pending draft B или ручную правку того же компонента. JSON без
+Character остаётся рабочим; неподдерживаемый контекст даёт ошибку до мутаций.
 
 ### 3. Повтор, сбой, уход со страницы и очистка
 
@@ -395,10 +433,11 @@ helpers при необходимости (они не заменяют durable 
 **Actions:**
 
 - [ ] Реализовать token fencing, on_commit publication, finite retries,
-  stale recovery, per-chunk cursor и terminal states по общему контракту.
+  stale recovery, per-chunk cursor, durable `pending_change_ids` и terminal
+  states по общему контракту.
 - [ ] В статусе показывать фазу/строки/результат/ошибку/повтор; ограниченный
   polling только во время работы с backoff при ошибке сети, keyboard controls,
-  aria-live без чтения всей таблицы при каждом обновлении.
+  aria-live без чтения canonical packet или всей таблицы при каждом обновлении.
 - [ ] Reuse существующий preview URL для состояния, добавить owner-scoped
   ссылку на активный/последний retained update на странице компонента.
 - [ ] Сделать cleanup совместимым с lease/row lock и terminal retention;
@@ -408,12 +447,15 @@ helpers при необходимости (они не заменяют durable 
 **Verification:** transactional concurrency tests (не внешний transaction
 обычного TestCase) и отдельные соединения: две доставки одного UUID, два POST
 confirm, два draft одного компонента, cleanup vs active chunk; lock order без
-deadlock. Crash до commit порции: никаких её units/cursor. Crash после commit:
-retry не повторяет порцию и не перетирает последующее ручное изменение.
-Сбой между language file creation и DB scan восстанавливается. Publish failure
-и потерянная публикация после commit дают retryable state. Старый worker после
-смены token не пишет. Отзыв прав/удаление компонента во время работы останавливает
-дальнейшие мутации. Ошибка второй порции оставляет точный partial result.
+deadlock. Crash до commit порции: никаких её units/cursor/owned pending PK.
+Crash после commit: retry не повторяет порцию и не перетирает последующее ручное
+изменение. Finalizing A сохраняет только свой durable набор, не foreign pending.
+Сбой между language file creation и DB scan восстанавливается; foreign pending
+до этого шага выдаёт retryable wait, а не commit от имени импорта. Publish
+failure и потерянная публикация после commit дают retryable state. Старый worker
+после смены token не пишет. Отзыв прав/удаление компонента во время работы
+останавливает дальнейшие мутации. Ошибка второй порции оставляет точный partial
+result.
 
 ### 4. End-to-end доказательство и обновление инструкций
 
@@ -438,10 +480,12 @@ retry не повторяет порцию и не перетирает посл
 - [ ] Создать полный синтетический файл с >5 000 **реальных новых** language
   cells: убедиться, что решение не просто перенесло лимит на effective diff.
   Закрыть вкладку после confirm, вернуться со страницы компонента, проверить
-  durable result. Для большого XLSX проверить и фазу подготовки.
-- [ ] Записать реальные upload/prepare/apply timings, peak memory worker и
-  максимальное время удержания component lock. На основании измерений уменьшить
-  внутреннюю порцию, если нужно; не возвращать просьбу разрезать файл.
+  durable result. Для большого XLSX проверить и фазу подготовки, serialized
+  payload ceiling и отсутствие чтения payload status polling.
+- [ ] Записать реальные upload/prepare/apply timings, peak memory worker,
+  serialized payload size и максимальное время удержания component lock. На
+  основании измерений уменьшить внутреннюю порцию, если нужно; не возвращать
+  просьбу разрезать файл.
 - [ ] Проверить desktop/mobile, keyboard/focus, labels/errors, escaped text,
   permission denied, empty/no-change, partial/retry. Использовать текущий
   browser skill `lightpanda-browser`; если нет visual runtime, явно заблокировать
@@ -501,12 +545,12 @@ Character, отсутствие удаления, preview drift, progress/recove
 
 ## Интеграция с текущей работой над очередью
 
-Этот план выполняется поверх результата
+Этот план выполняется поверх уже интегрированного результата
 `docs/product/plans/2026-09-10-producer-tasks-ahead-of-housekeeping.md`,
 а не параллельно реализует собственные приоритеты и scheduler статистики.
-Перед началом кода взять интегрированную версию той работы и сверить фактические
-интерфейсы; пока она в отдельном ворктри, это внешняя зависимость реализации,
-не причина менять её файлы из main.
+Перед началом кода сверить текущие интерфейсы этой работы в main; это
+удовлетворённая зависимость, не ожидание чужого ворктри и не причина менять её
+документ или повторять её патчи.
 
 - Использовать `INTERACTIVE_TASK_PRIORITY` из `weblate/utils/celery.py`
   в `apply_async` **конкретных** upload/confirm/retry постановок prepare/apply.
@@ -520,9 +564,10 @@ Character, отсутствие удаления, preview drift, progress/recove
   с `task_id` и общей константой; не расширять helper и не создавать новый
   диспетчер только ради этой интеграции.
 - Подготовка языка выполняет `create_translations_immediate` в текущей
-  интерактивной задаче; lock timeout повторяет её, не создаёт background
-  `perform_load`. Протокол finalizing использует предусмотренный зависимостью
-  interactive deferred commit. Не менять семантику автоматических callsites.
+  интерактивной задаче после safe preflight pending-набора; lock timeout
+  повторяет её, не создаёт background `perform_load`. Finalizing использует
+  `commit_pending_subset` только с pending данного draft. Не менять семантику
+  автоматических callsites.
 - Настройки Redis, `CELERY_TASK_DEFAULT_PRIORITY`, очереди и supervisord этим
   планом не меняются. Cleanup и порождённые пересчёты stats остаются background.
   Сохранения units используют уже внедрённый stats scheduler, не `.delay`
@@ -539,7 +584,7 @@ background backlog. Автоматические stats/cleanup остаются 
 с языками. Этот smoke не должен останавливать shared worker без отдельного
 разрешения. Общие потенциально конфликтующие файлы: tasks.py, create.py,
 component.py, utils/celery.py, test_loc_kit_ingest_contract.py, docs/changes.rst;
-после интеграции сначала сверить их, не перезаписывать патчи другой работы.
+перед изменением сверить их с интегрированной версией и не откатывать её патчи.
 
 ## Архитектурное ревью плана
 
@@ -548,6 +593,19 @@ component.py, utils/celery.py, test_loc_kit_ingest_contract.py, docs/changes.rst
 падения в background priority, ограничение одной доставки относительно Redis
 visibility timeout, snapshot source notes/references в pending и обязательная
 finalizing-фаза. Это ревью плана, не подтверждение реализации.
+
+Техническое ревью 2026-09-14 добавило обязательные изменения:
+
+- batch target write использует instance `is_batch_update`, а не несуществующий
+  параметр `Unit.translate`; initial source pending тоже defers до порционного
+  `store_update_changes`;
+- pending changes принадлежат draft по durable PK, и finalizing вызывает только
+  `commit_pending_subset`; полный `commit_pending` не может записать чужую
+  ручную правку или второй import;
+- canonical full payload вынесен в private storage, summary отделён от него,
+  установлен serialized-size ceiling и polling не читает rows/payload;
+- producer queue dependency отмечена как уже интегрированная, не как внешний
+  worktree blocker.
 
 Дополнения к приёмке задачи 2: новый target остаётся в PO после commit/reparse;
 существующий unit с тем же source/context в соседнем компоненте не изменяется;
