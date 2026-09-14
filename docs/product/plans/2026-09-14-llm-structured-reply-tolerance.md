@@ -18,8 +18,12 @@ plus one confirmed pre-existing order-dependent cache-pollution failure in
 `MachineTranslationCleanupTest::test_rst_reference_remains_placeholder`
 (passes in isolation; reproduces identically on unmodified `main`). `ruff`,
 `mypy` on `weblate/machinery/llm.py`, and `prek` on every touched
-non-Python file are clean. Implementation is not deployment: production
-rollout needs its own approval (see "Rollout").
+non-Python file are clean. Deployed to production 2026-09-14 as part of
+`main` `a61089c` (`deploy/vps.sh deploy`, action `build`; `DEPLOY-OK`,
+image revision `a61089c`, container healthy, login 200, translate queue 0).
+`trans.0124_llm_usage_refusal_evidence` confirmed applied (2026-09-14
+15:56 UTC). Remaining rollout: the paid `pirate-ships` sampler and the
+week-later `LLMUsageLog` analysis (see "Rollout").
 
 **Goal:** A structured LLM reply whose translation is correct - every placeholder
 token present, in the right order, with the right metadata - is accepted even when
